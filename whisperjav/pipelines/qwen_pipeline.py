@@ -156,6 +156,14 @@ class QwenPipeline(BasePipeline):
         # --qwen-drop-nonverbal-lines / --no-qwen-drop-nonverbal-lines.
         drop_nonverbal_lines: bool = True,
 
+        # v1.9.0: Phase-8 scene-overlap timestamp resolver. Semantic scene
+        # detection extracts scenes with a ±0.35s buffer (~0.7s overlap between
+        # adjacent scenes), which surfaces as overlapping / nested-duplicate
+        # subtitle timestamps at scene boundaries after stitching. This resolver
+        # drops nested-duplicate fragments and clips partial overlaps. No-op when
+        # scenes don't overlap. Default on for all qwen backends.
+        resolve_scene_overlaps: bool = True,
+
         # Adaptive Step-Down
         stepdown_enabled: bool = True,
         stepdown_initial_group: float = 6.0,
@@ -280,6 +288,9 @@ class QwenPipeline(BasePipeline):
 
         # v1.9.0: Phase-8 nonverbal single-token line filter toggle.
         self.drop_nonverbal_lines = drop_nonverbal_lines
+
+        # v1.9.0: Phase-8 scene-overlap timestamp resolver toggle.
+        self.resolve_scene_overlaps = resolve_scene_overlaps
 
         # Generator backend selection (v1.8.6+)
         self.generator_backend = generator_backend
@@ -1058,6 +1069,30 @@ class QwenPipeline(BasePipeline):
                 os.getpid(),
             )
 
+        # v1.9.0: scene-overlap timestamp resolver — ALL Qwen backends. Semantic
+        # scene detection extracts scenes with a ±0.35s buffer (~0.7s overlap
+        # between adjacent scenes), so stitched subs collide at scene boundaries:
+        # nested-duplicate fragments (a scene's trailing pad catching only an
+        # utterance onset) and partial ~0.7s tail overlaps. Runs LAST in Phase 8
+        # (after the line-drop filters, so it resolves the final entry set) IN
+        # PLACE on stitched_srt_path. No-op when scenes don't overlap.
+        overlap_stats = None
+        if self.resolve_scene_overlaps and num_subtitles > 0:
+            from whisperjav.modules.subtitle_pipeline.cleaners.scene_overlap_resolver import (
+                SceneOverlapResolver,
+            )
+            overlap_stats = SceneOverlapResolver().resolve_srt_file(stitched_srt_path)
+            num_subtitles = overlap_stats["final_count"]
+            logger.info(
+                "[QwenPipeline PID %s] Phase 8: scene-overlap resolver - %d -> %d entries "
+                "(-%d nested duplicate, %d overlaps clipped)",
+                os.getpid(),
+                overlap_stats["original_count"],
+                overlap_stats["final_count"],
+                overlap_stats["dropped_nested"],
+                overlap_stats["clipped_overlaps"],
+            )
+
         final_srt_path = self.output_dir / f"{media_basename}.{self.lang_code}.whisperjav.srt"
 
         if num_subtitles > 0:
@@ -1072,6 +1107,10 @@ class QwenPipeline(BasePipeline):
                 # v1.9.0: surface nonverbal-filter counters (feeds nonverbal_filtered).
                 stats["nonverbal_dropped"] = nonverbal_filter_stats["dropped_nonverbal"]
                 stats["nonverbal_empty_dropped"] = nonverbal_filter_stats["dropped_empty"]
+            if overlap_stats:
+                # v1.9.0: surface scene-overlap resolver counters.
+                stats["scene_overlap_nested_dropped"] = overlap_stats["dropped_nested"]
+                stats["scene_overlap_clipped"] = overlap_stats["clipped_overlaps"]
             processed_path = final_srt_path
             logger.info(
                 "[QwenPipeline PID %s] Phase 8: %d subtitles in final output",
