@@ -375,10 +375,12 @@ class TestAnimeWhisperSegDefaults:
     """
 
     # (sensitivity, chunk_threshold_s, max_group_duration_s, threshold, start_pad_ms, end_pad_ms)
+    # aggressive retuned 2026-07-13 (cross-clip VAD sweep): threshold 0.25->0.15,
+    # end_pad 0->30 + max_speech pinned to 4.0 (see test_aggressive_max_speech_pinned).
     EXPECTED = [
         ("conservative", 0.3,  3.0, 0.35, 100, 100),
         ("balanced",     0.25, 2.5, 0.30, 50,  50),
-        ("aggressive",   0.2,  2.0, 0.25, 0,   0),
+        ("aggressive",   0.2,  2.0, 0.15, 0,   30),
     ]
 
     @pytest.mark.parametrize("sens,chunk,mg,thr,sp,ep", EXPECTED)
@@ -390,6 +392,14 @@ class TestAnimeWhisperSegDefaults:
         assert d["threshold"] == thr
         assert d["start_pad_ms"] == sp
         assert d["end_pad_ms"] == ep
+
+    def test_aggressive_max_speech_pinned(self):
+        """max_speech is pinned to 4.0 for aggressive ONLY; other rows omit it
+        (they inherit the WhisperSeg YAML: balanced 5 / conservative 6)."""
+        from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
+        assert anime_whisperseg_defaults("aggressive")["max_speech_duration_s"] == 4.0
+        assert "max_speech_duration_s" not in anime_whisperseg_defaults("balanced")
+        assert "max_speech_duration_s" not in anime_whisperseg_defaults("conservative")
 
     def test_unknown_sensitivity_falls_back_to_balanced(self):
         """Owner rule: any unknown/None sensitivity uses the BALANCED row."""

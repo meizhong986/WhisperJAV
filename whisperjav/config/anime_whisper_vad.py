@@ -48,11 +48,18 @@ ANIME_WHISPER_WHISPERSEG_DEFAULTS: Dict[str, Dict[str, Any]] = {
         "end_pad_ms": 50,
     },
     "aggressive": {
+        # v1.9.0 tuning (2026-07-13): cross-clip VAD sweep over 4 Naked-Director
+        # benchmarks showed lowering threshold 0.25->0.15 + a 30ms end-pad lifts
+        # dialogue recall (time_recall 0.83->0.88 mean) at flat CER on every clip,
+        # without lengthening subs. max_speech pinned at 4.0 (its prior effective
+        # value from the WhisperSeg YAML) so the anime table is the single source.
+        # See tools/vad_hypothesis_suite + reference_benchmarks/.
         "chunk_threshold_s": 0.2,
         "max_group_duration_s": 2.0,
-        "threshold": 0.25,
+        "threshold": 0.15,
         "start_pad_ms": 0,
-        "end_pad_ms": 0,
+        "end_pad_ms": 30,
+        "max_speech_duration_s": 4.0,   # pinned (anime-aggressive only)
     },
 }
 

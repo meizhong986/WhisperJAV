@@ -622,6 +622,11 @@ def parse_arguments():
                            help="VAD padding before speech onset, ms (pipeline default: 100)")
     qwen_audio_group.add_argument("--qwen-vad-end-pad", type=int, default=None,
                            help="VAD padding after speech offset, ms (pipeline default: 200; end-of-speech is most critical)")
+    qwen_audio_group.add_argument("--qwen-max-speech-duration", type=float, default=None,
+                           help="Force-split any single speech segment longer than this (seconds). "
+                                "Overrides the sensitivity preset (conservative 6 / balanced 5 / "
+                                "aggressive 4). The binding cap on subtitle length — lower = shorter, "
+                                "more granular subtitles.")
 
     # ── Qwen3-ASR: Generation ─────────────────────────────────────────────
     qwen_gen_group = parser.add_argument_group("Qwen3-ASR: Generation")
@@ -1176,17 +1181,26 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         _vad_thr = getattr(args, 'qwen_vad_threshold', None)
         if _vad_thr is not None:
             _user_vad_overrides["threshold"] = _vad_thr
-        # v1.9.0 JAV retune: default the VAD threshold when the user gave none.
-        #   anime-whisper -> per-sensitivity value from the owner table
-        #                    (conservative 0.35 / balanced 0.30 / aggressive 0.25)
-        #   qwen3         -> flat 0.25 (unchanged; the per-sensitivity gradient is
-        #                    scoped to anime-whisper only). Cohere excluded.
-        # An explicit --qwen-vad-threshold above always wins.
-        if "threshold" not in _user_vad_overrides:
-            if _gen_backend_early == "anime-whisper":
-                _user_vad_overrides["threshold"] = anime_whisperseg_defaults(_qwen_sensitivity)["threshold"]
-            elif _gen_backend_early == "qwen3":
-                _user_vad_overrides["threshold"] = 0.25
+        # --qwen-max-speech-duration: explicit CLI cap on single-segment length.
+        # A SEGMENTER_PARAM, so it routes via segmenter_config to BOTH the Phase-4
+        # segmenter and the vad-grouped framer (the binding VAD for anime). Wins
+        # over the preset/table below.
+        _max_speech = getattr(args, 'qwen_max_speech_duration', None)
+        if _max_speech is not None:
+            _user_vad_overrides["max_speech_duration_s"] = float(_max_speech)
+        # v1.9.0 anime/qwen3 VAD defaults — fill in when the user gave no CLI value.
+        #   anime-whisper -> per-sensitivity table: threshold (cons 0.35 / bal 0.30 /
+        #                    agg 0.15) + max_speech where the table pins it
+        #                    (aggressive=4.0). qwen3 -> flat threshold 0.25. Cohere
+        #                    excluded. An explicit --qwen-vad-threshold / --qwen-max-
+        #                    speech-duration always wins (setdefault).
+        if _gen_backend_early == "anime-whisper":
+            _aw = anime_whisperseg_defaults(_qwen_sensitivity)
+            _user_vad_overrides.setdefault("threshold", _aw["threshold"])
+            if "max_speech_duration_s" in _aw:
+                _user_vad_overrides.setdefault("max_speech_duration_s", float(_aw["max_speech_duration_s"]))
+        elif _gen_backend_early == "qwen3":
+            _user_vad_overrides.setdefault("threshold", 0.25)
         # v1.9.0: VAD padding routed to pipeline scalars (segmenter_start/end_pad_ms)
         # below, NOT into segmenter_config — the pipeline injects start/end pad at
         # clobber time, so a speech_pad_ms in segmenter_config would be overwritten.

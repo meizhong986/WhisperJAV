@@ -1202,6 +1202,13 @@ def _build_pipeline(
                 user_segmenter_overrides["threshold"] = anime_whisperseg_defaults(qwen_sensitivity)["threshold"]
             elif _aw_gen == "qwen3":
                 user_segmenter_overrides["threshold"] = 0.25
+        # v1.9.0: the anime table also pins max_speech for some sensitivities
+        # (aggressive=4.0). Inject as a segmenter_config default so it reaches the
+        # Phase-4 segmenter AND the vad-grouped framer; GUI custom params above win.
+        if _aw_gen == "anime-whisper" and "max_speech_duration_s" not in user_segmenter_overrides:
+            _aw_ms = anime_whisperseg_defaults(qwen_sensitivity).get("max_speech_duration_s")
+            if _aw_ms is not None:
+                user_segmenter_overrides["max_speech_duration_s"] = float(_aw_ms)
         # NOTE: --passN-speech-pad-ms (pass_config["speech_pad_ms"]) is applied to the
         # pipeline padding scalars below, not to segmenter_config (see v1.9.0 note above).
         segmenter_backend = qwen_defaults.get("qwen_segmenter", "whisperseg")
