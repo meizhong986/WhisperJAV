@@ -22,10 +22,16 @@ Two distinct artifacts result, handled by two rules:
      corrupt the good full sub, so containment must be detected first.
 
   2. PARTIAL OVERLAP. Otherwise the tail of one sub bleeds past the start of the
-     next (the recurring ~0.7s). Rule: CLIP the earlier entry's end down to just
-     before the next entry's start. Both entries are kept; only the timeline is
-     cleaned. In-line text is NOT edited (a duplicated boundary word stays in
-     its line — removing words is riskier than it's worth).
+     next (the recurring ~0.7s). Rule: KEEP the earlier entry's end unchanged and
+     PUSH the later entry's START forward to just after it. This matches how the
+     semantic scene overlap actually arises — the earlier sub is the scene-A tail
+     and has the accurate end (it captured the full line); it is the later sub
+     (scene-B head) whose start is padded too early into the overlap zone. So the
+     second line genuinely begins after the first finishes. (The previous logic
+     clipped the earlier end instead, which made subtitles end ~0.7s too early
+     while the speaker was still finishing the line.) Both entries are kept; only
+     the second's start moves. In-line text is NOT edited (a duplicated boundary
+     word stays in its line — removing words is riskier than it's worth).
 
 No-op when scenes don't overlap (e.g. non-semantic scene detection), so it is
 safe to run for every qwen backend. Operates in place on the stitched SRT,
@@ -43,11 +49,11 @@ from whisperjav.utils.logger import logger
 class SceneOverlapResolver:
     """Resolves scene-overlap timestamp collisions in a stitched SRT file."""
 
-    # Gap (ms) left between a clipped entry's end and the next entry's start.
+    # Gap (ms) left between an entry's end and the next entry's start.
     MIN_GAP_MS = 1
 
     def resolve_srt_file(self, srt_path: Union[str, Path]) -> Dict[str, int]:
-        """Drop nested-duplicate entries + clip partial overlaps, in place.
+        """Drop nested-duplicate entries + de-overlap partial overlaps, in place.
 
         Entries are sorted by start time (container before nested via a
         secondary end-descending sort), resolved sequentially against the last
@@ -55,14 +61,14 @@ class SceneOverlapResolver:
         non-start-ordered stitch output as a side effect.
 
         Returns:
-            Stats dict: original_count, dropped_nested, clipped_overlaps,
+            Stats dict: original_count, dropped_nested, shifted_starts,
             final_count.
         """
         path = Path(srt_path)
         stats = {
             "original_count": 0,
             "dropped_nested": 0,
-            "clipped_overlaps": 0,
+            "shifted_starts": 0,
             "final_count": 0,
         }
         if not path.exists() or path.stat().st_size == 0:
@@ -107,16 +113,17 @@ class SceneOverlapResolver:
                 stats["dropped_nested"] += 1
                 continue
 
-            # Rule 2: partial overlap -> clip prev's end to just before cur.
+            # Rule 2: partial overlap -> KEEP prev's end (accurate scene-A tail),
+            # push cur's START forward to just after prev ends. cur extends past
+            # prev (containment handled by Rule 1), so cur stays valid. If the
+            # push would collapse cur (its end is within one gap of prev's end),
+            # it is a near-nested sliver -> drop it.
             if pe > cs:
-                new_pe = cs - self.MIN_GAP_MS
-                if new_pe > ps:
-                    prev.end = pysrt.SubRipTime.from_ordinal(new_pe)
-                    stats["clipped_overlaps"] += 1
+                new_cs = pe + self.MIN_GAP_MS
+                if new_cs < ce:
+                    cur.start = pysrt.SubRipTime.from_ordinal(new_cs)
+                    stats["shifted_starts"] += 1
                 else:
-                    # Clipping would collapse prev: it is a fragment overtaken by
-                    # the longer cur -> keep cur instead.
-                    kept[-1] = cur
                     stats["dropped_nested"] += 1
                     continue
 
@@ -129,14 +136,14 @@ class SceneOverlapResolver:
         pysrt.SubRipFile(items=kept).save(str(path), encoding="utf-8")
 
         stats["final_count"] = len(kept)
-        if stats["dropped_nested"] or stats["clipped_overlaps"]:
+        if stats["dropped_nested"] or stats["shifted_starts"]:
             logger.info(
                 "[SceneOverlapResolver] %s: %d -> %d entries "
-                "(-%d nested duplicate, %d overlaps clipped)",
+                "(-%d nested duplicate, %d starts shifted)",
                 path.name,
                 stats["original_count"],
                 stats["final_count"],
                 stats["dropped_nested"],
-                stats["clipped_overlaps"],
+                stats["shifted_starts"],
             )
         return stats

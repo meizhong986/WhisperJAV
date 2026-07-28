@@ -1085,12 +1085,12 @@ class QwenPipeline(BasePipeline):
             num_subtitles = overlap_stats["final_count"]
             logger.info(
                 "[QwenPipeline PID %s] Phase 8: scene-overlap resolver - %d -> %d entries "
-                "(-%d nested duplicate, %d overlaps clipped)",
+                "(-%d nested duplicate, %d starts shifted)",
                 os.getpid(),
                 overlap_stats["original_count"],
                 overlap_stats["final_count"],
                 overlap_stats["dropped_nested"],
-                overlap_stats["clipped_overlaps"],
+                overlap_stats["shifted_starts"],
             )
 
         final_srt_path = self.output_dir / f"{media_basename}.{self.lang_code}.whisperjav.srt"
@@ -1110,7 +1110,7 @@ class QwenPipeline(BasePipeline):
             if overlap_stats:
                 # v1.9.0: surface scene-overlap resolver counters.
                 stats["scene_overlap_nested_dropped"] = overlap_stats["dropped_nested"]
-                stats["scene_overlap_clipped"] = overlap_stats["clipped_overlaps"]
+                stats["scene_overlap_shifted"] = overlap_stats["shifted_starts"]
             processed_path = final_srt_path
             logger.info(
                 "[QwenPipeline PID %s] Phase 8: %d subtitles in final output",

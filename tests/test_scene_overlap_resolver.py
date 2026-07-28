@@ -45,12 +45,14 @@ class TestPartialOverlap:
             (25_098, 28_062, "ごめん、本当にごめん。"),
             (27_362, 31_362, "…ごめん、大丈夫です…"),
         ])
-        assert stats["clipped_overlaps"] == 1
+        assert stats["shifted_starts"] == 1
         assert stats["dropped_nested"] == 0
         assert stats["final_count"] == 2
-        assert subs[0].end.ordinal == 27_362 - 1   # clipped just before #2
-        assert subs[1].start.ordinal == 27_362     # #2 untouched
-        assert subs[1].end.ordinal == 31_362
+        # #1's end is KEPT (accurate scene-A tail); #2's start is pushed to just
+        # after it. The earlier sub keeps its full duration.
+        assert subs[0].end.ordinal == 28_062            # #1 end untouched
+        assert subs[1].start.ordinal == 28_062 + 1      # #2 start pushed past #1
+        assert subs[1].end.ordinal == 31_362            # #2 end untouched
         # No residual overlap anywhere.
         assert subs[0].end.ordinal < subs[1].start.ordinal
 
@@ -59,7 +61,7 @@ class TestPartialOverlap:
             (1_000, 4_000, "A"),
             (4_040, 8_040, "B"),
         ])
-        assert stats["clipped_overlaps"] == 0
+        assert stats["shifted_starts"] == 0
         assert stats["dropped_nested"] == 0
         assert stats["final_count"] == 2
         assert subs[0].end.ordinal == 4_000
@@ -74,7 +76,7 @@ class TestNestedDuplicate:
             (470_810, 471_326, "少し…"),
         ])
         assert stats["dropped_nested"] == 1
-        assert stats["clipped_overlaps"] == 0
+        assert stats["shifted_starts"] == 0
         assert stats["final_count"] == 1
         # The FULL sub survives intact (naive clip would have corrupted it).
         assert subs[0].text == "少しだけだぞ…"
@@ -124,18 +126,22 @@ class TestOrderingAndScale:
 
         stats, subs = _resolve(tmp_path, [(1_000, 2_000, "only")])
         assert stats["final_count"] == 1
-        assert stats["clipped_overlaps"] == 0
+        assert stats["shifted_starts"] == 0
         assert stats["dropped_nested"] == 0
 
     def test_chain_of_three_overlaps(self, tmp_path):
-        # Three consecutive scene-boundary tail overlaps resolve independently.
+        # Three consecutive scene-boundary tail overlaps resolve independently:
+        # each entry's END is kept; the next entry's START is pushed past it.
         stats, subs = _resolve(tmp_path, [
             (0, 3_000, "A"),
             (2_500, 5_500, "B"),
             (5_000, 8_000, "C"),
         ])
-        assert stats["clipped_overlaps"] == 2
+        assert stats["shifted_starts"] == 2
         assert stats["final_count"] == 3
-        assert subs[0].end.ordinal == 2_500 - 1
-        assert subs[1].end.ordinal == 5_000 - 1
-        assert subs[2].end.ordinal == 8_000
+        # ends all untouched
+        assert [s.end.ordinal for s in subs] == [3_000, 5_500, 8_000]
+        # starts pushed to just after the previous end
+        assert subs[0].start.ordinal == 0
+        assert subs[1].start.ordinal == 3_000 + 1
+        assert subs[2].start.ordinal == 5_500 + 1
