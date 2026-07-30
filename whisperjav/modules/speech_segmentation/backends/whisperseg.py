@@ -80,6 +80,7 @@ class WhisperSegSpeechSegmenter:
     def __init__(
         self,
         threshold: float = 0.35,
+        neg_threshold: Optional[float] = None,
         min_speech_duration_ms: int = 100,
         min_silence_duration_ms: int = 100,
         speech_pad_ms: int = 300,
@@ -98,10 +99,11 @@ class WhisperSegSpeechSegmenter:
 
         Args:
             threshold: Onset probability threshold [0.0, 1.0]. Default 0.35
-                (Silero-v6.2-aligned; vendor default is 0.5). The offset
-                (hysteresis) threshold is always auto-derived as
-                max(threshold - 0.15, 0.01) — matches vendor inference.py
-                default and is not user-tunable.
+                (Silero-v6.2-aligned; vendor default is 0.5).
+            neg_threshold: Offset (hysteresis) threshold. When None, derived as
+                max(threshold - 0.15, 0.01) matching vendor inference.py.
+                Set explicitly to decouple offset from onset — needed when
+                threshold < 0.30 where the formula collapses to 0.01.
             min_speech_duration_ms: Minimum speech segment duration.
             min_silence_duration_ms: Minimum silence duration to end a segment.
             speech_pad_ms: Symmetric post-hoc padding around each segment
@@ -125,6 +127,7 @@ class WhisperSegSpeechSegmenter:
             **kwargs: Absorber for factory-injected params (e.g., version).
         """
         self.threshold = float(threshold)
+        self.neg_threshold = float(neg_threshold) if neg_threshold is not None else None
         self.min_speech_duration_ms = int(min_speech_duration_ms)
         self.min_silence_duration_ms = int(min_silence_duration_ms)
         self.speech_pad_ms = int(speech_pad_ms)
@@ -450,11 +453,11 @@ class WhisperSegSpeechSegmenter:
 
         frame_ms = float(self._frame_duration_ms)
 
-        # Thresholds. The offset threshold is auto-derived from the onset
-        # threshold (vendor inference.py default). Not user-tunable —
-        # hysteresis stays at a fixed 0.15 gap, clamped at 0.01 minimum.
         threshold = float(self.threshold)
-        neg_threshold = max(threshold - 0.15, 0.01)
+        if self.neg_threshold is not None:
+            neg_threshold = float(self.neg_threshold)
+        else:
+            neg_threshold = max(threshold - 0.15, 0.01)
 
         # Duration conversions (ms → frames)
         min_speech_frames = max(1, int(self.min_speech_duration_ms / frame_ms))
@@ -486,21 +489,35 @@ class WhisperSegSpeechSegmenter:
                 current_probs = [prob]
                 continue
 
-            # Force-split at max duration
+            # Force-split at max duration — smart split seeking local
+            # probability minimum in the last 40% of the segment (inspired
+            # by ChickenRice's create_contiguous_chunks split_window_factor).
             if triggered and "start" in current:
                 duration = i - current["start"]
                 if duration > max_speech_frames:
-                    current["end"] = current["start"] + max_speech_frames
+                    window_start = int(max_speech_frames * 0.6)
+                    window_probs = current_probs[window_start:max_speech_frames]
+                    if window_probs:
+                        min_prob = float(np.min(window_probs))
+                        mean_prob = float(np.mean(window_probs))
+                        if min_prob < mean_prob * 0.85:
+                            best_offset = window_start + int(np.argmin(window_probs))
+                        else:
+                            best_offset = max_speech_frames
+                    else:
+                        best_offset = max_speech_frames
+                    split_frame = current["start"] + best_offset
+                    current["end"] = split_frame
                     if current_probs:
-                        valid = current_probs[: current["end"] - current["start"]]
+                        valid = current_probs[:best_offset]
                         if valid:
                             current["avg_prob"] = float(np.mean(valid))
                             current["min_prob"] = float(np.min(valid))
                             current["max_prob"] = float(np.max(valid))
                     speeches.append(current)
-                    current = {}
-                    current_probs = []
-                    triggered = False
+
+                    current = {"start": split_frame}
+                    current_probs = current_probs[best_offset:]
                     temp_end = 0
                     continue
 
@@ -698,6 +715,7 @@ class WhisperSegSpeechSegmenter:
         """Return current runtime parameters for metadata/observability."""
         return {
             "threshold": self.threshold,
+            "neg_threshold": self.neg_threshold,
             "min_speech_duration_ms": self.min_speech_duration_ms,
             "min_silence_duration_ms": self.min_silence_duration_ms,
             "speech_pad_ms": self.speech_pad_ms,

@@ -148,6 +148,7 @@ _PARAM_SCHEMAS = {
     },
     "whisperseg": {
         "threshold":               (float, 0.35, False),
+        "neg_threshold":           (float, None, True),   # v1.9.0: decoupled offset threshold (None=derive from threshold)
         "min_speech_duration_ms":  (int,   100,  False),
         "min_silence_duration_ms": (int,   100,  False),
         "speech_pad_ms":           (int,   300,  False),  # Symmetric fallback for start/end pad

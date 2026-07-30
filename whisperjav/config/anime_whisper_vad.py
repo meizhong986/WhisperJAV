@@ -51,15 +51,20 @@ ANIME_WHISPER_WHISPERSEG_DEFAULTS: Dict[str, Dict[str, Any]] = {
         # v1.9.0 tuning (2026-07-13): cross-clip VAD sweep over 4 Naked-Director
         # benchmarks showed lowering threshold 0.25->0.15 + a 30ms end-pad lifts
         # dialogue recall (time_recall 0.83->0.88 mean) at flat CER on every clip,
-        # without lengthening subs. max_speech pinned at 4.0 (its prior effective
-        # value from the WhisperSeg YAML) so the anime table is the single source.
-        # See tools/vad_hypothesis_suite + reference_benchmarks/.
+        # without lengthening subs. max_speech adjusted to 3.5 (typical JAV dialogue
+        # ~2.7s; 4.0 was too long). See tools/vad_hypothesis_suite + reference_benchmarks/.
+        #
+        # neg_threshold decoupled from threshold (2026-07-28): the upstream formula
+        # max(threshold-0.15, 0.01) collapses to 0.01 at threshold=0.15, disabling
+        # natural segment endings entirely. Explicit neg_threshold=0.10 restores
+        # hysteresis while keeping the wide-net onset at 0.15.
         "chunk_threshold_s": 0.2,
         "max_group_duration_s": 2.0,
         "threshold": 0.15,
+        "neg_threshold": 0.10,
         "start_pad_ms": 0,
         "end_pad_ms": 30,
-        "max_speech_duration_s": 4.0,   # pinned (anime-aggressive only)
+        "max_speech_duration_s": 3.5,
     },
 }
 
