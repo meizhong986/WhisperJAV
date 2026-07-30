@@ -1069,6 +1069,28 @@ class QwenPipeline(BasePipeline):
                 os.getpid(),
             )
 
+        # v1.9.0: non-linguistic utterance filter — ALL Qwen backends.
+        # Two-layer evidence+sound-kana check drops subtitle entries composed
+        # solely of moaning/breathing/sucking kana with no real dialogue.
+        # Runs after the single-token NonverbalLineFilter for broader coverage.
+        nonlinguistic_stats = None
+        if num_subtitles > 0:
+            from whisperjav.modules.subtitle_pipeline.cleaners.nonlinguistic_utterance_filter import (
+                NonlinguisticUtteranceFilter,
+            )
+            nonlinguistic_stats = NonlinguisticUtteranceFilter().filter_srt_file(stitched_srt_path)
+            num_subtitles = nonlinguistic_stats["final_count"]
+            if nonlinguistic_stats["dropped_nonlinguistic"] or nonlinguistic_stats["dropped_empty"]:
+                logger.info(
+                    "[QwenPipeline PID %s] Phase 8: non-linguistic utterance filter - %d -> %d entries "
+                    "(-%d non-linguistic, -%d empty)",
+                    os.getpid(),
+                    nonlinguistic_stats["original_count"],
+                    nonlinguistic_stats["final_count"],
+                    nonlinguistic_stats["dropped_nonlinguistic"],
+                    nonlinguistic_stats["dropped_empty"],
+                )
+
         # v1.9.0: scene-overlap timestamp resolver — ALL Qwen backends. Semantic
         # scene detection extracts scenes with a ±0.35s buffer (~0.7s overlap
         # between adjacent scenes), so stitched subs collide at scene boundaries:
@@ -1107,6 +1129,8 @@ class QwenPipeline(BasePipeline):
                 # v1.9.0: surface nonverbal-filter counters (feeds nonverbal_filtered).
                 stats["nonverbal_dropped"] = nonverbal_filter_stats["dropped_nonverbal"]
                 stats["nonverbal_empty_dropped"] = nonverbal_filter_stats["dropped_empty"]
+            if nonlinguistic_stats and nonlinguistic_stats["dropped_nonlinguistic"]:
+                stats["nonlinguistic_dropped"] = nonlinguistic_stats["dropped_nonlinguistic"]
             if overlap_stats:
                 # v1.9.0: surface scene-overlap resolver counters.
                 stats["scene_overlap_nested_dropped"] = overlap_stats["dropped_nested"]
