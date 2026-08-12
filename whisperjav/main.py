@@ -1165,7 +1165,10 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         # Dedicated Qwen3-ASR pipeline (ADR-004)
         from whisperjav.pipelines.qwen_pipeline import QwenPipeline
         from whisperjav.ensemble.pass_worker import resolve_qwen_sensitivity, SEGMENTER_PARAMS
-        from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
+        from whisperjav.config.anime_whisper_vad import (
+            anime_whisperseg_defaults,
+            apply_anime_segmenter_defaults,
+        )
         initial_output_dir = str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir
         # Resolve sensitivity preset into segmenter_config
         _qwen_sensitivity = getattr(args, 'qwen_sensitivity', 'balanced')
@@ -1189,16 +1192,16 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         if _max_speech is not None:
             _user_vad_overrides["max_speech_duration_s"] = float(_max_speech)
         # v1.9.0 anime/qwen3 VAD defaults — fill in when the user gave no CLI value.
-        #   anime-whisper -> per-sensitivity table: threshold (cons 0.35 / bal 0.30 /
-        #                    agg 0.15) + max_speech where the table pins it
-        #                    (aggressive=4.0). qwen3 -> flat threshold 0.25. Cohere
-        #                    excluded. An explicit --qwen-vad-threshold / --qwen-max-
-        #                    speech-duration always wins (setdefault).
+        #   anime-whisper -> per-sensitivity table (config/anime_whisper_vad.py):
+        #                    threshold, neg_threshold, min_silence_duration_ms,
+        #                    max_speech_duration_s where the table pins them.
+        #                    Single-source lift via apply_anime_segmenter_defaults
+        #                    (2026-07-30 fix — per-key copies here dropped
+        #                    neg_threshold as dead config). qwen3 -> flat
+        #                    threshold 0.25. Cohere excluded. Explicit CLI flags
+        #                    always win (setdefault).
         if _gen_backend_early == "anime-whisper":
-            _aw = anime_whisperseg_defaults(_qwen_sensitivity)
-            _user_vad_overrides.setdefault("threshold", _aw["threshold"])
-            if "max_speech_duration_s" in _aw:
-                _user_vad_overrides.setdefault("max_speech_duration_s", float(_aw["max_speech_duration_s"]))
+            apply_anime_segmenter_defaults(_user_vad_overrides, _qwen_sensitivity)
         elif _gen_backend_early == "qwen3":
             _user_vad_overrides.setdefault("threshold", 0.25)
         # v1.9.0: VAD padding routed to pipeline scalars (segmenter_start/end_pad_ms)

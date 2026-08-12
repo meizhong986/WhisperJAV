@@ -1942,10 +1942,12 @@ class WhisperJAVAPI:
         """
         Get parameter schema for the Qwen / ChronosJAV customize modal.
 
-        For the **anime-whisper** backend, the 5 WhisperSeg VAD fields (Frame
-        Gap, Max Group, VAD Threshold, Start/End Pad) are defaulted from the
-        owner's per-sensitivity table (single source of truth) so the Customize
-        dialog shows exactly what will run at the pass's selected sensitivity.
+        For the **anime-whisper** backend, the WhisperSeg VAD fields (Frame
+        Gap, Max Group, VAD Threshold, Start/End Pad, and the v1.9.0 offline-
+        decoder levers: Decoder, Grow Floor, Gap Cut, Max Speech Duration) are
+        defaulted from the owner's per-sensitivity table (single source of
+        truth) so the Customize dialog shows exactly what will run at the
+        pass's selected sensitivity.
         Balanced is the fallback for an unknown sensitivity. qwen3 / cohere are
         unaffected (they keep the static schema defaults).
         """
@@ -1959,6 +1961,16 @@ class WhisperJAVAPI:
             audio["vad_threshold"]["default"] = aw["threshold"]
             audio["vad_start_pad"]["default"] = int(aw["start_pad_ms"])
             audio["vad_end_pad"]["default"] = int(aw["end_pad_ms"])
+            # v1.9.0 offline-decoder levers — table-driven where the row pins
+            # them (aggressive); other sensitivities keep the schema defaults.
+            if "segmentation_decoder" in aw:
+                audio["vad_decoder"]["default"] = aw["segmentation_decoder"]
+            if "grow_floor" in aw:
+                audio["vad_grow_floor"]["default"] = aw["grow_floor"]
+            if "gap_merge_ms" in aw:
+                audio["vad_gap_merge_ms"]["default"] = int(aw["gap_merge_ms"])
+            if "max_speech_duration_s" in aw:
+                audio["max_speech_duration"]["default"] = aw["max_speech_duration_s"]
         return result
 
     def _get_qwen_schema_base(self) -> Dict[str, Any]:
@@ -2112,6 +2124,41 @@ class WhisperJAVAPI:
                         "group": "vad_settings",
                         "min": 0, "max": 800, "step": 50,
                         "default": 100,
+                    },
+                    "vad_decoder": {
+                        "type": "dropdown",
+                        "label": "VAD Decoder",
+                        "description": "How speech probabilities become segments. Offline (two-level): seeds at VAD Threshold, edges grow to the Grow Floor, dialogs cut at pauses >= Gap Cut. Hysteresis: vendor streaming state machine (ChickenRice lineage).",
+                        "group": "vad_settings",
+                        "options": [
+                            {"value": "offline", "label": "Offline two-level (default)"},
+                            {"value": "hysteresis", "label": "Hysteresis (ChickenRice)"},
+                        ],
+                        "default": "offline",
+                    },
+                    "vad_grow_floor": {
+                        "type": "slider",
+                        "label": "VAD Grow Floor",
+                        "description": "Offline decoder: segment edges extend while probability stays above this floor. The capture-vs-cut dial: lower keeps more quiet/whispered speech and cuts fewer pauses; higher trims tails and cuts more pauses.",
+                        "group": "vad_settings",
+                        "min": 0.01, "max": 0.30, "step": 0.01,
+                        "default": 0.05,
+                    },
+                    "vad_gap_merge_ms": {
+                        "type": "slider",
+                        "label": "VAD Gap Cut (ms)",
+                        "description": "Offline decoder: pauses at least this long (below the Grow Floor) split dialogs into separate segments; shorter pauses are absorbed.",
+                        "group": "vad_settings",
+                        "min": 100, "max": 1000, "step": 50,
+                        "default": 350,
+                    },
+                    "max_speech_duration": {
+                        "type": "slider",
+                        "label": "Max Speech Duration (s)",
+                        "description": "Single-segment ceiling. Segments longer than this are split at the quietest point (offline decoder) or per the force-split mode (hysteresis).",
+                        "group": "vad_settings",
+                        "min": 2.0, "max": 10.0, "step": 0.5,
+                        "default": 4.0,
                     },
                 },
                 # ── Tab 3: Generation ─────────────────────────────────

@@ -52,7 +52,14 @@ boundary seeking.
 Our state machine is a faithful line-for-line port of two upstream sources:
 
 1. **TransWithAI/Whisper-Vad-EncDec-ASMR-onnx/inference.py** — `get_speech_timestamps()`
+https://raw.githubusercontent.com/TransWithAI/Faster-Whisper-TransWithAI-ChickenRice/62104884d8553be1c30bc88c157d82b2b8d0792b/src/faster_whisper_transwithai_chickenrice/infer.py
+
+
 2. **TransWithAI/Faster-Whisper-TransWithAI-ChickenRice/vad_manager.py** — `get_speech_timestamps_onnx()`
+https://raw.githubusercontent.com/TransWithAI/Faster-Whisper-TransWithAI-ChickenRice/62104884d8553be1c30bc88c157d82b2b8d0792b/src/faster_whisper_transwithai_chickenrice/vad_manager.py
+
+
+
 
 Both upstreams use the same `neg_threshold` formula, the same naive force-split, and
 the same defaults (threshold=0.50, max_speech=infinity). Our problem is a parameter

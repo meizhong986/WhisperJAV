@@ -55,8 +55,12 @@ contract:
 spec:
   # --- Core VAD Parameters ---
   threshold: 0.35
-  # Offset (hysteresis) threshold is always auto-derived as
-  # max(threshold − 0.15, 0.01) inside the backend. Not user-tunable.
+  # Offset (hysteresis) threshold: auto-derived as max(threshold − 0.15, 0.01)
+  # inside the backend UNLESS an explicit neg_threshold is supplied via
+  # segmenter_config (v1.9.0). The formula collapses to 0.01 (dead hysteresis)
+  # below threshold 0.30, so low-threshold presets must decouple it — the
+  # anime-whisper aggressive row does (config/anime_whisper_vad.py). Not set
+  # here: the YAML presets all keep threshold >= 0.25 where the formula is sane.
 
   # --- Duration Filters ---
   min_speech_duration_ms: 100

@@ -14,7 +14,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
+from whisperjav.config.anime_whisper_vad import (
+    anime_whisperseg_defaults,
+    apply_anime_segmenter_defaults,
+)
 from whisperjav.config.legacy import resolve_legacy_pipeline, apply_balanced_vad_defaults
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
@@ -89,6 +92,15 @@ DECODER_PARAMS = {
 SEGMENTER_PARAMS = {
     # Core VAD (Silero, shared)
     "threshold",
+    "neg_threshold",           # v1.9.0: WhisperSeg decoupled offset threshold (anime table).
+                               # MUST stay in sync with anime_whisper_vad.SEGMENTER_CONFIG_KEYS —
+                               # keys missing here are silently stripped by resolve_qwen_sensitivity.
+    "speech_start_threshold",  # v1.9.0 "3a": refined display-start threshold (anime table).
+    "force_split_mode",        # v1.9.0: WhisperSeg "dip"|"chop" force-split behavior (anime table).
+    "segmentation_decoder",    # v1.9.0: WhisperSeg "hysteresis"|"offline" decoder (anime table + GUI).
+    "grow_floor",              # v1.9.0 offline decoder: edge-growth floor (anime table + GUI).
+    "gap_merge_ms",            # v1.9.0 offline decoder: dialog-cut gap length (anime table + GUI).
+    "split_smooth_ms",         # v1.9.0 offline decoder: overlong-split smoothing (anime table).
     "min_speech_duration_ms",
     "max_speech_duration_s",   # Keep for CLI backward compat (not in GUI)
     "min_silence_duration_ms",
@@ -455,6 +467,10 @@ def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
         "vad_padding": "qwen_vad_padding",        # legacy symmetric padding (back-compat)
         "vad_start_pad": "qwen_vad_start_pad",     # v1.9.0 asymmetric: pad before onset
         "vad_end_pad": "qwen_vad_end_pad",         # v1.9.0 asymmetric: pad after offset
+        "vad_decoder": "qwen_vad_decoder",         # v1.9.0 offline decoder: hysteresis|offline
+        "vad_grow_floor": "qwen_vad_grow_floor",   # v1.9.0 offline decoder: edge-growth floor
+        "vad_gap_merge_ms": "qwen_vad_gap_merge_ms",  # v1.9.0 offline decoder: dialog-cut gap (ms)
+        "max_speech_duration": "qwen_max_speech_duration",  # v1.9.0: single-segment ceiling (s)
     }
 
     # Track which qwen_* keys were explicitly set by user
@@ -1188,27 +1204,40 @@ def _build_pipeline(
         if _cli_vad_thr is not None:
             user_segmenter_overrides["threshold"] = max(0.0, min(1.0, float(_cli_vad_thr)))
             logger.debug("Pass %s: CLI vad_threshold override = %s", pass_number, _cli_vad_thr)
-        # v1.9.0 JAV retune: default the VAD threshold when the user set none via
-        # slider/CLI. DEFAULT only — the GUI slider / CLI override above wins.
-        #   anime-whisper -> per-sensitivity value from the owner table
-        #                    (conservative 0.35 / balanced 0.30 / aggressive 0.25).
-        #                    The GUI Ensemble tab exposes a per-pass sensitivity
-        #                    selector for anime, so this gradient is live.
-        #   qwen3         -> flat 0.25 (unchanged; gradient scoped to anime only).
+        # v1.9.0 offline-decoder levers from the GUI Customize modal (mapped to
+        # qwen_* by prepare_qwen_params). Routed into segmenter_config as user
+        # overrides so they win over the anime table defaults below.
+        for _qk, _sk, _cast in (
+            ("qwen_vad_decoder", "segmentation_decoder", str),
+            ("qwen_vad_grow_floor", "grow_floor", float),
+            ("qwen_vad_gap_merge_ms", "gap_merge_ms", int),
+            ("qwen_max_speech_duration", "max_speech_duration_s", float),
+        ):
+            _qv = qwen_defaults.get(_qk)
+            if _qv is not None and _qv != "":
+                user_segmenter_overrides[_sk] = _cast(_qv)
+                logger.debug("Pass %s: GUI segmenter override %s = %s", pass_number, _sk, _qv)
+        # v1.9.0 JAV retune: default the segmenter config when the user set none
+        # via slider/CLI. DEFAULT only — the GUI slider / CLI override above wins.
+        #   anime-whisper -> per-sensitivity values from the owner table
+        #                    (config/anime_whisper_vad.py). The GUI Ensemble tab
+        #                    exposes a per-pass sensitivity selector for anime,
+        #                    so this gradient is live.
+        #   qwen3         -> flat threshold 0.25 (gradient scoped to anime only).
         # Cohere excluded (keeps its sensitivity-resolved threshold). Layered as a
         # user-override so it sits above the sensitivity preset.
-        if "threshold" not in user_segmenter_overrides:
-            if _aw_gen == "anime-whisper":
-                user_segmenter_overrides["threshold"] = anime_whisperseg_defaults(qwen_sensitivity)["threshold"]
-            elif _aw_gen == "qwen3":
-                user_segmenter_overrides["threshold"] = 0.25
-        # v1.9.0: the anime table also pins max_speech for some sensitivities
-        # (aggressive=4.0). Inject as a segmenter_config default so it reaches the
-        # Phase-4 segmenter AND the vad-grouped framer; GUI custom params above win.
-        if _aw_gen == "anime-whisper" and "max_speech_duration_s" not in user_segmenter_overrides:
-            _aw_ms = anime_whisperseg_defaults(qwen_sensitivity).get("max_speech_duration_s")
-            if _aw_ms is not None:
-                user_segmenter_overrides["max_speech_duration_s"] = float(_aw_ms)
+        if _aw_gen == "anime-whisper":
+            # v1.9.0: inject ALL table-pinned segmenter_config defaults
+            # (threshold, neg_threshold, min_silence_duration_ms,
+            # max_speech_duration_s) so they reach the Phase-4 segmenter AND
+            # the vad-grouped framer. setdefault semantics: GUI custom params /
+            # sliders / CLI collected above always win. Single source of the
+            # lift: anime_whisper_vad.apply_anime_segmenter_defaults (2026-07-30
+            # fix — the previous per-key copies here silently dropped
+            # neg_threshold, shipping it as dead config).
+            apply_anime_segmenter_defaults(user_segmenter_overrides, qwen_sensitivity)
+        elif _aw_gen == "qwen3" and "threshold" not in user_segmenter_overrides:
+            user_segmenter_overrides["threshold"] = 0.25
         # NOTE: --passN-speech-pad-ms (pass_config["speech_pad_ms"]) is applied to the
         # pipeline padding scalars below, not to segmenter_config (see v1.9.0 note above).
         segmenter_backend = qwen_defaults.get("qwen_segmenter", "whisperseg")

@@ -149,6 +149,12 @@ _PARAM_SCHEMAS = {
     "whisperseg": {
         "threshold":               (float, 0.35, False),
         "neg_threshold":           (float, None, True),   # v1.9.0: decoupled offset threshold (None=derive from threshold)
+        "speech_start_threshold":  (float, None, True),   # v1.9.0 "3a": refined display-start threshold (None=disabled)
+        "force_split_mode":        (str,   "dip", False),  # v1.9.0: "dip" (smart split) | "chop" (vendor-faithful reset)
+        "segmentation_decoder":    (str,   "hysteresis", False),  # v1.9.0: "hysteresis" | "offline" (two-level TEN-shape)
+        "grow_floor":              (float, 0.05, False),   # v1.9.0 offline: edge-growth floor (capture-vs-cut dial)
+        "gap_merge_ms":            (int,   350,  False),   # v1.9.0 offline: gaps >= this become cuts; shorter merge
+        "split_smooth_ms":         (int,   120,  False),   # v1.9.0 offline: smoothing window for overlong-split minima
         "min_speech_duration_ms":  (int,   100,  False),
         "min_silence_duration_ms": (int,   100,  False),
         "speech_pad_ms":           (int,   300,  False),  # Symmetric fallback for start/end pad

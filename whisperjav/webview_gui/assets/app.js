@@ -3386,6 +3386,11 @@ const EnsembleManager = {
                 currentValues.vad_threshold = aud.vad_threshold.default;
                 currentValues.vad_start_pad = aud.vad_start_pad.default;
                 currentValues.vad_end_pad = aud.vad_end_pad.default;
+                // v1.9.0 offline-decoder levers (sensitivity-aware via Python table)
+                currentValues.vad_decoder = aud.vad_decoder.default;
+                currentValues.vad_grow_floor = aud.vad_grow_floor.default;
+                currentValues.vad_gap_merge_ms = aud.vad_gap_merge_ms.default;
+                currentValues.max_speech_duration = aud.max_speech_duration.default;
             }
 
             // Override defaults for cohere when not customized (v1.8.14 D2/D3/D7).
