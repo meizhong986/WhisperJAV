@@ -408,7 +408,7 @@ DEFAULT_QWEN_PARAMS = {
     "qwen_input_mode": "assembly",
     "qwen_framer": "vad-grouped",  # Preserve previous VAD_SLICING behavior for ensemble
     "qwen_safe_chunking": True,
-    "qwen_timestamp_mode": "aligner_vad_fallback",
+    "qwen_timestamp_mode": "vad_only",  # v1.9.0: no ForcedAligner by default
     "qwen_assembly_cleaner": True,
     "qwen_repetition_penalty": 1.1,
     "qwen_max_tokens_per_second": 20.0,
@@ -1272,7 +1272,7 @@ def _build_pipeline(
             "qwen_input_mode": qwen_defaults.get("qwen_input_mode", "assembly"),
             "qwen_framer": qwen_defaults.get("qwen_framer", "vad-grouped"),
             "qwen_safe_chunking": qwen_defaults.get("qwen_safe_chunking", True),
-            "timestamp_mode": qwen_defaults.get("qwen_timestamp_mode", "aligner_vad_fallback"),
+            "timestamp_mode": qwen_defaults.get("qwen_timestamp_mode", "vad_only"),
             "assembly_cleaner": qwen_defaults.get("qwen_assembly_cleaner", True),
             "repetition_penalty": qwen_defaults.get("qwen_repetition_penalty", 1.1),
             "max_tokens_per_audio_second": qwen_defaults.get("qwen_max_tokens_per_second", 20.0),

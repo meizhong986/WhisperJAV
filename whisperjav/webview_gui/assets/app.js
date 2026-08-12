@@ -270,10 +270,12 @@ const QwenManager = {
         repetition_penalty: 1.1,
         max_tokens_per_audio_second: 20.0,
         // Alignment
+        // v1.9.0: vad_only is the default — the ForcedAligner is not loaded.
+        // aligner_backend/aligner_id only apply when an aligner mode is chosen.
         aligner_backend: 'qwen3',
         aligner_id: 'Qwen/Qwen3-ForcedAligner-0.6B',
         assembly_cleaner: 'qwen3',
-        timestamp_mode: 'aligner_vad_fallback',
+        timestamp_mode: 'vad_only',
         stepdown: true,
         stepdown_initial_group: 6.0,
         stepdown_fallback_group: 6.0,

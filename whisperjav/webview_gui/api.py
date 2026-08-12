@@ -2228,14 +2228,14 @@ class WhisperJAVAPI:
                     "timestamp_mode": {
                         "type": "dropdown",
                         "label": "Timestamp Mode",
-                        "description": "How word timestamps are resolved from aligner output",
+                        "description": "How subtitle timestamps are resolved (VAD frames or ForcedAligner)",
                         "options": [
-                            {"value": "aligner_vad_fallback", "label": "Aligner + VAD Fallback (Recommended)"},
+                            {"value": "vad_only", "label": "VAD Only (Recommended — no aligner loaded)"},
+                            {"value": "aligner_vad_fallback", "label": "Aligner + VAD Fallback"},
                             {"value": "aligner_interpolation", "label": "Aligner + Interpolation"},
                             {"value": "aligner_only", "label": "Aligner Only (no recovery on collapse)"},
-                            {"value": "vad_only", "label": "VAD Only (no aligner loaded)"},
                         ],
-                        "default": "aligner_vad_fallback",
+                        "default": "vad_only",
                     },
                     "stepdown": {
                         "type": "checkbox",

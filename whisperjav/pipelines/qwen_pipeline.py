@@ -136,7 +136,11 @@ class QwenPipeline(BasePipeline):
         attn_implementation: str = "auto",
 
         # Timestamp resolution (bridges Phase 4 VAD and Phase 5 ASR)
-        timestamp_mode: str = "aligner_interpolation",  # Pipeline default; CLI overrides to aligner_vad_fallback
+        # v1.9.0: vad_only is the default — no ForcedAligner load (~1GB VRAM
+        # saved), VAD frame boundaries drive timestamps. Matches the CLI
+        # default in main.py. Cohere overrides to aligner_vad_fallback below
+        # (no native timestamps).
+        timestamp_mode: str = "vad_only",
 
         # Japanese post-processing — DISABLED for Qwen3 (C2 fix, ADR-006).
         # Qwen3 uses AssemblyTextCleaner, not the Whisper-era JapanesePostProcessor.
@@ -259,10 +263,10 @@ class QwenPipeline(BasePipeline):
             self.timestamp_mode = TimestampMode(timestamp_mode)
         except ValueError:
             logger.warning(
-                "Unknown timestamp_mode '%s', defaulting to 'aligner_interpolation'",
+                "Unknown timestamp_mode '%s', defaulting to 'vad_only'",
                 timestamp_mode,
             )
-            self.timestamp_mode = TimestampMode.ALIGNER_WITH_INTERPOLATION
+            self.timestamp_mode = TimestampMode.VAD_ONLY
 
         # Deprecation warning: japanese_postprocess is always False for Qwen3
         if japanese_postprocess:
@@ -1091,6 +1095,31 @@ class QwenPipeline(BasePipeline):
                     nonlinguistic_stats["dropped_empty"],
                 )
 
+        # v1.9.0: CPS-anomaly start retimer — ALL Qwen backends. Qwen sometimes
+        # emits subtitles whose duration is far too long for their text (start
+        # smeared backwards over non-speech; end correct). Ports the legacy
+        # TimingAdjuster rule: end fixed, start moved to end - expected duration
+        # (text length at language reading speed). Starts only move LATER, so
+        # this creates no overlaps and must run BEFORE SceneOverlapResolver.
+        retime_stats = None
+        if num_subtitles > 0:
+            from whisperjav.modules.subtitle_pipeline.cleaners.cps_start_retimer import (
+                CpsStartRetimer,
+            )
+            retime_stats = CpsStartRetimer(language=self.lang_code).retime_srt_file(
+                stitched_srt_path
+            )
+            if retime_stats["retimed_total"]:
+                logger.info(
+                    "[QwenPipeline PID %s] Phase 8: CPS start retimer - %d/%d entries "
+                    "retimed (%d duration hallucination, %d slow CPS; ends unchanged)",
+                    os.getpid(),
+                    retime_stats["retimed_total"],
+                    retime_stats["original_count"],
+                    retime_stats["retimed_long_duration"],
+                    retime_stats["retimed_slow_cps"],
+                )
+
         # v1.9.0: scene-overlap timestamp resolver — ALL Qwen backends. Semantic
         # scene detection extracts scenes with a ±0.35s buffer (~0.7s overlap
         # between adjacent scenes), so stitched subs collide at scene boundaries:
@@ -1131,6 +1160,9 @@ class QwenPipeline(BasePipeline):
                 stats["nonverbal_empty_dropped"] = nonverbal_filter_stats["dropped_empty"]
             if nonlinguistic_stats and nonlinguistic_stats["dropped_nonlinguistic"]:
                 stats["nonlinguistic_dropped"] = nonlinguistic_stats["dropped_nonlinguistic"]
+            if retime_stats and retime_stats["retimed_total"]:
+                # v1.9.0: surface CPS-retimer tally (feeds duration_adjustments).
+                stats["duration_adjustments"] = retime_stats["retimed_total"]
             if overlap_stats:
                 # v1.9.0: surface scene-overlap resolver counters.
                 stats["scene_overlap_nested_dropped"] = overlap_stats["dropped_nested"]

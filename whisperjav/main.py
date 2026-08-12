@@ -643,22 +643,29 @@ def parse_arguments():
     qwen_align_group = parser.add_argument_group("Qwen3-ASR: Alignment")
     qwen_align_group.add_argument("--qwen-timestamps", type=str, default="word",
                            choices=["word", "none"],
-                           help="Timestamp granularity: 'word' (ForcedAligner) or 'none' (default: word)")
+                           help="Timestamp granularity: 'word' (ForcedAligner) or 'none' (default: word). "
+                                "Only used by aligner modes — inert under the vad_only default.")
     qwen_align_group.add_argument("--qwen-aligner", type=str,
                            default="Qwen/Qwen3-ForcedAligner-0.6B",
-                           help="ForcedAligner model ID (default: Qwen/Qwen3-ForcedAligner-0.6B)")
+                           help="ForcedAligner model ID (default: Qwen/Qwen3-ForcedAligner-0.6B). "
+                                "Only loaded by aligner modes — inert under the vad_only default.")
     qwen_align_group.add_argument("--qwen-assembly-cleaner", dest="qwen_assembly_cleaner",
                            action="store_true", default=True,
                            help="Enable pre-alignment text cleaning (default: enabled)")
     qwen_align_group.add_argument("--no-qwen-assembly-cleaner", dest="qwen_assembly_cleaner",
                            action="store_false",
                            help="Disable pre-alignment text cleaning")
-    qwen_align_group.add_argument("--qwen-timestamp-mode", type=str, default="aligner_vad_fallback",
+    qwen_align_group.add_argument("--qwen-timestamp-mode", type=str, default="vad_only",
                            choices=["aligner_interpolation", "aligner_vad_fallback", "aligner_only", "vad_only"],
-                           help="Timestamp resolution mode (default: aligner_vad_fallback)")
+                           help="Timestamp resolution mode (default: vad_only — no ForcedAligner, "
+                                "VAD frame boundaries drive timestamps; saves ~1GB VRAM). "
+                                "Note: cohere generator has no native timestamps and keeps "
+                                "aligner_vad_fallback unless explicitly overridden.")
     qwen_align_group.add_argument("--qwen-stepdown", dest="qwen_stepdown",
                            action="store_true", default=True,
-                           help="Adaptive step-down: retry collapsed groups at fallback size (default: enabled)")
+                           help="Adaptive step-down: retry collapsed groups at fallback size "
+                                "(default: enabled). Requires an aligner mode — inert under "
+                                "the vad_only default.")
     qwen_align_group.add_argument("--no-qwen-stepdown", dest="qwen_stepdown",
                            action="store_false",
                            help="Disable adaptive step-down")
@@ -1249,8 +1256,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             "context": getattr(args, 'qwen_context', ''),
             "context_file": getattr(args, 'qwen_context_file', None),
             "attn_implementation": getattr(args, 'qwen_attn', 'auto'),
-            # Timestamp resolution
-            "timestamp_mode": getattr(args, 'qwen_timestamp_mode', 'aligner_vad_fallback'),
+            # Timestamp resolution (v1.9.0 default: vad_only — no ForcedAligner)
+            "timestamp_mode": getattr(args, 'qwen_timestamp_mode', 'vad_only'),
             # Japanese post-processing
             "japanese_postprocess": getattr(args, 'qwen_japanese_postprocess', False),
             "postprocess_preset": getattr(args, 'qwen_postprocess_preset', 'high_moan'),
