@@ -181,6 +181,7 @@ class TestSpeechSegmenterFactory:
         assert "nemo-lite" in backends
         assert "nemo-diarization" in backends
         assert "ten" in backends
+        assert "firered-vad" in backends
         assert "none" in backends
 
     def test_list_unique_backends(self):
@@ -189,6 +190,7 @@ class TestSpeechSegmenterFactory:
         assert "silero" in unique
         assert "nemo" in unique
         assert "ten" in unique
+        assert "firered-vad" in unique
         assert "none" in unique
         # Should not have version aliases
         assert "silero-v4.0" not in unique

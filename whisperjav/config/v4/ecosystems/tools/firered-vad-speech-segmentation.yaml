@@ -1,0 +1,194 @@
+# =============================================================================
+# FireRedVAD Speech Segmentation Tool Configuration (v1.9.0, EXPERIMENTAL)
+# =============================================================================
+# Industrial-grade DFSMN-based VAD from FireRedTeam (~0.6M params, Apache-2.0).
+# Claims 100+ language coverage (F1 97.57% on FLEURS-VAD-102).
+# Requires: pip install fireredvad
+# Model weights auto-download from HuggingFace (FireRedTeam/FireRedVAD).
+#
+# EXPERIMENTAL / early access for feedback. Presets are derived from upstream
+# README defaults, NOT yet tuned on JAV ground truth (unlike TEN/WhisperSeg).
+# =============================================================================
+
+schemaVersion: v1
+kind: Tool
+
+metadata:
+  name: firered-vad-speech-segmentation
+  displayName: "FireRedVAD (experimental)"
+  description: |
+    Speech segmentation using FireRedTeam's DFSMN-based VAD.
+    Tiny (~0.6M params) frame-level model with strong multilingual coverage.
+    CPU inference by default. Experimental — presets not yet JAV-tuned.
+  version: "1.0.0"
+  tags:
+    - speech-segmentation
+    - firered
+    - vad
+    - lightweight
+    - experimental
+  dependencies:
+    - "fireredvad"
+
+tool_type: speech_segmentation
+
+# =============================================================================
+# Input/Output Contract
+# =============================================================================
+contract:
+  input:
+    audio: "np.ndarray | Path | str"
+    sample_rate: int
+  output:
+    segments: "List[SpeechSegment]"
+    groups: "List[List[SpeechSegment]]"
+
+# =============================================================================
+# Tool Parameters (Balanced preset as default — upstream README defaults)
+# =============================================================================
+spec:
+  # --- Core VAD Parameters ---
+  threshold: 0.4               # upstream speech_threshold default
+  smooth_window_size: 5        # probability smoothing window (frames)
+
+  # --- Duration Filters (mapped to 10ms DFSMN frames in the backend) ---
+  min_speech_duration_ms: 200
+  min_silence_duration_ms: 200
+  max_speech_duration_s: 20    # upstream max_speech_frame default (2000 frames)
+
+  # --- Segment Padding (applied in WhisperJAV, asymmetric) ---
+  start_pad_ms: 50
+  end_pad_ms: 150
+
+  # --- Segment Grouping (aligned with other backends' balanced presets) ---
+  chunk_threshold_s: 1.0
+  max_group_duration_s: 6
+
+  # --- Compute ---
+  use_gpu: false               # 0.6M params — CPU is fast and spares ASR VRAM
+
+# =============================================================================
+# Sensitivity Presets
+# =============================================================================
+# NOTE: experimental first-pass presets. The threshold gradient mirrors the
+# other backends' conservative/balanced/aggressive spread around the upstream
+# default; expect retuning after JAV ground-truth benchmarking.
+presets:
+  conservative:
+    threshold: 0.5
+    min_speech_duration_ms: 250
+    min_silence_duration_ms: 250
+    max_group_duration_s: 7
+    end_pad_ms: 250
+
+  balanced: {}  # Uses spec defaults
+
+  aggressive:
+    threshold: 0.3
+    min_speech_duration_ms: 150
+    min_silence_duration_ms: 150
+    max_group_duration_s: 5
+    end_pad_ms: 100
+
+# =============================================================================
+# GUI Hints
+# =============================================================================
+gui:
+  threshold:
+    widget: slider
+    label: "Speech Threshold"
+    description: "Probability threshold to detect speech (lower = more sensitive)"
+    min: 0.1
+    max: 0.9
+    step: 0.05
+    data_type: float
+    group: detection
+
+  smooth_window_size:
+    widget: spinner
+    label: "Smoothing Window (frames)"
+    description: "Probability smoothing window in 10ms frames"
+    min: 1
+    max: 50
+    step: 1
+    data_type: int
+    group: processing
+
+  min_speech_duration_ms:
+    widget: spinner
+    label: "Min Speech Duration (ms)"
+    description: "Minimum speech segment duration to keep"
+    min: 10
+    max: 500
+    step: 10
+    data_type: int
+    group: filters
+
+  min_silence_duration_ms:
+    widget: spinner
+    label: "Min Silence Duration (ms)"
+    description: "Minimum silence gap to keep segments separate (shorter gaps are merged)"
+    min: 10
+    max: 500
+    step: 10
+    data_type: int
+    group: filters
+
+  max_speech_duration_s:
+    widget: slider
+    label: "Max Speech Duration (s)"
+    description: "Maximum single-segment duration before upstream force-split"
+    min: 1.0
+    max: 30.0
+    step: 0.5
+    data_type: float
+    unit: "s"
+    group: filters
+
+  chunk_threshold_s:
+    widget: slider
+    label: "Group Gap Threshold (s)"
+    description: "Maximum gap to group consecutive segments"
+    min: 0.5
+    max: 5.0
+    step: 0.1
+    data_type: float
+    group: grouping
+
+  start_pad_ms:
+    widget: spinner
+    label: "Start Padding (ms)"
+    description: "Milliseconds to extend segment start (captures speech onset)"
+    min: 0
+    max: 500
+    step: 10
+    data_type: int
+    group: padding
+
+  end_pad_ms:
+    widget: spinner
+    label: "End Padding (ms)"
+    description: "Milliseconds to extend segment end (captures speech offset)"
+    min: 0
+    max: 500
+    step: 10
+    data_type: int
+    group: padding
+
+  max_group_duration_s:
+    widget: slider
+    label: "Max Group Duration"
+    description: "Maximum duration for grouped segments"
+    min: 1
+    max: 60
+    step: 1
+    data_type: float
+    unit: "s"
+    group: grouping
+
+# =============================================================================
+# Provider Configuration
+# =============================================================================
+provider:
+  module: whisperjav.modules.speech_segmentation.backends.firered_vad
+  class: FireRedVadSpeechSegmenter

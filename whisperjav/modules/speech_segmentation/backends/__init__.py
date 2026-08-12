@@ -7,6 +7,7 @@ Available backends:
 - nemo: NVIDIA NeMo VAD
 - ten: TEN Framework VAD
 - whisperseg: WhisperSeg encoder-decoder VAD (ONNX, trained on Japanese ASMR)
+- firered-vad: FireRedTeam DFSMN VAD (v1.9.0 experimental, pip install fireredvad)
 - none: Passthrough (no segmentation)
 """
 

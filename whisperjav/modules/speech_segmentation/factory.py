@@ -29,6 +29,7 @@ _BACKEND_REGISTRY: Dict[str, str] = {
     "ten": "whisperjav.modules.speech_segmentation.backends.ten.TenSpeechSegmenter",
     "silero-v6.2": "whisperjav.modules.speech_segmentation.backends.silero_v6.SileroV6SpeechSegmenter",
     "whisperseg": "whisperjav.modules.speech_segmentation.backends.whisperseg.WhisperSegSpeechSegmenter",
+    "firered-vad": "whisperjav.modules.speech_segmentation.backends.firered_vad.FireRedVadSpeechSegmenter",
     "none": "whisperjav.modules.speech_segmentation.backends.none.NullSpeechSegmenter",
 }
 
@@ -63,6 +64,13 @@ _BACKEND_DEPENDENCIES: Dict[str, Dict[str, Any]] = {
         # onnxruntime is the real gate; transformers/huggingface_hub are usually present
         "packages": ["onnxruntime"],
         "install_hint": "pip install whisperjav[whisperseg] (or whisperjav[whisperseg-gpu] for CUDA)",
+        "always_available": False,
+    },
+    # v1.9.0 EXPERIMENTAL. Exact key required: the base-name fallback below
+    # would otherwise resolve "firered-vad" to unknown base "firered".
+    "firered-vad": {
+        "packages": ["fireredvad"],
+        "install_hint": "pip install fireredvad",
         "always_available": False,
     },
     "whisper": {
@@ -166,6 +174,21 @@ _PARAM_SCHEMAS = {
         "force_cpu":               (bool,  False, False),
         "num_threads":             (int,   1,    False),
     },
+    # v1.9.0 EXPERIMENTAL: FireRedVAD (DFSMN, ~0.6M params). Defaults mirror
+    # upstream README (speech_threshold 0.4, min speech/silence 200ms, max
+    # speech 20s). Grouping defaults match the other backends' YAML balanced.
+    "firered-vad": {
+        "threshold":               (float, 0.4,   False),
+        "smooth_window_size":      (int,   5,     False),
+        "min_speech_duration_ms":  (int,   200,   False),
+        "min_silence_duration_ms": (int,   200,   False),
+        "max_speech_duration_s":   (float, 20.0,  True),
+        "start_pad_ms":            (int,   50,    False),
+        "end_pad_ms":              (int,   150,   False),
+        "chunk_threshold_s":       (float, 1.0,   True),
+        "max_group_duration_s":    (float, 6.0,   True),
+        "use_gpu":                 (bool,  False, False),
+    },
 }
 
 
@@ -200,7 +223,7 @@ class SpeechSegmenterFactory:
     @staticmethod
     def list_unique_backends() -> List[str]:
         """Return list of unique backend names (without version aliases)."""
-        return ["silero", "nemo", "whisper", "ten", "whisperseg", "none"]
+        return ["silero", "nemo", "whisper", "ten", "whisperseg", "firered-vad", "none"]
 
     @staticmethod
     def is_backend_available(name: str) -> Tuple[bool, str]:
@@ -258,10 +281,11 @@ class SpeechSegmenterFactory:
             "silero-v6.2": "Silero VAD v6.2",
             "ten": "TEN VAD",
             "whisperseg": "WhisperSeg (JA-ASMR)",
+            "firered-vad": "FireRedVAD (experimental)",
             "none": "None (Skip)",
         }
 
-        for name in ["silero", "silero-v3.1", "silero-v6.2", "nemo-lite", "nemo-diarization", "whisper-vad", "whisper-vad-tiny", "whisper-vad-medium", "ten", "whisperseg", "none"]:
+        for name in ["silero", "silero-v3.1", "silero-v6.2", "nemo-lite", "nemo-diarization", "whisper-vad", "whisper-vad-tiny", "whisper-vad-medium", "ten", "whisperseg", "firered-vad", "none"]:
             available, hint = SpeechSegmenterFactory.is_backend_available(name)
             backends.append({
                 "name": name,
