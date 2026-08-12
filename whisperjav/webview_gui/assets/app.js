@@ -1231,18 +1231,18 @@ const EnsembleManager = {
     // State - Full Configuration Snapshot approach
     state: {
         pass1: {
-            pipeline: 'balanced',
-            sensitivity: 'aggressive',
-            sceneDetector: 'auditok',
+            pipeline: 'anime-whisper',  // v1.9.0: anime-whisper is the pass 1 default
+            sensitivity: 'aggressive',  // v1.9.0: aggressive default (tuned WhisperSeg row)
+            sceneDetector: 'semantic',
             speechEnhancer: 'none',
-            speechSegmenter: 'faster-whisper',  // v1.9.0: balanced default = native faster-whisper VAD
-            model: 'large-v2',
+            speechSegmenter: 'whisperseg',  // v1.9.0: WhisperSeg pairs with anime-whisper
+            model: 'litagin/anime-whisper',
             customized: false,
             params: null,  // null = use defaults, object = full custom config
             presetName: null,  // Name of loaded preset, or null if none
             isTransformers: false,  // Track if using Transformers pipeline
-            isQwen: false,  // ChronosJAV umbrella: any of qwen / anime-whisper / cohere
-            isAnimeWhisper: false,  // Track if using Anime-Whisper specifically
+            isQwen: true,  // ChronosJAV umbrella: any of qwen / anime-whisper / cohere
+            isAnimeWhisper: true,  // Track if using Anime-Whisper specifically
             isCohere: false,  // Track if using Cohere-Transcribe specifically (v1.8.14)
             isCrispasr: false,  // Track if using CrispASR external provider (v1.9.0)
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
@@ -1255,7 +1255,7 @@ const EnsembleManager = {
             sensitivity: 'balanced',
             sceneDetector: 'semantic',
             speechEnhancer: 'none',
-            speechSegmenter: 'whisperseg',  // v1.8.13: WhisperSeg system-wide default
+            speechSegmenter: 'ten',  // v1.9.0: TEN VAD on pass 2 for segmentation diversity vs pass 1's WhisperSeg
             model: 'Qwen/Qwen3-ASR-1.7B',
             customized: false,
             params: null,
@@ -1285,7 +1285,11 @@ const EnsembleManager = {
     legacyModels: [
         { value: 'large-v2', label: 'Large V2' },
         { value: 'large-v3', label: 'Large V3' },
-        { value: 'turbo', label: 'Turbo' }
+        { value: 'turbo', label: 'Turbo' },
+        // v1.9.0: whisper-ja-1.5B Japanese finetune (CT2 conversion, word timestamps
+        // intact). Balanced pipeline only — the Fidelity (OpenAI Whisper) pipeline
+        // cannot load CTranslate2 checkpoints.
+        { value: 'TransWithAI/whisper-ja-1.5B-ct2', label: 'whisper-ja-1.5B (CT2, JA)' }
     ],
     transformersModels: [
         { value: 'kotoba-tech/kotoba-whisper-bilingual-v1.0', label: 'Kotoba Bilingual v1.0' },
@@ -1694,12 +1698,15 @@ const EnsembleManager = {
         // below set whisperseg as the per-pipeline preset; users can manually
         // override via the dropdown (e.g., switch to silero-v3.1 for non-JA audio).
         if (pipelineType === 'anime-whisper') {
+            // v1.9.0: pass 1 anime-whisper defaults to aggressive — the tuned
+            // WhisperSeg row (wide-net capture). Pass 2 keeps balanced.
+            const animeSensitivity = passKey === 'pass1' ? 'aggressive' : 'balanced';
             sceneSelect.value = 'semantic';
             segmenterSelect.value = 'whisperseg';
-            sensitivitySelect.value = 'balanced';
+            sensitivitySelect.value = animeSensitivity;
             this.state[passKey].sceneDetector = 'semantic';
             this.state[passKey].speechSegmenter = 'whisperseg';
-            this.state[passKey].sensitivity = 'balanced';
+            this.state[passKey].sensitivity = animeSensitivity;
             this.state[passKey].framer = 'vad-grouped';
         } else if (pipelineType === 'cohere') {
             // Cohere prefers long contiguous segments — same defaults as
@@ -1713,11 +1720,14 @@ const EnsembleManager = {
             this.state[passKey].sensitivity = 'balanced';
             this.state[passKey].framer = 'vad-grouped';
         } else if (pipelineType === 'qwen') {
+            // v1.9.0: qwen on pass 2 pairs with TEN VAD for segmentation
+            // diversity vs pass 1's WhisperSeg; pass 1 qwen keeps WhisperSeg.
+            const qwenSegmenter = passKey === 'pass2' ? 'ten' : 'whisperseg';
             sceneSelect.value = 'semantic';
-            segmenterSelect.value = 'whisperseg';
+            segmenterSelect.value = qwenSegmenter;
             sensitivitySelect.value = 'balanced';
             this.state[passKey].sceneDetector = 'semantic';
-            this.state[passKey].speechSegmenter = 'whisperseg';
+            this.state[passKey].speechSegmenter = qwenSegmenter;
             this.state[passKey].sensitivity = 'balanced';
             this.state[passKey].framer = 'vad-grouped';
         } else {

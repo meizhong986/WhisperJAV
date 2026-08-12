@@ -419,7 +419,7 @@
                                     <div class="col-pipeline">
                                         <select id="pass1-pipeline" class="form-select compact">
                                             <optgroup label="Whisper-Based">
-                                                <option value="balanced" selected>Balanced</option>
+                                                <option value="balanced">Balanced</option>
                                                 <option value="fast">Fast</option>
                                                 <option value="faster">Faster</option>
                                                 <option value="fidelity">Fidelity</option>
@@ -429,7 +429,7 @@
                                             </optgroup>
                                             <optgroup label="ChronosJAV">
                                                 <option value="qwen">Qwen3-ASR</option>
-                                                <option value="anime-whisper">Anime-Whisper</option>
+                                                <option value="anime-whisper" selected>Anime-Whisper</option>
                                                 <option value="cohere" disabled>Cohere-Transcribe (preview — coming in v1.9.0)</option>
                                             </optgroup>
                                             <optgroup label="External (CrispASR)">
@@ -483,7 +483,7 @@
                                     </div>
                                     <div class="col-segmenter">
                                         <select id="pass1-segmenter" class="form-select compact">
-                                            <option value="faster-whisper" selected title="faster-whisper's built-in VAD (vad_filter=True). Fastest — one transcribe call per scene. Balanced default since v1.9.0. Pick an external segmenter instead to get the best-quality fine-grained grouping.">Faster-Whisper Native VAD (fast, default)</option>
+                                            <option value="faster-whisper" title="faster-whisper's built-in VAD (vad_filter=True). Fastest — one transcribe call per scene. Pick an external segmenter instead to get the best-quality fine-grained grouping.">Faster-Whisper Native VAD (fast)</option>
                                             <option value="silero">Silero v4.0</option>
                                             <option value="silero-v3.1">Silero v3.1</option>
                                             <option value="silero-v6.2">Silero v6.2</option>
@@ -495,7 +495,7 @@
                                             <!-- <option value="whisper-vad-tiny">Whisper VAD (tiny)</option> -->
                                             <!-- <option value="whisper-vad-medium">Whisper VAD (medium)</option> -->
                                             <option value="ten">TEN VAD</option>
-                                            <option value="whisperseg" title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). F1=0.787 on Netflix-GT JAV. For non-Japanese audio, switch to Silero v3.1.">WhisperSeg (JA-ASMR)</option>
+                                            <option value="whisperseg" selected title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). F1=0.787 on Netflix-GT JAV. For non-Japanese audio, switch to Silero v3.1.">WhisperSeg (JA-ASMR)</option>
                                             <option value="none">None</option>
                                         </select>
                                     </div>
@@ -505,6 +505,7 @@
                                             <option value="large-v2" selected>Large V2</option>
                                             <option value="large-v3">Large V3</option>
                                             <option value="turbo">Turbo</option>
+                                            <option value="TransWithAI/whisper-ja-1.5B-ct2" title="whisper-ja-1.5B Japanese finetune (CTranslate2). Use with the Balanced pipeline — not compatible with the Fidelity (OpenAI Whisper) pipeline.">whisper-ja-1.5B (CT2, JA)</option>
                                         </select>
                                     </div>
                                     <div class="col-actions">
@@ -657,8 +658,8 @@
                                             <!-- <option value="whisper-vad">Whisper VAD (small)</option> -->
                                             <!-- <option value="whisper-vad-tiny">Whisper VAD (tiny)</option> -->
                                             <!-- <option value="whisper-vad-medium">Whisper VAD (medium)</option> -->
-                                            <option value="ten">TEN VAD</option>
-                                            <option value="whisperseg" selected title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). Default since v1.8.13 — F1=0.787 on Netflix-GT JAV. For non-Japanese audio, switch to Silero v3.1.">WhisperSeg (JA-ASMR, default)</option>
+                                            <option value="ten" selected title="TEN VAD — pass 2 default for segmentation diversity vs pass 1's WhisperSeg.">TEN VAD (default)</option>
+                                            <option value="whisperseg" title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). F1=0.787 on Netflix-GT JAV. For non-Japanese audio, switch to Silero v3.1.">WhisperSeg (JA-ASMR)</option>
                                             <option value="none">None</option>
                                         </select>
                                     </div>
