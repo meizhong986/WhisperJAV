@@ -12,657 +12,408 @@
   </a>
 </p>
 
-A subtitle generator for Japanese Adult Videos.
+A subtitle generator for Japanese Adult Videos. Free, runs on your own machine, no cloud upload of your media.
 
 **Documentation:** [English](https://meizhong986.github.io/WhisperJAV/) | [简体中文](https://meizhong986.github.io/WhisperJAV/zh/)
 
 ---
 
+## The idea
 
+Speech recognition models like Whisper are trained on clean, curated speech. JAV audio is the opposite of that, and the mismatch breaks them in specific, well-understood ways:
 
+1. **The acoustic profile.** JAV audio has a low signal-to-noise ratio and a high density of non-verbal vocalisations — breathing, gasps, moans — whose spectra often mimic real Japanese syllables (e.g. *fu*), tricking the model into hearing words where none exist. Add extreme volume swings (whispers to screams) and theatrical role language (*yakuwarigo*) absent from training corpora, and the model's assumptions stop holding.
 
+2. **Long-form drift and hallucination.** These are feature-length recordings, not 30-second clips. Over long stretches of ambiguous audio — silence, rhythmic breathing — the model's attention collapses and it fills the void with repeated or invented text. This is a documented failure mode of Whisper-family models [3, 4, 5].
 
-### What is the idea: 
+3. **The pre-processing paradox.** Intuition says "denoise first". In practice, blanket denoising and vocal isolation can strip the high-frequency detail the model needs to tell consonants apart, making things worse. Fine-tuning on JAV data has its own trap: good datasets are scarce, so fine-tuned models tend to overfit and become hit-or-miss.
 
-Transformer-based ASR architectures like Whisper suffer significant performance degradation when applied to the **spontaneous and noisy domain of JAV**. This degradation is driven by specific acoustic and temporal characteristics that defy the statistical distributions of standard training data.
+WhisperJAV is built around these three failure points rather than around any single model:
 
-#### 1. The Acoustic Profile
-JAV audio is defined by "acoustic hell" and a low Signal-to-Noise Ratio (SNR), characterized by:
+- **Scene-based segmentation** — split the audio at natural acoustic boundaries so the model always processes a coherent environment, never a mixed stream [1, 2].
+- **VAD clamping** — detect where speech actually is, and feed the model only that, with measured padding. This is the main defence against hallucination on non-speech.
+- **Defensive decoding and post-processing** — tuned confidence thresholds discard low-quality output, and Japanese-aware filters clean what remains.
 
-*   **Non-Verbal Vocalisations (NVVs):** A high density of physiological sounds (heavy breathing, gasps, sighs) and "obscene sounds" that lack clear harmonic structure.
-*   **Spectral Mimicry:** These vocalizations often possess "curve-like spectrum features" that mimic the formants of fricative consonants or Japanese syllables (e.g., *fu*), acting as accidental adversarial examples that trick the model into recognizing words where none exist.
-*   **Extreme Dynamics:** Volatile shifts in audio intensity, ranging from faint whispers (*sasayaki*) to high-decibel screams, which confuse standard gain control and attention mechanisms.
-*   **Linguistic Variance:** The prevalence of theatrical onomatopoeia and *Role Language* (*Yakuwarigo*) containing exaggerated intonations and slang absent from standard corpora.
-
-#### 2. Temporal Drift and Hallucination
-While standard ASR models are typically trained on short, curated clips, JAV content comprises long-form media often exceeding 120 minutes. Research indicates that processing such extended inputs causes **contextual drift** and error accumulation. Specifically, extended periods of "ambiguous audio" (silence or rhythmic breathing) cause the Transformer's attention mechanism to collapse, triggering repetitive **hallucination loops** where the model generates unrelated text to fill the acoustic void.
-
-#### 3. The Pre-processing Paradox & Fine-Tuning Risks
-Standard audio engineering intuition—such as aggressive denoising or vocal separation—often fails in this domain. Because Whisper relies on specific **log-Mel spectrogram** features, generic normalization tools can inadvertently strip high-frequency transients essential for distinguishing consonants, resulting in "domain shift" and erroneous transcriptions. Consequently, audio processing requires a "surgical," multi-stage approach (like VAD clamping) rather than blanket filtering.
-
-Furthermore, while fine-tuning models on domain-specific data can be effective, it presents a high risk of **overfitting**. Due to the scarcity of high-quality, ethically sourced JAV datasets, fine-tuned models often become brittle, losing their generalization capabilities and leading to inconsistent "hit or miss" quality outputs.
-
-
-
-
-**WhisperJAV** is an attempt to address above failure points. The inference pipelines do:
-
-1.  **Acoustic Filtering:** Deploys **scene-based segmentation** and VAD clamping under the hypothesis that distinct scenes possess uniform acoustic characteristics, ensuring the model processes coherent audio environments rather than mixed streams [1-3].
-2.  **Linguistic Adaptation:** Normalizes **domain-specific terminology** and preserves onomatopoeia, specifically correcting dialect-induced tokenization errors (e.g., in *Kansai-ben*) that standard BPE tokenizers fail to parse [4, 5].
-3.  **Defensive Decoding:** Tunes **log-probability thresholding** and `no_speech_threshold` to systematically discard low-confidence outputs (hallucinations), while utilizing regex filters to clean non-lexical markers (e.g., `(moans)`) from the final subtitle track [6, 7].
-
-
+None of this is magic; it is careful plumbing around known model weaknesses, and the defaults are tuned against ground-truth benchmarks. Results still vary with source audio quality.
 
 ---
 
-## Quick Start
+## Quick start
 
-### GUI (Recommended for most users)
+**GUI** (recommended): launch **WhisperJAV** from the desktop shortcut (Windows installer) or run:
 
 ```bash
 whisperjav-gui
 ```
 
-A window opens. Add your files, pick a mode, click Start.
+Add files, pick a mode, click Start. Subtitles land next to your video as `.srt`.
 
-### Command Line
+**Command line:**
 
 ```bash
-# Basic usage
-whisperjav video.mp4
-
-# Specify mode and sensitivity
-whisperjav audio.mp3 --mode balanced --sensitivity aggressive
-
-# Process a folder
-whisperjav /path/to/media_folder --output-dir ./subtitles
+whisperjav video.mp4                                        # defaults
+whisperjav video.mp4 --mode balanced --sensitivity aggressive
+whisperjav /path/to/folder --output-dir ./subtitles         # whole folder
 ```
+
+Any input FFmpeg can read works: MP4, MKV, AVI, WMV, MP3, WAV, FLAC, and so on. Output is SRT (default), WebVTT, or both (`--output-format both`).
 
 ---
 
-## Features
+## How a video becomes subtitles
 
-### Processing Modes
+Every pipeline follows the same overall shape; modes differ in which components they use and how aggressively they are tuned.
 
-Seven pipelines, each with different tradeoffs. Scene detection, speech enhancement, and speech segmenter are configurable for all pipelines that support them — the table shows defaults.
+```mermaid
+flowchart LR
+    A[Audio<br/>extraction] --> B[Scene<br/>detection]
+    B --> C[Speech<br/>enhancement<br/><i>optional</i>]
+    C --> D[Speech<br/>segmentation<br/>VAD]
+    D --> E[ASR<br/>model]
+    E --> F[Post-<br/>processing]
+    F --> G[.srt]
+```
 
-| Pipeline | Backend | Scene Detection | Speech Enhancer | Speech Segmenter | Best For |
-|----------|---------|-----------------|-----------------|------------------|----------|
-| **faster** | Faster-Whisper (turbo) | — | — | — | Speed, clean audio |
-| **fast** | OpenAI Whisper | Auditok | — | — | General use, mixed quality |
-| **balanced** | Faster-Whisper | Auditok | Configurable | Silero | Default. Noisy, dialogue-heavy |
-| **fidelity** | OpenAI Whisper | Auditok | Configurable | Silero | Maximum accuracy, slower |
-| **transformers** | HuggingFace Kotoba | Optional | Configurable | Optional | Kotoba Japanese models |
-| **qwen** | Qwen3-ASR | Semantic | Configurable | Silero | Qwen ASR with forced alignment |
-| **anime** | anime-whisper | Semantic | Configurable | TEN | Anime/JAV-tuned dialogue |
+- **Scene detection** splits the audio at natural breaks instead of fixed-length chunks, so sentences are not cut mid-word and each chunk has consistent acoustics.
+- **Speech enhancement** (off by default) can clean audio per-scene — used surgically, per the pre-processing paradox above.
+- **Speech segmentation (VAD)** finds where speech actually is inside each scene. This choice matters more than most settings: it decides what the model hears and, in the modern pipelines, where your subtitle timestamps come from.
+- **The ASR model** turns speech into text.
+- **Post-processing** is the Japanese-specific cleanup pass:
+  - Sentence regrouping aware of ending particles (ね, よ, わ, の), aizuchi (うん, はい), and dialect patterns (Kansai-ben and others)
+  - Hallucination and repetition removal
+  - Sound-only line removal — subtitle lines that are purely moans/breathing kana are dropped (real dialogue is protected by an evidence check)
+  - Timing repair — a subtitle whose duration is absurdly long for its text gets its start pulled in (the end stays put); the console reports how many lines were retimed
+  - Scene-boundary overlap resolution
 
-### Sensitivity Settings
+Each stage has several interchangeable providers — the full menu, with strengths and weaknesses, is in [Mix-and-match strategies](#mix-and-match-strategies) below.
 
-- **Conservative**: Higher thresholds, fewer hallucinations. Good for noisy content.
-- **Balanced**: Default. Works for most content.
-- **Aggressive**: Lower thresholds, catches more dialogue. Good for whisper/ASMR content.
+---
+
+## Processing modes
+
+| Mode | Engine | Character |
+|---|---|---|
+| **balanced** | Faster-Whisper | Default. Full pipeline; good speed/accuracy balance |
+| **fidelity** | OpenAI Whisper | Slowest, most thorough of the classic pipelines |
+| **fast** | OpenAI Whisper + scene detection | General use, mixed-quality audio |
+| **faster** | Faster-Whisper, minimal preprocessing | Speed first, clean audio |
+| **qwen** (ChronosJAV) | Qwen3-ASR | Modern text-first recognizer |
+| **anime-whisper** (ChronosJAV) | anime-whisper | Anime/JAV-tuned dialogue |
+| **transformers** | HuggingFace | Kotoba and other HF Whisper models |
+| **crispasr** | External | Bring-your-own CrispASR build (experimental) |
+
+**Sensitivity** applies to every mode: **conservative** (fewer false positives, good for noisy content) · **balanced** · **aggressive** (catches more quiet dialogue; good for whisper/ASMR content — and the tuning target of most of our benchmark work).
 
 ### ChronosJAV
 
-ChronosJAV is a dedicated pipeline for transcribing with models that do not produce their own timestamps — LLMs, Qwen ASR, anime-whisper, Kotoba, and similar. It handles text generation and timestamp alignment as separate stages, so any model that can produce text from audio can be plugged in.
+Some of the best recognizers for this domain (anime-whisper, Qwen3-ASR and its Japanese finetunes) don't produce reliable timestamps on their own. ChronosJAV runs text generation and timing as separate stages: the VAD provides the time skeleton, the model provides the words. Since v1.9, timestamps come from the VAD frames by default (no aligner model loaded, ~1 GB less VRAM); a Qwen forced-aligner mode remains available in the settings for word-level alignment.
 
-#### Qwen3-ASR
+The same decoupled design is why new models can be added without rebuilding the pipeline — anything that turns audio into text can be slotted in.
 
-Uses [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) models (1.7B, 0.6B) for text generation with a local forced aligner for word-level timestamps. Three processing modes:
+---
 
-| Mode | How It Works | Best For |
-|------|-------------|----------|
-| **Assembly** | Text first, then align timestamps. Batches scenes up to 120s. | Most content |
-| **Context-Aware** | ASR and alignment together on full scenes (30-90s). | More context per utterance |
-| **VAD Slicing** (default) | Coupled ASR+alignment with step-wise fallback. | More detail, less context |
+## Two-pass ensemble
 
-#### Anime-Whisper
+Different pipelines miss different lines. Ensemble mode runs your file through two pipelines and merges the results.
 
-Uses [`litagin/anime-whisper`](https://huggingface.co/litagin/anime-whisper), a Whisper large-v3 model fine-tuned on anime and JAV dialogue. Greedy decoding with TEN VAD segmentation for tight subtitle timing. Also supports Kotoba v2.0 and v2.1 (lighter models; v2.1 adds punctuation).
-
-#### Future: LLM-based transcription
-
-The decoupled architecture means any model that generates text from audio can be wired in — including future LLM-based ASR models. New models can be deployed via YAML configuration without pipeline code changes.
-
-### Two-Pass Ensemble Mode
-
-Runs your video through two different pipelines and merges results. Different models catch different things.
+**The v1.9 default pairing:** pass 1 = **anime-whisper** with WhisperSeg VAD, pass 2 = **Qwen3-ASR** with TEN VAD — two different recognizers *and* two different VADs, so their blind spots don't overlap.
 
 ```bash
-# Pass 1 with transformers, Pass 2 with balanced
-whisperjav video.mp4 --ensemble --pass1-pipeline transformers --pass2-pipeline balanced
-
-# Serial mode: finish each file before starting the next
-whisperjav video.mp4 --ensemble --ensemble-serial --pass1-pipeline balanced --pass2-pipeline fidelity
-```
-
-**Merge strategies:**
-- `pass1_primary` (default) / `pass2_primary`: Prioritize one pass, fill gaps from other
-- `smart_merge`: Intelligent overlap detection
-- `full_merge`: Combine everything from both passes
-- `pass1_overlap` / `pass2_overlap`: Overlap-aware priority merge
-- `longest`: Keep whichever pass produced the longer subtitle for each segment
-
-**Ensemble presets**: Save, load, and delete named ensemble configurations from the GUI. Reuse your tuned settings across sessions and across different pipeline combinations.
-
-**Serial mode** (`--ensemble-serial`): Completes each file fully (Pass 1 → Pass 2 → Merge) before starting the next. See results as they finish instead of waiting for the entire batch.
-
-**BYOP: Faster Whisper XXL** (v1.8.9+): Use [PurfView's Faster Whisper XXL](https://github.com/Purfview/whisper-standalone-win) as Pass 2 in ensemble mode. Select "XXL Faster Whisper" as the Pass 2 pipeline, point to your `faster-whisper-xxl.exe`, and add any extra args. CLI: `--pass2-pipeline xxl --xxl-exe /path/to/faster-whisper-xxl.exe`
-
-### Speech Enhancement
-
-Pre-process audio per-scene after scene detection. Use surgically — audio processing that alters the mel-spectrogram can introduce artefacts.
-
-```bash
-# ClearVoice denoising (48kHz, best quality)
-whisperjav video.mp4 --mode balanced --pass1-speech-enhancer clearvoice
-
-# FFmpeg DSP filters (lightweight, always available)
-whisperjav video.mp4 --mode balanced --pass1-speech-enhancer ffmpeg-dsp:loudnorm,denoise
-
-# BS-RoFormer vocal isolation
-whisperjav video.mp4 --mode balanced --pass1-speech-enhancer bs-roformer
-
-# Ensemble with different enhancers per pass
 whisperjav video.mp4 --ensemble \
-    --pass1-pipeline balanced --pass1-speech-enhancer clearvoice \
-    --pass2-pipeline transformers --pass2-speech-enhancer none
+    --pass1-pipeline qwen --pass2-pipeline balanced \
+    --merge-strategy pass1_primary
 ```
 
-**Available backends:**
+- **Merge strategies:** `pass1_primary` / `pass2_primary` (one pass leads, the other fills gaps), `smart_merge`, `full_merge`, `pass1_overlap` / `pass2_overlap`, `longest`
+- **Presets:** save and reload named ensemble configurations from the GUI
+- **Serial mode** (`--ensemble-serial`): finish each file completely before starting the next, so results appear as they're done
+- **Bring your own pass 2:** [PurfView's Faster-Whisper XXL](https://github.com/Purfview/whisper-standalone-win) (`--pass2-pipeline xxl --xxl-exe ...`) or an external CrispASR build
 
-| Backend | Description | Models/Options |
-|---------|-------------|----------------|
-| `none` | No enhancement (default) | - |
-| `ffmpeg-dsp` | FFmpeg audio filters | `loudnorm`, `denoise`, `compress`, `highpass`, `lowpass`, `deess` |
-| `clearvoice` | ClearerVoice denoising | `MossFormer2_SE_48K` (default), `FRCRN_SE_16K` |
-| `zipenhancer` | ZipEnhancer 16kHz | `torch` (GPU), `onnx` (CPU) |
-| `bs-roformer` | Vocal isolation | `vocals`, `other` |
+---
 
-### Output Formats
+## Mix-and-match strategies
 
-SRT (default) and WebVTT for HTML5 video players:
+The Ensemble tab is a mixing desk. Each pass is a free combination of five choices — **pipeline × scene detection × audio pre-processing × speech segmentation × ASR model** — and the two-pass design is the sixth dimension. The defaults are benchmark-tuned, so you never *have* to touch any of this; but audio varies a lot, and one deliberate substitution is often worth the experiment. The golden rule: **change one thing at a time**, so you know what caused the difference.
+
+### Pipeline
+
+The recipe that ties the other choices together.
+
+| Pipeline | Strength | Watch out |
+|---|---|---|
+| **balanced** | The workhorse: full pipeline, good speed/accuracy, every component swappable | Jack of all trades — specialists beat it on their home turf |
+| **fidelity** | Most thorough classic pipeline; strong on quiet/ASMR content | Slowest option |
+| **fast** | Decent middle ground on mixed-quality audio | Fewer defences than balanced |
+| **faster** | Speed; fine for clean, dialogue-forward audio | Minimal preprocessing = less hallucination protection |
+| **qwen** (ChronosJAV) | Modern text-first recognizer; robust on messy audio | Timestamps come from the VAD, so the segmenter choice matters doubly |
+| **anime-whisper** (ChronosJAV) | Best-in-class on anime-style/JAV dialogue; heavily benchmark-tuned here | Can miss very faint, isolated utterances |
+| **transformers** | Runs any HF Whisper model; best GPU path on Apple Silicon | Uses HF's own chunking — scene/segmenter choices don't apply |
+| **crispasr** / **xxl** | Bring your own external engine as a pass | Self-contained: WhisperJAV's knobs don't reach inside |
+
+### Scene detection
+
+Where the long file gets cut into workable pieces.
+
+| Method | Strength | Watch out |
+|---|---|---|
+| **Semantic** | Groups acoustically similar audio; best for full-length features; ChronosJAV default | Occasionally cuts inside speech on very uniform audio |
+| **Auditok** | Energy-based: fast, simple, dependable | Constant background music can mask the pauses it needs |
+| **Silero** | Neural; holds up on noisy audio | Slower than auditok |
+| **None** | No cutting at all | Only sensible for short clips |
+
+### Audio pre-processing (speech enhancement)
+
+Off by default — remember the pre-processing paradox. The **"Enhance for VAD only"** checkbox is the safest way to use these: the cleaned audio guides speech detection while the model still hears the original.
+
+| Backend | Strength | Watch out |
+|---|---|---|
+| **none** | No artefacts, no surprises — the right default | Won't rescue genuinely bad audio |
+| **ffmpeg-dsp** | Transparent classic filters (loudnorm, denoise, compress…); loudnorm genuinely helps very quiet recordings | Aggressive settings dull consonants |
+| **zipenhancer** | Lightweight neural denoise; good against hiss | 16 kHz processing; can soften detail |
+| **clearvoice** | Stronger neural denoise, up to 48 kHz | Heavier; artefact risk on music-heavy audio |
+| **bs-roformer** | Vocal isolation — separates voice from loud BGM | The biggest intervention of all; reserve for music-dominated content |
+
+### Speech segmentation (VAD)
+
+Decides what the model hears — and in ChronosJAV pipelines, where your timestamps come from. Probably the highest-leverage swap on this list.
+
+| Backend | Strength | Watch out |
+|---|---|---|
+| **WhisperSeg** | Trained on Japanese ASMR-style audio; tuned against our ground truth; the JA default | Japanese-specialised — switch it for other languages |
+| **TEN VAD** | Light and quick; good general performer; pass-2 default for diversity | Less JA-specialised than WhisperSeg |
+| **Silero v3.1 / v4.0** | Solid general-purpose; the recommendation for non-Japanese audio | Tends to miss very quiet Japanese speech |
+| **Silero v6.2** | Adds max-duration splitting and finer control | Same quiet-speech caveat |
+| **Faster-Whisper native** | Fastest — one recognizer call per scene | Coarser timing than a dedicated VAD |
+| **FireRedVAD** *(new, experimental)* | Tiny multilingual model, cheap on CPU; early access for feedback | Presets not yet JAV-tuned; needs `pip install fireredvad` |
+| **None** | The model hears everything | Maximum hallucination exposure on non-speech |
+
+### ASR engine and model
+
+| Model | Pipeline | Strength | Watch out |
+|---|---|---|---|
+| **Whisper large-v2** | classic | The most predictable performer on this domain — that's why it's the default | Not the newest |
+| Whisper large-v3 | classic | Newer training | More hallucination-prone on JAV audio |
+| Whisper turbo | classic | Fastest Whisper | Some accuracy cost |
+| **whisper-ja-1.5B** (CT2) *(new)* | balanced | JA finetune, word timestamps intact; strongest results in our scene-length benchmarks | Community model; occasional repetitions (our filters catch most) |
+| **anime-whisper** | ChronosJAV | Excellent anime/JAV dialogue quality | No native timestamps — VAD-timed |
+| **Qwen3-ASR 1.7B / 0.6B** | ChronosJAV | Robust on messy audio; 0.6B fits 4 GB VRAM | No native timestamps — VAD-timed |
+| **JA Anime-Galgame 1.7B** *(new)* | ChronosJAV | Qwen finetune with published gains on anime speech (CER −27% rel.); recovers lines the base drops | Slightly more junk insertions (post-processing handles most) |
+| **JA-tuned 1.7B (neosophie)** *(new)* | ChronosJAV | Qwen finetune aimed at proper nouns and kanji-heavy phrasing | No published benchmarks |
+| **Kotoba family** | transformers | Japanese-optimized, light; bilingual variant; good on Apple Silicon | Smaller models — ceiling below the 1.5B+ class |
+
+### The two-pass dimension
+
+Everything above multiplies: two passes means two full recipes, then a merge. What makes a *good* pair is diversity — different recognizers **and** different VADs, so the passes fail in different places and the merge covers both.
+
+A few known-good recipes:
+
+| Goal | Pass 1 | Pass 2 | Merge |
+|---|---|---|---|
+| The v1.9 default | anime-whisper · semantic · WhisperSeg · aggressive | Qwen3-ASR · semantic · TEN | `pass1_primary` |
+| Classic + modern | balanced · large-v2 | qwen (or the Anime-Galgame finetune) | `pass1_primary` |
+| Quiet/ASMR recall | fidelity · aggressive | anime-whisper · aggressive | `longest` |
+| Second opinion on the model only | your usual recipe | same recipe, different ASR model | `pass1_primary` |
+
+Merge-strategy rule of thumb: `pass1_primary` when you trust pass 1 and want gap-filling; `longest` when you're chasing completeness; `smart_merge` when both passes are of similar quality. Save anything that works as a **preset** so it's one click next time.
+
+---
+
+## AI translation
+
+Generate and translate in one go, or translate subtitles you already have:
 
 ```bash
-whisperjav video.mp4 --output-format vtt
-whisperjav video.mp4 --output-format both    # generates .srt and .vtt
-```
-
-Also available as a dropdown in the GUI Advanced Options tab.
-
-### GUI
-
-The GUI has four tabs:
-
-1. **Transcription Mode**: Pipeline, sensitivity, model, language
-2. **Advanced Options**: Output format, scene detection method, debug settings
-3. **Ensemble Mode**: Two-pass configuration with presets, serial mode, and per-pass parameter customization
-4. **AI SRT Translate**: Translate existing subtitle files
-
-Settings persist across application restarts.
-
-### AI Translation
-
-Generate subtitles and translate them in one step:
-
-```bash
-# Generate and translate
-whisperjav video.mp4 --translate
-
-# Or translate existing subtitles
-whisperjav-translate -i subtitles.srt --provider deepseek
-```
-
-Supports Ollama (local, recommended), DeepSeek (cheap), Gemini (free tier), Claude, GPT-4, OpenRouter, GLM, Groq, and local LLMs.
-
-#### Ollama Translation (Recommended for Local)
-
-Run translation locally using [Ollama](https://ollama.com/) — no cloud API, no API key required:
-
-```bash
+whisperjav video.mp4 --translate                      # transcribe + translate
 whisperjav-translate -i subtitles.srt --provider ollama
 ```
 
-OllamaManager auto-starts the server, detects your GPU, and picks the best model for your VRAM:
+| Provider | Cost | Notes |
+|---|---|---|
+| **Ollama** | free, local | Recommended local option; auto-starts the server and picks a model for your VRAM |
+| DeepSeek | cheap | Good quality/price for this content |
+| Gemini | free tier | |
+| Claude / GPT / OpenRouter / GLM / Groq | paid API | |
+| Local LLM (llama-cpp) | free, local | Legacy option; auto-installs on first use |
 
-| VRAM | Recommended Model |
-|------|-------------------|
-| CPU only | qwen2.5:3b |
-| 8 GB | qwen2.5:7b |
-| 12 GB | gemma3:12b |
-| 16 GB+ | qwen2.5:14b |
-
-#### Local LLM Translation (Legacy)
-
-Run translation entirely on your GPU — no cloud API, no API key required:
-
-```bash
-whisperjav-translate -i subtitles.srt --provider local
-```
-
-**Zero-Config Setup**: On first use, WhisperJAV automatically downloads and installs `llama-cpp-python` (~700MB). No manual installation needed. Batch size auto-adjusts to your model's context window.
-
-Available models:
-| Model | VRAM | Notes |
-|-------|------|-------|
-| `llama-8b` | 6GB+ | **Default** — Llama 3.1 8B |
-| `gemma-9b` | 8GB+ | Gemma 2 9B (alternative) |
-| `llama-3b` | 3GB+ | Llama 3.2 3B (low VRAM only) |
-| `auto` | varies | Auto-selects based on available VRAM |
-
-**Resume Support**: If translation is interrupted, just run the same command again. It automatically resumes from where it left off using the `.subtrans` project file.
-
-### Supported Input Formats
-
-Any format FFmpeg can read: MP4, MKV, AVI, MOV, WMV, FLV, WAV, MP3, FLAC, M4A, M4B (audiobooks), and many more.
+Interrupted translations resume where they left off — just run the same command again.
 
 ---
 
-## What Makes It Work for JAV
+## The GUI
 
-### Scene Detection
-Splits audio at natural breaks instead of forcing fixed-length chunks. This prevents cutting off sentences mid-word.
+Four tabs:
 
-Four methods are available:
-- **Semantic** (default): Texture-based clustering using MFCC features, groups acoustically similar segments together
-- **Auditok**: Energy-based detection, fast and reliable
-- **Silero**: Neural VAD-based detection, better for noisy audio
-- **TEN**: Used by ChronosJAV pipeline for tight subtitle timing
+1. **Transcribe** — files, mode, sensitivity, language
+2. **Advanced options** — output format, scene detection, model override, debug
+3. **Ensemble** — the two-pass grid: per-pass pipeline, sensitivity, scene detector, enhancer, VAD, and model, plus a Customize dialog exposing each backend's tunable parameters, and preset save/load
+4. **AI SRT Translate** — translate existing subtitle files
 
-### Voice Activity Detection (VAD)
-Identifies when someone is actually speaking vs. background noise or music. Reduces false transcriptions during quiet moments.
-
-### Japanese Post-Processing
-- Handles sentence-ending particles (ね, よ, わ, の)
-- Preserves aizuchi (うん, はい, ええ)
-- Recognizes dialect patterns (Kansai-ben, feminine/masculine speech)
-- Filters out common Whisper hallucinations
-
-### Hallucination Removal
-Whisper sometimes generates repeated text or phrases that weren't spoken. WhisperJAV detects and removes these patterns.
+Sensible defaults everywhere: if you never open a Customize dialog, you get the benchmark-tuned configuration.
 
 ---
 
-## Content-Specific Recommendations
+## Which mode for which content
 
-| Content Type | Pipeline | Sensitivity | Notes |
-|--------------|----------|-------------|-------|
-| Drama / Dialogue Heavy | balanced | aggressive | Full pipeline with Silero VAD |
-| Anime / JAV Dialogue | anime | aggressive | anime-whisper model with TEN VAD |
-| Group Scenes | faster | conservative | Speed matters, less precision needed |
-| Amateur / Homemade | fast | conservative | Variable audio quality |
-| ASMR / VR / Whisper | fidelity | aggressive | Maximum accuracy for quiet speech |
-| Heavy Background Music | balanced | conservative | VAD helps filter music |
-| Maximum Accuracy | ensemble | varies | anime + balanced, or two different pipelines |
+| Content | Suggestion | Sensitivity |
+|---|---|---|
+| Dialogue-heavy drama | balanced | aggressive |
+| Anime-style / clear JAV dialogue | anime-whisper | aggressive |
+| ASMR / whispering / VR | fidelity or anime-whisper | aggressive |
+| Heavy background music | balanced | conservative |
+| Amateur / variable audio | fast | conservative |
+| Group scenes | faster | conservative |
+| Best possible result | ensemble (anime-whisper + qwen) | per-pass defaults |
+
+These are starting points, not rules — see [Mix-and-match strategies](#mix-and-match-strategies) for how to adapt them.
 
 ---
 
 ## Installation
 
-> **Upgrading?** Run `whisperjav-upgrade` (works on Windows, Linux, and macOS). For code-only updates: `whisperjav-upgrade --wheel-only`. See the [Upgrade Guide](docs/en/UPGRADE.md) for details.
+> **Already installed?** Upgrade with `whisperjav-upgrade` (all platforms). Rollback is available: `whisperjav-upgrade --rollback`.
 
----
+### Windows — standalone installer (recommended)
 
-### Which Installation Path Should I Follow?
+No Python knowledge needed.
 
-| Your Situation | Go To |
-|----------------|-------|
-| **New user on Windows** wanting GUI | [Windows Standalone Installer](#windows-standalone-installer) |
-| **Developer on Windows** | [Windows Source Install](#windows-source-install) |
-| **macOS user** | [macOS (Apple Silicon)](#macos-apple-silicon) |
-| **Linux user** | [Linux](#linux-ubuntu-debian-fedora-arch) |
-| **Colab or Kaggle** | [Cloud Notebooks](#google-colab--kaggle) |
-| **Developer or expert** wanting pip | [Expert Installation](#expert-installation) |
-
----
-
-### Windows Standalone Installer
-
-The easiest way. No Python knowledge needed.
-
-**Download:** [**Latest Windows Installer**](https://github.com/meizhong986/WhisperJAV/releases/latest)
-
-1. **Download** the `.exe` from the link above
-2. **Run the installer.** No admin rights required. Installs to `%LOCALAPPDATA%\WhisperJAV`.
-3. **Wait 10-20 minutes.** It downloads and configures Python, PyTorch, FFmpeg, and all dependencies.
-4. **Launch** from the Desktop shortcut.
-5. **First run** downloads models (~3 GB, another several minutes).
-
-**GPU auto-detection:** The installer checks your NVIDIA driver version and picks the right PyTorch:
-- Driver 570+ gets CUDA 12.8 (optimal for RTX 20/30/40/50-series)
-- Driver 450-569 gets CUDA 11.8 (broad compatibility)
-- No NVIDIA GPU gets CPU-only mode
-
----
-
-### Windows Source Install
-
-For people who manage their own Python environments.
-
-**Prerequisites:** Python 3.10-3.12, Git, FFmpeg in PATH.
-
-```batch
-git clone https://github.com/meizhong986/whisperjav.git
-cd whisperjav
-
-:: Full automated install (auto-detects GPU)
-installer\install_windows.bat
-
-:: Or with options:
-installer\install_windows.bat --cpu-only        :: Force CPU
-installer\install_windows.bat --cuda118         :: Force CUDA 11.8
-installer\install_windows.bat --cuda128         :: Force CUDA 12.8
-installer\install_windows.bat --local-llm       :: Include local LLM translation
-```
-
-The installer runs in 5 phases: PyTorch first (with GPU detection), then scientific stack, Whisper packages, audio/CLI tools, and optional extras. This order matters — PyTorch must be installed before anything that depends on it, or you end up with CPU-only wheels.
-
-For the full walkthrough, see [docs/en/guides/installation_windows_python.md](docs/en/guides/installation_windows_python.md).
-
----
-
-### macOS (Apple Silicon)
-
-**Prerequisites:**
-```bash
-xcode-select --install                    # Xcode Command Line Tools
-brew install python@3.12 ffmpeg portaudio git  # Or python@3.11
-```
-
-**Install:**
-```bash
-git clone https://github.com/meizhong986/whisperjav.git
-cd whisperjav
-
-# Create a virtual environment (required for Homebrew Python)
-python3 -m venv ~/venvs/whisperjav
-source ~/venvs/whisperjav/bin/activate
-
-# Run the macOS installer
-chmod +x installer/install_mac.sh
-./installer/install_mac.sh
-```
-
-**GPU acceleration:** Apple Silicon (M1/M2/M3/M4/M5) gets MPS acceleration automatically for Whisper pipelines. Use `--mode transformers` for best performance. The `balanced`, `fast`, and `faster` modes use CTranslate2 which doesn't support MPS, so those fall back to CPU.
-
-**Qwen pipeline on Mac:** Currently runs on CPU only. The forced aligner doesn't detect MPS yet. This is a known limitation we plan to fix.
-
-**Intel Macs:** CPU-only. No GPU acceleration available.
-
-For the full walkthrough, see [docs/en/guides/installation_mac_apple_silicon.md](docs/en/guides/installation_mac_apple_silicon.md).
-
----
-
-### Linux (Ubuntu, Debian, Fedora, Arch)
-
-**1. Install system packages first** — these can't come from pip:
-
-```bash
-# Ubuntu / Debian
-sudo apt-get update
-sudo apt-get install -y python3 python3-pip python3-venv python3-dev \
-    build-essential ffmpeg git libsndfile1 libsndfile1-dev
-
-# Fedora / RHEL
-sudo dnf install -y python3 python3-pip python3-devel gcc gcc-c++ \
-    ffmpeg git libsndfile libsndfile-devel
-
-# Arch
-sudo pacman -S --noconfirm python python-pip base-devel ffmpeg git libsndfile
-```
-
-For the GUI, you'll also need WebKit2GTK (`libwebkit2gtk-4.0-dev` on Ubuntu, `webkit2gtk4.0-devel` on Fedora).
-
-**2. Install WhisperJAV:**
-
-```bash
-git clone https://github.com/meizhong986/whisperjav.git
-cd whisperjav
-
-# Recommended: use the install script
-chmod +x installer/install_linux.sh
-./installer/install_linux.sh
-
-# With options:
-./installer/install_linux.sh --cpu-only
-./installer/install_linux.sh --local-llm
-```
-
-**NVIDIA GPU:** You need the NVIDIA driver (450+ or 570+) but NOT the CUDA Toolkit — PyTorch bundles its own CUDA runtime.
-
-**PEP 668 note:** If your distro's Python is "externally managed" (Ubuntu 24.04+, Fedora 38+), you'll need a virtual environment. The install script detects this and tells you what to do.
-
-For the full walkthrough including Colab/Kaggle setup, headless servers, and systemd services, see [docs/en/guides/installation_linux.md](docs/en/guides/installation_linux.md).
-
----
+1. Download the `.exe` from [**Releases**](https://github.com/meizhong986/WhisperJAV/releases/latest)
+2. Run it — no admin rights required (installs to `%LOCALAPPDATA%\WhisperJAV`)
+3. Wait 10–20 minutes while it sets up Python, PyTorch, FFmpeg and dependencies. It detects your NVIDIA driver and installs the matching CUDA build automatically (or CPU-only if no GPU)
+4. Launch from the desktop shortcut. First transcription downloads models (~3 GB)
 
 ### Google Colab / Kaggle
 
-Two notebooks are maintained:
+No local install at all — use the badges at the top of this page. Maintained notebooks for both platforms.
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_colab_edition_expert.ipynb)
-[![Open In Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://kaggle.com/kernels/welcome?src=https://github.com/meizhong986/WhisperJAV/blob/main/notebook/WhisperJAV_kaggle_parallel_edition.ipynb)
+<details>
+<summary><b>Windows — install from source</b></summary>
 
-If you run into issues, please open a [GitHub issue](https://github.com/meizhong986/WhisperJAV/issues) with your system info, the console log, and the error output.
-
----
-
-### Expert Installation
-
-For users comfortable with Python package management. Choose the components you need.
-
-#### Modular Installation
-
-WhisperJAV supports modular extras. Install only what you need:
-
-```bash
-# Core only (minimal)
-pip install git+https://github.com/meizhong986/whisperjav.git
-
-# CLI with audio processing
-pip install "whisperjav[cli] @ git+https://github.com/meizhong986/whisperjav.git"
-
-# GUI support
-pip install "whisperjav[gui] @ git+https://github.com/meizhong986/whisperjav.git"
-
-# Translation support
-pip install "whisperjav[translate] @ git+https://github.com/meizhong986/whisperjav.git"
-
-# Everything
-pip install "whisperjav[all] @ git+https://github.com/meizhong986/whisperjav.git"
-```
-
-**Available extras:**
-
-| Extra | Description |
-|-------|-------------|
-| `cli` | Audio processing, VAD, scene detection |
-| `gui` | PyWebView GUI (Windows: WebView2, Linux/Mac: WebKit) |
-| `translate` | AI translation (PySubtrans, OpenAI, Gemini) |
-| `llm` | Local LLM server (FastAPI, llama-cpp) |
-| `enhance` | Speech enhancement (ClearVoice, BS-RoFormer) |
-| `huggingface` | HuggingFace Transformers pipeline |
-| `analysis` | Scientific analysis, visualization |
-| `all` | All of the above |
-| `colab` | Optimized for Colab/Kaggle (cli + translate + huggingface) |
-
-#### PyTorch Installation (Required First)
-
-PyTorch must be installed before WhisperJAV. Choose your platform:
-
-```bash
-# NVIDIA GPU (CUDA 12.8)
-pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
-
-# NVIDIA GPU (CUDA 11.8)
-pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
-
-# Apple Silicon (MPS)
-pip install torch torchaudio
-
-# CPU only
-pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
-```
-
-#### Development Installation
-
-For contributing or modifying the code:
-
-```bash
-git clone https://github.com/meizhong986/whisperjav.git
-cd whisperjav
-
-# Install in editable mode with dev dependencies
-pip install -e ".[dev]"
-
-# Run tests
-python -m pytest tests/
-```
-
-#### Windows Source Installation
+Prerequisites: Python 3.10–3.12, Git, FFmpeg in PATH.
 
 ```batch
 git clone https://github.com/meizhong986/whisperjav.git
 cd whisperjav
-
-:: Standard install
-installer\install_windows.bat
-
-:: Options
-installer\install_windows.bat --cpu-only
-installer\install_windows.bat --cuda118
-installer\install_windows.bat --local-llm
-installer\install_windows.bat --dev
+installer\install_windows.bat            :: auto-detects GPU
+installer\install_windows.bat --cpu-only :: or force CPU
 ```
 
-**Prerequisites for Windows source install:**
-- Python 3.10-3.12 from [python.org](https://www.python.org/downloads/)
-- FFmpeg in PATH from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/)
-- Git from [git-scm.com](https://git-scm.com/download/win)
+Full guide: [docs/en/guides/installation_windows_python.md](docs/en/guides/installation_windows_python.md)
+</details>
 
----
-
-### System Requirements
-
-| Requirement | Minimum | Recommended |
-|-------------|---------|-------------|
-| **OS** | Windows 10, macOS 11, Ubuntu 20.04 | Windows 11, macOS 14, Ubuntu 22.04 |
-| **Python** | 3.10 | 3.11 |
-| **RAM** | 8 GB | 16 GB |
-| **Disk** | 8 GB | 15 GB (with models) |
-| **GPU** | None (CPU works) | NVIDIA RTX 2060+ or Apple Silicon |
-
-**GPU Support:**
-- NVIDIA: CUDA 11.8 or 12.8 (Windows, Linux)
-- Apple Silicon: MPS acceleration for Whisper (M1/M2/M3/M4/M5). Qwen pipeline is CPU-only on Mac for now.
-- AMD ROCm: Experimental (Linux only)
-- CPU fallback: Works on all platforms, 5-10x slower
-
-**Processing Time Estimates (per hour of video):**
-
-| Hardware | Time |
-|----------|------|
-| NVIDIA RTX GPU | 5-10 minutes |
-| Apple Silicon | 8-15 minutes |
-| CPU | 30-60 minutes |
-
----
-
-## CLI Reference
+<details>
+<summary><b>macOS (Apple Silicon)</b></summary>
 
 ```bash
-# Basic usage
-whisperjav video.mp4
-whisperjav video.mp4 --mode balanced --sensitivity aggressive
+xcode-select --install
+brew install python@3.12 ffmpeg portaudio git
 
-# All modes: faster, fast, balanced, fidelity, transformers, qwen
-whisperjav video.mp4 --mode fidelity
-
-# Output format (SRT, VTT, or both)
-whisperjav video.mp4 --output-format vtt
-whisperjav video.mp4 --output-format both --output-dir ./subtitles
-
-# Two-pass ensemble
-whisperjav video.mp4 --ensemble --pass1-pipeline transformers --pass2-pipeline balanced
-whisperjav video.mp4 --ensemble --ensemble-serial --merge-strategy longest
-
-# Batch processing
-whisperjav /path/to/folder --output-dir ./subtitles
-whisperjav /path/to/folder --skip-existing    # Resume interrupted batch
-
-# Translation
-whisperjav video.mp4 --translate --translate-provider deepseek
-whisperjav-translate -i subtitles.srt --provider local
-
-# Debugging
-whisperjav video.mp4 --debug --keep-temp
+git clone https://github.com/meizhong986/whisperjav.git
+cd whisperjav
+python3 -m venv ~/venvs/whisperjav && source ~/venvs/whisperjav/bin/activate
+chmod +x installer/install_mac.sh && ./installer/install_mac.sh
 ```
 
-Run `whisperjav --help` for all options.
+M-series chips get MPS acceleration for Whisper pipelines (`--mode transformers` performs best). The CTranslate2-based modes and the Qwen pipeline currently run on CPU on Mac. Intel Macs are CPU-only.
+
+Full guide: [docs/en/guides/installation_mac_apple_silicon.md](docs/en/guides/installation_mac_apple_silicon.md)
+</details>
+
+<details>
+<summary><b>Linux</b></summary>
+
+Install system packages first (Ubuntu example; see the guide for Fedora/Arch):
+
+```bash
+sudo apt-get install -y python3 python3-pip python3-venv python3-dev \
+    build-essential ffmpeg git libsndfile1 libsndfile1-dev
+```
+
+Then:
+
+```bash
+git clone https://github.com/meizhong986/whisperjav.git
+cd whisperjav
+chmod +x installer/install_linux.sh && ./installer/install_linux.sh
+```
+
+You need the NVIDIA driver (450+), but not the CUDA Toolkit — PyTorch bundles its own runtime. GUI needs WebKit2GTK. On distros with externally-managed Python (Ubuntu 24.04+), use a venv; the script detects this and tells you what to do.
+
+Full guide: [docs/en/guides/installation_linux.md](docs/en/guides/installation_linux.md)
+</details>
+
+<details>
+<summary><b>Expert: pip with modular extras</b></summary>
+
+Install PyTorch first (pick your platform):
+
+```bash
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128  # NVIDIA
+pip install torch torchaudio                                                     # Apple Silicon
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu    # CPU
+```
+
+Then WhisperJAV with the extras you want:
+
+```bash
+pip install "whisperjav[all] @ git+https://github.com/meizhong986/whisperjav.git"
+```
+
+Extras: `cli`, `gui`, `translate`, `llm`, `enhance`, `huggingface`, `analysis`, `colab`, `all`.
+</details>
+
+### System requirements
+
+| | Minimum | Recommended |
+|---|---|---|
+| OS | Windows 10 / macOS 11 / Ubuntu 20.04 | Windows 11 / macOS 14 / Ubuntu 22.04 |
+| Python (source installs) | 3.10 | 3.11 |
+| RAM | 8 GB | 16 GB |
+| Disk | 8 GB | 15 GB with models |
+| GPU | none (CPU works, slowly) | NVIDIA RTX 2060+ or Apple Silicon |
+
+Rough speed per hour of video: **RTX GPU** 5–10 min · **Apple Silicon** 8–15 min · **CPU** 30–60 min.
 
 ---
 
 ## Troubleshooting
 
-**FFmpeg not found**: Install FFmpeg and add it to your PATH.
-
-**Slow processing / GPU warning**: Your PyTorch might be CPU-only. Reinstall with GPU support:
-```bash
-pip uninstall torch torchvision torchaudio
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
-```
-
-**model.bin error in faster mode**: Enable Windows Developer Mode or run as Administrator, then delete the cached model folder:
-```powershell
-Remove-Item -Recurse -Force "$env:USERPROFILE\.cache\huggingface\hub\models--Systran--faster-whisper-large-v2"
-```
+- **"FFmpeg not found"** — install FFmpeg and add it to PATH.
+- **Very slow, GPU warning in log** — your PyTorch is CPU-only. Reinstall it with the CUDA index URL shown above.
+- **`model.bin` error in faster mode** — enable Windows Developer Mode (or run once as admin), then delete the cached model folder under `%USERPROFILE%\.cache\huggingface\hub`.
+- Anything else: open a [GitHub issue](https://github.com/meizhong986/WhisperJAV/issues) with your system info and the console log. Logs and reproduction details make fixes much faster.
 
 ---
 
 ## Contributing
 
-Contributions welcome. See `CONTRIBUTING.md` for guidelines.
+Contributions are welcome — see `CONTRIBUTING.md`. Development setup:
 
 ```bash
 git clone https://github.com/meizhong986/whisperjav.git
 cd whisperjav
 pip install -e ".[dev]"
 python -m pytest tests/
-python -m ruff check whisperjav/
 ```
 
 ---
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) file.
+MIT. See [LICENSE](LICENSE).
 
----
+## References
 
-## Citation and credits
-
-- Chen, Y., et al. (2025). "ChronusOmni: Improving Time Awareness of Omni Large Language Models." arXiv:2512.09841. *(Inspiration for the ChronosJAV pipeline)*
-- Roll, N., et al. (2025). "In-Context Learning Boosts Speech Recognition via Human-like Adaptation to Speakers and Language Varieties." arXiv:2505.14887.
-- Wang, Y., et al. (2025). "Calm-Whisper: Reduce Whisper Hallucination On Non-Speech By Calming Crazy Heads Down." Interspeech 2025. arXiv:2505.12969.
-- Barański, M., et al. (2025). "Investigation of Whisper ASR Hallucinations Induced by Non-Speech Audio." arXiv:2501.11378.
-- Koenecke, A., et al. (2024). "Careless Whisper: Speech-to-Text Hallucination Harms." ACM FAccT 2024.
-- Yang, X., et al. (2024). "PromptASR for Contextualized ASR with Controllable Style." ICASSP 2024. arXiv:2309.07414.
-- Bain, M., et al. (2023). "WhisperX: Time-Accurate Speech Transcription of Long-Form Audio." arXiv:2303.00747.
-
+1. Chen, Y., et al. (2025). "ChronusOmni: Improving Time Awareness of Omni Large Language Models." arXiv:2512.09841. *(Inspiration for the ChronosJAV pipeline)*
+2. Bain, M., et al. (2023). "WhisperX: Time-Accurate Speech Transcription of Long-Form Audio." arXiv:2303.00747.
+3. Wang, Y., et al. (2025). "Calm-Whisper: Reduce Whisper Hallucination On Non-Speech By Calming Crazy Heads Down." Interspeech 2025. arXiv:2505.12969.
+4. Barański, M., et al. (2025). "Investigation of Whisper ASR Hallucinations Induced by Non-Speech Audio." arXiv:2501.11378.
+5. Koenecke, A., et al. (2024). "Careless Whisper: Speech-to-Text Hallucination Harms." ACM FAccT 2024.
+6. Roll, N., et al. (2025). "In-Context Learning Boosts Speech Recognition via Human-like Adaptation to Speakers and Language Varieties." arXiv:2505.14887.
+7. Yang, X., et al. (2024). "PromptASR for Contextualized ASR with Controllable Style." ICASSP 2024. arXiv:2309.07414.
 
 ## Acknowledgments
 
-- [OpenAI Whisper](https://github.com/openai/whisper) - The underlying ASR model
-- [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) - Qwen-based ASR with forced alignment
-- [stable-ts](https://github.com/jianfch/stable-ts) - Timestamp refinement
-- [faster-whisper](https://github.com/guillaumekln/faster-whisper) - Optimized CTranslate2 inference
-- [HuggingFace Transformers](https://github.com/huggingface/transformers) - Transformers pipeline backend
-- [Anime-Whisper](https://huggingface.co/litagin/anime-whisper) - Anime/JAV-tuned speech model (ChronosJAV pipeline)
-- [Kotoba-Whisper](https://huggingface.co/kotoba-tech/kotoba-whisper-v2.2) - Japanese-optimized Whisper model
-- [PySubtrans](https://github.com/machinewrapped/llm-subtrans) - AI-powered subtitle translation engine
-- The testing community for feedback and bug reports
-
----
+Built on the shoulders of: [OpenAI Whisper](https://github.com/openai/whisper) · [faster-whisper](https://github.com/guillaumekln/faster-whisper) · [stable-ts](https://github.com/jianfch/stable-ts) · [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) · [anime-whisper](https://huggingface.co/litagin/anime-whisper) · [Kotoba-Whisper](https://huggingface.co/kotoba-tech/kotoba-whisper-v2.2) · [HuggingFace Transformers](https://github.com/huggingface/transformers) · [PySubtrans](https://github.com/machinewrapped/llm-subtrans) — and the testing community, whose feedback and bug reports shape every release.
 
 ## Disclaimer
 
