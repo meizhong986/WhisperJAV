@@ -1993,9 +1993,17 @@ class WhisperJAVAPI:
                         "options": [
                             {"value": "Qwen/Qwen3-ASR-1.7B", "label": "Qwen3-ASR-1.7B (8GB VRAM)"},
                             {"value": "Qwen/Qwen3-ASR-0.6B", "label": "Qwen3-ASR-0.6B (4GB VRAM)"},
+                            # v1.9.0 (R6.4): galgame/anime SFT of the 1.7B base.
+                            {"value": "jaykwok/Qwen3-ASR-1.7B-JA-Anime-Galgame",
+                             "label": "JA Anime-Galgame 1.7B (jaykwok finetune, 8GB VRAM)"},
+                            # v1.9.0 (R6.1): proper-noun/kanji-focused JA finetune.
+                            {"value": "neosophie/Qwen3-ASR-1.7B-JA",
+                             "label": "JA-tuned 1.7B (neosophie finetune, 8GB VRAM)"},
                         ],
                         "default": "Qwen/Qwen3-ASR-1.7B",
-                        "description": "1.7B is more accurate, 0.6B is faster and uses less VRAM",
+                        "description": "1.7B is more accurate, 0.6B is faster and uses less VRAM. "
+                                       "The JA finetunes are 1.7B-class (8GB): Anime-Galgame is "
+                                       "dialogue-tuned; neosophie targets proper nouns.",
                     },
                     "language": {
                         "type": "dropdown",

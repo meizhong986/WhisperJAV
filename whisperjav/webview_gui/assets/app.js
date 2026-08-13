@@ -1301,7 +1301,13 @@ const EnsembleManager = {
     ],
     qwenModels: [
         { value: 'Qwen/Qwen3-ASR-1.7B', label: 'Qwen3-ASR-1.7B    8GB' },
-        { value: 'Qwen/Qwen3-ASR-0.6B', label: 'Qwen3-ASR-0.6B    4GB' }
+        { value: 'Qwen/Qwen3-ASR-0.6B', label: 'Qwen3-ASR-0.6B    4GB' },
+        // v1.9.0 (R6.4): full SFT on litagin galgame speech corpus. Published
+        // CER 0.1437→0.1285 vs base (anime speech −26.8% rel.); owner-tested.
+        { value: 'jaykwok/Qwen3-ASR-1.7B-JA-Anime-Galgame', label: 'JA Anime-Galgame 1.7B    8GB' },
+        // v1.9.0 (R6.1): JA finetune focused on proper nouns / kanji-heavy
+        // expressions; owner-tested.
+        { value: 'neosophie/Qwen3-ASR-1.7B-JA', label: 'JA-tuned 1.7B (neosophie)    8GB' }
     ],
     animeWhisperModels: [
         { value: 'litagin/anime-whisper', label: 'anime-whisper    ~4GB' },
