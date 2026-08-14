@@ -3767,6 +3767,51 @@ const EnsembleManager = {
             ));
         }
 
+        // v1.9.0 offline-decoder levers (code-review fix): these four fields
+        // were schema-declared (api.py) and mapped end-to-end in pass_worker,
+        // but no controls were ever rendered — the GUI tuning path did not
+        // exist. Rendered here inside VAD Settings; collection is generic
+        // over .param-control elements, so no collector changes are needed.
+        const decDef = schemaSection.vad_decoder;
+        if (decDef) {
+            const decControl = document.createElement('div');
+            decControl.className = 'param-control';
+            decControl.dataset.param = 'vad_decoder';
+
+            const decLabel = document.createElement('label');
+            decLabel.textContent = decDef.label;
+            decControl.appendChild(decLabel);
+
+            const decSelect = document.createElement('select');
+            decSelect.className = 'param-select';
+            const currentDec = currentValues.vad_decoder || decDef.default || 'offline';
+            decDef.options.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.label;
+                if (opt.value === currentDec) option.selected = true;
+                decSelect.appendChild(option);
+            });
+            decControl.appendChild(decSelect);
+
+            const decDesc = document.createElement('p');
+            decDesc.className = 'param-description';
+            decDesc.textContent = decDef.description;
+            decControl.appendChild(decDesc);
+            vadContainer.appendChild(decControl);
+        }
+        for (const leverKey of ['vad_grow_floor', 'vad_gap_merge_ms', 'max_speech_duration']) {
+            const leverDef = schemaSection[leverKey];
+            if (leverDef) {
+                vadContainer.appendChild(this.createTransformersSlider(
+                    leverKey, leverDef.label,
+                    leverDef.min, leverDef.max, leverDef.step,
+                    currentValues[leverKey] ?? leverDef.default,
+                    leverDef.description
+                ));
+            }
+        }
+
         vadDetails.appendChild(vadContainer);
         container.appendChild(vadDetails);
 
