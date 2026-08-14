@@ -134,6 +134,8 @@ weaknesses, plus known-good two-pass recipes.
 
 - Returning users' saved form values can shadow the new ensemble defaults until
   the dropdowns are touched once (see above).
+- In ensemble, selecting CrispASR for *both* passes currently runs pass 1's
+  backend in both passes — a two-engine CrispASR ensemble isn't supported yet.
 - FireRedVAD presets are not yet JAV-tuned — treat it as an experiment.
 - whisper-ja-1.5B (CT2) cannot be used with the Fidelity pipeline (different
   engine format); the GUI notes this.
