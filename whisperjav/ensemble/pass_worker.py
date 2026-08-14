@@ -1743,6 +1743,20 @@ def _apply_gui_overrides(
     # Override speech segmenter if specified
     # Note: ASR modules read from params["speech_segmenter"]["backend"], not params["vad"]["backend"]
     speech_segmenter = pass_config.get("speech_segmenter")
+    # v1.9.0 fix (code-review): CLI ensemble (--passN-pipeline balanced with no
+    # --passN-speech-segmenter) previously skipped this whole block, leaving the
+    # resolver's external-whisperseg default — while `--mode balanced` and the
+    # GUI (which always sends an explicit segmenter) both default to
+    # faster-whisper's NATIVE VAD since the v1.9.0 throughput retune, and
+    # apply_balanced_vad_defaults below keyed off the wrong backend. Default it
+    # here so the same mode+sensitivity resolves identically at all three entry
+    # points. An explicit --passN-speech-segmenter still wins.
+    if speech_segmenter is None and pass_config.get("pipeline") == "balanced":
+        speech_segmenter = "faster-whisper"
+        logger.debug(
+            "Pass %s: balanced pipeline defaults to faster-whisper native VAD (v1.9.0)",
+            pass_number,
+        )
     if speech_segmenter is not None:  # Allow empty string for default
         segmenter_backend = SPEECH_SEGMENTER_MAP.get(speech_segmenter, speech_segmenter)
 
