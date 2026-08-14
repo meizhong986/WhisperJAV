@@ -2024,6 +2024,22 @@ def main():
                 getattr(args, 'mode', None)
             )
 
+    # v1.9.0 fix (code-review): 'faster-whisper' means "use faster-whisper's
+    # NATIVE VAD (vad_filter=True)" and only the balanced pipeline's
+    # FasterWhisperProASR engine can honor it. On any other mode it would
+    # reach an engine that passes it verbatim to SpeechSegmenterFactory,
+    # which has no such backend — aborting the run mid-processing. Downgrade
+    # with a warning instead of crashing.
+    if speech_segmenter == "faster-whisper" and resolved_config is not None \
+            and getattr(args, 'mode', None) != "balanced":
+        _fw_fallback = "whisperseg" if _path_safe_for_whisperseg_default(args) else "silero-v3.1"
+        logger.warning(
+            "Speech segmenter 'faster-whisper' (native VAD) is only available with "
+            "--mode balanced; falling back to '%s' for --mode %s.",
+            _fw_fallback, getattr(args, 'mode', None)
+        )
+        speech_segmenter = _fw_fallback
+
     # Guard: explicit non-Silero choice on a path with the routing bug → downgrade with warning.
     if speech_segmenter is not None and resolved_config is not None:
         if (not _path_safe_for_whisperseg_default(args)

@@ -65,6 +65,21 @@ class WhisperProASR:
         # fallback in sync.
         segmenter_backend = speech_segmenter_config.get("backend", "whisperseg")
 
+        # v1.9.0 fix (code-review): 'faster-whisper' means "use faster-whisper's
+        # NATIVE VAD" — only FasterWhisperProASR can honor it (it intercepts the
+        # name and enables vad_filter). This engine (OpenAI Whisper) receives it
+        # when a fidelity pass is paired with that GUI/CLI segmenter option (the
+        # ensemble path has no mode-aware guard). Passing it to the factory
+        # raises ValueError ('architecture violation') and aborts the run —
+        # remap to this engine's default external segmenter instead.
+        if segmenter_backend == "faster-whisper":
+            logger.warning(
+                "Speech segmenter 'faster-whisper' (native VAD) is only available "
+                "with the balanced pipeline's Faster-Whisper engine; falling back "
+                "to 'whisperseg' for this pipeline."
+            )
+            segmenter_backend = "whisperseg"
+
         # --- CONSTRUCTOR FIREWALL ---
         # The resolver unconditionally produces Silero VAD presets (threshold=0.068,
         # speech_pad_ms=500, etc.) because LEGACY_PIPELINES hardcodes vad="silero".
