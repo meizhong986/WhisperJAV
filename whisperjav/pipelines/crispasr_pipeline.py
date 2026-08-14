@@ -76,6 +76,19 @@ class CrispASRPipeline(BasePipeline):
         )
 
         self.progress = progress_display or DummyProgress()
+        # v1.9.0 fix (code-review): CrispASR has no translate task — the
+        # engine's -l flag is a SOURCE-language hint, so direct-to-english
+        # used to pass '-l en' for Japanese audio and the engine "transcribed"
+        # Japanese speech as English (garbage). Downgrade to a native
+        # transcription with a clear warning instead.
+        if subs_language == "direct-to-english":
+            logger.warning(
+                "CrispASR does not support direct-to-english (the engine has no "
+                "translate task; its language flag is a source-language hint). "
+                "Producing a native-language transcription instead — translate "
+                "it afterwards with --translate or whisperjav-translate."
+            )
+            subs_language = "native"
         self.subs_language = subs_language
         self.crispasr_exe = crispasr_exe
         self.crispasr_backend = crispasr_backend or DEFAULT_BACKEND

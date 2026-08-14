@@ -1789,6 +1789,16 @@ def main():
                          "Use synchronous mode (the default).")
             sys.exit(1)
 
+    # v1.9.0 fix (code-review): --mode crispasr crashed under --async-processing
+    # (resolved_config is None on the crispasr path, and process_files_async
+    # dereferences it; even past that, async_processor maps unknown modes to
+    # FidelityPipeline, silently ignoring --crispasr-exe). Fail fast with the
+    # same message shape as the decoupled guard above.
+    if getattr(args, 'mode', None) == 'crispasr' and getattr(args, 'async_processing', False):
+        logger.error("--mode crispasr does not support --async-processing. "
+                     "Use synchronous mode (the default).")
+        sys.exit(1)
+
     # Skip input validation if --dump-params is used (diagnostic mode)
     if not args.input and not args.dump_params:
         logger.error("No input files specified. Use -h for help.")

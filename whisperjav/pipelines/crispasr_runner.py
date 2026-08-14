@@ -155,6 +155,9 @@ def run_crispasr(
     )
 
     start_time = time.monotonic()
+    # Wall-clock stamp for _find_srt: only SRT files written DURING this run
+    # may be attributed to it (v1.9.0 code-review fix — see _find_srt).
+    run_started_wall = time.time()
 
     # CAPTURE stdout (not stream).  CrispASR reliably prints the full
     # transcription to stdout in a fixed, documented format
@@ -193,7 +196,7 @@ def run_crispasr(
     # process shutdown (the class of issue WhisperJAV's Nuclear Exit solves);
     # the transcription completes first.
     # 1) A file the engine wrote (if this build honours -osrt/-of).
-    srt_path = _find_srt(output_dir, input_file, outbase)
+    srt_path = _find_srt(output_dir, input_file, outbase, run_started_wall)
     # 2) Otherwise synthesise it from the captured stdout (the robust path).
     if srt_path is None:
         srt_path = _srt_from_stdout(stdout_text, outbase)
@@ -219,14 +222,36 @@ def run_crispasr(
     )
 
 
-def _find_srt(output_dir: str, input_file: str, outbase: str) -> Optional[Path]:
-    """Locate an SRT the engine wrote.  Returns Path if non-empty, else None."""
+def _find_srt(
+    output_dir: str, input_file: str, outbase: str, run_started_wall: float
+) -> Optional[Path]:
+    """Locate an SRT the engine wrote DURING this run.
+
+    Returns Path if non-empty and freshly written, else None.
+
+    v1.9.0 fix (code-review): every candidate is gated on mtime >= run start
+    (2s filesystem-granularity slack). The pipeline reuses ONE shared output
+    dir across a batch, so without the gate, fallback #3 (newest *.srt, no
+    stem filter) could return the PREVIOUS file's SRT as this file's
+    transcript whenever the engine wrote no file for the current input (the
+    documented -osrt-fragile case) and stale files survived (--keep-temp or
+    a skipped cleanup). A pre-existing file is by definition not this run's
+    output — stdout synthesis then takes over, which is the robust path.
+    """
     in_parent = Path(input_file).parent
     in_stem = Path(input_file).stem
+    min_mtime = run_started_wall - 2.0  # slack for coarse filesystem timestamps
+
+    def _fresh(p: Path) -> bool:
+        try:
+            st = p.stat()
+        except OSError:
+            return False
+        return st.st_size > 0 and st.st_mtime >= min_mtime
 
     # 1. The exact -of target.
     expected = Path(outbase + ".srt")
-    if expected.is_file() and expected.stat().st_size > 0:
+    if expected.is_file() and _fresh(expected):
         return expected
 
     # 2. <input_stem>.srt in output_dir or next to the input (whisper.cpp
@@ -235,17 +260,18 @@ def _find_srt(output_dir: str, input_file: str, outbase: str) -> Optional[Path]:
         Path(output_dir) / f"{in_stem}.srt",
         in_parent / f"{in_stem}.srt",
     ):
-        if cand.is_file() and cand.stat().st_size > 0:
+        if cand.is_file() and _fresh(cand):
             return cand
 
-    # 3. Newest non-empty .srt in output_dir or the input's directory.
+    # 3. Newest non-empty .srt in output_dir or the input's directory —
+    #    fresh-only, so a previous batch item's SRT can never be returned.
     srts = sorted(
         list(Path(output_dir).glob("*.srt")) + list(in_parent.glob("*.srt")),
         key=os.path.getmtime,
         reverse=True,
     )
     for s in srts:
-        if s.stat().st_size > 0:
+        if _fresh(s):
             return s
 
     return None
