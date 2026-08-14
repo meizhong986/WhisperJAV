@@ -280,17 +280,23 @@ def _is_japanese_sound_line(text: str) -> bool:
 def _should_remove_entry(text: str) -> bool:
     """Decide whether a subtitle entry should be removed.
 
-    For bilingual entries (Japanese + English lines), the decision is based
-    solely on the Japanese line.  If the Japanese line is sound-only, the
-    entire entry (including any translation) is removed.
+    The decision is based solely on the Japanese lines (bilingual entries'
+    translation lines are ignored). The entry is removed only when EVERY
+    Japanese line is sound-only — a single line with dialogue evidence keeps
+    the whole entry.
+
+    v1.9.0 fix: the original implementation returned on the FIRST Japanese
+    line, so a line-wrapped entry like "はぁはぁ\\nもう我慢できない" was
+    deleted even though its second line is real dialogue. All Japanese lines
+    are now examined.
     """
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     if not lines:
         return False
-    for line in lines:
-        if _contains_japanese(line):
-            return _is_japanese_sound_line(line)
-    return False
+    ja_lines = [ln for ln in lines if _contains_japanese(ln)]
+    if not ja_lines:
+        return False
+    return all(_is_japanese_sound_line(ln) for ln in ja_lines)
 
 
 # ── Filter class ────────────────────────────────────────────────────────

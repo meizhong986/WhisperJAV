@@ -221,6 +221,28 @@ class TestShouldRemoveEntry:
     def test_whitespace_only_kept(self):
         assert not _should_remove_entry("   \n   ")
 
+    # ── v1.9.0 multi-line fix: ALL Japanese lines are examined ─────────
+    # The original implementation returned on the FIRST Japanese line, so
+    # a line-wrapped entry starting with sound-kana lost its dialogue line.
+
+    def test_multiline_sound_then_dialogue_kept(self):
+        # The exact reported failure case: line 2 has 我慢 (kanji evidence).
+        assert not _should_remove_entry("はぁはぁ\nもう我慢できない")
+
+    def test_multiline_dialogue_then_sound_kept(self):
+        assert not _should_remove_entry("もう我慢できない\nはぁはぁ")
+
+    def test_multiline_all_sound_removed(self):
+        assert _should_remove_entry("はぁはぁ\nんっんっ")
+
+    def test_multiline_sound_dialogue_sound_kept(self):
+        # Dialogue sandwiched between sound lines still protects the entry.
+        assert not _should_remove_entry("あぁっ\nやめてください\nはぁはぁ")
+
+    def test_multiline_sound_with_english_translation_removed(self):
+        # Bilingual semantics unchanged: EN lines don't count as evidence.
+        assert _should_remove_entry("はぁはぁ\nんっ\n(heavy breathing)")
+
 
 # ── SRT file integration ───────────────────────────────────────────────
 
