@@ -54,7 +54,11 @@ spec:
   # --- Duration Filters (mapped to 10ms DFSMN frames in the backend) ---
   min_speech_duration_ms: 200
   min_silence_duration_ms: 200
-  max_speech_duration_s: 20    # upstream max_speech_frame default (2000 frames)
+  # v1.9.0: JAV-capped (upstream default 20s allowed ~9s segments in owner
+  # testing; JAV utterances rarely exceed ~5s). Upstream splits overlong runs
+  # at the lowest-probability frame — only segments exceeding the cap are
+  # affected. Gradient matches TEN: conservative 7 / balanced 6 / aggressive 5.
+  max_speech_duration_s: 6
 
   # --- Segment Padding (applied in WhisperJAV, asymmetric) ---
   start_pad_ms: 50
@@ -78,6 +82,7 @@ presets:
     threshold: 0.5
     min_speech_duration_ms: 250
     min_silence_duration_ms: 250
+    max_speech_duration_s: 7
     max_group_duration_s: 7
     end_pad_ms: 250
 
@@ -87,6 +92,7 @@ presets:
     threshold: 0.3
     min_speech_duration_ms: 150
     min_silence_duration_ms: 150
+    max_speech_duration_s: 5
     max_group_duration_s: 5
     end_pad_ms: 100
 

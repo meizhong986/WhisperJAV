@@ -174,15 +174,18 @@ _PARAM_SCHEMAS = {
         "force_cpu":               (bool,  False, False),
         "num_threads":             (int,   1,    False),
     },
-    # v1.9.0 EXPERIMENTAL: FireRedVAD (DFSMN, ~0.6M params). Defaults mirror
-    # upstream README (speech_threshold 0.4, min speech/silence 200ms, max
-    # speech 20s). Grouping defaults match the other backends' YAML balanced.
+    # v1.9.0 EXPERIMENTAL: FireRedVAD (DFSMN, ~0.6M params). Detection defaults
+    # mirror upstream README (speech_threshold 0.4, min speech/silence 200ms);
+    # max_speech is JAV-capped at 6s (upstream default 20s produced ~9s segments
+    # in owner testing — JAV utterances rarely exceed ~5s). Upstream splits
+    # overlong runs at the lowest-probability frame, so the cap only affects
+    # segments that exceed it. Grouping matches the other backends' balanced.
     "firered-vad": {
         "threshold":               (float, 0.4,   False),
         "smooth_window_size":      (int,   5,     False),
         "min_speech_duration_ms":  (int,   200,   False),
         "min_silence_duration_ms": (int,   200,   False),
-        "max_speech_duration_s":   (float, 20.0,  True),
+        "max_speech_duration_s":   (float, 6.0,   True),
         "start_pad_ms":            (int,   50,    False),
         "end_pad_ms":              (int,   150,   False),
         "chunk_threshold_s":       (float, 1.0,   True),

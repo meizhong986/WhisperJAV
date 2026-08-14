@@ -72,7 +72,7 @@ class FireRedVadSpeechSegmenter:
         smooth_window_size: int = 5,
         min_speech_duration_ms: int = 200,
         min_silence_duration_ms: int = 200,
-        max_speech_duration_s: Optional[float] = 20.0,
+        max_speech_duration_s: Optional[float] = 6.0,
         chunk_threshold_s: Optional[float] = 1.0,
         max_group_duration_s: Optional[float] = None,
         start_pad_ms: int = 50,
@@ -93,7 +93,11 @@ class FireRedVadSpeechSegmenter:
                 separate; maps to both min_silence_frame and
                 merge_silence_frame (shorter gaps are merged upstream).
             max_speech_duration_s: Maximum single-segment duration; maps to
-                max_speech_frame. None/0 disables (upstream cap 20s default).
+                max_speech_frame. None/0 falls back to the upstream 20s cap.
+                Default 6s (JAV-capped — upstream's own 20s default allowed
+                ~9s segments; upstream splits overlong runs at the
+                lowest-probability frame, so only segments exceeding the cap
+                are affected).
             chunk_threshold_s: Gap threshold for segment grouping (seconds).
             max_group_duration_s: Maximum duration for a segment group.
             start_pad_ms: Milliseconds to pad before segment start.

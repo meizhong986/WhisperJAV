@@ -66,6 +66,33 @@ class TestClassify:
             == "duration_hallucination"
         )
 
+    # ── v1.9.0 duration-aware slow-CPS trigger ──────────────────────────
+    # The duration term is capped at _CPS_REF_DURATION_S (5s): long
+    # subtitles are retimed only when text is short in ABSOLUTE terms
+    # (< 5 chars at ja MIN_SAFE_CPS 1.0), never for slow delivery alone.
+
+    def test_slow_long_dialog_not_retimed(self):
+        # 8 chars over 9s = 0.89 CPS — legitimate slow JAV delivery.
+        # Old rule would have flagged this (0.89 < 1.0); new rule keeps it.
+        assert self.retimer._classify(text_len=8, duration_s=9.0) == ""
+
+    def test_char_floor_boundary_at_reference(self):
+        # Floor is MIN_SAFE_CPS * 5s = 5 chars: 5 chars is safe, 4 triggers.
+        assert self.retimer._classify(text_len=5, duration_s=9.0) == ""
+        assert (
+            self.retimer._classify(text_len=4, duration_s=9.0)
+            == "abnormally_slow_cps"
+        )
+
+    def test_short_durations_keep_classic_cps_rule(self):
+        # Below the 5s reference the rule is arithmetically the old CPS check:
+        # 3 chars / 4s = 0.75 CPS -> triggers; 4 chars / 4s = 1.0 CPS -> safe.
+        assert (
+            self.retimer._classify(text_len=3, duration_s=4.0)
+            == "abnormally_slow_cps"
+        )
+        assert self.retimer._classify(text_len=4, duration_s=4.0) == ""
+
 
 class TestRetimeSrtFile:
     def test_slow_cps_start_moved_end_fixed(self, tmp_path):
@@ -89,6 +116,15 @@ class TestRetimeSrtFile:
         subs = pysrt.open(str(path), encoding="utf-8")
         assert subs[0].end.ordinal == 30_000
         assert subs[0].start.ordinal == 30_000 - 12_000
+
+    def test_slow_long_dialog_file_untouched(self, tmp_path):
+        # v1.9.0: 8 chars over 9s must survive with original timestamps.
+        path = _make_srt(tmp_path, [(0, 9_000, "あ、そこ、だめです")])
+        stats = CpsStartRetimer().retime_srt_file(path)
+
+        assert stats["retimed_total"] == 0
+        subs = pysrt.open(str(path), encoding="utf-8")
+        assert (subs[0].start.ordinal, subs[0].end.ordinal) == (0, 9_000)
 
     def test_normal_entries_untouched(self, tmp_path):
         entries = [

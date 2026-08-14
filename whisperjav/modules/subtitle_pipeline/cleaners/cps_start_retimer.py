@@ -17,11 +17,24 @@ original-vs-sanitized text and have no meaning for an already-final SRT),
 reusing the same constants from ``sanitization_constants``:
 
     trigger 1 (duration_hallucination): duration > MAX_SUBTITLE_DURATION (12s)
-    trigger 2 (abnormally_slow_cps):    CPS < MIN_SAFE_CPS (1.0), text length
-                                        >= MIN_TEXT_LENGTH_FOR_CPS_CHECK
+    trigger 2 (abnormally_slow_cps):    text is short in ABSOLUTE terms —
+                                        text_len < MIN_SAFE_CPS *
+                                        min(duration, _CPS_REF_DURATION_S)
 
     new_start = end - clamp(len(text) / CHARS_PER_SECOND[lang],
                             MIN_SUBTITLE_DURATION, MAX_SUBTITLE_DURATION)
+
+    v1.9.0 duration-aware refinement of trigger 2 (owner field finding): the
+    original rule (CPS < MIN_SAFE_CPS regardless of length) false-positived on
+    legitimate slow JAV delivery — e.g. 8 characters drawn out over 9 seconds
+    is real speech, not a smear. The actual smear pathology is TINY text over
+    a long window. Capping the duration term at _CPS_REF_DURATION_S turns the
+    check into an absolute-short-text test for long subtitles: at MIN_SAFE_CPS
+    1.0 and reference 5s, a subtitle with >= 5 characters is never
+    CPS-retimed, while 3 characters over 9 seconds still is. For durations
+    <= 5s the rule is arithmetically identical to the original CPS check.
+    Equivalent framing: the effective CPS floor decays as ref/duration beyond
+    the reference — a slower allowed reading speed for longer dialogs.
 
 Both triggers fire only when the current duration EXCEEDS the recomputed one,
 so starts only ever move LATER. That guarantees no new overlap with the
@@ -40,6 +53,11 @@ from whisperjav.config.sanitization_constants import (
     TimingConstants,
 )
 from whisperjav.utils.logger import logger
+
+# Reference duration for the slow-CPS trigger. Below this the check equals the
+# classic CPS < MIN_SAFE_CPS rule; above it the duration term stops growing, so
+# only absolutely-short text (< MIN_SAFE_CPS * this many chars) is retimed.
+_CPS_REF_DURATION_S = 5.0
 
 
 class CpsStartRetimer:
@@ -66,13 +84,19 @@ class CpsStartRetimer:
 
         Mirrors TimingAdjuster's evaluation order: duration-hallucination
         (condition b) is checked before abnormally-slow-CPS (condition d).
+
+        The slow-CPS check is duration-aware (v1.9.0): the duration term is
+        capped at _CPS_REF_DURATION_S, so long subtitles are only retimed
+        when their text is short in absolute terms (the smear pathology),
+        never merely for slow delivery. See the module docstring.
         """
         if duration_s > self._timing.MAX_SUBTITLE_DURATION:
             return "duration_hallucination"
         if (
             text_len >= self._timing.MIN_TEXT_LENGTH_FOR_CPS_CHECK
             and duration_s > 0
-            and (text_len / duration_s) < self._timing.MIN_SAFE_CPS
+            and text_len
+            < self._timing.MIN_SAFE_CPS * min(duration_s, _CPS_REF_DURATION_S)
         ):
             return "abnormally_slow_cps"
         return ""
