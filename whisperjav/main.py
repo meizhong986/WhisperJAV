@@ -1209,10 +1209,17 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         #                    neg_threshold as dead config). qwen3 -> flat
         #                    threshold 0.25. Cohere excluded. Explicit CLI flags
         #                    always win (setdefault).
-        if _gen_backend_early == "anime-whisper":
-            apply_anime_segmenter_defaults(_user_vad_overrides, _qwen_sensitivity)
-        elif _gen_backend_early == "qwen3":
-            _user_vad_overrides.setdefault("threshold", 0.25)
+        # v1.9.0 fix (code-review): these are WhisperSeg-scale values — inject
+        # them ONLY when the segmenter actually is whisperseg. Injecting the
+        # flat 0.25 (or the anime table) as a user-override on TEN/Silero/
+        # FireRedVAD rode above THEIR per-sensitivity YAML presets in
+        # resolve_qwen_sensitivity, silently replacing e.g. TEN's tuned
+        # 0.42/0.32/0.22 gradient and making the sensitivity selector inert.
+        if _qwen_segmenter == "whisperseg":
+            if _gen_backend_early == "anime-whisper":
+                apply_anime_segmenter_defaults(_user_vad_overrides, _qwen_sensitivity)
+            elif _gen_backend_early == "qwen3":
+                _user_vad_overrides.setdefault("threshold", 0.25)
         # v1.9.0: VAD padding routed to pipeline scalars (segmenter_start/end_pad_ms)
         # below, NOT into segmenter_config — the pipeline injects start/end pad at
         # clobber time, so a speech_pad_ms in segmenter_config would be overwritten.
