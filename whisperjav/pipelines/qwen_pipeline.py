@@ -445,16 +445,20 @@ class QwenPipeline(BasePipeline):
         framer_kwargs = {}
         if self.framer_backend == "vad-grouped":
             _framer_segmenter_config = dict(self.segmenter_config or {})
-            # v1.9.0: anime-whisper is VAD_ONLY — the framer's OWN segmenter (built
-            # inside VadGroupedFramer._ensure_segmenter) produces the binding subtitle
+            # v1.9.0: under VAD_ONLY the framer's OWN segmenter (built inside
+            # VadGroupedFramer._ensure_segmenter) produces the binding subtitle
             # boundaries, and it reads padding from segmenter_config only. The
             # pipeline's start/end pad SCALARS are injected into the Phase-4 segmenter
             # (process(), Phase 4) but do NOT reach the framer segmenter — so without
             # this forward, the per-sensitivity Start/End Pad would silently use the
-            # backend's speech_pad_ms fallback instead of the owner's values. Forward
-            # them here so all 5 anime VAD defaults actually bind. Anime-scoped:
-            # qwen3/cohere keep their existing framer segmenter_config untouched.
-            if self.generator_backend == "anime-whisper":
+            # backend's speech_pad_ms fallback instead of the tuned values.
+            # v1.9.0 fix (code-review): originally anime-scoped; with vad_only now
+            # the DEFAULT for qwen3 too, the same forward must apply to qwen3 —
+            # otherwise --qwen-vad-start-pad/--qwen-vad-end-pad and the GUI pad
+            # sliders have zero effect on qwen3 subtitle timing (a silent
+            # regression of the v1.8.15 100/100ms pad retune). Cohere stays
+            # excluded: it runs aligner-first and was scoped out of the retune.
+            if self.generator_backend in ("anime-whisper", "qwen3"):
                 _framer_segmenter_config["start_pad_ms"] = self.segmenter_start_pad_ms
                 _framer_segmenter_config["end_pad_ms"] = self.segmenter_end_pad_ms
             framer_kwargs = {
