@@ -11,10 +11,14 @@ results still depend on your source audio.
 - New two-pass ensemble defaults: anime-whisper + Qwen3-ASR out of the box
 - Subtitle timing overhaul for anime-whisper: far fewer subtitles spanning pauses,
   starts that land on the actual speech
+- Scene detection (semantic) overhaul: scenes now begin at speech onsets, boundary
+  audio duplication cut by ~90%, and a timestamp drift on long files is fixed
 - Cleaner output: sound-only lines removed, absurdly long subtitle durations repaired
 - Three new selectable Japanese models, and one new experimental voice detector
 - Balanced mode is faster (native VAD by default)
 - Qwen pipeline uses less VRAM by default (~1 GB saved)
+- A full code review of the release found and fixed a set of reliability bugs
+  before shipping (details below)
 
 ---
 
@@ -54,6 +58,58 @@ For tinkerers, four new levers appear in the Customize dialog (decoder mode,
 growth floor, gap merge, max speech duration). The previous behavior remains
 selectable.
 
+## Scene detection overhaul (semantic)
+
+Semantic scene detection — the default for the modern pipelines — was audited
+end-to-end against ground-truth clips and reworked where the measurements said
+it hurt:
+
+- **Scenes now begin at speech onsets.** Cuts are placed at real silences
+  (using a calibrated per-file silence floor) and anchored to the *end* of the
+  silence, so trailing quiet stays with the scene that is ending and the next
+  scene opens on sound. Leading silence in an ASR chunk is a known
+  hallucination trigger; this removes it at the source.
+- **Boundary duplication is largely gone.** The fixed 0.35s padding around
+  every scene used to reach into neighbouring speech at most boundaries,
+  putting the same words into two scenes (duplicate subtitles, then clipped
+  timing). Padding is now clamped to the silence actually present: measured
+  duplicated speech per boundary dropped from ~0.38s to ~0.03s on the
+  reference clips (median: zero).
+- **A timestamp drift on long files is fixed.** Scene boundaries drifted late
+  by roughly 2 seconds per hour of video due to a frame-accounting bug; on a
+  two-hour file, late scenes (and every subtitle in them) were seconds off.
+- **Nothing is ever discarded** — this was verified and is now locked in by
+  tests: semantic scenes tile the full file exactly, so every second of audio
+  reaches the voice detector and the recognizer. If a line is missing from
+  the final SRT, scene detection is not the suspect.
+- Scenes exceeding the configured maximum length are not split (unchanged),
+  but are now reported in the console instead of passing silently.
+
+## Reliability fixes from a pre-release code review
+
+A full review of this release's changes surfaced real bugs; the ones a user
+could hit are fixed:
+
+- The sound-only line filter could delete a multi-line subtitle whose first
+  line was breathing kana even when the second line was real dialogue. It now
+  checks every line before dropping anything.
+- The default ensemble's pass 2 (TEN VAD) was silently running at a threshold
+  tuned for a different detector, making the sensitivity selector ineffective
+  there. Each detector now keeps its own tuned values.
+- The Qwen VAD padding knobs (GUI sliders and CLI flags) had no effect under
+  the new default timing mode. They work again.
+- Selecting "Faster-Whisper Native VAD" together with the Fidelity pipeline
+  crashed mid-run; it now falls back with a clear warning (that option only
+  exists for the Balanced engine).
+- The four new VAD decoder levers were missing from the Customize dialog.
+- CLI ensemble with a balanced pass now uses the same fast native-VAD default
+  as the GUI and single-file mode.
+- CrispASR preview hardening: in batches, one file's subtitles can no longer
+  be attributed to the next file; "direct to English" now produces a native
+  transcription with a warning instead of garbage (the engine cannot
+  translate); and an unsupported async combination fails fast instead of
+  crashing.
+
 ## Cleaner subtitle output
 
 - **Sound-only lines are removed.** Lines consisting purely of moan/breathing kana
@@ -66,7 +122,9 @@ selectable.
 - **Absurd durations are repaired** (Qwen pipelines). When a subtitle's duration is
   far too long for its text — a few characters stretched over ten seconds — the
   start is pulled in to match a normal reading speed while the end stays put. The
-  console reports how many lines were retimed, so nothing happens silently.
+  rule is deliberately conservative: a subtitle with five or more characters is
+  never retimed, so slow, drawn-out delivery keeps its real timing. The console
+  reports how many lines were retimed, so nothing happens silently.
 - **Scene-boundary overlaps are resolved** (Qwen pipelines). Duplicate fragments
   and overlapping timestamps at scene joins are cleaned up automatically.
 
@@ -91,9 +149,11 @@ download from Hugging Face on first use.
 
 A tiny (~2 MB) multilingual voice-activity model, added as an **experimental**
 speech-segmentation option for early feedback. It is not installed by default —
-select it in the GUI and it will tell you to run `pip install fireredvad`. Its
-presets are first-pass values, not yet tuned on JAV ground truth like WhisperSeg's.
-Feedback welcome on the issue tracker.
+the GUI shows it as "(N/A)" until you run `pip install fireredvad` inside
+WhisperJAV's Python environment. Segment length is capped at JAV-appropriate
+values (5–7s by sensitivity; early testing with the upstream 20s cap produced
+overlong segments). Its presets are first-pass values, not yet tuned on JAV
+ground truth like WhisperSeg's. Feedback welcome on the issue tracker.
 
 ## Qwen pipeline: VAD-first timestamps by default
 
