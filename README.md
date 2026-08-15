@@ -74,8 +74,8 @@ flowchart LR
     F --> G[.srt]
 ```
 
-- **Scene detection** splits the audio at natural breaks instead of fixed-length chunks, so sentences are not cut mid-word and each chunk has consistent acoustics.
-- **Speech enhancement** (off by default) can clean audio per-scene — used surgically, per the pre-processing paradox above.
+- **Scene detection** uses the media characteristics to cut by predicted scenes. This allows the downstream VAD and ASR to receive chunks which have similar DNA.
+- **Speech enhancement** (off by default) can clean audio per-scene — used surgically, per the pre-processing paradox above. 
 - **Speech segmentation (VAD)** finds where speech actually is inside each scene. This choice matters more than most settings: it decides what the model hears and, in the modern pipelines, where your subtitle timestamps come from.
 - **The ASR model** turns speech into text.
 - **Post-processing** is the Japanese-specific cleanup pass:
