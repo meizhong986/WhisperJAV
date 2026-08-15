@@ -143,6 +143,10 @@ class WhisperJAVAPI:
         if mode == 'transformers':
             return self._build_transformers_args(args, options)
 
+        # Handle CrispASR mode separately (external provider, --crispasr-* args)
+        if mode == 'crispasr':
+            return self._build_crispasr_args(args, options)
+
         # Source audio language (for transcription)
         source_language = options.get('source_language', 'japanese')
         args += ["--language", source_language]
@@ -283,6 +287,58 @@ class WhisperJAVAPI:
             args += ["--debug"]
 
         # Output format (srt/vtt/both)
+        output_format = options.get('output_format', 'srt')
+        if output_format and output_format != 'srt':
+            args += ["--output-format", output_format]
+
+        if options.get('accept_cpu_mode', False):
+            args += ["--accept-cpu-mode"]
+
+        return args
+
+    def _build_crispasr_args(self, args: List[str], options: Dict[str, Any]) -> List[str]:
+        """
+        Build CLI arguments for CrispASR mode (single --mode crispasr).
+
+        CrispASR is a self-contained external provider invoked via dedicated
+        --crispasr-* arguments. It does not use sensitivity / scene / segmenter
+        presets (those are for the in-process pipelines).
+        """
+        # Source / subtitle language
+        source_language = options.get('source_language', 'japanese')
+        args += ["--language", source_language]
+
+        subs_language = options.get('subs_language', 'native')
+        args += ["--subs-language", subs_language]
+
+        # Output directory
+        output_dir = options.get('output_dir', self.default_output)
+        args += ["--output-dir", output_dir]
+
+        # CrispASR-specific args
+        crispasr_exe = (options.get('crispasr_exe') or '').strip()
+        if crispasr_exe:
+            args += ["--crispasr-exe", crispasr_exe]
+
+        crispasr_backend = (options.get('crispasr_backend') or '').strip()
+        if crispasr_backend:
+            args += ["--crispasr-backend", crispasr_backend]
+
+        crispasr_args = (options.get('crispasr_args') or '').strip()
+        if crispasr_args:
+            args += ["--crispasr-args", crispasr_args]
+
+        # Common arguments
+        temp_dir = options.get('temp_dir', '').strip()
+        if temp_dir:
+            args += ["--temp-dir", temp_dir]
+
+        if options.get('keep_temp', False):
+            args += ["--keep-temp"]
+
+        if options.get('debug', False):
+            args += ["--debug"]
+
         output_format = options.get('output_format', 'srt')
         if output_format and output_format != 'srt':
             args += ["--output-format", output_format]
@@ -726,6 +782,57 @@ class WhisperJAVAPI:
         except Exception as e:
             return {"success": False, "message": str(e)}
 
+    def select_crispasr_exe(self) -> Dict[str, Any]:
+        """Open a file dialog to select the CrispASR executable."""
+        windows = webview.windows
+        if not windows:
+            return {"success": False, "message": "No active window"}
+
+        window = windows[0]
+        file_types = [
+            'Executable Files (*.exe)',
+            'All Files (*.*)'
+        ]
+
+        result = window.create_file_dialog(
+            FileDialog.OPEN,
+            allow_multiple=False,
+            file_types=file_types
+        )
+
+        if result and len(result) > 0:
+            return {"success": True, "path": result[0]}
+        return {"success": False, "message": "No file selected"}
+
+    def get_crispasr_preferences(self) -> Dict[str, Any]:
+        """Return persisted CrispASR preferences from asr_config.json.
+
+        Stored under a dedicated `crispasr` key (NOT `byop` — CrispASR is
+        not BYOP/XXL coupled).
+        """
+        try:
+            from whisperjav.config.manager import ConfigManager
+            mgr = ConfigManager()
+            prefs = mgr.get_ui_preferences()
+            return prefs.get('crispasr', {})
+        except Exception:
+            return {}
+
+    def save_crispasr_preferences(self, prefs: Dict[str, Any]) -> Dict[str, Any]:
+        """Persist CrispASR preferences (crispasr_exe_path, crispasr_extra_args)."""
+        try:
+            from whisperjav.config.manager import ConfigManager
+            mgr = ConfigManager()
+            ui_prefs = mgr.get_ui_preferences()
+            crispasr = ui_prefs.get('crispasr', {})
+            crispasr.update(prefs)
+            ui_prefs['crispasr'] = crispasr
+            mgr.update_ui_preferences(ui_prefs)
+            mgr.save_config()
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
     def open_output_folder(self, path: str) -> Dict[str, Any]:
         """
         Open output folder in file explorer.
@@ -1053,6 +1160,7 @@ class WhisperJAVAPI:
             "nemo-lite": "nemo-speech-segmentation.yaml",
             "silero-v6.2": "silero-v6-speech-segmentation.yaml",
             "whisperseg": "whisperseg-speech-segmentation.yaml",
+            "firered-vad": "firered-vad-speech-segmentation.yaml",  # v1.9.0 experimental
         }
 
         # Handle "none" backend
@@ -1830,13 +1938,49 @@ class WhisperJAVAPI:
             }
         }
 
-    def get_qwen_schema(self) -> Dict[str, Any]:
+    def get_qwen_schema(self, sensitivity: str = "balanced",
+                        generator_backend: str = "qwen3") -> Dict[str, Any]:
         """
-        Get parameter schema for Qwen3-ASR pipeline customize modal.
+        Get parameter schema for the Qwen / ChronosJAV customize modal.
 
-        Returns the schema used by the frontend to generate the customize
-        modal UI for Qwen3-ASR pipeline parameters.  Organized into 5
-        pipeline-stage sections: model, audio, generation, alignment, output.
+        For the **anime-whisper** backend, the WhisperSeg VAD fields (Frame
+        Gap, Max Group, VAD Threshold, Start/End Pad, and the v1.9.0 offline-
+        decoder levers: Decoder, Grow Floor, Gap Cut, Max Speech Duration) are
+        defaulted from the owner's per-sensitivity table (single source of
+        truth) so the Customize dialog shows exactly what will run at the
+        pass's selected sensitivity.
+        Balanced is the fallback for an unknown sensitivity. qwen3 / cohere are
+        unaffected (they keep the static schema defaults).
+        """
+        result = self._get_qwen_schema_base()
+        if generator_backend == "anime-whisper" and result.get("success"):
+            from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
+            aw = anime_whisperseg_defaults(sensitivity)
+            audio = result["schema"]["audio"]
+            audio["chunk_threshold_ms"]["default"] = int(round(aw["chunk_threshold_s"] * 1000))
+            audio["max_group_duration"]["default"] = aw["max_group_duration_s"]
+            audio["vad_threshold"]["default"] = aw["threshold"]
+            audio["vad_start_pad"]["default"] = int(aw["start_pad_ms"])
+            audio["vad_end_pad"]["default"] = int(aw["end_pad_ms"])
+            # v1.9.0 offline-decoder levers — table-driven where the row pins
+            # them (aggressive); other sensitivities keep the schema defaults.
+            if "segmentation_decoder" in aw:
+                audio["vad_decoder"]["default"] = aw["segmentation_decoder"]
+            if "grow_floor" in aw:
+                audio["vad_grow_floor"]["default"] = aw["grow_floor"]
+            if "gap_merge_ms" in aw:
+                audio["vad_gap_merge_ms"]["default"] = int(aw["gap_merge_ms"])
+            if "max_speech_duration_s" in aw:
+                audio["max_speech_duration"]["default"] = aw["max_speech_duration_s"]
+        return result
+
+    def _get_qwen_schema_base(self) -> Dict[str, Any]:
+        """
+        Build the static Qwen customize-modal schema (backend-agnostic).
+
+        Organized into 5 pipeline-stage sections: model, audio, generation,
+        alignment, output. Anime-whisper per-sensitivity overrides are applied
+        by the public get_qwen_schema() wrapper.
         """
         return {
             "success": True,
@@ -1849,9 +1993,17 @@ class WhisperJAVAPI:
                         "options": [
                             {"value": "Qwen/Qwen3-ASR-1.7B", "label": "Qwen3-ASR-1.7B (8GB VRAM)"},
                             {"value": "Qwen/Qwen3-ASR-0.6B", "label": "Qwen3-ASR-0.6B (4GB VRAM)"},
+                            # v1.9.0 (R6.4): galgame/anime SFT of the 1.7B base.
+                            {"value": "jaykwok/Qwen3-ASR-1.7B-JA-Anime-Galgame",
+                             "label": "JA Anime-Galgame 1.7B (jaykwok finetune, 8GB VRAM)"},
+                            # v1.9.0 (R6.1): proper-noun/kanji-focused JA finetune.
+                            {"value": "neosophie/Qwen3-ASR-1.7B-JA",
+                             "label": "JA-tuned 1.7B (neosophie finetune, 8GB VRAM)"},
                         ],
                         "default": "Qwen/Qwen3-ASR-1.7B",
-                        "description": "1.7B is more accurate, 0.6B is faster and uses less VRAM",
+                        "description": "1.7B is more accurate, 0.6B is faster and uses less VRAM. "
+                                       "The JA finetunes are 1.7B-class (8GB): Anime-Galgame is "
+                                       "dialogue-tuned; neosophie targets proper nouns.",
                     },
                     "language": {
                         "type": "dropdown",
@@ -1944,35 +2096,78 @@ class WhisperJAVAPI:
                         "min": 20, "max": 300, "step": 5,
                         "default": 48,
                     },
-                    "chunk_threshold": {
+                    "chunk_threshold_ms": {
                         "type": "slider",
-                        "label": "Frame Gap Threshold",
-                        "description": "Silence gap (seconds) that splits speech into separate frames. Lower = more smaller frames, higher = fewer larger frames.",
-                        "min": 0.3, "max": 5.0, "step": 0.1,
-                        "default": 1.0,
+                        "label": "Frame Gap Threshold (ms)",
+                        "description": "Max silence gap (ms) between two segments that can still be grouped together. Gaps larger than this start a new group. JAV default: 300ms.",
+                        "min": 100, "max": 2000, "step": 50,
+                        "default": 300,
                     },
                     "max_group_duration": {
                         "type": "slider",
-                        "label": "Max Group Duration",
-                        "description": "Maximum duration for VAD segment grouping",
-                        "min": 3, "max": 60, "step": 1,
-                        "default": 6,
+                        "label": "Max Group Duration (s)",
+                        "description": "Maximum duration (seconds) for a grouped VAD segment sent to ASR. JAV default: 3.0s.",
+                        "min": 1.0, "max": 14.0, "step": 0.5,
+                        "default": 3.0,
                     },
                     "vad_threshold": {
                         "type": "slider",
                         "label": "VAD Threshold",
-                        "description": "Speech detection probability threshold. Overrides sensitivity preset. Lower = more sensitive.",
+                        "description": "Speech detection probability threshold. Overrides sensitivity preset. Lower = more sensitive. JAV default: 0.25.",
                         "group": "vad_settings",
                         "min": 0.05, "max": 0.80, "step": 0.05,
-                        "default": 0.35,
+                        "default": 0.25,
                     },
-                    "vad_padding": {
+                    "vad_start_pad": {
                         "type": "slider",
-                        "label": "VAD Padding (ms)",
-                        "description": "Padding around detected speech segments (ms). Overrides sensitivity preset.",
+                        "label": "VAD Start Pad (ms)",
+                        "description": "Padding added before each speech segment (ms). JAV default: 100ms.",
                         "group": "vad_settings",
-                        "min": 50, "max": 600, "step": 25,
-                        "default": 250,
+                        "min": 0, "max": 600, "step": 50,
+                        "default": 100,
+                    },
+                    "vad_end_pad": {
+                        "type": "slider",
+                        "label": "VAD End Pad (ms)",
+                        "description": "Padding added after each speech segment (ms). Capturing end-of-speech is critical for JAV ASR accuracy. JAV default: 100ms.",
+                        "group": "vad_settings",
+                        "min": 0, "max": 800, "step": 50,
+                        "default": 100,
+                    },
+                    "vad_decoder": {
+                        "type": "dropdown",
+                        "label": "VAD Decoder",
+                        "description": "How speech probabilities become segments. Offline (two-level): seeds at VAD Threshold, edges grow to the Grow Floor, dialogs cut at pauses >= Gap Cut. Hysteresis: vendor streaming state machine (ChickenRice lineage).",
+                        "group": "vad_settings",
+                        "options": [
+                            {"value": "offline", "label": "Offline two-level (default)"},
+                            {"value": "hysteresis", "label": "Hysteresis (ChickenRice)"},
+                        ],
+                        "default": "offline",
+                    },
+                    "vad_grow_floor": {
+                        "type": "slider",
+                        "label": "VAD Grow Floor",
+                        "description": "Offline decoder: segment edges extend while probability stays above this floor. The capture-vs-cut dial: lower keeps more quiet/whispered speech and cuts fewer pauses; higher trims tails and cuts more pauses.",
+                        "group": "vad_settings",
+                        "min": 0.01, "max": 0.30, "step": 0.01,
+                        "default": 0.05,
+                    },
+                    "vad_gap_merge_ms": {
+                        "type": "slider",
+                        "label": "VAD Gap Cut (ms)",
+                        "description": "Offline decoder: pauses at least this long (below the Grow Floor) split dialogs into separate segments; shorter pauses are absorbed.",
+                        "group": "vad_settings",
+                        "min": 100, "max": 1000, "step": 50,
+                        "default": 350,
+                    },
+                    "max_speech_duration": {
+                        "type": "slider",
+                        "label": "Max Speech Duration (s)",
+                        "description": "Single-segment ceiling. Segments longer than this are split at the quietest point (offline decoder) or per the force-split mode (hysteresis).",
+                        "group": "vad_settings",
+                        "min": 2.0, "max": 10.0, "step": 0.5,
+                        "default": 4.0,
                     },
                 },
                 # ── Tab 3: Generation ─────────────────────────────────
@@ -2042,14 +2237,14 @@ class WhisperJAVAPI:
                     "timestamp_mode": {
                         "type": "dropdown",
                         "label": "Timestamp Mode",
-                        "description": "How word timestamps are resolved from aligner output",
+                        "description": "How subtitle timestamps are resolved (VAD frames or ForcedAligner)",
                         "options": [
-                            {"value": "aligner_vad_fallback", "label": "Aligner + VAD Fallback (Recommended)"},
+                            {"value": "vad_only", "label": "VAD Only (Recommended — no aligner loaded)"},
+                            {"value": "aligner_vad_fallback", "label": "Aligner + VAD Fallback"},
                             {"value": "aligner_interpolation", "label": "Aligner + Interpolation"},
                             {"value": "aligner_only", "label": "Aligner Only (no recovery on collapse)"},
-                            {"value": "vad_only", "label": "VAD Only (no aligner loaded)"},
                         ],
-                        "default": "aligner_vad_fallback",
+                        "default": "vad_only",
                     },
                     "stepdown": {
                         "type": "checkbox",
@@ -2223,7 +2418,7 @@ class WhisperJAVAPI:
     # Two-Pass Ensemble Methods
     # ========================================================================
 
-    def get_pipeline_defaults(self, pipeline: str, sensitivity: str) -> Dict[str, Any]:
+    def get_pipeline_defaults(self, pipeline: str, sensitivity: str, segmenter: str = None) -> Dict[str, Any]:
         """
         Get resolved parameters for a pipeline+sensitivity combination.
 
@@ -2267,6 +2462,21 @@ class WhisperJAVAPI:
                 sensitivity=sensitivity,
                 task='transcribe'
             )
+
+            # v1.9.0: reflect the runtime balanced VAD defaults in the Customize
+            # panel — native faster_whisper_vad preset (e.g. threshold 0.40), or the
+            # Test-D fine-grained grouping for an external segmenter on balanced —
+            # instead of the raw silero preset. Legacy (non-V3) configs only. Uses
+            # the SAME shared helper main.py / pass_worker apply at run time, so the
+            # panel shows what will actually run.
+            if segmenter and 'asr' not in config.get('params', {}):
+                from whisperjav.config.legacy import apply_balanced_vad_defaults
+                config.setdefault('params', {}).setdefault('speech_segmenter', {})['backend'] = segmenter
+                apply_balanced_vad_defaults(
+                    config,
+                    sensitivity=sensitivity,
+                    is_balanced=(pipeline == 'balanced'),
+                )
 
             # Determine scene detection method (default: auditok)
             scene_detection_method = 'auditok'
@@ -2506,7 +2716,13 @@ class WhisperJAVAPI:
             p1_pipeline = 'qwen'
         args += ["--pass1-pipeline", p1_pipeline]
 
-        if pass1.get('isTransformers'):
+        crispasr_p1 = pass1.get('isCrispasr') or p1_pipeline == 'crispasr'
+        if crispasr_p1:
+            # CrispASR pass: self-contained external provider. No sensitivity /
+            # params / scene / segmenter / enhancer / model. The shared
+            # --crispasr-* flags are emitted once after both passes.
+            pass
+        elif pass1.get('isTransformers'):
             # Transformers pass: no sensitivity, handle HF params
             if pass1.get('customized') and pass1.get('params'):
                 args += ["--pass1-hf-params", json.dumps(pass1['params'])]
@@ -2517,6 +2733,10 @@ class WhisperJAVAPI:
                 args += ["--pass1-sensitivity", pass1['sensitivity']]
             # Always inject framer from state (even when not customized)
             qwen1_params = dict(pass1.get('params') or {}) if pass1.get('customized') else {}
+            # v1.9.0: GUI stores Frame Gap in ms (chunk_threshold_ms); the CLI/pipeline
+            # contract is seconds (chunk_threshold). Convert at pack time.
+            if 'chunk_threshold_ms' in qwen1_params:
+                qwen1_params['chunk_threshold'] = float(qwen1_params.pop('chunk_threshold_ms')) / 1000.0
             if pass1.get('framer'):
                 qwen1_params['framer'] = pass1['framer']
             if pass1.get('isAnimeWhisper'):
@@ -2546,51 +2766,54 @@ class WhisperJAVAPI:
             if pass1.get('customized') and pass1.get('params'):
                 args += ["--pass1-params", json.dumps(pass1['params'])]
 
-        # Pass 1: Scene Detector
-        # Note: All pipelines use --pass1-scene-detector. For Qwen, pass_worker.py
-        # translates this to qwen_scene parameter.
-        scene1 = pass1.get('sceneDetector')
-        if scene1 and scene1 != 'none':
-            args += ["--pass1-scene-detector", scene1]
+        # Pass 1: Scene/Segmenter/Enhancer/Model — skipped for CrispASR
+        # (external provider; same pattern as the BYOP XXL skip in pass 2).
+        if not crispasr_p1:
+            # Pass 1: Scene Detector
+            # Note: All pipelines use --pass1-scene-detector. For Qwen, pass_worker.py
+            # translates this to qwen_scene parameter.
+            scene1 = pass1.get('sceneDetector')
+            if scene1 and scene1 != 'none':
+                args += ["--pass1-scene-detector", scene1]
 
-        # Pass 1: Speech Segmenter
-        # - Transformers: Skip (uses HF internal chunking)
-        # - Qwen/Legacy: Use --pass1-speech-segmenter (pass_worker.py translates to qwen_segmenter for Qwen)
-        segmenter1 = pass1.get('speechSegmenter')
-        if pass1.get('isTransformers'):
-            # Transformers: Skip segmenter entirely (HF internal chunking)
-            pass
-        else:
-            # Both Qwen and Legacy use --pass1-speech-segmenter
-            # For Qwen: pass_worker.py translates to qwen_segmenter (post-ASR VAD filter)
-            # For Legacy: used as pre-ASR speech segmentation
-            if segmenter1:  # Pass any value including "none" to disable
-                args += ["--pass1-speech-segmenter", segmenter1]
-
-        # Pass 1: Speech Enhancer
-        # Note: All pipelines use --pass1-speech-enhancer. For Qwen, pass_worker.py
-        # translates this to qwen_enhancer parameter.
-        enhancer1 = pass1.get('speechEnhancer')
-        if enhancer1 and enhancer1 != 'none':
-            # Handle FFmpeg DSP with selected effects
-            if enhancer1 == 'ffmpeg-dsp':
-                dsp_effects = pass1.get('dspEffects', ['loudnorm'])
-                effects_str = ','.join(dsp_effects) if dsp_effects else 'loudnorm'
-                args += ["--pass1-speech-enhancer", f"ffmpeg-dsp:{effects_str}"]
+            # Pass 1: Speech Segmenter
+            # - Transformers: Skip (uses HF internal chunking)
+            # - Qwen/Legacy: Use --pass1-speech-segmenter (pass_worker.py translates to qwen_segmenter for Qwen)
+            segmenter1 = pass1.get('speechSegmenter')
+            if pass1.get('isTransformers'):
+                # Transformers: Skip segmenter entirely (HF internal chunking)
+                pass
             else:
-                args += ["--pass1-speech-enhancer", enhancer1]
+                # Both Qwen and Legacy use --pass1-speech-segmenter
+                # For Qwen: pass_worker.py translates to qwen_segmenter (post-ASR VAD filter)
+                # For Legacy: used as pre-ASR speech segmentation
+                if segmenter1:  # Pass any value including "none" to disable
+                    args += ["--pass1-speech-segmenter", segmenter1]
 
-        # Pass 1: Enhance-for-VAD (dual-track: enhanced audio for VAD, original for ASR)
-        # Only effective for Qwen pipeline; pass_worker.py silently ignores for others.
-        if pass1.get('enhanceForVad') and enhancer1 and enhancer1 not in ('none', ''):
-            args += ["--pass1-enhance-for-vad"]
+            # Pass 1: Speech Enhancer
+            # Note: All pipelines use --pass1-speech-enhancer. For Qwen, pass_worker.py
+            # translates this to qwen_enhancer parameter.
+            enhancer1 = pass1.get('speechEnhancer')
+            if enhancer1 and enhancer1 != 'none':
+                # Handle FFmpeg DSP with selected effects
+                if enhancer1 == 'ffmpeg-dsp':
+                    dsp_effects = pass1.get('dspEffects', ['loudnorm'])
+                    effects_str = ','.join(dsp_effects) if dsp_effects else 'loudnorm'
+                    args += ["--pass1-speech-enhancer", f"ffmpeg-dsp:{effects_str}"]
+                else:
+                    args += ["--pass1-speech-enhancer", enhancer1]
 
-        # Pass 1: Model
-        # Note: All pipelines use --pass1-model. For Qwen, pass_worker.py
-        # translates this to qwen_model_id parameter.
-        model1 = pass1.get('model')
-        if model1:
-            args += ["--pass1-model", model1]
+            # Pass 1: Enhance-for-VAD (dual-track: enhanced audio for VAD, original for ASR)
+            # Only effective for Qwen pipeline; pass_worker.py silently ignores for others.
+            if pass1.get('enhanceForVad') and enhancer1 and enhancer1 not in ('none', ''):
+                args += ["--pass1-enhance-for-vad"]
+
+            # Pass 1: Model
+            # Note: All pipelines use --pass1-model. For Qwen, pass_worker.py
+            # translates this to qwen_model_id parameter.
+            model1 = pass1.get('model')
+            if model1:
+                args += ["--pass1-model", model1]
 
         # Pass 2 configuration
         pass2 = config.get('pass2', {})
@@ -2610,6 +2833,11 @@ class WhisperJAVAPI:
                 if xxl_exe:
                     args += ["--xxl-exe", xxl_exe]
                 # Skip all pipeline-specific args — XXL handles everything internally
+            elif pass2.get('isCrispasr') or p2_pipeline == 'crispasr':
+                # CrispASR pass: self-contained external provider. The shared
+                # --crispasr-* flags are emitted once after both passes.
+                # No sensitivity / params here.
+                pass
             elif pass2.get('isTransformers'):
                 # Transformers pass: no sensitivity, handle HF params
                 if pass2.get('customized') and pass2.get('params'):
@@ -2621,6 +2849,9 @@ class WhisperJAVAPI:
                     args += ["--pass2-sensitivity", pass2['sensitivity']]
                 # Always inject framer from state (even when not customized)
                 qwen2_params = dict(pass2.get('params') or {}) if pass2.get('customized') else {}
+                # v1.9.0: GUI stores Frame Gap in ms; convert to seconds at pack time.
+                if 'chunk_threshold_ms' in qwen2_params:
+                    qwen2_params['chunk_threshold'] = float(qwen2_params.pop('chunk_threshold_ms')) / 1000.0
                 if pass2.get('framer'):
                     qwen2_params['framer'] = pass2['framer']
                 if pass2.get('isAnimeWhisper'):
@@ -2644,8 +2875,10 @@ class WhisperJAVAPI:
                 if pass2.get('customized') and pass2.get('params'):
                     args += ["--pass2-params", json.dumps(pass2['params'])]
 
-            # Pass 2: Scene/Segmenter/Enhancer/Model — skip for BYOP XXL (external tool)
-            if not (pass2.get('isXxl') or p2_pipeline == 'xxl'):
+            # Pass 2: Scene/Segmenter/Enhancer/Model — skip for BYOP XXL and
+            # CrispASR (both external/self-contained providers)
+            if not (pass2.get('isXxl') or p2_pipeline == 'xxl'
+                    or pass2.get('isCrispasr') or p2_pipeline == 'crispasr'):
                 # Pass 2: Scene Detector
                 # Note: All pipelines use --pass2-scene-detector. For Qwen, pass_worker.py
                 # translates this to qwen_scene parameter.
@@ -2690,6 +2923,27 @@ class WhisperJAVAPI:
                 model2 = pass2.get('model')
                 if model2:
                     args += ["--pass2-model", model2]
+
+        # CrispASR shared flags — emitted once for whichever pass(es) use it.
+        # The CLI uses single --crispasr-* flags (like --xxl-exe), so when both
+        # passes are CrispASR with different backends, pass 1's backend wins.
+        p1_is_crispasr = pass1.get('isCrispasr') or p1_pipeline == 'crispasr'
+        p2_is_crispasr = pass2.get('enabled', False) and (
+            pass2.get('isCrispasr') or pass2.get('pipeline') == 'crispasr'
+        )
+        if p1_is_crispasr or p2_is_crispasr:
+            crispasr_exe = (config.get('crispasrExe') or '').strip()
+            if crispasr_exe:
+                args += ["--crispasr-exe", crispasr_exe]
+            crispasr_backend = (
+                pass1.get('crispasrBackend') if p1_is_crispasr
+                else pass2.get('crispasrBackend')
+            )
+            if crispasr_backend:
+                args += ["--crispasr-backend", str(crispasr_backend)]
+            crispasr_args = (config.get('crispasrArgs') or '').strip()
+            if crispasr_args:
+                args += ["--crispasr-args", crispasr_args]
 
         # Merge strategy (default: pass1_primary - Pass 1 as base, fill gaps from Pass 2)
         merge_strategy = config.get('merge_strategy', 'pass1_primary')

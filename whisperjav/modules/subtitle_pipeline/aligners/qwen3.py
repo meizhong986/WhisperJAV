@@ -14,7 +14,9 @@ VRAM cleanup (audit M5 resolution):
 """
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Union
+
+import numpy as np
 
 from whisperjav.modules.subtitle_pipeline.types import AlignmentResult, WordTimestamp
 from whisperjav.utils.logger import logger
@@ -32,6 +34,11 @@ class Qwen3ForcedAlignerAdapter:
     aligner timestamps.  This step is Qwen3-specific — it understands Qwen3's
     particular text/punctuation format.
     """
+
+    # v1.9.0: Qwen3 ForcedAligner.align() accepts (np.ndarray, sr) AudioLike, so
+    # this aligner can consume in-memory frame audio — letting the orchestrator run
+    # pathless (no per-VAD-group temp WAVs) even when an aligner is present.
+    accepts_array = True
 
     def __init__(
         self,
@@ -104,7 +111,7 @@ class Qwen3ForcedAlignerAdapter:
 
     def align(
         self,
-        audio_path: Path,
+        audio_path: Union[Path, np.ndarray],
         text: str,
         language: str = "ja",
         **kwargs: Any,
@@ -130,7 +137,7 @@ class Qwen3ForcedAlignerAdapter:
 
     def align_batch(
         self,
-        audio_paths: list[Path],
+        audio_paths: list[Union[Path, np.ndarray]],
         texts: list[str],
         language: str = "ja",
         **kwargs: Any,

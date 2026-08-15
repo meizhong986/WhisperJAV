@@ -228,5 +228,9 @@ class SceneDiagnostics:
     hardening_sorted: bool = False
     stepdown: Optional[dict] = None  # {"attempted": bool, "enabled": bool, "improved": bool}
     vad_regions: Optional[list] = None
+    # "3a" audit trail (vad_only): per-frame {vad_start, vad_end, speech_start,
+    # internal_breaks}. vad_start/vad_end are the RAW boundaries fed to the ASR;
+    # speech_start is the refined display start actually used for the subtitle.
+    frame_timing: Optional[list] = None
     group_details: Optional[list] = None
     error: Optional[str] = None

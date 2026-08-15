@@ -25,7 +25,7 @@ VRAM cleanup:
 
 import os
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import numpy as np
 
@@ -40,6 +40,13 @@ class AnimeWhisperGenerator:
     Uses WhisperProcessor + WhisperForConditionalGeneration directly,
     loading audio via librosa and running model.generate() under torch.no_grad().
     """
+
+    # v1.9.0: this generator can consume in-memory 16kHz mono float32 numpy
+    # arrays directly (not just file paths). The orchestrator reads this flag to
+    # skip the per-VAD-group temp WAV write when no aligner is present
+    # (anime-whisper runs vad_only). See _load_audio() and the orchestrator's
+    # pathless slicing branch.
+    accepts_array = True
 
     def __init__(
         self,
@@ -183,31 +190,43 @@ class AnimeWhisperGenerator:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _load_audio(audio_path: Path) -> np.ndarray:
+    def _load_audio(audio: Union[Path, np.ndarray]) -> np.ndarray:
         """
-        Load audio file as float32 numpy array at 16kHz mono.
+        Return a float32 numpy array at 16kHz mono.
 
-        Uses librosa (proven path from working anime-whisper scripts).
-        Falls back to soundfile if librosa fails.
+        Accepts EITHER a file path OR an already-in-memory numpy array:
+
+        - np.ndarray (v1.9.0 pathless mode): assumed 16kHz mono per the
+          scene-audio contract; downmixed to mono and cast to float32 with NO
+          disk round-trip. This is what lets the orchestrator skip the
+          per-VAD-group temp WAV write entirely.
+        - Path: loaded via librosa at 16kHz (proven anime-whisper path), with a
+          soundfile + resample fallback.
         """
+        if isinstance(audio, np.ndarray):
+            arr = audio
+            if arr.ndim > 1:
+                arr = arr.mean(axis=1)
+            return arr.astype(np.float32, copy=False)
+
         import librosa
 
         try:
-            audio, _sr = librosa.load(str(audio_path), sr=16000)
-            return audio
+            loaded, _sr = librosa.load(str(audio), sr=16000)
+            return loaded
         except Exception as e:
             logger.warning(
                 "[AnimeWhisperGenerator] librosa failed for %s: %s — trying soundfile",
-                audio_path.name if hasattr(audio_path, "name") else audio_path, e,
+                audio.name if hasattr(audio, "name") else audio, e,
             )
             import soundfile as sf
-            audio, sr = sf.read(str(audio_path))
+            loaded, sr = sf.read(str(audio))
             if sr != 16000:
-                audio = librosa.resample(audio, orig_sr=sr, target_sr=16000)
+                loaded = librosa.resample(loaded, orig_sr=sr, target_sr=16000)
             # Ensure mono
-            if audio.ndim > 1:
-                audio = audio.mean(axis=1)
-            return audio.astype(np.float32)
+            if loaded.ndim > 1:
+                loaded = loaded.mean(axis=1)
+            return loaded.astype(np.float32)
 
     # ------------------------------------------------------------------
     # Generation
@@ -215,16 +234,17 @@ class AnimeWhisperGenerator:
 
     def generate(
         self,
-        audio_path: Path,
+        audio_path: Union[Path, np.ndarray],
         language: str = "ja",
         context: Optional[str] = None,
         **kwargs: Any,
     ) -> TranscriptionResult:
         """
-        Transcribe a single audio file to text.
+        Transcribe a single audio source to text.
 
         Args:
-            audio_path: Path to the audio file (WAV, 16kHz mono expected).
+            audio_path: Path to the audio file (WAV, 16kHz mono expected) OR an
+                in-memory numpy array (16kHz mono float32) in pathless mode.
             language: Language code (ignored — model is Japanese-only).
             context: IGNORED.  anime-whisper's model card explicitly warns
                 that initial prompts cause hallucinations.
@@ -288,19 +308,22 @@ class AnimeWhisperGenerator:
             language="ja",
             metadata={
                 "generator": "anime-whisper",
-                "audio_path": str(audio_path),
+                "audio_path": str(audio_path) if isinstance(audio_path, Path) else "<in-memory>",
             },
         )
 
     def generate_batch(
         self,
-        audio_paths: list[Path],
+        audio_paths: list[Union[Path, np.ndarray]],
         language: str = "ja",
         contexts: Optional[list[str]] = None,
         **kwargs: Any,
     ) -> list[TranscriptionResult]:
         """
-        Transcribe a batch of audio files to text.
+        Transcribe a batch of audio sources to text.
+
+        Each entry may be a file path OR an in-memory numpy array (16kHz mono
+        float32) — see generate().
 
         Processes one file at a time (Whisper encoder takes fixed-size
         mel spectrogram per utterance).  The VRAM lifecycle (load/unload)
@@ -325,7 +348,7 @@ class AnimeWhisperGenerator:
             logger.debug(
                 "[AnimeWhisperGenerator] Generating %d/%d: %s",
                 i + 1, len(audio_paths),
-                audio_path.name if hasattr(audio_path, "name") else audio_path,
+                audio_path.name if isinstance(audio_path, Path) else "<in-memory array>",
             )
             result = self.generate(audio_path, language=language)
             results.append(result)

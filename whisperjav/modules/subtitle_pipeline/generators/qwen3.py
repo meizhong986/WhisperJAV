@@ -15,7 +15,9 @@ VRAM cleanup (audit M5 resolution):
 """
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Union
+
+import numpy as np
 
 from whisperjav.modules.subtitle_pipeline.types import TranscriptionResult
 from whisperjav.utils.logger import logger
@@ -28,6 +30,11 @@ class Qwen3TextGenerator:
     Produces raw transcription text (no timestamps) from audio files.
     Manages its own QwenASR lifecycle via load()/unload() for VRAM swapping.
     """
+
+    # v1.9.0: Qwen3-ASR's transcribe() accepts (np.ndarray, sr) AudioLike, so this
+    # generator can consume in-memory frame audio. The orchestrator reads this flag
+    # (together with the aligner's) to skip per-VAD-group temp WAV writes.
+    accepts_array = True
 
     def __init__(
         self,
@@ -126,7 +133,7 @@ class Qwen3TextGenerator:
 
     def generate(
         self,
-        audio_path: Path,
+        audio_path: Union[Path, np.ndarray],
         language: str = "ja",
         context: Optional[str] = None,
         **kwargs: Any,
@@ -152,7 +159,7 @@ class Qwen3TextGenerator:
 
     def generate_batch(
         self,
-        audio_paths: list[Path],
+        audio_paths: list[Union[Path, np.ndarray]],
         language: str = "ja",
         contexts: Optional[list[str]] = None,
         **kwargs: Any,
@@ -189,7 +196,7 @@ class Qwen3TextGenerator:
             TranscriptionResult(
                 text=t,
                 language=language,
-                metadata={"generator": "qwen3", "audio_path": str(p)},
+                metadata={"generator": "qwen3", "audio_path": str(p) if not isinstance(p, np.ndarray) else "<in-memory>"},
             )
             for t, p in zip(texts, audio_paths)
         ]

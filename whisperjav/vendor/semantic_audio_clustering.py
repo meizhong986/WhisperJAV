@@ -6,6 +6,29 @@ Changes from V6:
 2. SPLIT LOGIC changed to 'Snap to Silence' (cuts at lowest energy).
 3. FULL COVERAGE guaranteed (0.0 -> Duration).
 4. Class naming fixed (SemanticSegmenter).
+
+WhisperJAV modifications (v7.2.0, 2026-08 — diverges from upstream v7.1):
+A. Per-chunk anchored time axis: the feature time axis is built per 60s
+   chunk from the chunk's TRUE start time instead of one global arange over
+   the concatenated frame count. Librosa's centered framing yields ~1 extra
+   frame per chunk, so the old axis drifted late by ~32ms per chunk
+   (~2s/hour) — boundary timestamps late in long files were systematically
+   wrong.
+B. Silence-aware, onset-anchored boundary snapping: _snap_to_silence now
+   uses the calibrated silence floor (rms_base — previously computed by
+   AdaptiveClassifier but never used here) to find actual silence runs, and
+   places the cut near the END of the run so the NEXT scene starts at sound
+   onset (leading silence in an ASR chunk provokes hallucination; trailing
+   silence belongs to the previous scene). Pure argmin remains only as the
+   fallback when the window contains no silence at all.
+C. Silence-clamped per-boundary padding: the fixed ±0.35s ASR pad (which
+   empirically overshot into speech at 81% of cuts) is replaced by
+   per-segment pads clamped to the measured silence extent around each
+   boundary (floor 0.05s, cap 0.35s) — padding never deliberately reaches
+   into neighbouring speech.
+D. Overlong scenes are LOGGED, not split: max_duration remains a merge
+   ceiling only (docstrings previously claimed splitting that never
+   existed); a warning now reports any final segment exceeding it.
 """
 
 import numpy as np
@@ -30,7 +53,7 @@ from enum import Enum
 
 warnings.filterwarnings('ignore')
 
-__version__ = "7.1.0"
+__version__ = "7.2.0"  # 7.1.0 + WhisperJAV modifications A-D (see module docstring)
 
 
 def _diagnose_environment(log_fn=None):
@@ -132,10 +155,13 @@ class SegmentationConfig:
     Configuration for the Semantic Audio Clustering pipeline.
     
     Attributes:
-        min_duration (float): Minimum duration of a segment in seconds. 
+        min_duration (float): Minimum duration of a segment in seconds.
                               Segments shorter than this will be merged. Default: 20.0
-        max_duration (float): Maximum duration of a segment in seconds.
-                              Segments longer than this will be split. Default: 420.0 (7 mins)
+        max_duration (float): Merge ceiling in seconds: merges that would
+                              produce a segment longer than this are declined.
+                              NOTE: overlong segments are NOT split — if
+                              clustering yields one, it is kept and a warning
+                              is logged (WJAV mod D). Default: 420.0 (7 mins)
         snap_window (float):  Window size in seconds for snapping boundaries to silence. Default: 5.0
         sample_rate (int):    Target sample rate for processing. Default: 16000
         chunk_duration (int): Duration of audio chunks for streaming in seconds. Default: 60
@@ -190,16 +216,20 @@ class Segment:
     scene_type: SceneType
     confidence: float
     avg_db: float
-    
+    # WJAV mod C: per-boundary ASR pads, clamped to the measured silence
+    # extent around each boundary by compute_adaptive_pads(). The historical
+    # behavior was a fixed 0.35s on both sides regardless of what the audio
+    # contained — on the GT clips that pad overshot into neighbouring speech
+    # at 81% of cuts, duplicating boundary audio into both scenes. Defaults
+    # keep the historical value for any caller that doesn't set pads.
+    start_pad: float = 0.35
+    end_pad: float = 0.35
+
     def to_dict(self):
-        # Safe padding: buffer around each segment for ASR extraction.
-        # 0.35s captures Japanese soft consonant onsets and trailing particles
-        # at scene boundaries (±0.35s → ~0.7s overlap between adjacent scenes).
-        pad = 0.35
-        safe_start = max(0.0, self.start - pad)
-        # Note: We don't clamp the end to duration here because we don't always 
+        safe_start = max(0.0, self.start - self.start_pad)
+        # Note: We don't clamp the end to duration here because we don't always
         # have the total duration handy in this class, but ffmpeg handles over-reading fine.
-        safe_end = self.end + pad
+        safe_end = self.end + self.end_pad
 
         return {
             # 1. STRICT TIMESTAMPS (For SRT / Timeline / Database)
@@ -215,7 +245,10 @@ class Segment:
                 "start": round(safe_start, 3),
                 "end": round(safe_end, 3),
                 "duration": round(safe_end - safe_start, 3),
-                "padding_applied": pad
+                "padding_applied": {
+                    "start": round(self.start_pad, 3),
+                    "end": round(self.end_pad, 3),
+                },
             },
             "context": {
                 "label": self.scene_type.value,
@@ -308,6 +341,8 @@ class StreamFeatureExtractor:
             native_sr = info.samplerate
             block_size = int(self.chunk_dur * native_sr)
             feature_list = []
+            chunk_start_times = []   # WJAV mod A: true start time of each chunk (s)
+            chunk_frame_counts = []  # WJAV mod A: frames produced per chunk
             total_blocks = int(np.ceil(info.frames / block_size))
             self._log(
                 f"[1/5 diag] Step 2 OK: {total_dur:.1f}s, {native_sr}Hz, "
@@ -361,6 +396,9 @@ class StreamFeatureExtractor:
 
                     feats = np.vstack([mfcc, delta, rms, zcr, contrast, chroma_std])
                     feature_list.append(feats)
+                    # WJAV mod A: anchor this chunk's frames to its true start.
+                    chunk_start_times.append(i * block_size / native_sr)
+                    chunk_frame_counts.append(feats.shape[1])
 
                     if i == 0:
                         self._log(
@@ -376,7 +414,21 @@ class StreamFeatureExtractor:
             )
 
             full_features = np.hstack(feature_list)
-            times = librosa.frames_to_time(np.arange(full_features.shape[1]), sr=self.sr, hop_length=self.hop_length)
+            # WJAV mod A: build the time axis PER CHUNK, anchored to each
+            # chunk's true start time. The previous global
+            # frames_to_time(arange(total_frames)) treated the concatenated
+            # frames as one continuous stream, but librosa's centered framing
+            # emits ~1 extra frame per chunk — the axis drifted late by
+            # ~hop/sr (32ms) per chunk, i.e. ~2s per hour of audio, so late
+            # boundaries were systematically misplaced. Frame j of a chunk is
+            # centered at chunk_start + j*hop/sr. Seam frames of adjacent
+            # chunks may share a timestamp (non-strict monotonicity); all
+            # consumers use searchsorted/masks, which tolerate ties.
+            frame_dt = self.hop_length / self.sr
+            times = np.concatenate([
+                start_t + np.arange(n) * frame_dt
+                for start_t, n in zip(chunk_start_times, chunk_frame_counts)
+            ]) if feature_list else np.array([])
             return full_features, times, total_dur
 
         finally:
@@ -390,6 +442,82 @@ class StreamFeatureExtractor:
 # 3. SEMANTIC SEGMENTATION
 # ==========================================
 
+# --- WJAV mod B/C helpers (module-level for unit-testability) ---------------
+
+def compute_silence_floor(features, config: SegmentationConfig) -> float:
+    """Calibrated silence floor.
+
+    Same formula as AdaptiveClassifier.calibrate's rms_base (20th percentile,
+    clamped) times the configured multiplier — kept in one place so the
+    snapper, the pad computation, and the classifier agree on what "silence"
+    means for this file.
+    """
+    rms = features[FeatureRegistry.RMS, :]
+    rms_base = max(float(np.percentile(rms, 20)), 0.001)
+    return rms_base * config.silence_threshold_multiplier
+
+
+def smoothed_rms(features, config: SegmentationConfig):
+    """Median-smoothed RMS curve (matches the snapper's historical smoothing)."""
+    return median_filter(
+        features[FeatureRegistry.RMS, :], size=config.rms_smoothing_window
+    )
+
+
+def _silence_runs(mask) -> List[tuple]:
+    """Contiguous True runs in a boolean mask -> [(start_idx, end_idx)] inclusive."""
+    runs = []
+    start = None
+    for i, v in enumerate(mask):
+        if v and start is None:
+            start = i
+        elif not v and start is not None:
+            runs.append((start, i - 1))
+            start = None
+    if start is not None:
+        runs.append((start, len(mask) - 1))
+    return runs
+
+
+def compute_adaptive_pads(
+    seg_start: float,
+    seg_end: float,
+    rms_curve,
+    times,
+    silence_floor: float,
+    min_pad: float = 0.05,
+    max_pad: float = 0.35,
+    is_first: bool = False,
+) -> tuple:
+    """WJAV mod C: per-segment ASR pads clamped to the measured silence extent.
+
+    start_pad: how far BACKWARD from seg_start RMS stays at/below the silence
+    floor (so the pad reaches into silence, never deliberately into the
+    previous scene's speech). end_pad: same, FORWARD from seg_end. Both are
+    clamped to [min_pad, max_pad]; min_pad covers framing edge effects at
+    boundaries that have no silence at all (argmin-fallback cuts).
+    The first segment gets start_pad 0 (file starts at 0.0).
+    """
+    n = len(times)
+    idx_s = int(np.searchsorted(times, seg_start))
+    idx_s = min(max(idx_s, 0), n - 1)
+    j = idx_s
+    while j > 0 and rms_curve[j - 1] <= silence_floor:
+        j -= 1
+    extent_back = max(0.0, float(times[idx_s] - times[j]))
+
+    idx_e = int(np.searchsorted(times, seg_end))
+    idx_e = min(max(idx_e, 0), n - 1)
+    k = idx_e
+    while k < n - 1 and rms_curve[k + 1] <= silence_floor:
+        k += 1
+    extent_fwd = max(0.0, float(times[k] - times[idx_e]))
+
+    start_pad = 0.0 if is_first else min(max(extent_back, min_pad), max_pad)
+    end_pad = min(max(extent_fwd, min_pad), max_pad)
+    return round(start_pad, 3), round(end_pad, 3)
+
+
 class SemanticSegmenter:
     def __init__(self, config: SegmentationConfig, logger: Optional[logging.Logger] = None):
         self.config = config
@@ -401,69 +529,145 @@ class SemanticSegmenter:
         if self.logger: self.logger.log(level, msg)
         else: print(msg)
 
-    def segment(self, features, times, duration):
+    def segment(self, features, times, duration, silence_floor=None):
         self._log("--> [2/5] Clustering, Merging & Snapping to Silence...")
-        
+
+        # WJAV mod B: the silence floor is normally passed in by the caller
+        # (process_movie_v7 hands over the classifier's calibrated value); the
+        # self-computed fallback keeps the historical segment() signature
+        # working and produces the identical value by construction.
+        if silence_floor is None:
+            silence_floor = compute_silence_floor(features, self.config)
+
         # 1. Pre-clustering Smoothing
-        fps = self.config.fps 
-        feats_smooth = median_filter(features, size=(1, self.config.smoothing_window)) 
-        
-        step = int(fps * 0.5) 
+        fps = self.config.fps
+        feats_smooth = median_filter(features, size=(1, self.config.smoothing_window))
+
+        step = int(fps * 0.5)
         X = feats_smooth[:, ::step].T
         X_times = times[::step]
-        
+
         # 2. Dynamic Clustering
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
         clusterer = AgglomerativeClustering(n_clusters=None, distance_threshold=self.config.clustering_threshold, linkage='ward')
         labels = clusterer.fit_predict(X_scaled)
-        
+
         # 3. Raw Boundaries
         boundaries = [0.0]
         for i in range(1, len(labels)):
             if labels[i] != labels[i-1]:
                 boundaries.append(X_times[i])
         boundaries.append(duration)
-        
+
         # 4. Snap to SILENCE (Lowest Energy)
         # This replaces the old Flux snapping to prioritize speech safety
-        boundaries = self._snap_to_silence(boundaries, features, times)
-        
+        boundaries = self._snap_to_silence(boundaries, features, times, silence_floor)
+
         # 5. Smart Merge (Semantic)
         segments = self._smart_merge(boundaries, features, times)
-        
+
         # 6. Forced Cleanup
         segments = self._forced_cleanup(segments)
-        
+
         # 7. ABSOLUTE COVERAGE CHECK
         segments = self._ensure_timeline_coverage(segments, duration)
-        
+
         return segments
 
-    def _snap_to_silence(self, boundaries, features, times):
-        """Refines boundaries by sliding them to the Local Minimum Energy (RMS)."""
-        self._log("    -> Snapping cut points to lowest energy (silence)...")
-        
-        # Extract RMS curve
-        rms_curve = features[FeatureRegistry.RMS, :]
-        rms_smooth = median_filter(rms_curve, size=self.config.rms_smoothing_window)
+    def _snap_to_silence(self, boundaries, features, times, silence_floor):
+        """Refine boundaries onto actual silence, anchored to the sound ONSET.
+
+        WJAV mod B (replaces the pure-argmin snap, which had no notion of
+        silence at all and landed 35% of cuts in outright speech on the GT
+        clips): within ±snap_window of each raw boundary,
+
+        1. find contiguous runs of frames whose smoothed RMS is at/below the
+           calibrated silence floor;
+        2. prefer the run NEAREST the raw boundary among runs wide enough to
+           host a full ASR pad (~0.42s = 0.35s pad + onset back-off); when no
+           run is that wide, take the WIDEST run available. (Nearest-first
+           over marginal runs was tried and measured WORSE on the GT clips —
+           it favored ~100ms moan-gaps beside the boundary over the real
+           silence valley a few seconds away, which plain argmin used to
+           find. Quality beats proximity within the search window.)
+        3. place the cut near the END of the run (2-frame back-off), so the
+           NEXT scene begins at the sound onset — leading silence in an ASR
+           chunk provokes hallucination, and trailing silence belongs to the
+           scene that is ending;
+        4. only when the window contains no silence at all, fall back to the
+           historical argmin (lowest-energy frame) placement.
+        """
+        self._log("    -> Snapping cut points to silence (onset-anchored)...")
+
+        rms_smooth = smoothed_rms(features, self.config)
+        frame_dt = self.config.hop_length / self.config.sample_rate
+        onset_backoff_frames = 2  # cut this many frames before the onset
+        # A run must host the full 0.35s start pad plus the back-off for the
+        # cut to be pad-safe on both sides.
+        pad_safe_width_frames = max(2, int(round(0.42 / frame_dt)))  # ~420ms
 
         refined = [0.0]
         search_window = self.config.snap_window # Look +/- window seconds
-        
+
         for b in boundaries[1:-1]:
             # Search range
             start_idx = max(0, np.searchsorted(times, b - search_window))
             end_idx = min(len(rms_smooth), np.searchsorted(times, b + search_window))
-            
-            if end_idx > start_idx:
-                # Find MINIMUM energy in this window
+
+            if end_idx <= start_idx:
+                refined.append(b)
+                continue
+
+            window_mask = rms_smooth[start_idx:end_idx] <= silence_floor
+            runs = _silence_runs(window_mask)
+
+            if not runs:
+                # Bounded second look: JAV audio has long silence-free
+                # stretches; one 2x-widened attempt converts a share of the
+                # hard cuts to real silences before giving up to argmin.
+                # min_duration merging downstream absorbs any tiny segment a
+                # far-moved cut could create.
+                w_start = max(0, np.searchsorted(times, b - 2 * search_window))
+                w_end = min(len(rms_smooth), np.searchsorted(times, b + 2 * search_window))
+                wide_mask = rms_smooth[w_start:w_end] <= silence_floor
+                wide_runs = _silence_runs(wide_mask)
+                if wide_runs:
+                    start_idx, end_idx = w_start, w_end
+                    runs = wide_runs
+
+            if runs:
+                b_local = int(np.searchsorted(times, b)) - start_idx
+                pad_safe = [
+                    r for r in runs if (r[1] - r[0] + 1) >= pad_safe_width_frames
+                ]
+
+                def _dist(run):
+                    lo, hi = run
+                    if lo <= b_local <= hi:
+                        return 0
+                    return min(abs(b_local - lo), abs(b_local - hi))
+
+                if pad_safe:
+                    # Semantic fidelity: nearest run among the fully safe ones.
+                    chosen = min(pad_safe, key=_dist)
+                else:
+                    # No run hosts a full pad — take the widest silence
+                    # available (ties broken toward the boundary).
+                    chosen = max(
+                        runs, key=lambda r: (r[1] - r[0], -_dist(r))
+                    )
+
+                cut_idx = start_idx + max(
+                    chosen[0], chosen[1] - onset_backoff_frames
+                )
+                refined.append(times[cut_idx])
+            else:
+                # Historical behavior: lowest-energy frame in the window.
                 window_slice = rms_smooth[start_idx:end_idx]
                 local_min_idx = np.argmin(window_slice) + start_idx
                 refined.append(times[local_min_idx])
-            else:
-                refined.append(b)
-                
+
         refined.append(boundaries[-1])
         return sorted(list(set(refined)))
 
@@ -743,9 +947,26 @@ def process_movie_v7(
     if progress_callback: progress_callback(0.85, "Clustering and segmenting...")
 
     # 3. Segmentation
+    # WJAV mod B: hand the classifier's calibrated silence floor to the
+    # segmenter so snapping, padding, and classification agree on "silence".
+    silence_floor = classifier.stats["rms_base"] * config.silence_threshold_multiplier
     segmenter = SemanticSegmenter(config, logger)
-    raw_segments = segmenter.segment(features, times, duration)
-    
+    raw_segments = segmenter.segment(features, times, duration, silence_floor=silence_floor)
+
+    # WJAV mod D: max_duration is a merge ceiling, NOT a splitter (no split
+    # exists; _forced_cleanup can even exceed it while absorbing sub-minimum
+    # neighbours). Owner heuristics say overlong scenes are rare — make that
+    # observable instead of silent so the claim stays measured.
+    _overlong = [s for s in raw_segments if (s["end"] - s["start"]) > config.max_duration + 0.5]
+    if _overlong:
+        _worst = max(s["end"] - s["start"] for s in _overlong)
+        log(
+            f"WARNING: {len(_overlong)} scene(s) exceed max_duration="
+            f"{config.max_duration:.0f}s (longest {_worst:.0f}s). max_duration "
+            f"limits merging only — overlong scenes are not split.",
+            logging.WARNING,
+        )
+
     log(f"--> [4/5] Building Metadata...")
     if progress_callback: progress_callback(0.9, "Building metadata...")
 
@@ -769,13 +990,24 @@ def process_movie_v7(
         "segments": []
     }
     
+    # WJAV mod C: pads clamped to the measured silence around each boundary
+    # (same smoothed RMS + floor the snapper used).
+    _rms_smooth = smoothed_rms(features, config)
+
     final_objs = []
     for i, s_data in enumerate(raw_segments):
         s_type, conf, db = classifier.classify(s_data["start"], s_data["end"], features, times)
-        
-        seg = Segment(s_data["start"], s_data["end"], s_type, conf, db)
+
+        start_pad, end_pad = compute_adaptive_pads(
+            s_data["start"], s_data["end"], _rms_smooth, times, silence_floor,
+            is_first=(i == 0),
+        )
+        seg = Segment(
+            s_data["start"], s_data["end"], s_type, conf, db,
+            start_pad=start_pad, end_pad=end_pad,
+        )
         final_objs.append(seg)
-        
+
         # Add index to dict
         seg_dict = seg.to_dict()
         seg_dict["segment_index"] = i

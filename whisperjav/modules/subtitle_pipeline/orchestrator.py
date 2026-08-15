@@ -269,7 +269,10 @@ class DecoupledSubtitlePipeline:
                 (dual-track mode).  When None, framing uses scene_audio_paths.
         """
         try:
-            scene_frames, frame_audio_paths, frame_speech_regions = self._step1_frame_and_slice(
+            (
+                scene_frames, frame_audio_paths, frame_speech_regions,
+                frame_speech_starts,
+            ) = self._step1_frame_and_slice(
                 scene_audio_paths, scene_durations,
                 framer_override_max_group=framer_override_max_group,
                 vad_audio_paths=vad_audio_paths,
@@ -280,6 +283,7 @@ class DecoupledSubtitlePipeline:
                 scene_frames, scene_texts, scene_alignments,
                 scene_audio_paths, scene_durations,
                 frame_speech_regions, scene_speech_regions,
+                frame_speech_starts=frame_speech_starts,
             )
         finally:
             self._cleanup_temp_files()
@@ -329,6 +333,7 @@ class DecoupledSubtitlePipeline:
         list[list[TemporalFrame]],
         list[list[Path]],
         list[Optional[list[list[tuple[float, float]]]]],
+        list[Optional[list[Optional[float]]]],
     ]:
         """
         Frame each scene and slice audio per frame into temp WAV files.
@@ -345,6 +350,11 @@ class DecoupledSubtitlePipeline:
             scene_frames: Per-scene list of TemporalFrame objects.
             frame_audio_paths: Per-scene, per-frame temp WAV paths.
             frame_speech_regions: Per-scene speech regions from framer metadata.
+            frame_speech_starts: Per-scene, per-frame "3a" refined display
+                starts from framer metadata (None entries fall back to the
+                frame start; None per scene when the framer doesn't provide
+                them). Audio slicing above always uses the RAW frame
+                boundaries — the refined start affects display timing only.
         """
         n_scenes = len(scene_audio_paths)
         dual_track = vad_audio_paths is not None
@@ -355,8 +365,21 @@ class DecoupledSubtitlePipeline:
         )
 
         scene_frames: list[list[TemporalFrame]] = []
-        frame_audio_paths: list[list[Path]] = []
+        frame_audio_paths: list[list] = []  # Path entries, or np.ndarray in pathless mode
         frame_speech_regions: list[Optional[list[list[tuple[float, float]]]]] = []
+        frame_speech_starts: list[Optional[list[Optional[float]]]] = []
+
+        # v1.9.0 pathless mode: when the generator can consume in-memory arrays
+        # AND there is no aligner (e.g. anime-whisper, which is vad_only), skip the
+        # per-VAD-group temp WAV write entirely and pass numpy slices downstream.
+        # Fail-safe: if either condition is unmet, fall back to the WAV path.
+        pathless = getattr(self.generator, "accepts_array", False) and (
+            self.aligner is None or getattr(self.aligner, "accepts_array", False)
+        )
+        if pathless:
+            logger.info(
+                "[DecoupledPipeline] Step 1: pathless mode — in-memory frame audio, no temp WAVs"
+            )
 
         for scene_idx, audio_path in enumerate(scene_audio_paths):
             # Dual-track: framer runs on enhanced audio, slicing on original
@@ -376,28 +399,50 @@ class DecoupledSubtitlePipeline:
             # Extract speech regions from framer metadata (VadGroupedFramer provides these)
             regions = framing_result.metadata.get("speech_regions")
             frame_speech_regions.append(regions)
+            # "3a" refined display starts (VadGroupedFramer; None elsewhere)
+            frame_speech_starts.append(framing_result.metadata.get("speech_starts"))
 
-            # Load ASR audio (only needed if dual-track and we have frames to slice)
-            if dual_track and not (len(frames) == 1 and frames[0].start == 0.0):
-                asr_audio, sr = self._load_audio(audio_path)
-            else:
-                asr_audio = framing_audio  # same source, no extra load
-
-            # Slice audio per frame → temp WAV (always from ASR audio)
-            frame_paths = []
-            for frame_idx, frame in enumerate(frames):
-                if len(frames) == 1 and frame.start == 0.0:
-                    # Full-scene frame — use original ASR audio path (no slicing needed)
-                    frame_paths.append(audio_path)
+            if pathless:
+                # In-memory slicing — NO temp WAV. ASR always reads the ORIGINAL
+                # audio (load it explicitly under dual-track, since framing_audio
+                # is the enhanced track in that mode).
+                if dual_track:
+                    asr_audio, sr = self._load_audio(audio_path)
                 else:
-                    # Slice and write temp WAV from ASR audio
-                    start_sample = int(frame.start * sr)
-                    end_sample = int(frame.end * sr)
-                    frame_audio = asr_audio[start_sample:end_sample]
-                    temp_path = self._write_temp_wav(frame_audio, sr, scene_idx, frame_idx)
-                    frame_paths.append(temp_path)
+                    asr_audio = framing_audio
+                frame_entries: list = []
+                for frame in frames:
+                    if len(frames) == 1 and frame.start == 0.0:
+                        frame_entries.append(asr_audio)  # full-scene frame
+                    else:
+                        start_sample = int(frame.start * sr)
+                        end_sample = int(frame.end * sr)
+                        # .copy() so the parent scene array can be freed after the
+                        # scene loop — bounds peak RAM to the speech regions only.
+                        frame_entries.append(asr_audio[start_sample:end_sample].copy())
+                frame_audio_paths.append(frame_entries)
+            else:
+                # Load ASR audio (only needed if dual-track and we have frames to slice)
+                if dual_track and not (len(frames) == 1 and frames[0].start == 0.0):
+                    asr_audio, sr = self._load_audio(audio_path)
+                else:
+                    asr_audio = framing_audio  # same source, no extra load
 
-            frame_audio_paths.append(frame_paths)
+                # Slice audio per frame → temp WAV (always from ASR audio)
+                frame_paths = []
+                for frame_idx, frame in enumerate(frames):
+                    if len(frames) == 1 and frame.start == 0.0:
+                        # Full-scene frame — use original ASR audio path (no slicing needed)
+                        frame_paths.append(audio_path)
+                    else:
+                        # Slice and write temp WAV from ASR audio
+                        start_sample = int(frame.start * sr)
+                        end_sample = int(frame.end * sr)
+                        frame_audio = asr_audio[start_sample:end_sample]
+                        temp_path = self._write_temp_wav(frame_audio, sr, scene_idx, frame_idx)
+                        frame_paths.append(temp_path)
+
+                frame_audio_paths.append(frame_paths)
 
             logger.debug(
                 "[DecoupledPipeline] Scene %d: %d frames (%.1fs)",
@@ -412,7 +457,7 @@ class DecoupledSubtitlePipeline:
             n_scenes, total_frames,
         )
 
-        return scene_frames, frame_audio_paths, frame_speech_regions
+        return scene_frames, frame_audio_paths, frame_speech_regions, frame_speech_starts
 
     # -----------------------------------------------------------------------
     # Steps 2-4: Text generation + cleaning
@@ -723,6 +768,7 @@ class DecoupledSubtitlePipeline:
         scene_durations: list[float],
         frame_speech_regions: list[Optional[list[list[tuple[float, float]]]]],
         scene_speech_regions: Optional[list[list[tuple[float, float]]]],
+        frame_speech_starts: Optional[list[Optional[list[Optional[float]]]]] = None,
     ) -> list[tuple[Any, dict[str, Any]]]:
         """
         Per-scene: merge words → sentinel → reconstruct → harden.
@@ -743,11 +789,36 @@ class DecoupledSubtitlePipeline:
         total_segments = 0
         total_collapses = 0
 
+        vad_only_mode = self.hardening_config.timestamp_mode == TimestampMode.VAD_ONLY
+
         for scene_idx in range(n_scenes):
             frames = scene_frames[scene_idx]
             texts = scene_texts[scene_idx]
             duration = scene_durations[scene_idx]
             audio_path = scene_audio_paths[scene_idx]
+
+            # "3a" refined display starts (vad_only display timing only). The
+            # RAW frame boundaries already fed the ASR audio slices in Step 1;
+            # this moves each subtitle's start to the first confident-speech
+            # frame the segmenter recorded. Starts only move LATER, so this
+            # cannot create overlaps or lose captured content.
+            scene_starts = (
+                frame_speech_starts[scene_idx]
+                if (
+                    vad_only_mode
+                    and frame_speech_starts
+                    and scene_idx < len(frame_speech_starts)
+                )
+                else None
+            )
+            display_starts: list[float] = []
+            for fi, fr in enumerate(frames):
+                ds = fr.start
+                if scene_starts and fi < len(scene_starts):
+                    s = scene_starts[fi]
+                    if s is not None and fr.start < s < fr.end:
+                        ds = s
+                display_starts.append(ds)
 
             self.sentinel_stats["total_scenes"] += 1
 
@@ -850,11 +921,11 @@ class DecoupledSubtitlePipeline:
                         # Frame-native: one segment per frame, each frame = one word entry.
                         # User explicitly set regroup_mode=OFF — they want raw frame output.
                         frame_word_groups = []
-                        for frame, text in zip(frames, texts):
+                        for fi, (frame, text) in enumerate(zip(frames, texts)):
                             if text.strip():
                                 frame_word_groups.append([{
                                     "word": text.strip(),
-                                    "start": frame.start,
+                                    "start": display_starts[fi],
                                     "end": frame.end,
                                 }])
                         word_count = len(frame_word_groups)
@@ -863,10 +934,10 @@ class DecoupledSubtitlePipeline:
                     else:
                         # Standard split-and-regroup path
                         words = []
-                        for frame, text in zip(frames, texts):
+                        for fi, (frame, text) in enumerate(zip(frames, texts)):
                             if text.strip():
                                 words.extend(
-                                    split_frame_to_words(text, frame.start, frame.end)
+                                    split_frame_to_words(text, display_starts[fi], frame.end)
                                 )
                         word_count = len(words)
                         # G1 complement: VAD_ONLY preserves exact frame boundaries —
@@ -925,6 +996,21 @@ class DecoupledSubtitlePipeline:
                         for s, e in per_scene_regions
                     ]
 
+                # "3a" audit trail: raw VAD frame boundaries (fed to the ASR)
+                # vs refined display starts (used for subtitle timing).
+                # internal_breaks reserved for the future "3b" splitter.
+                frame_timing = None
+                if scene_starts is not None:
+                    frame_timing = [
+                        {
+                            "vad_start": round(fr.start, 3),
+                            "vad_end": round(fr.end, 3),
+                            "speech_start": round(display_starts[fi], 3),
+                            "internal_breaks": [],
+                        }
+                        for fi, fr in enumerate(frames)
+                    ]
+
                 scene_diag = SceneDiagnostics(
                     schema_version="2.0.0",
                     scene_index=scene_idx,
@@ -943,6 +1029,7 @@ class DecoupledSubtitlePipeline:
                     hardening_clamped=hardening_diag.clamped_count,
                     hardening_sorted=hardening_diag.sorted,
                     vad_regions=vad_regions,
+                    frame_timing=frame_timing,
                 )
                 diagnostics = asdict(scene_diag)
 

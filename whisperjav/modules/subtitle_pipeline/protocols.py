@@ -9,7 +9,7 @@ works.  No base class inheritance required.
 """
 
 from pathlib import Path
-from typing import Any, Optional, runtime_checkable
+from typing import Any, Optional, Union, runtime_checkable
 
 import numpy as np
 from typing_extensions import Protocol
@@ -72,26 +72,41 @@ class TextGenerator(Protocol):
 
     Manages its own model lifecycle via load()/unload().  The orchestrator
     calls load() before generation and unload() after to enable VRAM swaps.
+
+    Optional attribute ``accepts_array: bool`` (treated as False when absent):
+    when True, generate()/generate_batch() accept in-memory numpy arrays (mono
+    float32, 16kHz) in place of file paths. The orchestrator uses this flag to
+    skip writing one temp WAV per VAD group when no aligner is present.
     """
 
     def generate(
         self,
-        audio_path: Path,
+        audio_path: Union[Path, np.ndarray],
         language: str = "ja",
         context: Optional[str] = None,
         **kwargs: Any,
     ) -> TranscriptionResult:
-        """Transcribe a single audio file."""
+        """
+        Transcribe a single audio source.
+
+        ``audio_path`` may be a file path OR an in-memory numpy array (mono
+        float32, 16kHz) for generators that set ``accepts_array = True``.
+        """
         ...
 
     def generate_batch(
         self,
-        audio_paths: list[Path],
+        audio_paths: list[Union[Path, np.ndarray]],
         language: str = "ja",
         contexts: Optional[list[str]] = None,
         **kwargs: Any,
     ) -> list[TranscriptionResult]:
-        """Transcribe a batch of audio files."""
+        """
+        Transcribe a batch of audio sources.
+
+        Each entry may be a file path OR an in-memory numpy array (mono float32,
+        16kHz) — see generate().
+        """
         ...
 
     def load(self) -> None:

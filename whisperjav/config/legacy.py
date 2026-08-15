@@ -49,6 +49,7 @@ for backward compatibility.
 from typing import Any, Dict, List, Optional
 
 from .resolver_v3 import resolve_config_v3
+from whisperjav.utils.logger import logger
 
 
 def _filter_none_values(params: Dict[str, Any]) -> Dict[str, Any]:
@@ -452,3 +453,69 @@ def get_legacy_pipeline_info(pipeline_name: str) -> Dict[str, Any]:
         'name': pipeline_name,
         **LEGACY_PIPELINES[pipeline_name]
     }
+
+
+def apply_balanced_vad_defaults(
+    resolved_config: Dict[str, Any],
+    sensitivity: str = "balanced",
+    is_balanced: bool = False,
+) -> None:
+    """
+    Apply the v1.9.0 balanced-pipeline VAD defaults to a resolved config, IN PLACE.
+
+    SHARED by the single-pass path (main.py) and the ensemble path
+    (ensemble/pass_worker.py) so the two cannot drift. Behaviour:
+
+    * speech_segmenter backend == "faster-whisper"  → overlay the tuned
+      ``faster_whisper_vad`` VadOptions preset (threshold scaled for
+      faster-whisper's BUNDLED Silero, e.g. balanced=0.40 — NOT the external
+      silero-v3.1/v6.2 scale, e.g. 0.28, which over-triggers here).
+    * ``is_balanced`` AND an EXTERNAL segmenter selected → "Test D" fine-grained
+      grouping default (max_group_duration_s=9.0, chunk_threshold_s=0.1), the
+      best-quality config from the owner A/B (2026-06-30).
+
+    The effective backend is read from
+    ``resolved_config["params"]["speech_segmenter"]["backend"]``. Call this AFTER
+    the backend is set and BEFORE explicit user overrides (CLI flags / GUI
+    Customize params), which must win over these defaults.
+
+    Args:
+        resolved_config: Resolved config dict (mutated in place).
+        sensitivity: Sensitivity level for the native VAD preset lookup.
+        is_balanced: True iff this is the balanced pipeline/mode (gates Test-D).
+    """
+    params = resolved_config.setdefault("params", {})
+    backend = (params.get("speech_segmenter") or {}).get("backend")
+
+    if backend == "faster-whisper":
+        # Native VAD: use the scale-correct faster_whisper_vad preset.
+        try:
+            from whisperjav.config.components.base import get_vad_registry
+            fw_vad = get_vad_registry().get("faster_whisper_vad")
+            preset = fw_vad.get_preset(sensitivity) if fw_vad else None
+            if preset is not None:
+                params["vad"] = preset.model_dump()
+                logger.debug(
+                    "apply_balanced_vad_defaults: native faster_whisper_vad preset "
+                    "(sensitivity=%s): %s", sensitivity, params["vad"],
+                )
+            else:
+                logger.warning(
+                    "faster_whisper_vad preset not found for sensitivity '%s'; "
+                    "native VAD will use faster-whisper library defaults", sensitivity,
+                )
+        except Exception as e:  # pragma: no cover - defensive
+            logger.warning("Could not apply faster_whisper_vad preset: %s", e)
+
+    elif is_balanced and backend not in (None, "", "none"):
+        # Balanced + external segmenter → Test-D fine-grained grouping default.
+        vad = params.setdefault("vad", {})
+        ss = params.setdefault("speech_segmenter", {})
+        vad["max_group_duration_s"] = 9.0
+        vad["chunk_threshold_s"] = 0.1
+        ss["max_group_duration_s"] = 9.0
+        ss["chunk_threshold_s"] = 0.1
+        logger.info(
+            "Balanced + external segmenter '%s': Test-D grouping defaults applied "
+            "(max_group=9.0s, chunk_threshold=0.1s)", backend,
+        )

@@ -14,7 +14,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from whisperjav.config.legacy import resolve_legacy_pipeline
+from whisperjav.config.anime_whisper_vad import (
+    anime_whisperseg_defaults,
+    apply_anime_segmenter_defaults,
+)
+from whisperjav.config.legacy import resolve_legacy_pipeline, apply_balanced_vad_defaults
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
@@ -24,6 +28,7 @@ from whisperjav.pipelines.kotoba_faster_whisper_pipeline import (
 )
 from whisperjav.pipelines.transformers_pipeline import TransformersPipeline
 from whisperjav.pipelines.qwen_pipeline import QwenPipeline
+from whisperjav.pipelines.crispasr_pipeline import CrispASRPipeline
 from whisperjav.utils.logger import logger, setup_logger
 from whisperjav.utils.parameter_tracer import create_tracer, NullTracer
 
@@ -37,6 +42,7 @@ PIPELINE_CLASSES = {
     "kotoba-faster-whisper": KotobaFasterWhisperPipeline,
     "transformers": TransformersPipeline,
     "qwen": QwenPipeline,  # Dedicated Qwen3-ASR pipeline (ADR-004)
+    "crispasr": CrispASRPipeline,  # Standalone external-provider pipeline (docs/plans/crispasr_v190/08)
 }
 
 DEFAULT_HF_PARAMS = {
@@ -86,6 +92,15 @@ DECODER_PARAMS = {
 SEGMENTER_PARAMS = {
     # Core VAD (Silero, shared)
     "threshold",
+    "neg_threshold",           # v1.9.0: WhisperSeg decoupled offset threshold (anime table).
+                               # MUST stay in sync with anime_whisper_vad.SEGMENTER_CONFIG_KEYS —
+                               # keys missing here are silently stripped by resolve_qwen_sensitivity.
+    "speech_start_threshold",  # v1.9.0 "3a": refined display-start threshold (anime table).
+    "force_split_mode",        # v1.9.0: WhisperSeg "dip"|"chop" force-split behavior (anime table).
+    "segmentation_decoder",    # v1.9.0: WhisperSeg "hysteresis"|"offline" decoder (anime table + GUI).
+    "grow_floor",              # v1.9.0 offline decoder: edge-growth floor (anime table + GUI).
+    "gap_merge_ms",            # v1.9.0 offline decoder: dialog-cut gap length (anime table + GUI).
+    "split_smooth_ms",         # v1.9.0 offline decoder: overlong-split smoothing (anime table).
     "min_speech_duration_ms",
     "max_speech_duration_s",   # Keep for CLI backward compat (not in GUI)
     "min_silence_duration_ms",
@@ -99,6 +114,9 @@ SEGMENTER_PARAMS = {
     "end_pad_ms",
     # Whisper VAD-specific
     "cache_results",
+    # FireRedVAD-specific (v1.9.0 experimental)
+    "smooth_window_size",
+    "use_gpu",
 }
 
 # Backend name → YAML tool name mapping for ConfigManager.get_tool_config()
@@ -117,6 +135,7 @@ _SEGMENTER_TOOL_NAMES = {
     "whisper-vad-small": "whisper-vad-speech-segmentation",
     "whisper-vad-medium": "whisper-vad-speech-segmentation",
     "whisperseg": "whisperseg-speech-segmentation",
+    "firered-vad": "firered-vad-speech-segmentation",  # v1.9.0 experimental
 }
 
 # Provider params - common transcriber options shared by all backends
@@ -393,7 +412,7 @@ DEFAULT_QWEN_PARAMS = {
     "qwen_input_mode": "assembly",
     "qwen_framer": "vad-grouped",  # Preserve previous VAD_SLICING behavior for ensemble
     "qwen_safe_chunking": True,
-    "qwen_timestamp_mode": "aligner_vad_fallback",
+    "qwen_timestamp_mode": "vad_only",  # v1.9.0: no ForcedAligner by default
     "qwen_assembly_cleaner": True,
     "qwen_repetition_penalty": 1.1,
     "qwen_max_tokens_per_second": 20.0,
@@ -449,7 +468,13 @@ def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
         "chunk_threshold": "qwen_chunk_threshold",
         "generator_backend": "qwen_generator_backend",
         "vad_threshold": "qwen_vad_threshold",
-        "vad_padding": "qwen_vad_padding",
+        "vad_padding": "qwen_vad_padding",        # legacy symmetric padding (back-compat)
+        "vad_start_pad": "qwen_vad_start_pad",     # v1.9.0 asymmetric: pad before onset
+        "vad_end_pad": "qwen_vad_end_pad",         # v1.9.0 asymmetric: pad after offset
+        "vad_decoder": "qwen_vad_decoder",         # v1.9.0 offline decoder: hysteresis|offline
+        "vad_grow_floor": "qwen_vad_grow_floor",   # v1.9.0 offline decoder: edge-growth floor
+        "vad_gap_merge_ms": "qwen_vad_gap_merge_ms",  # v1.9.0 offline decoder: dialog-cut gap (ms)
+        "max_speech_duration": "qwen_max_speech_duration",  # v1.9.0: single-segment ceiling (s)
     }
 
     # Track which qwen_* keys were explicitly set by user
@@ -503,7 +528,11 @@ def resolve_qwen_sensitivity(
     Returns:
         Dict of segmenter config params (filtered to SEGMENTER_PARAMS keys)
     """
-    if segmenter_backend == "none" or not segmenter_backend:
+    # "faster-whisper" = native VAD inside faster-whisper (vad_filter). Like
+    # "none", it has no EXTERNAL segmenter config to resolve by sensitivity, so
+    # return empty (the ASR enables vad_filter itself). Avoids a spurious
+    # "Unknown segmenter backend" warning when balanced runs native VAD in a pass.
+    if segmenter_backend in ("none", "faster-whisper") or not segmenter_backend:
         return {}
 
     tool_name = _SEGMENTER_TOOL_NAMES.get(segmenter_backend)
@@ -1169,21 +1198,61 @@ def _build_pipeline(
         if _vad_thr is not None:
             user_segmenter_overrides["threshold"] = float(_vad_thr)
             logger.debug("Pass %s: VAD threshold slider override = %s", pass_number, _vad_thr)
-        _vad_pad = qwen_defaults.get("qwen_vad_padding")
-        if _vad_pad is not None:
-            user_segmenter_overrides["speech_pad_ms"] = int(_vad_pad)
-            logger.debug("Pass %s: VAD padding slider override = %s ms", pass_number, _vad_pad)
+        # v1.9.0: VAD padding (legacy symmetric qwen_vad_padding + new asymmetric
+        # start/end) is routed to the pipeline scalars after qwen_pipeline_params is
+        # built — the pipeline injects start_pad_ms/end_pad_ms at clobber time, so it
+        # must NOT go into segmenter_config here (it would be overwritten anyway).
         # CLI pass-level overrides (--pass1-vad-threshold, --pass1-speech-pad-ms)
         # Highest priority — overrides both GUI sliders and sensitivity presets
         _cli_vad_thr = pass_config.get("vad_threshold")
         if _cli_vad_thr is not None:
             user_segmenter_overrides["threshold"] = max(0.0, min(1.0, float(_cli_vad_thr)))
             logger.debug("Pass %s: CLI vad_threshold override = %s", pass_number, _cli_vad_thr)
-        _cli_pad = pass_config.get("speech_pad_ms")
-        if _cli_pad is not None:
-            user_segmenter_overrides["speech_pad_ms"] = max(0, int(_cli_pad))
-            logger.debug("Pass %s: CLI speech_pad_ms override = %s ms", pass_number, _cli_pad)
+        # v1.9.0 offline-decoder levers from the GUI Customize modal (mapped to
+        # qwen_* by prepare_qwen_params). Routed into segmenter_config as user
+        # overrides so they win over the anime table defaults below.
+        for _qk, _sk, _cast in (
+            ("qwen_vad_decoder", "segmentation_decoder", str),
+            ("qwen_vad_grow_floor", "grow_floor", float),
+            ("qwen_vad_gap_merge_ms", "gap_merge_ms", int),
+            ("qwen_max_speech_duration", "max_speech_duration_s", float),
+        ):
+            _qv = qwen_defaults.get(_qk)
+            if _qv is not None and _qv != "":
+                user_segmenter_overrides[_sk] = _cast(_qv)
+                logger.debug("Pass %s: GUI segmenter override %s = %s", pass_number, _sk, _qv)
+        # v1.9.0 JAV retune: default the segmenter config when the user set none
+        # via slider/CLI. DEFAULT only — the GUI slider / CLI override above wins.
+        #   anime-whisper -> per-sensitivity values from the owner table
+        #                    (config/anime_whisper_vad.py). The GUI Ensemble tab
+        #                    exposes a per-pass sensitivity selector for anime,
+        #                    so this gradient is live.
+        #   qwen3         -> flat threshold 0.25 (gradient scoped to anime only).
+        # Cohere excluded (keeps its sensitivity-resolved threshold). Layered as a
+        # user-override so it sits above the sensitivity preset.
+        # v1.9.0 fix (code-review): the anime table and the flat 0.25 are
+        # WhisperSeg-scale values — inject them ONLY when the segmenter
+        # actually is whisperseg. Injected as user-overrides they ride ABOVE
+        # the backend's own per-sensitivity YAML presets in
+        # resolve_qwen_sensitivity, so on the default GUI ensemble config
+        # (pass 2 = qwen + TEN) the flat 0.25 silently replaced TEN's tuned
+        # 0.42/0.32/0.22 gradient and made the sensitivity selector inert.
         segmenter_backend = qwen_defaults.get("qwen_segmenter", "whisperseg")
+        if segmenter_backend == "whisperseg":
+            if _aw_gen == "anime-whisper":
+                # v1.9.0: inject ALL table-pinned segmenter_config defaults
+                # (threshold, neg_threshold, min_silence_duration_ms,
+                # max_speech_duration_s) so they reach the Phase-4 segmenter AND
+                # the vad-grouped framer. setdefault semantics: GUI custom params /
+                # sliders / CLI collected above always win. Single source of the
+                # lift: anime_whisper_vad.apply_anime_segmenter_defaults (2026-07-30
+                # fix — the previous per-key copies here silently dropped
+                # neg_threshold, shipping it as dead config).
+                apply_anime_segmenter_defaults(user_segmenter_overrides, qwen_sensitivity)
+            elif _aw_gen == "qwen3" and "threshold" not in user_segmenter_overrides:
+                user_segmenter_overrides["threshold"] = 0.25
+        # NOTE: --passN-speech-pad-ms (pass_config["speech_pad_ms"]) is applied to the
+        # pipeline padding scalars below, not to segmenter_config (see v1.9.0 note above).
         segmenter_config = resolve_qwen_sensitivity(
             segmenter_backend, qwen_sensitivity, user_segmenter_overrides or None
         )
@@ -1215,7 +1284,7 @@ def _build_pipeline(
             "qwen_input_mode": qwen_defaults.get("qwen_input_mode", "assembly"),
             "qwen_framer": qwen_defaults.get("qwen_framer", "vad-grouped"),
             "qwen_safe_chunking": qwen_defaults.get("qwen_safe_chunking", True),
-            "timestamp_mode": qwen_defaults.get("qwen_timestamp_mode", "aligner_vad_fallback"),
+            "timestamp_mode": qwen_defaults.get("qwen_timestamp_mode", "vad_only"),
             "assembly_cleaner": qwen_defaults.get("qwen_assembly_cleaner", True),
             "repetition_penalty": qwen_defaults.get("qwen_repetition_penalty", 1.1),
             "max_tokens_per_audio_second": qwen_defaults.get("qwen_max_tokens_per_second", 20.0),
@@ -1229,6 +1298,11 @@ def _build_pipeline(
         _gen_backend = qwen_pipeline_params.get("generator_backend", "qwen3")
         if _gen_backend == "anime-whisper":
             _user_qwen = pass_config.get("qwen_params") or {}
+            # v1.9.0: per-sensitivity WhisperSeg VAD defaults (owner table, single
+            # source of truth). Balanced is the fallback for unknown sensitivity.
+            # Each still gated on the user NOT having set it explicitly, so GUI
+            # sliders / CLI (applied below via qwen_defaults) win.
+            _aw_vad = anime_whisperseg_defaults(qwen_sensitivity)
             if "model_id" not in _user_qwen and not pass_config.get("model"):
                 qwen_pipeline_params["model_id"] = "litagin/anime-whisper"
             if "timestamp_mode" not in _user_qwen:
@@ -1238,9 +1312,13 @@ def _build_pipeline(
             if "stepdown" not in _user_qwen:
                 qwen_pipeline_params["stepdown_enabled"] = False
             if "chunk_threshold" not in _user_qwen:
-                qwen_pipeline_params["segmenter_chunk_threshold"] = 0.5
+                qwen_pipeline_params["segmenter_chunk_threshold"] = _aw_vad["chunk_threshold_s"]
             if "max_group_duration" not in _user_qwen:
-                qwen_pipeline_params["segmenter_max_group_duration"] = 5.0
+                qwen_pipeline_params["segmenter_max_group_duration"] = _aw_vad["max_group_duration_s"]
+            if "vad_padding" not in _user_qwen and "vad_start_pad" not in _user_qwen:
+                qwen_pipeline_params["segmenter_start_pad_ms"] = int(_aw_vad["start_pad_ms"])
+            if "vad_padding" not in _user_qwen and "vad_end_pad" not in _user_qwen:
+                qwen_pipeline_params["segmenter_end_pad_ms"] = int(_aw_vad["end_pad_ms"])
         elif _gen_backend == "cohere":
             # Cohere Transcribe defaults (D7: Qwen3 ForcedAligner ON by default).
             # User can disable aligner via Customize Parameters; the customize
@@ -1257,6 +1335,13 @@ def _build_pipeline(
                 qwen_pipeline_params["segmenter_chunk_threshold"] = 1.0
             if "max_group_duration" not in _user_qwen:
                 qwen_pipeline_params["segmenter_max_group_duration"] = 6.0
+            # v1.9.0: Cohere keeps pre-v1.9.0 SYMMETRIC padding (~300ms). The new
+            # asymmetric 100/200 default applies ONLY to qwen3 + anime-whisper, so
+            # pin cohere's pad scalars here (explicit user sliders still override below).
+            if "vad_padding" not in _user_qwen and "vad_start_pad" not in _user_qwen:
+                qwen_pipeline_params["segmenter_start_pad_ms"] = 300
+            if "vad_padding" not in _user_qwen and "vad_end_pad" not in _user_qwen:
+                qwen_pipeline_params["segmenter_end_pad_ms"] = 300
         # Pipeline-owned defaults: only forward when ensemble config explicitly overrides
         if "qwen_scene_min_duration" in qwen_defaults:
             qwen_pipeline_params["scene_min_duration"] = qwen_defaults["qwen_scene_min_duration"]
@@ -1267,6 +1352,21 @@ def _build_pipeline(
         _chunk_thr = qwen_defaults.get("qwen_chunk_threshold")
         if _chunk_thr is not None:
             qwen_pipeline_params["segmenter_chunk_threshold"] = float(_chunk_thr)
+        # v1.9.0: asymmetric VAD padding → pipeline scalars (qwen owns default 100/200).
+        # Precedence (low→high): legacy symmetric (GUI vad_padding / CLI speech_pad_ms)
+        # applied to BOTH sides, then explicit start/end pad sliders win per-side.
+        _legacy_pad = qwen_defaults.get("qwen_vad_padding")
+        if _legacy_pad is None:
+            _legacy_pad = pass_config.get("speech_pad_ms")
+        if _legacy_pad is not None:
+            qwen_pipeline_params["segmenter_start_pad_ms"] = max(0, int(_legacy_pad))
+            qwen_pipeline_params["segmenter_end_pad_ms"] = max(0, int(_legacy_pad))
+        _start_pad = qwen_defaults.get("qwen_vad_start_pad")
+        if _start_pad is not None:
+            qwen_pipeline_params["segmenter_start_pad_ms"] = max(0, int(_start_pad))
+        _end_pad = qwen_defaults.get("qwen_vad_end_pad")
+        if _end_pad is not None:
+            qwen_pipeline_params["segmenter_end_pad_ms"] = max(0, int(_end_pad))
         if "qwen_stepdown_initial_group" in qwen_defaults:
             qwen_pipeline_params["stepdown_initial_group"] = qwen_defaults["qwen_stepdown_initial_group"]
         if "qwen_stepdown_fallback_group" in qwen_defaults:
@@ -1295,6 +1395,49 @@ def _build_pipeline(
         except Exception as e:
             logger.error(
                 "[Worker %s] Pass %s: FAILED to create QwenPipeline - %s: %s",
+                os.getpid(), pass_number, type(e).__name__, e
+            )
+            raise
+
+    # CrispASR — simple standalone external-provider pipeline
+    # (docs/plans/crispasr_v190/08).  Constructs directly from pass_config
+    # like transformers/qwen.  It deliberately does NOT fall through to
+    # resolve_legacy_pipeline(): crispasr is not a LEGACY_PIPELINES entry
+    # (legacy.py:172 would raise), and per legacy.py's own docstring,
+    # dedicated-CLI-arg pipelines construct their config separately.
+    if pipeline_name == "crispasr":
+        crispasr_kwargs = {
+            "output_dir": output_dir,
+            "temp_dir": str(pass_temp_dir),
+            "keep_temp_files": keep_temp_files,
+            "save_metadata_json": pass_config.get("save_metadata_json", False),
+            "progress_display": None,
+            "subs_language": subs_language,
+            "crispasr_exe": pass_config.get("crispasr_exe"),
+            "crispasr_args": pass_config.get("crispasr_args") or "",
+            "crispasr_language": pass_config.get("language") or "ja",
+        }
+        # Only forward the backend when set so the pipeline default applies
+        # (passing None would override the default with None).
+        _crispasr_backend = pass_config.get("crispasr_backend")
+        if _crispasr_backend:
+            crispasr_kwargs["crispasr_backend"] = _crispasr_backend
+        logger.debug(
+            "[Worker %s] Pass %s: Creating CrispASRPipeline with backend=%s, exe=%s",
+            os.getpid(), pass_number,
+            _crispasr_backend or "(default)",
+            crispasr_kwargs["crispasr_exe"],
+        )
+        try:
+            pipeline = CrispASRPipeline(**crispasr_kwargs)
+            logger.debug(
+                "[Worker %s] Pass %s: CrispASRPipeline created successfully",
+                os.getpid(), pass_number
+            )
+            return pipeline
+        except Exception as e:
+            logger.error(
+                "[Worker %s] Pass %s: FAILED to create CrispASRPipeline - %s: %s",
                 os.getpid(), pass_number, type(e).__name__, e
             )
             raise
@@ -1546,6 +1689,7 @@ SPEECH_SEGMENTER_MAP = {
     "whisper-vad-medium": "whisper-vad-medium",
     "ten": "ten",
     "silero-v6.2": "silero-v6.2",
+    "firered-vad": "firered-vad",  # v1.9.0 experimental
     "none": "none",
 }
 
@@ -1599,6 +1743,20 @@ def _apply_gui_overrides(
     # Override speech segmenter if specified
     # Note: ASR modules read from params["speech_segmenter"]["backend"], not params["vad"]["backend"]
     speech_segmenter = pass_config.get("speech_segmenter")
+    # v1.9.0 fix (code-review): CLI ensemble (--passN-pipeline balanced with no
+    # --passN-speech-segmenter) previously skipped this whole block, leaving the
+    # resolver's external-whisperseg default — while `--mode balanced` and the
+    # GUI (which always sends an explicit segmenter) both default to
+    # faster-whisper's NATIVE VAD since the v1.9.0 throughput retune, and
+    # apply_balanced_vad_defaults below keyed off the wrong backend. Default it
+    # here so the same mode+sensitivity resolves identically at all three entry
+    # points. An explicit --passN-speech-segmenter still wins.
+    if speech_segmenter is None and pass_config.get("pipeline") == "balanced":
+        speech_segmenter = "faster-whisper"
+        logger.debug(
+            "Pass %s: balanced pipeline defaults to faster-whisper native VAD (v1.9.0)",
+            pass_number,
+        )
     if speech_segmenter is not None:  # Allow empty string for default
         segmenter_backend = SPEECH_SEGMENTER_MAP.get(speech_segmenter, speech_segmenter)
 
@@ -1633,6 +1791,18 @@ def _apply_gui_overrides(
                 "Pass %s: Override speech_segmenter = %s, resolved %d sensitivity params (%s)",
                 pass_number, segmenter_backend, len(segmenter_params), sensitivity,
             )
+
+    # v1.9.0: apply the SHARED balanced VAD defaults so the ensemble path matches
+    # the single-pass path — native faster_whisper_vad preset (scale-correct 0.40,
+    # not the silero 0.28 scale), or Test-D fine-grained grouping for an external
+    # segmenter on the balanced pipeline. Runs AFTER the segmenter backend is set
+    # above and BEFORE the explicit vad_threshold / speech_pad_ms overrides below
+    # (and apply_custom_params later), all of which still win.
+    apply_balanced_vad_defaults(
+        resolved_config,
+        sensitivity=pass_config.get("sensitivity", "balanced"),
+        is_balanced=(pass_config.get("pipeline") == "balanced"),
+    )
 
     # Override speech enhancer if specified
     speech_enhancer = pass_config.get("speech_enhancer")
