@@ -89,10 +89,13 @@ PYTHON_MAJOR=$(echo "$PYTHON_VERSION" | cut -d'.' -f1)
 PYTHON_MINOR=$(echo "$PYTHON_VERSION" | cut -d'.' -f2)
 info "Python: $PYTHON_VERSION"
 
-if [[ "$PYTHON_MAJOR" -ne 3 ]] || [[ "$PYTHON_MINOR" -lt 10 ]] || [[ "$PYTHON_MINOR" -gt 12 ]]; then
-    error "Python 3.10-3.12 required. Found: $PYTHON_VERSION"
+
+if [[ "$PYTHON_MAJOR" -ne 3 ]] || [[ "$PYTHON_MINOR" -lt 10 ]] || [[ "$PYTHON_MINOR" -gt 14 ]]; then
+    error "Python 3.10-3.14 required. Found: $PYTHON_VERSION"
     exit 1
 fi
+
+
 
 # Verify Colab's PyTorch is available
 TORCH_CHECK=$(python3 -c "

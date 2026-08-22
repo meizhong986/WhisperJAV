@@ -31,7 +31,7 @@ readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "MeiZhong"}]
 maintainers = [{name = "MeiZhong"}]
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.10,<3.14"
 keywords = [
     "whisper",
     "transcription",
@@ -56,6 +56,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Multimedia :: Sound/Audio :: Speech",
     "Topic :: Multimedia :: Video",
 ]
@@ -132,7 +133,8 @@ cli = [
     "ten-vad",
 
     # Performance and utilities
-    "numba>=0.60.0",
+
+    "numba>=0.61.0",
     "psutil>=5.9.0",
 
     # Scene detection clustering
