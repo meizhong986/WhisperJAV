@@ -150,6 +150,18 @@ The recipe that ties the other choices together.
 | **transformers** | Runs any HF Whisper model; best GPU path on Apple Silicon | Uses HF's own chunking — scene/segmenter choices don't apply |
 | **crispasr** / **xxl** | Bring your own external engine as a pass | Self-contained: WhisperJAV's knobs don't reach inside |
 
+> **Naming note (CLI users).** *ChronosJAV* is one pipeline with interchangeable recognizers, so **qwen** and **anime-whisper** are two backends of it rather than two separate pipelines. The GUI lists them side by side in the pipeline dropdown; on the command line both live under `qwen`, and the backend is chosen inside the params:
+>
+> ```bash
+> # Qwen3-ASR (the default backend)
+> --pass1-pipeline qwen
+>
+> # anime-whisper, same pipeline, different recognizer
+> --pass1-pipeline qwen --pass1-qwen-params '{"generator_backend": "anime-whisper"}'
+> ```
+>
+> The usable values for `generator_backend` are `qwen3` and `anime-whisper` (a third, `cohere`, exists in the code but is not currently enabled). Note also that `litagin/anime-whisper` can be loaded through the **transformers** pipeline via `--hf-model-id` — but that route uses HF's own chunking and does not produce usable per-line timing, so prefer the ChronosJAV route above.
+
 ### Scene detection
 
 Where the long file gets cut into workable pieces.
@@ -214,7 +226,18 @@ A few known-good recipes:
 | Quiet/ASMR recall | fidelity · aggressive | anime-whisper · aggressive | `longest` |
 | Second opinion on the model only | your usual recipe | same recipe, different ASR model | `pass1_primary` |
 
-Merge-strategy rule of thumb: `pass1_primary` when you trust pass 1 and want gap-filling; `longest` when you're chasing completeness; `smart_merge` when both passes are of similar quality. Save anything that works as a **preset** so it's one click next time.
+**Merge strategies.** Seven are available (`--merge-strategy`):
+
+| Strategy | What it does |
+|---|---|
+| **`pass1_primary`** | Keeps pass 1 as primary and fills missing parts from pass 2 |
+| `pass2_primary` | The mirror image — pass 2 primary, filled from pass 1 |
+| `smart_merge` | Automatically picks the better line from each pass |
+| `full_merge` | Includes every line from both passes — most recall, most duplicates to clean up |
+| `longest` | For each overlapping pair, picks the subtitle with more text content |
+| `pass1_overlap` / `pass2_overlap` | Same as the `_primary` pair, but tolerates up to 30% overlap when filling — use when the two passes disagree slightly on boundaries |
+
+Save anything that works as a **preset** so it's one click next time.
 
 ---
 
