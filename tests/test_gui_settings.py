@@ -123,6 +123,14 @@ class TestS01FirstLaunch:
         This is the root cause of S01 bug: if these drift, first-launch users
         see wrong defaults.  The expected values below are copied from the HTML.
         If index.html changes, update both the HTML and this test.
+
+        NOTE (v1.9.2): the ``pass{1,2}_model`` entries are NOT taken from the
+        static HTML.  Those dropdowns are repopulated by ``handlePipelineChange``
+        in app.js whenever the pipeline changes, so the ``selected`` attribute in
+        index.html is only the classic-pipeline placeholder.  For those two keys
+        the authoritative value is DEFAULT_GUI_SETTINGS itself.
+        See ``test_static_selects_match_html`` below, which parses index.html and
+        catches drift automatically for every non-dynamic dropdown.
         """
         # HTML `selected` values (source of truth: index.html)
         html_defaults = {
@@ -139,18 +147,18 @@ class TestS01FirstLaunch:
             "temp_dir": "",
             "accept_cpu_mode": False,
             "async_processing": False,
-            "pass1_pipeline": "balanced",
+            "pass1_pipeline": "anime-whisper",
             "pass1_sensitivity": "aggressive",
             "pass1_scene_detector": "semantic",
             "pass1_speech_enhancer": "none",
-            "pass1_speech_segmenter": "silero-v6.2",
-            "pass1_model": "large-v2",
+            "pass1_speech_segmenter": "whisperseg",
+            "pass1_model": "litagin/anime-whisper",
             "pass2_enabled": False,
             "pass2_pipeline": "qwen",
             "pass2_sensitivity": "balanced",
             "pass2_scene_detector": "semantic",
             "pass2_speech_enhancer": "none",
-            "pass2_speech_segmenter": "silero-v6.2",
+            "pass2_speech_segmenter": "ten",
             "pass2_model": "Qwen/Qwen3-ASR-1.7B",
             "merge_strategy": "pass1_primary",
             "pass1_preset": "",
@@ -162,6 +170,82 @@ class TestS01FirstLaunch:
                 f"DEFAULT_GUI_SETTINGS[{key!r}] = {actual!r}, "
                 f"but HTML selected = {expected!r}"
             )
+
+    # Setting key -> index.html <select> id, for dropdowns whose options are
+    # STATIC in the markup.  Deliberately excludes pass1_model / pass2_model:
+    # handlePipelineChange() in app.js rebuilds those lists per pipeline, so the
+    # markup's `selected` attribute is not authoritative for them.
+    _STATIC_SELECT_IDS = {
+        "mode": "mode",
+        "sensitivity": "sensitivity",
+        "source_language": "source-language",
+        "subs_language": "language",
+        "pass1_pipeline": "pass1-pipeline",
+        "pass1_sensitivity": "pass1-sensitivity",
+        "pass1_scene_detector": "pass1-scene",
+        "pass1_speech_enhancer": "pass1-enhancer",
+        "pass1_speech_segmenter": "pass1-segmenter",
+        "pass2_pipeline": "pass2-pipeline",
+        "pass2_sensitivity": "pass2-sensitivity",
+        "pass2_scene_detector": "pass2-scene",
+        "pass2_speech_enhancer": "pass2-enhancer",
+        "pass2_speech_segmenter": "pass2-segmenter",
+        "merge_strategy": "merge-strategy",
+    }
+
+    def test_static_selects_match_html(self):
+        """S01: parse index.html and compare `selected` options to the defaults.
+
+        The sibling test above compares against a hand-copied dict, which cannot
+        detect HTML/Python drift — it only detects drift from whatever someone
+        last typed into the test.  This one reads the markup directly, so a
+        changed default in index.html fails here without anyone remembering to
+        update a fixture.  (That drift is exactly what happened in v1.9.0: the
+        ensemble defaults moved to anime-whisper/WhisperSeg/TEN and the copied
+        dict was left behind.)
+        """
+        import re
+
+        html_path = (
+            Path(__file__).resolve().parent.parent
+            / "whisperjav" / "webview_gui" / "assets" / "index.html"
+        )
+        assert html_path.exists(), f"index.html not found at {html_path}"
+        html = html_path.read_text(encoding="utf-8")
+
+        selected_by_id = {}
+        for block in re.finditer(
+            r'<select\b[^>]*\bid="([^"]+)"[^>]*>(.*?)</select>', html, re.S
+        ):
+            element_id, body = block.group(1), block.group(2)
+            chosen = re.findall(
+                r'<option\b[^>]*\bvalue="([^"]*)"[^>]*\bselected\b', body
+            )
+            if chosen:
+                selected_by_id[element_id] = chosen[0]
+
+        mismatches = []
+        for key, element_id in self._STATIC_SELECT_IDS.items():
+            assert key in DEFAULT_GUI_SETTINGS, (
+                f"{key!r} is in the static-select map but not in "
+                f"DEFAULT_GUI_SETTINGS — update one of them."
+            )
+            assert element_id in selected_by_id, (
+                f"index.html has no <select id={element_id!r}> with a selected "
+                f"option (renamed or removed?) — update _STATIC_SELECT_IDS."
+            )
+            if DEFAULT_GUI_SETTINGS[key] != selected_by_id[element_id]:
+                mismatches.append(
+                    f"  {key}: DEFAULT_GUI_SETTINGS={DEFAULT_GUI_SETTINGS[key]!r} "
+                    f"but index.html #{element_id} selects "
+                    f"{selected_by_id[element_id]!r}"
+                )
+
+        assert not mismatches, (
+            "GUI defaults have drifted from index.html — first-launch users "
+            "would see different values than the backend assumes:\n"
+            + "\n".join(mismatches)
+        )
 
 
 # ===================================================================
