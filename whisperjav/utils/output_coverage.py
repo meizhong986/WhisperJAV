@@ -252,3 +252,51 @@ def report_coverage(report: CoverageReport, file_label: str) -> None:
         "and report it on issue #394.",
         file_label, report.detail,
     )
+
+
+# Segmenter names that are passthroughs rather than genuine speech detection.
+# Under faster-whisper's native VAD -- the balanced default since v1.9.0 -- the
+# external segmenter is NullSpeechSegmenter, which returns the whole scene as a
+# single segment unconditionally. Counting that as "speech was detected" would
+# manufacture corroboration and fail runs whose audio genuinely holds no
+# dialogue; #324 is the case that would have been wrongly failed.
+PASSTHROUGH_SEGMENTERS = frozenset({"none", ""})
+
+
+class SpeechPositiveEmptyStreak:
+    """Counts consecutive scenes where speech was detected but nothing came back.
+
+    This is the corroborating signal both #394 reporters asked for -- the thing
+    that distinguishes "the recogniser stopped working" from "the speech stopped".
+    Span alone cannot make that distinction, which is why it only warns.
+
+    A scene is only counted when an external segmenter genuinely reported speech.
+    Scenes where the detector found nothing are neutral: they neither extend the
+    streak (silence is not a malfunction) nor reset it (a quiet gap between two
+    broken stretches should not disguise them as two short ones).
+    """
+
+    def __init__(self, segmenter_name: Optional[str] = None):
+        self._trustworthy = (segmenter_name or "").lower() not in PASSTHROUGH_SEGMENTERS
+        self.current = 0
+        self.longest = 0
+
+    @property
+    def is_meaningful(self) -> bool:
+        """False when no external detector is running, so the signal is unusable."""
+        return self._trustworthy
+
+    def record(self, produced_output: bool, speech_detected: bool) -> None:
+        """Record one scene's outcome."""
+        if not self._trustworthy:
+            return
+        if produced_output:
+            self.current = 0
+        elif speech_detected:
+            self.current += 1
+            self.longest = max(self.longest, self.current)
+        # else: detector found no speech and none was produced -- consistent, neutral
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        return (f"SpeechPositiveEmptyStreak(longest={self.longest}, "
+                f"current={self.current}, meaningful={self._trustworthy})")

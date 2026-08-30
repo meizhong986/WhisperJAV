@@ -141,8 +141,15 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
   `--min-coverage` to adjust the threshold, or `--min-coverage 0` to switch the
   span check off entirely.
 
+  A run *is* failed when short output is corroborated by evidence that the
+  recognizer stopped working: consecutive scenes where the voice detector
+  reported speech but nothing came back. That distinction — "the recognizer
+  stopped" versus "the speech stopped" — is the whole point, and span alone
+  cannot make it. Balanced mode reports this signal; other pipelines warn until
+  they do.
+
   The policy here was set by the people who reported the problem rather than by
-  us — see *Known limitations* for what is still missing. (#394, #263)
+  us. (#394, #263)
 
 ---
 
@@ -192,11 +199,9 @@ Not user-visible, but worth recording:
 
 ## Planned for this release, not yet landed
 
-- **Corroborated failure detection for #394.** The check above fails a run only
-  when there are no subtitles at all. Catching the *partial* cases — where output
-  stops part-way while dialogue continues — needs the recogniser to report
-  consecutive empty results, which is not yet instrumented. Until it is, those
-  runs warn rather than fail.
+- **Corroboration outside Balanced mode.** Balanced now reports the
+  speech-positive empty-scene signal; Fidelity, Fast, Faster and the ChronosJAV
+  pipelines do not yet, so short output there warns rather than fails.
 - **Coverage checking in async mode.** Wired for normal processing only.
 
 ---
@@ -217,6 +222,7 @@ Not user-visible, but worth recording:
 
 | Date | Change |
 |------|--------|
+| 2026-08-30 | Corroborating signal instrumented in Balanced: consecutive scenes with detected speech but no output now corroborate a low-coverage failure (#394) |
 | 2026-08-30 | Artifacts `[SANITIZATION SUMMARY]` now counts real removals and the real final subtitle count instead of a counter the active workflow never updated |
 | 2026-08-30 | Output coverage gate wired: empty output fails the run and exits non-zero; short output warns. Nuclear exit no longer hardcoded to 0 (#394, #263) |
 | 2026-08-30 | DeepSeek reasoning disabled for v4-flash (#395, @mcdman); post-processing stage logging so a stall names the operation that hung (#372) |

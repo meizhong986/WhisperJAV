@@ -16,6 +16,7 @@ from whisperjav.modules.scene_detection_backends import SceneDetectorFactory
 
 from whisperjav.modules.srt_stitching import SRTStitcher
 from whisperjav.utils.logger import logger
+from whisperjav.utils.output_coverage import SpeechPositiveEmptyStreak
 
 from whisperjav.utils.progress_display import DummyProgress
 from whisperjav.utils.progress_aggregator import AsyncProgressReporter
@@ -433,6 +434,15 @@ class BalancedPipeline(BasePipeline):
             # Accumulate VAD segments across all scenes for visualization data contract
             all_vad_segments = []
 
+            # #394: track consecutive scenes where the detector reported speech
+            # but nothing came back. This is the corroborating signal that tells
+            # "the recogniser stopped" apart from "the speech stopped" -- span
+            # alone cannot, which is why span alone only warns. The tracker
+            # disables itself when no external segmenter is running.
+            empty_streak = SpeechPositiveEmptyStreak(
+                asr.get_segmenter_name() if hasattr(asr, 'get_segmenter_name') else None
+            )
+
             for idx, (scene_path, start_time_sec, _, _) in enumerate(scene_paths):
                 scene_srt_path = scene_srts_dir / f"{scene_path.stem}.srt"
                 scene_num = idx + 1
@@ -496,6 +506,16 @@ class BalancedPipeline(BasePipeline):
                     # Collect VAD segments from ASR (adjusted by scene start offset)
                     if hasattr(asr, 'get_last_vad_segments'):
                         scene_vad = asr.get_last_vad_segments()
+
+                        # #394: did the detector find speech here, and did the
+                        # recogniser return anything for it?
+                        empty_streak.record(
+                            produced_output=bool(
+                                scene_srt_path.exists() and scene_srt_path.stat().st_size > 0
+                            ),
+                            speech_detected=bool(scene_vad),
+                        )
+
                         for seg in scene_vad:
                             all_vad_segments.append({
                                 "start_sec": round(start_time_sec + seg["start_sec"], 3),
@@ -608,6 +628,13 @@ class BalancedPipeline(BasePipeline):
 
             total_time = time.time() - start_time
             master_metadata["summary"]["total_processing_time_seconds"] = round(total_time, 2)
+            # #394: surfaced so the caller can corroborate a low-coverage result.
+            master_metadata["summary"]["speech_positive_empty_streak"] = empty_streak.longest
+            if empty_streak.longest:
+                logger.warning(
+                    "%d consecutive scene(s) produced no output while speech was "
+                    "still being detected (issue #394).", empty_streak.longest
+                )
             master_metadata["metadata_master"]["updated_at"] = datetime.now().isoformat() + "Z"
 
             self.metadata_manager.save_master_metadata(master_metadata, media_basename)

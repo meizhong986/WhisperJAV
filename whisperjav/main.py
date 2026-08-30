@@ -1436,6 +1436,13 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                     media_info.get('duration'),
                     min_coverage=(DEFAULT_MIN_COVERAGE if args.min_coverage is None
                                   else args.min_coverage),
+                    # Corroboration: short output is only failed when the
+                    # recognizer is independently shown to have stopped working.
+                    # Pipelines that do not report this leave it at 0, so they
+                    # warn rather than fail.
+                    speech_positive_empty_streak=metadata.get("summary", {}).get(
+                        "speech_positive_empty_streak", 0
+                    ),
                 )
                 report_coverage(_cov, Path(file_path_str).name)
                 if _cov.is_failure:

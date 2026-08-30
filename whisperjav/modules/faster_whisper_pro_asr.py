@@ -233,6 +233,18 @@ class FasterWhisperProASR:
         """Return a copy of accumulated filter statistics."""
         return dict(self._filter_statistics)
 
+    def get_segmenter_name(self) -> str:
+        """Name of the speech segmenter actually in use, or "none".
+
+        Callers need this to know whether ``get_last_vad_segments()`` represents
+        a genuine speech detection. Under faster-whisper's native VAD the
+        segmenter is NullSpeechSegmenter, which returns the whole scene as one
+        segment unconditionally -- a passthrough, not a detection. Treating that
+        as evidence of speech would misread silence as a malfunction (#324).
+        """
+        seg = getattr(self, "_external_segmenter", None)
+        return getattr(seg, "name", "none") if seg is not None else "none"
+
     def get_last_vad_segments(self) -> List[Dict]:
         """
         Return VAD segments from the last transcription.

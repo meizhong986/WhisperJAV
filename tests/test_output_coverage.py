@@ -279,3 +279,100 @@ class TestExitStatusWiring:
             timeout=180,
         )
         assert bad.returncode != 0
+
+
+# ---------------------------------------------------------------------------
+# The corroborating signal itself (#394)
+# ---------------------------------------------------------------------------
+
+class TestSpeechPositiveEmptyStreak:
+    """Counts consecutive scenes where speech was detected but nothing returned.
+
+    The subtlety is #324: under faster-whisper's native VAD the segmenter is a
+    passthrough returning one segment per scene unconditionally. Counting that as
+    a detection would have failed a run whose audio genuinely held no dialogue,
+    which is the exact false positive both #394 reporters warned about.
+    """
+
+    def test_counts_consecutive_speech_positive_empties(self):
+        from whisperjav.utils.output_coverage import SpeechPositiveEmptyStreak
+
+        t = SpeechPositiveEmptyStreak("silero-v3.1")
+        for _ in range(7):
+            t.record(produced_output=False, speech_detected=True)
+        assert t.longest == 7
+
+    def test_output_resets_the_streak(self):
+        from whisperjav.utils.output_coverage import SpeechPositiveEmptyStreak
+
+        t = SpeechPositiveEmptyStreak("whisperseg")
+        for _ in range(4):
+            t.record(produced_output=False, speech_detected=True)
+        t.record(produced_output=True, speech_detected=True)
+        t.record(produced_output=False, speech_detected=True)
+        assert t.longest == 4, "the peak must be retained"
+        assert t.current == 1
+
+    def test_silence_is_neutral(self):
+        """Quiet scenes neither extend the streak nor disguise a broken run."""
+        from whisperjav.utils.output_coverage import SpeechPositiveEmptyStreak
+
+        t = SpeechPositiveEmptyStreak("ten")
+        t.record(produced_output=False, speech_detected=True)
+        t.record(produced_output=False, speech_detected=False)  # genuine silence
+        t.record(produced_output=False, speech_detected=True)
+        assert t.longest == 2, "silence must not reset a genuine streak"
+
+    def test_no_speech_and_no_output_never_counts(self):
+        from whisperjav.utils.output_coverage import SpeechPositiveEmptyStreak
+
+        t = SpeechPositiveEmptyStreak("silero-v4.0")
+        for _ in range(20):
+            t.record(produced_output=False, speech_detected=False)
+        assert t.longest == 0
+
+    def test_passthrough_segmenter_produces_no_signal(self):
+        """#324: native VAD gives a passthrough, not a detection."""
+        from whisperjav.utils.output_coverage import SpeechPositiveEmptyStreak
+
+        for name in ("none", "", None):
+            t = SpeechPositiveEmptyStreak(name)
+            assert not t.is_meaningful
+            for _ in range(33):  # the #324 run's actual empty-scene count
+                t.record(produced_output=False, speech_detected=True)
+            assert t.longest == 0, (
+                "a passthrough segmenter must never corroborate a failure"
+            )
+
+    def test_324_run_would_not_have_been_failed(self):
+        """End to end: #324's numbers must produce a warning, not a failure."""
+        from whisperjav.utils.output_coverage import (
+            SpeechPositiveEmptyStreak,
+            assess_coverage,
+        )
+
+        t = SpeechPositiveEmptyStreak("none")  # native VAD
+        for _ in range(33):
+            t.record(produced_output=False, speech_detected=True)
+
+        import datetime as _dt
+        import tempfile
+        from pathlib import Path as _P
+
+        import srt as srt_lib
+
+        with tempfile.TemporaryDirectory() as d:
+            srt_file = _P(d) / "k.srt"
+            srt_file.write_text(srt_lib.compose([
+                srt_lib.Subtitle(index=1, start=_dt.timedelta(seconds=30),
+                                 end=_dt.timedelta(seconds=32.7), content="x")
+            ]), encoding="utf-8")
+            report = assess_coverage(
+                srt_file, media_duration_s=1061.4,
+                speech_positive_empty_streak=t.longest,
+            )
+
+        assert report.verdict == "implausible", "3% span must still be flagged"
+        assert not report.is_failure, (
+            "#324 must warn, not fail: the empty scenes came from a passthrough"
+        )
