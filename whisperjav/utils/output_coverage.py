@@ -144,8 +144,19 @@ def assess_coverage(
         min_coverage: span below which the result is "implausible". Pass 0 to
             disable the ratio check; zero-cue output is still reported as empty.
         speech_positive_empty_streak: longest run of consecutive empty ASR
-            results observed *while the voice detector still reported speech*.
-            This is the corroborating signal both #394 reporters asked for.
+            results observed *while an external voice detector still reported
+            speech*. This is the corroborating signal both #394 reporters asked
+            for.
+
+            **Only pass a non-zero value when an external segmenter is in use.**
+            Under faster-whisper's native VAD — the balanced default since
+            v1.9.0 — segmentation is bypassed by ``NullSpeechSegmenter``, which
+            returns the whole scene as one segment unconditionally. That is a
+            passthrough, not a speech detection, so counting it as
+            speech-positive would invent corroboration where none exists.
+            Issue #324 is the cautionary case: 33 consecutive empty scenes on a
+            music performance where the audio genuinely held no dialogue. Under
+            native VAD the honest corroboration is ``probe_failed``.
         probe_failed: True if a same-instance health probe failed — the signal
             @AlanZ-Git identified, where a known-good clip returns nothing from
             the already-loaded model but transcribes correctly in a fresh
