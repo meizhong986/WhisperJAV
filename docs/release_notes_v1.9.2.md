@@ -88,6 +88,31 @@ you find out something went wrong.
   — on Windows and macOS pywebview installs its backend automatically, and the
   guide now says so rather than leaving people to wonder. (#366)
 
+### Convenience
+
+- **Batch runs can skip files that already have subtitles.** A *Skip
+  already-subtitled files* checkbox now appears in the GUI, and it works in
+  ensemble mode as well as single-pass. `--skip-existing` already existed on the
+  command line but had never been exposed in the interface, and did not cover
+  ensemble runs. (#328)
+
+- **The GUI can remember your settings between launches, if you ask it to.**
+  A *Remember settings* checkbox stores the first tab's fields and restores them
+  next time. It is **off by default**, so the deliberate start-from-defaults
+  behaviour is unchanged unless you opt in. (#96, #298, #381)
+
+- **Saving presets no longer fails on relocated user profiles.** Where
+  `%APPDATA%` is a junction — common when the profile has been moved to another
+  drive — saving a preset could fail and the preset then could not be found.
+  Writes are now atomic and resolve the real location first. (#309)
+
+- **The GUI's DeepSeek model lists are current.** Both dropdowns offered
+  `deepseek-chat` and `deepseek-coder`, retired upstream on 2026-07-24. They now
+  offer `deepseek-v4-flash` and `deepseek-v4-pro`, and the OpenRouter list
+  matches the backend default instead of contradicting it. (#325, #382)
+
+With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
+
 ---
 
 ## Documentation
@@ -136,10 +161,6 @@ Not user-visible, but worth recording:
 
 ## Planned for this release, not yet landed
 
-- **PR #378** (@Mimic-me) — reviewed and scheduled. Adds *Skip already-subtitled
-  files* to the GUI and ensemble mode (#328), opt-in settings persistence
-  (#96, #298, #381), atomic and junction-safe preset saves (#309), and corrects
-  the DeepSeek model names in the GUI dropdowns (#325, #382).
 - **Output coverage checking (#394)** — the code to detect a subtitle file that
   cannot plausibly cover its input is written and tested but is **not yet
   active**. Enforcing it requires changing when WhisperJAV reports failure, which
@@ -164,6 +185,7 @@ Not user-visible, but worth recording:
 
 | Date | Change |
 |------|--------|
+| 2026-08-30 | PR #378 merged (@Mimic-me): skip-existing in the GUI and ensemble (#328), opt-in settings persistence (#96, #298, #381), junction-safe preset saves (#309), DeepSeek v4 names in the GUI (#325, #382); OpenRouter dropdown synced to the backend default |
 | 2026-08-30 | Linux install guide: GUI-backend step moved to a shared section covering every distribution; Fedora WebKit package corrected to the 4.1 series (#366) |
 | 2026-08-30 | Seven small defects fixed: #340, #341, #306, #325, #323, #334, #366, plus the Ollama fallback model list |
 | 2026-08-30 | Output coverage assessment added with tests — inert, pending a decision on enforcement (#394) |
