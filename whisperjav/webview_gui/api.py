@@ -3684,8 +3684,17 @@ class WhisperJAVAPI:
 
     # ── Ollama-specific API methods ──────────────────────────────────────
 
+    # Served when config/ollama_models.json cannot be read.  Must mirror that
+    # file's instruct-only curation: v1.8.11 removed Qwen3-family *thinking*
+    # models from the curated list because they emit chain-of-thought into the
+    # SRT and break the format, but this fallback kept leading with
+    # Shisa-v2.1-Qwen3-8B — so any user whose config failed to load was handed
+    # the known-bad recommendation as option one.  #305's reporter was running
+    # exactly that model when they reported English output in a Chinese
+    # translation.  Kept in step by test_v192_small_fixes.py.
     _CURATED_MODELS_FALLBACK = [
-        {"model": "hf.co/mradermacher/shisa-v2.1-qwen3-8b-GGUF:Q8_0", "size": "8.7 GB", "label": "Shisa-v2.1-Qwen3-8B Q8"},
+        {"model": "gemma3:12b", "size": "8.1 GB", "label": "Gemma 3 12B (instruct)"},
+        {"model": "qwen2.5:7b-instruct", "size": "4.7 GB", "label": "Qwen2.5-7B Instruct"},
         {"model": "huihui_ai/qwen2.5-abliterate:7b-instruct-q4_K_M", "size": "4.7 GB", "label": "Qwen2.5-7B-Abliterated Q4"},
         {"model": "dolphin-llama3:8b-256k-v2.9-q4_K_M", "size": "4.8 GB", "label": "Dolphin-Llama3-8B-256K Q4"},
     ]

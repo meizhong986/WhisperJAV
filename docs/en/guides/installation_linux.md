@@ -100,11 +100,26 @@ sudo apt-get install -y libc++1 libc++abi1
 sudo apt-get install -y portaudio19-dev
 
 # Optional: For GUI (whisperjav-gui)
-sudo apt-get install -y \
-    libwebkit2gtk-4.0-dev \
-    libgtk-3-dev \
-    gir1.2-webkit2-4.0
+# Ubuntu 24.04+ ships the 4.1 series only; 22.04 and earlier ship 4.0.
+# Install whichever your release provides:
+sudo apt-get install -y libgtk-3-dev
+sudo apt-get install -y libwebkit2gtk-4.1-dev gir1.2-webkit2-4.1 \
+  || sudo apt-get install -y libwebkit2gtk-4.0-dev gir1.2-webkit2-4.0
 ```
+
+> **The system packages above are not sufficient on their own.** They are
+> installed system-wide, and a virtual environment created without
+> `--system-site-packages` cannot see the `gi` (PyGObject) bindings, so
+> `whisperjav-gui` fails with `ModuleNotFoundError: No module named 'gi'`.
+> Install a GUI backend *into the virtual environment* as well (#366):
+>
+> ```bash
+> # Qt backend - the simplest option, needs no system GTK bindings
+> pip install "pywebview[qt]"
+>
+> # or, to use the GTK backend, expose the system bindings to the venv:
+> #   python3 -m venv --system-site-packages whisperjav-env
+> ```
 
 **Ubuntu 20.04 (Focal) users:** The default Python is 3.8, which is too old. Install Python 3.10+ from the deadsnakes PPA:
 
@@ -420,7 +435,7 @@ pip install "whisperjav[all] @ git+https://github.com/meizhong986/whisperjav.git
 | Extra | Description | System Deps Required |
 |-------|-------------|---------------------|
 | `cli` | Audio processing, VAD, scene detection | libsndfile |
-| `gui` | PyWebView GUI interface | libwebkit2gtk-4.0-dev, libgtk-3-dev |
+| `gui` | PyWebView GUI interface | libgtk-3-dev + libwebkit2gtk-4.1-dev (4.0 on Ubuntu ≤ 22.04), **plus `pywebview[qt]` inside the venv** |
 | `translate` | AI subtitle translation (cloud APIs) | None |
 | `llm` | Local LLM server (FastAPI) | None |
 | `enhance` | Speech enhancement (ClearVoice, BS-RoFormer) | libsndfile |
@@ -721,12 +736,29 @@ sudo dnf install -y python3-tkinter
 The GUI requires WebKit2GTK. For CLI-only use, this is not needed.
 
 ```bash
-# Ubuntu/Debian
+# Ubuntu 24.04+ (4.1 series — 4.0 is no longer packaged)
+sudo apt-get install -y libwebkit2gtk-4.1-dev
+
+# Ubuntu 22.04 and earlier (4.0 series)
 sudo apt-get install -y libwebkit2gtk-4.0-dev
 
 # Fedora
-sudo dnf install -y webkit2gtk4.0-devel
+sudo dnf install -y webkit2gtk4.1-devel
 ```
+
+**`ModuleNotFoundError: No module named 'gi'`** (#366)
+
+A different problem, despite also being about the GUI. The apt packages above are
+installed system-wide, but pywebview needs a backend *inside* your virtual
+environment. Installing the Qt backend is the quickest fix and avoids the GTK
+bindings entirely:
+
+```bash
+pip install "pywebview[qt]"
+```
+
+Alternatively, recreate the virtual environment with `--system-site-packages` so
+it can see the system PyGObject bindings.
 
 ### Permission Denied
 

@@ -100,6 +100,14 @@ LANGUAGE_CODE_MAP = {
 }
 
 
+# Speech-enhancement backends accepted on the CLI.  Kept in step with
+# SpeechEnhancerFactory._BACKEND_REGISTRY by test_cli_enhancer_choices_match_registry;
+# hardcoded rather than imported so `--help` does not pay the factory import cost.
+# Without `choices=`, a typo such as `zipenhance` was accepted and silently
+# downgraded to no enhancement part-way through a multi-hour run (#306).
+SPEECH_ENHANCER_CHOICES = ["none", "ffmpeg-dsp", "zipenhancer", "clearvoice", "bs-roformer"]
+
+
 def build_translation_context(args) -> str:
     """Build extra_context string for translation from CLI arguments."""
     context_parts = []
@@ -211,7 +219,8 @@ def parse_arguments():
     twopass_group.add_argument("--pass1-speech-segmenter", default=None,
                                help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none)")
     twopass_group.add_argument("--pass1-speech-enhancer", default=None,
-                               help="Speech enhancer for pass 1 (e.g., none)")
+                               choices=SPEECH_ENHANCER_CHOICES,
+                               help="Speech enhancer for pass 1 (default: none). An unrecognised name is rejected here rather than silently falling back mid-run (#306).")
     twopass_group.add_argument("--pass1-enhance-for-vad", action="store_true", default=False,
                                help="Dual-track mode for pass 1: enhanced audio for VAD, original for ASR")
     twopass_group.add_argument("--pass1-model", default=None,
@@ -241,7 +250,8 @@ def parse_arguments():
     twopass_group.add_argument("--pass2-speech-segmenter", default=None,
                                help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none)")
     twopass_group.add_argument("--pass2-speech-enhancer", default=None,
-                               help="Speech enhancer for pass 2 (e.g., none)")
+                               choices=SPEECH_ENHANCER_CHOICES,
+                               help="Speech enhancer for pass 2 (default: none). An unrecognised name is rejected here rather than silently falling back mid-run (#306).")
     twopass_group.add_argument("--pass2-enhance-for-vad", action="store_true", default=False,
                                help="Dual-track mode for pass 2: enhanced audio for VAD, original for ASR")
     twopass_group.add_argument("--pass2-model", default=None,
@@ -2057,10 +2067,11 @@ def main():
                 and speech_segmenter != "faster-whisper"
                 and not speech_segmenter.startswith("silero")):
             logger.warning(
-                "Speech segmenter '%s' is not supported in --mode %s due to a known "
-                "v1.9.0 routing bug (catastrophic empty output on JAV moaning content). "
-                "Falling back to silero-v3.1. Use --ensemble for full WhisperSeg / TEN / "
-                "NeMo / whisper-vad support.",
+                "Speech segmenter '%s' is not wired for single-pass --mode %s: that "
+                "path does not carry the segmenter's parameters through, which can "
+                "produce empty output on JAV audio. Falling back to silero-v3.1. "
+                "WhisperSeg / TEN / NeMo / whisper-vad are fully supported via "
+                "--ensemble, and silero-v6.2 works here.",
                 speech_segmenter, getattr(args, 'mode', None)
             )
             speech_segmenter = "silero-v3.1"

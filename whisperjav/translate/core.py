@@ -57,6 +57,43 @@ def cap_batch_size_for_context(max_batch_size: int, n_ctx: int) -> int:
     return min(max_batch_size, safe_max)
 
 
+# PySubtrans defaults min_batch_size to 10 (Options.py) and SubtitleBatcher
+# raises "min_batch_size must be less than max_batch_size" when the floor
+# exceeds the ceiling.
+PYSUBTRANS_DEFAULT_MIN_BATCH = 10
+
+
+def resolve_batch_window(max_batch_size: int) -> tuple:
+    """Return a (min_batch_size, max_batch_size) pair PySubtrans will accept.
+
+    ``cap_batch_size_for_context`` lowers the ceiling to fit the model's context
+    window, but nothing lowered the floor, which PySubtrans defaults to 10.  For
+    any context of 4096 or less the ceiling comes out at 5, so the floor exceeded
+    it and every translation aborted with::
+
+        Error translating xxx.srt: min_batch_size must be less than max_batch_size
+
+    That made small-context Ollama models (qwen2.5:3b and friends) unusable for
+    translation, deterministically, with an error that pointed at a setting the
+    user had not touched — the reported Max Batch Size of 30 was already being
+    overridden by the cap (#341).
+
+    Args:
+        max_batch_size: the ceiling, typically from cap_batch_size_for_context().
+
+    Returns:
+        ``(min_batch_size, max_batch_size)`` with the floor guaranteed not to
+        exceed the ceiling.  The default floor is preserved whenever it fits, so
+        behaviour for ordinary context sizes is unchanged.
+    """
+    max_batch_size = max(1, int(max_batch_size))
+    min_batch_size = min(PYSUBTRANS_DEFAULT_MIN_BATCH, max_batch_size)
+    if min_batch_size == max_batch_size and max_batch_size > 1:
+        # Keep a genuine window rather than a single admissible size.
+        min_batch_size = max_batch_size - 1
+    return max(1, min_batch_size), max_batch_size
+
+
 def compute_max_output_tokens(batch_size: int, n_ctx: int) -> int:
     """Compute max_tokens for local LLM output to prevent context overflow (#196).
 
@@ -202,6 +239,18 @@ def translate_subtitle(
             print(f"[TRANSLATE]   Thinking model: YES (will patch response parsing)",
                   file=sys.stderr)
 
+        # Resolve a batch window PySubtrans will accept.  The caller supplies
+        # only a ceiling; if it has been capped below PySubtrans' default floor
+        # of 10, passing that floor through raises before any translation runs
+        # (#341).
+        _resolved_min_batch, _resolved_max_batch = resolve_batch_window(max_batch_size)
+        if _resolved_max_batch != max_batch_size or _resolved_min_batch != PYSUBTRANS_DEFAULT_MIN_BATCH:
+            print(
+                f"[TRANSLATE]   Batch window: min={_resolved_min_batch}, "
+                f"max={_resolved_max_batch}",
+                file=sys.stderr,
+            )
+
         # Build provider options
         opt_kwargs = {
             'provider': provider_config['pysubtrans_name'],
@@ -211,7 +260,8 @@ def translate_subtitle(
             'prompt': prompt,
             'preprocess_subtitles': True,
             'scene_threshold': scene_threshold,
-            'max_batch_size': max_batch_size,
+            'max_batch_size': _resolved_max_batch,
+            'min_batch_size': _resolved_min_batch,
             'postprocess_translation': True
         }
 
