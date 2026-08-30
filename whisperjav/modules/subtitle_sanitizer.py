@@ -342,7 +342,7 @@ class SubtitleSanitizer:
 
             if self.config.save_artifacts and self.artifact_entries:
 
-                self._save_artifacts_srt(paths['artifacts'])
+                self._save_artifacts_srt(paths['artifacts'], len(final_subtitles))
 
             
 
@@ -448,7 +448,7 @@ class SubtitleSanitizer:
 
         if self.config.save_artifacts and self.artifact_entries:
 
-            self._save_artifacts_srt(paths['artifacts'])
+            self._save_artifacts_srt(paths['artifacts'], len(final_subtitles))
 
 
 
@@ -1237,9 +1237,15 @@ class SubtitleSanitizer:
 
 
 
-    def _save_artifacts_srt(self, artifacts_path: Path):
+    def _save_artifacts_srt(self, artifacts_path: Path, final_count: Optional[int] = None):
 
-        """Save artifacts as SRT file with detailed information"""
+        """Save artifacts as SRT file with detailed information.
+
+        ``final_count`` is the number of subtitles actually written to the output.
+        It is passed in because the summary must describe the run that happened,
+        not a counter that only one code path maintains -- see
+        ``_create_summary_subtitle``.
+        """
 
         if not self.artifact_entries: return
 
@@ -1249,7 +1255,7 @@ class SubtitleSanitizer:
 
         if self.config.artifact_detail_level in ["full", "summary"]:
 
-            artifacts_subs.append(self._create_summary_subtitle())
+            artifacts_subs.append(self._create_summary_subtitle(final_count))
 
         for entry in sorted(self.artifact_entries, key=lambda e: e.index):
 
@@ -1267,21 +1273,45 @@ class SubtitleSanitizer:
 
 
 
-    def _create_summary_subtitle(self) -> pysrt.SubRipItem:
+    def _create_summary_subtitle(self, final_count: Optional[int] = None) -> pysrt.SubRipItem:
 
-        # Implementation remains the same...
+        """Build the [SANITIZATION SUMMARY] block written into the artifacts file.
 
-        stats = self.phase1_stats
+        Derived from ``self.artifact_entries`` -- the record of what was actually
+        removed -- rather than from ``self.phase1_stats``.
+
+        ``phase1_stats`` is only populated by ``_process_phase1_refactored``. The
+        rule-based workflow that ``process()`` actually runs sets
+        ``original_count`` and nothing else, so the summary reported
+        ``Hallucinations modified/removed: 0`` and ``Final subtitles: 0`` on runs
+        where entries had plainly been removed and subtitles plainly survived.
+
+        That mattered more than a cosmetic miscount: this block is inside the
+        artifacts file users attach to bug reports, so it was actively
+        misinforming diagnosis. Found while investigating #324, where the summary
+        claimed nothing was removed and nothing survived, while the file itself
+        listed two removals and the run produced seven subtitles.
+        """
+
+        hallucinations = sum(1 for e in self.artifact_entries if 'hallucination' in e.category)
+
+        repetitions = sum(1 for e in self.artifact_entries if 'repetition' in e.category)
+
+        if final_count is None:
+
+            final_count = self.phase1_stats.final_count
 
         summary_text = f"""[SANITIZATION SUMMARY]
 
-Original subtitles: {stats.original_count}
+Original subtitles: {self.phase1_stats.original_count}
 
-Hallucinations modified/removed: {stats.hallucinations_removed}
+Hallucinations modified/removed: {hallucinations}
 
-Repetitions modified/removed: {stats.repetitions_cleaned}
+Repetitions modified/removed: {repetitions}
 
-Final subtitles: {stats.final_count}
+Total artifact entries: {len(self.artifact_entries)}
+
+Final subtitles: {final_count}
 
 Config: {self.config.sensitivity_mode}"""
 

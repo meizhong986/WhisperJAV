@@ -302,3 +302,83 @@ class TestDeepSeekThinkingPatch:
             client = None
 
         assert not apply_deepseek_thinking_patch(NoClient(), "deepseek-v4-flash")
+
+
+# ---------------------------------------------------------------------------
+# Artifacts summary reported zero while entries had plainly been removed
+# ---------------------------------------------------------------------------
+
+class TestArtifactsSummaryIsAccurate:
+    """The [SANITIZATION SUMMARY] block inside the artifacts file was derived
+    from ``phase1_stats``, which only ``_process_phase1_refactored`` populates.
+    The rule-based workflow that ``process()`` actually runs sets
+    ``original_count`` and nothing else, so the summary claimed nothing had been
+    removed and nothing had survived.
+
+    Found while investigating #324, where it reported 0 removed and 0 final while
+    the same file listed two removals and the run produced seven subtitles. This
+    matters beyond a wrong number: it is the file users attach to bug reports, so
+    it was actively misinforming diagnosis.
+    """
+
+    @staticmethod
+    def _sanitizer_with_entries():
+        """Build the object without __init__ — that would load the hallucination
+        database over the network, which a unit test must not do."""
+        from whisperjav.modules.subtitle_sanitizer import (
+            ArtifactEntry,
+            Phase1Stats,
+            SubtitleSanitizer,
+        )
+
+        def _entry(index, category):
+            return ArtifactEntry(
+                index=index, start_time="00:00:01,000", end_time="00:00:02,000",
+                original_text="x", modified_text=None, reason="test",
+                category=category, confidence=0.9, pattern=None, step="test",
+                additional_info={},
+            )
+
+        s = object.__new__(SubtitleSanitizer)
+        s.artifact_entries = [
+            _entry(1, "hallucination_nonsensical"),
+            _entry(2, "hallucination_nonsensical"),
+            _entry(3, "repetition_ngram"),
+        ]
+        s.phase1_stats = Phase1Stats(original_count=9)
+
+        class _Cfg:
+            sensitivity_mode = "balanced"
+
+        s.config = _Cfg()
+        return s
+
+    def test_summary_counts_what_was_actually_removed(self):
+        s = self._sanitizer_with_entries()
+        text = s._create_summary_subtitle(final_count=7).text
+
+        assert "Original subtitles: 9" in text
+        assert "Hallucinations modified/removed: 2" in text
+        assert "Repetitions modified/removed: 1" in text
+        assert "Final subtitles: 7" in text
+
+    def test_the_324_symptom_does_not_recur(self):
+        """phase1_stats is left at zero by the workflow that actually runs;
+        the summary must not simply echo it."""
+        s = self._sanitizer_with_entries()
+        assert s.phase1_stats.hallucinations_removed == 0
+        assert s.phase1_stats.final_count == 0
+
+        text = s._create_summary_subtitle(final_count=7).text
+        assert "Hallucinations modified/removed: 0" not in text
+        assert "Final subtitles: 0" not in text
+
+    def test_total_entry_count_is_reported(self):
+        s = self._sanitizer_with_entries()
+        assert "Total artifact entries: 3" in s._create_summary_subtitle(7).text
+
+    def test_falls_back_when_no_count_is_supplied(self):
+        """Older callers must not crash."""
+        s = self._sanitizer_with_entries()
+        s.phase1_stats.final_count = 42
+        assert "Final subtitles: 42" in s._create_summary_subtitle().text

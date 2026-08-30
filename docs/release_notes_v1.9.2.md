@@ -115,6 +115,16 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
 
 ### Failures that used to pass silently
 
+- **The sanitization summary inside the artifacts file told the truth again.**
+  When WhisperJAV writes its `.artifacts.srt` — the file people attach to bug
+  reports — it opens with a `[SANITIZATION SUMMARY]` block. That block was being
+  built from a counter only one internal code path maintained, so on ordinary
+  runs it reported `Hallucinations modified/removed: 0` and `Final subtitles: 0`
+  while the very same file went on to list the removals and the run produced
+  plenty of subtitles. It now counts what was actually removed and how many
+  subtitles were actually written. This was worth fixing beyond tidiness: it was
+  misinforming the diagnosis of other bugs. Found while investigating #324.
+
 - **A run that produces no usable subtitles now says so, and exits non-zero.**
   WhisperJAV could finish, print `[SUCCESS]`, and hand back an empty or
   drastically incomplete subtitle file — an 8,766-second video returning output
@@ -207,6 +217,7 @@ Not user-visible, but worth recording:
 
 | Date | Change |
 |------|--------|
+| 2026-08-30 | Artifacts `[SANITIZATION SUMMARY]` now counts real removals and the real final subtitle count instead of a counter the active workflow never updated |
 | 2026-08-30 | Output coverage gate wired: empty output fails the run and exits non-zero; short output warns. Nuclear exit no longer hardcoded to 0 (#394, #263) |
 | 2026-08-30 | DeepSeek reasoning disabled for v4-flash (#395, @mcdman); post-processing stage logging so a stall names the operation that hung (#372) |
 | 2026-08-30 | PR #378 merged (@Mimic-me): skip-existing in the GUI and ensemble (#328), opt-in settings persistence (#96, #298, #381), junction-safe preset saves (#309), DeepSeek v4 names in the GUI (#325, #382); OpenRouter dropdown synced to the backend default |
