@@ -13,6 +13,7 @@
    - [Ubuntu / Debian](#ubuntu--debian)
    - [Fedora / RHEL / CentOS Stream](#fedora--rhel--centos-stream)
    - [Arch Linux / Manjaro](#arch-linux--manjaro)
+   - [GUI backend (all distributions)](#gui-backend-all-distributions)
 3. [NVIDIA Driver and CUDA Setup](#nvidia-driver-and-cuda-setup)
 4. [Installation Methods](#installation-methods)
    - [Method 1: Source Installation (Recommended)](#method-1-source-installation-recommended)
@@ -107,20 +108,6 @@ sudo apt-get install -y libwebkit2gtk-4.1-dev gir1.2-webkit2-4.1 \
   || sudo apt-get install -y libwebkit2gtk-4.0-dev gir1.2-webkit2-4.0
 ```
 
-> **The system packages above are not sufficient on their own.** They are
-> installed system-wide, and a virtual environment created without
-> `--system-site-packages` cannot see the `gi` (PyGObject) bindings, so
-> `whisperjav-gui` fails with `ModuleNotFoundError: No module named 'gi'`.
-> Install a GUI backend *into the virtual environment* as well (#366):
->
-> ```bash
-> # Qt backend - the simplest option, needs no system GTK bindings
-> pip install "pywebview[qt]"
->
-> # or, to use the GTK backend, expose the system bindings to the venv:
-> #   python3 -m venv --system-site-packages whisperjav-env
-> ```
-
 **Ubuntu 20.04 (Focal) users:** The default Python is 3.8, which is too old. Install Python 3.10+ from the deadsnakes PPA:
 
 ```bash
@@ -150,8 +137,9 @@ sudo dnf install -y libsndfile libsndfile-devel
 sudo dnf install -y portaudio-devel
 
 # Optional: For GUI
+# On older Fedora/RHEL releases use webkit2gtk4.0-devel instead.
 sudo dnf install -y \
-    webkit2gtk4.0-devel \
+    webkit2gtk4.1-devel \
     gtk3-devel
 ```
 
@@ -185,6 +173,29 @@ sudo pacman -S --noconfirm portaudio
 # Optional: For GUI
 sudo pacman -S --noconfirm webkit2gtk gtk3
 ```
+
+### GUI backend (all distributions)
+
+The system packages above provide WebKit, but they are **not sufficient on
+their own**. Unlike Windows and macOS - where pywebview declares its backend as
+a normal dependency, so it installs automatically - pywebview ships **no Linux
+backend by default**; GTK and Qt are both opt-in extras. On top of that, apt/dnf
+packages land system-wide, so a virtual environment created without
+`--system-site-packages` cannot see the `gi` (PyGObject) bindings.
+
+Following the distro instructions alone therefore still ends in
+`ModuleNotFoundError: No module named 'gi'` when you launch `whisperjav-gui`
+(#366). Install a backend *into the virtual environment* as well:
+
+```bash
+# Qt backend - simplest, needs no system GTK bindings
+pip install "pywebview[qt]"
+
+# or, to use GTK instead, expose the system bindings to the venv:
+#   python3 -m venv --system-site-packages whisperjav-env
+```
+
+This step is Linux-only. Windows and macOS need nothing extra.
 
 ---
 
