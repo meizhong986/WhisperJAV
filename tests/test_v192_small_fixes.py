@@ -230,3 +230,74 @@ class TestUnknownEnhancerIsRejectedAtTheBoundary:
         # not be reported as an unknown backend.
         assert isinstance(ok, bool)
         assert "Unknown backend" not in hint
+
+
+# ---------------------------------------------------------------------------
+# #395 — DeepSeek turns reasoning on by default; it must be switchable off
+# ---------------------------------------------------------------------------
+
+class TestDeepSeekThinkingPatch:
+    """#395: DeepSeek made v4 models reason server-side by default, which is
+    slow, burns rate limit, and can leak reasoning text into the subtitles.
+
+    PySubtrans talks to DeepSeek's chat-completion endpoint directly, so the
+    switch is a plain top-level `thinking` field in the request body rather than
+    the OpenAI SDK's `extra_body` wrapper. Diagnosed by @mcdman on the issue.
+    """
+
+    def test_flash_is_switched_off_but_pro_is_left_alone(self):
+        from whisperjav.translate.core import should_disable_deepseek_thinking
+
+        assert should_disable_deepseek_thinking("deepseek-v4-flash")
+        assert should_disable_deepseek_thinking("deepseek/deepseek-v4-flash")
+        # -pro IS the reasoning model; choosing it is an explicit request for it.
+        assert not should_disable_deepseek_thinking("deepseek-v4-pro")
+        assert not should_disable_deepseek_thinking("deepseek/deepseek-v4-pro")
+
+    def test_non_v4_models_are_untouched(self):
+        """An unrecognised field could be rejected outright by older models."""
+        from whisperjav.translate.core import should_disable_deepseek_thinking
+
+        for model in ("deepseek-chat", "deepseek-reasoner", "gpt-4o", "", None):
+            assert not should_disable_deepseek_thinking(model)
+
+    def test_patch_injects_the_field_into_the_request_body(self):
+        from whisperjav.translate.core import apply_deepseek_thinking_patch
+
+        class FakeClient:
+            def _generate_request_body(self, request, temperature):
+                return {"model": "deepseek-v4-flash", "messages": [], "stream": False}
+
+        class FakeTranslator:
+            client = FakeClient()
+
+        translator = FakeTranslator()
+        assert apply_deepseek_thinking_patch(translator, "deepseek-v4-flash")
+
+        body = translator.client._generate_request_body(object(), 0.5)
+        assert body["thinking"] == {"type": "disabled"}
+        # the original fields must survive
+        assert body["model"] == "deepseek-v4-flash"
+        assert "messages" in body
+
+    def test_patch_is_not_applied_to_pro(self):
+        from whisperjav.translate.core import apply_deepseek_thinking_patch
+
+        class FakeClient:
+            def _generate_request_body(self, request, temperature):
+                return {}
+
+        class FakeTranslator:
+            client = FakeClient()
+
+        translator = FakeTranslator()
+        assert not apply_deepseek_thinking_patch(translator, "deepseek-v4-pro")
+        assert "thinking" not in translator.client._generate_request_body(object(), 0.5)
+
+    def test_missing_client_degrades_instead_of_raising(self):
+        from whisperjav.translate.core import apply_deepseek_thinking_patch
+
+        class NoClient:
+            client = None
+
+        assert not apply_deepseek_thinking_patch(NoClient(), "deepseek-v4-flash")

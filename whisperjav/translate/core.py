@@ -63,6 +63,65 @@ def cap_batch_size_for_context(max_batch_size: int, n_ctx: int) -> int:
 PYSUBTRANS_DEFAULT_MIN_BATCH = 10
 
 
+def should_disable_deepseek_thinking(model: str) -> bool:
+    """Whether to ask DeepSeek to turn reasoning off for *model* (#395).
+
+    DeepSeek changed the server-side default so that v4 models reason before
+    answering. For subtitle translation that is pure cost: it is slow, it burns
+    rate limit, and the reasoning text can leak into the output and break the
+    line-for-line format.
+
+    Only ``-flash`` is switched off. ``-pro`` *is* the reasoning model, so a user
+    who selects it has asked for reasoning and we leave their choice alone. Models
+    outside the v4 family are untouched, since an unrecognised field could be
+    rejected outright.
+    """
+    if not model:
+        return False
+    m = model.lower()
+    return 'deepseek-v4' in m and 'pro' not in m
+
+
+def apply_deepseek_thinking_patch(translator, model: str, debug: bool = False) -> bool:
+    """Ask DeepSeek not to reason, by adding ``thinking`` to the request body.
+
+    PySubtrans talks to DeepSeek's chat-completion endpoint directly rather than
+    through the OpenAI SDK, so this is a plain top-level field in the request
+    body — not the SDK's ``extra_body`` wrapper. ``CustomClient`` builds a fixed
+    body with no extension point, so the method is wrapped on the client
+    instance, mirroring the Qwen3 reasoning patch applied further down this file.
+
+    Credit: diagnosed and prototyped by @mcdman on #395.
+
+    Returns True if the patch was applied.
+    """
+    if not should_disable_deepseek_thinking(model):
+        return False
+
+    client = getattr(translator, 'client', None)
+    if client is None or not hasattr(client, '_generate_request_body'):
+        print("[TRANSLATE]   WARNING: could not disable DeepSeek thinking mode - "
+              "translator.client._generate_request_body not found",
+              file=sys.stderr)
+        return False
+
+    original = client._generate_request_body
+
+    def _patched(request, temperature, _orig=original):
+        body = _orig(request, temperature)
+        try:
+            body['thinking'] = {"type": "disabled"}
+        except TypeError:
+            return body
+        if debug:
+            print("[TRANSLATE]   [deepseek-patch] thinking disabled", file=sys.stderr)
+        return body
+
+    client._generate_request_body = _patched
+    print(f"[TRANSLATE]   DeepSeek thinking mode: DISABLED for {model}", file=sys.stderr)
+    return True
+
+
 def resolve_batch_window(max_batch_size: int) -> tuple:
     """Return a (min_batch_size, max_batch_size) pair PySubtrans will accept.
 
@@ -478,6 +537,14 @@ def translate_subtitle(
         # Initialize translator and translate
         print(f"[TRANSLATE] Initializing translator...", file=sys.stderr)
         translator = init_translator(options, translation_provider=provider)
+
+        # =====================================================================
+        # DeepSeek: turn reasoning off for v4-flash (#395)
+        # =====================================================================
+        # DeepSeek made v4 models reason by default server-side, which is slow,
+        # rate-limit hungry, and can leak reasoning text into the subtitles.
+        if provider_config.get('pysubtrans_name') == 'DeepSeek':
+            apply_deepseek_thinking_patch(translator, model, debug=debug)
 
         # =====================================================================
         # Qwen3 thinking model workaround: patch response parsing

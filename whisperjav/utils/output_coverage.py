@@ -3,7 +3,7 @@
 Why this exists
 ---------------
 WhisperJAV could finish a run, report success, and hand the user a subtitle file
-covering a small fraction of the input.  Reported instances:
+covering a small fraction of the input. Reported instances:
 
 * an 8,766 s input returning **PASS** with an SRT whose last cue ended at 376.9 s
   (4.299% of the file);
@@ -15,17 +15,29 @@ In every case the exit status was 0, so nothing downstream — least of all the
 GUI, which declares success on ``exit_code == 0`` alone — had any way to tell a
 good run from a destroyed one.
 
-This module does not diagnose *why* output is missing; the underlying cause is
-still under investigation.  It answers a narrower and fully decidable question:
-**does the subtitle file span a plausible portion of the media it came from?**
+What decides a failure
+----------------------
+The first draft of this module treated low temporal span as sufficient grounds
+to fail a run. Both reporters on #394 rejected that, and they were right:
 
-Deliberate limits
------------------
-Span is not speech coverage.  A file whose dialogue genuinely stops early will
-show a low span, and that is not a defect.  The thresholds are therefore set
-conservatively, the assessment is advisory unless a caller opts into enforcement,
-and the numbers are always reported so a human can judge.  A false failure would
-be worse than the problem being solved.
+* **@daoran9**: *"I would avoid using media-duration span as the only hard-failure
+  signal. A long intro, outro, credits section or non-dialogue tail could make
+  that metric ambiguous. Also, a transcription stopping at 60% would not trigger
+  the 25% threshold."*
+* **@13e5t** supplied a case the threshold would have missed entirely — a
+  10-minute file whose SRT stopped at roughly 6 minutes while dialogue continued.
+  At 60% span, no span-based threshold set low enough to be safe would catch it.
+
+So span alone never fails a run; it warns. A run is failed only when the output
+is unusable beyond argument (no cues at all), or when low span is **corroborated**
+by evidence of the recogniser having actually stopped working — consecutive empty
+results while the voice detector was still reporting speech, or a failed
+same-instance health probe. That is the shape both reporters asked for, and it
+catches the real cases through the corroborating signal rather than through a
+threshold that has to be guessed.
+
+This module does not diagnose *why* output is missing; the underlying cause is
+still open.
 """
 
 from __future__ import annotations
@@ -36,13 +48,16 @@ from typing import Optional, Union
 
 from whisperjav.utils.logger import logger
 
-# Below this ratio of (last cue end / media duration) the output is treated as
-# implausible.  Chosen well under the lowest legitimate value we have seen and
-# well above the observed failures (0.043, ~0.057).
+# Span below this fraction of the media duration is reported as implausible.
+# On its own it only warns; see the module docstring.
 DEFAULT_MIN_COVERAGE = 0.25
 
-# Between DEFAULT_MIN_COVERAGE and this, report but do not fail.
+# Between DEFAULT_MIN_COVERAGE and this, the output is merely short.
 SUSPICIOUS_COVERAGE = 0.60
+
+# Consecutive empty ASR results, while the voice detector still reported speech,
+# that constitute corroboration. Chosen well above ordinary quiet passages.
+DEFAULT_EMPTY_STREAK_THRESHOLD = 5
 
 # Media shorter than this are not assessed: a short clip can legitimately hold a
 # single line near the start, making the ratio meaningless.
@@ -59,19 +74,27 @@ class CoverageReport:
     media_duration_s: Optional[float]
     subtitle_count: int
     detail: str
+    corroborated: bool = False
 
     @property
     def is_failure(self) -> bool:
-        """True when the output is bad enough that a run should not be called successful."""
-        return self.verdict in ("implausible", "empty")
+        """True when the run should not be reported as successful.
+
+        Deliberately narrow: no cues at all, or short output *plus* independent
+        evidence that the recogniser stopped working. Short output on its own is
+        not enough — speech can genuinely stop early.
+        """
+        return self.verdict == "empty" or (
+            self.verdict == "implausible" and self.corroborated
+        )
 
     @property
     def is_noteworthy(self) -> bool:
-        """True when the user should see this, whether or not it fails the run."""
+        """True when the user should see this, whether or not the run fails."""
         return self.verdict in ("implausible", "empty", "suspicious")
 
 
-def _parse_last_cue_end(srt_path: Path) -> tuple[int, Optional[float]]:
+def _parse_last_cue_end(srt_path: Path) -> tuple:
     """Return (cue_count, last_cue_end_seconds) for an SRT file.
 
     Parsed defensively: a malformed or partially written file yields whatever
@@ -101,8 +124,7 @@ def _parse_last_cue_end(srt_path: Path) -> tuple[int, Optional[float]]:
     if not cues:
         return 0, None
 
-    last_end = max(c.end.total_seconds() for c in cues)
-    return len(cues), last_end
+    return len(cues), max(c.end.total_seconds() for c in cues)
 
 
 def assess_coverage(
@@ -110,62 +132,87 @@ def assess_coverage(
     media_duration_s: Optional[float],
     *,
     min_coverage: float = DEFAULT_MIN_COVERAGE,
+    speech_positive_empty_streak: int = 0,
+    probe_failed: bool = False,
+    empty_streak_threshold: int = DEFAULT_EMPTY_STREAK_THRESHOLD,
 ) -> CoverageReport:
     """Assess whether *srt_path* plausibly covers *media_duration_s*.
 
     Args:
         srt_path: the final subtitle file. A missing path yields "empty".
         media_duration_s: source duration in seconds, from media discovery.
-        min_coverage: ratio below which the result is "implausible".
-            Pass 0 to disable the ratio check entirely (zero-cue output is
-            still reported as "empty").
+        min_coverage: span below which the result is "implausible". Pass 0 to
+            disable the ratio check; zero-cue output is still reported as empty.
+        speech_positive_empty_streak: longest run of consecutive empty ASR
+            results observed *while the voice detector still reported speech*.
+            This is the corroborating signal both #394 reporters asked for.
+        probe_failed: True if a same-instance health probe failed — the signal
+            @AlanZ-Git identified, where a known-good clip returns nothing from
+            the already-loaded model but transcribes correctly in a fresh
+            process.
+        empty_streak_threshold: streak length that counts as corroboration.
 
     Returns:
         A :class:`CoverageReport`. Never raises.
     """
+    corroborated = bool(probe_failed) or (
+        speech_positive_empty_streak >= empty_streak_threshold
+    )
+
+    def _report(verdict, ratio, last_end, count, detail):
+        return CoverageReport(
+            verdict, ratio, last_end, media_duration_s, count, detail, corroborated
+        )
+
     if not srt_path:
-        return CoverageReport("empty", None, None, media_duration_s, 0,
-                              "no subtitle file was produced")
+        return _report("empty", None, None, 0, "no subtitle file was produced")
 
     path = Path(srt_path)
     if not path.exists():
-        return CoverageReport("empty", None, None, media_duration_s, 0,
-                              f"subtitle file was not created: {path.name}")
+        return _report("empty", None, None, 0,
+                       f"subtitle file was not created: {path.name}")
 
     count, last_end = _parse_last_cue_end(path)
 
     if count == 0 or last_end is None:
-        return CoverageReport("empty", None, None, media_duration_s, 0,
-                              f"{path.name} contains no subtitles")
+        return _report("empty", None, None, 0, f"{path.name} contains no subtitles")
 
     if not media_duration_s or media_duration_s <= 0:
-        return CoverageReport("unknown", None, last_end, media_duration_s, count,
-                              "media duration unknown, coverage not assessed")
+        return _report("unknown", None, last_end, count,
+                       "media duration unknown, coverage not assessed")
 
     if media_duration_s < MIN_ASSESSABLE_DURATION_S:
-        return CoverageReport("unknown", None, last_end, media_duration_s, count,
-                              f"media shorter than {MIN_ASSESSABLE_DURATION_S:.0f}s, "
-                              "coverage not assessed")
+        return _report("unknown", None, last_end, count,
+                       f"media shorter than {MIN_ASSESSABLE_DURATION_S:.0f}s, "
+                       "coverage not assessed")
 
     ratio = last_end / media_duration_s
+    span = (f"subtitles stop at {last_end:.0f}s of {media_duration_s:.0f}s "
+            f"({ratio:.1%} of the file); {count} cue(s) produced")
 
     if min_coverage > 0 and ratio < min_coverage:
-        verdict = "implausible"
-        detail = (
-            f"subtitles stop at {last_end:.0f}s of {media_duration_s:.0f}s "
-            f"({ratio:.1%} of the file); {count} cue(s) produced"
-        )
-    elif ratio < SUSPICIOUS_COVERAGE:
-        verdict = "suspicious"
-        detail = (
-            f"subtitles stop at {last_end:.0f}s of {media_duration_s:.0f}s "
-            f"({ratio:.1%} of the file); {count} cue(s) produced"
-        )
-    else:
-        verdict = "ok"
-        detail = f"{count} cue(s) spanning {ratio:.1%} of the file"
+        detail = span
+        if corroborated:
+            why = ("a health probe failed" if probe_failed
+                   else f"{speech_positive_empty_streak} consecutive empty results "
+                        "while speech was still being detected")
+            detail = f"{span}; corroborated by {why}"
+        return _report("implausible", ratio, last_end, count, detail)
 
-    return CoverageReport(verdict, ratio, last_end, media_duration_s, count, detail)
+    if ratio < SUSPICIOUS_COVERAGE:
+        return _report("suspicious", ratio, last_end, count, span)
+
+    # Full-length output can still be corroborated as broken — @13e5t's case
+    # stopped at ~60% of a 10-minute file, which no safe span threshold catches.
+    if corroborated:
+        why = ("a health probe failed" if probe_failed
+               else f"{speech_positive_empty_streak} consecutive empty results "
+                    "while speech was still being detected")
+        return _report("suspicious", ratio, last_end, count,
+                       f"{count} cue(s) spanning {ratio:.1%} of the file, but {why}")
+
+    return _report("ok", ratio, last_end, count,
+                   f"{count} cue(s) spanning {ratio:.1%} of the file")
 
 
 def report_coverage(report: CoverageReport, file_label: str) -> None:
@@ -178,18 +225,19 @@ def report_coverage(report: CoverageReport, file_label: str) -> None:
         logger.debug("Coverage not assessed for %s: %s", file_label, report.detail)
         return
 
-    if report.verdict == "suspicious":
-        logger.warning(
-            "Output looks short for %s: %s. This can be normal if speech genuinely "
-            "stops early; if not, please re-run with --log-level DEBUG and report it.",
+    if report.is_failure:
+        logger.error(
+            "Incomplete output for %s: %s. The run finished without raising an "
+            "error, but the result does not plausibly cover the input. This is "
+            "the failure tracked in issue #394.",
             file_label, report.detail,
         )
         return
 
-    # implausible / empty
-    logger.error(
-        "Incomplete output for %s: %s. The run finished without raising an error, "
-        "but the result does not plausibly cover the input. This is the failure "
-        "tracked in issue #394.",
+    logger.warning(
+        "Output looks short for %s: %s. This can be normal when speech genuinely "
+        "stops early, so the run is not being failed on this alone. If the file "
+        "does have dialogue past that point, please re-run with --log-level DEBUG "
+        "and report it on issue #394.",
         file_label, report.detail,
     )
