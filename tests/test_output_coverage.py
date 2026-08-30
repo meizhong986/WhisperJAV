@@ -203,3 +203,79 @@ def test_threshold_boundary_is_not_a_failure(tmp_path):
     srt = _write_srt(tmp_path / "l.srt", [(0.0, duration * DEFAULT_MIN_COVERAGE, "x")])
     report = assess_coverage(srt, media_duration_s=duration)
     assert not report.is_failure
+
+
+# ---------------------------------------------------------------------------
+# Wiring: the gate must actually reach the exit status (#394, #263)
+# ---------------------------------------------------------------------------
+
+class TestExitStatusWiring:
+    """Detecting bad output is useless if the process still reports success.
+
+    Until v1.9.2 process_files_sync returned None whatever happened, and the
+    ctranslate2 "nuclear exit" was hardcoded to _os._exit(0) -- so for balanced,
+    fast and faster (the most-used modes) the process reported success even when
+    every file had failed. That is why the GUI, which decides purely on the exit
+    code, printed [SUCCESS] over a 0-byte subtitle file in #263.
+    """
+
+    def test_sync_processor_returns_a_failure_count(self):
+        """The signature must expose failures to the caller."""
+        import inspect
+
+        from whisperjav import main as wj_main
+
+        src = inspect.getsource(wj_main.process_files_sync)
+        assert "return len(failed_files)" in src, (
+            "process_files_sync must report how many files failed, otherwise the "
+            "caller cannot set a meaningful exit status"
+        )
+
+    def test_nuclear_exit_is_not_hardcoded_to_zero(self):
+        """The ctranslate2 fast-path must carry the real status."""
+        import inspect
+
+        from whisperjav import main as wj_main
+
+        src = inspect.getsource(wj_main.main)
+        assert "_os._exit(_exit_status)" in src, "nuclear exit must use the real status"
+        assert "_os._exit(0)" not in src, (
+            "a hardcoded zero here silently discards every failure on balanced/"
+            "fast/faster"
+        )
+
+    def test_coverage_failure_is_recorded_as_a_failed_file(self):
+        import inspect
+
+        from whisperjav import main as wj_main
+
+        src = inspect.getsource(wj_main.process_files_sync)
+        assert "assess_coverage(" in src
+        assert "if _cov.is_failure:" in src
+        assert "failed_files.append" in src
+
+    def test_min_coverage_flag_exists_and_defaults_to_none(self):
+        """None means 'use the module default'; 0 disables the span check."""
+        import subprocess
+        import sys
+
+        result = subprocess.run(
+            [sys.executable, "-m", "whisperjav.main", "--help"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=180,
+        )
+        assert "--min-coverage" in result.stdout
+
+        # A value must be accepted, and nonsense rejected.
+        ok = subprocess.run(
+            [sys.executable, "-m", "whisperjav.main", "--min-coverage", "0.4", "--help"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=180,
+        )
+        assert ok.returncode == 0
+        bad = subprocess.run(
+            [sys.executable, "-m", "whisperjav.main", "--min-coverage", "abc", "--help"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=180,
+        )
+        assert bad.returncode != 0

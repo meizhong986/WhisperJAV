@@ -198,7 +198,8 @@ class TestUnknownEnhancerIsRejectedAtTheBoundary:
 
         result = subprocess.run(
             [sys.executable, "-m", "whisperjav.main", "dummy.mp4", flag, "zipenhance"],
-            capture_output=True, text=True, timeout=180,
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=180,
         )
         assert result.returncode != 0, f"{flag} accepted an unknown backend name"
         combined = result.stdout + result.stderr

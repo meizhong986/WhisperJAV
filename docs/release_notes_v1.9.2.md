@@ -113,6 +113,27 @@ you find out something went wrong.
 
 With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
 
+### Failures that used to pass silently
+
+- **A run that produces no usable subtitles now says so, and exits non-zero.**
+  WhisperJAV could finish, print `[SUCCESS]`, and hand back an empty or
+  drastically incomplete subtitle file — an 8,766-second video returning output
+  that stopped at 377 seconds was reported as a success, and in one case a
+  0-byte file was written while the console declared the run complete. Two things
+  were wrong: nothing compared the output against the input, and the process
+  returned "success" to the operating system regardless — for balanced, fast and
+  faster it was hardcoded to do so. Both are fixed. A file with no subtitles at
+  all now fails the run.
+
+  Short-but-present output is treated more cautiously: it produces a prominent
+  warning and does **not** fail the run, because speech can legitimately stop
+  early and a wrong failure would be worse than the silence it replaces. Use
+  `--min-coverage` to adjust the threshold, or `--min-coverage 0` to switch the
+  span check off entirely.
+
+  The policy here was set by the people who reported the problem rather than by
+  us — see *Known limitations* for what is still missing. (#394, #263)
+
 ---
 
 ## Documentation
@@ -161,11 +182,12 @@ Not user-visible, but worth recording:
 
 ## Planned for this release, not yet landed
 
-- **Output coverage checking (#394)** — the code to detect a subtitle file that
-  cannot plausibly cover its input is written and tested but is **not yet
-  active**. Enforcing it requires changing when WhisperJAV reports failure, which
-  affects anyone driving it from a script; that trade-off has been put to the
-  reporters before committing to it.
+- **Corroborated failure detection for #394.** The check above fails a run only
+  when there are no subtitles at all. Catching the *partial* cases — where output
+  stops part-way while dialogue continues — needs the recogniser to report
+  consecutive empty results, which is not yet instrumented. Until it is, those
+  runs warn rather than fail.
+- **Coverage checking in async mode.** Wired for normal processing only.
 
 ---
 
@@ -185,6 +207,8 @@ Not user-visible, but worth recording:
 
 | Date | Change |
 |------|--------|
+| 2026-08-30 | Output coverage gate wired: empty output fails the run and exits non-zero; short output warns. Nuclear exit no longer hardcoded to 0 (#394, #263) |
+| 2026-08-30 | DeepSeek reasoning disabled for v4-flash (#395, @mcdman); post-processing stage logging so a stall names the operation that hung (#372) |
 | 2026-08-30 | PR #378 merged (@Mimic-me): skip-existing in the GUI and ensemble (#328), opt-in settings persistence (#96, #298, #381), junction-safe preset saves (#309), DeepSeek v4 names in the GUI (#325, #382); OpenRouter dropdown synced to the backend default |
 | 2026-08-30 | Linux install guide: GUI-backend step moved to a shared section covering every distribution; Fedora WebKit package corrected to the 4.1 series (#366) |
 | 2026-08-30 | Seven small defects fixed: #340, #341, #306, #325, #323, #334, #366, plus the Ollama fallback model list |

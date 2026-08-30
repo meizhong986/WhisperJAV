@@ -68,6 +68,11 @@ fix_stdout()
 
 from whisperjav.utils.logger import setup_logger, logger
 from whisperjav.utils.device_detector import get_best_device
+from whisperjav.utils.output_coverage import (
+    DEFAULT_MIN_COVERAGE,
+    assess_coverage,
+    report_coverage,
+)
 from whisperjav.modules.media_discovery import MediaDiscovery
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
@@ -421,6 +426,13 @@ def parse_arguments():
                             help="Use async processing (better for GUIs)")
     async_group.add_argument("--max-workers", type=int, default=1,
                             help="Max concurrent workers (default: 1)")
+    async_group.add_argument("--min-coverage", type=float, default=None,
+                            metavar="RATIO",
+                            help="Fail a file when its subtitles span less than this "
+                                 "fraction of the media AND the recognizer is "
+                                 "independently shown to have stopped working "
+                                 "(default: 0.25). Short output on its own only "
+                                 "warns. Set 0 to disable the span check entirely.")
     
     # Subtitle signature options
     signature_group = parser.add_argument_group("Subtitle Attribution")
@@ -1416,6 +1428,20 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                 
                 subtitle_count = metadata.get("summary", {}).get("final_subtitles_refined", 0)
                 output_path = metadata.get("output_files", {}).get("final_srt", "")
+
+                # #394: a run could finish, report success, and hand back a
+                # subtitle file covering a fraction of the input. Nothing checked.
+                _cov = assess_coverage(
+                    output_path or None,
+                    media_info.get('duration'),
+                    min_coverage=(DEFAULT_MIN_COVERAGE if args.min_coverage is None
+                                  else args.min_coverage),
+                )
+                report_coverage(_cov, Path(file_path_str).name)
+                if _cov.is_failure:
+                    failed_files.append(file_path_str)
+                    all_stats[-1]["status"] = "failed"
+                    all_stats[-1]["error"] = f"incomplete output: {_cov.detail}"
                 
                 # Add signatures to the generated subtitle file
                 if output_path and Path(output_path).exists():
@@ -1553,6 +1579,12 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
 
     if not args.keep_temp:
         cleanup_temp_directory(args.temp_dir)
+
+    # #394: the caller needs this to set a meaningful exit status. Previously
+    # this function returned None whatever happened, so a run in which every
+    # file failed still exited 0 -- which is why the GUI, which decides purely
+    # on the exit code, reported success over a 0-byte subtitle file (#263).
+    return len(failed_files)
 
 
 def process_files_async(media_files: List[Dict], args: argparse.Namespace, resolved_config: Dict):
@@ -2731,8 +2763,9 @@ def main():
         # Choose sync or async processing for normal mode
         elif args.async_processing:
             process_files_async(media_files, args, resolved_config)
+            _failed_count = 0
         else:
-            process_files_sync(media_files, args, resolved_config)
+            _failed_count = process_files_sync(media_files, args, resolved_config) or 0
 
         # =============================================================================
         # NUCLEAR EXIT FOR CTRANSLATE2 MODES
@@ -2752,11 +2785,23 @@ def main():
         # - https://github.com/SYSTRAN/faster-whisper/issues/71
         # - https://github.com/OpenNMT/CTranslate2/issues/1782
         # =============================================================================
+        # #394: the status must survive the nuclear exit below. Until v1.9.2 this
+        # was hardcoded to 0, so for the three most-used modes the process
+        # reported success no matter what had happened.
+        _exit_status = 1 if _failed_count else 0
+        if _failed_count:
+            logger.error("%d file(s) did not produce usable output - exiting with "
+                         "status 1. Re-run with --log-level DEBUG for detail.",
+                         _failed_count)
+
         ctranslate2_modes = {'balanced', 'fast', 'faster'}
         if args.mode in ctranslate2_modes and not args.ensemble:
             logger.debug(f"Using nuclear exit for {args.mode} mode (ctranslate2 crash prevention)")
             import os as _os
-            _os._exit(0)
+            _os._exit(_exit_status)
+
+        if _exit_status:
+            sys.exit(_exit_status)
 
     except KeyboardInterrupt:
         logger.warning("\nProcessing interrupted by user")
