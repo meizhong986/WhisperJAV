@@ -46,6 +46,8 @@ DEFAULT_GUI_SETTINGS = {
     "output_dir": "",
     "debug_logging": False,
     "keep_temp": False,
+    "skip_existing": False,
+    "remember_settings": False,
     "temp_dir": "",
     "accept_cpu_mode": False,
     "async_processing": False,
@@ -79,7 +81,34 @@ def get_gui_settings_path() -> Path:
     else:
         base = Path.home() / ".config"
 
-    return (base / "WhisperJAV" / "gui_settings.json").expanduser()
+    path = (base / "WhisperJAV" / "gui_settings.json").expanduser()
+    try:
+        return path.resolve()
+    except OSError:
+        return path
+
+
+def atomic_write_json(path, payload, logger_=None) -> None:
+    """Write payload as JSON atomically; fall back to direct write on OSError (#309)."""
+    import json as _json
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        _json.dump(payload, f, indent=2, ensure_ascii=False)
+        f.flush()
+        os.fsync(f.fileno())
+    try:
+        os.replace(tmp_path, path)
+    except OSError as exc:
+        if logger_ is not None:
+            logger_.warning("Atomic replace failed for %s (%s); direct write", path, exc)
+        with open(path, "w", encoding="utf-8") as f:
+            _json.dump(payload, f, indent=2, ensure_ascii=False)
+        try:
+            tmp_path.unlink()
+        except OSError:
+            pass
 
 
 def _rotate_backups(settings_path: Path) -> Optional[Path]:
@@ -224,19 +253,8 @@ def save_gui_settings(settings: dict) -> bool:
         existing["version"] = SETTINGS_SCHEMA_VERSION
         existing["_comment"] = DEFAULT_GUI_SETTINGS["_comment"]
 
-        settings_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Atomic write: .tmp → rename
-        tmp_path = settings_path.with_suffix(".json.tmp")
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(existing, f, indent=2, ensure_ascii=False)
-            f.flush()
-            os.fsync(f.fileno())
-
-        # On Windows, rename fails if target exists — remove first
-        if settings_path.exists():
-            settings_path.unlink()
-        tmp_path.rename(settings_path)
+        # Atomic write with junction-safe fallback (#309)
+        atomic_write_json(settings_path, existing, logger_=logger)
 
         logger.debug("GUI settings saved to %s", settings_path)
         return True

@@ -174,6 +174,9 @@ class WhisperJAVAPI:
         if options.get('keep_temp', False):
             args += ["--keep-temp"]
 
+        if options.get('skip_existing', False):
+            args += ["--skip-existing"]
+
         # Debug logging
         if options.get('debug', False):
             args += ["--debug"]
@@ -282,6 +285,9 @@ class WhisperJAVAPI:
 
         if options.get('keep_temp', False):
             args += ["--keep-temp"]
+
+        if options.get('skip_existing', False):
+            args += ["--skip-existing"]
 
         if options.get('debug', False):
             args += ["--debug"]
@@ -1744,6 +1750,9 @@ class WhisperJAVAPI:
         if options.get('keep_temp', False):
             args += ["--keep-temp"]
 
+        if options.get('skip_existing', False):
+            args += ["--skip-existing"]
+
         # Verbosity
         verbosity = options.get('verbosity', 'summary')
         if verbosity:
@@ -2971,6 +2980,9 @@ class WhisperJAVAPI:
         if config.get('keep_temp', False):
             args += ["--keep-temp"]
 
+        if config.get('skip_existing', False):
+            args += ["--skip-existing"]
+
         # Debug logging
         if config.get('debug', False):
             args += ["--debug"]
@@ -3449,6 +3461,8 @@ class WhisperJAVAPI:
         "debug_logging":             "debugLogging",
         "output_format":             "outputFormat",
         "keep_temp":                 "keepTemp",
+        "skip_existing":             "skipExisting",
+        "remember_settings":         "rememberSettings",
         "temp_dir":                  "tempDir",
         "accept_cpu_mode":           "acceptCpuMode",
         "async_processing":          "asyncProcessing",
