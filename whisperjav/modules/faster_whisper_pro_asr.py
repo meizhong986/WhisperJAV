@@ -233,6 +233,24 @@ class FasterWhisperProASR:
         """Return a copy of accumulated filter statistics."""
         return dict(self._filter_statistics)
 
+    def get_last_decode_stats(self) -> List[Dict]:
+        """Full segment dicts from the last transcription, for diagnostics.
+
+        Each entry is a faster-whisper ``Segment`` as a dict, so it carries the
+        decode metadata that discriminates between explanations for #394 --
+        ``temperature`` (a value above the first configured one means fallback
+        fired), ``compression_ratio``, ``avg_logprob`` and ``no_speech_prob``.
+
+        Returns an empty list when nothing was captured; never raises.
+        """
+        out: List[Dict] = []
+        try:
+            for result in getattr(self, "_last_full_results", []) or []:
+                out.extend(result.get("segments") or [])
+        except Exception:  # noqa: BLE001 - diagnostics must not break the run
+            return []
+        return out
+
     def get_segmenter_name(self) -> str:
         """Name of the speech segmenter actually in use, or "none".
 

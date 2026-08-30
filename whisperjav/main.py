@@ -426,6 +426,12 @@ def parse_arguments():
                             help="Use async processing (better for GUIs)")
     async_group.add_argument("--max-workers", type=int, default=1,
                             help="Max concurrent workers (default: 1)")
+    async_group.add_argument("--asr-telemetry", type=str, default=None,
+                            metavar="PATH",
+                            help="Write a per-scene JSONL record of decode behaviour "
+                                 "(temperature/fallback, logprob, compression ratio) "
+                                 "and memory use. Diagnostic aid for issue #394; off "
+                                 "by default. Balanced mode only.")
     async_group.add_argument("--min-coverage", type=float, default=None,
                             metavar="RATIO",
                             help="Fail a file when its subtitles span less than this "
@@ -1157,6 +1163,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         effective_mode = args.mode
     elif args.mode == "balanced":
         pipeline = BalancedPipeline(**pipeline_args)
+        # #394 diagnostics, set after construction so no pipeline signature changes.
+        pipeline.asr_telemetry_path = getattr(args, 'asr_telemetry', None)
         effective_mode = args.mode
     elif args.mode == "kotoba-faster-whisper":
         # Kotoba Faster-Whisper pipeline with scene detection (always on)

@@ -182,6 +182,27 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
 
 ---
 
+## For diagnosing #394
+
+- **`--asr-telemetry PATH`** writes one JSON record per scene: how long the
+  recognizer took, how many segments it returned, whether the decoder had to
+  retry at a higher temperature, the confidence and compression figures behind
+  those retries, and GPU and process memory at that moment. It is off unless you
+  ask for it, and currently covers Balanced mode.
+
+  It exists because every record we had described the *aftermath* of the #394
+  failure and none described the approach to it. The most useful unexplained
+  detail in that issue is that the collapse is preceded by a slowdown —
+  @daoran9 measured the median call going from 1.05s to 31.65s beforehand — and
+  a model that is merely stuck returns nothing *quickly*. Whether that slowdown
+  comes from repeated decoder retries or from memory growth points at very
+  different causes, and until now nothing recorded either.
+
+  At the end of a run it also prints a one-line before/after comparison, so a
+  reporter can paste a single line rather than be persuaded to attach a file.
+
+---
+
 ## Under the hood
 
 Not user-visible, but worth recording:
@@ -222,6 +243,7 @@ Not user-visible, but worth recording:
 
 | Date | Change |
 |------|--------|
+| 2026-08-30 | `--asr-telemetry`: per-scene decode and memory record, plus a trend summary, to capture what precedes a #394 collapse rather than only its aftermath |
 | 2026-08-30 | Corroborating signal instrumented in Balanced: consecutive scenes with detected speech but no output now corroborate a low-coverage failure (#394) |
 | 2026-08-30 | Artifacts `[SANITIZATION SUMMARY]` now counts real removals and the real final subtitle count instead of a counter the active workflow never updated |
 | 2026-08-30 | Output coverage gate wired: empty output fails the run and exits non-zero; short output warns. Nuclear exit no longer hardcoded to 0 (#394, #263) |

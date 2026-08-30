@@ -17,6 +17,7 @@ from whisperjav.modules.scene_detection_backends import SceneDetectorFactory
 from whisperjav.modules.srt_stitching import SRTStitcher
 from whisperjav.utils.logger import logger
 from whisperjav.utils.output_coverage import SpeechPositiveEmptyStreak
+from whisperjav.utils.asr_telemetry import AsrTelemetry
 
 from whisperjav.utils.progress_display import DummyProgress
 from whisperjav.utils.progress_aggregator import AsyncProgressReporter
@@ -443,6 +444,19 @@ class BalancedPipeline(BasePipeline):
                 asr.get_segmenter_name() if hasattr(asr, 'get_segmenter_name') else None
             )
 
+            # #394 diagnostics: opt-in per-scene record of decode behaviour and
+            # memory, so the *approach* to a failure is visible and not only its
+            # aftermath. Off unless --asr-telemetry was passed.
+            telemetry = None
+            _telemetry_path = getattr(self, 'asr_telemetry_path', None)
+            if _telemetry_path:
+                # A directory (or an existing one) gets one file per media, so a
+                # batch run does not overwrite itself.
+                _tp = Path(_telemetry_path)
+                if _tp.is_dir() or not _tp.suffix:
+                    _tp = _tp / f"{media_basename}.asr_telemetry.jsonl"
+                telemetry = AsrTelemetry(_tp, media_basename)
+
             for idx, (scene_path, start_time_sec, _, _) in enumerate(scene_paths):
                 scene_srt_path = scene_srts_dir / f"{scene_path.stem}.srt"
                 scene_num = idx + 1
@@ -487,12 +501,14 @@ class BalancedPipeline(BasePipeline):
                     last_update_time = time.time()
 
                 try:
+                    _scene_t0 = time.time()
                     # Use unified progress manager's external suppression if available
                     if unified_manager:
                         with unified_manager.suppress_external_progress():
                             asr.transcribe_to_srt(scene_path, scene_srt_path, task=self.asr_task)
                     else:
                         asr.transcribe_to_srt(scene_path, scene_srt_path, task=self.asr_task)
+                    _scene_wall = time.time() - _scene_t0
 
                     # Process results - simplified to reduce message spam
                     if scene_srt_path.exists() and scene_srt_path.stat().st_size > 0:
@@ -515,6 +531,19 @@ class BalancedPipeline(BasePipeline):
                             ),
                             speech_detected=bool(scene_vad),
                         )
+
+                        if telemetry is not None:
+                            telemetry.record_scene(
+                                index=scene_num,
+                                audio_duration_s=scene_paths[idx][3],
+                                wall_s=_scene_wall,
+                                segments=(asr.get_last_decode_stats()
+                                          if hasattr(asr, 'get_last_decode_stats') else []),
+                                speech_detected=bool(scene_vad),
+                                produced_output=bool(
+                                    scene_srt_path.exists() and scene_srt_path.stat().st_size > 0
+                                ),
+                            )
 
                         for seg in scene_vad:
                             all_vad_segments.append({
@@ -629,6 +658,9 @@ class BalancedPipeline(BasePipeline):
             total_time = time.time() - start_time
             master_metadata["summary"]["total_processing_time_seconds"] = round(total_time, 2)
             # #394: surfaced so the caller can corroborate a low-coverage result.
+            if telemetry is not None:
+                telemetry.write()
+
             master_metadata["summary"]["speech_positive_empty_streak"] = empty_streak.longest
             if empty_streak.longest:
                 logger.warning(
