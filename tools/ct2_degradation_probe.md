@@ -33,7 +33,8 @@ your machine, and the tool only ever reads your files.
 > fixed at the same time: the tool crashed with `UnicodeEncodeError` when
 > printing a Japanese transcript on a Windows console using a legacy code page,
 > and the `bare` arm ran with its own decode defaults rather than the ones
-> WhisperJAV ships. Thank you to the people who reported the first one — twice.
+> WhisperJAV ships. Thank you to @Kukuindi, who reported the first one and kept
+> reporting it.
 
 ## Running it
 
@@ -139,8 +140,14 @@ clip you chose, so review it before posting if that matters to you.
   its ASR module only for `--engine whisperjav`. With `--profile raw --engine
   bare` it imports nothing from WhisperJAV at all and runs against any version.
 - Every JSONL now opens with a `"record": "config"` line naming the engine,
-  profile, model, segmenter and every decode option in force, so a result file
-  can never be read out of context.
+  profile, model and every decode option in force, so a result file can never be
+  read out of context. The `whisperjav` arm additionally records the sensitivity
+  and the speech segmenter.
+- The `bare` arm can only ever exercise faster-whisper's *internal* VAD. If your
+  runs use an external segmenter (`silero-v3.1`, `whisperseg`, ...), WhisperJAV
+  splits each scene itself and makes one call per group — a path `bare` cannot
+  reproduce. For those configurations the `whisperjav` arm is the faithful one,
+  and the tool says so when you select one.
 - Needs `faster-whisper`, `numpy` and `soundfile`; `librosa` only if your audio
   is not already 16 kHz; `psutil` and `torch` only for the memory columns, and it
   degrades quietly without them.
