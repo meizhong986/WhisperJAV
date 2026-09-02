@@ -56,8 +56,10 @@ Standalone-installer users can run it with the bundled Python::
 Output is a JSONL file, one record per iteration, plus a verdict on stdout.
 Please attach the JSONL to issue #394.
 
-This tool is read-only with respect to your installation. It imports nothing
-from WhisperJAV unless --engine whisperjav is requested.
+This tool is read-only with respect to your installation. Under the default
+--profile shipped it imports WhisperJAV's config layer (no GPU stack) to resolve
+the decode parameters; --profile raw --engine bare imports nothing from
+WhisperJAV at all and runs against any version.
 """
 
 from __future__ import annotations
@@ -270,13 +272,27 @@ class BareEngine:
             compute_type = resolved["model"].get("compute_type", args.compute_type)
             candidate = dict(resolved["params"].get("decoder", {}))
             candidate.update(resolved["params"].get("provider", {}))
-            candidate["vad_filter"] = True
-            candidate["vad_parameters"] = _vad_parameters(
-                resolved["params"].get("vad", {}) or {})
+            segmenter = (resolved["params"].get("speech_segmenter", {}) or {}).get("backend")
+            if segmenter == "faster-whisper":
+                candidate["vad_filter"] = True
+                candidate["vad_parameters"] = _vad_parameters(
+                    resolved["params"].get("vad", {}) or {})
+            else:
+                # An external segmenter does not use faster-whisper's internal VAD
+                # at all: WhisperJAV splits the scene itself and makes one call per
+                # group. Feeding those thresholds to the internal VAD would be a
+                # different experiment on a different threshold scale, so this arm
+                # leaves the VAD off and says so.
+                candidate["vad_filter"] = False
+                _log(f"NOTE: segmenter '{segmenter}' is an external per-group "
+                     f"segmenter. The bare arm cannot reproduce that path -- it runs "
+                     f"one call per chunk with the VAD off. For this configuration "
+                     f"the --engine whisperjav arm is the faithful one.")
             candidate.pop("task", None)
             opts = _accepted_kwargs(WhisperModel.transcribe, candidate)
         else:
-            model_name, device, compute_type = args.model, args.device, args.compute_type
+            model_name = args.model or "large-v2"
+            device, compute_type = args.device, args.compute_type
             opts = dict(
                 beam_size=args.beam_size,
                 best_of=args.best_of,
@@ -395,8 +411,10 @@ def build_parser() -> argparse.ArgumentParser:
                         "'faster-whisper' is the v1.9.0 balanced default (native "
                         "internal VAD). Pass silero-v3.1 to probe the external "
                         "per-group path instead.")
-    p.add_argument("--model", default="large-v2",
-                   help="Overrides the resolved model name under --profile shipped.")
+    p.add_argument("--model", default=None,
+                   help="Model name. Under --profile shipped, defaults to the model "
+                        "your configuration resolves to; under --profile raw, to "
+                        "large-v2.")
     p.add_argument("--device", default="cuda")
     p.add_argument("--compute-type", default="float16")
     p.add_argument("--language", default="ja")
