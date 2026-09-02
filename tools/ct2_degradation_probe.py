@@ -16,6 +16,13 @@ two ways:
     --engine bare        faster-whisper directly, no WhisperJAV involved
     --engine whisperjav  through WhisperJAV's ASR module
 
+Both arms run WhisperJAV's *shipped* decode configuration by default, resolved
+live from the installed package (--profile shipped). That matters: with the
+tool's own defaults instead (--profile raw), the bare arm ran with VAD off, no
+repetition penalty and no word timestamps -- a configuration WhisperJAV never
+uses -- so a clean result said nothing about the configuration people actually
+run. Results collected before 2026-09-02 were all --profile raw.
+
 Same audio, same model, same decode parameters, same probe. **The difference
 between the two runs is the answer**, and running both from one harness removes
 any argument about the configurations differing.
@@ -63,6 +70,8 @@ import sys
 import time
 from pathlib import Path
 
+PROBE_VERSION = "2026-09-02"
+
 DEFAULT_CHUNK_SECONDS = 30.0
 DEFAULT_ITERATIONS = 200
 
@@ -73,7 +82,27 @@ _WORDISH = re.compile(r"[^\W_]", re.UNICODE)
 
 
 def _log(msg: str) -> None:
-    print(msg, flush=True)
+    """Print without ever failing on the console's code page.
+
+    The transcripts this tool prints are Japanese. A Windows console on a legacy
+    code page raises UnicodeEncodeError on the first line of output, which killed
+    the run before it started. Reconfigure once if we can, and degrade to an
+    ASCII-safe rendering if we cannot.
+    """
+    try:
+        print(msg, flush=True)
+    except UnicodeEncodeError:
+        enc = getattr(sys.stdout, "encoding", None) or "ascii"
+        print(msg.encode(enc, errors="replace").decode(enc, errors="replace"),
+              flush=True)
+
+
+def _make_stdout_utf8() -> None:
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:  # noqa: BLE001 - older Python, or a wrapped stream
+            pass
 
 
 def _memory_snapshot() -> dict:
@@ -140,6 +169,92 @@ def _read_audio(path: Path):
     return data, sr
 
 
+def resolve_shipped_params(args) -> dict:
+    """Return WhisperJAV's resolved runtime configuration for --mode balanced.
+
+    Imports only the config layer, which pulls in no GPU stack. Returns a dict
+    with 'model', 'params' and 'task', the exact structure the pipelines hand to
+    FasterWhisperProASR. Raises SystemExit with an actionable message rather
+    than a traceback if the installed package cannot provide it.
+    """
+    try:
+        from whisperjav.config.legacy import resolve_legacy_pipeline
+    except ImportError as exc:
+        _log(f"ERROR: --profile shipped needs WhisperJAV importable ({exc}).\n"
+             f"Run this with the Python that has WhisperJAV installed, or pass\n"
+             f"--profile raw to use this tool's own decode defaults.")
+        raise SystemExit(2) from exc
+
+    try:
+        cfg = resolve_legacy_pipeline(
+            "balanced", args.sensitivity, task="transcribe",
+            device=args.device, compute_type=args.compute_type,
+        )
+    except Exception as exc:  # noqa: BLE001 - any resolver failure is fatal here
+        _log(f"ERROR: could not resolve the balanced configuration ({exc}).\n"
+             f"Pass --profile raw to fall back to this tool's own defaults.")
+        raise SystemExit(2) from exc
+
+    # Two steps in main.py stand between the resolver and what actually runs,
+    # and skipping either gives a configuration WhisperJAV never uses.
+    #
+    #   1. main.py:2014-2023 -- balanced with no explicit --speech-segmenter
+    #      defaults to "faster-whisper", i.e. the native internal VAD.
+    #   2. main.py:2083 -- apply_balanced_vad_defaults() then overlays the VAD
+    #      preset for THAT backend. Without step 1 the overlay does not fire and
+    #      the threshold stays on the external-Silero scale (0.28 / 5.0 s)
+    #      instead of the native faster-whisper one (0.40 / 15.0 s).
+    #
+    # This was caught by running the tool, not by reading it.
+    params = cfg.setdefault("params", {})
+    params.setdefault("speech_segmenter", {})
+    if not params["speech_segmenter"].get("backend"):
+        params["speech_segmenter"]["backend"] = args.speech_segmenter
+    try:
+        from whisperjav.config.legacy import apply_balanced_vad_defaults
+
+        apply_balanced_vad_defaults(cfg, sensitivity=args.sensitivity, is_balanced=True)
+    except ImportError:
+        _log("WARNING: this WhisperJAV predates apply_balanced_vad_defaults; the "
+             "VAD parameters below are the resolver's, not the shipped overlay's.")
+
+    model_cfg = dict(cfg["model"])
+    if args.model:
+        model_cfg["model_name"] = args.model
+    return {"model": model_cfg, "params": cfg["params"], "task": cfg.get("task", "transcribe")}
+
+
+def _accepted_kwargs(func, candidate: dict) -> dict:
+    """Drop keys the callee does not accept.
+
+    WhisperJAV's params carry entries that belong to WhisperJAV and not to
+    faster-whisper (logprob_margin, drop_nonverbal_vocals, ...), and
+    faster-whisper's own signature moves between versions. Filtering keeps this
+    tool runnable against whatever the user has installed.
+    """
+    import inspect
+
+    try:
+        allowed = set(inspect.signature(func).parameters)
+    except (TypeError, ValueError):
+        return dict(candidate)
+    return {k: v for k, v in candidate.items() if k in allowed}
+
+
+def _vad_parameters(vad: dict) -> dict:
+    """Filter WhisperJAV's vad params down to what this faster-whisper accepts."""
+    try:
+        import dataclasses
+
+        from faster_whisper.vad import VadOptions
+
+        allowed = {f.name for f in dataclasses.fields(VadOptions)}
+    except Exception:  # noqa: BLE001 - fall back to the long-stable subset
+        allowed = {"threshold", "min_speech_duration_ms", "max_speech_duration_s",
+                   "min_silence_duration_ms", "speech_pad_ms"}
+    return {k: v for k, v in vad.items() if k in allowed and v is not None}
+
+
 class BareEngine:
     """faster-whisper directly. No WhisperJAV code is involved."""
 
@@ -148,17 +263,35 @@ class BareEngine:
     def __init__(self, args):
         from faster_whisper import WhisperModel
 
-        _log(f"Loading model '{args.model}' on {args.device} ({args.compute_type})...")
-        self.model = WhisperModel(args.model, device=args.device,
-                                  compute_type=args.compute_type)
-        self.opts = dict(
-            beam_size=args.beam_size,
-            best_of=args.best_of,
-            temperature=[float(t) for t in args.temperature.split(",")],
-            language=args.language or None,
-            vad_filter=args.vad_filter,
-        )
-        _log(f"Decode options: {self.opts}")
+        if args.profile == "shipped":
+            resolved = resolve_shipped_params(args)
+            model_name = resolved["model"].get("model_name", args.model)
+            device = resolved["model"].get("device", args.device)
+            compute_type = resolved["model"].get("compute_type", args.compute_type)
+            candidate = dict(resolved["params"].get("decoder", {}))
+            candidate.update(resolved["params"].get("provider", {}))
+            candidate["vad_filter"] = True
+            candidate["vad_parameters"] = _vad_parameters(
+                resolved["params"].get("vad", {}) or {})
+            candidate.pop("task", None)
+            opts = _accepted_kwargs(WhisperModel.transcribe, candidate)
+        else:
+            model_name, device, compute_type = args.model, args.device, args.compute_type
+            opts = dict(
+                beam_size=args.beam_size,
+                best_of=args.best_of,
+                temperature=[float(t) for t in args.temperature.split(",")],
+                language=args.language or None,
+                vad_filter=args.vad_filter,
+            )
+
+        _log(f"Loading model '{model_name}' on {device} ({compute_type})...")
+        self.model = WhisperModel(model_name, device=device, compute_type=compute_type)
+        self.opts = opts
+        self.config = {"profile": args.profile, "model": model_name,
+                       "device": device, "compute_type": compute_type,
+                       "decode_options": {k: str(v) for k, v in sorted(opts.items())}}
+        _log(f"Profile: {args.profile}. Decode options: {self.opts}")
 
     def transcribe(self, samples, sample_rate):
         segments, _info = self.model.transcribe(samples, **self.opts)
@@ -189,14 +322,35 @@ class WhisperJavEngine:
         except ImportError as exc:
             _log(f"ERROR: --engine whisperjav needs WhisperJAV importable ({exc}).\n"
                  f"Run this with the Python that has WhisperJAV installed, or use "
-                 f"--engine bare, which is the decisive experiment anyway.")
+                 f"--engine bare.")
             raise SystemExit(2) from exc
 
-        _log(f"Loading WhisperJAV ASR with model '{args.model}'...")
+        # The configuration is built by WhisperJAV's own resolver rather than
+        # assembled here, so this arm cannot drift away from what the pipeline
+        # runs. An earlier version of this file passed model_name/device/
+        # compute_type directly; that signature has never existed and the arm
+        # could not start. See issue #394.
+        resolved = resolve_shipped_params(args)
+        model_cfg, params = resolved["model"], resolved["params"]
+
+        _log(f"Loading WhisperJAV ASR: model '{model_cfg.get('model_name')}', "
+             f"sensitivity '{args.sensitivity}', "
+             f"segmenter '{params.get('speech_segmenter', {}).get('backend')}'...")
         self.asr = FasterWhisperProASR(
-            model_name=args.model, device=args.device,
-            compute_type=args.compute_type,
+            model_config=model_cfg, params=params, task=resolved["task"],
         )
+        self.config = {
+            "profile": "shipped",
+            "model": model_cfg.get("model_name"),
+            "device": model_cfg.get("device"),
+            "compute_type": model_cfg.get("compute_type"),
+            "sensitivity": args.sensitivity,
+            "speech_segmenter": params.get("speech_segmenter", {}).get("backend"),
+            "decode_options": {
+                k: str(v) for k, v in sorted(
+                    {**params.get("decoder", {}), **params.get("provider", {})}.items())
+            },
+        }
 
     def transcribe(self, samples, sample_rate):
         # Write a temp wav; the module's public entry point takes a path.
@@ -226,17 +380,35 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--reference", required=True, type=Path,
                    help="A short clip (5-15s) you have verified transcribes correctly.")
     p.add_argument("--engine", choices=["bare", "whisperjav"], default="bare",
-                   help="bare = faster-whisper directly (default, and the decisive one).")
-    p.add_argument("--model", default="large-v2")
+                   help="bare = faster-whisper directly; whisperjav = through our ASR "
+                        "module. Run BOTH: the difference between them is the answer.")
+    p.add_argument("--profile", choices=["shipped", "raw"], default="shipped",
+                   help="shipped (default) = use WhisperJAV's resolved balanced decode "
+                        "parameters in both arms, so the comparison is about the engine "
+                        "and not about settings. raw = this tool's own defaults "
+                        "(what runs collected before 2026-09-02 used).")
+    p.add_argument("--sensitivity", default="balanced",
+                   choices=["conservative", "balanced", "aggressive"],
+                   help="Sensitivity to resolve for --profile shipped (default: balanced).")
+    p.add_argument("--speech-segmenter", default="faster-whisper",
+                   help="Segmenter to resolve for --profile shipped. Default "
+                        "'faster-whisper' is the v1.9.0 balanced default (native "
+                        "internal VAD). Pass silero-v3.1 to probe the external "
+                        "per-group path instead.")
+    p.add_argument("--model", default="large-v2",
+                   help="Overrides the resolved model name under --profile shipped.")
     p.add_argument("--device", default="cuda")
     p.add_argument("--compute-type", default="float16")
     p.add_argument("--language", default="ja")
-    p.add_argument("--beam-size", type=int, default=5)
-    p.add_argument("--best-of", type=int, default=1)
+    p.add_argument("--beam-size", type=int, default=5,
+                   help="--profile raw only.")
+    p.add_argument("--best-of", type=int, default=1,
+                   help="--profile raw only.")
     p.add_argument("--temperature", default="0.0,0.2,0.4,0.6,0.8,1.0",
                    help="Comma-separated fallback ladder.")
     p.add_argument("--vad-filter", action="store_true",
-                   help="Use faster-whisper's internal VAD.")
+                   help="--profile raw only. Under 'shipped' the VAD setting comes "
+                        "from the resolved configuration.")
     p.add_argument("--chunk-seconds", type=float, default=DEFAULT_CHUNK_SECONDS)
     p.add_argument("--iterations", type=int, default=DEFAULT_ITERATIONS,
                    help="Maximum chunks to process before stopping.")
@@ -248,6 +420,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv=None) -> int:
+    _make_stdout_utf8()
     args = build_parser().parse_args(argv)
 
     for path in (args.audio, args.reference):
@@ -278,7 +451,15 @@ def main(argv=None) -> int:
     _log(f"Problem audio: {args.audio.name} ({len(audio) / sr:.1f}s) "
          f"-> {n} chunk(s) of {args.chunk_seconds:.0f}s\n")
 
-    records, degraded_at = [], None
+    # First record describes the run, so no JSONL can be read out of context.
+    config_record = {"record": "config", "engine": engine.name,
+                     "probe_version": PROBE_VERSION}
+    config_record.update(getattr(engine, "config", {}))
+    config_record["reference_clip_s"] = round(len(ref_samples) / max(ref_sr, 1), 2)
+    config_record["audio_s"] = round(len(audio) / max(sr, 1), 2)
+    config_record["chunk_seconds"] = args.chunk_seconds
+
+    records, degraded_at = [config_record], None
     for i in range(n):
         piece = audio[i * chunk:(i + 1) * chunk]
         if len(piece) == 0:
@@ -337,14 +518,15 @@ def main(argv=None) -> int:
         with open(args.out, "w", encoding="utf-8") as fh:
             for rec in records:
                 fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
-        _log(f"\nWrote {len(records)} record(s) to {args.out}")
+        _log(f"\nWrote {len(records) - 1} chunk record(s) plus a config header "
+             f"to {args.out}")
     except Exception as exc:
         _log(f"\nWARNING: could not write {args.out}: {exc}")
 
     _log("\n" + "=" * 68)
     if degraded_at is not None:
         _log(f"VERDICT: instance degraded after {degraded_at} chunk(s), "
-             f"engine={engine.name}")
+             f"engine={engine.name}, profile={args.profile}")
         if engine.name == "bare":
             _log("This reproduced WITHOUT WhisperJAV, which points at\n"
                  "faster-whisper / CTranslate2 rather than at WhisperJAV.")
@@ -352,10 +534,12 @@ def main(argv=None) -> int:
             _log("This reproduced through WhisperJAV. Please also run with\n"
                  "--engine bare: if that stays clean, the cause is on our side.")
     else:
-        _log(f"VERDICT: no degradation in {len(records)} chunk(s), "
-             f"engine={engine.name}")
+        _log(f"VERDICT: no degradation in {len(records) - 1} chunk(s), "
+             f"engine={engine.name}, profile={args.profile}")
         _log("Either this material does not trigger it, or more chunks are needed.\n"
-             "Raising --iterations, or using audio known to have failed, may help.")
+             "Raising --iterations, or using audio known to have failed, may help.\n"
+             "A clean result on ONE arm settles nothing on its own: the comparison\n"
+             "between --engine bare and --engine whisperjav is what discriminates.")
     _log("=" * 68)
     _log(f"\nPlease attach {args.out} to https://github.com/meizhong986/WhisperJAV/issues/394")
     return 0

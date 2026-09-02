@@ -24,15 +24,35 @@ same experiment can be run with and without WhisperJAV in the path.
 You supply the reference clip yourself. Nothing is uploaded; everything stays on
 your machine, and the tool only ever reads your files.
 
+> **Fixed 2026-09-02 — please re-run if you tried this before.** The
+> `--engine whisperjav` arm could not start: it called the ASR class with a
+> constructor signature that has never existed, and failed with
+> `TypeError: FasterWhisperProASR.__init__() got an unexpected keyword argument
+> 'model_name'`. It now builds its configuration through WhisperJAV's own
+> resolver, so it cannot drift from the pipeline again. Two further defects were
+> fixed at the same time: the tool crashed with `UnicodeEncodeError` when
+> printing a Japanese transcript on a Windows console using a legacy code page,
+> and the `bare` arm ran with its own decode defaults rather than the ones
+> WhisperJAV ships. Thank you to the people who reported the first one — twice.
+
 ## Running it
 
 ```bash
 python tools/ct2_degradation_probe.py \
     --audio  /path/to/problem_file.wav \
     --reference /path/to/known_good_clip.wav \
-    --model large-v2 \
-    --out ct2_probe.jsonl
+    --engine bare \
+    --out ct2_probe_bare.jsonl
+
+python tools/ct2_degradation_probe.py \
+    --audio  /path/to/problem_file.wav \
+    --reference /path/to/known_good_clip.wav \
+    --engine whisperjav \
+    --out ct2_probe_whisperjav.jsonl
 ```
+
+Please run **both**. One arm on its own cannot answer the question — see the
+table below.
 
 If you installed WhisperJAV with the Windows standalone installer, use the Python
 that came with it:
@@ -41,9 +61,24 @@ that came with it:
 %LOCALAPPDATA%\WhisperJAV\python.exe tools\ct2_degradation_probe.py --audio ... --reference ...
 ```
 
-Match the model and decode settings to the run that failed for you — `--model`,
-`--beam-size`, `--best-of`, `--temperature`, `--language`, and `--vad-filter` if
-you use faster-whisper's internal VAD.
+### Decode settings — you should not need to set any
+
+By default (`--profile shipped`) **both arms resolve WhisperJAV's own balanced
+configuration from your installed copy** and run with it: the same model, beam
+size, temperature ladder, repetition penalty, word timestamps and VAD parameters
+the pipeline uses. That is the point — the comparison is then about the engine,
+not about settings.
+
+Adjust only if your failing run differed: `--sensitivity` (conservative /
+balanced / aggressive) and `--speech-segmenter` (default `faster-whisper`, the
+v1.9.0 balanced native VAD; pass `silero-v3.1` if you use the external one).
+`--model` overrides the resolved model name.
+
+`--profile raw` restores the tool's own defaults — VAD off, beam 5, the full
+temperature ladder, no repetition penalty, no word timestamps. **Results
+collected before 2026-09-02 were all effectively `raw`**, which is a
+configuration WhisperJAV never runs, so a clean `bare` result from those runs
+says less than it appears to.
 
 ## What it does
 
@@ -63,7 +98,9 @@ degraded, and the tool reports the chunk at which that happened.
 
 Same audio, same model, same decode parameters, same probe. **The difference
 between the two runs is the answer.** Running both from one harness means nobody
-has to wonder whether the two configurations really matched.
+has to wonder whether the two configurations really matched — and under
+`--profile shipped` both are pinned to the configuration WhisperJAV actually
+runs, so that question is settled by construction rather than by care.
 
 | Result | What it means | What happens next |
 |---|---|---|
@@ -74,8 +111,10 @@ has to wonder whether the two configurations really matched.
 This table was written **before** any results came in, deliberately, so the
 conclusion cannot be fitted to whatever we happen to see.
 
-Start with `--engine bare`. It is the decisive one, and it needs nothing except
-faster-whisper.
+Note the second row: **a clean `bare` result on its own matches no row in this
+table.** It is only informative next to the `whisperjav` arm on the same audio
+and the same reference clip. If you can run only one, run `bare` — it needs
+nothing but faster-whisper — but please come back for the other when you can.
 
 ## Output
 
@@ -96,8 +135,12 @@ clip you chose, so review it before posting if that matters to you.
 ## Notes
 
 - Read-only with respect to your installation.
-- Imports nothing from WhisperJAV unless `--engine whisperjav` is used, so it
-  runs against any version — including one older than the branch it ships on.
+- Imports WhisperJAV's *config* layer for `--profile shipped` (no GPU stack) and
+  its ASR module only for `--engine whisperjav`. With `--profile raw --engine
+  bare` it imports nothing from WhisperJAV at all and runs against any version.
+- Every JSONL now opens with a `"record": "config"` line naming the engine,
+  profile, model, segmenter and every decode option in force, so a result file
+  can never be read out of context.
 - Needs `faster-whisper`, `numpy` and `soundfile`; `librosa` only if your audio
   is not already 16 kHz; `psutil` and `torch` only for the memory columns, and it
   degrades quietly without them.
