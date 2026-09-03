@@ -39,8 +39,9 @@ import argparse
 import sys
 from pathlib import Path
 import json
+import time
 import tempfile
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 import io
 import shutil
 import subprocess
@@ -68,10 +69,19 @@ fix_stdout()
 
 from whisperjav.utils.logger import setup_logger, logger
 from whisperjav.utils.device_detector import get_best_device
-from whisperjav.utils.output_coverage import (
-    DEFAULT_MIN_COVERAGE,
-    assess_coverage,
-    report_coverage,
+from whisperjav.utils.run_outcome import (
+    FAIL_ON_CHOICES,
+    FileOutcome,
+    classify_output,
+    default_manifest_path,
+    exit_status,
+    failed_outcome,
+    log_outcome,
+    mark_translation,
+    parse_fail_on,
+    print_summary,
+    skipped_outcome,
+    write_manifest,
 )
 from whisperjav.modules.media_discovery import MediaDiscovery
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
@@ -434,11 +444,18 @@ def parse_arguments():
                                  "by default. Balanced mode only.")
     async_group.add_argument("--min-coverage", type=float, default=None,
                             metavar="RATIO",
-                            help="Fail a file when its subtitles span less than this "
-                                 "fraction of the media AND the recognizer is "
-                                 "independently shown to have stopped working "
-                                 "(default: 0.25). Short output on its own only "
-                                 "warns. Set 0 to disable the span check entirely.")
+                            help="A file whose subtitles span less than this fraction "
+                                 "of the media is reported as 'suspect' (default: 0.25; "
+                                 "media under 120 s is not assessed). Set 0 to disable "
+                                 "the span check. Reporting only; see --fail-on for the "
+                                 "exit status.")
+    async_group.add_argument("--fail-on", action="append", default=None,
+                            metavar="STATE",
+                            help="Make the run exit non-zero when any file ends in one "
+                                 "of these states: " + ", ".join(FAIL_ON_CHOICES) + ". "
+                                 "Repeatable or comma-separated. By default only a "
+                                 "'failed' file (an error) makes the run exit non-zero; "
+                                 "'empty' and 'suspect' are reported and exit 0.")
     
     # Subtitle signature options
     signature_group = parser.add_argument_group("Subtitle Attribution")
@@ -875,25 +892,32 @@ def _get_xxl_extra_args_from_config() -> str:
         return ''
 
 
-def apply_vtt_conversion(srt_path: str, output_format: str) -> None:
+def apply_vtt_conversion(srt_path: str, output_format: str) -> Optional[str]:
     """Convert SRT to VTT if requested by --output-format, and optionally remove the SRT.
 
     Args:
         srt_path: Path to the SRT file.
         output_format: "srt" (no-op), "vtt" (convert and remove SRT), or "both" (convert, keep SRT).
+
+    Returns:
+        The VTT path when a conversion happened, else None. Callers that
+        record the output file (the run manifest) need it, because with
+        "vtt" the SRT they recorded no longer exists.
     """
     if output_format == "srt" or not srt_path:
-        return
+        return None
     srt = Path(srt_path)
     if not srt.exists():
-        return
+        return None
     try:
         vtt_path = convert_srt_to_vtt(srt)
         if output_format == "vtt":
             srt.unlink()
             logger.info(f"Removed SRT (--output-format vtt): {srt.name}")
+        return str(vtt_path) if vtt_path else None
     except Exception as e:
         logger.warning(f"VTT conversion failed for {srt}: {e}")
+        return None
 
 
 def cleanup_temp_directory(temp_dir: str):
@@ -1005,9 +1029,17 @@ def print_subtitle_metrics(totals: Dict[str, int]):
         print(f"  Untracked delta    : {discrepancy}")
 
 
-def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolved_config: Dict):
-    """Process files synchronously with enhanced progress reporting."""
-    
+def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolved_config: Dict,
+                       outcomes: Optional[List[FileOutcome]] = None) -> List[FileOutcome]:
+    """Process files synchronously with enhanced progress reporting.
+
+    ``outcomes`` is the run's shared list, owned by main(): appending to it as
+    each file finishes means an interrupted run still has a record of the
+    files that completed.
+    """
+    if outcomes is None:
+        outcomes = []
+
     # Import unified progress components at function start
     from whisperjav.utils.unified_progress import UnifiedProgressManager, VerbosityLevel as UnifiedVerbosityLevel
     from whisperjav.utils.progress_adapter import ProgressDisplayAdapter
@@ -1393,7 +1425,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         effective_mode = args.mode
     
     all_stats, failed_files = [], []
-    
+
     # Calculate expected output lang_code for skip-existing check
     if args.subs_language == 'direct-to-english':
         output_lang_code = 'en'
@@ -1420,6 +1452,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                     logger.info(f"Skipping (output exists): {file_name}")
                     skipped_count += 1
                     all_stats.append({"file": file_path_str, "status": "skipped", "reason": "output_exists"})
+                    outcomes.append(skipped_outcome(file_path_str))
                     continue
 
             # Per-file output directory override for "source" mode
@@ -1430,6 +1463,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
 
             progress.set_current_file(file_path_str, i)
 
+            outcome = None  # the outcome recorded for this file, if any
             try:
                 metadata = pipeline.process(media_info)
                 all_stats.append({"file": file_path_str, "status": "success", "metadata": metadata})
@@ -1437,26 +1471,24 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                 subtitle_count = metadata.get("summary", {}).get("final_subtitles_refined", 0)
                 output_path = metadata.get("output_files", {}).get("final_srt", "")
 
-                # #394: a run could finish, report success, and hand back a
-                # subtitle file covering a fraction of the input. Nothing checked.
-                _cov = assess_coverage(
+                # The per-file verdict (done / empty / suspect), in the shared
+                # vocabulary. The exit status is decided once, in main().
+                outcome = classify_output(
+                    file_path_str,
                     output_path or None,
                     media_info.get('duration'),
-                    min_coverage=(DEFAULT_MIN_COVERAGE if args.min_coverage is None
-                                  else args.min_coverage),
-                    # Corroboration: short output is only failed when the
-                    # recognizer is independently shown to have stopped working.
-                    # Pipelines that do not report this leave it at 0, so they
-                    # warn rather than fail.
+                    min_coverage=args.min_coverage,
+                    # Corroboration is only meaningful with a genuine external
+                    # segmenter; pipelines that do not report it leave it at 0.
                     speech_positive_empty_streak=metadata.get("summary", {}).get(
                         "speech_positive_empty_streak", 0
                     ),
+                    processing_time_s=metadata.get("summary", {}).get(
+                        "total_processing_time_seconds"
+                    ),
                 )
-                report_coverage(_cov, Path(file_path_str).name)
-                if _cov.is_failure:
-                    failed_files.append(file_path_str)
-                    all_stats[-1]["status"] = "failed"
-                    all_stats[-1]["error"] = f"incomplete output: {_cov.detail}"
+                outcomes.append(outcome)
+                log_outcome(outcome)
                 
                 # Add signatures to the generated subtitle file
                 if output_path and Path(output_path).exists():
@@ -1470,6 +1502,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                     )
 
                 # Translation step (if requested)
+                if args.translate and not output_path:
+                    mark_translation(outcome, "skipped", error="no subtitle output to translate")
                 if args.translate and output_path:
                     try:
                         logger.info("Starting translation...")
@@ -1496,30 +1530,40 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                         if translated_path:
                             metadata.setdefault("output_files", {})["translated_srt"] = str(translated_path)
                             logger.info(f"Translation complete: {translated_path.name}")
+                            mark_translation(outcome, "done", translated_output=str(translated_path))
                         else:
                             logger.error("Translation failed: no output generated")
+                            mark_translation(outcome, "failed", error="no output generated")
 
                     except ConfigurationError as e:
                         logger.error(f"Translation configuration error: {e}")
+                        mark_translation(outcome, "failed", error=f"configuration error: {e}")
                         # Don't re-raise - continue with next file
                     except TranslationError as e:
                         logger.error(f"Translation failed: {e}")
+                        mark_translation(outcome, "failed", error=str(e))
                         # Don't re-raise - continue with next file
                     except FileNotFoundError as e:
                         logger.error(f"Translation failed: {e}")
+                        mark_translation(outcome, "failed", error=str(e))
                         # Don't re-raise - continue with next file
                     except Exception as e:
                         logger.error(f"Translation failed: {e}")
+                        mark_translation(outcome, "failed", error=str(e))
                         # Don't re-raise - continue with next file
 
                 # VTT conversion (if requested via --output-format)
                 output_format = getattr(args, 'output_format', 'srt')
                 if output_format != 'srt':
-                    apply_vtt_conversion(output_path, output_format)
+                    _vtt = apply_vtt_conversion(output_path, output_format)
+                    if _vtt and output_format == 'vtt':
+                        outcome.output = _vtt  # the SRT the manifest named is gone
                     # Also convert translated SRT if present
                     translated_srt = metadata.get("output_files", {}).get("translated_srt", "")
                     if translated_srt:
-                        apply_vtt_conversion(translated_srt, output_format)
+                        _tvtt = apply_vtt_conversion(translated_srt, output_format)
+                        if _tvtt and output_format == 'vtt':
+                            outcome.translated_output = _tvtt
 
                 progress.show_file_complete(file_name, subtitle_count, output_path)
                 
@@ -1530,6 +1574,12 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                 logger.error(f"Failed to process {file_path_str}: {e}", exc_info=True)
                 failed_files.append(file_path_str)
                 all_stats.append({"file": file_path_str, "status": "failed", "error": str(e)})
+                # One outcome per file: if this file was already classified
+                # (the error came from a later step), replace, do not append.
+                if outcome is not None and outcomes and outcomes[-1] is outcome:
+                    outcomes[-1] = failed_outcome(file_path_str, str(e), output=outcome.output)
+                else:
+                    outcomes.append(failed_outcome(file_path_str, str(e)))
                 progress.update_overall(1)
                 
     finally:
@@ -1561,26 +1611,14 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
     ]
     subtitle_totals = aggregate_subtitle_metrics(successful_metadata)
 
-    # Print summary
-    print("\n" + "="*50)
-    print("PROCESSING SUMMARY")
-    print("="*50)
-    print(f"Total files: {len(media_files)}")
-    print(f"Successful: {len(media_files) - len(failed_files) - skipped_count}")
-    if skipped_count > 0:
-        print(f"Skipped (already processed): {skipped_count}")
-    print(f"Failed: {len(failed_files)}")
+    # Timing and filter metrics. The per-file state table and the exit status
+    # are printed once, for every execution path, by _finish_run() in main().
     if subtitle_totals.get("processing_time_seconds"):
         total_time = subtitle_totals["processing_time_seconds"]
-        print(f"Processing time (s): {total_time:.2f}")
+        print(f"\nProcessing time (s): {total_time:.2f}")
         if subtitle_totals.get("files_processed"):
             avg_time = total_time / subtitle_totals["files_processed"]
             print(f"Average per file (s): {avg_time:.2f}")
-    
-    if failed_files:
-        print("\nFailed files:")
-        for file in failed_files:
-            print(f"  - {file}")
 
     print_subtitle_metrics(subtitle_totals)
     
@@ -1595,16 +1633,26 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
     if not args.keep_temp:
         cleanup_temp_directory(args.temp_dir)
 
-    # #394: the caller needs this to set a meaningful exit status. Previously
-    # this function returned None whatever happened, so a run in which every
-    # file failed still exited 0 -- which is why the GUI, which decides purely
-    # on the exit code, reported success over a 0-byte subtitle file (#263).
-    return len(failed_files)
+    # One outcome per input file, in the shared vocabulary. main() maps the
+    # set of outcomes to the exit status; nothing here may decide it.
+    return outcomes
 
 
-def process_files_async(media_files: List[Dict], args: argparse.Namespace, resolved_config: Dict):
-    """Process files asynchronously using the new async processor."""
-    
+# How long to wait, after a task's future has resolved, for its completion
+# callback to record the final status on the task object. Module-level so a
+# test can shorten it.
+_ASYNC_STATUS_SETTLE_S = 5.0
+
+
+def process_files_async(media_files: List[Dict], args: argparse.Namespace, resolved_config: Dict,
+                        outcomes: Optional[List[FileOutcome]] = None) -> List[FileOutcome]:
+    """Process files asynchronously using the new async processor.
+
+    ``outcomes`` is the run's shared list, owned by main(); see process_files_sync.
+    """
+    if outcomes is None:
+        outcomes = []
+
     # Determine verbosity
     if args.verbosity:
         verbosity = VerbosityLevel(args.verbosity)
@@ -1675,24 +1723,87 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
         if skipped_files:
             print(f"\nSkipping {len(skipped_files)} files with existing outputs")
 
+    outcomes.extend(skipped_outcome(p) for p in skipped_files)
+
     try:
         # Process files
         print(f"\nProcessing {len(files_to_process)} files asynchronously...")
         task_ids = manager.process_files(files_to_process, args.mode, resolved_config)
-        
-        # Get actual task objects from the processor
+
+        # process_files() submits with wait=False and returns at once. Until
+        # v1.9.2 nothing here waited, so the summary described tasks that had
+        # not run and shutdown() then cancelled them ("Task cancelled before
+        # processing started"). Wait for each task, then for its completion
+        # callback: Future.result() can return a moment before the done
+        # callback has recorded the final status on the task object.
         tasks = []
         for task_id in task_ids:
+            try:
+                manager.processor.wait_for_task(task_id)
+            except Exception as wait_error:  # noqa: BLE001 - the task's own error is recorded on it
+                logger.debug("Waiting for task %s raised %s", task_id, wait_error)
             task = manager.processor.get_task_status(task_id)
+            _terminal = (ProcessingStatus.COMPLETED, ProcessingStatus.FAILED,
+                         ProcessingStatus.CANCELLED)
+            _deadline = time.time() + _ASYNC_STATUS_SETTLE_S
+            while (task is not None and task.status not in _terminal
+                   and time.time() < _deadline):
+                time.sleep(0.05)
+                task = manager.processor.get_task_status(task_id)
+            # The Future is authoritative. If the mirrored status never settled
+            # but the work is done, read the result from the Future rather than
+            # call a finished file failed on a timing accident.
+            _future = getattr(task, 'future', None) if task is not None else None
+            if task is not None and task.status not in _terminal and _future is not None and _future.done():
+                try:
+                    task.result = _future.result()
+                    task.status = ProcessingStatus.COMPLETED
+                except InterruptedError:
+                    task.status = ProcessingStatus.CANCELLED
+                except Exception as task_error:  # noqa: BLE001 - recorded on the task
+                    task.status = ProcessingStatus.FAILED
+                    task.error = task_error
             if task:
                 tasks.append(task)
         
+        # One outcome per task, in the shared vocabulary, measured before the
+        # signature cue is appended (as the sync path does). The state table
+        # and the exit status are produced once, for every path, by _finish_run().
+        _outcome_by_task: Dict[str, FileOutcome] = {}
+        for task in tasks:
+            _path = task.media_info.get('path', 'Unknown File')
+            if task.status == ProcessingStatus.COMPLETED and isinstance(task.result, dict):
+                _summary = task.result.get("summary", {})
+                outcome = classify_output(
+                    _path,
+                    task.result.get("output_files", {}).get("final_srt") or None,
+                    task.media_info.get('duration'),
+                    min_coverage=args.min_coverage,
+                    speech_positive_empty_streak=_summary.get("speech_positive_empty_streak", 0),
+                    processing_time_s=_summary.get("total_processing_time_seconds"),
+                )
+            elif task.status == ProcessingStatus.CANCELLED:
+                outcome = failed_outcome(_path, "cancelled")
+            else:
+                outcome = failed_outcome(
+                    _path,
+                    str(task.error) if task.error
+                    else f"task ended in state '{task.status.value}' with no result",
+                )
+            outcomes.append(outcome)
+            _outcome_by_task[task.task_id] = outcome
+            log_outcome(outcome)
+
         # Add signatures to successfully processed files
         for task in tasks:
             if task.status == ProcessingStatus.COMPLETED and hasattr(task, 'result'):
                 # Try to get the output path from the task result
                 if isinstance(task.result, dict):
                     output_path = task.result.get("output_files", {}).get("final_srt", "")
+                    if args.translate and not (output_path and Path(output_path).exists()):
+                        _oc = _outcome_by_task.get(task.task_id)
+                        if _oc is not None:
+                            mark_translation(_oc, "skipped", error="no subtitle output to translate")
                     if output_path and Path(output_path).exists():
                         add_signatures_to_srt(
                             srt_path=output_path,
@@ -1723,53 +1834,59 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
                                     endpoint=getattr(args, 'translate_endpoint', None)
                                 )
 
+                                _oc = _outcome_by_task.get(task.task_id)
                                 if translated_path:
                                     task.result.setdefault("output_files", {})["translated_srt"] = str(translated_path)
                                     logger.info(f"Translation complete: {translated_path.name}")
+                                    if _oc is not None:
+                                        mark_translation(_oc, "done", translated_output=str(translated_path))
                                 else:
                                     logger.error("Translation failed: no output generated")
+                                    if _oc is not None:
+                                        mark_translation(_oc, "failed", error="no output generated")
 
                             except ConfigurationError as e:
                                 logger.error(f"Translation configuration error: {e}")
+                                _oc = _outcome_by_task.get(task.task_id)
+                                if _oc is not None:
+                                    mark_translation(_oc, "failed", error=f"configuration error: {e}")
                                 # Don't re-raise - continue with next file
                             except TranslationError as e:
                                 logger.error(f"Translation failed: {e}")
+                                _oc = _outcome_by_task.get(task.task_id)
+                                if _oc is not None:
+                                    mark_translation(_oc, "failed", error=str(e))
                                 # Don't re-raise - continue with next file
                             except FileNotFoundError as e:
                                 logger.error(f"Translation failed: {e}")
+                                _oc = _outcome_by_task.get(task.task_id)
+                                if _oc is not None:
+                                    mark_translation(_oc, "failed", error=str(e))
                                 # Don't re-raise - continue with next file
                             except Exception as e:
                                 logger.error(f"Translation failed: {e}")
+                                _oc = _outcome_by_task.get(task.task_id)
+                                if _oc is not None:
+                                    mark_translation(_oc, "failed", error=str(e))
                                 # Don't re-raise - continue with next file
 
                         # VTT conversion (if requested via --output-format)
                         output_format = getattr(args, 'output_format', 'srt')
                         if output_format != 'srt':
-                            apply_vtt_conversion(output_path, output_format)
+                            _vtt = apply_vtt_conversion(output_path, output_format)
+                            _oc = _outcome_by_task.get(task.task_id)
+                            if _vtt and output_format == 'vtt' and _oc is not None:
+                                _oc.output = _vtt
                             translated_srt = task.result.get("output_files", {}).get("translated_srt", "")
                             if translated_srt:
-                                apply_vtt_conversion(translated_srt, output_format)
+                                _tvtt = apply_vtt_conversion(translated_srt, output_format)
+                                if _tvtt and output_format == 'vtt' and _oc is not None:
+                                    _oc.translated_output = _tvtt
 
-        # Summarize results
-        successful = sum(1 for t in tasks if t.status == ProcessingStatus.COMPLETED)
-        failed = sum(1 for t in tasks if t.status == ProcessingStatus.FAILED)
-        cancelled = sum(1 for t in tasks if t.status == ProcessingStatus.CANCELLED)
         subtitle_totals = aggregate_subtitle_metrics([
             t.result for t in tasks
             if t.status == ProcessingStatus.COMPLETED and isinstance(t.result, dict)
         ])
-        
-        print("\n" + "="*50)
-        print("ASYNC PROCESSING SUMMARY")
-        print("="*50)
-        print(f"Total files: {len(media_files)}")
-        print(f"Successful: {successful}")
-        if len(skipped_files) > 0:
-            print(f"Skipped (already processed): {len(skipped_files)}")
-        print(f"Failed: {failed}")
-        if cancelled > 0:
-            print(f"Cancelled: {cancelled}")
-
         print_subtitle_metrics(subtitle_totals)
         
         # Save stats if requested
@@ -1789,9 +1906,52 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
     
     finally:
         manager.shutdown()
-        
+
         if not args.keep_temp:
             cleanup_temp_directory(args.temp_dir)
+
+    return outcomes
+
+
+def _finish_run(outcomes: List[FileOutcome], args: argparse.Namespace,
+                media_files: List[Dict], started_at, note: str = "",
+                force_status: Optional[int] = None) -> int:
+    """The one place that turns per-file outcomes into the exit status.
+
+    Prints the state table, writes the manifest next to the outputs, and
+    returns the exit status. Every execution path (sync, async, ensemble) ends
+    here, including an interrupted or crashed run (``note`` says so and
+    ``force_status`` carries the non-zero status such a run must return);
+    argument validation is the only thing that exits before this.
+    """
+    fail_on = parse_fail_on(getattr(args, 'fail_on', None))
+    status = exit_status(outcomes, fail_on)
+    if force_status is not None:
+        status = max(status, force_status)
+    # Reporting must never change the verdict: a problem printing the table or
+    # writing the manifest is logged, and the status computed above stands.
+    try:
+        manifest_path = write_manifest(
+            outcomes,
+            # From the raw inputs, not the discovered media: the GUI derives
+            # the same path from the same values (see default_manifest_path).
+            default_manifest_path(args.output_dir, [str(p) for p in (getattr(args, 'input', None) or [])]),
+            mode="ensemble" if getattr(args, 'ensemble', False) else args.mode,
+            fail_on=fail_on,
+            status=status,
+            started_at=started_at,
+            version=__version__,
+            note=note,
+        )
+        print_summary(outcomes, fail_on, status, manifest_path, note)
+    except Exception as report_error:  # noqa: BLE001
+        logger.warning("Could not print the run summary: %s", report_error)
+    if status and not note:
+        logger.error(
+            "Run exits with status 1: at least one file is in a failing state "
+            "(%s). See the RUN SUMMARY above.", ", ".join(sorted({"failed"} | set(fail_on)))
+        )
+    return status
 
 
 def main():
@@ -1801,7 +1961,18 @@ def main():
     patch_hf_hub_downloads()
 
     args = parse_arguments()
-    
+
+    # A mistyped --fail-on or --min-coverage must fail now, not after hours
+    # of transcription. Exit 2 is argparse's own usage-error status.
+    try:
+        parse_fail_on(getattr(args, 'fail_on', None))
+        _mc = getattr(args, 'min_coverage', None)
+        if _mc is not None and not (0.0 <= _mc <= 1.0):
+            raise ValueError(f"--min-coverage: expected a fraction between 0 and 1, got {_mc}")
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(2)
+
     # Run environment checks if requested
     if args.check or args.check_verbose:
         run_preflight_checks(verbose=args.check_verbose)
@@ -2395,6 +2566,12 @@ def main():
     for f in media_files:
         logger.info(f"  - {f['path']}")
 
+    import datetime as _dt
+    _run_started_at = _dt.datetime.now()
+    # The run's outcomes, one per file, shared by every execution path so an
+    # interrupted run still reports the files that finished.
+    outcomes: List[FileOutcome] = []
+
     # Create parameter tracer for ensemble mode (must be created before try block)
     tracer = create_tracer(args.trace_params) if args.ensemble else None
     if tracer and args.trace_params:
@@ -2546,6 +2723,7 @@ def main():
             # --skip-existing (#328): filter out files whose merged output
             # already exists. Mirrors the sync/async single-pass behavior;
             # ensemble's final artifact is <basename>.<lang>.merged.whisperjav.srt.
+            _all_media_files = media_files
             if getattr(args, 'skip_existing', False):
                 _out_lang = 'en' if args.subs_language == 'direct-to-english' else language_code
                 _to_source = str(args.output_dir).lower().strip() == "source"
@@ -2556,6 +2734,7 @@ def main():
                     _dir = _src.parent if _to_source else Path(args.output_dir)
                     if (_dir / f"{_base}.{_out_lang}.merged.whisperjav.srt").exists():
                         logger.info(f"Skipping (merged output exists): {_src.name}")
+                        outcomes.append(skipped_outcome(str(_src), "merged output already exists"))
                     else:
                         _remaining.append(media_info)
                 _n_skipped = len(media_files) - len(_remaining)
@@ -2564,7 +2743,7 @@ def main():
                 media_files = _remaining
                 if not media_files:
                     print("All files already have merged outputs - nothing to do.")
-                    sys.exit(0)
+                    sys.exit(_finish_run(outcomes, args, _all_media_files, _run_started_at))
 
             # Create orchestrator
             # "source" sentinel is passed through — orchestrator resolves per-file
@@ -2589,52 +2768,64 @@ def main():
                 merge_strategy=args.merge_strategy
             )
 
-            # Report individual results
+            # One outcome per result, in the shared vocabulary. A failed
+            # pass is "failed"; pass 2 failing with pass 1 kept is "suspect";
+            # a completed merge is classified by its output like any other file.
             failed_files = []
             degraded_files = []
             successful_count = 0
             total_processing_time = 0.0
+            _duration_by_path = {
+                str(m.get('path')): m.get('duration') for m in media_files
+            }
+            # Keyed by input path, not basename: two inputs in different
+            # folders may share a name, and the manifest must not mix them up.
+            _outcome_by_input: Dict[str, FileOutcome] = {}
 
             for result in results:
                 basename = result.get('input', {}).get('basename', 'unknown')
+                in_path = result.get('input', {}).get('file') or basename
                 status = result.get('status', 'unknown')
+                _summary = result.get('summary', {}) or {}
+                _elapsed = _summary.get('total_processing_time_seconds')
                 if result.get('error') or status == 'failed':
-                    logger.error(f"Failed: {basename} - {result.get('error', 'Unknown error')}")
                     failed_files.append(basename)
-                elif status == 'degraded':
-                    output_path = result.get('summary', {}).get('final_output', 'unknown')
-                    logger.warning(f"Degraded (fallback): {basename} -> {output_path}")
-                    degraded_files.append(basename)
-                    total_processing_time += result.get('summary', {}).get('total_processing_time_seconds', 0.0)
+                    outcome = failed_outcome(
+                        in_path, str(result.get('error') or 'ensemble pass failed'),
+                        processing_time_s=_elapsed,
+                    )
                 else:
-                    output_path = result.get('summary', {}).get('final_output', 'unknown')
-                    logger.info(f"Completed: {output_path}")
-                    successful_count += 1
-                    total_processing_time += result.get('summary', {}).get('total_processing_time_seconds', 0.0)
+                    if status == 'degraded':
+                        degraded_files.append(basename)
+                    else:
+                        successful_count += 1
+                    total_processing_time += _elapsed or 0.0
+                    outcome = classify_output(
+                        in_path,
+                        _summary.get('final_output') or None,
+                        _duration_by_path.get(str(in_path)),
+                        min_coverage=args.min_coverage,
+                        # The pass worker does not carry the per-scene
+                        # speech-positive streak back through the orchestrator,
+                        # so ensemble runs have no corroboration signal yet.
+                        speech_positive_empty_streak=0,
+                        degraded=(status == 'degraded'),
+                        degraded_reason="pass 2 failed; output is pass 1 alone",
+                        processing_time_s=_elapsed,
+                    )
+                    if status == 'degraded' and args.translate:
+                        # Fallback output is deliberately not translated (below).
+                        mark_translation(outcome, "skipped",
+                                         error="pass-1 fallback output is not translated")
+                outcomes.append(outcome)
+                _outcome_by_input[str(in_path)] = outcome
+                log_outcome(outcome)
 
-            # Print ensemble processing summary (matching standard pipeline format)
-            print("\n" + "="*50)
-            print("ENSEMBLE PROCESSING SUMMARY")
-            print("="*50)
-            print(f"Total files: {len(media_files)}")
-            print(f"Completed: {successful_count}")
-            if degraded_files:
-                print(f"Partial (fallback): {len(degraded_files)}")
-            print(f"Failed: {len(failed_files)}")
             if total_processing_time > 0:
-                print(f"Total processing time: {total_processing_time:.2f}s")
+                print(f"\nTotal processing time: {total_processing_time:.2f}s")
                 completed_total = successful_count + len(degraded_files)
                 if completed_total > 0:
                     print(f"Average per file: {total_processing_time / completed_total:.2f}s")
-            if degraded_files:
-                print("\nPartial (pass 2 failed, output is pass 1 fallback):")
-                for f in degraded_files:
-                    print(f"  - {f}")
-            if failed_files:
-                print("\nFailed files:")
-                for f in failed_files:
-                    print(f"  - {f}")
-            print("="*50)
 
             # ============================================================
             # TRANSLATION: Translate only fully successful ensemble outputs.
@@ -2649,6 +2840,7 @@ def main():
 
                 translation_success = 0
                 translation_failed = 0
+                translation_skipped = 0
                 extra_context = build_translation_context(args)
 
                 for result in results:
@@ -2656,11 +2848,14 @@ def main():
                     if result.get('error') or status in ('failed', 'degraded'):
                         continue  # Skip failed and degraded (fallback) files
 
+                    basename = result.get('input', {}).get('basename', 'unknown')
+                    _oc = _outcome_by_input.get(str(result.get('input', {}).get('file') or basename))
+
                     output_path = result.get('summary', {}).get('final_output')
                     if not output_path:
+                        if _oc is not None:
+                            mark_translation(_oc, "skipped", error="no subtitle output to translate")
                         continue
-
-                    basename = result.get('input', {}).get('basename', 'unknown')
 
                     # Pre-validate SRT has enough content for translation
                     try:
@@ -2673,11 +2868,16 @@ def main():
                                 f"only {len(srt_blocks)} subtitle(s) found (minimum: 2)"
                             )
                             print(f"  Skipping {basename}: too few subtitles ({len(srt_blocks)})")
-                            translation_failed += 1
+                            translation_skipped += 1
+                            if _oc is not None:
+                                mark_translation(_oc, "skipped",
+                                                 error=f"too few subtitles ({len(srt_blocks)})")
                             continue
                     except OSError as e:
                         logger.warning(f"Skipping translation for {basename}: cannot read SRT: {e}")
                         translation_failed += 1
+                        if _oc is not None:
+                            mark_translation(_oc, "failed", error=f"cannot read SRT: {e}")
                         continue
 
                     try:
@@ -2703,22 +2903,31 @@ def main():
                             print(f"  -> {translated_path}")
                             result.setdefault('summary', {})['translated_output'] = str(translated_path)
                             translation_success += 1
+                            if _oc is not None:
+                                mark_translation(_oc, "done", translated_output=str(translated_path))
                         else:
                             logger.warning(f"Translation returned no output for {basename}")
                             translation_failed += 1
+                            if _oc is not None:
+                                mark_translation(_oc, "failed", error="no output generated")
 
                     except (TranslationError, ConfigurationError) as e:
                         logger.error(f"Translation failed for {basename}: {e}")
                         translation_failed += 1
+                        if _oc is not None:
+                            mark_translation(_oc, "failed", error=str(e))
                     except Exception as e:
                         logger.error(f"Unexpected translation error for {basename}: {e}")
                         translation_failed += 1
+                        if _oc is not None:
+                            mark_translation(_oc, "failed", error=str(e))
 
                 # Print translation summary
                 print("\n" + "-"*50)
                 print("TRANSLATION SUMMARY")
                 print("-"*50)
                 print(f"Translated: {translation_success}")
+                print(f"Skipped (too few subtitles): {translation_skipped}")
                 print(f"Failed: {translation_failed}")
                 print("="*50)
 
@@ -2742,45 +2951,36 @@ def main():
                 for result in results:
                     if result.get('error') or result.get('status') == 'failed':
                         continue
+                    _oc = _outcome_by_input.get(str(result.get('input', {}).get('file')
+                                                    or result.get('input', {}).get('basename')))
                     srt_path = result.get('summary', {}).get('final_output')
                     if srt_path:
-                        apply_vtt_conversion(srt_path, output_format)
+                        _vtt = apply_vtt_conversion(srt_path, output_format)
+                        if _vtt and output_format == 'vtt' and _oc is not None:
+                            _oc.output = _vtt
                     # Also convert translated SRT if present
                     translated_srt = result.get('summary', {}).get('translated_output', '')
                     if translated_srt:
-                        apply_vtt_conversion(translated_srt, output_format)
+                        _tvtt = apply_vtt_conversion(translated_srt, output_format)
+                        if _tvtt and output_format == 'vtt' and _oc is not None:
+                            _oc.translated_output = _tvtt
 
             # Close parameter tracer for ensemble mode
             if tracer:
                 tracer.close()
 
-            # ============================================================
-            # ENSEMBLE EXIT STATUS: Reflect actual success/failure
-            # ============================================================
-            has_failures = len(failed_files) > 0
-            has_degraded = len(degraded_files) > 0
-            has_translation_failures = (
-                args.translate and successful_count > 0
-                and translation_failed > 0
-            )
-
-            if has_failures or has_degraded or has_translation_failures:
-                parts = []
-                if has_failures:
-                    parts.append(f"{len(failed_files)} transcription(s) failed")
-                if has_degraded:
-                    parts.append(f"{len(degraded_files)} file(s) degraded (pass 2 failed, fell back to pass 1)")
-                if has_translation_failures:
-                    parts.append(f"{translation_failed} translation(s) failed")
-                logger.warning("Ensemble completed with errors: %s", "; ".join(parts))
-                sys.exit(1)
+            # The exit status is decided below by _finish_run(), from the same
+            # per-file outcomes every other path produces. This branch used to
+            # decide it here on its own, and its success path fell through to
+            # a variable the other branches bound -- the v1.9.2 pre-release bug
+            # where every successful ensemble run exited 1.
+            media_files = _all_media_files
 
         # Choose sync or async processing for normal mode
         elif args.async_processing:
-            process_files_async(media_files, args, resolved_config)
-            _failed_count = 0
+            process_files_async(media_files, args, resolved_config, outcomes)
         else:
-            _failed_count = process_files_sync(media_files, args, resolved_config) or 0
+            process_files_sync(media_files, args, resolved_config, outcomes)
 
         # =============================================================================
         # NUCLEAR EXIT FOR CTRANSLATE2 MODES
@@ -2800,19 +3000,23 @@ def main():
         # - https://github.com/SYSTRAN/faster-whisper/issues/71
         # - https://github.com/OpenNMT/CTranslate2/issues/1782
         # =============================================================================
-        # #394: the status must survive the nuclear exit below. Until v1.9.2 this
-        # was hardcoded to 0, so for the three most-used modes the process
-        # reported success no matter what had happened.
-        _exit_status = 1 if _failed_count else 0
-        if _failed_count:
-            logger.error("%d file(s) did not produce usable output - exiting with "
-                         "status 1. Re-run with --log-level DEBUG for detail.",
-                         _failed_count)
+        # One place decides the exit status, for every execution path. The
+        # status must survive the nuclear exit below, which until v1.9.2 was
+        # hardcoded to 0.
+        _exit_status = _finish_run(outcomes, args, media_files, _run_started_at)
 
         ctranslate2_modes = {'balanced', 'fast', 'faster'}
         if args.mode in ctranslate2_modes and not args.ensemble:
             logger.debug(f"Using nuclear exit for {args.mode} mode (ctranslate2 crash prevention)")
             import os as _os
+            # os._exit skips interpreter shutdown, so nothing flushes stdio for
+            # us. The RUN SUMMARY is the last thing printed; a GUI reading a
+            # pipe must not lose it.
+            for _stream in (sys.stdout, sys.stderr):
+                try:
+                    _stream.flush()
+                except Exception:  # noqa: BLE001
+                    pass
             _os._exit(_exit_status)
 
         if _exit_status:
@@ -2823,13 +3027,29 @@ def main():
         if not args.keep_temp:
             logger.debug("Cleaning up temporary files...")
             cleanup_temp_directory(args.temp_dir)
-        sys.exit(1)
+        sys.exit(_finish_interrupted_run(
+            outcomes, args, media_files, _run_started_at,
+            f"Interrupted by user after {len(outcomes)} of {len(media_files)} file(s); "
+            "the table covers the files that finished."))
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}", exc_info=True)
         if not args.keep_temp:
             logger.debug("Cleaning up temporary files...")
             cleanup_temp_directory(args.temp_dir)
-        sys.exit(1)
+        sys.exit(_finish_interrupted_run(
+            outcomes, args, media_files, _run_started_at,
+            f"Run stopped by an unexpected error after {len(outcomes)} of "
+            f"{len(media_files)} file(s): {e}"))
+
+
+def _finish_interrupted_run(outcomes, args, media_files, started_at, note: str) -> int:
+    """Report what finished before an interrupt or crash. Always returns 1;
+    never raises, because this runs inside an exception handler."""
+    try:
+        return _finish_run(outcomes, args, media_files, started_at, note=note, force_status=1)
+    except Exception as finish_error:  # noqa: BLE001
+        logger.debug("Could not write the run summary: %s", finish_error)
+        return 1
 
 
 if __name__ == "__main__":

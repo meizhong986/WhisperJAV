@@ -1,4 +1,9 @@
-"""Output coverage assessment (#394).
+"""Output coverage measurement (#394).
+
+Measures how much of the source media a subtitle file spans and whether an
+independent signal corroborates a recogniser failure. It *observes*; it does
+not decide. The per-file state and the exit status are decided in
+``whisperjav.utils.run_outcome`` from these observations.
 
 Why this exists
 ---------------
@@ -11,30 +16,20 @@ covering a small fraction of the input. Reported instances:
 * 314 consecutive failed scenes producing a 0-byte SRT while the console printed
   ``[SUCCESS] Process completed successfully``.
 
-In every case the exit status was 0, so nothing downstream — least of all the
-GUI, which declares success on ``exit_code == 0`` alone — had any way to tell a
-good run from a destroyed one.
+What is measured
+----------------
+* ``verdict``: ``"empty"`` (no cues at all), ``"unknown"`` (duration unknown or
+  media too short to assess), ``"implausible"`` (span below ``min_coverage``),
+  or ``"ok"``.
+* ``corroborated``: whether an independent signal says the recogniser stopped
+  working -- consecutive empty results while a genuine voice detector still
+  reported speech, or a failed same-instance health probe.
 
-What decides a failure
-----------------------
-The first draft of this module treated low temporal span as sufficient grounds
-to fail a run. Both reporters on #394 rejected that, and they were right:
-
-* **@daoran9**: *"I would avoid using media-duration span as the only hard-failure
-  signal. A long intro, outro, credits section or non-dialogue tail could make
-  that metric ambiguous. Also, a transcription stopping at 60% would not trigger
-  the 25% threshold."*
-* **@13e5t** supplied a case the threshold would have missed entirely — a
-  10-minute file whose SRT stopped at roughly 6 minutes while dialogue continued.
-  At 60% span, no span-based threshold set low enough to be safe would catch it.
-
-So span alone never fails a run; it warns. A run is failed only when the output
-is unusable beyond argument (no cues at all), or when low span is **corroborated**
-by evidence of the recogniser having actually stopped working — consecutive empty
-results while the voice detector was still reporting speech, or a failed
-same-instance health probe. That is the shape both reporters asked for, and it
-catches the real cases through the corroborating signal rather than through a
-threshold that has to be guessed.
+Span alone is ambiguous: a long intro, credits, a music performance or speech
+that genuinely stops early all shorten it (both #394 reporters said so, and
+#324 is a music show where three external segmenters produced one cue each).
+That is why span and corroboration are reported separately and why neither
+fails a run by itself; see ``run_outcome`` for the contract.
 
 This module does not diagnose *why* output is missing; the underlying cause is
 still open.
@@ -49,11 +44,7 @@ from typing import Optional, Union
 from whisperjav.utils.logger import logger
 
 # Span below this fraction of the media duration is reported as implausible.
-# On its own it only warns; see the module docstring.
 DEFAULT_MIN_COVERAGE = 0.25
-
-# Between DEFAULT_MIN_COVERAGE and this, the output is merely short.
-SUSPICIOUS_COVERAGE = 0.60
 
 # Consecutive empty ASR results, while the voice detector still reported speech,
 # that constitute corroboration. Chosen well above ordinary quiet passages.
@@ -66,32 +57,16 @@ MIN_ASSESSABLE_DURATION_S = 120.0
 
 @dataclass(frozen=True)
 class CoverageReport:
-    """Outcome of assessing one subtitle file against its source media."""
+    """Measurements of one subtitle file against its source media."""
 
-    verdict: str  # "ok" | "suspicious" | "implausible" | "empty" | "unknown"
+    verdict: str  # "ok" | "implausible" | "empty" | "unknown"
     coverage_ratio: Optional[float]  # last cue end / media duration
     last_cue_end_s: Optional[float]
     media_duration_s: Optional[float]
     subtitle_count: int
     detail: str
     corroborated: bool = False
-
-    @property
-    def is_failure(self) -> bool:
-        """True when the run should not be reported as successful.
-
-        Deliberately narrow: no cues at all, or short output *plus* independent
-        evidence that the recogniser stopped working. Short output on its own is
-        not enough — speech can genuinely stop early.
-        """
-        return self.verdict == "empty" or (
-            self.verdict == "implausible" and self.corroborated
-        )
-
-    @property
-    def is_noteworthy(self) -> bool:
-        """True when the user should see this, whether or not the run fails."""
-        return self.verdict in ("implausible", "empty", "suspicious")
+    corroboration_detail: str = ""
 
 
 def _parse_last_cue_end(srt_path: Path) -> tuple:
@@ -136,7 +111,7 @@ def assess_coverage(
     probe_failed: bool = False,
     empty_streak_threshold: int = DEFAULT_EMPTY_STREAK_THRESHOLD,
 ) -> CoverageReport:
-    """Assess whether *srt_path* plausibly covers *media_duration_s*.
+    """Measure whether *srt_path* plausibly covers *media_duration_s*.
 
     Args:
         srt_path: the final subtitle file. A missing path yields "empty".
@@ -145,19 +120,17 @@ def assess_coverage(
             disable the ratio check; zero-cue output is still reported as empty.
         speech_positive_empty_streak: longest run of consecutive empty ASR
             results observed *while an external voice detector still reported
-            speech*. This is the corroborating signal both #394 reporters asked
-            for.
+            speech*.
 
             **Only pass a non-zero value when an external segmenter is in use.**
-            Under faster-whisper's native VAD — the balanced default since
-            v1.9.0 — segmentation is bypassed by ``NullSpeechSegmenter``, which
+            Under faster-whisper's native VAD -- the balanced default since
+            v1.9.0 -- segmentation is bypassed by ``NullSpeechSegmenter``, which
             returns the whole scene as one segment unconditionally. That is a
             passthrough, not a speech detection, so counting it as
             speech-positive would invent corroboration where none exists.
             Issue #324 is the cautionary case: 33 consecutive empty scenes on a
-            music performance where the audio genuinely held no dialogue. Under
-            native VAD the honest corroboration is ``probe_failed``.
-        probe_failed: True if a same-instance health probe failed — the signal
+            music performance where the audio genuinely held no dialogue.
+        probe_failed: True if a same-instance health probe failed -- the signal
             @AlanZ-Git identified, where a known-good clip returns nothing from
             the already-loaded model but transcribes correctly in a fresh
             process.
@@ -169,10 +142,16 @@ def assess_coverage(
     corroborated = bool(probe_failed) or (
         speech_positive_empty_streak >= empty_streak_threshold
     )
+    # A noun phrase, so it reads after "corroborated by ..." wherever it is used.
+    why = ""
+    if corroborated:
+        why = ("a failed health probe" if probe_failed
+               else f"{speech_positive_empty_streak} consecutive empty results "
+                    "while speech was still being detected")
 
     def _report(verdict, ratio, last_end, count, detail):
         return CoverageReport(
-            verdict, ratio, last_end, media_duration_s, count, detail, corroborated
+            verdict, ratio, last_end, media_duration_s, count, detail, corroborated, why
         )
 
     if not srt_path:
@@ -202,73 +181,27 @@ def assess_coverage(
             f"({ratio:.1%} of the file); {count} cue(s) produced")
 
     if min_coverage > 0 and ratio < min_coverage:
-        detail = span
-        if corroborated:
-            why = ("a health probe failed" if probe_failed
-                   else f"{speech_positive_empty_streak} consecutive empty results "
-                        "while speech was still being detected")
-            detail = f"{span}; corroborated by {why}"
+        detail = f"{span}; corroborated by {why}" if corroborated else span
         return _report("implausible", ratio, last_end, count, detail)
-
-    if ratio < SUSPICIOUS_COVERAGE:
-        return _report("suspicious", ratio, last_end, count, span)
-
-    # Full-length output can still be corroborated as broken — @13e5t's case
-    # stopped at ~60% of a 10-minute file, which no safe span threshold catches.
-    if corroborated:
-        why = ("a health probe failed" if probe_failed
-               else f"{speech_positive_empty_streak} consecutive empty results "
-                    "while speech was still being detected")
-        return _report("suspicious", ratio, last_end, count,
-                       f"{count} cue(s) spanning {ratio:.1%} of the file, but {why}")
 
     return _report("ok", ratio, last_end, count,
                    f"{count} cue(s) spanning {ratio:.1%} of the file")
-
-
-def report_coverage(report: CoverageReport, file_label: str) -> None:
-    """Surface *report* to the user at a severity matching its verdict."""
-    if report.verdict == "ok":
-        logger.debug("Coverage OK for %s: %s", file_label, report.detail)
-        return
-
-    if report.verdict == "unknown":
-        logger.debug("Coverage not assessed for %s: %s", file_label, report.detail)
-        return
-
-    if report.is_failure:
-        logger.error(
-            "Incomplete output for %s: %s. The run finished without raising an "
-            "error, but the result does not plausibly cover the input. This is "
-            "the failure tracked in issue #394.",
-            file_label, report.detail,
-        )
-        return
-
-    logger.warning(
-        "Output looks short for %s: %s. This can be normal when speech genuinely "
-        "stops early, so the run is not being failed on this alone. If the file "
-        "does have dialogue past that point, please re-run with --log-level DEBUG "
-        "and report it on issue #394.",
-        file_label, report.detail,
-    )
 
 
 # Segmenter names that are passthroughs rather than genuine speech detection.
 # Under faster-whisper's native VAD -- the balanced default since v1.9.0 -- the
 # external segmenter is NullSpeechSegmenter, which returns the whole scene as a
 # single segment unconditionally. Counting that as "speech was detected" would
-# manufacture corroboration and fail runs whose audio genuinely holds no
-# dialogue; #324 is the case that would have been wrongly failed.
+# manufacture corroboration; #324 is the case that would have been wrongly
+# flagged.
 PASSTHROUGH_SEGMENTERS = frozenset({"none", ""})
 
 
 class SpeechPositiveEmptyStreak:
     """Counts consecutive scenes where speech was detected but nothing came back.
 
-    This is the corroborating signal both #394 reporters asked for -- the thing
-    that distinguishes "the recogniser stopped working" from "the speech stopped".
-    Span alone cannot make that distinction, which is why it only warns.
+    This is the corroborating signal that distinguishes "the recogniser stopped
+    working" from "the speech stopped". Span alone cannot make that distinction.
 
     A scene is only counted when an external segmenter genuinely reported speech.
     Scenes where the detector found nothing are neutral: they neither extend the
