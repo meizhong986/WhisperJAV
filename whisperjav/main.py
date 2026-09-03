@@ -2485,6 +2485,29 @@ def main():
                 pass1_config, pass2_config, logger=logger
             )
 
+            # --skip-existing (#328): filter out files whose merged output
+            # already exists. Mirrors the sync/async single-pass behavior;
+            # ensemble's final artifact is <basename>.<lang>.merged.whisperjav.srt.
+            if getattr(args, 'skip_existing', False):
+                _out_lang = 'en' if args.subs_language == 'direct-to-english' else language_code
+                _to_source = str(args.output_dir).lower().strip() == "source"
+                _remaining = []
+                for media_info in media_files:
+                    _src = Path(media_info.get('path', ''))
+                    _base = media_info.get('basename', _src.stem)
+                    _dir = _src.parent if _to_source else Path(args.output_dir)
+                    if (_dir / f"{_base}.{_out_lang}.merged.whisperjav.srt").exists():
+                        logger.info(f"Skipping (merged output exists): {_src.name}")
+                    else:
+                        _remaining.append(media_info)
+                _n_skipped = len(media_files) - len(_remaining)
+                if _n_skipped:
+                    print(f"\nSkipping {_n_skipped} file(s) with existing merged outputs (--skip-existing)")
+                media_files = _remaining
+                if not media_files:
+                    print("All files already have merged outputs - nothing to do.")
+                    sys.exit(0)
+
             # Create orchestrator
             # "source" sentinel is passed through — orchestrator resolves per-file
             ensemble_output_dir = args.output_dir

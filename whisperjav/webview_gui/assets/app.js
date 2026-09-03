@@ -712,6 +712,7 @@ const FormManager = {
             subs_language: document.getElementById('language').value,
             debug: document.getElementById('debugLogging').checked,
             keep_temp: document.getElementById('keepTemp').checked,
+            skip_existing: document.getElementById('skipExisting').checked,
             temp_dir: document.getElementById('tempDir').value.trim(),
             accept_cpu_mode: document.getElementById('acceptCpuMode').checked,
             output_format: document.getElementById('outputFormat').value,
@@ -5389,6 +5390,7 @@ const EnsembleManager = {
             subs_language: document.getElementById('language').value,
             debug: document.getElementById('debugLogging').checked,
             keep_temp: document.getElementById('keepTemp').checked,
+            skip_existing: document.getElementById('skipExisting').checked,
             temp_dir: document.getElementById('tempDir').value.trim(),
             output_format: document.getElementById('outputFormat').value,
         };
@@ -6903,7 +6905,9 @@ const TranslatorManager = {
     // Provider model options (Ollama models are now driven by OllamaStateManager)
     providerModels: {
         local: ['gemma-9b', 'llama-8b', 'llama-3b', 'auto'],
-        deepseek: ['deepseek-chat', 'deepseek-coder'],
+        // #325: deepseek-chat/-reasoner deprecate 2026-07-24; v4 names per
+        // https://api-docs.deepseek.com/ (flash = non-thinking, pro = thinking)
+        deepseek: ['deepseek-v4-flash', 'deepseek-v4-pro'],
         gemini: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
         claude: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022', 'claude-3-opus-20240229'],
         gpt: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'],
@@ -7469,7 +7473,9 @@ const TranslationSettingsModal = {
     // Provider model options (Ollama models are now driven by OllamaStateManager)
     providerModels: {
         local: ['gemma-9b', 'llama-8b', 'llama-3b', 'auto'],
-        deepseek: ['deepseek-chat', 'deepseek-coder'],
+        // #325: deepseek-chat/-reasoner deprecate 2026-07-24; v4 names per
+        // https://api-docs.deepseek.com/ (flash = non-thinking, pro = thinking)
+        deepseek: ['deepseek-v4-flash', 'deepseek-v4-pro'],
         gemini: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
         claude: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022', 'claude-3-opus-20240229'],
         gpt: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'],
@@ -7759,15 +7765,77 @@ const TranslationSettingsModal = {
 // GUI Settings Persistence
 // ============================================================
 const SettingsPersistence = {
-    // Disabled: Tab 1 + Tab 3 always start from HTML defaults.
-    // Backend module (gui_settings.py) retained for future "exit prompt" feature.
-    // Preset CRUD (EnsembleManager) is unaffected.
-    init() {},
-    collectAll() { return {}; },
-    applyToForm() {},
-    async loadFromBackend() {},
-    scheduleSave() {},
-    async _doSave() {},
+    // v1.9.0 (#96/#298): OPT-IN persistence for Tab 1 form fields.
+    FIELDS: {
+        'mode':             { key: 'mode',           prop: 'value' },
+        'sensitivity':      { key: 'sensitivity',    prop: 'value' },
+        'source-language':  { key: 'sourceLanguage', prop: 'value' },
+        'language':         { key: 'subsLanguage',   prop: 'value' },
+        'outputDir':        { key: 'outputDir',      prop: 'value' },
+        'outputFormat':     { key: 'outputFormat',   prop: 'value' },
+        'tempDir':          { key: 'tempDir',        prop: 'value' },
+        'debugLogging':     { key: 'debugLogging',   prop: 'checked' },
+        'keepTemp':         { key: 'keepTemp',       prop: 'checked' },
+        'skipExisting':     { key: 'skipExisting',   prop: 'checked' },
+        'acceptCpuMode':    { key: 'acceptCpuMode',  prop: 'checked' },
+    },
+    _saveTimer: null,
+    enabled: false,
+    init() {
+        const toggle = document.getElementById('rememberSettings');
+        if (!toggle) return;
+        toggle.addEventListener('change', () => {
+            this.enabled = toggle.checked;
+            this._doSave();
+        });
+        for (const id of Object.keys(this.FIELDS)) {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('change', () => this.scheduleSave());
+        }
+    },
+    collectAll() {
+        const out = { rememberSettings: this.enabled };
+        if (!this.enabled) return out;
+        for (const [id, spec] of Object.entries(this.FIELDS)) {
+            const el = document.getElementById(id);
+            if (el) out[spec.key] = el[spec.prop];
+        }
+        return out;
+    },
+    applyToForm(settings) {
+        for (const [id, spec] of Object.entries(this.FIELDS)) {
+            if (!(spec.key in settings)) continue;
+            const el = document.getElementById(id);
+            if (!el) continue;
+            el[spec.prop] = settings[spec.key];
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    },
+    async loadFromBackend() {
+        try {
+            const res = await pywebview.api.get_gui_settings();
+            if (!res || !res.success) return;
+            const settings = res.settings || {};
+            const toggle = document.getElementById('rememberSettings');
+            this.enabled = !!settings.rememberSettings;
+            if (toggle) toggle.checked = this.enabled;
+            if (this.enabled) this.applyToForm(settings);
+        } catch (e) {
+            console.warn('Failed to load GUI settings:', e);
+        }
+    },
+    scheduleSave() {
+        if (!this.enabled) return;
+        clearTimeout(this._saveTimer);
+        this._saveTimer = setTimeout(() => this._doSave(), 500);
+    },
+    async _doSave() {
+        try {
+            await pywebview.api.save_gui_settings(this.collectAll());
+        } catch (e) {
+            console.warn('Failed to save GUI settings:', e);
+        }
+    },
     async restorePresets() {},
 };
 
@@ -7797,6 +7865,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     TranslatorManager.init();
     TranslateIntegrationManager.init();
     TranslationSettingsModal.init();
+    SettingsPersistence.init();
 
     // Initial validation
     FormManager.validateForm();
@@ -7850,6 +7919,8 @@ window.addEventListener('pywebviewready', async () => {
 
     // Tab 4 translation settings (unaffected by persistence removal)
     await TranslationSettingsModal.loadSettingsFromBackend();
+
+    await SettingsPersistence.loadFromBackend();
 
     // Restore saved provider selections from localStorage
     const savedEnsemble = localStorage.getItem('whisperjav_ensemble_provider');
