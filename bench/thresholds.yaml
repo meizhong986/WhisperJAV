@@ -1,0 +1,16 @@
+# Accuracy-gate thresholds. Values are maximum tolerated ABSOLUTE regression
+# vs baseline, per metric. Hard bounds fail regardless of baseline.
+# Defaults live in whisperjav/bench/regression.py; this file overrides.
+thresholds:
+  cer: 0.03
+  recall: 0.03
+  precision: 0.03
+  f1: 0.03
+  mean_iou: 0.05
+  gt_coverage: 0.05
+  false_alarm_ratio: 0.05
+  repetition_ratio: 0.10
+hard_bounds:
+  count_ratio: {min: 0.4, max: 3.0}   # F4/F6 collapse signature ~0.1
+  recall: {min: 0.25}
+  repetition_ratio: {max: 0.5}
