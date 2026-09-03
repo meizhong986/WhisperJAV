@@ -900,8 +900,9 @@ class TestCompleteness:
         data_keys = {
             k for k in DEFAULT_GUI_SETTINGS if k not in ("version", "_comment")
         }
-        # 15 Tab 1 keys + 14 Tab 3 keys + 2 preset keys = 31
-        # (v1.9.0: +skip_existing, +remember_settings)
-        assert len(data_keys) == 31, (
-            f"Expected 31 settings keys, got {len(data_keys)}: {data_keys}"
+        # 17 Tab 1 keys + 14 Tab 3 keys + 2 preset keys = 33
+        # (v1.9.0: +skip_existing, +remember_settings;
+        #  v1.9.2: +fail_on_empty, +fail_on_suspect)
+        assert len(data_keys) == 33, (
+            f"Expected 33 settings keys, got {len(data_keys)}: {data_keys}"
         )

@@ -400,6 +400,22 @@
                                     </label>
                                 </div>
                             </div>
+                            <!-- Run outcome contract: every file ends as done / empty / suspect / failed / skipped.
+                                 Only 'failed' fails the run by default; these promote the other two. Same as --fail-on. -->
+                            <div class="form-row" id="adv-row-4">
+                                <div class="form-group">
+                                    <label class="checkbox-label" title="A file that produced no subtitles is reported as 'empty' and does not fail the run. Tick to treat it as a failure (same as --fail-on empty).">
+                                        <input type="checkbox" id="failOnEmpty">
+                                        <span>Treat 'empty' files as failures</span>
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label class="checkbox-label" title="A file whose subtitles cover too little of the media, or whose recognizer stopped while speech was still detected, is reported as 'suspect' and does not fail the run. Tick to treat it as a failure (same as --fail-on suspect).">
+                                        <input type="checkbox" id="failOnSuspect">
+                                        <span>Treat 'suspect' files as failures</span>
+                                    </label>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Tab 3: Two-Pass Ensemble Mode -->

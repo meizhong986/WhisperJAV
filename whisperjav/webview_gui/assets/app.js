@@ -713,6 +713,8 @@ const FormManager = {
             debug: document.getElementById('debugLogging').checked,
             keep_temp: document.getElementById('keepTemp').checked,
             skip_existing: document.getElementById('skipExisting').checked,
+            fail_on_empty: document.getElementById('failOnEmpty').checked,
+            fail_on_suspect: document.getElementById('failOnSuspect').checked,
             temp_dir: document.getElementById('tempDir').value.trim(),
             accept_cpu_mode: document.getElementById('acceptCpuMode').checked,
             output_format: document.getElementById('outputFormat').value,
@@ -1028,24 +1030,32 @@ const ProcessManager = {
                     AppState.isRunning = false;
                     this.updateButtonStates();
 
-                    // Show completion status
+                    // Show completion status, in the CLI's own words: the per-file
+                    // tally from whisperjav_run.json. The exit status is the CLI's
+                    // decision; the GUI repeats it and never re-derives it.
+                    const summary = status.run_summary || null;
+                    const tally = summary ? summary.tally : null;
                     if (status.status === 'completed') {
                         ProgressManager.setProgress(100);
-                        ProgressManager.setStatus('Completed');
+                        ProgressManager.setStatus(tally ? `Finished · ${tally}` : 'Finished');
 
                         // For Ensemble Mode (tab3), translation is handled by CLI --translate flag
                         // For other modes, trigger separate translation subprocess if enabled
                         const isEnsembleMode = AppState.activeTab === 'tab3';
+                        const needsALook = summary && (summary.counts.empty > 0 || summary.counts.suspect > 0);
+                        const body = (tally ? `Files: ${tally}.` : 'The run finished.') +
+                            (needsALook ? ' Some files ended empty or suspect (listed below).' : '');
+                        this.logFileStates(summary);
 
                         if (isEnsembleMode) {
                             // CLI handled everything including translation (if enabled)
-                            ErrorHandler.showSuccess('Process Completed',
+                            ErrorHandler.showSuccess('Finished',
                                 TranslateIntegrationManager.wasEnabledOnStart()
-                                    ? 'Transcription and translation finished successfully'
-                                    : 'Transcription finished successfully');
+                                    ? `${body} Translation was run as part of the ensemble.`
+                                    : body);
                         } else {
                             // Transcription Mode - translation needs separate subprocess (legacy)
-                            ErrorHandler.showSuccess('Process Completed', 'Transcription finished successfully');
+                            ErrorHandler.showSuccess('Finished', body);
 
                             if (TranslateIntegrationManager.wasEnabledOnStart()) {
                                 // Use output_files from API (computed based on mode/language)
@@ -1059,8 +1069,18 @@ const ProcessManager = {
                         }
                     } else if (status.status === 'error') {
                         ProgressManager.reset();
-                        ProgressManager.setStatus(`Error (exit code: ${status.exit_code})`);
-                        ErrorHandler.show('Process Failed', `Process exited with code ${status.exit_code}. Check console for details.`);
+                        this.logFileStates(summary);
+                        if (summary && summary.note) {
+                            ProgressManager.setStatus(`Stopped · ${tally}`);
+                            ErrorHandler.show('Run stopped', `${summary.note} Files: ${tally}. Exit status ${status.exit_code}.`);
+                        } else if (tally) {
+                            ProgressManager.setStatus(`Finished with failures · ${tally}`);
+                            ErrorHandler.show('Finished with failures',
+                                `Files: ${tally}. Exit status ${status.exit_code}; a run fails on: ${(summary.fails_on || ['failed']).join(', ')}. See the RUN SUMMARY in the console.`);
+                        } else {
+                            ProgressManager.setStatus(`Finished with failures (exit status ${status.exit_code})`);
+                            ErrorHandler.show('Finished with failures', `Process exited with status ${status.exit_code} and wrote no run summary. Check the console for details.`);
+                        }
                     } else if (status.status === 'cancelled') {
                         ProgressManager.reset();
                         ProgressManager.setStatus('Cancelled');
@@ -1097,14 +1117,30 @@ const ProcessManager = {
         }
     },
 
+    logFileStates(summary) {
+        // State-aware close: name every file that did not end 'done', in the
+        // CLI's words, and say where the manifest is. 'done' files are counted
+        // in the tally; the RUN SUMMARY table in the console has all of them.
+        if (!summary) return;
+        const files = summary.files || [];
+        for (const f of files) {
+            if (f.state === 'done') continue;
+            const level = f.state === 'failed' ? 'error' : (f.state === 'skipped' ? 'info' : 'warning');
+            ConsoleManager.log(`${f.state}: ${f.name}${f.detail ? ' — ' + f.detail : ''}`, level);
+        }
+        if (summary.manifest_path) {
+            ConsoleManager.log(`Manifest: ${summary.manifest_path}`, 'info');
+        }
+    },
+
     formatStatus(status) {
         // Format status for display
         const statusMap = {
             'idle': 'Idle',
             'running': 'Running...',
-            'completed': 'Completed',
+            'completed': 'Finished',
             'cancelled': 'Cancelled',
-            'error': 'Error'
+            'error': 'Finished with failures'
         };
         return statusMap[status] || status;
     },
@@ -5391,6 +5427,8 @@ const EnsembleManager = {
             debug: document.getElementById('debugLogging').checked,
             keep_temp: document.getElementById('keepTemp').checked,
             skip_existing: document.getElementById('skipExisting').checked,
+            fail_on_empty: document.getElementById('failOnEmpty').checked,
+            fail_on_suspect: document.getElementById('failOnSuspect').checked,
             temp_dir: document.getElementById('tempDir').value.trim(),
             output_format: document.getElementById('outputFormat').value,
         };
@@ -7782,6 +7820,8 @@ const SettingsPersistence = {
         'keepTemp':         { key: 'keepTemp',       prop: 'checked' },
         'skipExisting':     { key: 'skipExisting',   prop: 'checked' },
         'acceptCpuMode':    { key: 'acceptCpuMode',  prop: 'checked' },
+        'failOnEmpty':      { key: 'failOnEmpty',    prop: 'checked' },
+        'failOnSuspect':    { key: 'failOnSuspect',  prop: 'checked' },
     },
     _saveTimer: null,
     enabled: false,

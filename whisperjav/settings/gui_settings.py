@@ -48,6 +48,8 @@ DEFAULT_GUI_SETTINGS = {
     "keep_temp": False,
     "skip_existing": False,
     "remember_settings": False,
+    "fail_on_empty": False,
+    "fail_on_suspect": False,
     "temp_dir": "",
     "accept_cpu_mode": False,
     "async_processing": False,
