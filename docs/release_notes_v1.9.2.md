@@ -125,31 +125,71 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
   subtitles were actually written. This was worth fixing beyond tidiness: it was
   misinforming the diagnosis of other bugs. Found while investigating #324.
 
-- **A run that produces no usable subtitles now says so, and exits non-zero.**
-  WhisperJAV could finish, print `[SUCCESS]`, and hand back an empty or
-  drastically incomplete subtitle file — an 8,766-second video returning output
-  that stopped at 377 seconds was reported as a success, and in one case a
-  0-byte file was written while the console declared the run complete. Two things
-  were wrong: nothing compared the output against the input, and the process
-  returned "success" to the operating system regardless — for balanced, fast and
-  faster it was hardcoded to do so. Both are fixed. A file with no subtitles at
-  all now fails the run.
+- **Every run now ends with a per-file state table, a manifest, and an exit
+  status that means the same thing in every mode.** WhisperJAV could finish,
+  print `[SUCCESS]`, and hand back an empty or drastically incomplete subtitle
+  file — an 8,766-second video returning output that stopped at 377 seconds was
+  reported as a success, and in one case a 0-byte file was written while the
+  console declared the run complete. Nothing compared the output against the
+  input, and each execution path decided "success" on its own: the normal path
+  returned nothing to the caller, the async path hard-coded zero failures, the
+  ensemble path kept a separate failure list, and for balanced, fast and faster
+  the exit status was hardcoded to 0.
 
-  Short-but-present output is treated more cautiously: it produces a prominent
-  warning and does **not** fail the run, because speech can legitimately stop
-  early and a wrong failure would be worse than the silence it replaces. Use
-  `--min-coverage` to adjust the threshold, or `--min-coverage 0` to switch the
-  span check off entirely.
+  One vocabulary now describes every file, in the console, in the manifest and
+  here:
 
-  A run *is* failed when short output is corroborated by evidence that the
-  recognizer stopped working: consecutive scenes where the voice detector
-  reported speech but nothing came back. That distinction — "the recognizer
-  stopped" versus "the speech stopped" — is the whole point, and span alone
-  cannot make it. Balanced mode reports this signal; other pipelines warn until
-  they do.
+  | State | Meaning | Exit status |
+  |---|---|---|
+  | `done` | a subtitle file with at least one cue was written | 0 |
+  | `empty` | the run completed and produced no cues, and nothing contradicts that reading | 0 (reported; `--fail-on empty` makes it 1) |
+  | `suspect` | something does not add up: the output spans less than `--min-coverage` of the media, the recognizer returned nothing for consecutive scenes while speech was still detected (Balanced with an external segmenter only), or in ensemble pass 2 failed and the output is pass 1 alone. A zero-cue file with any of that evidence is `suspect`, not `empty` | 0 (reported; `--fail-on suspect` makes it 1) |
+  | `failed` | an error: an exception, a crash, a translation that raised, or a subtitle file the pipeline reported writing that does not exist | 1 |
+  | `skipped` | nothing was attempted because the output already existed | 0 |
 
-  The policy here was set by the people who reported the problem rather than by
-  us. (#394, #263)
+  Zero subtitles is an observation, not a failure: silence, music and speech the
+  recognizer could not use all end there, and the run says so instead of
+  guessing. Warnings never change the exit status. Scripts that want a stricter
+  contract opt in with `--fail-on empty`, `--fail-on suspect`, or both.
+  Coverage is shown next to the state as `ok`, `low` or `not assessed`
+  (unknown duration, media under two minutes), so a check that could not run is
+  visible rather than silent.
+
+  A normal or async batch continues through every file; the exit status
+  reflects the worst file. (An ensemble batch is processed by one worker per
+  pass, so a worker crash still ends the whole batch, as before.) An
+  interrupted or crashed run prints the table for the files that finished and
+  exits 1. A `whisperjav_run.json` manifest is written next to the outputs
+  (into the output directory, or beside the first input when
+  `--output-dir source`) with the same states, so a script can read per-file
+  results instead of parsing the console.
+
+  Found while wiring this: `--async-processing` never waited for its tasks.
+  It submitted them, summarised them while they were still queued, and then
+  cancelled whatever had not started when it shut down, so an async run
+  reported "Task cancelled before processing started" and its summary never
+  described real results. It now waits for each task and reports it like any
+  other file.
+
+  **The GUI follows the same contract.** When a transcription or ensemble run
+  ends, the GUI no longer prints `[SUCCESS]` on exit status 0. It reads the
+  manifest the run wrote and closes with the tally in the same five words:
+  `[FINISHED] done 2 · empty 1 · suspect 0 · failed 0 · skipped 0 (exit status
+  0)`, or `[FINISHED WITH FAILURES] …`, or `[STOPPED] …` for an interrupted
+  run. The status line shows `Finished · <tally>`, the console lists every
+  file that did not end `done` with its state and reason, and the manifest
+  path is printed. Two checkboxes under Advanced options, *Treat 'empty' files
+  as failures* and *Treat 'suspect' files as failures*, are the GUI's form of
+  `--fail-on`; they apply to every Transcription-tab mode and to Ensemble
+  runs, and are off by default. The GUI never re-derives the exit status; it
+  repeats the one the run returned. (The separate translation runner's closing
+  lines use the same `[FINISHED]` wording.)
+
+  This replaces the pre-release behaviour, announced on #394, in which a file
+  with no subtitles failed the run: that made a normal outcome fatal by
+  default, and it did not apply to ensemble or async runs at all. A translation
+  error now marks the file `failed` in every mode; previously the ensemble path
+  exited 1 on it and the others exited 0. (#394, #263)
 
 ---
 
@@ -220,10 +260,10 @@ Not user-visible, but worth recording:
 
 ## Planned for this release, not yet landed
 
-- **Corroboration outside Balanced mode.** Balanced now reports the
+- **Corroboration outside Balanced mode.** Balanced reports the
   speech-positive empty-scene signal; Fidelity, Fast, Faster and the ChronosJAV
-  pipelines do not yet, so short output there warns rather than fails.
-- **Coverage checking in async mode.** Wired for normal processing only.
+  pipelines do not yet, so `suspect` there can only come from the span check
+  (or, in ensemble, from a pass-2 failure).
 
 ---
 
@@ -243,6 +283,8 @@ Not user-visible, but worth recording:
 
 | Date | Change |
 |------|--------|
+| 2026-09-03 | GUI speaks the same contract: reads `whisperjav_run.json` on exit, closes with `[FINISHED] <tally>` instead of `[SUCCESS]`, shows the tally in the status line and dialog, and offers the two "treat as failure" checkboxes (`--fail-on`) for Transcription and Ensemble runs |
+| 2026-09-03 | One per-file vocabulary (`done` / `empty` / `suspect` / `failed` / `skipped`), one exit-status rule for sync, async and ensemble, `--fail-on`, the RUN SUMMARY table and the `whisperjav_run.json` manifest. Replaces the pre-release gate that failed a run on empty output and fixes the pre-release defect where every successful ensemble run exited 1 (#394, #263) |
 | 2026-08-30 | `--asr-telemetry`: per-scene decode and memory record, plus a trend summary, to capture what precedes a #394 collapse rather than only its aftermath |
 | 2026-08-30 | Corroborating signal instrumented in Balanced: consecutive scenes with detected speech but no output now corroborate a low-coverage failure (#394) |
 | 2026-08-30 | Artifacts `[SANITIZATION SUMMARY]` now counts real removals and the real final subtitle count instead of a counter the active workflow never updated |
