@@ -94,9 +94,9 @@ class TestTelemetryFile:
 
 
 class TestTrendSummary:
-    def test_surfaces_the_394_shape(self):
+    def test_surfaces_the_394_shape(self, tmp_path):
         """Healthy early, degrading late — the pattern reporters described."""
-        t = AsrTelemetry("unused", "x")
+        t = AsrTelemetry(tmp_path / "t.jsonl", "x")  # records go to disk as they happen
         for i in range(10):                      # healthy
             t.record_scene(index=i, audio_duration_s=28.0, wall_s=1.05,
                            segments=[_segment()], speech_detected=True,
@@ -112,9 +112,9 @@ class TestTrendSummary:
         assert "RTF" in trend
         assert "fallback segs/scene 0.00 -> 2.00" in trend
 
-    def test_too_few_scenes_gives_no_trend(self):
+    def test_too_few_scenes_gives_no_trend(self, tmp_path):
         """Don't imply a trend from a handful of samples."""
-        t = AsrTelemetry("unused", "x")
+        t = AsrTelemetry(tmp_path / "t.jsonl", "x")
         for i in range(4):
             t.record_scene(index=i, audio_duration_s=28.0, wall_s=1.0)
         assert t.trend_summary(window=10) is None
