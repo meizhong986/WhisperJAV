@@ -415,6 +415,12 @@
                                         <span>Treat 'suspect' files as failures</span>
                                     </label>
                                 </div>
+                                <div class="form-group">
+                                    <label class="checkbox-label" title="Balanced runs keep a per-scene record of the recognizer (timing, decoder retries, confidence, memory) in raw_subs next to the outputs, for diagnosing runs that stop producing subtitles. Untick to skip it (same as --no-asr-telemetry).">
+                                        <input type="checkbox" id="asrTelemetry" checked>
+                                        <span>Keep per-scene ASR telemetry (raw_subs)</span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
 

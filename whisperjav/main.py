@@ -438,10 +438,16 @@ def parse_arguments():
                             help="Max concurrent workers (default: 1)")
     async_group.add_argument("--asr-telemetry", type=str, default=None,
                             metavar="PATH",
-                            help="Write a per-scene JSONL record of decode behaviour "
-                                 "(temperature/fallback, logprob, compression ratio) "
-                                 "and memory use. Diagnostic aid for issue #394; off "
-                                 "by default. Balanced mode only.")
+                            help="Where to write the per-scene JSONL record of decode "
+                                 "behaviour (temperature/fallback, logprob, compression "
+                                 "ratio) and memory use that Balanced runs keep for "
+                                 "issue #394. A directory gets one file per media; a "
+                                 "file path is for a single input (later inputs "
+                                 "overwrite it). Default: raw_subs/<name>.asr_telemetry.jsonl "
+                                 "next to the outputs (per pass inside an ensemble). "
+                                 "On by default; see --no-asr-telemetry.")
+    async_group.add_argument("--no-asr-telemetry", action="store_true", default=False,
+                            help="Do not write the per-scene ASR telemetry file.")
     async_group.add_argument("--min-coverage", type=float, default=None,
                             metavar="RATIO",
                             help="A file whose subtitles span less than this fraction "
@@ -1195,8 +1201,12 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         effective_mode = args.mode
     elif args.mode == "balanced":
         pipeline = BalancedPipeline(**pipeline_args)
-        # #394 diagnostics, set after construction so no pipeline signature changes.
+        # #394 per-scene telemetry: on by default, path resolved by the
+        # pipeline (raw_subs next to the outputs) unless --asr-telemetry says
+        # otherwise. The async path carries the same two values in
+        # resolved_config; see BalancedPipeline.__init__.
         pipeline.asr_telemetry_path = getattr(args, 'asr_telemetry', None)
+        pipeline.asr_telemetry_enabled = not getattr(args, 'no_asr_telemetry', False)
         effective_mode = args.mode
     elif args.mode == "kotoba-faster-whisper":
         # Kotoba Faster-Whisper pipeline with scene detection (always on)
@@ -1669,6 +1679,12 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
 
     # Update resolved config with runtime options
     resolved_config['output_dir'] = str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir
+    if output_to_source:
+        # Each file's outputs go beside that file. The async processor builds
+        # one pipeline per task and honours a per-file 'output_dir'; without
+        # this every file in the batch landed beside the first one.
+        for _m in media_files:
+            _m['output_dir'] = str(Path(_m['path']).parent)
     resolved_config['temp_dir'] = args.temp_dir
     resolved_config['keep_temp_files'] = args.keep_temp
     resolved_config['subs_language'] = args.subs_language
@@ -1676,7 +1692,11 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
     
     # Add scene detection method for kotoba pipeline
     resolved_config['scene_method'] = getattr(args, 'scene_detection_method', None) or 'auditok'
-    
+
+    # #394 per-scene telemetry (read by BalancedPipeline.__init__)
+    resolved_config['asr_telemetry'] = getattr(args, 'asr_telemetry', None)
+    resolved_config['asr_telemetry_enabled'] = not getattr(args, 'no_asr_telemetry', False)
+
     # Create async manager
     def progress_callback(message: Dict):
         """Handle progress messages."""
@@ -2675,6 +2695,10 @@ def main():
                 'language': language_code,  # Source language code (e.g., 'en', 'ja')
                 'device': args.device,  # Hardware override (None = auto-detect)
                 'compute_type': args.compute_type,  # Compute type override (None = auto)
+                # #394 per-scene telemetry, applied by the pass worker to
+                # pipelines that record it (Balanced).
+                'asr_telemetry': getattr(args, 'asr_telemetry', None),
+                'asr_telemetry_enabled': not getattr(args, 'no_asr_telemetry', False),
             }
 
             pass2_config = None
@@ -2700,6 +2724,8 @@ def main():
                     'language': language_code,  # Source language code (e.g., 'en', 'ja')
                     'device': args.device,  # Hardware override (None = auto-detect)
                     'compute_type': args.compute_type,  # Compute type override (None = auto)
+                    'asr_telemetry': getattr(args, 'asr_telemetry', None),
+                    'asr_telemetry_enabled': not getattr(args, 'no_asr_telemetry', False),
                     # BYOP XXL fields (only used when pipeline='xxl')
                     # xxl_exe from CLI flag; extra args from persisted BYOP
                     # preferences in asr_config.json (set via GUI extra args field)

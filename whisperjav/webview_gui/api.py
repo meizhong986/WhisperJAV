@@ -190,6 +190,10 @@ class WhisperJAVAPI:
         if _fail_on:
             args += ["--fail-on", ",".join(_fail_on)]
 
+        # Per-scene ASR telemetry is on by default; the checkbox only opts out.
+        if options.get('asr_telemetry', True) is False:
+            args += ["--no-asr-telemetry"]
+
         # Debug logging
         if options.get('debug', False):
             args += ["--debug"]
@@ -307,6 +311,10 @@ class WhisperJAVAPI:
         if _fail_on:
             args += ["--fail-on", ",".join(_fail_on)]
 
+        # Per-scene ASR telemetry is on by default; the checkbox only opts out.
+        if options.get('asr_telemetry', True) is False:
+            args += ["--no-asr-telemetry"]
+
         if options.get('debug', False):
             args += ["--debug"]
 
@@ -359,6 +367,10 @@ class WhisperJAVAPI:
         _fail_on = [s for s in ("empty", "suspect") if options.get(f"fail_on_{s}", False)]
         if _fail_on:
             args += ["--fail-on", ",".join(_fail_on)]
+
+        # Per-scene ASR telemetry is on by default; the checkbox only opts out.
+        if options.get('asr_telemetry', True) is False:
+            args += ["--no-asr-telemetry"]
 
         # Common arguments
         temp_dir = options.get('temp_dir', '').strip()
@@ -1870,6 +1882,10 @@ class WhisperJAVAPI:
         if _fail_on:
             args += ["--fail-on", ",".join(_fail_on)]
 
+        # Per-scene ASR telemetry is on by default; the checkbox only opts out.
+        if options.get('asr_telemetry', True) is False:
+            args += ["--no-asr-telemetry"]
+
         # Verbosity
         verbosity = options.get('verbosity', 'summary')
         if verbosity:
@@ -3108,6 +3124,10 @@ class WhisperJAVAPI:
         if _fail_on:
             args += ["--fail-on", ",".join(_fail_on)]
 
+        # Per-scene ASR telemetry is on by default; the checkbox only opts out.
+        if config.get('asr_telemetry', True) is False:
+            args += ["--no-asr-telemetry"]
+
         # Debug logging
         if config.get('debug', False):
             args += ["--debug"]
@@ -3590,6 +3610,7 @@ class WhisperJAVAPI:
         "remember_settings":         "rememberSettings",
         "fail_on_empty":             "failOnEmpty",
         "fail_on_suspect":           "failOnSuspect",
+        "asr_telemetry":             "asrTelemetry",
         "temp_dir":                  "tempDir",
         "accept_cpu_mode":           "acceptCpuMode",
         "async_processing":          "asyncProcessing",

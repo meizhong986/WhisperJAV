@@ -162,6 +162,10 @@ class AsyncPipelineProcessor:
         # Add the reporter to the pipeline args, as it's an expected kwarg
         pipeline_args_with_reporter = pipeline_args.copy()
         pipeline_args_with_reporter['progress_reporter'] = progress_reporter
+        # A per-file output directory (--output-dir source) overrides the
+        # batch-wide one; each task has its own pipeline instance.
+        if media_info.get('output_dir'):
+            pipeline_args_with_reporter['output_dir'] = media_info['output_dir']
         
         pipeline = None
         try:

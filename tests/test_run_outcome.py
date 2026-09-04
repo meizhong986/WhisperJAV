@@ -346,11 +346,13 @@ def _base_args(out_dir, tmp_path):
 class _StubOrchestrator:
     """Replaces EnsembleOrchestrator. `plan` maps basename -> (status, srt or None)."""
     plan = {}
+    last_pass1_config = None
 
     def __init__(self, **kw):
         pass
 
     def process_batch(self, media_files, pass1_config, pass2_config, merge_strategy):
+        _StubOrchestrator.last_pass1_config = dict(pass1_config)
         results = []
         for m in media_files:
             status, srt, err = self.plan[m["basename"]]
@@ -439,6 +441,22 @@ class TestEnsemblePath:
         assert code == 1
         states = [f["state"] for f in json.loads((out_dir / MANIFEST_NAME).read_text(encoding="utf-8"))["files"]]
         assert states == ["failed", "done"]
+
+    def test_pass_config_carries_the_telemetry_settings(self, monkeypatch, media_dir, out_dir, tmp_path):
+        """main() hands --asr-telemetry / --no-asr-telemetry to the pass worker."""
+        import whisperjav.ensemble.orchestrator as O
+
+        a = media_dir / "a.mp4"; a.write_bytes(b"x")
+        srt = _fake_srt(out_dir, "a.ja.merged.whisperjav.srt", [(1, 2, "x"), (3500, 3590, "y")])
+        _StubOrchestrator.plan = {"a": ("completed", srt, None)}
+        _run_main(monkeypatch, _ensemble_argv([a], out_dir, tmp_path),
+                  [_media(a, 3600.0)], [(O, "EnsembleOrchestrator", _StubOrchestrator)])
+        cfg = _StubOrchestrator.last_pass1_config
+        assert cfg["asr_telemetry_enabled"] is True and cfg["asr_telemetry"] is None
+        _run_main(monkeypatch, _ensemble_argv([a], out_dir, tmp_path, ["--no-asr-telemetry", "--asr-telemetry", str(tmp_path / "t")]),
+                  [_media(a, 3600.0)], [(O, "EnsembleOrchestrator", _StubOrchestrator)])
+        cfg = _StubOrchestrator.last_pass1_config
+        assert cfg["asr_telemetry_enabled"] is False and cfg["asr_telemetry"] == str(tmp_path / "t")
 
     def test_failed_result_without_error_key_is_failed(self, monkeypatch, media_dir, out_dir, tmp_path):
         import whisperjav.ensemble.orchestrator as O
@@ -747,6 +765,36 @@ class TestAsyncPath:
         assert code == 1
         f = json.loads((out_dir / MANIFEST_NAME).read_text(encoding="utf-8"))["files"][0]
         assert f["state"] == "failed" and "state 'running'" in f["detail"]
+
+    def test_async_source_mode_puts_each_files_output_beside_it(self, monkeypatch, media_dir, out_dir, tmp_path):
+        """Pre-v1.9.2 every file's outputs landed beside the *first* input."""
+        import whisperjav.pipelines.faster_pipeline as FP
+
+        d1 = tmp_path / "src1"; d1.mkdir()
+        d2 = tmp_path / "src2"; d2.mkdir()
+        a = d1 / "a.mp4"; a.write_bytes(b"x")
+        b = d2 / "b.mp4"; b.write_bytes(b"x")
+        seen = {}
+
+        class _RecordingPipeline:
+            def __init__(self, **kw):
+                self.output_dir = Path(kw.get("output_dir"))
+
+            def process(self, media_info):
+                name = media_info["basename"]
+                seen[name] = self.output_dir
+                srt = _fake_srt(self.output_dir, f"{name}.ja.whisperjav.srt", [(1, 2, "x"), (3500, 3590, "y")])
+                return _metadata(srt)
+
+            def cleanup(self):
+                pass
+
+        argv = [str(a), str(b), "--mode", "faster", "--async-processing", "--output-dir", "source",
+                "--temp-dir", str(tmp_path / "tmp"), "--accept-cpu-mode", "--no-signature", "--no-progress"]
+        code = _run_main(monkeypatch, argv, [_media(a, 3600.0), _media(b, 3600.0)],
+                         [(FP, "FasterPipeline", _RecordingPipeline)])
+        assert code == 0
+        assert seen["a"] == d1 and seen["b"] == d2
 
     def test_real_async_manager_waits_for_its_tasks(self, monkeypatch, media_dir, out_dir, tmp_path):
         """The real AsyncPipelineManager submits with wait=False; the CLI path

@@ -17,7 +17,7 @@ from whisperjav.modules.scene_detection_backends import SceneDetectorFactory
 from whisperjav.modules.srt_stitching import SRTStitcher
 from whisperjav.utils.logger import logger
 from whisperjav.utils.output_coverage import SpeechPositiveEmptyStreak
-from whisperjav.utils.asr_telemetry import AsrTelemetry
+from whisperjav.utils.asr_telemetry import AsrTelemetry, resolve_telemetry_path
 
 from whisperjav.utils.progress_display import DummyProgress
 from whisperjav.utils.progress_aggregator import AsyncProgressReporter
@@ -118,6 +118,14 @@ class BalancedPipeline(BasePipeline):
         self.tracer = kwargs.get('parameter_tracer', NullTracer())
 
         # --- V3 STRUCTURED CONFIG UNPACKING ---
+        # #394 per-scene ASR telemetry. On by default; the file goes to
+        # raw_subs/ next to the outputs unless a path is given. The sync path
+        # and the ensemble pass worker overwrite these attributes after
+        # construction; the async path only has resolved_config to carry them.
+        self.asr_telemetry_enabled = bool(resolved_config.get("asr_telemetry_enabled", True))
+        self.asr_telemetry_path = resolved_config.get("asr_telemetry")
+        self.asr_telemetry_tag = None  # e.g. "pass1" inside an ensemble run
+
         model_cfg = resolved_config["model"]
         params = resolved_config["params"]
         features = resolved_config["features"]
@@ -444,18 +452,22 @@ class BalancedPipeline(BasePipeline):
                 asr.get_segmenter_name() if hasattr(asr, 'get_segmenter_name') else None
             )
 
-            # #394 diagnostics: opt-in per-scene record of decode behaviour and
+            # #394 diagnostics: per-scene record of decode behaviour and
             # memory, so the *approach* to a failure is visible and not only its
-            # aftermath. Off unless --asr-telemetry was passed.
+            # aftermath. On by default (raw_subs/ next to the outputs);
+            # --asr-telemetry moves it, --no-asr-telemetry switches it off.
             telemetry = None
-            _telemetry_path = getattr(self, 'asr_telemetry_path', None)
-            if _telemetry_path:
-                # A directory (or an existing one) gets one file per media, so a
-                # batch run does not overwrite itself.
-                _tp = Path(_telemetry_path)
-                if _tp.is_dir() or not _tp.suffix:
-                    _tp = _tp / f"{media_basename}.asr_telemetry.jsonl"
+            _tp = resolve_telemetry_path(
+                getattr(self, 'asr_telemetry_path', None),
+                getattr(self, 'asr_telemetry_enabled', True),
+                self.output_dir,
+                media_basename,
+                getattr(self, 'asr_telemetry_tag', None),
+            )
+            if _tp is not None:
                 telemetry = AsrTelemetry(_tp, media_basename)
+            # Reachable from the error handler below, which cannot see this local.
+            self._active_telemetry = telemetry
 
             for idx, (scene_path, start_time_sec, _, _) in enumerate(scene_paths):
                 scene_srt_path = scene_srts_dir / f"{scene_path.stem}.srt"
@@ -657,9 +669,10 @@ class BalancedPipeline(BasePipeline):
 
             total_time = time.time() - start_time
             master_metadata["summary"]["total_processing_time_seconds"] = round(total_time, 2)
-            # #394: surfaced so the caller can corroborate a low-coverage result.
+            # #394: every scene is already on disk; this logs the trend line.
             if telemetry is not None:
-                telemetry.write()
+                telemetry.finalize()
+            self._active_telemetry = None
 
             master_metadata["summary"]["speech_positive_empty_streak"] = empty_streak.longest
             if empty_streak.longest:
@@ -699,6 +712,11 @@ class BalancedPipeline(BasePipeline):
         except Exception as e:
             self.progress.show_message(f"Pipeline error: {str(e)}", "error", 0)
             logger.error(f"Pipeline error: {e}", exc_info=True)
+            # #394: the scenes recorded so far are already on disk; say where.
+            _t = getattr(self, '_active_telemetry', None)
+            if _t is not None:
+                _t.finalize()
+                self._active_telemetry = None
             self.metadata_manager.update_processing_stage(
                 master_metadata, "error", "failed", error_message=str(e))
             self.metadata_manager.save_master_metadata(master_metadata, media_basename)

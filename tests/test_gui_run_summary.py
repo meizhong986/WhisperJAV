@@ -68,6 +68,19 @@ class TestFailOnIsForwarded:
     def test_settings_map_carries_both_keys(self):
         assert WhisperJAVAPI._GUI_SETTINGS_MAP["fail_on_empty"] == "failOnEmpty"
         assert WhisperJAVAPI._GUI_SETTINGS_MAP["fail_on_suspect"] == "failOnSuspect"
+        assert WhisperJAVAPI._GUI_SETTINGS_MAP["asr_telemetry"] == "asrTelemetry"
+
+    def test_telemetry_opt_out_reaches_every_builder(self, api, tmp_path):
+        """On by default: nothing is emitted unless the checkbox is unticked."""
+        assert "--no-asr-telemetry" not in api.build_args(_base_options(tmp_path))
+        assert "--no-asr-telemetry" in api.build_args(_base_options(tmp_path, asr_telemetry=False))
+        assert "--no-asr-telemetry" in api.build_args(_base_options(tmp_path, mode="crispasr", asr_telemetry=False))
+        cfg = _base_options(tmp_path, asr_telemetry=False)
+        cfg.update({"pass1_pipeline": "balanced", "pass1_sensitivity": "balanced"})
+        assert "--no-asr-telemetry" in api._build_twopass_args(cfg)
+        assert 'id="asrTelemetry" checked' in (
+            __import__("pathlib").Path(__file__).resolve().parent.parent / "whisperjav" / "webview_gui" /
+            "assets" / "index.html").read_text(encoding="utf-8")
 
     def test_every_mode_in_the_dropdown_forwards_the_flag(self, api, tmp_path):
         """build_args dispatches to per-mode builders (transformers, crispasr,

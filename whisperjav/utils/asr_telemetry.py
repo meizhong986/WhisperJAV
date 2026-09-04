@@ -27,12 +27,32 @@ What is captured, and why each field earns its place
     is discarded as silence. Recording them shows *which* gate is firing.
 ``wall_s`` and ``rtf``
     The slowdown itself, per scene, against constant-length input.
-``cuda_allocated_mb`` / ``cuda_reserved_mb`` / ``rss_mb``
-    If memory grows monotonically up to the failure, that is close to
-    conclusive and points upstream at CTranslate2 rather than at our parameters.
+``cuda_used_mb`` / ``cuda_allocated_mb`` / ``cuda_reserved_mb`` / ``rss_mb``
+    ``cuda_used_mb`` is device-wide (``torch.cuda.mem_get_info``), which is
+    the only one of these that can see CTranslate2's own arena -- the
+    ``allocated``/``reserved`` pair reports PyTorch's caching allocator alone,
+    and Balanced's recogniser does not allocate through it. If the device-wide
+    figure or the process RSS grows monotonically up to the failure, that is
+    close to conclusive and points upstream rather than at our parameters.
+
+Each record is appended to the file the moment its scene finishes, so a run
+that crashes, hangs, or is killed still leaves everything up to that scene on
+disk. That is the whole point of keeping it on by default: the record has to
+exist before anyone knows the run was one of the bad ones.
 
 The output is a JSONL file — one object per scene — so a reporter can attach it
-and it can be plotted directly. Off unless ``--asr-telemetry`` is passed.
+and it can be plotted directly.
+
+Where it goes, and when
+-----------------------
+On by default (owner decision, 2026-09-03): a run that later turns out to be
+#394 has to have recorded its approach *before* anyone knew to ask. The file
+lives in ``raw_subs/`` next to the outputs — the folder that already holds the
+per-run artefacts users attach to bug reports — as
+``<name>.asr_telemetry.jsonl`` (``<name>.pass1.asr_telemetry.jsonl`` inside an
+ensemble run, one per pass). ``--asr-telemetry PATH`` moves it (a directory,
+or a file path for a single input); ``--no-asr-telemetry`` switches it off.
+``resolve_telemetry_path`` is the one place that rule lives.
 
 This module is diagnostic only. It changes no behaviour and must never raise
 into the pipeline: a telemetry failure has to stay a telemetry failure.
@@ -47,10 +67,47 @@ from typing import Any, Optional
 
 from whisperjav.utils.logger import logger
 
+TELEMETRY_SUFFIX = ".asr_telemetry.jsonl"
+TELEMETRY_SUBDIR = "raw_subs"
+
+
+def resolve_telemetry_path(
+    override: Optional[str],
+    enabled: bool,
+    output_dir: Optional[Path],
+    basename: str,
+    tag: Optional[str] = None,
+) -> Optional[Path]:
+    """Where this media's telemetry file goes, or None when telemetry is off.
+
+    ``override`` is the user's ``--asr-telemetry`` value: a directory (or a
+    path without a suffix) gets one file per media; a file path is used as
+    given. ``tag`` distinguishes passes inside an ensemble run (``pass1``).
+    Without an override the file goes to ``<output_dir>/raw_subs/``.
+    Never raises.
+    """
+    if not enabled:
+        return None
+    try:
+        name = f"{basename}.{tag}{TELEMETRY_SUFFIX}" if tag else f"{basename}{TELEMETRY_SUFFIX}"
+        if override:
+            p = Path(override)
+            if p.is_dir() or not p.suffix:
+                return p / name
+            if tag:
+                return p.with_name(f"{p.stem}.{tag}{p.suffix}")
+            return p
+        if output_dir is None:
+            return None
+        return Path(output_dir) / TELEMETRY_SUBDIR / name
+    except Exception:  # noqa: BLE001 - a path problem must not abort a run
+        return None
+
 
 def _memory_snapshot() -> dict[str, Optional[float]]:
     """Best-effort memory reading. Never raises, never imports heavily."""
     snap: dict[str, Optional[float]] = {
+        "cuda_used_mb": None,
         "cuda_allocated_mb": None,
         "cuda_reserved_mb": None,
         "rss_mb": None,
@@ -61,6 +118,11 @@ def _memory_snapshot() -> dict[str, Optional[float]]:
         if torch.cuda.is_available():
             snap["cuda_allocated_mb"] = round(torch.cuda.memory_allocated() / 1048576, 1)
             snap["cuda_reserved_mb"] = round(torch.cuda.memory_reserved() / 1048576, 1)
+            try:
+                free_b, total_b = torch.cuda.mem_get_info()
+                snap["cuda_used_mb"] = round((total_b - free_b) / 1048576, 1)
+            except Exception:  # noqa: BLE001
+                snap["cuda_used_mb"] = None
     except Exception:  # noqa: BLE001 - diagnostics must not break the run
         pass
     try:
@@ -106,13 +168,37 @@ def summarise_segments(segments: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 class AsrTelemetry:
-    """Collects one record per scene and writes them as JSONL."""
+    """One record per scene, appended to a JSONL file as each scene finishes.
+
+    The file is truncated on the first record and every later record is
+    appended and flushed immediately, so an interrupted run leaves a partial
+    but valid file. ``write()`` (alias ``finalize()``) only logs the trend and
+    the path; it does not hold anything back for the end.
+    """
 
     def __init__(self, output_path: Path, media_name: str = ""):
         self.output_path = Path(output_path)
         self.media_name = media_name
         self.records: list[dict[str, Any]] = []
         self._t0 = time.time()
+        self._file_ready = False   # truncated / created on first record
+        self._write_failed = False  # warn once, then keep the run going
+
+    def _append(self, rec: dict[str, Any]) -> None:
+        """Append one record to disk now. Never raises; warns once on failure."""
+        if self._write_failed:
+            return
+        try:
+            if not self._file_ready:
+                self.output_path.parent.mkdir(parents=True, exist_ok=True)
+                self.output_path.write_text("", encoding="utf-8")
+                self._file_ready = True
+            with open(self.output_path, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+                fh.flush()
+        except Exception as exc:  # noqa: BLE001 - a diagnostic must never fail the run
+            self._write_failed = True
+            logger.warning("Could not write ASR telemetry to %s: %s", self.output_path, exc)
 
     def record_scene(
         self,
@@ -140,6 +226,7 @@ class AsrTelemetry:
             rec.update(summarise_segments(segments or []))
             rec.update(_memory_snapshot())
             self.records.append(rec)
+            self._append(rec)
         except Exception as exc:  # noqa: BLE001
             logger.debug("ASR telemetry: could not record scene %s: %s", index, exc)
 
@@ -179,26 +266,22 @@ class AsrTelemetry:
         except Exception:  # noqa: BLE001
             return None
 
-    def write(self) -> Optional[Path]:
-        """Write the JSONL file. Returns the path, or None on failure."""
-        if not self.records:
+    def finalize(self) -> Optional[Path]:
+        """Log the trend and the path. Every record is already on disk.
+
+        Returns the path, or None if nothing was recorded or the file could
+        not be written. Safe to call from an error path.
+        """
+        if not self.records or self._write_failed or not self._file_ready:
             return None
         try:
-            self.output_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.output_path, "w", encoding="utf-8") as fh:
-                for rec in self.records:
-                    fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
-        except Exception as exc:  # noqa: BLE001
-            # Deliberately broad. A malformed path raises ValueError rather than
-            # OSError, and a record holding something unserialisable raises
-            # TypeError — neither should turn a diagnostic aid into a run failure.
-            logger.warning("Could not write ASR telemetry to %s: %s", self.output_path, exc)
-            return None
-
-        trend = self.trend_summary()
-        if trend:
-            logger.info("ASR telemetry trend (first 10 scenes -> last 10): %s", trend)
-        logger.info("ASR telemetry written to %s (%d scenes). Please attach this "
-                    "file if you are reporting issue #394.",
-                    self.output_path, len(self.records))
+            trend = self.trend_summary()
+            if trend:
+                logger.info("ASR telemetry trend (first 10 scenes -> last 10): %s", trend)
+            logger.info("ASR telemetry: %s (%d scenes)", self.output_path, len(self.records))
+        except Exception:  # noqa: BLE001
+            pass
         return self.output_path
+
+    # Kept for callers written against the buffered version.
+    write = finalize

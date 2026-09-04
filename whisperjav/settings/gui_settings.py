@@ -50,6 +50,7 @@ DEFAULT_GUI_SETTINGS = {
     "remember_settings": False,
     "fail_on_empty": False,
     "fail_on_suspect": False,
+    "asr_telemetry": True,
     "temp_dir": "",
     "accept_cpu_mode": False,
     "async_processing": False,

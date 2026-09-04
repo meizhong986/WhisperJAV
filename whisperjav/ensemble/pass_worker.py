@@ -746,6 +746,13 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                 "[Worker %s] Pass %s: File details - path=%s, basename_len=%d",
                 os.getpid(), pass_number, media_info.get("path"), len(basename)
             )
+            # #394 per-scene telemetry goes beside this file's pass output,
+            # tagged with the pass number so two Balanced passes do not
+            # overwrite each other. Pipelines that do not record it ignore it.
+            _configure_telemetry(
+                pipeline, pass_config, pass_number,
+                Path(media_info.get('output_dir', payload.output_dir)),
+            )
             try:
                 result = pipeline.process({
                     **media_info,
@@ -1039,6 +1046,27 @@ def _run_xxl_pass(
     # Write Drop-Box and Nuclear Exit (same pattern as normal passes)
     final_result = {"results": [r.__dict__ for r in results], "worker_error": None}
     _write_dropbox_and_exit(result_file, final_result, tracer, 0)
+
+
+def _configure_telemetry(pipeline: Any, pass_config: Dict[str, Any],
+                         pass_number: int, file_output_dir: Path) -> None:
+    """Point the pipeline's #394 telemetry at this file's pass output folder.
+
+    The pipeline resolves the final path itself (see
+    ``whisperjav.utils.asr_telemetry.resolve_telemetry_path``): with no user
+    override it is ``<file_output_dir>/raw_subs/<name>.pass<N>.asr_telemetry.jsonl``.
+    The pipeline's own ``output_dir`` cannot be used for this, because in
+    ``--output-dir source`` mode the orchestrator points it at the temp
+    directory and moves only the SRT out afterwards.
+    """
+    enabled = bool(pass_config.get("asr_telemetry_enabled", True))
+    override = pass_config.get("asr_telemetry")
+    setattr(pipeline, "asr_telemetry_enabled", enabled)
+    setattr(pipeline, "asr_telemetry_tag", f"pass{pass_number}")
+    # No override: a directory, so the pipeline names the file; the pass tag
+    # is applied by the pipeline in both cases.
+    setattr(pipeline, "asr_telemetry_path",
+            override if override else str(Path(file_output_dir) / "raw_subs"))
 
 
 def _build_pipeline(

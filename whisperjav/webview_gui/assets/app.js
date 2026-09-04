@@ -715,6 +715,7 @@ const FormManager = {
             skip_existing: document.getElementById('skipExisting').checked,
             fail_on_empty: document.getElementById('failOnEmpty').checked,
             fail_on_suspect: document.getElementById('failOnSuspect').checked,
+            asr_telemetry: document.getElementById('asrTelemetry').checked,
             temp_dir: document.getElementById('tempDir').value.trim(),
             accept_cpu_mode: document.getElementById('acceptCpuMode').checked,
             output_format: document.getElementById('outputFormat').value,
@@ -5429,6 +5430,7 @@ const EnsembleManager = {
             skip_existing: document.getElementById('skipExisting').checked,
             fail_on_empty: document.getElementById('failOnEmpty').checked,
             fail_on_suspect: document.getElementById('failOnSuspect').checked,
+            asr_telemetry: document.getElementById('asrTelemetry').checked,
             temp_dir: document.getElementById('tempDir').value.trim(),
             output_format: document.getElementById('outputFormat').value,
         };
@@ -7822,6 +7824,7 @@ const SettingsPersistence = {
         'acceptCpuMode':    { key: 'acceptCpuMode',  prop: 'checked' },
         'failOnEmpty':      { key: 'failOnEmpty',    prop: 'checked' },
         'failOnSuspect':    { key: 'failOnSuspect',  prop: 'checked' },
+        'asrTelemetry':     { key: 'asrTelemetry',   prop: 'checked' },
     },
     _saveTimer: null,
     enabled: false,
