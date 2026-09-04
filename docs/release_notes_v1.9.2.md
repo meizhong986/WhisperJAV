@@ -53,6 +53,15 @@ you find out something went wrong.
   their reasoning into the subtitle file. The fallback now mirrors the curated,
   instruct-only list.
 
+- **DeepSeek v4-flash no longer reasons before translating.** DeepSeek changed
+  its server-side default so that v4 models think before answering, which is
+  slow, burns rate limit, and can leak reasoning text into the subtitle file.
+  WhisperJAV now asks for reasoning to be turned off on `deepseek-v4-flash`
+  when the DeepSeek provider is used directly; `deepseek-v4-pro` *is* the
+  reasoning model and is left alone, as are models outside the v4 family. The
+  OpenRouter route to the same model is not covered, because it goes through a
+  different client. Diagnosed and prototyped by @mcdman. (#395)
+
 - **OpenRouter no longer defaults to a retired model.** The DeepSeek route was
   pinned to `deepseek/deepseek-chat`, which DeepSeek retired on 2026-07-24. It
   now uses `deepseek/deepseek-v4-flash`, matching the direct-API default.
@@ -97,9 +106,11 @@ you find out something went wrong.
   ensemble runs. (#328)
 
 - **The GUI can remember your settings between launches, if you ask it to.**
-  A *Remember settings* checkbox stores the first tab's fields and restores them
-  next time. It is **off by default**, so the deliberate start-from-defaults
-  behaviour is unchanged unless you opt in. (#96, #298, #381)
+  A *Remember settings* checkbox stores the Transcription tab's fields and
+  restores them next time. It is **off by default**, so the deliberate
+  start-from-defaults behaviour is unchanged unless you opt in. This answers
+  the settings-reset question in #96; the two-pass Customize parameters asked
+  for in #381 still reset on launch. (#96, in part)
 
 - **Saving presets no longer fails on relocated user profiles.** Where
   `%APPDATA%` is a junction — common when the profile has been moved to another
@@ -224,11 +235,30 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
 
 ## For diagnosing #394
 
-- **`--asr-telemetry PATH`** writes one JSON record per scene: how long the
-  recognizer took, how many segments it returned, whether the decoder had to
-  retry at a higher temperature, the confidence and compression figures behind
-  those retries, and GPU and process memory at that moment. It is off unless you
-  ask for it, and currently covers Balanced mode.
+- **Every Balanced run now keeps a per-scene telemetry file, on by default.**
+  One JSON record per scene: how long the recognizer took, how many segments
+  it returned, whether the decoder had to retry at a higher temperature, the
+  confidence and compression figures behind those retries, and GPU and process
+  memory at that moment. It is written to `raw_subs/<name>.asr_telemetry.jsonl`
+  next to the outputs, the folder that already holds the artifacts people
+  attach to bug reports, so a run that later turns out to be a #394 case has
+  its record without anyone having known to ask. Inside an ensemble run each
+  Balanced pass writes its own file (`<name>.pass1.asr_telemetry.jsonl`,
+  `…pass2…`), beside that file's pass outputs, in `source` mode too.
+  Each scene's record is appended the moment the scene finishes, so a run that
+  crashes, hangs or is stopped still leaves everything up to that point on
+  disk. `--asr-telemetry PATH` moves it (a directory gets one file per media;
+  a file path is for a single input, later inputs overwrite it);
+  `--no-asr-telemetry` switches it off, and the GUI has the same switch under
+  Advanced options (*Keep per-scene ASR telemetry*, on by default). Pipelines
+  other than Balanced do not record it yet, so the GUI's default ensemble
+  pairing (anime-whisper + Qwen3-ASR) still produces no telemetry. The memory
+  figures include a device-wide CUDA reading, since the recognizer allocates
+  outside PyTorch's own counters.
+
+  Found while wiring this: with `--async-processing` and `--output-dir
+  source`, every file's outputs were written beside the *first* file in the
+  batch. Each file's outputs now go beside that file, as in the normal path.
 
   It exists because every record we had described the *aftermath* of the #394
   failure and none described the approach to it. The most useful unexplained
@@ -269,13 +299,19 @@ Not user-visible, but worth recording:
 
 ## Known limitations
 
+- **`--async-processing` with Balanced mode and more than one file ends the
+  process without a summary.** The async path was never actually running its
+  tasks before this release (see above); now that it does, the second file's
+  recognizer initialising after the first file's pipeline was torn down kills
+  the process natively, with no traceback, in the same way the ctranslate2
+  destructor crash the normal path deliberately avoids. One file works;
+  `faster` mode with several files works; the normal (non-async) path is
+  unaffected and is the recommended way to batch. The GUI reports such a run
+  as finished with failures and no run summary, which is the honest reading.
 - **The root cause behind #394 is still open.** The recognizer can enter a state
   where it returns nothing for the rest of a run, and the work above detects the
   *result* rather than preventing it. Investigation continues, with useful
   evidence contributed by @AlanZ-Git and @daoran9.
-- **DeepSeek's thinking mode cannot be disabled from WhisperJAV** (#395). The
-  translation library builds a fixed request and offers no way to pass the
-  option DeepSeek requires, so this needs an upstream change first.
 
 ---
 
@@ -283,6 +319,7 @@ Not user-visible, but worth recording:
 
 | Date | Change |
 |------|--------|
+| 2026-09-04 | ASR telemetry on by default, written to `raw_subs/` next to the outputs; reaches Balanced passes inside ensemble runs (per-pass files, source mode included); `--no-asr-telemetry` added. Version set to 1.9.2 in code. Release-note corrections: #395 is fixed, not a limitation; persistence entry no longer credits #298 (closed) or #381 |
 | 2026-09-03 | GUI speaks the same contract: reads `whisperjav_run.json` on exit, closes with `[FINISHED] <tally>` instead of `[SUCCESS]`, shows the tally in the status line and dialog, and offers the two "treat as failure" checkboxes (`--fail-on`) for Transcription and Ensemble runs |
 | 2026-09-03 | One per-file vocabulary (`done` / `empty` / `suspect` / `failed` / `skipped`), one exit-status rule for sync, async and ensemble, `--fail-on`, the RUN SUMMARY table and the `whisperjav_run.json` manifest. Replaces the pre-release gate that failed a run on empty output and fixes the pre-release defect where every successful ensemble run exited 1 (#394, #263) |
 | 2026-08-30 | `--asr-telemetry`: per-scene decode and memory record, plus a trend summary, to capture what precedes a #394 collapse rather than only its aftermath |

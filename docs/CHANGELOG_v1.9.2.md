@@ -10,6 +10,69 @@
 
 ---
 
+## 2026-09-04 — ASR telemetry on by default and inside ensemble; version 1.9.2; note corrections
+
+**Area:** `whisperjav/utils/asr_telemetry.py` (new `resolve_telemetry_path`),
+`whisperjav/pipelines/balanced_pipeline.py`, `whisperjav/ensemble/pass_worker.py`
+(new `_configure_telemetry`), `whisperjav/main.py`, `whisperjav/__version__.py`,
+`installer/VERSION`, `docs/release_notes_v1.9.2.md`; tests
+`tests/test_asr_telemetry_default.py` (new), `tests/test_run_outcome.py`.
+
+**What changed**
+- Telemetry is **on by default**. Default location
+  `<output_dir>/raw_subs/<name>.asr_telemetry.jsonl` (the folder users already
+  attach to bug reports). `--asr-telemetry PATH` moves it (directory → one
+  file per media; file path used as given); new `--no-asr-telemetry` disables.
+  `resolve_telemetry_path()` is the one place the rule lives.
+- Ensemble: `main.py` puts `asr_telemetry` / `asr_telemetry_enabled` into both
+  pass configs; the pass worker calls `_configure_telemetry()` per file before
+  `pipeline.process`, pointing the pipeline at
+  `<file_output_dir>/raw_subs/` with tag `passN`, so each Balanced pass writes
+  `<name>.passN.asr_telemetry.jsonl` beside that file's pass outputs. Needed
+  because in `source` mode the orchestrator points the pipeline's own
+  `output_dir` at the temp directory and moves only the SRT out.
+- Async path: the two values travel in `resolved_config` and
+  `BalancedPipeline.__init__` reads them (the sync path sets the attributes
+  after construction, as before).
+- Version: `__version__.py` and `installer/VERSION` set to 1.9.2 (VERSION had
+  been left at 1.9.0 while `__version__.py` said 1.9.1).
+- Release notes: #395 moved from Known limitations to Fixed (the patch exists,
+  v4-flash only, credit @mcdman); persistence entry no longer credits #298
+  (closed 2026-04-23) or #381 (two-pass Customize persistence not built);
+  telemetry section rewritten.
+
+**Decision:** owner (2026-09-04, CL1–CL3): take items 1 and 2; set the version
+in code; make telemetry reach ensemble; telemetry should be on by default.
+Location under `raw_subs/` is my choice (stated rationale: must survive the
+run and be where reporters already look); owner to veto if unwanted.
+
+**After adversary review (same day), also:**
+- `AsrTelemetry` appends each record to disk as its scene finishes (truncate on
+  first record, append + flush per scene; `finalize()` only logs, `write` is an
+  alias); `BalancedPipeline` finalizes from its error handler too, so a crash,
+  hang or interrupt leaves a partial file. The buffered version wrote only on
+  the success path, which contradicted the reason for default-on.
+- GUI opt-out: Advanced options checkbox "Keep per-scene ASR telemetry"
+  (`asrTelemetry`, on by default) → `--no-asr-telemetry` in every builder;
+  persisted (settings count 33 → 34).
+- `cuda_used_mb` (device-wide, `torch.cuda.mem_get_info`) added: the
+  PyTorch allocator counters cannot see CTranslate2's arena.
+- **Pre-existing bug fixed:** `--async-processing --output-dir source` wrote
+  every file's outputs beside the first input (`main.py` set one output_dir
+  from `media_files[0]`; the processor never overrode it per task). Now each
+  media carries `output_dir` and `AsyncPipelineProcessor._process_media`
+  applies it per task.
+- Notes: #395 qualified to the direct DeepSeek provider (OpenRouter route not
+  patched); "#96's first question" attribution dropped; file-path
+  `--asr-telemetry` with several inputs documented as overwriting.
+
+**Limits:** only `BalancedPipeline` records telemetry, so the GUI's default
+ensemble pairing (anime-whisper + Qwen3-ASR) still records nothing (the CLI's
+default `--pass1-pipeline` is balanced). `installer/generated/` is still the
+v1.9.0 set until `build_release.py` is run (owner-gated).
+
+---
+
 ## 2026-09-03 — GUI follows the run-outcome contract
 
 **Area:** `whisperjav/webview_gui/api.py`, `assets/app.js`, `assets/index.html`,
@@ -137,9 +200,20 @@ from that batch is superseded by the contract above.
 
 ## Open items carried on this branch
 
-- Release-note corrections not yet made: #395 "cannot be disabled" limitation
-  is stale; #298 (closed) and #381 credited to PR #378; `--asr-telemetry`
-  help does not say it never reaches ensemble.
+- **Async + Balanced + more than one file dies natively** (exit 127 on
+  Windows, no traceback, no RUN SUMMARY) when the second task's
+  `FasterWhisperProASR` initialises after the first task's pipeline was
+  cleaned up in `AsyncPipelineProcessor._process_media`'s `finally`. Verified
+  2026-09-04 with `--mode balanced --model tiny` on two clips, both in an
+  ordinary output dir and in source mode; `--mode faster` with two files
+  works; one Balanced file works. Pre-existing (the async path never ran its
+  tasks before 2026-09-03), same family as the ctranslate2 destructor crash
+  the sync path avoids by never destroying the ASR. Not fixed; stated in the
+  release notes. Owner decision: keep async as-is with the limitation, or make
+  it reuse one pipeline per mode as the sync path does.
+- Telemetry outside `BalancedPipeline` (the default ensemble pairing records
+  nothing); a Transcribe-tab segmenter control (owner decision); a default cue
+  ceiling for the default ensemble (owner decision); #394 containment.
 - Test hygiene: `tests/test_gui_refactor.py`, `tests/test_postprocessing_performance.py`
   (rewrap stdout at import) and `tests/test_tab_spacing.py` (opens Tk)
   prevent a single-session `pytest tests/`.
