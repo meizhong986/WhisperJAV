@@ -1292,7 +1292,7 @@ class WhisperJAVAPI:
             "nemo-lite": "nemo-speech-segmentation.yaml",
             "silero-v6.2": "silero-v6-speech-segmentation.yaml",
             "whisperseg": "whisperseg-speech-segmentation.yaml",
-            "firered-vad": "firered-vad-speech-segmentation.yaml",  # Balanced default since v1.9.2
+            "firered-vad": "firered-vad-speech-segmentation.yaml",  # v1.9.0; installed by default since v1.9.2
         }
 
         # Handle "none" backend

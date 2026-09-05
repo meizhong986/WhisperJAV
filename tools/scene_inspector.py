@@ -67,7 +67,7 @@ if str(REPO_ROOT) not in sys.path:
 BACKENDS = ("auditok", "silero", "semantic", "none")
 DEFAULT_BACKEND = "auditok"          # the legacy pipelines' default (main.py --scene-detection-method)
 SENSITIVITIES = ("conservative", "balanced", "aggressive")
-DEFAULT_SPEECH_SEGMENTER = "firered-vad"   # the v1.9.2 Balanced default
+DEFAULT_SPEECH_SEGMENTER = "firered-vad"   # installed with WhisperJAV since v1.9.2 (tool default only)
 OUTPUT_SUBFOLDER = "scenes_info"     # owner P2
 SCREENSHOT_SUBFOLDER = "screenshots"
 FRAME_POSITIONS = ("begin", "middle", "end")

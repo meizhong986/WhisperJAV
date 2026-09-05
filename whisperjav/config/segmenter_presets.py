@@ -13,7 +13,7 @@ stage. v1.9.2 moved them here unchanged; ``pass_worker`` re-exports the old name
 """
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Optional
 
 from whisperjav.utils.logger import logger
 
@@ -64,18 +64,20 @@ SEGMENTER_TOOL_NAMES = {
     "whisper-vad-small": "whisper-vad-speech-segmentation",
     "whisper-vad-medium": "whisper-vad-speech-segmentation",
     "whisperseg": "whisperseg-speech-segmentation",
-    "firered-vad": "firered-vad-speech-segmentation",  # v1.9.0; Balanced default since v1.9.2
+    "firered-vad": "firered-vad-speech-segmentation",  # v1.9.0; installed by default since v1.9.2
 }
 
-# v1.9.2 (owner CFF3 + D7): the Balanced pipeline defaults to a WhisperJAV external
-# speech segmenter, FireRedVAD first. If its package is missing the next member is
-# used — never faster-whisper's internal VAD (owner: "external" means a WhisperJAV
-# segmenter). silero-v3.1 closes the chain because it is always installable.
-BALANCED_DEFAULT_SEGMENTER_CHAIN: Tuple[str, ...] = ("firered-vad", "ten", "silero-v3.1")
+# The Balanced pipeline's default speech segmenter is faster-whisper's built-in VAD
+# (vad_filter=True, one recognizer call per scene), as in v1.9.0/v1.9.1. A v1.9.2
+# development build defaulted to FireRedVAD with a fallback chain; the owner reversed
+# that on 2026-09-05 (N3). A WhisperJAV segmenter is selected explicitly with
+# --speech-segmenter (CLI), --passN-speech-segmenter (ensemble) or the GUI dropdown.
+BALANCED_DEFAULT_SEGMENTER = "faster-whisper"
 
-# Backends the single-pass Balanced path may run without the routing-guard downgrade:
-# their sensitivity presets are resolved by resolve_segmenter_sensitivity() below.
-BALANCED_SINGLE_PASS_EXTERNAL = frozenset(BALANCED_DEFAULT_SEGMENTER_CHAIN)
+# WhisperJAV segmenters the single-pass Balanced path runs without the routing-guard
+# downgrade: their sensitivity presets are resolved by resolve_segmenter_sensitivity()
+# below (v1.9.2), so --sensitivity is honoured for them on --mode balanced.
+BALANCED_SINGLE_PASS_EXTERNAL = frozenset({"firered-vad", "ten"})
 
 
 def resolve_segmenter_sensitivity(
@@ -131,35 +133,3 @@ def resolve_segmenter_sensitivity(
         )
         return {k: v for k, v in (user_overrides or {}).items() if k in SEGMENTER_PARAMS}
 
-
-def pick_balanced_default_segmenter(
-    is_available: Optional[Callable[[str], bool]] = None,
-    chain: Iterable[str] = BALANCED_DEFAULT_SEGMENTER_CHAIN,
-) -> str:
-    """
-    Return the Balanced pipeline's default speech segmenter: the first member of
-    ``chain`` whose package is installed. Logs a WARNING naming the pip command
-    when FireRedVAD has to be skipped. The last member is returned unconditionally.
-
-    Args:
-        is_available: availability predicate (tests inject one). Default uses
-            SpeechSegmenterFactory.is_backend_available, which checks importability
-            without importing the backend.
-        chain: ordered candidates; defaults to BALANCED_DEFAULT_SEGMENTER_CHAIN.
-    """
-    if is_available is None:
-        from whisperjav.modules.speech_segmentation.factory import SpeechSegmenterFactory
-
-        def is_available(name: str) -> bool:
-            return bool(SpeechSegmenterFactory.is_backend_available(name)[0])
-
-    chain = tuple(chain)
-    for candidate in chain[:-1]:
-        if is_available(candidate):
-            return candidate
-        logger.warning(
-            "Balanced default speech segmenter '%s' is not installed "
-            "(pip install %s); falling back to the next WhisperJAV segmenter.",
-            candidate, "fireredvad" if candidate == "firered-vad" else candidate,
-        )
-    return chain[-1]

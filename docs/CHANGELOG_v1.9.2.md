@@ -252,7 +252,55 @@ WARNING names the effective method. Real CPU runs on the 293 s Netflix clip (bal
 **Decision:** owner (CFF2, 2026-09-05): expose to CLI and the GUI Customize parameters tab.
 Customize lives on the Ensemble tab only (D4).
 
-## 2026-09-05 — CFF3: Balanced defaults to an external speech segmenter (FireRedVAD), single-pass presets resolved
+## 2026-09-06 — N3: Balanced default speech segmenter back to faster-whisper's built-in VAD (CFF3 default reversed)
+
+**Area:** `whisperjav/config/segmenter_presets.py` (`BALANCED_DEFAULT_SEGMENTER = "faster-whisper"`;
+the fallback chain and `pick_balanced_default_segmenter` removed — no caller left);
+`whisperjav/main.py` (default block, `--speech-segmenter` help, guard comment);
+`whisperjav/ensemble/pass_worker.py` (balanced pass default); `whisperjav/webview_gui/assets/app.js`
+(`applyPipelinePresets` balanced → `faster-whisper`; `pickBalancedDefaultSegmenter`,
+`reapplyBalancedDefaultIfUnavailable` and the availability cache removed); `index.html` (FireRedVAD
+option titles); `whisperjav/utils/preflight_check.py` (fireredvad message); comments in
+`faster_whisper_pro_asr.py`, `api.py`, `factory.py`, `speech_segmentation/__init__.py`,
+`backends/__init__.py`, `backends/firered_vad.py`, `installer/core/registry.py` (the `reason=` string
+for the fireredvad dependency — the last three found by the adversary pass), the FireRedVAD YAML,
+`pyproject.toml`; `tools/ct2_degradation_probe.py` and `tools/scene_inspector.py` (help/comment);
+`README.md` segmenter table; tests `tests/test_balanced_defaults_v192.py` rewritten (18 tests).
+
+**Owner decision (typed, 2026-09-05, N3):** "I have changed my mind and revert my earlier
+requirements: CFF3. As such the default behaviour for the balanced pipeline would be to use the
+internal VAD of faster-whisper." Scope confirmed 2026-09-06: **default only**. Kept from CFF3: the
+single-pass path resolves a WhisperJAV segmenter's per-sensitivity YAML preset, and `firered-vad` /
+`ten` are exempt from the routing-guard downgrade on `--mode balanced` (an explicit choice honours
+`--sensitivity`; Test-D grouping still overlays). CFF6 (FireRedVAD installed, not experimental) stays.
+
+**What changed**
+- `--mode balanced` without `--speech-segmenter` runs faster-whisper's built-in VAD again, as in
+  v1.9.0/v1.9.1 (one recognizer call per scene). Same at the ensemble pass worker for a balanced pass
+  without `--passN-speech-segmenter`, and in the GUI Ensemble-tab preset when a pass is switched to
+  balanced. The Transcribe tab sends no segmenter (D4) and so follows the CLI default.
+- Consequences reverted with it: Balanced is as fast as v1.9.0/v1.9.1; the #394 corroboration counter
+  is inert under the built-in VAD (the recogniser reports segmenter "none"), so a zero-cue Balanced
+  file is `empty`, not `suspect`, unless a WhisperJAV segmenter is chosen; D6 and D7 no longer apply.
+- `fireredvad` stays a standard dependency; preflight now describes it as the segmenter behind
+  `--speech-segmenter firered-vad`, not as the Balanced default.
+
+**Verification (executed 2026-09-06):** `python -m whisperjav.main --help | grep speech-segmenter`
+(new default text shown); `--speech-segmenter faster-whisper --help` exit 0; `py_compile` on every
+touched Python file; `node --check app.js`; `pytest tests/test_balanced_defaults_v192.py` 18 passed
+(`--dump-params`: default backend `faster-whisper` with the native VAD preset for all three
+sensitivities and no `_dump_note`; explicit `firered-vad` → preset .5/.4/.3 + Test-D 9.0/0.1, not
+downgraded; `ten` exempt; `whisperseg` still downgrades; CLI overrides win; fidelity unchanged);
+`pytest tests/test_gui_settings.py tests/test_run_outcome.py tests/test_output_coverage.py` 134
+passed. **The ensemble default is verified by code read only** (`pass_worker.py`: backend
+`faster-whisper` → not in `SPEECH_SEGMENTER_MAP`, passes through → resolver returns `{}` →
+`apply_balanced_vad_defaults` native branch); no executed test covers that arm because the test
+module cannot import `pass_worker`. GUI not rendered here: owner to confirm the Ensemble tab shows
+Faster-Whisper native when a pass is set to balanced. A user-saved ensemble preset from the
+FireRedVAD build still carries `firered-vad` (presets store the segmenter) — that is saved state,
+not a failed revert.
+
+## 2026-09-05 — CFF3: Balanced defaults to an external speech segmenter (FireRedVAD), single-pass presets resolved — **DEFAULT REVERSED 2026-09-06 (N3, above); preset resolution and guard exemption remain**
 
 **Area:** new `whisperjav/config/segmenter_presets.py`; `whisperjav/main.py` (default block,
 routing guard, preset merge, `--speech-segmenter` help); `whisperjav/ensemble/pass_worker.py`
@@ -334,8 +382,8 @@ dropdowns), `README.md`; tests `tests/test_dependency_cross_match.py`.
   drops the `experimental` tag; `speech_segmentation/backends/__init__.py` was missed at first and
   fixed after the adversary pass). The remaining truthful caveat is kept in words: detection presets
   are upstream-derived, the segment cap was JAV-tuned on 2026-08-14.
-- Preflight lists `fireredvad` as an optional dependency with an actionable message (it is the
-  Balanced default from CFF3; without it Balanced falls back to another WhisperJAV segmenter).
+- Preflight lists `fireredvad` as an optional dependency with an actionable message (worded for
+  the CFF3 default at the time; reworded 2026-09-06 when N3 reversed that default).
 - Hygiene found by the sync gate while adding the entry: the registry pinned `numba>=0.60.0`
   while pyproject says `>=0.61.0`, and the fallback template disagreed with the registry on
   `numba` and `transformers`. Aligned the registry and the fallback template to what pyproject
@@ -356,7 +404,9 @@ known stale silero-v6.2 set.
 **Decision:** owner (CFF6, 2026-09-05): FireRedVAD "mandatory" in dependency, setup and
 installation; no longer experimental. Fallback when the package is absent at runtime: owner D7
 (another WhisperJAV segmenter, never faster-whisper's internal VAD) — implemented with CFF3.
-Thread owed: #311 (requester was told it needs `pip install fireredvad`).
+**Superseded 2026-09-06 (N3):** Balanced defaults to the built-in VAD again, so there is no runtime
+fallback chain any more; `fireredvad` stays a standard dependency and is used only when selected
+explicitly. Thread owed: #311 (requester was told it needs `pip install fireredvad`).
 
 ## 2026-09-04 — ASR telemetry on by default and inside ensemble; version 1.9.2; note corrections
 

@@ -1781,16 +1781,15 @@ const EnsembleManager = {
             // Whisper-based pipeline defaults (balanced, faster, fast, fidelity)
             const pipeline = this.state[passKey].pipeline;
             if (pipeline === 'balanced') {
-                // v1.9.2: balanced defaults to an external WhisperJAV segmenter —
-                // FireRedVAD, then TEN, then Silero v3.1 if a package is missing
-                // (same chain as main.py / pass_worker). Test-D fine-grained
-                // grouping is applied in main.py. Scene detection stays auditok.
-                // 'faster-whisper' (native VAD, v1.9.0 default) stays selectable.
-                const balancedSegmenter = this.pickBalancedDefaultSegmenter();
+                // Balanced defaults to faster-whisper's built-in VAD (fastest; one
+                // transcribe call per scene), the same default as main.py and the
+                // ensemble pass worker. Picking a WhisperJAV segmenter instead
+                // auto-applies the fine-grained grouping (handled in main.py).
+                // Scene detection stays auditok.
                 sceneSelect.value = 'auditok';
-                segmenterSelect.value = balancedSegmenter;
+                segmenterSelect.value = 'faster-whisper';
                 this.state[passKey].sceneDetector = 'auditok';
-                this.state[passKey].speechSegmenter = balancedSegmenter;
+                this.state[passKey].speechSegmenter = 'faster-whisper';
             } else if (pipeline === 'fidelity') {
                 // v1.8.13: whisperseg + semantic for fidelity (unchanged)
                 sceneSelect.value = 'semantic';
@@ -1807,44 +1806,6 @@ const EnsembleManager = {
             }
             sensitivitySelect.value = 'aggressive';
             this.state[passKey].sensitivity = 'aggressive';
-        }
-    },
-
-    // v1.9.2: Balanced default segmenter chain, mirrored from
-    // whisperjav/config/segmenter_presets.py BALANCED_DEFAULT_SEGMENTER_CHAIN.
-    // Uses the availability map fetched by updateSegmenterAvailability(); before
-    // that map exists (or if every member is unavailable) the first member wins,
-    // and the backend applies the same chain at run time.
-    balancedDefaultSegmenterChain: ['firered-vad', 'ten', 'silero-v3.1'],
-    segmenterAvailability: null,
-
-    pickBalancedDefaultSegmenter() {
-        const chain = this.balancedDefaultSegmenterChain;
-        const map = this.segmenterAvailability;
-        if (!map) return chain[0];  // before the availability fetch resolves; re-applied below
-        for (const name of chain) {
-            const info = map[name];
-            if (info && info.available) return name;
-        }
-        return chain[chain.length - 1];  // silero-v3.1 is always installable
-    },
-
-    // Called once the availability map is known: a balanced pass that was
-    // preset before the fetch resolved (or restored by the browser) must not
-    // keep an unavailable segmenter — an explicit unavailable choice fails the run.
-    reapplyBalancedDefaultIfUnavailable() {
-        const map = this.segmenterAvailability;
-        if (!map) return;
-        for (const passKey of ['pass1', 'pass2']) {
-            const st = this.state[passKey];
-            if (!st || st.pipeline !== 'balanced') continue;
-            const info = map[st.speechSegmenter];
-            if (info && !info.available) {
-                const pick = this.pickBalancedDefaultSegmenter();
-                const sel = document.getElementById(`${passKey}-segmenter`);
-                if (sel) sel.value = pick;
-                st.speechSegmenter = pick;
-            }
         }
     },
 
@@ -5594,10 +5555,6 @@ const EnsembleManager = {
                     hint: b.install_hint || ''
                 };
             });
-            // v1.9.2: remembered for pickBalancedDefaultSegmenter().
-            this.segmenterAvailability = availabilityMap;
-            this.reapplyBalancedDefaultIfUnavailable();
-
             // Update both pass1 and pass2 segmenter dropdowns
             ['pass1-segmenter', 'pass2-segmenter'].forEach(selectId => {
                 const select = document.getElementById(selectId);

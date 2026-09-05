@@ -92,8 +92,8 @@ from whisperjav.pipelines.kotoba_faster_whisper_pipeline import KotobaFasterWhis
 from whisperjav.config.legacy import resolve_legacy_pipeline, resolve_ensemble_config, apply_balanced_vad_defaults
 from whisperjav.utils.model_refresh import DEFAULT_MODEL_REFRESH_AUDIO_MINUTES
 from whisperjav.config.segmenter_presets import (
+    BALANCED_DEFAULT_SEGMENTER,
     BALANCED_SINGLE_PASS_EXTERNAL,
-    pick_balanced_default_segmenter,
     resolve_segmenter_sensitivity,
 )
 from whisperjav.__version__ import __version__, __version_display__
@@ -403,9 +403,10 @@ def parse_arguments():
                              metavar="BACKEND",
                              help=(
                                  "Speech segmentation backend. Defaults: --mode balanced uses "
-                                 "firered-vad (v1.9.2; falls back to ten, then silero-v3.1 if the "
-                                 "fireredvad package is missing); --ensemble and --mode qwen use "
-                                 "whisperseg; other single-pass modes use silero-v3.1. Choices: "
+                                 "faster-whisper (the recognizer's built-in VAD, one call per scene); "
+                                 "--ensemble and --mode qwen use whisperseg; other single-pass modes "
+                                 "use silero-v3.1. On --mode balanced, firered-vad and ten honour "
+                                 "--sensitivity (v1.9.2). Choices: "
                                  "firered-vad (FireRedTeam DFSMN VAD, tiny, CPU), "
                                  "whisperseg (Whisper-encoder VAD trained on JA ASMR, ONNX, "
                                  "F1=0.787 on Netflix-GT JAV), "
@@ -2331,16 +2332,13 @@ def main():
     speech_segmenter = getattr(args, 'speech_segmenter', None)
     if speech_segmenter is None and resolved_config is not None:
         if getattr(args, 'mode', None) == "balanced":
-            # v1.9.2 (owner CFF3): balanced defaults to a WhisperJAV EXTERNAL
-            # speech segmenter again — FireRedVAD first, then TEN, then
-            # silero-v3.1 if a package is missing (owner D7: never fall back to
-            # faster-whisper's internal VAD). This reverses the v1.9.0 native-VAD
-            # default: the external per-group path decodes each VAD group
-            # separately, so Balanced is slower than in v1.9.0/v1.9.1 but keeps
-            # a real speech detector in the loop (timing, #394 corroboration).
-            # Revert to the v1.9.0 behaviour with --speech-segmenter faster-whisper.
-            speech_segmenter = pick_balanced_default_segmenter()
-            logger.debug("No --speech-segmenter passed; --mode balanced uses v1.9.2 default: %s (external segmenter)", speech_segmenter)
+            # Balanced defaults to faster-whisper's built-in VAD (v1.9.0 throughput
+            # retune: one transcribe(vad_filter=True) call per scene). A v1.9.2
+            # development build defaulted to FireRedVAD; the owner reversed that
+            # (2026-09-05, N3). An explicit --speech-segmenter picks a WhisperJAV
+            # segmenter; firered-vad and ten then honour --sensitivity here.
+            speech_segmenter = BALANCED_DEFAULT_SEGMENTER
+            logger.debug("No --speech-segmenter passed; --mode balanced uses %s (built-in VAD)", speech_segmenter)
         elif _path_safe_for_whisperseg_default(args):
             speech_segmenter = "whisperseg"
             logger.debug("No --speech-segmenter passed; using v1.8.13 default: whisperseg")
@@ -2371,8 +2369,8 @@ def main():
 
     # Guard: explicit non-Silero choice on a path with the routing bug → downgrade with warning.
     # v1.9.2: `--mode balanced` resolves the YAML sensitivity presets for
-    # firered-vad and ten below (the members of the Balanced default chain), so
-    # those two are exempt there. Other backends keep the downgrade.
+    # firered-vad and ten below, so those two are exempt there. Other backends
+    # keep the downgrade.
     _balanced_external_ok = (
         getattr(args, 'mode', None) == "balanced"
         and speech_segmenter in BALANCED_SINGLE_PASS_EXTERNAL

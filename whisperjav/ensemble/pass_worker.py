@@ -93,8 +93,8 @@ DECODER_PARAMS = {
 # names this module and its tests have always used.
 from whisperjav.config.segmenter_presets import (  # noqa: E402
     SEGMENTER_PARAMS,
+    BALANCED_DEFAULT_SEGMENTER,
     SEGMENTER_TOOL_NAMES as _SEGMENTER_TOOL_NAMES,
-    pick_balanced_default_segmenter,
     resolve_segmenter_sensitivity as resolve_qwen_sensitivity,
 )
 
@@ -1626,7 +1626,7 @@ SPEECH_SEGMENTER_MAP = {
     "whisper-vad-medium": "whisper-vad-medium",
     "ten": "ten",
     "silero-v6.2": "silero-v6.2",
-    "firered-vad": "firered-vad",  # v1.9.0; Balanced default since v1.9.2
+    "firered-vad": "firered-vad",  # v1.9.0; installed by default since v1.9.2
     "none": "none",
 }
 
@@ -1689,11 +1689,11 @@ def _apply_gui_overrides(
     # here so the same mode+sensitivity resolves identically at all three entry
     # points. An explicit --passN-speech-segmenter still wins.
     if speech_segmenter is None and pass_config.get("pipeline") == "balanced":
-        # v1.9.2 (owner CFF3/D7): FireRedVAD, then TEN, then silero-v3.1 —
-        # the same chain main.py uses for `--mode balanced`.
-        speech_segmenter = pick_balanced_default_segmenter()
+        # Same default as main.py's `--mode balanced` (owner N3, 2026-09-05:
+        # the built-in VAD, reversing the v1.9.2 development-build FireRedVAD default).
+        speech_segmenter = BALANCED_DEFAULT_SEGMENTER
         logger.debug(
-            "Pass %s: balanced pipeline defaults to external segmenter %s (v1.9.2)",
+            "Pass %s: balanced pipeline defaults to %s (built-in VAD)",
             pass_number, speech_segmenter,
         )
     if speech_segmenter is not None:  # Allow empty string for default

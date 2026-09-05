@@ -195,8 +195,8 @@ Decides what the model hears — and in ChronosJAV pipelines, where your timesta
 | **TEN VAD** | Light and quick; good general performer; pass-2 default for diversity | Less JA-specialised than WhisperSeg |
 | **Silero v3.1 / v4.0** | Solid general-purpose; the recommendation for non-Japanese audio | Tends to miss very quiet Japanese speech |
 | **Silero v6.2** | Adds max-duration splitting and finer control | Same quiet-speech caveat |
-| **Faster-Whisper native** | Fastest — one recognizer call per scene; the v1.9.0–v1.9.1 Balanced default, still one flag away (`--speech-segmenter faster-whisper`) | Coarser timing than a dedicated VAD; no independent speech detector for the run-outcome check |
-| **FireRedVAD** *(Balanced default since v1.9.2)* | Tiny multilingual model, cheap on CPU; lowest false-alarm rate of the bundled VADs | Detection presets upstream-derived; segment cap JAV-tuned |
+| **Faster-Whisper native** *(Balanced default)* | Fastest — one recognizer call per scene | Coarser timing than a dedicated VAD; no independent speech detector for the run-outcome check |
+| **FireRedVAD** | Tiny multilingual model, cheap on CPU; lowest false-alarm rate of the bundled VADs; installed by default since v1.9.2 | Detection presets upstream-derived; segment cap JAV-tuned |
 | **None** | The model hears everything | Maximum hallucination exposure on non-speech |
 
 ### ASR engine and model

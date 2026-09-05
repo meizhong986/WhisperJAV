@@ -221,26 +221,22 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
   applies to Transcription and Ensemble runs). Balanced's per-scene telemetry records which instance
   generation decoded each scene. This is containment, not a fix for the root cause, which is still
   under investigation.
-- **Balanced mode uses a real speech detector again — FireRedVAD by default.** v1.9.0 switched
-  Balanced to faster-whisper's built-in VAD for speed. v1.9.2 reverses that: Balanced now runs
-  FireRedVAD (a tiny CPU model with the lowest false-alarm rate of the bundled VADs) and hands the
-  recognizer one speech group at a time. Expect Balanced to be slower than in v1.9.0/v1.9.1; in
-  exchange, timing follows detected speech and the run-outcome check has an independent speech
-  signal (see next item). If the `fireredvad` package is missing, Balanced falls back to TEN-VAD,
-  then Silero v3.1, with a warning — never to the built-in VAD. The fast v1.9.0 behaviour is one
-  flag away: `--speech-segmenter faster-whisper`. In the GUI, the Ensemble tab's balanced pass
-  now defaults to FireRedVAD; the Transcribe tab follows the CLI default.
+- **Balanced keeps faster-whisper's built-in VAD as its default speech segmenter**, as in
+  v1.9.0/v1.9.1 (one recognizer call per scene). A WhisperJAV segmenter is one flag away:
+  `--speech-segmenter firered-vad` (or `ten`, `silero-v3.1`, …); in the GUI, the Ensemble tab's
+  segmenter dropdown. Under the built-in VAD there is no independent speech detector, so the
+  run-outcome check cannot mark a zero-cue Balanced file `suspect`; it is reported `empty`.
 - **`--sensitivity` now applies to FireRedVAD and TEN on plain `--mode balanced`.** The
   single-pass path previously never loaded a non-Silero segmenter's sensitivity preset (which is
   why it used to downgrade those choices to Silero). It does now, in the same order as ensemble:
   preset, then the fine-grained grouping overlay, then your explicit flags. Other segmenters
   (WhisperSeg, NeMo, whisper-vad) are still routed through `--ensemble` only.
-- **Balanced runs can now be reported `suspect`.** The "speech kept being detected but nothing
-  came back" counter that corroborates a #394-style stall only works with a real speech
-  detector, so it was inert under the built-in VAD. With FireRedVAD it is active: a Balanced
-  file with zero cues while speech was detected for several scenes in a row is classified
-  `suspect` instead of `empty`. The exit code changes only if you use `--fail-on suspect`
-  (CLI or the GUI checkbox); the run summary wording changes for everyone.
+- **Balanced runs with a WhisperJAV segmenter can be reported `suspect`.** The "speech kept being
+  detected but nothing came back" counter that corroborates a #394-style stall only works with a
+  real speech detector, so it is inert under the default built-in VAD. With `--speech-segmenter
+  firered-vad` (or any other WhisperJAV segmenter) it is active: a Balanced file with zero cues
+  while speech was detected for several scenes in a row is classified `suspect` instead of
+  `empty`. The exit code changes only if you use `--fail-on suspect` (CLI or the GUI checkbox).
 - **FireRedVAD is installed with WhisperJAV.** The `fireredvad` package is now part of the
   standard install (every extra that includes `cli`, the Windows installer, Colab and Kaggle).
   It is no longer marked experimental in the CLI, the GUI or the docs. Its detection presets are
@@ -349,10 +345,11 @@ Not user-visible, but worth recording:
 
 ## Planned for this release, not yet landed
 
-- **Corroboration outside Balanced mode.** Balanced reports the
-  speech-positive empty-scene signal; Fidelity, Fast, Faster and the ChronosJAV
-  pipelines do not yet, so `suspect` there can only come from the span check
-  (or, in ensemble, from a pass-2 failure).
+- **Corroboration beyond Balanced with a WhisperJAV segmenter.** Balanced reports the
+  speech-positive empty-scene signal only when a WhisperJAV segmenter is selected
+  (`--speech-segmenter firered-vad`, `ten`, …); under its default built-in VAD, and in
+  Fidelity, Fast, Faster and the ChronosJAV pipelines, `suspect` can only come from the
+  span check (or, in ensemble, from a pass-2 failure).
 
 ---
 
@@ -380,7 +377,7 @@ Not user-visible, but worth recording:
 | 2026-09-05 | Recognizer refreshed after 20 minutes of scene audio (`--model-refresh-audio-minutes`, GUI field): Balanced hosts its CTranslate2 model in a worker process and replaces it, Fidelity reloads in place; telemetry gains `model_epoch`; async + Balanced + several files now completes with refresh on |
 | 2026-09-05 | Qwen lone-line filter also drops 「はい。」 and 「うん。」 (exact lone token only; `--no-qwen-drop-nonverbal-lines` to keep) (#254) |
 | 2026-09-05 | Semantic scene-change threshold exposed: `--scene-clustering-threshold`, `--qwen-scene-clustering-threshold`, `--passN-qwen-params scene_clustering_threshold`, and a slider in both Customize modals |
-| 2026-09-05 | Balanced default segmenter → FireRedVAD (external; TEN, then Silero v3.1 if missing — never the built-in VAD); `--sensitivity` presets now resolved for FireRedVAD/TEN on single-pass balanced; `--speech-segmenter faster-whisper` restores the v1.9.0 behaviour; Balanced runs can be `suspect` |
+| 2026-09-06 | Balanced default segmenter stays faster-whisper's built-in VAD (owner reversed the 2026-09-05 FireRedVAD default before release); `--sensitivity` presets resolved for FireRedVAD/TEN on single-pass balanced; Balanced runs with a WhisperJAV segmenter can be `suspect` |
 | 2026-09-05 | `fireredvad` becomes a standard dependency (`[cli]`, installer, Colab/Kaggle); all "experimental" labels on FireRedVAD removed; registry/template pins aligned with pyproject (#311) |
 | 2026-09-04 | ASR telemetry on by default, written to `raw_subs/` next to the outputs; reaches Balanced passes inside ensemble runs (per-pass files, source mode included); `--no-asr-telemetry` added. Version set to 1.9.2 in code. Release-note corrections: #395 is fixed, not a limitation; persistence entry no longer credits #298 (closed) or #381 |
 | 2026-09-03 | GUI speaks the same contract: reads `whisperjav_run.json` on exit, closes with `[FINISHED] <tally>` instead of `[SUCCESS]`, shows the tally in the status line and dialog, and offers the two "treat as failure" checkboxes (`--fail-on`) for Transcription and Ensemble runs |

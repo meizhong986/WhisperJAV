@@ -1,5 +1,5 @@
 # =============================================================================
-# FireRedVAD Speech Segmentation Tool Configuration (v1.9.0; Balanced default since v1.9.2)
+# FireRedVAD Speech Segmentation Tool Configuration (v1.9.0; installed by default since v1.9.2)
 # =============================================================================
 # Industrial-grade DFSMN-based VAD from FireRedTeam (~0.6M params, Apache-2.0).
 # Claims 100+ language coverage (F1 97.57% on FLEURS-VAD-102).
@@ -20,7 +20,7 @@ metadata:
   description: |
     Speech segmentation using FireRedTeam's DFSMN-based VAD.
     Tiny (~0.6M params) frame-level model with strong multilingual coverage.
-    CPU inference by default. Default speech segmenter of the Balanced pipeline (v1.9.2).
+    CPU inference by default. Installed with WhisperJAV since v1.9.2.
   version: "1.0.0"
   tags:
     - speech-segmentation

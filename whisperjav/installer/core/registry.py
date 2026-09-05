@@ -500,7 +500,7 @@ PACKAGES: List[Package] = [
         version=">=0.0.2",
         extra=Extra.CLI,
         order=49,
-        reason="FireRedVAD speech segmenter - Balanced pipeline default since v1.9.2",
+        reason="FireRedVAD speech segmenter - ships by default since v1.9.2 (owner CFF6); selected with --speech-segmenter firered-vad",
     ),
 
     # =========================================================================

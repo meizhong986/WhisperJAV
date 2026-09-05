@@ -1,5 +1,5 @@
 """
-FireRedVAD speech segmentation backend (v1.9.0; Balanced pipeline default since v1.9.2).
+FireRedVAD speech segmentation backend (v1.9.0; installed by default since v1.9.2).
 
 Industrial-grade DFSMN-based VAD from FireRedTeam (~0.6M params, ~2.2MB),
 claiming 100+ language coverage. Apache-2.0 licensed.

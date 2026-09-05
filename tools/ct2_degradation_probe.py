@@ -408,12 +408,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Sensitivity to resolve for --profile shipped (default: balanced).")
     p.add_argument("--speech-segmenter", default="faster-whisper",
                    help="Segmenter to resolve for --profile shipped. Default "
-                        "'faster-whisper' is the v1.9.0/v1.9.1 balanced default (native "
-                        "internal VAD) and is kept so new runs stay comparable with "
-                        "the ones reporters already collected. WhisperJAV v1.9.2 ships "
-                        "firered-vad as the balanced default; pass it explicitly to "
-                        "mirror that release. Pass silero-v3.1 to probe the external "
-                        "per-group path.")
+                        "'faster-whisper' is the shipped balanced default (native "
+                        "internal VAD, v1.9.0 onwards). Pass silero-v3.1 or firered-vad "
+                        "to probe the external per-group path.")
     p.add_argument("--model", default=None,
                    help="Model name. Under --profile shipped, defaults to the model "
                         "your configuration resolves to; under --profile raw, to "
