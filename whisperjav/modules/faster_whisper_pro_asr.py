@@ -84,13 +84,11 @@ class FasterWhisperProASR:
 
         # Determine speech segmenter backend FIRST (needed for firewall below)
         speech_segmenter_config = params.get("speech_segmenter", {})
-        # v1.8.13: default flipped silero-v3.1 -> whisperseg to align with
-        # LEGACY_PIPELINES["balanced"]["vad"] = "whisperseg" (resolver-level
-        # default). The fallback only fires when speech_segmenter.backend is
-        # not set (e.g., direct module instantiation bypassing the resolver).
-        # v1.8.12 history: aligned with v3.1 to fix prior silent override to
-        # silero-v4.0 — that alignment is preserved by keeping resolver and
-        # fallback in sync.
+        # The backend is always set upstream (main.py / pass_worker) — on
+        # --mode balanced it is the v1.9.2 default chain firered-vad → ten →
+        # silero-v3.1. This fallback only fires on direct module instantiation
+        # that bypasses the resolver. (LEGACY_PIPELINES["balanced"]["vad"] is
+        # the Pydantic VAD *component*, "silero-v3.1", not this selector.)
         segmenter_backend = speech_segmenter_config.get("backend", "whisperseg")
 
         # v1.9.0 T1: "faster-whisper" backend = faster-whisper's BUILT-IN VAD.

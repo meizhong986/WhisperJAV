@@ -90,6 +90,11 @@ from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 from whisperjav.pipelines.kotoba_faster_whisper_pipeline import KotobaFasterWhisperPipeline
 from whisperjav.config.legacy import resolve_legacy_pipeline, resolve_ensemble_config, apply_balanced_vad_defaults
+from whisperjav.config.segmenter_presets import (
+    BALANCED_SINGLE_PASS_EXTERNAL,
+    pick_balanced_default_segmenter,
+    resolve_segmenter_sensitivity,
+)
 from whisperjav.__version__ import __version__, __version_display__
 
 
@@ -383,21 +388,25 @@ def parse_arguments():
                                  "whisper-vad", "whisper-vad-tiny", "whisper-vad-base", "whisper-vad-medium",
                                  "ten", "whisperseg", "firered-vad", "faster-whisper", "none"
                              ],
-                             default=None,  # None = use whisperseg (v1.8.13 default for balanced/fidelity)
+                             default=None,  # None = per-mode default (see help text)
                              metavar="BACKEND",
                              help=(
-                                 "Speech segmentation backend: "
-                                 "whisperseg (default for balanced/fidelity since v1.8.13 — "
-                                 "Whisper-encoder VAD trained on JA ASMR, ONNX, F1=0.787 on Netflix-GT JAV), "
+                                 "Speech segmentation backend. Defaults: --mode balanced uses "
+                                 "firered-vad (v1.9.2; falls back to ten, then silero-v3.1 if the "
+                                 "fireredvad package is missing); --ensemble and --mode qwen use "
+                                 "whisperseg; other single-pass modes use silero-v3.1. Choices: "
+                                 "firered-vad (FireRedTeam DFSMN VAD, tiny, CPU), "
+                                 "whisperseg (Whisper-encoder VAD trained on JA ASMR, ONNX, "
+                                 "F1=0.787 on Netflix-GT JAV), "
                                  "silero-v3.1 (recommended for non-Japanese audio), "
                                  "silero/silero-v4.0, silero-v6.2 (pip pkg, max_speech_duration_s + hysteresis), "
                                  "nemo/nemo-lite (fast frame VAD ~0.5GB), "
                                  "whisper-vad (neural VAD using Whisper small model ~500MB), "
                                  "whisper-vad-tiny/base/medium (other model sizes), "
                                  "ten (TEN Framework), "
-                                 "faster-whisper (v1.9.0 balanced default — faster-whisper's "
-                                 "built-in VAD via vad_filter; one transcribe call per scene, "
-                                 "no external per-group overhead), "
+                                 "faster-whisper (faster-whisper's built-in VAD via vad_filter; "
+                                 "one transcribe call per scene -- the v1.9.0/v1.9.1 balanced "
+                                 "default, fastest), "
                                  "none (disable segmentation)"
                              ))
     tuning_group.add_argument("--initial-prompt",
@@ -2261,15 +2270,16 @@ def main():
     speech_segmenter = getattr(args, 'speech_segmenter', None)
     if speech_segmenter is None and resolved_config is not None:
         if getattr(args, 'mode', None) == "balanced":
-            # v1.9.0 T1: balanced defaults to faster-whisper's native VAD
-            # (vad_filter=True, one transcribe call per scene). This is the
-            # throughput fix — it bypasses the external per-group segmenter
-            # whose N-calls-per-scene padding was the 2-3x slowdown. Native
-            # VAD does NOT hit the v1.9.0 non-Silero routing bug because it
-            # uses faster-whisper's internal VAD, not the external grouping
-            # path. Revert with --speech-segmenter silero-v3.1.
-            speech_segmenter = "faster-whisper"
-            logger.debug("No --speech-segmenter passed; --mode balanced uses v1.9.0 default: faster-whisper (native VAD)")
+            # v1.9.2 (owner CFF3): balanced defaults to a WhisperJAV EXTERNAL
+            # speech segmenter again — FireRedVAD first, then TEN, then
+            # silero-v3.1 if a package is missing (owner D7: never fall back to
+            # faster-whisper's internal VAD). This reverses the v1.9.0 native-VAD
+            # default: the external per-group path decodes each VAD group
+            # separately, so Balanced is slower than in v1.9.0/v1.9.1 but keeps
+            # a real speech detector in the loop (timing, #394 corroboration).
+            # Revert to the v1.9.0 behaviour with --speech-segmenter faster-whisper.
+            speech_segmenter = pick_balanced_default_segmenter()
+            logger.debug("No --speech-segmenter passed; --mode balanced uses v1.9.2 default: %s (external segmenter)", speech_segmenter)
         elif _path_safe_for_whisperseg_default(args):
             speech_segmenter = "whisperseg"
             logger.debug("No --speech-segmenter passed; using v1.8.13 default: whisperseg")
@@ -2299,17 +2309,25 @@ def main():
         speech_segmenter = _fw_fallback
 
     # Guard: explicit non-Silero choice on a path with the routing bug → downgrade with warning.
+    # v1.9.2: `--mode balanced` resolves the YAML sensitivity presets for
+    # firered-vad and ten below (the members of the Balanced default chain), so
+    # those two are exempt there. Other backends keep the downgrade.
+    _balanced_external_ok = (
+        getattr(args, 'mode', None) == "balanced"
+        and speech_segmenter in BALANCED_SINGLE_PASS_EXTERNAL
+    )
     if speech_segmenter is not None and resolved_config is not None:
         if (not _path_safe_for_whisperseg_default(args)
+                and not _balanced_external_ok
                 and speech_segmenter != "none"
                 and speech_segmenter != "faster-whisper"
                 and not speech_segmenter.startswith("silero")):
             logger.warning(
                 "Speech segmenter '%s' is not wired for single-pass --mode %s: that "
-                "path does not carry the segmenter's parameters through, which can "
-                "produce empty output on JAV audio. Falling back to silero-v3.1. "
-                "WhisperSeg / TEN / NeMo / whisper-vad are fully supported via "
-                "--ensemble, and silero-v6.2 works here.",
+                "path does not resolve the segmenter's sensitivity presets. "
+                "Falling back to silero-v3.1. WhisperSeg / NeMo / whisper-vad are "
+                "fully supported via --ensemble; firered-vad and ten are supported "
+                "on --mode balanced, and silero-v6.2 works here.",
                 speech_segmenter, getattr(args, 'mode', None)
             )
             speech_segmenter = "silero-v3.1"
@@ -2322,6 +2340,23 @@ def main():
         resolved_config["params"]["speech_segmenter"]["backend"] = speech_segmenter
         logger.info(f"Speech segmenter set to: {speech_segmenter}")
         # Note: Speech Segmenter factory handles "none" backend internally
+
+        # v1.9.2: resolve the backend's per-sensitivity YAML preset on the
+        # single-pass path too (the ensemble path always did, via
+        # pass_worker._apply_gui_overrides). Silero backends keep their Pydantic
+        # VAD component; native/none have nothing to resolve. Runs BEFORE the
+        # Test-D grouping overlay and the explicit CLI overrides, which win.
+        if (speech_segmenter not in ("none", "faster-whisper")
+                and not speech_segmenter.startswith("silero")):
+            _preset = resolve_segmenter_sensitivity(
+                speech_segmenter, getattr(args, 'sensitivity', 'balanced')
+            )
+            for _k, _v in _preset.items():
+                resolved_config["params"]["speech_segmenter"].setdefault(_k, _v)
+            logger.debug(
+                "Speech segmenter '%s': %d sensitivity-preset params resolved (%s)",
+                speech_segmenter, len(_preset), getattr(args, 'sensitivity', 'balanced'),
+            )
 
         # v1.9.0: apply the SHARED balanced VAD defaults — native faster_whisper_vad
         # preset (scale-correct for faster-whisper's bundled Silero), or the Test-D

@@ -428,6 +428,7 @@ filterwarnings = [
 ]
 markers = [
     "gated_model: tests that require gated HuggingFace model weights (HF_TOKEN required; skipped in CI)",
+    "slow: tests that shell out to the real CLI (seconds each); deselect with -m 'not slow'",
 ]
 
 # -----------------------------------------------------------------------------

@@ -206,6 +206,26 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
 
 ## Changed defaults and installation
 
+- **Balanced mode uses a real speech detector again — FireRedVAD by default.** v1.9.0 switched
+  Balanced to faster-whisper's built-in VAD for speed. v1.9.2 reverses that: Balanced now runs
+  FireRedVAD (a tiny CPU model with the lowest false-alarm rate of the bundled VADs) and hands the
+  recognizer one speech group at a time. Expect Balanced to be slower than in v1.9.0/v1.9.1; in
+  exchange, timing follows detected speech and the run-outcome check has an independent speech
+  signal (see next item). If the `fireredvad` package is missing, Balanced falls back to TEN-VAD,
+  then Silero v3.1, with a warning — never to the built-in VAD. The fast v1.9.0 behaviour is one
+  flag away: `--speech-segmenter faster-whisper`. In the GUI, the Ensemble tab's balanced pass
+  now defaults to FireRedVAD; the Transcribe tab follows the CLI default.
+- **`--sensitivity` now applies to FireRedVAD and TEN on plain `--mode balanced`.** The
+  single-pass path previously never loaded a non-Silero segmenter's sensitivity preset (which is
+  why it used to downgrade those choices to Silero). It does now, in the same order as ensemble:
+  preset, then the fine-grained grouping overlay, then your explicit flags. Other segmenters
+  (WhisperSeg, NeMo, whisper-vad) are still routed through `--ensemble` only.
+- **Balanced runs can now be reported `suspect`.** The "speech kept being detected but nothing
+  came back" counter that corroborates a #394-style stall only works with a real speech
+  detector, so it was inert under the built-in VAD. With FireRedVAD it is active: a Balanced
+  file with zero cues while speech was detected for several scenes in a row is classified
+  `suspect` instead of `empty`. The exit code changes only if you use `--fail-on suspect`
+  (CLI or the GUI checkbox); the run summary wording changes for everyone.
 - **FireRedVAD is installed with WhisperJAV.** The `fireredvad` package is now part of the
   standard install (every extra that includes `cli`, the Windows installer, Colab and Kaggle).
   It is no longer marked experimental in the CLI, the GUI or the docs. Its detection presets are
@@ -329,6 +349,7 @@ Not user-visible, but worth recording:
 
 | Date | Change |
 |------|--------|
+| 2026-09-05 | Balanced default segmenter → FireRedVAD (external; TEN, then Silero v3.1 if missing — never the built-in VAD); `--sensitivity` presets now resolved for FireRedVAD/TEN on single-pass balanced; `--speech-segmenter faster-whisper` restores the v1.9.0 behaviour; Balanced runs can be `suspect` |
 | 2026-09-05 | `fireredvad` becomes a standard dependency (`[cli]`, installer, Colab/Kaggle); all "experimental" labels on FireRedVAD removed; registry/template pins aligned with pyproject (#311) |
 | 2026-09-04 | ASR telemetry on by default, written to `raw_subs/` next to the outputs; reaches Balanced passes inside ensemble runs (per-pass files, source mode included); `--no-asr-telemetry` added. Version set to 1.9.2 in code. Release-note corrections: #395 is fixed, not a limitation; persistence entry no longer credits #298 (closed) or #381 |
 | 2026-09-03 | GUI speaks the same contract: reads `whisperjav_run.json` on exit, closes with `[FINISHED] <tally>` instead of `[SUCCESS]`, shows the tally in the status line and dialog, and offers the two "treat as failure" checkboxes (`--fail-on`) for Transcription and Ensemble runs |

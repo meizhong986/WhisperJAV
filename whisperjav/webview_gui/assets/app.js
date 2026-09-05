@@ -1778,14 +1778,16 @@ const EnsembleManager = {
             // Whisper-based pipeline defaults (balanced, faster, fast, fidelity)
             const pipeline = this.state[passKey].pipeline;
             if (pipeline === 'balanced') {
-                // v1.9.0: balanced defaults to faster-whisper native VAD (fastest;
-                // one transcribe call per scene). Picking an external segmenter
-                // instead auto-applies the best-quality fine-grained grouping
-                // (handled in main.py). Scene detection stays auditok.
+                // v1.9.2: balanced defaults to an external WhisperJAV segmenter —
+                // FireRedVAD, then TEN, then Silero v3.1 if a package is missing
+                // (same chain as main.py / pass_worker). Test-D fine-grained
+                // grouping is applied in main.py. Scene detection stays auditok.
+                // 'faster-whisper' (native VAD, v1.9.0 default) stays selectable.
+                const balancedSegmenter = this.pickBalancedDefaultSegmenter();
                 sceneSelect.value = 'auditok';
-                segmenterSelect.value = 'faster-whisper';
+                segmenterSelect.value = balancedSegmenter;
                 this.state[passKey].sceneDetector = 'auditok';
-                this.state[passKey].speechSegmenter = 'faster-whisper';
+                this.state[passKey].speechSegmenter = balancedSegmenter;
             } else if (pipeline === 'fidelity') {
                 // v1.8.13: whisperseg + semantic for fidelity (unchanged)
                 sceneSelect.value = 'semantic';
@@ -1803,6 +1805,24 @@ const EnsembleManager = {
             sensitivitySelect.value = 'aggressive';
             this.state[passKey].sensitivity = 'aggressive';
         }
+    },
+
+    // v1.9.2: Balanced default segmenter chain, mirrored from
+    // whisperjav/config/segmenter_presets.py BALANCED_DEFAULT_SEGMENTER_CHAIN.
+    // Uses the availability map fetched by updateSegmenterAvailability(); before
+    // that map exists (or if every member is unavailable) the first member wins,
+    // and the backend applies the same chain at run time.
+    balancedDefaultSegmenterChain: ['firered-vad', 'ten', 'silero-v3.1'],
+    segmenterAvailability: null,
+
+    pickBalancedDefaultSegmenter() {
+        const map = this.segmenterAvailability;
+        if (!map) return this.balancedDefaultSegmenterChain[0];
+        for (const name of this.balancedDefaultSegmenterChain) {
+            const info = map[name];
+            if (!info || info.available) return name;
+        }
+        return this.balancedDefaultSegmenterChain[0];
     },
 
     // Swap model dropdown options based on pipeline type
@@ -5538,6 +5558,8 @@ const EnsembleManager = {
                     hint: b.install_hint || ''
                 };
             });
+            // v1.9.2: remembered for pickBalancedDefaultSegmenter().
+            this.segmenterAvailability = availabilityMap;
 
             // Update both pass1 and pass2 segmenter dropdowns
             ['pass1-segmenter', 'pass2-segmenter'].forEach(selectId => {

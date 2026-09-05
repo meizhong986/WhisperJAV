@@ -1287,7 +1287,7 @@ class WhisperJAVAPI:
             "nemo-lite": "nemo-speech-segmentation.yaml",
             "silero-v6.2": "silero-v6-speech-segmentation.yaml",
             "whisperseg": "whisperseg-speech-segmentation.yaml",
-            "firered-vad": "firered-vad-speech-segmentation.yaml",  # v1.9.0 experimental
+            "firered-vad": "firered-vad-speech-segmentation.yaml",  # Balanced default since v1.9.2
         }
 
         # Handle "none" backend
@@ -2613,12 +2613,25 @@ class WhisperJAVAPI:
             # panel shows what will actually run.
             if segmenter and 'asr' not in config.get('params', {}):
                 from whisperjav.config.legacy import apply_balanced_vad_defaults
-                config.setdefault('params', {}).setdefault('speech_segmenter', {})['backend'] = segmenter
+                from whisperjav.config.segmenter_presets import resolve_segmenter_sensitivity
+                ss = config.setdefault('params', {}).setdefault('speech_segmenter', {})
+                ss['backend'] = segmenter
+                # v1.9.2: same order as main.py — YAML sensitivity preset for a
+                # non-silero external backend, then the balanced overlay.
+                if segmenter not in ('none', 'faster-whisper') and not segmenter.startswith('silero'):
+                    for _k, _v in resolve_segmenter_sensitivity(segmenter, sensitivity).items():
+                        ss.setdefault(_k, _v)
                 apply_balanced_vad_defaults(
                     config,
                     sensitivity=sensitivity,
                     is_balanced=(pipeline == 'balanced'),
                 )
+                # Mirror the ASR constructor firewall (faster_whisper_pro_asr.py):
+                # for a non-silero external backend the resolver's silero VAD
+                # values are discarded at run time, so show what actually runs —
+                # the segmenter's own effective parameters.
+                if segmenter not in ('none', 'faster-whisper') and not segmenter.startswith('silero'):
+                    config['params']['vad'] = {k: v for k, v in ss.items() if k != 'backend'}
 
             # Determine scene detection method (default: auditok)
             scene_detection_method = 'auditok'

@@ -10,6 +10,66 @@
 
 ---
 
+## 2026-09-05 — CFF3: Balanced defaults to an external speech segmenter (FireRedVAD), single-pass presets resolved
+
+**Area:** new `whisperjav/config/segmenter_presets.py`; `whisperjav/main.py` (default block,
+routing guard, preset merge, `--speech-segmenter` help); `whisperjav/ensemble/pass_worker.py`
+(re-exports, balanced default); `whisperjav/webview_gui/api.py` (`get_pipeline_defaults`);
+`whisperjav/webview_gui/assets/app.js` (`applyPipelinePresets`, `pickBalancedDefaultSegmenter`);
+`whisperjav/modules/faster_whisper_pro_asr.py` (stale comment); `tools/ct2_degradation_probe.py`
+(help only); `README.md`; tests `tests/test_balanced_defaults_v192.py` (new, 21 tests).
+
+**What changed**
+- `--mode balanced` with no `--speech-segmenter` now runs a WhisperJAV external segmenter:
+  `firered-vad`, or `ten` if the fireredvad package is missing, or `silero-v3.1` if both are
+  (WARNING with the pip command when FireRedVAD is skipped). The same chain is applied by the
+  ensemble pass worker for a balanced pass without `--passN-speech-segmenter`, and by the GUI's
+  Ensemble-tab preset when the pipeline is switched to balanced (availability-aware).
+  `--speech-segmenter faster-whisper` restores the v1.9.0/v1.9.1 native-VAD behaviour.
+- The single-pass path now resolves the backend's per-sensitivity YAML preset (the ensemble
+  path always did). Order: backend → YAML preset → Test-D grouping overlay → explicit CLI
+  overrides. Before this, `--sensitivity` was inert for a non-silero segmenter on
+  `--mode balanced` — the guard's stated reason for downgrading such choices.
+- Routing guard: `firered-vad` and `ten` are exempt on `--mode balanced` (their presets now
+  flow); every other non-silero backend keeps the downgrade to silero-v3.1 (fidelity/fast/faster
+  untouched; wider unification is PR #375's scope). Warning text updated.
+- `SEGMENTER_PARAMS`, the backend→YAML tool map and `resolve_qwen_sensitivity` moved verbatim
+  from `pass_worker.py` (imports every pipeline) to the light module
+  `config/segmenter_presets.py`; `pass_worker` re-exports the old names, so existing imports and
+  tests are unchanged.
+- GUI Customize panel (`get_pipeline_defaults`): for a non-silero external backend the returned
+  `vad` block is the segmenter's effective parameters (YAML preset + Test-D) instead of the
+  resolver's silero values that the ASR firewall discards at run time.
+- Probe tool default left at `faster-whisper` so new runs stay comparable with the reporter
+  datasets already collected; its help says how to mirror the v1.9.2 default.
+
+**Consequences stated for users (release notes):** Balanced is slower than in v1.9.0/v1.9.1
+(one recognizer call per VAD group instead of per scene); the #394 corroboration counter is
+active on balanced by default, so a file with zero cues while speech kept being detected is
+`suspect` rather than `empty` (exit code changes only under `--fail-on suspect`); Test-D
+grouping (9.0 s / 0.1 s) overrides the FireRedVAD YAML `max_group_duration_s` (7/6/5) and
+`chunk_threshold_s` (1.0) — the Segmenter tab in Customize shows the YAML values for those two
+keys, not the Test-D ones (pre-existing display gap for every external segmenter on balanced).
+
+**Verification (executed):** `--dump-params --mode balanced` × conservative/balanced/aggressive →
+backend firered-vad, threshold .5/.4/.3, max_speech 7/6/5, end_pad 250/150/100, max_group 9.0,
+chunk 0.1, `vad` cleared + `_dump_note`; `--speech-segmenter faster-whisper` → native preset kept;
+`ten` → exempt, preset + Test-D; `whisperseg` → downgrade warning; `silero-v6.2`, `--mode
+fidelity`, `--mode fast` unchanged; `--vad-threshold 0.6 --max-group-duration 6` win. Real CPU
+run (`--mode balanced --model tiny`, 15 s clip): "Speech segmenter set to: firered-vad",
+Test-D line, "Speech Segmenter initialized: firered-vad", 3 cues, RUN SUMMARY exit 0.
+`--help` lists firered-vad; `--speech-segmenter firered-vad --help` exit 0. `get_pipeline_defaults`
+called directly for firered-vad / faster-whisper / silero-v3.1. `node --check app.js`.
+Suites: new file 21 passed; `test_qwen_sensitivity` + `test_ensemble_params` +
+`test_gui_custom_params_simulation` 104 passed / 8 failed — identical to the baseline before
+this change (stale silero-v6.2 set); `test_gui_settings` + `test_gui_run_summary` 76 passed.
+
+**Decision:** owner (CFF3, 2026-09-05): default = FireRedVAD, "external" = a WhisperJAV segmenter
+as opposed to faster-whisper's native VAD; D3 Test-D stays; D4 no Transcribe-tab dropdown; D6
+`suspect` verdicts on balanced accepted after explanation; D7 fallback to another WhisperJAV
+segmenter, never native. Guard exemption limited to the two chain members (owner: no
+over-engineering). Thread owed: #311.
+
 ## 2026-09-05 — CFF6: FireRedVAD becomes a first-class dependency (installed with `[cli]`)
 
 **Area:** `pyproject.toml` (`[cli]` extra), `uv.lock`, `whisperjav/installer/core/registry.py`,
