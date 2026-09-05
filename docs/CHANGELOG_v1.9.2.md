@@ -43,6 +43,9 @@ range is not explained by this reading and stays open. No audio-only scene work 
 found. Adversary pass ran on the note; ten findings folded in (note §8).
 
 **Decision:** owner (2026-09-05) asked for the logic to be researched, not accuracy; no change made.
+Owner N1/N2 (2026-09-05, after the literature review): the threshold slider STAYS in 1.9.2 unchanged; the
+study is marked for 2.x, where the semantic detector's boundary logic and granularity control are to be
+revisited (roadmap §9.3).
 
 ## 2026-09-05 — tools/scene_inspector.py: scene-detector statistics and per-scene screenshots
 
