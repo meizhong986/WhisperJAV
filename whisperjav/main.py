@@ -767,12 +767,13 @@ def parse_arguments():
                            help=argparse.SUPPRESS)
     qwen_output_group.add_argument("--qwen-drop-nonverbal-lines", dest="qwen_drop_nonverbal_lines",
                            action="store_true", default=True,
-                           help="Drop lone nonverbal single-token subtitle lines "
-                                "(あ。 は。 え。 ん。 つ。 ふ。 ふっ。 切。) in Phase 8 (default: enabled). "
-                                "Applies to all Qwen backends (qwen3 / cohere / anime-whisper).")
+                           help="Drop lone nonverbal subtitle lines "
+                                "(あ。 は。 え。 ん。 つ。 ふ。 ふっ。 切。 and, since v1.9.2, はい。 うん。) "
+                                "in Phase 8 (default: enabled). Only a line that is exactly one of these "
+                                "tokens is dropped. Applies to all Qwen backends (qwen3 / cohere / anime-whisper).")
     qwen_output_group.add_argument("--no-qwen-drop-nonverbal-lines", dest="qwen_drop_nonverbal_lines",
                            action="store_false",
-                           help="Keep nonverbal single-token subtitle lines (disable the Phase-8 filter)")
+                           help="Keep lone nonverbal subtitle lines (disable the Phase-8 filter)")
 
     # Decoupled Pipeline Options (IMPL-001 Phase 2)
     decoupled_group = parser.add_argument_group(

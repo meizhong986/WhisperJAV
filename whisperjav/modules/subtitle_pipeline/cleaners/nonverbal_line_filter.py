@@ -1,25 +1,28 @@
-"""Nonverbal single-token line filter for Qwen-family SRT output (v1.9.0).
+"""Nonverbal lone-line filter for Qwen-family SRT output (v1.9.0; extended v1.9.2).
 
 Qwen3-ASR is run in ChronosJAV with deliberately sensitive VAD / decoding to
 capture maximum detail. A side effect is that many moan onsets, breaths and
-ASR truncations surface as standalone one-token subtitle lines (e.g. "あ。",
-"は。", "え。", "切。"). Too many of these clutter the subtitle for the viewer.
+ASR truncations surface as standalone subtitle lines (e.g. "あ。", "は。",
+"え。", "切。"). Too many of these clutter the subtitle for the viewer.
 
-This filter drops SRT entries whose ENTIRE (stripped) text is a single
-owner-curated nonverbal / truncation token, optionally followed by one "。".
-It is deliberately conservative: whole-line exact match means multi-token
-lines, sentences, and meaningful backchannel ("はい。", "うん。") are NEVER
-touched — only lone artifact tokens are removed.
+This filter drops SRT entries whose ENTIRE (stripped) text is exactly one
+owner-curated token, optionally followed by one "。". Whole-line exact match
+means multi-token lines and sentences are never touched.
 
-Owner-curated token set (2026-07-03), validated against a real qwen3 pass2
-SRT (MIMK-276): matched 302 / 2414 lines (12.5%), all high-confidence junk,
-with zero real-dialogue hits. Broadening to other trailing punctuation was
-tested and added nothing, so only "。" is honoured.
+Owner-curated token set:
+    - v1.9.0 (2026-07-03): single-character artifacts, validated against a real
+      qwen3 pass2 SRT (MIMK-276): matched 302 / 2414 lines (12.5%), all
+      high-confidence junk, zero real-dialogue hits. Broadening to other
+      trailing punctuation was tested and added nothing, so only "。" is honoured.
+    - v1.9.2 (2026-09-05, owner CFF5): lone "はい。" and "うん。" added. In the
+      owner's JAV tests roughly 90% of these lone lines are moans during
+      intimate scenes, not agreement (evidence: two SRT screenshots, dozens of
+      lone cues of 0.07-2.9 s). Only the exact lone token is dropped; "はいはい。",
+      "うんうん。", "ううん。", "あ、うん。" and any sentence containing them are kept.
 
-Intentionally NOT dropped here (higher false-positive risk / a different
-problem — see pipelines/AGENTS.md):
+Intentionally NOT dropped here (different problem — see pipelines/AGENTS.md):
     - multi-token stutters ("あ、あ。"), laughter ("はは。", "あはは。"),
-      long-vowel onsets ("あー。"), agreement backchannel ("うん。", "はい。").
+      long-vowel onsets ("あー。"), repeated backchannel ("はいはい。").
 """
 
 import re
@@ -30,8 +33,9 @@ import pysrt
 
 from whisperjav.utils.logger import logger
 
-# Owner-curated whole-line nonverbal / truncation tokens (v1.9.0).
-NONVERBAL_TOKENS = ("つ", "ふ", "ふっ", "切", "は", "え", "あ", "ん")
+# Owner-curated whole-line nonverbal / truncation tokens (v1.9.0), plus the lone
+# backchannel tokens the owner asked to drop in v1.9.2 (CFF5: ~90% moans in JAV).
+NONVERBAL_TOKENS = ("つ", "ふ", "ふっ", "切", "は", "え", "あ", "ん", "はい", "うん")
 
 # Whole-line match: optional surrounding whitespace, exactly one token, and an
 # optional single "。". Longer tokens are placed first in the alternation so
@@ -51,9 +55,9 @@ class NonverbalLineFilter:
         """Return True iff the whole (stripped) line is one curated nonverbal token.
 
         Examples (drop):  "あ。", "あ", "は。", "え。", "ん。", "つ。", "ふ。",
-                          "ふっ。", "切。", "  は。 " (surrounding whitespace)
-        Examples (keep):  "はい。", "うん。", "あー。", "あ、あ。", "はは。",
-                          "気持ちいい。", "", any multi-token / sentence line.
+                          "ふっ。", "切。", "はい。", "うん。", "  は。 " (whitespace)
+        Examples (keep):  "はいはい。", "うんうん。", "ううん。", "あ、うん。", "あー。",
+                          "あ、あ。", "はは。", "気持ちいい。", "", any sentence line.
         """
         if not text:
             return False

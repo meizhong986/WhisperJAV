@@ -239,6 +239,12 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
   in the Ensemble tab's Customize Parameters dialog (Scene tab for Whisper pipelines, Audio → Custom
   Scene Bounds for the ChronosJAV pipelines). It only affects the semantic detector; the CLI warns
   if you set it with auditok or silero.
+- **ChronosJAV output drops lone 「はい。」 and 「うん。」 lines.** The Qwen pipelines' lone-line
+  filter (v1.9.0) removed single-character artefacts such as 「あ。」 and 「は。」 but deliberately kept
+  「はい。」 and 「うん。」 as backchannel. In JAV material almost all of those lone lines are moans, not
+  agreement, so they are now dropped too. Only a line that is exactly that one word goes; 「はいはい。」,
+  「ううん。」, 「あ、うん。」 and full sentences are untouched. Disable with
+  `--no-qwen-drop-nonverbal-lines`. (#254)
 
 ---
 
@@ -357,6 +363,7 @@ Not user-visible, but worth recording:
 
 | Date | Change |
 |------|--------|
+| 2026-09-05 | Qwen lone-line filter also drops 「はい。」 and 「うん。」 (exact lone token only; `--no-qwen-drop-nonverbal-lines` to keep) (#254) |
 | 2026-09-05 | Semantic scene-change threshold exposed: `--scene-clustering-threshold`, `--qwen-scene-clustering-threshold`, `--passN-qwen-params scene_clustering_threshold`, and a slider in both Customize modals |
 | 2026-09-05 | Balanced default segmenter → FireRedVAD (external; TEN, then Silero v3.1 if missing — never the built-in VAD); `--sensitivity` presets now resolved for FireRedVAD/TEN on single-pass balanced; `--speech-segmenter faster-whisper` restores the v1.9.0 behaviour; Balanced runs can be `suspect` |
 | 2026-09-05 | `fireredvad` becomes a standard dependency (`[cli]`, installer, Colab/Kaggle); all "experimental" labels on FireRedVAD removed; registry/template pins aligned with pyproject (#311) |

@@ -1,4 +1,4 @@
-"""Regression tests for the v1.9.0 nonverbal single-token line filter.
+"""Regression tests for the nonverbal lone-line filter (v1.9.0; はい/うん added v1.9.2).
 
 Covers:
     - is_nonverbal_line() token matching (positives + safety negatives)
@@ -28,17 +28,24 @@ class TestIsNonverbalLine:
         assert NonverbalLineFilter.is_nonverbal_line("  は。 ") is True
         assert NonverbalLineFilter.is_nonverbal_line("\nあ\n") is True
 
+    @pytest.mark.parametrize("text", ["はい", "はい。", "うん", "うん。", " はい。 "])
+    def test_lone_backchannel_is_dropped_since_v192(self, text):
+        # Owner CFF5 (2026-09-05): lone はい。/うん。 are ~90% moans in JAV.
+        assert NonverbalLineFilter.is_nonverbal_line(text) is True
+
     @pytest.mark.parametrize(
         "text",
         [
-            "はい。",        # real backchannel — starts with は but is 2 tokens
-            "うん。",        # agreement — never dropped
+            "はいはい。",     # repeated backchannel — kept (exact token only)
+            "うんうん。",     # repeated — kept
+            "ううん。",       # negation — kept
+            "あ、うん。",     # combo — kept
+            "はい、そうです。",  # sentence — kept
             "あー。",        # long-vowel onset — deliberately kept
             "あ、あ。",       # multi-token stutter — kept
             "はは。",        # laughter — kept
             "気持ちいい。",   # real dialogue
             "ダメ…",         # real dialogue with ellipsis
-            "あ、うん。",     # combo — kept
             "ふん。",        # not in the curated set (ふ + ん) — kept
             "",              # empty
             "   ",           # whitespace only
@@ -71,25 +78,26 @@ class TestFilterSrtFile:
             srt,
             [
                 ("00:00:01,000", "00:00:02,000", "あ。"),          # drop
-                ("00:00:02,000", "00:00:03,000", "はい。"),        # keep
+                ("00:00:02,000", "00:00:03,000", "はい。"),        # drop (v1.9.2)
                 ("00:00:03,000", "00:00:04,000", "は。"),          # drop
                 ("00:00:04,000", "00:00:05,000", "気持ちいい。"),  # keep
                 ("00:00:05,000", "00:00:06,000", "切。"),          # drop
-                ("00:00:06,000", "00:00:07,000", "うん。"),        # keep
+                ("00:00:06,000", "00:00:07,000", "うん。"),        # drop (v1.9.2)
                 ("00:00:07,000", "00:00:08,000", "ふっ。"),        # drop
+                ("00:00:08,000", "00:00:09,000", "はい、そうです。"),  # keep (sentence)
             ],
         )
 
         stats = NonverbalLineFilter().filter_srt_file(srt)
 
-        assert stats["original_count"] == 7
-        assert stats["dropped_nonverbal"] == 4
+        assert stats["original_count"] == 8
+        assert stats["dropped_nonverbal"] == 6
         assert stats["dropped_empty"] == 0
-        assert stats["final_count"] == 3
+        assert stats["final_count"] == 2
 
         subs = pysrt.open(str(srt), encoding="utf-8")
-        assert [s.text for s in subs] == ["はい。", "気持ちいい。", "うん。"]
-        assert [s.index for s in subs] == [1, 2, 3]  # renumbered
+        assert [s.text for s in subs] == ["気持ちいい。", "はい、そうです。"]
+        assert [s.index for s in subs] == [1, 2]  # renumbered
 
     def test_missing_file_returns_zero_stats(self, tmp_path):
         stats = NonverbalLineFilter().filter_srt_file(tmp_path / "nope.srt")

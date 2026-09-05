@@ -10,6 +10,33 @@
 
 ---
 
+## 2026-09-05 — CFF5: Qwen lone-line filter also drops 「はい。」 and 「うん。」
+
+**Area:** `whisperjav/modules/subtitle_pipeline/cleaners/nonverbal_line_filter.py`,
+`whisperjav/main.py` (help text of `--[no-]qwen-drop-nonverbal-lines`); tests
+`tests/test_nonverbal_line_filter.py`.
+
+**What changed**
+- `NONVERBAL_TOKENS` gains `はい` and `うん`. The predicate is unchanged: a line is dropped only
+  when its whole stripped text is exactly one token plus an optional single `。`, so `はいはい。`,
+  `うんうん。`, `ううん。`, `あ、うん。` and any sentence stay (tests added for each). Runs in Phase 8
+  for all three Qwen backends (qwen3 / anime-whisper / cohere) before the nonlinguistic filter,
+  which lists the two words as keep-evidence — no conflict, it only sees surviving lines.
+- Docstring rewritten (the v1.9.0 text stated the opposite rule) with the owner's evidence:
+  two SRT screenshots of lone `はい。` (0.065–2.720 s) and `うん。` (0.300–2.900 s) cues; "almost
+  90% … refer to human moans during intimate scenes".
+- Off switch unchanged: `--no-qwen-drop-nonverbal-lines` (single-pass). Ensemble Qwen passes inherit
+  the default and have no switch — unchanged by owner decision D8.
+- Not covered on purpose: the Balanced pipeline (legacy sanitizer path; `filter_list_v08.json`
+  already holds both words as exact-match hallucination entries).
+
+**Verification (executed):** `pytest tests/test_nonverbal_line_filter.py` (positives incl. the two
+new tokens with/without `。`/whitespace; 13 negatives; SRT drop/renumber 8 → 2); `--help` shows the
+tokens; `--no-qwen-drop-nonverbal-lines --help` exit 0.
+
+**Decision:** owner (CFF5, 2026-09-05) + D8 (token list only; no ensemble off-switch, no GUI
+checkbox). Thread owed: #254 (owner's v1.9.0 reply lists the old token set).
+
 ## 2026-09-05 — CFF2: semantic scene-change threshold exposed on the CLI and in Customize
 
 **Area:** `whisperjav/main.py` (two flags, features injection, qwen kwargs, decoupled kwargs,
