@@ -415,6 +415,7 @@ def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
         "safe_chunking": "qwen_safe_chunking",
         "scene_min_duration": "qwen_scene_min_duration",
         "scene_max_duration": "qwen_scene_max_duration",
+        "scene_clustering_threshold": "qwen_scene_clustering_threshold",  # v1.9.2 CFF2
         "aligner_backend": "qwen_aligner_backend",
         "timestamp_mode": "qwen_timestamp_mode",
         "assembly_cleaner": "qwen_assembly_cleaner",
@@ -1281,6 +1282,8 @@ def _build_pipeline(
             qwen_pipeline_params["scene_min_duration"] = qwen_defaults["qwen_scene_min_duration"]
         if "qwen_scene_max_duration" in qwen_defaults:
             qwen_pipeline_params["scene_max_duration"] = qwen_defaults["qwen_scene_max_duration"]
+        if qwen_defaults.get("qwen_scene_clustering_threshold") is not None:
+            qwen_pipeline_params["scene_clustering_threshold"] = qwen_defaults["qwen_scene_clustering_threshold"]
         if "qwen_max_group_duration" in qwen_defaults:
             qwen_pipeline_params["segmenter_max_group_duration"] = qwen_defaults["qwen_max_group_duration"]
         _chunk_thr = qwen_defaults.get("qwen_chunk_threshold")

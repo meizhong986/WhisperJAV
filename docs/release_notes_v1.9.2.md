@@ -232,6 +232,14 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
   the upstream defaults; the segment-length cap was tuned on JAV field tests in v1.9.0. The
   ~2 MB model weights still download from HuggingFace on first use. (#311)
 
+- **The semantic scene detector's sensitivity is adjustable.** `--scene-clustering-threshold`
+  (legacy modes and `--pipeline decoupled`) and `--qwen-scene-clustering-threshold` (`--mode qwen`)
+  set the clustering distance that separates one scene from the next: 18 by default, 10 for more
+  and shorter scenes, 22 for fewer and longer. In the GUI it is the "Scene Change Threshold" slider
+  in the Ensemble tab's Customize Parameters dialog (Scene tab for Whisper pipelines, Audio → Custom
+  Scene Bounds for the ChronosJAV pipelines). It only affects the semantic detector; the CLI warns
+  if you set it with auditok or silero.
+
 ---
 
 ## Documentation
@@ -349,6 +357,7 @@ Not user-visible, but worth recording:
 
 | Date | Change |
 |------|--------|
+| 2026-09-05 | Semantic scene-change threshold exposed: `--scene-clustering-threshold`, `--qwen-scene-clustering-threshold`, `--passN-qwen-params scene_clustering_threshold`, and a slider in both Customize modals |
 | 2026-09-05 | Balanced default segmenter → FireRedVAD (external; TEN, then Silero v3.1 if missing — never the built-in VAD); `--sensitivity` presets now resolved for FireRedVAD/TEN on single-pass balanced; `--speech-segmenter faster-whisper` restores the v1.9.0 behaviour; Balanced runs can be `suspect` |
 | 2026-09-05 | `fireredvad` becomes a standard dependency (`[cli]`, installer, Colab/Kaggle); all "experimental" labels on FireRedVAD removed; registry/template pins aligned with pyproject (#311) |
 | 2026-09-04 | ASR telemetry on by default, written to `raw_subs/` next to the outputs; reaches Balanced passes inside ensemble runs (per-pass files, source mode included); `--no-asr-telemetry` added. Version set to 1.9.2 in code. Release-note corrections: #395 is fixed, not a limitation; persistence entry no longer credits #298 (closed) or #381 |

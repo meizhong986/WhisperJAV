@@ -256,6 +256,7 @@ const QwenManager = {
         safe_chunking: true,
         scene_min_duration: 12,
         scene_max_duration: 48,
+        scene_clustering_threshold: 18,  // v1.9.2 CFF2 (semantic detector)
         chunk_threshold_ms: 300,
         max_group_duration: 3,
         vad_threshold: 0.25,
@@ -3757,6 +3758,17 @@ const EnsembleManager = {
             currentValues.scene_max_duration ?? maxDef.default,
             maxDef.description
         ));
+
+        // v1.9.2 (CFF2): semantic clustering threshold (scene-change sensitivity)
+        const clusterDef = schemaSection.scene_clustering_threshold;
+        if (clusterDef) {
+            boundsContainer.appendChild(this.createTransformersSlider(
+                'scene_clustering_threshold', clusterDef.label,
+                clusterDef.min, clusterDef.max, clusterDef.step,
+                currentValues.scene_clustering_threshold ?? clusterDef.default,
+                clusterDef.description
+            ));
+        }
 
         boundsDetails.appendChild(boundsContainer);
         container.appendChild(boundsDetails);

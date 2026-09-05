@@ -378,6 +378,16 @@ def parse_arguments():
                                  "silero (VAD-based), or "
                                  "semantic (texture-based clustering)"
                              ))
+    tuning_group.add_argument("--scene-clustering-threshold",
+                             type=float,
+                             default=None,
+                             metavar="FLOAT",
+                             help=(
+                                 "Semantic scene detector only: the clustering distance that "
+                                 "separates one scene from the next. Lower values tend to give "
+                                 "more, shorter scenes; higher values fewer, longer ones. Default "
+                                 "18 (aggressive preset 10, conservative 22). Ignored by auditok/silero."
+                             ))
     tuning_group.add_argument("--no-vad", action="store_true",
                              help="Disable VAD speech segmentation (balanced/fidelity: skip Silero VAD; kotoba: disable faster-whisper VAD)")
     tuning_group.add_argument("--speech-segmenter",
@@ -637,6 +647,10 @@ def parse_arguments():
                            help="Minimum scene duration in seconds (default: 12)")
     qwen_audio_group.add_argument("--qwen-scene-max-duration", type=float, default=None,
                            help="Maximum scene duration in seconds (default: 48)")
+    qwen_audio_group.add_argument("--qwen-scene-clustering-threshold", type=float, default=None,
+                           metavar="FLOAT",
+                           help="Semantic scene detector only: clustering distance separating "
+                                "scenes. Lower values tend to give more, shorter scenes. Default 18 (YAML).")
     qwen_audio_group.add_argument("--qwen-enhancer", type=str, default="none",
                            choices=["none", "clearvoice", "bs-roformer", "zipenhancer", "ffmpeg-dsp"],
                            help="Speech enhancement backend (default: none)")
@@ -1177,6 +1191,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         _pipeline_kwargs.setdefault("subs_language", args.subs_language)
         if getattr(args, 'scene_detection_method', None):
             _pipeline_kwargs.setdefault("scene_detector", args.scene_detection_method)
+        if getattr(args, 'scene_clustering_threshold', None) is not None:
+            _pipeline_kwargs.setdefault("scene_clustering_threshold", args.scene_clustering_threshold)
         if getattr(args, 'speech_segmenter', None):
             _pipeline_kwargs.setdefault("speech_segmenter", args.speech_segmenter)
 
@@ -1369,6 +1385,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         _scene_max = getattr(args, 'qwen_scene_max_duration', None)
         if _scene_max is not None:
             qwen_kwargs["scene_max_duration"] = _scene_max
+        _scene_thr = getattr(args, 'qwen_scene_clustering_threshold', None)
+        if _scene_thr is not None:
+            qwen_kwargs["scene_clustering_threshold"] = _scene_thr
         _max_grp = getattr(args, 'qwen_max_group_duration', None)
         if _max_grp is not None:
             qwen_kwargs["segmenter_max_group_duration"] = _max_grp
@@ -2192,6 +2211,26 @@ def main():
                     resolved_config["features"]["scene_detection"] = scene_cfg
                 scene_cfg["method"] = args.scene_detection_method
 
+        # v1.9.2 (CFF2): semantic clustering threshold. Reaches every legacy
+        # pipeline through features["scene_detection"] -> SceneDetectorFactory
+        # kwargs; the auditok/silero backends accept and ignore the key.
+        _cluster_thr = getattr(args, 'scene_clustering_threshold', None)
+        if _cluster_thr is not None and resolved_config and "features" in resolved_config:
+            scene_cfg = resolved_config["features"].get("scene_detection")
+            if scene_cfg is None:
+                scene_cfg = {}
+                resolved_config["features"]["scene_detection"] = scene_cfg
+            scene_cfg["clustering_threshold"] = float(_cluster_thr)
+            _effective_method = scene_cfg.get("method") or "auditok"
+            if _effective_method != "semantic":
+                logger.warning(
+                    "--scene-clustering-threshold only affects the semantic scene "
+                    "detector; the effective method here is '%s'. Add "
+                    "--scene-detection-method semantic.", _effective_method,
+                )
+            else:
+                logger.info(f"Semantic scene clustering threshold: {_cluster_thr}")
+
     except Exception as e:
         logger.error(f"Failed to resolve configuration: {e}")
         sys.exit(1)
@@ -2487,6 +2526,7 @@ def main():
                 "asr": getattr(args, 'asr', None),
                 "vad": getattr(args, 'vad', None),
                 "speech_segmenter": getattr(args, 'speech_segmenter', None),
+                "scene_clustering_threshold": getattr(args, 'scene_clustering_threshold', None),
                 "transformers_two_pass": getattr(args, 'transformers_two_pass', False),
             }
         }

@@ -147,8 +147,8 @@ gui:
 
   clustering_threshold:
     widget: slider
-    label: "Clustering Threshold"
-    description: "Distance threshold for grouping. Lower = more segments."
+    label: "Scene Change Threshold"
+    description: "Clustering distance that separates one scene from the next. Lower values tend to give more, shorter scenes; higher fewer, longer (default 18). CLI: --scene-clustering-threshold."
     min: 5
     max: 30
     step: 1

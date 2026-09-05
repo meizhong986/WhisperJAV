@@ -10,6 +10,46 @@
 
 ---
 
+## 2026-09-05 — CFF2: semantic scene-change threshold exposed on the CLI and in Customize
+
+**Area:** `whisperjav/main.py` (two flags, features injection, qwen kwargs, decoupled kwargs,
+`--dump-params` echo); `whisperjav/pipelines/qwen_pipeline.py`, `whisperjav/pipelines/decoupled_pipeline.py`
+(ctor param → `clustering_threshold` kwarg); `whisperjav/ensemble/pass_worker.py` (`prepare_qwen_params`
+mapping + lift); `whisperjav/webview_gui/api.py` (Qwen Audio-tab schema); `webview_gui/assets/app.js`
+(Qwen "Custom Scene Bounds" slider, `QwenManager.defaults`); the semantic tool YAML (slider label /
+description); tests `tests/test_scene_clustering_threshold_v192.py` (new, 8 tests).
+
+**What changed**
+- The semantic detector's `clustering_threshold` (Ward distance, default 18, YAML presets 10
+  aggressive / 22 conservative) was a constructor kwarg all the way to the vendored engine, but
+  nothing above the factory set it. Now: `--scene-clustering-threshold FLOAT` for the legacy modes
+  (written into `features["scene_detection"]`, so every legacy pipeline passes it to the factory;
+  auditok/silero accept and ignore it, with a WARNING when the effective method is not semantic) and
+  `--qwen-scene-clustering-threshold FLOAT` for `--mode qwen` (ctor param, applied independently of
+  safe chunking); `--pipeline decoupled` takes the legacy flag. Both echoed in `--dump-params`.
+- Ensemble: legacy passes already accepted `clustering_threshold` in `--passN-params`; Qwen passes
+  now accept `scene_clustering_threshold` in `--passN-qwen-params` (mapped to
+  `qwen_scene_clustering_threshold`, lifted only when set).
+- GUI (Ensemble tab Customize): the legacy modal's Scene tab already rendered the slider from the
+  YAML hints (label now "Scene Change Threshold"); the Qwen/anime-whisper/cohere modal gains the same
+  slider under Audio → Custom Scene Bounds (5–30, default 18), collected by the shared collector.
+  Transformers passes are method-only (`--hf-scene`) and unchanged — noted, not extended.
+- Wording: the presets call 10 "more, shorter segments" and 22 "fewer, longer"; on the 293 s clip
+  the final count went 7 → 6 scenes when lowering 18 → 10 because the detector's min-duration merge
+  runs after clustering, so help text says "tends to", not "=".
+
+**Verification (executed):** `--help` lists both flags; each parses with exit 0. `--dump-params
+--mode balanced --scene-detection-method semantic --scene-clustering-threshold 10` →
+`features.scene_detection = {method: semantic, clustering_threshold: 10.0}`; without `semantic` the
+WARNING names the effective method. Real CPU runs on the 293 s Netflix clip (balanced, tiny,
+`--debug`) at 18 and 10: the factory log shows `clustering_threshold: 18.0` / `10.0`, 7 vs 6 scenes,
+48 vs 50 cues, both exit 0. `inspect.signature` confirms the Qwen and Decoupled ctor params;
+`prepare_qwen_params({"qwen_params": {"scene_clustering_threshold": 12}})` → 12.
+`node --check app.js`. New test file 8 passed.
+
+**Decision:** owner (CFF2, 2026-09-05): expose to CLI and the GUI Customize parameters tab.
+Customize lives on the Ensemble tab only (D4).
+
 ## 2026-09-05 — CFF3: Balanced defaults to an external speech segmenter (FireRedVAD), single-pass presets resolved
 
 **Area:** new `whisperjav/config/segmenter_presets.py`; `whisperjav/main.py` (default block,
