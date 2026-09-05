@@ -10,6 +10,29 @@
 
 ---
 
+## 2026-09-05 — tools/scene_inspector.py: scene-detector statistics and per-scene screenshots
+
+**Area:** new `tools/scene_inspector.py` + `tools/scene_inspector.md`. Developer/user utility, no
+product code touched.
+
+**What it does:** runs a WhisperJAV scene backend (auditok default; silero, semantic, none) on a
+media file the way the pipelines do (AudioExtractor 16 kHz mono, `SceneDetectorFactory.create` with
+the backend's own defaults, `--param KEY=VALUE` overrides) and writes to `<media folder>/scenes_info/`
+(or `--output-dir`): `<name>.scenes.csv`, `<name>.scenes.json`, `<name>.summary.md` (count, coverage,
+duration percentiles + histogram, scenes over the 29 s window and the 180 s aligner limit, gaps,
+scenes per minute, per-scene table with hh:mm:ss.mmm) and `screenshots/` with begin/middle/end frames
+per scene named `<name>__scene0001__begin__00_12_03.450.jpg` (`--no-screenshots` to skip; skipped with
+a recorded reason for audio-only input). `--list-params BACKEND` prints accepted parameters with
+their YAML defaults and presets. Statistics use the extracted audio duration; the container header is
+reported beside it (the 293 s test clip carries a 30:55 header).
+
+**Verification (executed):** 293 s mkv default backend → 19 scenes, 57 frames, exit 0; semantic with
+`clustering_threshold=10` → 6 scenes, effective parameter recorded; audio-only wav → screenshots
+skipped with reason; `--list-params` for auditok/semantic; `--help` exit 0; one frame opened and
+checked visually.
+
+**Decision:** owner request 2026-09-05 (I2, P1–P7). P8 suggestions delivered for review, not built.
+
 ## 2026-09-05 — CFF1: the recogniser is unloaded and reloaded after 20 minutes of scene audio
 
 **Area:** new `whisperjav/utils/model_refresh.py` (policy), new `whisperjav/modules/asr_worker_proxy.py`
