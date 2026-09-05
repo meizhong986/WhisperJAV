@@ -30,6 +30,18 @@ contradicted by the measurements and await the owner's choice.
 adversary pass reproduced the first run bit-for-bit and supplied the `snap_window` and label-run
 attacks, which the second run confirms; arm A is boundary-identical to `SemanticSegmenter.segment`.
 
+**Literature (same day, owner asked for the science, not a slider fix):** `literature_review.md`.
+Sundaram & Chang (2000-2003) define computable audio scenes as long-term consistency of ambient sound
+(>= 8 s to establish context; typically 40-50 s; explicitly "not semantic scenes") and detect them by
+correlating an attention span (16 s) against a memory (32 s); they warn that cluster-threshold methods
+"critically" depend on a threshold that cannot be set from the data. Every temporal method in the field
+(Foote novelty, BIC, memory-model, global partition with a continuity term, embeddings + the same
+detectors) carries an explicit temporal term plus a magnitude lever. The shipped engine is a global
+partition WITHOUT any temporal-continuity term (unconstrained Ward, cut at every label change), which is
+why its threshold sets class count, not granularity; the measured rise in scene count over the slider
+range is not explained by this reading and stays open. No audio-only scene work on adult video was
+found. Adversary pass ran on the note; ten findings folded in (note §8).
+
 **Decision:** owner (2026-09-05) asked for the logic to be researched, not accuracy; no change made.
 
 ## 2026-09-05 — tools/scene_inspector.py: scene-detector statistics and per-scene screenshots

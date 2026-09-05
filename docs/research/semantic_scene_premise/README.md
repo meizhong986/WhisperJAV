@@ -6,7 +6,8 @@ if the science is sound, why does the implementation not deliver?* Accuracy agai
 reference is **out of scope** (owner C5); this note is about the logic and about which knobs move the
 result. No product file was changed for it.
 
-Files: `semantic_lever_study.py` (the experiment), `lever_study_results.json` (every number below).
+Files: `semantic_lever_study.py` (the experiment), `lever_study_results.json` (every number below),
+`literature_review.md` (what the field establishes about the premise and its levers).
 Re-run from the repo root: `python -X utf8 docs/research/semantic_scene_premise/semantic_lever_study.py
 <wav> [<wav>] OUT.json` (the output path is the **last** argument; `-X utf8` because the engine prints a
 non-cp1252 arrow). Results here: sklearn 1.6.1, numpy 1.26.4, scipy 1.17.0. An independent adversary
