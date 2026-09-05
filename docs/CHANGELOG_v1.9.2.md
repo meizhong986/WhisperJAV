@@ -31,7 +31,25 @@ reported beside it (the 293 s test clip carries a 30:55 header).
 skipped with reason; `--list-params` for auditok/semantic; `--help` exit 0; one frame opened and
 checked visually.
 
-**Decision:** owner request 2026-09-05 (I2, P1–P7). P8 suggestions delivered for review, not built.
+**Same day, owner accepted all seven P8 suggestions (i2/i3) and asked for the semantic threshold
+to be user-settable (i1):** `--backend a,b,...` runs several backends and writes `<name>.compare.md/.json`
+(counts, coverage, percentiles, pairwise boundary agreement within 1 s); per-scene RMS/peak dBFS;
+`--speech-ratio [SEGMENTER]` (speech seconds and ratio per scene, default firered-vad);
+`<name>.<backend>.contact_sheet_pNN.jpg` (begin frames, labelled, 60 per page);
+`<name>.<backend>.chapters.ffmeta` (muxed with ffmpeg and read back by ffprobe); `--sensitivity`
+(preset keys only, see below); `--srt FILE` (cues per scene, scenes without cues, cues in gaps);
+`--scene-threshold FLOAT` (shortcut for `clustering_threshold`, warns when semantic is not selected).
+Outputs now carry the backend in the file name; screenshots go to `screenshots/<backend>/`. Coverage is
+the union of scene intervals (padded semantic scenes overlap; 1.3 s of overlap on the test clip is
+reported separately).
+
+**Finding for the owner (product, unchanged):** the scene tool YAML `spec` blocks are not the backend
+constructor defaults — auditok `pass2_max_duration_s` 1800 vs 28 s, `pass2_max_silence_s` 1.8 vs 0.94,
+`pass1_max_silence_s` 2.5 vs 1.8 — and the pipelines pass a third set from the Pydantic preset.
+Applying the whole spec produced one 222 s scene on the 293 s clip; the tool therefore applies only
+the `presets.<name>` keys for `--sensitivity`.
+
+**Decision:** owner request 2026-09-05 (I2 P1–P7; i1–i3 for the seven additions).
 
 ## 2026-09-05 — CFF1: the recogniser is unloaded and reloaded after 20 minutes of scene audio
 
