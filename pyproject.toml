@@ -131,6 +131,7 @@ cli = [
     "auditok",
     "silero-vad>=6.2",
     "ten-vad",
+    "fireredvad>=0.0.2",  # v1.9.2: Balanced default speech segmenter
 
     # Performance and utilities
 

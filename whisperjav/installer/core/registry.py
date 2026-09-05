@@ -382,7 +382,7 @@ PACKAGES: List[Package] = [
     ),
     Package(
         name="numba",
-        version=">=0.60.0",
+        version=">=0.61.0",
         extra=Extra.CLI,
         order=22,
         reason="JIT compilation for performance - 0.60.0+ required for numpy 2.x binary support",
@@ -494,6 +494,13 @@ PACKAGES: List[Package] = [
         order=48,
         import_name="sklearn",  # pip name != import name
         reason="Clustering for semantic scene detection",
+    ),
+    Package(
+        name="fireredvad",
+        version=">=0.0.2",
+        extra=Extra.CLI,
+        order=49,
+        reason="FireRedVAD speech segmenter - Balanced pipeline default since v1.9.2",
     ),
 
     # =========================================================================

@@ -204,6 +204,16 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
 
 ---
 
+## Changed defaults and installation
+
+- **FireRedVAD is installed with WhisperJAV.** The `fireredvad` package is now part of the
+  standard install (every extra that includes `cli`, the Windows installer, Colab and Kaggle).
+  It is no longer marked experimental in the CLI, the GUI or the docs. Its detection presets are
+  the upstream defaults; the segment-length cap was tuned on JAV field tests in v1.9.0. The
+  ~2 MB model weights still download from HuggingFace on first use. (#311)
+
+---
+
 ## Documentation
 
 - The README's **Mix-and-match strategies** section gained a naming note for
@@ -319,6 +329,7 @@ Not user-visible, but worth recording:
 
 | Date | Change |
 |------|--------|
+| 2026-09-05 | `fireredvad` becomes a standard dependency (`[cli]`, installer, Colab/Kaggle); all "experimental" labels on FireRedVAD removed; registry/template pins aligned with pyproject (#311) |
 | 2026-09-04 | ASR telemetry on by default, written to `raw_subs/` next to the outputs; reaches Balanced passes inside ensemble runs (per-pass files, source mode included); `--no-asr-telemetry` added. Version set to 1.9.2 in code. Release-note corrections: #395 is fixed, not a limitation; persistence entry no longer credits #298 (closed) or #381 |
 | 2026-09-03 | GUI speaks the same contract: reads `whisperjav_run.json` on exit, closes with `[FINISHED] <tally>` instead of `[SUCCESS]`, shows the tally in the status line and dialog, and offers the two "treat as failure" checkboxes (`--fail-on`) for Transcription and Ensemble runs |
 | 2026-09-03 | One per-file vocabulary (`done` / `empty` / `suspect` / `failed` / `skipped`), one exit-status rule for sync, async and ensemble, `--fail-on`, the RUN SUMMARY table and the `whisperjav_run.json` manifest. Replaces the pre-release gate that failed a run on empty output and fixes the pre-release defect where every successful ensemble run exited 1 (#394, #263) |

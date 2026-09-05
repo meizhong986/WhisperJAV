@@ -114,7 +114,7 @@ SEGMENTER_PARAMS = {
     "end_pad_ms",
     # Whisper VAD-specific
     "cache_results",
-    # FireRedVAD-specific (v1.9.0 experimental)
+    # FireRedVAD-specific (v1.9.0)
     "smooth_window_size",
     "use_gpu",
 }
@@ -135,7 +135,7 @@ _SEGMENTER_TOOL_NAMES = {
     "whisper-vad-small": "whisper-vad-speech-segmentation",
     "whisper-vad-medium": "whisper-vad-speech-segmentation",
     "whisperseg": "whisperseg-speech-segmentation",
-    "firered-vad": "firered-vad-speech-segmentation",  # v1.9.0 experimental
+    "firered-vad": "firered-vad-speech-segmentation",  # v1.9.0; Balanced default since v1.9.2
 }
 
 # Provider params - common transcriber options shared by all backends
@@ -1717,7 +1717,7 @@ SPEECH_SEGMENTER_MAP = {
     "whisper-vad-medium": "whisper-vad-medium",
     "ten": "ten",
     "silero-v6.2": "silero-v6.2",
-    "firered-vad": "firered-vad",  # v1.9.0 experimental
+    "firered-vad": "firered-vad",  # v1.9.0; Balanced default since v1.9.2
     "none": "none",
 }
 

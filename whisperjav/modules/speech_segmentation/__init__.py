@@ -10,7 +10,7 @@ Available backends:
 - nemo: NVIDIA NeMo VAD (requires nemo_toolkit)
 - ten: TEN Framework VAD (requires ten-vad)
 - whisperseg: WhisperSeg encoder-decoder VAD (ONNX, trained on Japanese ASMR)
-- firered-vad: FireRedTeam DFSMN VAD (v1.9.0 experimental, requires fireredvad)
+- firered-vad: FireRedTeam DFSMN VAD (Balanced pipeline default since v1.9.2; fireredvad pkg)
 - none: No segmentation (passthrough)
 
 Example usage:

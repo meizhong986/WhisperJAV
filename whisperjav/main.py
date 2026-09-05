@@ -645,7 +645,7 @@ def parse_arguments():
                                 "silero-v6.2 (force-splits long chunks), "
                                 "ten, silero/silero-v4.0/v3.1, "
                                 "nemo/nemo-lite, whisper-vad, "
-                                "firered-vad (v1.9.0 experimental), none")
+                                "firered-vad, none")
     qwen_audio_group.add_argument("--qwen-max-group-duration", type=float, default=None,
                            help="Max duration (seconds) for VAD segment grouping (pipeline default: 4.0)")
     qwen_audio_group.add_argument("--qwen-chunk-threshold", type=float, default=None,

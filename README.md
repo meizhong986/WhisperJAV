@@ -196,7 +196,7 @@ Decides what the model hears — and in ChronosJAV pipelines, where your timesta
 | **Silero v3.1 / v4.0** | Solid general-purpose; the recommendation for non-Japanese audio | Tends to miss very quiet Japanese speech |
 | **Silero v6.2** | Adds max-duration splitting and finer control | Same quiet-speech caveat |
 | **Faster-Whisper native** | Fastest — one recognizer call per scene | Coarser timing than a dedicated VAD |
-| **FireRedVAD** *(new, experimental)* | Tiny multilingual model, cheap on CPU; early access for feedback | Presets not yet JAV-tuned; needs `pip install fireredvad` |
+| **FireRedVAD** *(Balanced default since v1.9.2)* | Tiny multilingual model, cheap on CPU; lowest false-alarm rate of the bundled VADs | Detection presets upstream-derived; segment cap JAV-tuned |
 | **None** | The model hears everything | Maximum hallucination exposure on non-speech |
 
 ### ASR engine and model

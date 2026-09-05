@@ -1,13 +1,14 @@
 # =============================================================================
-# FireRedVAD Speech Segmentation Tool Configuration (v1.9.0, EXPERIMENTAL)
+# FireRedVAD Speech Segmentation Tool Configuration (v1.9.0; Balanced default since v1.9.2)
 # =============================================================================
 # Industrial-grade DFSMN-based VAD from FireRedTeam (~0.6M params, Apache-2.0).
 # Claims 100+ language coverage (F1 97.57% on FLEURS-VAD-102).
 # Requires: pip install fireredvad
 # Model weights auto-download from HuggingFace (FireRedTeam/FireRedVAD).
 #
-# EXPERIMENTAL / early access for feedback. Presets are derived from upstream
-# README defaults, NOT yet tuned on JAV ground truth (unlike TEN/WhisperSeg).
+# Detection presets are derived from upstream README defaults; the segment
+# length cap (max_speech_duration_s) was JAV-tuned from owner field tests (2026-08-14).
+# Installed with the [cli] extra since v1.9.2.
 # =============================================================================
 
 schemaVersion: v1
@@ -15,18 +16,17 @@ kind: Tool
 
 metadata:
   name: firered-vad-speech-segmentation
-  displayName: "FireRedVAD (experimental)"
+  displayName: "FireRedVAD"
   description: |
     Speech segmentation using FireRedTeam's DFSMN-based VAD.
     Tiny (~0.6M params) frame-level model with strong multilingual coverage.
-    CPU inference by default. Experimental — presets not yet JAV-tuned.
+    CPU inference by default. Default speech segmenter of the Balanced pipeline (v1.9.2).
   version: "1.0.0"
   tags:
     - speech-segmentation
     - firered
     - vad
     - lightweight
-    - experimental
   dependencies:
     - "fireredvad"
 
@@ -74,7 +74,7 @@ spec:
 # =============================================================================
 # Sensitivity Presets
 # =============================================================================
-# NOTE: experimental first-pass presets. The threshold gradient mirrors the
+# NOTE: detection presets are upstream-derived. The threshold gradient mirrors the
 # other backends' conservative/balanced/aggressive spread around the upstream
 # default; expect retuning after JAV ground-truth benchmarking.
 presets:

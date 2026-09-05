@@ -10,6 +10,46 @@
 
 ---
 
+## 2026-09-05 — CFF6: FireRedVAD becomes a first-class dependency (installed with `[cli]`)
+
+**Area:** `pyproject.toml` (`[cli]` extra), `uv.lock`, `whisperjav/installer/core/registry.py`,
+`whisperjav/installer/validation/imports.py`, `installer/templates/requirements.txt.template`,
+`whisperjav/utils/preflight_check.py`, labels in `whisperjav/modules/speech_segmentation/`
+(`backends/firered_vad.py`, `factory.py`, `__init__.py`), the tool YAML
+`firered-vad-speech-segmentation.yaml`, `whisperjav/ensemble/pass_worker.py` (comments),
+`whisperjav/main.py` (`--qwen-segmenter` help), `webview_gui/assets/index.html` (both segmenter
+dropdowns), `README.md`; tests `tests/test_dependency_cross_match.py`.
+
+**What changed**
+- `fireredvad>=0.0.2` (PyPI, Apache-2.0, Python ≥3.10) is a `[cli]` dependency, so `[all]`,
+  `[colab]` and `[kaggle]` inherit it and the conda-constructor `requirements_v1.9.2.txt`
+  (generated from pyproject by `installer/build_release.py`) carries it. Registry entry at CLI
+  order 49; removed from the import scanner's optional list; fallback template updated.
+  `uv lock` added exactly four packages (fireredvad, kaldi-native-fbank, kaldiio, textgrid);
+  no existing pin moved (uv re-derived some environment markers). `kaldi-native-fbank` ships
+  wheels for win/linux/macOS × cp310–cp313, so no platform marker is needed.
+- Every "experimental" label on FireRedVAD removed (display name is now `FireRedVAD`; the YAML
+  drops the `experimental` tag). The remaining truthful caveat is kept in words: detection presets
+  are upstream-derived, the segment cap was JAV-tuned on 2026-08-14.
+- Preflight lists `fireredvad` as an optional dependency with an actionable message (it is the
+  Balanced default from CFF3; without it Balanced falls back to another WhisperJAV segmenter).
+- Hygiene found by the sync gate while adding the entry: the registry pinned `numba>=0.60.0`
+  while pyproject says `>=0.61.0`, and the fallback template disagreed with the registry on
+  `numba` and `transformers` — aligned to pyproject/registry so the sync and template tests pass.
+
+**Verification:** `python -m whisperjav.installer.validation` → PASSED (was failing on the numba
+mismatch before); `pytest tests/test_installer.py tests/test_installation.py
+tests/test_dependency_cross_match.py` → 100 passed, 6 failed, all six identical on HEAD before this
+change (WJ env has numpy 1.26 / pip-check conflicts / a stale entry-point test); `uv lock` exit 0;
+`installer/build_release.py --dry-run` reports requirements generated from pyproject; YAML parses;
+`tests/test_config_v4.py` 33 passed; `tests/test_speech_segmentation.py` 83 passed, 4 failed = the
+known stale silero-v6.2 set.
+
+**Decision:** owner (CFF6, 2026-09-05): FireRedVAD "mandatory" in dependency, setup and
+installation; no longer experimental. Fallback when the package is absent at runtime: owner D7
+(another WhisperJAV segmenter, never faster-whisper's internal VAD) — implemented with CFF3.
+Thread owed: #311 (requester was told it needs `pip install fireredvad`).
+
 ## 2026-09-04 — ASR telemetry on by default and inside ensemble; version 1.9.2; note corrections
 
 **Area:** `whisperjav/utils/asr_telemetry.py` (new `resolve_telemetry_path`),

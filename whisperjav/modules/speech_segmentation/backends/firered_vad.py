@@ -1,5 +1,5 @@
 """
-FireRedVAD speech segmentation backend (v1.9.0, EXPERIMENTAL).
+FireRedVAD speech segmentation backend (v1.9.0; Balanced pipeline default since v1.9.2).
 
 Industrial-grade DFSMN-based VAD from FireRedTeam (~0.6M params, ~2.2MB),
 claiming 100+ language coverage. Apache-2.0 licensed.
@@ -52,7 +52,7 @@ _FRAME_MS = 10
 
 class FireRedVadSpeechSegmenter:
     """
-    FireRedVAD speech segmentation backend (experimental).
+    FireRedVAD speech segmentation backend.
 
     Pipeline:
         1. Normalize input to a 16kHz mono PCM16 WAV file
@@ -131,7 +131,7 @@ class FireRedVadSpeechSegmenter:
 
     @property
     def display_name(self) -> str:
-        return "FireRedVAD (experimental)"
+        return "FireRedVAD"
 
     # ------------------------------------------------------------------
     # Model loading

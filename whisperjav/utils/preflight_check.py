@@ -387,7 +387,12 @@ class PreflightChecker:
         ]
 
         optional_deps = {
-            'stable_whisper': "Required only for legacy fast/faster pipelines"
+            'stable_whisper': "Required only for legacy fast/faster pipelines",
+            # v1.9.2: FireRedVAD is the Balanced pipeline's default speech
+            # segmenter and ships in the [cli] extra. When it is missing, Balanced
+            # falls back to another WhisperJAV segmenter (TEN-VAD, then Silero).
+            'fireredvad': "Default speech segmenter for the Balanced pipeline "
+                          "(pip install fireredvad); Balanced falls back to TEN-VAD without it",
         }
         
         missing = []
