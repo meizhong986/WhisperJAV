@@ -80,9 +80,18 @@ class WhisperSegSpeechSegmenter:
     def __init__(
         self,
         threshold: float = 0.35,
+        neg_threshold: Optional[float] = None,
+        speech_start_threshold: Optional[float] = None,
+        force_split_mode: str = "dip",
+        segmentation_decoder: str = "hysteresis",
+        grow_floor: float = 0.05,
+        gap_merge_ms: int = 350,
+        split_smooth_ms: int = 120,
         min_speech_duration_ms: int = 100,
         min_silence_duration_ms: int = 100,
         speech_pad_ms: int = 300,
+        start_pad_ms: Optional[int] = None,  # Asymmetric: pad before speech onset.
+        end_pad_ms: Optional[int] = None,    # Asymmetric: pad after speech offset.
         max_speech_duration_s: Optional[float] = None,
         chunk_threshold_s: Optional[float] = 1.0,
         max_group_duration_s: Optional[float] = None,
@@ -96,14 +105,63 @@ class WhisperSegSpeechSegmenter:
 
         Args:
             threshold: Onset probability threshold [0.0, 1.0]. Default 0.35
-                (Silero-v6.2-aligned; vendor default is 0.5). The offset
-                (hysteresis) threshold is always auto-derived as
-                max(threshold - 0.15, 0.01) — matches vendor inference.py
-                default and is not user-tunable.
+                (Silero-v6.2-aligned; vendor default is 0.5).
+            neg_threshold: Offset (hysteresis) threshold. When None, derived as
+                max(threshold - 0.15, 0.01) matching vendor inference.py.
+                Set explicitly to decouple offset from onset — needed when
+                threshold < 0.30 where the formula collapses to 0.01.
+            speech_start_threshold: Display-timing refinement (v1.9.0, "3a").
+                When set, each segment additionally records the time of the
+                first frame whose probability reaches this value in
+                metadata["speech_start_sec"]. Consumers (vad_only subtitle
+                timing) may use it as the display start while the RAW segment
+                boundary still feeds the ASR audio slice — decoupling capture
+                from timing. If the segment starts at/above the value, the
+                refined start equals the raw start; if it never reaches it,
+                no metadata key is written (callers fall back to raw start).
+                None (default) disables the computation.
+            force_split_mode: What happens when a segment exceeds
+                max_speech_duration_s.
+                "dip" (default, v1.9.0 smart split): split at the lowest-
+                probability frame in the last 40% of the segment; triggered
+                stays True (contiguous, no re-onset required).
+                "chop" (vendor-faithful, pre-i2): end at exactly
+                start + max_speech, reset the state machine (triggered=False)
+                so speech must re-cross `threshold` to start a new segment.
+                Chop prunes non-speech after the split and anchors every
+                segment at a real onset — empirically stronger content
+                capture on wide-net presets (threshold 0.15), at the cost of
+                near-uniform segment lengths in continuous speech.
+            segmentation_decoder: Which decoder converts the probability
+                stream into segments.
+                "hysteresis" (default): the vendor-lineage streaming state
+                machine (threshold/neg_threshold/min_silence + force-split).
+                "offline" (v1.9.0): two-level offline decoder — segments are
+                SEEDED by runs of prob >= threshold, their edges GROW outward
+                while prob >= grow_floor (captures attached quiet speech),
+                gaps shorter than gap_merge_ms are merged, longer gaps become
+                real cuts, and segments over max_speech_duration_s are split
+                at minima of the smoothed probability curve. Decides from the
+                whole curve at once instead of frame-by-frame.
+            grow_floor: ("offline") Low probability floor for edge growth.
+                The capture-vs-cut dial: lower keeps more quiet speech AND
+                bridges more gaps (fewer cuts); higher trims tails and cuts
+                more gaps. Must be <= threshold.
+            gap_merge_ms: ("offline") Gaps shorter than this are merged into
+                the surrounding segment; gaps this long or longer become
+                segment boundaries (the "cut dialogs at pauses" knob).
+            split_smooth_ms: ("offline") Smoothing window for the probability
+                curve when choosing split points inside overlong segments.
             min_speech_duration_ms: Minimum speech segment duration.
             min_silence_duration_ms: Minimum silence duration to end a segment.
-            speech_pad_ms: Post-hoc padding applied around each segment
-                (overlap-prevented).
+            speech_pad_ms: Symmetric post-hoc padding around each segment
+                (overlap-prevented). Used as the fallback when start_pad_ms /
+                end_pad_ms are not supplied.
+            start_pad_ms: Asymmetric padding before speech onset. None → inherit
+                speech_pad_ms.
+            end_pad_ms: Asymmetric padding after speech offset. None → inherit
+                speech_pad_ms. (JAV: capturing end-of-speech is most critical, so
+                the qwen/anime pipeline defaults end_pad > start_pad.)
             max_speech_duration_s: Force-split segments exceeding this duration.
                 None = inherits max_group_duration_s.
             chunk_threshold_s: Gap threshold for post-VAD segment grouping (seconds).
@@ -117,9 +175,38 @@ class WhisperSegSpeechSegmenter:
             **kwargs: Absorber for factory-injected params (e.g., version).
         """
         self.threshold = float(threshold)
+        self.neg_threshold = float(neg_threshold) if neg_threshold is not None else None
+        self.speech_start_threshold = (
+            float(speech_start_threshold) if speech_start_threshold is not None else None
+        )
+        _mode = str(force_split_mode).strip().lower() if force_split_mode else "dip"
+        if _mode not in ("dip", "chop"):
+            logger.warning(
+                "WhisperSeg: unknown force_split_mode %r, using 'dip'", force_split_mode
+            )
+            _mode = "dip"
+        self.force_split_mode = _mode
+        _dec = (
+            str(segmentation_decoder).strip().lower()
+            if segmentation_decoder else "hysteresis"
+        )
+        if _dec not in ("hysteresis", "offline"):
+            logger.warning(
+                "WhisperSeg: unknown segmentation_decoder %r, using 'hysteresis'",
+                segmentation_decoder,
+            )
+            _dec = "hysteresis"
+        self.segmentation_decoder = _dec
+        self.grow_floor = min(max(0.0, float(grow_floor)), self.threshold)
+        self.gap_merge_ms = max(0, int(gap_merge_ms))
+        self.split_smooth_ms = max(20, int(split_smooth_ms))
         self.min_speech_duration_ms = int(min_speech_duration_ms)
         self.min_silence_duration_ms = int(min_silence_duration_ms)
         self.speech_pad_ms = int(speech_pad_ms)
+        # Asymmetric padding (v1.9.0): start/end fall back to symmetric
+        # speech_pad_ms when unset, preserving behavior for existing callers.
+        self.start_pad_ms = int(start_pad_ms) if start_pad_ms is not None else int(speech_pad_ms)
+        self.end_pad_ms = int(end_pad_ms) if end_pad_ms is not None else int(speech_pad_ms)
         self.force_cpu = bool(force_cpu)
         self.num_threads = int(num_threads)
         self.model_path = model_path
@@ -438,16 +525,29 @@ class WhisperSegSpeechSegmenter:
 
         frame_ms = float(self._frame_duration_ms)
 
-        # Thresholds. The offset threshold is auto-derived from the onset
-        # threshold (vendor inference.py default). Not user-tunable —
-        # hysteresis stays at a fixed 0.15 gap, clamped at 0.01 minimum.
         threshold = float(self.threshold)
-        neg_threshold = max(threshold - 0.15, 0.01)
+        if self.neg_threshold is not None:
+            neg_threshold = float(self.neg_threshold)
+        else:
+            neg_threshold = max(threshold - 0.15, 0.01)
+
+        # "3a" display-timing refinement: absolute frame index of the first
+        # probability >= speech_start_threshold within the segment's used span,
+        # or None when disabled / never reached. Computed here because the
+        # probability stream only exists inside this function.
+        sst = self.speech_start_threshold
+
+        def _speech_start_frame(start_frame: int, probs_slice: List[float]) -> Optional[int]:
+            if sst is None:
+                return None
+            for k, pv in enumerate(probs_slice):
+                if pv >= sst:
+                    return start_frame + k
+            return None
 
         # Duration conversions (ms → frames)
         min_speech_frames = max(1, int(self.min_speech_duration_ms / frame_ms))
         min_silence_frames = max(1, int(self.min_silence_duration_ms / frame_ms))
-        speech_pad_frames = max(0, int(self.speech_pad_ms / frame_ms))
         if self.max_speech_duration_s and self.max_speech_duration_s > 0:
             max_speech_frames = int(self.max_speech_duration_s * 1000.0 / frame_ms)
         else:
@@ -473,21 +573,61 @@ class WhisperSegSpeechSegmenter:
                 current_probs = [prob]
                 continue
 
-            # Force-split at max duration
-            if triggered and "start" in current:
+            # Force-split at max duration. Two modes (see __init__ docstring):
+            #   "chop" — vendor-faithful pre-i2 behavior: exact ceiling, full
+            #            state reset, re-onset >= threshold required.
+            #   "dip"  — v1.9.0 smart split seeking the local probability
+            #            minimum in the last 40% (ChickenRice-inspired),
+            #            contiguous continuation.
+            if triggered and "start" in current and self.force_split_mode == "chop":
                 duration = i - current["start"]
                 if duration > max_speech_frames:
                     current["end"] = current["start"] + max_speech_frames
                     if current_probs:
-                        valid = current_probs[: current["end"] - current["start"]]
+                        valid = current_probs[:max_speech_frames]
                         if valid:
                             current["avg_prob"] = float(np.mean(valid))
                             current["min_prob"] = float(np.min(valid))
                             current["max_prob"] = float(np.max(valid))
+                            current["speech_start"] = _speech_start_frame(
+                                current["start"], valid
+                            )
                     speeches.append(current)
                     current = {}
                     current_probs = []
                     triggered = False
+                    temp_end = 0
+                    continue
+
+            if triggered and "start" in current and self.force_split_mode == "dip":
+                duration = i - current["start"]
+                if duration > max_speech_frames:
+                    window_start = int(max_speech_frames * 0.6)
+                    window_probs = current_probs[window_start:max_speech_frames]
+                    if window_probs:
+                        min_prob = float(np.min(window_probs))
+                        mean_prob = float(np.mean(window_probs))
+                        if min_prob < mean_prob * 0.85:
+                            best_offset = window_start + int(np.argmin(window_probs))
+                        else:
+                            best_offset = max_speech_frames
+                    else:
+                        best_offset = max_speech_frames
+                    split_frame = current["start"] + best_offset
+                    current["end"] = split_frame
+                    if current_probs:
+                        valid = current_probs[:best_offset]
+                        if valid:
+                            current["avg_prob"] = float(np.mean(valid))
+                            current["min_prob"] = float(np.min(valid))
+                            current["max_prob"] = float(np.max(valid))
+                            current["speech_start"] = _speech_start_frame(
+                                current["start"], valid
+                            )
+                    speeches.append(current)
+
+                    current = {"start": split_frame}
+                    current_probs = current_probs[best_offset:]
                     temp_end = 0
                     continue
 
@@ -505,6 +645,9 @@ class WhisperSegSpeechSegmenter:
                                 current["avg_prob"] = float(np.mean(valid))
                                 current["min_prob"] = float(np.min(valid))
                                 current["max_prob"] = float(np.max(valid))
+                                current["speech_start"] = _speech_start_frame(
+                                    current["start"], valid
+                                )
                         speeches.append(current)
                     current = {}
                     current_probs = []
@@ -522,29 +665,41 @@ class WhisperSegSpeechSegmenter:
                     current["avg_prob"] = float(np.mean(current_probs))
                     current["min_prob"] = float(np.min(current_probs))
                     current["max_prob"] = float(np.max(current_probs))
+                    current["speech_start"] = _speech_start_frame(
+                        current["start"], current_probs
+                    )
                 speeches.append(current)
 
-        # Post-hoc padding with overlap prevention
+        return self._pad_and_convert(speeches, len(speech_probs), audio_duration_sec)
+
+    def _pad_and_convert(
+        self,
+        speeches: List[Dict[str, Any]],
+        n_frames: int,
+        audio_duration_sec: float,
+    ) -> List[SpeechSegment]:
+        """Shared tail for both decoders: post-hoc asymmetric padding with
+        overlap prevention, then frame indices → SpeechSegment conversion."""
+        frame_ms = float(self._frame_duration_ms)
+        start_pad_frames = max(0, int(self.start_pad_ms / frame_ms))
+        end_pad_frames = max(0, int(self.end_pad_ms / frame_ms))
+
         for idx, seg in enumerate(speeches):
             if idx == 0:
-                seg["start"] = max(0, seg["start"] - speech_pad_frames)
+                seg["start"] = max(0, seg["start"] - start_pad_frames)
             else:
                 seg["start"] = max(
                     speeches[idx - 1]["end"],
-                    seg["start"] - speech_pad_frames,
+                    seg["start"] - start_pad_frames,
                 )
             if idx < len(speeches) - 1:
                 seg["end"] = min(
                     speeches[idx + 1]["start"],
-                    seg["end"] + speech_pad_frames,
+                    seg["end"] + end_pad_frames,
                 )
             else:
-                seg["end"] = min(
-                    len(speech_probs),
-                    seg["end"] + speech_pad_frames,
-                )
+                seg["end"] = min(n_frames, seg["end"] + end_pad_frames)
 
-        # Frame indices → SpeechSegment (both seconds and samples populated)
         results: List[SpeechSegment] = []
         for seg in speeches:
             start_sec = seg["start"] * frame_ms / 1000.0
@@ -558,6 +713,13 @@ class WhisperSegSpeechSegmenter:
                 metadata["min_prob"] = seg["min_prob"]
             if "max_prob" in seg:
                 metadata["max_prob"] = seg["max_prob"]
+            if seg.get("speech_start") is not None:
+                # Refined display start ("3a"): first frame >= speech_start_threshold.
+                # Always >= the (padded) raw start; consumers fall back to
+                # start_sec when absent.
+                metadata["speech_start_sec"] = min(
+                    seg["speech_start"] * frame_ms / 1000.0, end_sec
+                )
             results.append(
                 SpeechSegment(
                     start_sec=start_sec,
@@ -569,6 +731,174 @@ class WhisperSegSpeechSegmenter:
                 )
             )
         return results
+
+    # ------------------------------------------------------------------
+    # Offline decoder (v1.9.0) — two-level TEN-shape pipeline
+    # ------------------------------------------------------------------
+
+    def _probs_to_segments_offline(
+        self,
+        speech_probs: np.ndarray,
+        audio_duration_sec: float,
+    ) -> List[SpeechSegment]:
+        """Offline two-level decoder: seed → grow → merge → drop → split.
+
+        Decides from the whole probability curve at once (we are not
+        streaming), unlike the ported hysteresis state machine:
+
+        1. SEED: contiguous runs of prob >= threshold anchor segments.
+        2. GROW: keep every contiguous run of prob >= grow_floor that
+           contains at least one seed — quiet speech attached to confident
+           speech rides along; floor-runs with no seed (noise) are dropped.
+        3. MERGE: gaps shorter than gap_merge_ms are absorbed; longer gaps
+           become real segment boundaries (dialog cuts).
+        4. DROP: segments shorter than min_speech_duration_ms are removed.
+        5. SPLIT: segments longer than max_speech_duration_s are split at
+           local minima of the smoothed probability curve (spacing-
+           constrained), with an even-split fallback — no blind chop.
+
+        Padding + SpeechSegment conversion shared with the hysteresis
+        decoder (_pad_and_convert). Pipeline shape adapted from the TEN
+        backend (ten.py), with exact frame-index bookkeeping.
+        """
+        if len(speech_probs) == 0:
+            return []
+
+        p = np.asarray(speech_probs, dtype=np.float32)
+        frame_ms = float(self._frame_duration_ms)
+        n = len(p)
+
+        min_speech_frames = max(1, int(self.min_speech_duration_ms / frame_ms))
+        gap_merge_frames = max(1, int(self.gap_merge_ms / frame_ms))
+        if self.max_speech_duration_s and self.max_speech_duration_s > 0:
+            max_speech_frames = int(self.max_speech_duration_s * 1000.0 / frame_ms)
+        else:
+            max_speech_frames = n
+
+        seed_mask = p >= self.threshold
+        if not seed_mask.any():
+            return []
+        floor_mask = p >= min(self.grow_floor, self.threshold)
+
+        # Contiguous floor-runs, kept only when they contain a seed (steps 1+2)
+        runs: List[List[int]] = []
+        in_run = False
+        run_start = 0
+        for i in range(n):
+            if floor_mask[i] and not in_run:
+                in_run = True
+                run_start = i
+            elif not floor_mask[i] and in_run:
+                in_run = False
+                runs.append([run_start, i])
+        if in_run:
+            runs.append([run_start, n])
+        segs = [r for r in runs if seed_mask[r[0]:r[1]].any()]
+        if not segs:
+            return []
+
+        # Step 3: merge short gaps
+        merged: List[List[int]] = [segs[0][:]]
+        for r in segs[1:]:
+            if r[0] - merged[-1][1] < gap_merge_frames:
+                merged[-1][1] = r[1]
+            else:
+                merged.append(r[:])
+
+        # Step 4: drop micro-segments
+        kept = [r for r in merged if r[1] - r[0] >= min_speech_frames]
+
+        # Step 5: split overlong segments at smoothed minima
+        bounded: List[List[int]] = []
+        for r in kept:
+            bounded.extend(self._split_overlong(p, r[0], r[1], max_speech_frames))
+
+        # Build speech dicts with stats + "3a" refined start per final part
+        sst = self.speech_start_threshold
+        speeches: List[Dict[str, Any]] = []
+        for i0, i1 in bounded:
+            window = p[i0:i1]
+            seg: Dict[str, Any] = {
+                "start": i0,
+                "end": i1,
+                "avg_prob": float(window.mean()),
+                "min_prob": float(window.min()),
+                "max_prob": float(window.max()),
+            }
+            if sst is not None:
+                hits = np.flatnonzero(window >= sst)
+                if len(hits):
+                    seg["speech_start"] = i0 + int(hits[0])
+            speeches.append(seg)
+
+        return self._pad_and_convert(speeches, n, audio_duration_sec)
+
+    def _split_overlong(
+        self,
+        p: np.ndarray,
+        i0: int,
+        i1: int,
+        max_speech_frames: int,
+    ) -> List[List[int]]:
+        """Split [i0, i1) into parts <= max_speech_frames, preferring minima
+        of the smoothed probability curve (0.6s sliver guard between cuts);
+        even-split fallback bounds any remainder."""
+        if i1 - i0 <= max_speech_frames:
+            return [[i0, i1]]
+
+        frame_ms = float(self._frame_duration_ms)
+        window = max(1, int(self.split_smooth_ms / frame_ms))
+        seg_p = p[i0:i1]
+        kernel = np.ones(window, dtype=np.float32) / window
+        smoothed = np.convolve(seg_p, kernel, mode="same")
+
+        # Local minima of the smoothed curve (interior frames only)
+        minima = [
+            j for j in range(1, len(smoothed) - 1)
+            if smoothed[j] <= smoothed[j - 1] and smoothed[j] <= smoothed[j + 1]
+        ]
+
+        # Greedy selection: cut at the deepest minimum inside each
+        # (spacing_min, ceiling] lookahead from the previous cut. Among
+        # near-tied minima (within 0.02 of the deepest) prefer the LATEST
+        # position — on flat stretches this stretches parts toward the
+        # ceiling instead of cutting early (more ASR context per part).
+        # spacing_min is only a sliver guard (0.6s): a genuine dip shortly
+        # after the previous cut SHOULD produce a subtitle-sized part.
+        spacing_min = max(1, int(600.0 / frame_ms))
+        cuts: List[int] = []
+        prev = 0
+        while i1 - i0 - prev > max_speech_frames:
+            cands = [j for j in minima if prev + spacing_min <= j < prev + max_speech_frames]
+            if not cands:
+                break
+            floor_val = min(smoothed[j] for j in cands)
+            best = max(j for j in cands if smoothed[j] <= floor_val + 0.02)
+            cuts.append(best)
+            prev = best
+
+        parts: List[List[int]] = []
+        prev = 0
+        for c in cuts:
+            parts.append([i0 + prev, i0 + c])
+            prev = c
+        parts.append([i0 + prev, i1])
+
+        # Fallback: even-split any part still over the ceiling
+        final: List[List[int]] = []
+        for a, b in parts:
+            length = b - a
+            if length <= max_speech_frames:
+                final.append([a, b])
+            else:
+                n_parts = int(np.ceil(length / max_speech_frames))
+                step = length / n_parts
+                for k in range(n_parts):
+                    fa = a + int(round(k * step))
+                    fb = a + int(round((k + 1) * step)) if k < n_parts - 1 else b
+                    if fb > fa:
+                        final.append([fa, fb])
+        return final
 
     # ------------------------------------------------------------------
     # Public: segment
@@ -613,7 +943,10 @@ class WhisperSegSpeechSegmenter:
                 processing_time_sec=time.time() - start_time,
             )
 
-        segments = self._probs_to_segments(probs, duration_sec)
+        if self.segmentation_decoder == "offline":
+            segments = self._probs_to_segments_offline(probs, duration_sec)
+        else:
+            segments = self._probs_to_segments(probs, duration_sec)
         groups = group_segments(
             segments,
             max_group_duration_s=self.max_group_duration_s,
@@ -685,9 +1018,18 @@ class WhisperSegSpeechSegmenter:
         """Return current runtime parameters for metadata/observability."""
         return {
             "threshold": self.threshold,
+            "neg_threshold": self.neg_threshold,
+            "speech_start_threshold": self.speech_start_threshold,
+            "force_split_mode": self.force_split_mode,
+            "segmentation_decoder": self.segmentation_decoder,
+            "grow_floor": self.grow_floor,
+            "gap_merge_ms": self.gap_merge_ms,
+            "split_smooth_ms": self.split_smooth_ms,
             "min_speech_duration_ms": self.min_speech_duration_ms,
             "min_silence_duration_ms": self.min_silence_duration_ms,
             "speech_pad_ms": self.speech_pad_ms,
+            "start_pad_ms": self.start_pad_ms,
+            "end_pad_ms": self.end_pad_ms,
             "max_speech_duration_s": self.max_speech_duration_s,
             "chunk_threshold_s": self.chunk_threshold_s,
             "max_group_duration_s": self.max_group_duration_s,

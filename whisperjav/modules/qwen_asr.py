@@ -22,11 +22,27 @@ import warnings
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Union
 
+import numpy as np
 import torch
 import stable_whisper
 
 from whisperjav.utils.logger import logger
 from whisperjav.modules.japanese_postprocessor import JapanesePostProcessor
+
+
+def _as_audiolike(entry):
+    """Convert a frame-audio entry to qwen_asr's ``AudioLike``.
+
+    v1.9.0 pathless mode: in-memory numpy slices (mono float32, 16 kHz per the
+    scene-audio contract) are passed as ``(array, 16000)`` tuples, which both
+    ``Qwen3ASRModel.transcribe()`` and ``Qwen3ForcedAligner.align()`` accept
+    directly (``AudioLike = Union[str, Tuple[np.ndarray, int]]``) — so no
+    per-VAD-group temp WAV is needed. Path/str entries pass through as strings
+    (legacy behavior, unchanged).
+    """
+    if isinstance(entry, np.ndarray):
+        return (entry, 16000)
+    return str(entry)
 
 
 
@@ -1197,7 +1213,7 @@ class QwenASR:
 
     def transcribe_text_only(
         self,
-        audio_paths: List[Union[str, Path]],
+        audio_paths: List[Union[str, Path, np.ndarray]],
         contexts: Optional[List[str]] = None,
         language: Optional[str] = None,
         audio_durations: Optional[List[float]] = None,
@@ -1249,8 +1265,9 @@ class QwenASR:
                 )
             ctx_list = contexts
 
-        # Convert paths to strings for qwen-asr
-        audio_strs = [str(p) for p in audio_paths]
+        # Convert entries to qwen-asr AudioLike: str path OR (np.ndarray, 16000)
+        # for in-memory frame audio (v1.9.0 pathless mode).
+        audio_inputs = [_as_audiolike(p) for p in audio_paths]
 
         logger.info(
             "Assembly: Text generation — %d scenes, language=%s",
@@ -1279,7 +1296,7 @@ class QwenASR:
                 self.model.max_new_tokens = scene_token_limit
                 try:
                     result = self.model.transcribe(
-                        audio=[audio_strs[i]],
+                        audio=[audio_inputs[i]],
                         context=[ctx_list[i]],
                         language=qwen_language,
                         return_time_stamps=False,
@@ -1319,7 +1336,7 @@ class QwenASR:
 
     def align_standalone(
         self,
-        audio_paths: List[Union[str, Path]],
+        audio_paths: List[Union[str, Path, np.ndarray]],
         texts: List[str],
         language: Optional[str] = None,
         audio_durations: Optional[List[float]] = None,
@@ -1369,7 +1386,7 @@ class QwenASR:
         for i, (path, text) in enumerate(zip(audio_paths, texts)):
             if text.strip():
                 to_align_indices.append(i)
-                to_align_audio.append(str(path))
+                to_align_audio.append(_as_audiolike(path))
                 to_align_text.append(text)
 
         n_with_text = len(to_align_indices)

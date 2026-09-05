@@ -80,6 +80,7 @@ nav:
     - Ensemble Mode: pipelines/ensemble.md
     - ChronosJAV: pipelines/chronosjav.md
     - Qwen3-ASR: pipelines/qwen3-asr.md
+    - CrispASR: pipelines/crispasr.md
   - Upgrading:
     - UPGRADE.md
     - Troubleshooting: UPGRADE_TROUBLESHOOTING.md

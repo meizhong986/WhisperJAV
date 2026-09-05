@@ -21,10 +21,12 @@ channels:
 # Minimal base environment (heavy dependencies in post-install)
 specs:
   - python=3.10.18  # Pinned for stability (tested version)
+  - openssl=3.6.2   # Pinned to bypass the ASN.1 Windows cert store bug
   - pip             # Package installer
   - git             # Required for GitHub installs
   - ffmpeg>=6,<8    # Audio/video processing (v6 or v7 required, v8+ incompatible)
   - menuinst        # Desktop/Start Menu shortcut creation
+
 
 # Install in dependency order for reliability
 install_in_dependency_order: true

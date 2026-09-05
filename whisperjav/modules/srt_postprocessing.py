@@ -157,7 +157,18 @@ class SRTPostProcessor:
 
         # Process
         result = self.cjk_sanitizer.process(srt_path)
-        
+
+        # Non-linguistic utterance filter (Japanese only): drop subtitle entries
+        # composed solely of sound-effect kana (moaning, breathing, etc.).
+        nonlinguistic_stats = None
+        if self.language == 'ja':
+            from whisperjav.modules.subtitle_pipeline.cleaners.nonlinguistic_utterance_filter import (
+                NonlinguisticUtteranceFilter,
+            )
+            nonlinguistic_stats = NonlinguisticUtteranceFilter().filter_srt_file(
+                result.sanitized_path
+            )
+
         # Return in expected format
         stats = result.statistics
         
@@ -180,6 +191,9 @@ class SRTPostProcessor:
                 'empty_removed': stats.get('removals', 0)
             }
         
+        if nonlinguistic_stats and nonlinguistic_stats["dropped_nonlinguistic"]:
+            old_stats['nonlinguistic_dropped'] = nonlinguistic_stats['dropped_nonlinguistic']
+
         return result.sanitized_path, old_stats
         
     

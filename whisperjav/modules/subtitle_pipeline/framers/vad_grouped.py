@@ -102,6 +102,7 @@ class VadGroupedFramer:
 
         frames = []
         speech_regions_per_frame: list[list[tuple[float, float]]] = []
+        speech_starts_per_frame: list[Optional[float]] = []
         skipped = 0
 
         for group in seg_result.groups:
@@ -129,6 +130,20 @@ class VadGroupedFramer:
             # These are used by the sentinel for VAD-guided redistribution
             regions = [(seg.start_sec, seg.end_sec) for seg in group]
             speech_regions_per_frame.append(regions)
+
+            # "3a" refined display start: first segment in the group that
+            # recorded a speech_start_sec (first frame >= speech_start_threshold
+            # in the backend). None -> consumers fall back to the frame start.
+            speech_starts_per_frame.append(
+                next(
+                    (
+                        s.metadata.get("speech_start_sec")
+                        for s in group
+                        if s.metadata.get("speech_start_sec") is not None
+                    ),
+                    None,
+                )
+            )
 
         if skipped > 0:
             logger.debug(
@@ -159,6 +174,7 @@ class VadGroupedFramer:
                 "audio_duration_sec": duration,
                 "speech_coverage_ratio": seg_result.speech_coverage_ratio,
                 "speech_regions": speech_regions_per_frame,
+                "speech_starts": speech_starts_per_frame,
                 "segmenter_params": seg_result.parameters,
             },
         )

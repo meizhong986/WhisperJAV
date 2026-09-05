@@ -93,6 +93,15 @@ class FasterWhisperProASR:
         # fallback in sync.
         segmenter_backend = speech_segmenter_config.get("backend", "whisperseg")
 
+        # v1.9.0 T1: "faster-whisper" backend = faster-whisper's BUILT-IN VAD.
+        # Instead of running the external per-group segmenter (N transcribe calls
+        # per scene), we make ONE transcribe(vad_filter=True) call per scene and
+        # let faster-whisper pack speech into full 30s encoder windows. This is
+        # the balanced-pipeline throughput fix. Its vad_params ARE meaningful
+        # (they become faster-whisper VadOptions), so it is EXEMPT from the
+        # firewall below and routes to the single-call full-audio path.
+        self._use_native_vad = (segmenter_backend == "faster-whisper")
+
         # --- CONSTRUCTOR FIREWALL ---
         # The resolver unconditionally produces Silero VAD presets (threshold=0.068,
         # speech_pad_ms=500, etc.) because LEGACY_PIPELINES hardcodes vad="silero".
@@ -101,7 +110,9 @@ class FasterWhisperProASR:
         # - self.vad_threshold / self.min_speech_duration_ms (logging)
         # - merged_segmenter_config (merge guard below, now doubly safe)
         # - self._vad_parameters (faster-whisper VadOptions, dormant but clean)
-        if not segmenter_backend.startswith("silero"):
+        # Exemptions: silero* (real Silero params) and faster-whisper native VAD
+        # (params are its VadOptions).
+        if not (segmenter_backend.startswith("silero") or self._use_native_vad):
             logger.debug(
                 "Non-Silero backend '%s': clearing resolver-produced Silero vad_params "
                 "to prevent contamination (firewall)",
@@ -121,12 +132,19 @@ class FasterWhisperProASR:
         else:
             merged_segmenter_config = dict(speech_segmenter_config)
 
+        # Native VAD runs INSIDE faster-whisper (vad_filter=True), so the external
+        # segmenter is the "none" passthrough — transcribe() then routes to the
+        # single-call full-audio path with vad_filter enabled.
+        factory_backend = "none" if self._use_native_vad else segmenter_backend
         try:
             self._external_segmenter = SpeechSegmenterFactory.create(
-                segmenter_backend,
+                factory_backend,
                 config=merged_segmenter_config
             )
-            logger.info(f"Speech Segmenter initialized: {self._external_segmenter.name}")
+            if self._use_native_vad:
+                logger.info("Speech Segmenter: faster-whisper native VAD (vad_filter=True, single call/scene)")
+            else:
+                logger.info(f"Speech Segmenter initialized: {self._external_segmenter.name}")
         except Exception as e:
             logger.error(f"Failed to create Speech Segmenter '{segmenter_backend}': {e}")
             raise ValueError(f"Speech Segmenter not configured - this is an architecture violation: {e}")
@@ -169,6 +187,14 @@ class FasterWhisperProASR:
         # Ensure task is set correctly
         self.whisper_params['task'] = task
         # Language is now passed from decoder_params (set via CLI --language argument)
+
+        # v1.9.0 T1: native faster-whisper VAD — enable the built-in vad_filter so
+        # the single full-audio transcribe() call performs VAD internally (one
+        # encoder pass per 30s window instead of one per external VAD group).
+        # self._vad_parameters (built below from the faster_whisper_vad preset)
+        # is attached in _prepare_whisper_params().
+        if self._use_native_vad:
+            self.whisper_params['vad_filter'] = True
 
         # Store task for metadata
         self.task = task
@@ -522,7 +548,10 @@ class FasterWhisperProASR:
         if not vad_segments:
             # Check if this is because segmenter returned empty (no speech) or "none" backend
             if self._external_segmenter.name == "none":
-                logger.info("Speech segmentation: disabled (none backend) - transcribing full audio directly")
+                if getattr(self, "_use_native_vad", False):
+                    logger.info("faster-whisper native VAD: single transcribe call per scene (vad_filter=True)")
+                else:
+                    logger.info("Speech segmentation: disabled (none backend) - transcribing full audio directly")
                 all_segments = self._transcribe_full_audio(audio_data, sample_rate)
             elif should_force_full_transcribe(vad_segments, audio_duration):
                 logger.warning(

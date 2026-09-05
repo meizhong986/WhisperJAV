@@ -197,6 +197,7 @@ OPTIONAL_IMPORTS: Set[str] = {
     # Optional speech backends (try/except guarded)
     "nemo",           # NVIDIA NeMo speech
     "whisperx",       # WhisperX alternative
+    "fireredvad",     # FireRedVAD segmenter backend (v1.9.0 experimental, pip install fireredvad)
 
     # NeMo dependencies (optional)
     "omegaconf",      # OmegaConf for NeMo config

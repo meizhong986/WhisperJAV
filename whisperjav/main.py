@@ -74,7 +74,7 @@ from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 from whisperjav.pipelines.kotoba_faster_whisper_pipeline import KotobaFasterWhisperPipeline
-from whisperjav.config.legacy import resolve_legacy_pipeline, resolve_ensemble_config
+from whisperjav.config.legacy import resolve_legacy_pipeline, resolve_ensemble_config, apply_balanced_vad_defaults
 from whisperjav.__version__ import __version__, __version_display__
 
 
@@ -162,8 +162,8 @@ def parse_arguments():
     # Core arguments
     parser.add_argument("input", nargs="*", help="Input media file(s), directory, or wildcard pattern.")
     # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
-    parser.add_argument("--mode", choices=["fidelity", "balanced", "fast", "faster", "transformers", "qwen"], default="balanced",
-                       help="Processing mode (default: balanced)")
+    parser.add_argument("--mode", choices=["fidelity", "balanced", "fast", "faster", "transformers", "qwen", "crispasr"], default="balanced",
+                       help="Processing mode (default: balanced). 'crispasr' = CrispASR external provider (requires --crispasr-exe)")
     parser.add_argument("--model", default=None,
                        help="Override the default Whisper model (e.g., large-v2, turbo, large). Overrides config default.")
     parser.add_argument("--language", choices=["japanese", "korean", "chinese", "english"],
@@ -192,8 +192,8 @@ def parse_arguments():
                                help="Enable two-pass ensemble mode")
     # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
     twopass_group.add_argument("--pass1-pipeline", default="balanced",
-                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen"],
-                               help="Pipeline for pass 1 (default: balanced)")
+                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen", "crispasr"],
+                               help="Pipeline for pass 1 (default: balanced). 'crispasr' requires --crispasr-exe")
     twopass_group.add_argument("--pass1-sensitivity", default="balanced",
                                choices=["conservative", "balanced", "aggressive"],
                                help="Sensitivity for pass 1 (default: balanced)")
@@ -222,8 +222,8 @@ def parse_arguments():
                                help="Speech padding in ms for pass 1")
     # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
     twopass_group.add_argument("--pass2-pipeline", default=None,
-                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen", "xxl"],
-                               help="Pipeline for pass 2 (enables pass 2). 'xxl' = BYOP XXL Faster Whisper (requires --xxl-exe)")
+                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen", "xxl", "crispasr"],
+                               help="Pipeline for pass 2 (enables pass 2). 'xxl' = BYOP XXL Faster Whisper (requires --xxl-exe); 'crispasr' requires --crispasr-exe")
     twopass_group.add_argument("--pass2-sensitivity", default="balanced",
                                choices=["conservative", "balanced", "aggressive"],
                                help="Sensitivity for pass 2 (default: balanced)")
@@ -261,6 +261,24 @@ def parse_arguments():
     byop_group = parser.add_argument_group("BYOP — Bring Your Own Provider")
     byop_group.add_argument("--xxl-exe", default=None,
                             help="Path to faster-whisper-xxl executable (required for --pass2-pipeline xxl)")
+
+    # CrispASR — standalone external-provider pipeline (NOT BYOP/XXL coupled).
+    # docs/plans/crispasr_v190/08_crispasr_simple_pipeline_design.md
+    crispasr_group = parser.add_argument_group(
+        "CrispASR Mode Options (--mode crispasr / --passN-pipeline crispasr)"
+    )
+    crispasr_group.add_argument("--crispasr-exe", default=None,
+                                help="Path to the crispasr external executable "
+                                     "(required for --mode crispasr or --passN-pipeline crispasr)")
+    crispasr_group.add_argument("--crispasr-backend", default="parakeet",
+                                choices=["whispercpp", "parakeet", "cohere"],
+                                help="CrispASR ASR backend (default: parakeet). "
+                                     "'whispercpp' = crispasr's whisper backend (defaults to large-v2). "
+                                     "All curated backends emit native word timestamps; no aligner needed.")
+    crispasr_group.add_argument("--crispasr-args", default="",
+                                help="Extra arguments passed verbatim to crispasr "
+                                     "(shlex-split, appended to argv). Single escape valve "
+                                     "for advanced CrispASR-internal control.")
 
     # Environment check
     parser.add_argument("--check", action="store_true", help="Run environment checks and exit")
@@ -338,7 +356,7 @@ def parse_arguments():
                                  "silero", "silero-v4.0", "silero-v3.1", "silero-v6.2",
                                  "nemo", "nemo-lite",
                                  "whisper-vad", "whisper-vad-tiny", "whisper-vad-base", "whisper-vad-medium",
-                                 "ten", "whisperseg", "none"
+                                 "ten", "whisperseg", "firered-vad", "faster-whisper", "none"
                              ],
                              default=None,  # None = use whisperseg (v1.8.13 default for balanced/fidelity)
                              metavar="BACKEND",
@@ -352,6 +370,9 @@ def parse_arguments():
                                  "whisper-vad (neural VAD using Whisper small model ~500MB), "
                                  "whisper-vad-tiny/base/medium (other model sizes), "
                                  "ten (TEN Framework), "
+                                 "faster-whisper (v1.9.0 balanced default — faster-whisper's "
+                                 "built-in VAD via vad_filter; one transcribe call per scene, "
+                                 "no external per-group overhead), "
                                  "none (disable segmentation)"
                              ))
     tuning_group.add_argument("--initial-prompt",
@@ -365,6 +386,19 @@ def parse_arguments():
                              type=int, default=None,
                              metavar="INT",
                              help="Padding around detected speech in milliseconds (default: backend-specific)")
+    tuning_group.add_argument("--max-group-duration",
+                             type=float, default=None,
+                             metavar="SECONDS",
+                             help="Max duration (s) of a VAD segment GROUP before a new transcribe() call "
+                                  "(external segmenters: silero/nemo/etc). Larger = fewer calls = faster "
+                                  "(each <=30s call is one encoder pass), but longer subtitles. "
+                                  "Overrides the sensitivity preset. No effect with --speech-segmenter faster-whisper.")
+    tuning_group.add_argument("--chunk-threshold",
+                             type=float, default=None,
+                             metavar="SECONDS",
+                             help="Gap (s) above which adjacent speech segments are split into separate groups "
+                                  "(external segmenters). Larger = fewer groups (merges across longer silences). "
+                                  "Overrides the sensitivity preset.")
     tuning_group.add_argument("--condition-on-previous-text",
                              type=str, default=None,
                              choices=["true", "false"],
@@ -553,16 +587,18 @@ def parse_arguments():
                                 "for ASR transcription (Qwen/Decoupled pipelines only)")
     qwen_audio_group.add_argument("--qwen-segmenter", type=str, default="whisperseg",
                            choices=["none", "silero", "silero-v4.0", "silero-v3.1", "silero-v6.2",
-                                    "nemo", "nemo-lite", "whisper-vad", "ten", "whisperseg"],
+                                    "nemo", "nemo-lite", "whisper-vad", "ten", "whisperseg",
+                                    "firered-vad"],
                            help="Speech segmentation backend for VAD-based chunking: "
                                 "whisperseg (default since v1.8.13, JA-ASMR ONNX), "
                                 "silero-v6.2 (force-splits long chunks), "
                                 "ten, silero/silero-v4.0/v3.1, "
-                                "nemo/nemo-lite, whisper-vad, none")
+                                "nemo/nemo-lite, whisper-vad, "
+                                "firered-vad (v1.9.0 experimental), none")
     qwen_audio_group.add_argument("--qwen-max-group-duration", type=float, default=None,
-                           help="Max duration (seconds) for VAD segment grouping (pipeline default: 6.0)")
+                           help="Max duration (seconds) for VAD segment grouping (pipeline default: 4.0)")
     qwen_audio_group.add_argument("--qwen-chunk-threshold", type=float, default=None,
-                           help="Silence gap threshold (seconds) for VAD frame grouping (pipeline default: 1.0)")
+                           help="Silence gap (seconds) above which segments are NOT grouped (pipeline default: 0.4 / 400ms)")
     qwen_audio_group.add_argument("--qwen-input-mode", type=str, default="assembly",
                            choices=["assembly", "context_aware", "vad_slicing"],
                            help="Audio input strategy: 'assembly' (default). "
@@ -582,7 +618,17 @@ def parse_arguments():
     qwen_audio_group.add_argument("--qwen-vad-threshold", type=float, default=None,
                            help="VAD speech detection threshold (overrides sensitivity preset)")
     qwen_audio_group.add_argument("--qwen-vad-padding", type=int, default=None,
-                           help="VAD speech padding in ms (overrides sensitivity preset)")
+                           help="Legacy symmetric VAD padding in ms (applies to both start and end). "
+                                "Prefer --qwen-vad-start-pad / --qwen-vad-end-pad.")
+    qwen_audio_group.add_argument("--qwen-vad-start-pad", type=int, default=None,
+                           help="VAD padding before speech onset, ms (pipeline default: 100)")
+    qwen_audio_group.add_argument("--qwen-vad-end-pad", type=int, default=None,
+                           help="VAD padding after speech offset, ms (pipeline default: 200; end-of-speech is most critical)")
+    qwen_audio_group.add_argument("--qwen-max-speech-duration", type=float, default=None,
+                           help="Force-split any single speech segment longer than this (seconds). "
+                                "Overrides the sensitivity preset (conservative 6 / balanced 5 / "
+                                "aggressive 4). The binding cap on subtitle length — lower = shorter, "
+                                "more granular subtitles.")
 
     # ── Qwen3-ASR: Generation ─────────────────────────────────────────────
     qwen_gen_group = parser.add_argument_group("Qwen3-ASR: Generation")
@@ -599,22 +645,29 @@ def parse_arguments():
     qwen_align_group = parser.add_argument_group("Qwen3-ASR: Alignment")
     qwen_align_group.add_argument("--qwen-timestamps", type=str, default="word",
                            choices=["word", "none"],
-                           help="Timestamp granularity: 'word' (ForcedAligner) or 'none' (default: word)")
+                           help="Timestamp granularity: 'word' (ForcedAligner) or 'none' (default: word). "
+                                "Only used by aligner modes — inert under the vad_only default.")
     qwen_align_group.add_argument("--qwen-aligner", type=str,
                            default="Qwen/Qwen3-ForcedAligner-0.6B",
-                           help="ForcedAligner model ID (default: Qwen/Qwen3-ForcedAligner-0.6B)")
+                           help="ForcedAligner model ID (default: Qwen/Qwen3-ForcedAligner-0.6B). "
+                                "Only loaded by aligner modes — inert under the vad_only default.")
     qwen_align_group.add_argument("--qwen-assembly-cleaner", dest="qwen_assembly_cleaner",
                            action="store_true", default=True,
                            help="Enable pre-alignment text cleaning (default: enabled)")
     qwen_align_group.add_argument("--no-qwen-assembly-cleaner", dest="qwen_assembly_cleaner",
                            action="store_false",
                            help="Disable pre-alignment text cleaning")
-    qwen_align_group.add_argument("--qwen-timestamp-mode", type=str, default="aligner_vad_fallback",
+    qwen_align_group.add_argument("--qwen-timestamp-mode", type=str, default="vad_only",
                            choices=["aligner_interpolation", "aligner_vad_fallback", "aligner_only", "vad_only"],
-                           help="Timestamp resolution mode (default: aligner_vad_fallback)")
+                           help="Timestamp resolution mode (default: vad_only — no ForcedAligner, "
+                                "VAD frame boundaries drive timestamps; saves ~1GB VRAM). "
+                                "Note: cohere generator has no native timestamps and keeps "
+                                "aligner_vad_fallback unless explicitly overridden.")
     qwen_align_group.add_argument("--qwen-stepdown", dest="qwen_stepdown",
                            action="store_true", default=True,
-                           help="Adaptive step-down: retry collapsed groups at fallback size (default: enabled)")
+                           help="Adaptive step-down: retry collapsed groups at fallback size "
+                                "(default: enabled). Requires an aligner mode — inert under "
+                                "the vad_only default.")
     qwen_align_group.add_argument("--no-qwen-stepdown", dest="qwen_stepdown",
                            action="store_false",
                            help="Disable adaptive step-down")
@@ -638,6 +691,14 @@ def parse_arguments():
     qwen_output_group.add_argument("--no-qwen-japanese-postprocess", dest="qwen_japanese_postprocess",
                            action="store_false",
                            help=argparse.SUPPRESS)
+    qwen_output_group.add_argument("--qwen-drop-nonverbal-lines", dest="qwen_drop_nonverbal_lines",
+                           action="store_true", default=True,
+                           help="Drop lone nonverbal single-token subtitle lines "
+                                "(あ。 は。 え。 ん。 つ。 ふ。 ふっ。 切。) in Phase 8 (default: enabled). "
+                                "Applies to all Qwen backends (qwen3 / cohere / anime-whisper).")
+    qwen_output_group.add_argument("--no-qwen-drop-nonverbal-lines", dest="qwen_drop_nonverbal_lines",
+                           action="store_false",
+                           help="Keep nonverbal single-token subtitle lines (disable the Phase-8 filter)")
 
     # Decoupled Pipeline Options (IMPL-001 Phase 2)
     decoupled_group = parser.add_argument_group(
@@ -1113,6 +1174,10 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         # Dedicated Qwen3-ASR pipeline (ADR-004)
         from whisperjav.pipelines.qwen_pipeline import QwenPipeline
         from whisperjav.ensemble.pass_worker import resolve_qwen_sensitivity, SEGMENTER_PARAMS
+        from whisperjav.config.anime_whisper_vad import (
+            anime_whisperseg_defaults,
+            apply_anime_segmenter_defaults,
+        )
         initial_output_dir = str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir
         # Resolve sensitivity preset into segmenter_config
         _qwen_sensitivity = getattr(args, 'qwen_sensitivity', 'balanced')
@@ -1128,9 +1193,36 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         _vad_thr = getattr(args, 'qwen_vad_threshold', None)
         if _vad_thr is not None:
             _user_vad_overrides["threshold"] = _vad_thr
-        _vad_pad = getattr(args, 'qwen_vad_padding', None)
-        if _vad_pad is not None:
-            _user_vad_overrides["speech_pad_ms"] = _vad_pad
+        # --qwen-max-speech-duration: explicit CLI cap on single-segment length.
+        # A SEGMENTER_PARAM, so it routes via segmenter_config to BOTH the Phase-4
+        # segmenter and the vad-grouped framer (the binding VAD for anime). Wins
+        # over the preset/table below.
+        _max_speech = getattr(args, 'qwen_max_speech_duration', None)
+        if _max_speech is not None:
+            _user_vad_overrides["max_speech_duration_s"] = float(_max_speech)
+        # v1.9.0 anime/qwen3 VAD defaults — fill in when the user gave no CLI value.
+        #   anime-whisper -> per-sensitivity table (config/anime_whisper_vad.py):
+        #                    threshold, neg_threshold, min_silence_duration_ms,
+        #                    max_speech_duration_s where the table pins them.
+        #                    Single-source lift via apply_anime_segmenter_defaults
+        #                    (2026-07-30 fix — per-key copies here dropped
+        #                    neg_threshold as dead config). qwen3 -> flat
+        #                    threshold 0.25. Cohere excluded. Explicit CLI flags
+        #                    always win (setdefault).
+        # v1.9.0 fix (code-review): these are WhisperSeg-scale values — inject
+        # them ONLY when the segmenter actually is whisperseg. Injecting the
+        # flat 0.25 (or the anime table) as a user-override on TEN/Silero/
+        # FireRedVAD rode above THEIR per-sensitivity YAML presets in
+        # resolve_qwen_sensitivity, silently replacing e.g. TEN's tuned
+        # 0.42/0.32/0.22 gradient and making the sensitivity selector inert.
+        if _qwen_segmenter == "whisperseg":
+            if _gen_backend_early == "anime-whisper":
+                apply_anime_segmenter_defaults(_user_vad_overrides, _qwen_sensitivity)
+            elif _gen_backend_early == "qwen3":
+                _user_vad_overrides.setdefault("threshold", 0.25)
+        # v1.9.0: VAD padding routed to pipeline scalars (segmenter_start/end_pad_ms)
+        # below, NOT into segmenter_config — the pipeline injects start/end pad at
+        # clobber time, so a speech_pad_ms in segmenter_config would be overwritten.
         _resolved_segmenter_config = resolve_qwen_sensitivity(
             _qwen_segmenter, _qwen_sensitivity, _user_vad_overrides or None
         )
@@ -1157,6 +1249,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             "segmenter_config": _resolved_segmenter_config or None,
             # Adaptive Step-Down
             "stepdown_enabled": getattr(args, 'qwen_stepdown', True),
+            # v1.9.0: Phase-8 nonverbal single-token line filter (default on)
+            "drop_nonverbal_lines": getattr(args, 'qwen_drop_nonverbal_lines', True),
             # Generator backend selection (v1.8.6+)
             "generator_backend": getattr(args, 'qwen_generator', 'qwen3'),
             # Qwen ASR
@@ -1171,8 +1265,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             "context": getattr(args, 'qwen_context', ''),
             "context_file": getattr(args, 'qwen_context_file', None),
             "attn_implementation": getattr(args, 'qwen_attn', 'auto'),
-            # Timestamp resolution
-            "timestamp_mode": getattr(args, 'qwen_timestamp_mode', 'aligner_vad_fallback'),
+            # Timestamp resolution (v1.9.0 default: vad_only — no ForcedAligner)
+            "timestamp_mode": getattr(args, 'qwen_timestamp_mode', 'vad_only'),
             # Japanese post-processing
             "japanese_postprocess": getattr(args, 'qwen_japanese_postprocess', False),
             "postprocess_preset": getattr(args, 'qwen_postprocess_preset', 'high_moan'),
@@ -1200,6 +1294,18 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         _chunk_thr = getattr(args, 'qwen_chunk_threshold', None)
         if _chunk_thr is not None:
             qwen_kwargs["segmenter_chunk_threshold"] = _chunk_thr
+        # v1.9.0: asymmetric VAD padding (pipeline owns default 100/200). Legacy
+        # --qwen-vad-padding maps symmetrically; explicit start/end win per-side.
+        _vad_pad_legacy = getattr(args, 'qwen_vad_padding', None)
+        if _vad_pad_legacy is not None:
+            qwen_kwargs["segmenter_start_pad_ms"] = max(0, int(_vad_pad_legacy))
+            qwen_kwargs["segmenter_end_pad_ms"] = max(0, int(_vad_pad_legacy))
+        _vad_start_pad = getattr(args, 'qwen_vad_start_pad', None)
+        if _vad_start_pad is not None:
+            qwen_kwargs["segmenter_start_pad_ms"] = max(0, int(_vad_start_pad))
+        _vad_end_pad = getattr(args, 'qwen_vad_end_pad', None)
+        if _vad_end_pad is not None:
+            qwen_kwargs["segmenter_end_pad_ms"] = max(0, int(_vad_end_pad))
         _sd_init = getattr(args, 'qwen_stepdown_initial_group', None)
         if _sd_init is not None:
             qwen_kwargs["stepdown_initial_group"] = _sd_init
@@ -1210,6 +1316,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         # unless the user explicitly set them via CLI flags
         _gen_backend = qwen_kwargs.get("generator_backend", "qwen3")
         if _gen_backend == "anime-whisper":
+            # v1.9.0: per-sensitivity WhisperSeg VAD defaults (owner table, single
+            # source of truth). Balanced is the fallback for unknown sensitivity.
+            _aw_vad = anime_whisperseg_defaults(_qwen_sensitivity)
             if not any(a.startswith('--qwen-model-id') for a in sys.argv):
                 qwen_kwargs["model_id"] = "litagin/anime-whisper"
             if not any(a.startswith('--qwen-timestamp-mode') for a in sys.argv):
@@ -1219,11 +1328,35 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             if not any(a.startswith('--qwen-stepdown') for a in sys.argv):
                 qwen_kwargs["stepdown_enabled"] = False
             if not any(a.startswith('--qwen-chunk-threshold') for a in sys.argv):
-                qwen_kwargs["segmenter_chunk_threshold"] = 0.5
+                qwen_kwargs["segmenter_chunk_threshold"] = _aw_vad["chunk_threshold_s"]
             if not any(a.startswith('--qwen-max-group-duration') for a in sys.argv):
-                qwen_kwargs["segmenter_max_group_duration"] = 5.0
+                qwen_kwargs["segmenter_max_group_duration"] = _aw_vad["max_group_duration_s"]
+            # Per-sensitivity padding. The explicit pad flags (applied above) win;
+            # --qwen-vad-padding sets both sides symmetrically, so it gates both.
+            if not any(a.startswith(('--qwen-vad-start-pad', '--qwen-vad-padding')) for a in sys.argv):
+                qwen_kwargs["segmenter_start_pad_ms"] = int(_aw_vad["start_pad_ms"])
+            if not any(a.startswith(('--qwen-vad-end-pad', '--qwen-vad-padding')) for a in sys.argv):
+                qwen_kwargs["segmenter_end_pad_ms"] = int(_aw_vad["end_pad_ms"])
 
         pipeline = QwenPipeline(**qwen_kwargs)
+        effective_mode = args.mode
+    elif args.mode == "crispasr":
+        # CrispASR standalone external-provider pipeline (docs/plans/crispasr_v190/08).
+        # Constructed directly from --crispasr-* args, like transformers/qwen.
+        from whisperjav.pipelines.crispasr_pipeline import CrispASRPipeline
+        initial_output_dir = str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir
+        pipeline = CrispASRPipeline(
+            output_dir=initial_output_dir,
+            temp_dir=args.temp_dir,
+            keep_temp_files=args.keep_temp,
+            save_metadata_json=getattr(args, 'debug', False),
+            progress_display=progress,
+            crispasr_exe=getattr(args, 'crispasr_exe', None),
+            crispasr_backend=getattr(args, 'crispasr_backend', 'parakeet'),
+            crispasr_args=getattr(args, 'crispasr_args', ''),
+            crispasr_language=getattr(args, 'language', 'japanese'),
+            subs_language=args.subs_language,
+        )
         effective_mode = args.mode
     else:  # fidelity
         pipeline = FidelityPipeline(**pipeline_args)
@@ -1656,6 +1789,16 @@ def main():
                          "Use synchronous mode (the default).")
             sys.exit(1)
 
+    # v1.9.0 fix (code-review): --mode crispasr crashed under --async-processing
+    # (resolved_config is None on the crispasr path, and process_files_async
+    # dereferences it; even past that, async_processor maps unknown modes to
+    # FidelityPipeline, silently ignoring --crispasr-exe). Fail fast with the
+    # same message shape as the decoupled guard above.
+    if getattr(args, 'mode', None) == 'crispasr' and getattr(args, 'async_processing', False):
+        logger.error("--mode crispasr does not support --async-processing. "
+                     "Use synchronous mode (the default).")
+        sys.exit(1)
+
     # Skip input validation if --dump-params is used (diagnostic mode)
     if not args.input and not args.dump_params:
         logger.error("No input files specified. Use -h for help.")
@@ -1763,6 +1906,13 @@ def main():
             resolved_config = None
             logger.debug("Qwen mode: skipping legacy config resolution (uses --qwen-* args)")
 
+        elif args.mode == "crispasr":
+            # CrispASR mode: uses dedicated --crispasr-* arguments, not legacy
+            # config. resolve_legacy_pipeline() would raise (crispasr is not a
+            # LEGACY_PIPELINES entry) — skip it, like transformers/qwen.
+            resolved_config = None
+            logger.debug("CrispASR mode: skipping legacy config resolution (uses --crispasr-* args)")
+
         else:
             # Legacy mode: use pipeline resolver
             resolved_config = resolve_legacy_pipeline(
@@ -1862,7 +2012,17 @@ def main():
 
     speech_segmenter = getattr(args, 'speech_segmenter', None)
     if speech_segmenter is None and resolved_config is not None:
-        if _path_safe_for_whisperseg_default(args):
+        if getattr(args, 'mode', None) == "balanced":
+            # v1.9.0 T1: balanced defaults to faster-whisper's native VAD
+            # (vad_filter=True, one transcribe call per scene). This is the
+            # throughput fix — it bypasses the external per-group segmenter
+            # whose N-calls-per-scene padding was the 2-3x slowdown. Native
+            # VAD does NOT hit the v1.9.0 non-Silero routing bug because it
+            # uses faster-whisper's internal VAD, not the external grouping
+            # path. Revert with --speech-segmenter silero-v3.1.
+            speech_segmenter = "faster-whisper"
+            logger.debug("No --speech-segmenter passed; --mode balanced uses v1.9.0 default: faster-whisper (native VAD)")
+        elif _path_safe_for_whisperseg_default(args):
             speech_segmenter = "whisperseg"
             logger.debug("No --speech-segmenter passed; using v1.8.13 default: whisperseg")
         else:
@@ -1874,10 +2034,27 @@ def main():
                 getattr(args, 'mode', None)
             )
 
+    # v1.9.0 fix (code-review): 'faster-whisper' means "use faster-whisper's
+    # NATIVE VAD (vad_filter=True)" and only the balanced pipeline's
+    # FasterWhisperProASR engine can honor it. On any other mode it would
+    # reach an engine that passes it verbatim to SpeechSegmenterFactory,
+    # which has no such backend — aborting the run mid-processing. Downgrade
+    # with a warning instead of crashing.
+    if speech_segmenter == "faster-whisper" and resolved_config is not None \
+            and getattr(args, 'mode', None) != "balanced":
+        _fw_fallback = "whisperseg" if _path_safe_for_whisperseg_default(args) else "silero-v3.1"
+        logger.warning(
+            "Speech segmenter 'faster-whisper' (native VAD) is only available with "
+            "--mode balanced; falling back to '%s' for --mode %s.",
+            _fw_fallback, getattr(args, 'mode', None)
+        )
+        speech_segmenter = _fw_fallback
+
     # Guard: explicit non-Silero choice on a path with the routing bug → downgrade with warning.
     if speech_segmenter is not None and resolved_config is not None:
         if (not _path_safe_for_whisperseg_default(args)
                 and speech_segmenter != "none"
+                and speech_segmenter != "faster-whisper"
                 and not speech_segmenter.startswith("silero")):
             logger.warning(
                 "Speech segmenter '%s' is not supported in --mode %s due to a known "
@@ -1896,6 +2073,18 @@ def main():
         resolved_config["params"]["speech_segmenter"]["backend"] = speech_segmenter
         logger.info(f"Speech segmenter set to: {speech_segmenter}")
         # Note: Speech Segmenter factory handles "none" backend internally
+
+        # v1.9.0: apply the SHARED balanced VAD defaults — native faster_whisper_vad
+        # preset (scale-correct for faster-whisper's bundled Silero), or the Test-D
+        # fine-grained grouping for an external segmenter on balanced. Shared with
+        # the ensemble path (pass_worker._apply_gui_overrides) so the two cannot
+        # drift. Explicit CLI overrides below (--vad-threshold / --speech-pad-ms /
+        # --max-group-duration / --chunk-threshold) run after and win.
+        apply_balanced_vad_defaults(
+            resolved_config,
+            sensitivity=getattr(args, 'sensitivity', 'balanced'),
+            is_balanced=(getattr(args, 'mode', None) == "balanced"),
+        )
 
     # Apply CLI quality knobs (--initial-prompt, --vad-threshold, --condition-on-previous-text)
     if resolved_config is not None:
@@ -1935,6 +2124,32 @@ def main():
             resolved_config["params"]["speech_segmenter"]["speech_pad_ms"] = speech_pad_ms
             logger.info(f"Speech pad set via CLI: {speech_pad_ms}ms")
 
+        # Group-sizing knobs for external segmenters (silero/nemo/etc). These
+        # control the encoder-pass count: each <=30s GROUP is one transcribe()
+        # call. Routed into both params["vad"] and speech_segmenter config so the
+        # segmenter's _group_segments() picks them up via merged_segmenter_config.
+        max_group_duration = getattr(args, 'max_group_duration', None)
+        if max_group_duration is not None:
+            max_group_duration = max(1.0, float(max_group_duration))
+            if "vad" not in resolved_config["params"]:
+                resolved_config["params"]["vad"] = {}
+            resolved_config["params"]["vad"]["max_group_duration_s"] = max_group_duration
+            if "speech_segmenter" not in resolved_config["params"]:
+                resolved_config["params"]["speech_segmenter"] = {}
+            resolved_config["params"]["speech_segmenter"]["max_group_duration_s"] = max_group_duration
+            logger.info(f"Max group duration set via CLI: {max_group_duration}s")
+
+        chunk_threshold = getattr(args, 'chunk_threshold', None)
+        if chunk_threshold is not None:
+            chunk_threshold = max(0.0, float(chunk_threshold))
+            if "vad" not in resolved_config["params"]:
+                resolved_config["params"]["vad"] = {}
+            resolved_config["params"]["vad"]["chunk_threshold_s"] = chunk_threshold
+            if "speech_segmenter" not in resolved_config["params"]:
+                resolved_config["params"]["speech_segmenter"] = {}
+            resolved_config["params"]["speech_segmenter"]["chunk_threshold_s"] = chunk_threshold
+            logger.info(f"Chunk threshold set via CLI: {chunk_threshold}s")
+
         condition_on_prev = getattr(args, 'condition_on_previous_text', None)
         if condition_on_prev is not None:
             condition_bool = condition_on_prev.lower() == "true"
@@ -1961,7 +2176,9 @@ def main():
             params = dump_resolved.get("params") or {}
             ss = params.get("speech_segmenter") or {}
             backend = ss.get("backend") or "silero-v3.1"  # firewall default
-            if backend and not backend.startswith("silero"):
+            # faster-whisper native VAD keeps its vad_params (they ARE its
+            # VadOptions); only the external non-silero segmenters get cleared.
+            if backend and not backend.startswith("silero") and backend != "faster-whisper":
                 cleared_vad = params.pop("vad", None)
                 params["_dump_note"] = (
                     f"Resolver-produced silero vad_params cleared for non-silero "
@@ -2031,6 +2248,8 @@ def main():
                     ),
                     "hf_params_provided": bool(getattr(args, 'pass1_hf_params', None)),
                     "qwen_params_provided": bool(getattr(args, 'pass1_qwen_params', None)),
+                    "crispasr_exe": getattr(args, 'crispasr_exe', None),
+                    "crispasr_backend": getattr(args, 'crispasr_backend', None),
                     "language": language_code,
                     "device": args.device,
                     "compute_type": args.compute_type,
@@ -2061,6 +2280,8 @@ def main():
                     "device": args.device,
                     "compute_type": args.compute_type,
                     "xxl_exe": getattr(args, 'xxl_exe', None),
+                    "crispasr_exe": getattr(args, 'crispasr_exe', None),
+                    "crispasr_backend": getattr(args, 'crispasr_backend', None),
                 }
             # Apply the same conditional_sensitivity_cap that runs at runtime
             # so the dump shows what pass 2 will ACTUALLY use, not what was
@@ -2211,6 +2432,11 @@ def main():
                 'params': pass1_params,  # None = use defaults, object = custom
                 'hf_params': pass1_hf_params,  # For transformers pipeline
                 'qwen_params': pass1_qwen_params,  # For qwen pipeline
+                # CrispASR fields (only used when pipeline='crispasr'); shared
+                # across both passes, mirroring the --xxl-exe precedent.
+                'crispasr_exe': getattr(args, 'crispasr_exe', None),
+                'crispasr_backend': getattr(args, 'crispasr_backend', None),
+                'crispasr_args': getattr(args, 'crispasr_args', ''),
                 'language': language_code,  # Source language code (e.g., 'en', 'ja')
                 'device': args.device,  # Hardware override (None = auto-detect)
                 'compute_type': args.compute_type,  # Compute type override (None = auto)
@@ -2231,6 +2457,11 @@ def main():
                     'params': pass2_params,
                     'hf_params': pass2_hf_params,  # For transformers pipeline
                     'qwen_params': pass2_qwen_params,  # For qwen pipeline
+                    # CrispASR fields (only used when pipeline='crispasr'); shared
+                    # across both passes, mirroring the --xxl-exe precedent.
+                    'crispasr_exe': getattr(args, 'crispasr_exe', None),
+                    'crispasr_backend': getattr(args, 'crispasr_backend', None),
+                    'crispasr_args': getattr(args, 'crispasr_args', ''),
                     'language': language_code,  # Source language code (e.g., 'en', 'ja')
                     'device': args.device,  # Hardware override (None = auto-detect)
                     'compute_type': args.compute_type,  # Compute type override (None = auto)

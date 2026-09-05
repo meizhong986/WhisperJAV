@@ -214,6 +214,7 @@
                                             <option value="kotoba-faster-whisper">kotoba&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(kotoba-v2-fp16&nbsp;&nbsp;&nbsp;6GB VRAM)</option>
                                             -->
                                             <option value="transformers">transformers&nbsp;&nbsp;(HF kotoba-bilingual&nbsp;6GB VRAM)</option>
+                                            <option value="crispasr">crispasr&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(external provider — set exe path)</option>
                                             <option value="anime" disabled>anime (future placeholder)</option>
                                         </select>
                                     </div>
@@ -274,6 +275,37 @@
                                         <strong>Transformers Mode:</strong> Uses HuggingFace pipeline with chunked long-form algorithm.
                                         Sensitivity presets do not apply. Use Ensemble tab's "Customize Parameters" button for fine-tuning.
                                     </p>
+                                </div>
+                            </div>
+
+                            <!-- Row 4: CrispASR settings (shown when crispasr mode selected).
+                                 Self-contained external provider — NOT the BYOP panel. -->
+                            <div class="byop-settings-panel" id="crispasrModeRow" style="display: none;">
+                                <div class="byop-settings-header">
+                                    <span class="byop-title">CrispASR (external provider)</span>
+                                    <span class="byop-hint">Self-contained engine — WhisperJAV scene/segmenter/enhancer settings do not apply</span>
+                                </div>
+                                <div class="byop-settings-row">
+                                    <label class="byop-label" for="crispasr-mode-backend">Backend</label>
+                                    <select id="crispasr-mode-backend" class="form-select compact">
+                                        <option value="parakeet" selected>parakeet (native word ts)</option>
+                                        <option value="whispercpp">whispercpp (whisper.cpp large-v2)</option>
+                                        <option value="cohere">cohere (native word ts)</option>
+                                    </select>
+                                </div>
+                                <div class="byop-settings-row">
+                                    <label class="byop-label" for="crispasr-mode-exe-path">Executable</label>
+                                    <input type="text" id="crispasr-mode-exe-path" class="form-input byop-path-input"
+                                           placeholder="Path to the crispasr executable" readonly
+                                           title="Click Browse to select the crispasr executable">
+                                    <button type="button" class="btn btn-secondary btn-compact" id="crispasr-mode-browse-btn"
+                                            title="Browse for the crispasr executable">Browse</button>
+                                </div>
+                                <div class="byop-settings-row">
+                                    <label class="byop-label" for="crispasr-mode-extra-args">Extra Args</label>
+                                    <input type="text" id="crispasr-mode-extra-args" class="form-input byop-args-input"
+                                           placeholder="e.g. --vad --split-on-punct"
+                                           title="Additional command-line arguments passed verbatim to crispasr">
                                 </div>
                             </div>
 
@@ -387,7 +419,7 @@
                                     <div class="col-pipeline">
                                         <select id="pass1-pipeline" class="form-select compact">
                                             <optgroup label="Whisper-Based">
-                                                <option value="balanced" selected>Balanced</option>
+                                                <option value="balanced">Balanced</option>
                                                 <option value="fast">Fast</option>
                                                 <option value="faster">Faster</option>
                                                 <option value="fidelity">Fidelity</option>
@@ -397,8 +429,11 @@
                                             </optgroup>
                                             <optgroup label="ChronosJAV">
                                                 <option value="qwen">Qwen3-ASR</option>
-                                                <option value="anime-whisper">Anime-Whisper</option>
+                                                <option value="anime-whisper" selected>Anime-Whisper</option>
                                                 <option value="cohere" disabled>Cohere-Transcribe (preview — coming in v1.9.0)</option>
+                                            </optgroup>
+                                            <optgroup label="External (CrispASR)">
+                                                <option value="crispasr">CrispASR</option>
                                             </optgroup>
                                         </select>
                                     </div>
@@ -448,6 +483,7 @@
                                     </div>
                                     <div class="col-segmenter">
                                         <select id="pass1-segmenter" class="form-select compact">
+                                            <option value="faster-whisper" title="faster-whisper's built-in VAD (vad_filter=True). Fastest — one transcribe call per scene. Pick an external segmenter instead to get the best-quality fine-grained grouping.">Faster-Whisper Native VAD (fast)</option>
                                             <option value="silero">Silero v4.0</option>
                                             <option value="silero-v3.1">Silero v3.1</option>
                                             <option value="silero-v6.2">Silero v6.2</option>
@@ -459,7 +495,8 @@
                                             <!-- <option value="whisper-vad-tiny">Whisper VAD (tiny)</option> -->
                                             <!-- <option value="whisper-vad-medium">Whisper VAD (medium)</option> -->
                                             <option value="ten">TEN VAD</option>
-                                            <option value="whisperseg" selected title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). Default since v1.8.13 — F1=0.787 on Netflix-GT JAV. For non-Japanese audio, switch to Silero v3.1.">WhisperSeg (JA-ASMR, default)</option>
+                                            <option value="whisperseg" selected title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). F1=0.787 on Netflix-GT JAV. For non-Japanese audio, switch to Silero v3.1.">WhisperSeg (JA-ASMR)</option>
+                                            <option value="firered-vad" title="FireRedTeam DFSMN VAD (~0.6M params, 100+ languages). v1.9.0 experimental — early access for feedback; requires 'pip install fireredvad'.">FireRedVAD (experimental)</option>
                                             <option value="none">None</option>
                                         </select>
                                     </div>
@@ -469,6 +506,7 @@
                                             <option value="large-v2" selected>Large V2</option>
                                             <option value="large-v3">Large V3</option>
                                             <option value="turbo">Turbo</option>
+                                            <option value="TransWithAI/whisper-ja-1.5B-ct2" title="whisper-ja-1.5B Japanese finetune (CTranslate2). Use with the Balanced pipeline — not compatible with the Fidelity (OpenAI Whisper) pipeline.">whisper-ja-1.5B (CT2, JA)</option>
                                         </select>
                                     </div>
                                     <div class="col-actions">
@@ -559,6 +597,9 @@
                                             <optgroup label="External (BYOP)">
                                                 <option value="xxl">XXL Faster Whisper</option>
                                             </optgroup>
+                                            <optgroup label="External (CrispASR)">
+                                                <option value="crispasr">CrispASR</option>
+                                            </optgroup>
                                         </select>
                                     </div>
                                     <div class="col-separator"></div>
@@ -607,6 +648,7 @@
                                     </div>
                                     <div class="col-segmenter">
                                         <select id="pass2-segmenter" class="form-select compact" disabled>
+                                            <option value="faster-whisper" title="faster-whisper's built-in VAD (vad_filter=True). Fastest — one transcribe call per scene.">Faster-Whisper Native VAD (fast)</option>
                                             <option value="silero">Silero v4.0</option>
                                             <option value="silero-v3.1">Silero v3.1</option>
                                             <option value="silero-v6.2">Silero v6.2</option>
@@ -617,8 +659,9 @@
                                             <!-- <option value="whisper-vad">Whisper VAD (small)</option> -->
                                             <!-- <option value="whisper-vad-tiny">Whisper VAD (tiny)</option> -->
                                             <!-- <option value="whisper-vad-medium">Whisper VAD (medium)</option> -->
-                                            <option value="ten">TEN VAD</option>
-                                            <option value="whisperseg" selected title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). Default since v1.8.13 — F1=0.787 on Netflix-GT JAV. For non-Japanese audio, switch to Silero v3.1.">WhisperSeg (JA-ASMR, default)</option>
+                                            <option value="ten" selected title="TEN VAD — pass 2 default for segmentation diversity vs pass 1's WhisperSeg.">TEN VAD (default)</option>
+                                            <option value="whisperseg" title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). F1=0.787 on Netflix-GT JAV. For non-Japanese audio, switch to Silero v3.1.">WhisperSeg (JA-ASMR)</option>
+                                            <option value="firered-vad" title="FireRedTeam DFSMN VAD (~0.6M params, 100+ languages). v1.9.0 experimental — early access for feedback; requires 'pip install fireredvad'.">FireRedVAD (experimental)</option>
                                             <option value="none">None</option>
                                         </select>
                                     </div>
@@ -627,6 +670,8 @@
                                         <select id="pass2-model" class="form-select compact" disabled>
                                             <option value="Qwen/Qwen3-ASR-1.7B" selected>Qwen3-ASR-1.7B    8GB</option>
                                             <option value="Qwen/Qwen3-ASR-0.6B">Qwen3-ASR-0.6B    4GB</option>
+                                            <option value="jaykwok/Qwen3-ASR-1.7B-JA-Anime-Galgame" title="Full SFT of Qwen3-ASR-1.7B on galgame speech. Published CER 0.1285 vs base 0.1437; −26.8% on anime speech.">JA Anime-Galgame 1.7B    8GB</option>
+                                            <option value="neosophie/Qwen3-ASR-1.7B-JA" title="Japanese finetune of Qwen3-ASR-1.7B focused on proper nouns and kanji-heavy expressions.">JA-tuned 1.7B (neosophie)    8GB</option>
                                         </select>
                                     </div>
                                     <div class="col-actions">
@@ -710,6 +755,30 @@
                                                value="--model large-v3 --verbose True --standard_asia"
                                                placeholder="e.g. --model large-v3 --verbose --standard_asia"
                                                title="Additional command-line arguments passed directly to XXL">
+                                    </div>
+                                </div>
+
+                                <!-- CrispASR Settings Row (shown when CrispASR selected as Pass 1 or Pass 2).
+                                     Separate from the BYOP panel — CrispASR is not BYOP/XXL coupled.
+                                     Backend is chosen via the per-pass Model column. -->
+                                <div class="byop-settings-panel" id="crispasr-settings-panel" style="display: none;">
+                                    <div class="byop-settings-header">
+                                        <span class="byop-title">CrispASR (external provider)</span>
+                                        <span class="byop-hint">Backend is selected in the Model column. Exe path is shared across passes.</span>
+                                    </div>
+                                    <div class="byop-settings-row">
+                                        <label class="byop-label" for="crispasr-exe-path">Executable</label>
+                                        <input type="text" id="crispasr-exe-path" class="form-input byop-path-input"
+                                               placeholder="Path to the crispasr executable" readonly
+                                               title="Click Browse to select the crispasr executable">
+                                        <button type="button" class="btn btn-secondary btn-compact" id="crispasr-browse-btn"
+                                                title="Browse for the crispasr executable">Browse</button>
+                                    </div>
+                                    <div class="byop-settings-row">
+                                        <label class="byop-label" for="crispasr-extra-args">Extra Args</label>
+                                        <input type="text" id="crispasr-extra-args" class="form-input byop-args-input"
+                                               placeholder="e.g. --vad --split-on-punct"
+                                               title="Additional command-line arguments passed verbatim to crispasr">
                                     </div>
                                 </div>
 
