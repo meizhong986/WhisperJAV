@@ -194,6 +194,11 @@ class WhisperJAVAPI:
         if options.get('asr_telemetry', True) is False:
             args += ["--no-asr-telemetry"]
 
+        # v1.9.2 (CFF1): recogniser refresh budget in minutes of scene audio (0 = never).
+        _mr = options.get('model_refresh_audio_minutes')
+        if _mr not in (None, ''):
+            args += ["--model-refresh-audio-minutes", str(_mr)]
+
         # Debug logging
         if options.get('debug', False):
             args += ["--debug"]
@@ -1886,6 +1891,11 @@ class WhisperJAVAPI:
         if options.get('asr_telemetry', True) is False:
             args += ["--no-asr-telemetry"]
 
+        # v1.9.2 (CFF1): recogniser refresh budget in minutes of scene audio (0 = never).
+        _mr = options.get('model_refresh_audio_minutes')
+        if _mr not in (None, ''):
+            args += ["--model-refresh-audio-minutes", str(_mr)]
+
         # Verbosity
         verbosity = options.get('verbosity', 'summary')
         if verbosity:
@@ -3149,6 +3159,11 @@ class WhisperJAVAPI:
         if config.get('asr_telemetry', True) is False:
             args += ["--no-asr-telemetry"]
 
+        # v1.9.2 (CFF1): recogniser refresh budget in minutes of scene audio (0 = never).
+        _mr = config.get('model_refresh_audio_minutes')
+        if _mr not in (None, ''):
+            args += ["--model-refresh-audio-minutes", str(_mr)]
+
         # Debug logging
         if config.get('debug', False):
             args += ["--debug"]
@@ -3632,6 +3647,7 @@ class WhisperJAVAPI:
         "fail_on_empty":             "failOnEmpty",
         "fail_on_suspect":           "failOnSuspect",
         "asr_telemetry":             "asrTelemetry",
+        "model_refresh_audio_minutes": "modelRefreshAudioMinutes",
         "temp_dir":                  "tempDir",
         "accept_cpu_mode":           "acceptCpuMode",
         "async_processing":          "asyncProcessing",

@@ -90,6 +90,7 @@ from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 from whisperjav.pipelines.kotoba_faster_whisper_pipeline import KotobaFasterWhisperPipeline
 from whisperjav.config.legacy import resolve_legacy_pipeline, resolve_ensemble_config, apply_balanced_vad_defaults
+from whisperjav.utils.model_refresh import DEFAULT_MODEL_REFRESH_AUDIO_MINUTES
 from whisperjav.config.segmenter_presets import (
     BALANCED_SINGLE_PASS_EXTERNAL,
     pick_balanced_default_segmenter,
@@ -389,7 +390,7 @@ def parse_arguments():
                                  "18 (aggressive preset 10, conservative 22). Ignored by auditok/silero."
                              ))
     tuning_group.add_argument("--no-vad", action="store_true",
-                             help="Disable VAD speech segmentation (balanced/fidelity: skip Silero VAD; kotoba: disable faster-whisper VAD)")
+                             help="Disable speech segmentation (balanced/fidelity: no external segmenter, the whole scene goes to the recognizer; kotoba: disable faster-whisper VAD)")
     tuning_group.add_argument("--speech-segmenter",
                              type=str,
                              choices=[
@@ -467,6 +468,17 @@ def parse_arguments():
                                  "On by default; see --no-asr-telemetry.")
     async_group.add_argument("--no-asr-telemetry", action="store_true", default=False,
                             help="Do not write the per-scene ASR telemetry file.")
+    async_group.add_argument("--model-refresh-audio-minutes", type=float,
+                            default=DEFAULT_MODEL_REFRESH_AUDIO_MINUTES, metavar="MINUTES",
+                            help="Minutes of scene AUDIO handed to the recognizer before it is "
+                                 "unloaded and reloaded as a fresh instance at the next scene "
+                                 "boundary (Balanced and Fidelity). Counted per recognizer "
+                                 "instance: a Balanced batch shares one instance across its files, "
+                                 "while Fidelity and --async-processing load one per file, so the "
+                                 "count restarts with each file there. Containment for the "
+                                 "same-instance degradation reported in #394. Default: 20. Set 0 "
+                                 "to never refresh (Balanced then keeps one in-process instance "
+                                 "as before v1.9.2).")
     async_group.add_argument("--min-coverage", type=float, default=None,
                             metavar="RATIO",
                             help="A file whose subtitles span less than this fraction "
@@ -1233,6 +1245,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         # resolved_config; see BalancedPipeline.__init__.
         pipeline.asr_telemetry_path = getattr(args, 'asr_telemetry', None)
         pipeline.asr_telemetry_enabled = not getattr(args, 'no_asr_telemetry', False)
+        # v1.9.2 (CFF1): recogniser refresh budget (minutes of scene audio).
+        pipeline.model_refresh_audio_minutes = getattr(args, 'model_refresh_audio_minutes', DEFAULT_MODEL_REFRESH_AUDIO_MINUTES)
         effective_mode = args.mode
     elif args.mode == "kotoba-faster-whisper":
         # Kotoba Faster-Whisper pipeline with scene detection (always on)
@@ -1461,6 +1475,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         effective_mode = args.mode
     else:  # fidelity
         pipeline = FidelityPipeline(**pipeline_args)
+        # v1.9.2 (CFF1): recogniser refresh budget (minutes of scene audio).
+        pipeline.model_refresh_audio_minutes = getattr(args, 'model_refresh_audio_minutes', DEFAULT_MODEL_REFRESH_AUDIO_MINUTES)
         effective_mode = args.mode
     
     all_stats, failed_files = [], []
@@ -1725,6 +1741,8 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
     # #394 per-scene telemetry (read by BalancedPipeline.__init__)
     resolved_config['asr_telemetry'] = getattr(args, 'asr_telemetry', None)
     resolved_config['asr_telemetry_enabled'] = not getattr(args, 'no_asr_telemetry', False)
+    # v1.9.2 (CFF1): the async path builds one pipeline per file from resolved_config.
+    resolved_config['model_refresh_audio_minutes'] = getattr(args, 'model_refresh_audio_minutes', DEFAULT_MODEL_REFRESH_AUDIO_MINUTES)
 
     # Create async manager
     def progress_callback(message: Dict):
@@ -2018,6 +2036,9 @@ def main():
         _mc = getattr(args, 'min_coverage', None)
         if _mc is not None and not (0.0 <= _mc <= 1.0):
             raise ValueError(f"--min-coverage: expected a fraction between 0 and 1, got {_mc}")
+        _mr = getattr(args, 'model_refresh_audio_minutes', None)
+        if _mr is not None and _mr < 0:
+            raise ValueError(f"--model-refresh-audio-minutes: expected 0 (never) or a positive number of minutes, got {_mr}")
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         sys.exit(2)
@@ -2528,6 +2549,8 @@ def main():
                 "vad": getattr(args, 'vad', None),
                 "speech_segmenter": getattr(args, 'speech_segmenter', None),
                 "scene_clustering_threshold": getattr(args, 'scene_clustering_threshold', None),
+                "qwen_scene_clustering_threshold": getattr(args, 'qwen_scene_clustering_threshold', None),
+                "model_refresh_audio_minutes": getattr(args, 'model_refresh_audio_minutes', None),
                 "transformers_two_pass": getattr(args, 'transformers_two_pass', False),
             }
         }
@@ -2859,6 +2882,9 @@ def main():
                 parameter_tracer=tracer,
                 log_level=log_level,
                 serial_file_processing=getattr(args, 'ensemble_serial', False),
+                # v1.9.2 (CFF1): rides worker_kwargs into every pass pipeline's
+                # constructor; Balanced/Fidelity honour it, the others ignore it.
+                model_refresh_audio_minutes=getattr(args, 'model_refresh_audio_minutes', DEFAULT_MODEL_REFRESH_AUDIO_MINUTES),
             )
 
             # Process all files with batch processing for optimal VRAM usage

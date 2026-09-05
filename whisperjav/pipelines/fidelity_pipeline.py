@@ -16,6 +16,7 @@ from whisperjav.modules.scene_detection_backends import SceneDetectorFactory
 
 from whisperjav.modules.srt_stitching import SRTStitcher
 from whisperjav.utils.logger import logger
+from whisperjav.utils.model_refresh import DEFAULT_MODEL_REFRESH_AUDIO_MINUTES, ModelRefreshPolicy
 
 
 from whisperjav.utils.progress_display import DummyProgress
@@ -115,6 +116,17 @@ class FidelityPipeline(BasePipeline):
         self.audio_extractor = AudioExtractor(sample_rate=extraction_sr)
         self.scene_detector = SceneDetectorFactory.safe_create_from_legacy_kwargs(**scene_opts)
 
+        # v1.9.2 (owner CFF1 / D2): reload the Whisper model after this many
+        # minutes of SCENE audio, at a scene boundary. 0 = never. Sync path sets
+        # the attribute after construction; async uses resolved_config; ensemble
+        # passes it as a kwarg.
+        self.model_refresh_audio_minutes = float(
+            kwargs.get(
+                "model_refresh_audio_minutes",
+                resolved_config.get("model_refresh_audio_minutes", DEFAULT_MODEL_REFRESH_AUDIO_MINUTES),
+            ) or 0.0
+        )
+
         # ASR CONFIG (model created in process() after enhancement cleanup)
         self._asr_config = {
             'model_config': effective_model_cfg,
@@ -134,6 +146,46 @@ class FidelityPipeline(BasePipeline):
             # Get language from decoder params (set by CLI --language)
             self.lang_code = params["decoder"].get("language", "ja")
         self.standard_postprocessor = StandardPostProcessor(language=self.lang_code, **post_proc_opts)
+
+    def _release_asr(self, asr, carry: Dict[str, int]) -> None:
+        """v1.9.2 (CFF1), step 1 of a refresh: fold the instance's filter statistics
+        into ``carry`` and run its teardown (the external segmenter it owns, then
+        ``cleanup()``). The CALLER must drop its own reference (``asr = None``)
+        before ``_load_fresh_asr`` — a reference held anywhere keeps the model in
+        memory, so the new one would load beside it.
+        """
+        try:
+            for k, v in (asr.get_filter_statistics() or {}).items():
+                carry[k] = carry.get(k, 0) + int(v or 0)
+        except Exception:  # noqa: BLE001 - statistics are best-effort
+            pass
+        seg = getattr(asr, "_external_segmenter", None)
+        if seg is not None and hasattr(seg, "cleanup"):
+            try:
+                seg.cleanup()
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"Segmenter cleanup during refresh failed (non-fatal): {e}")
+        asr.cleanup()
+
+    def _load_fresh_asr(self, policy: ModelRefreshPolicy):
+        """v1.9.2 (CFF1), step 2 of a refresh: collect the released model, clear the
+        CUDA cache, load a fresh ``WhisperProASR`` (and its segmenter) and start
+        the next budget generation. A load failure raises and fails the file, as a
+        failed initial load would — there is no instance left to continue on.
+        """
+        import gc
+        gc.collect()
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:  # noqa: BLE001 - CUDA cache clear is best-effort
+            pass
+        new_asr = WhisperProASR(**self._asr_config)
+        if hasattr(new_asr, "reset_statistics"):
+            new_asr.reset_statistics()
+        policy.reset()
+        return new_asr
 
     def process(self, media_info: Dict) -> Dict:
         """Process media file through fidelity pipeline with scene detection and VAD-enhanced ASR."""
@@ -273,6 +325,11 @@ class FidelityPipeline(BasePipeline):
             if hasattr(asr, "reset_statistics"):
                 asr.reset_statistics()
 
+            # v1.9.2 (CFF1): refresh budget in scene audio; statistics from
+            # retired instances are carried so the file totals stay complete.
+            refresh_policy = ModelRefreshPolicy.from_minutes(self.model_refresh_audio_minutes)
+            filter_stats_carry: Dict[str, int] = {}
+
             # Step 4: Transcribe scenes
             if self.progress_reporter:
                 self.progress_reporter.report_step("Transcribing scenes with VAD", 4, 6)
@@ -366,6 +423,22 @@ class FidelityPipeline(BasePipeline):
                     master_metadata["scenes_detected"][idx]["transcribed"] = False
                     master_metadata["scenes_detected"][idx]["error"] = str(e)
                     self.progress.update_subtask(1)
+
+                # v1.9.2 (CFF1 / D2): every scene handed to the instance counts
+                # toward the budget (failed ones included); refresh at the
+                # boundary if it is spent and scenes remain.
+                master_metadata["scenes_detected"][idx]["model_epoch"] = refresh_policy.epoch
+                refresh_policy.record(scene_paths[idx][3])
+                if refresh_policy.due() and scene_num < total_scenes:
+                    logger.info(
+                        "Model refresh %d: unloading Whisper after %.1f min of scene audio "
+                        "(budget %.0f min) and loading a fresh instance (scene boundary).",
+                        refresh_policy.refresh_count + 1, refresh_policy.consumed_minutes,
+                        refresh_policy.budget_minutes,
+                    )
+                    self._release_asr(asr, filter_stats_carry)
+                    asr = None  # drop the last reference BEFORE loading the next model
+                    asr = self._load_fresh_asr(refresh_policy)
             
             self.progress.finish_subtask()
             
@@ -431,6 +504,10 @@ class FidelityPipeline(BasePipeline):
                 filter_stats = asr.get_filter_statistics() or {}
                 logprob_filtered = filter_stats.get('logprob_filtered', 0)
                 nonverbal_filtered = filter_stats.get('nonverbal_filtered', 0)
+            logprob_filtered += filter_stats_carry.get('logprob_filtered', 0)
+            nonverbal_filtered += filter_stats_carry.get('nonverbal_filtered', 0)
+            master_metadata["summary"]["model_refresh_audio_minutes"] = self.model_refresh_audio_minutes
+            master_metadata["summary"]["model_refreshes"] = refresh_policy.refresh_count
 
             # C. DESTROY ASR - Trigger C++ destructor while interpreter is STABLE
             # This prevents the "Zone of Death" crash during Python shutdown

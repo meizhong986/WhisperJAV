@@ -51,6 +51,7 @@ DEFAULT_GUI_SETTINGS = {
     "fail_on_empty": False,
     "fail_on_suspect": False,
     "asr_telemetry": True,
+    "model_refresh_audio_minutes": 20,
     "temp_dir": "",
     "accept_cpu_mode": False,
     "async_processing": False,

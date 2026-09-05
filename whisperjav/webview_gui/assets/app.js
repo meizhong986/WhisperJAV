@@ -717,6 +717,8 @@ const FormManager = {
             fail_on_empty: document.getElementById('failOnEmpty').checked,
             fail_on_suspect: document.getElementById('failOnSuspect').checked,
             asr_telemetry: document.getElementById('asrTelemetry').checked,
+            // v1.9.2 (CFF1): minutes of scene audio before the recognizer is reloaded (0 = never)
+            model_refresh_audio_minutes: document.getElementById('modelRefreshAudioMinutes').value,
             temp_dir: document.getElementById('tempDir').value.trim(),
             accept_cpu_mode: document.getElementById('acceptCpuMode').checked,
             output_format: document.getElementById('outputFormat').value,
@@ -1817,13 +1819,33 @@ const EnsembleManager = {
     segmenterAvailability: null,
 
     pickBalancedDefaultSegmenter() {
+        const chain = this.balancedDefaultSegmenterChain;
         const map = this.segmenterAvailability;
-        if (!map) return this.balancedDefaultSegmenterChain[0];
-        for (const name of this.balancedDefaultSegmenterChain) {
+        if (!map) return chain[0];  // before the availability fetch resolves; re-applied below
+        for (const name of chain) {
             const info = map[name];
-            if (!info || info.available) return name;
+            if (info && info.available) return name;
         }
-        return this.balancedDefaultSegmenterChain[0];
+        return chain[chain.length - 1];  // silero-v3.1 is always installable
+    },
+
+    // Called once the availability map is known: a balanced pass that was
+    // preset before the fetch resolved (or restored by the browser) must not
+    // keep an unavailable segmenter — an explicit unavailable choice fails the run.
+    reapplyBalancedDefaultIfUnavailable() {
+        const map = this.segmenterAvailability;
+        if (!map) return;
+        for (const passKey of ['pass1', 'pass2']) {
+            const st = this.state[passKey];
+            if (!st || st.pipeline !== 'balanced') continue;
+            const info = map[st.speechSegmenter];
+            if (info && !info.available) {
+                const pick = this.pickBalancedDefaultSegmenter();
+                const sel = document.getElementById(`${passKey}-segmenter`);
+                if (sel) sel.value = pick;
+                st.speechSegmenter = pick;
+            }
+        }
     },
 
     // Swap model dropdown options based on pipeline type
@@ -5463,6 +5485,8 @@ const EnsembleManager = {
             fail_on_empty: document.getElementById('failOnEmpty').checked,
             fail_on_suspect: document.getElementById('failOnSuspect').checked,
             asr_telemetry: document.getElementById('asrTelemetry').checked,
+            // v1.9.2 (CFF1): shared Advanced-options field (Transcription tab), like source-language
+            model_refresh_audio_minutes: document.getElementById('modelRefreshAudioMinutes').value,
             temp_dir: document.getElementById('tempDir').value.trim(),
             output_format: document.getElementById('outputFormat').value,
         };
@@ -5572,6 +5596,7 @@ const EnsembleManager = {
             });
             // v1.9.2: remembered for pickBalancedDefaultSegmenter().
             this.segmenterAvailability = availabilityMap;
+            this.reapplyBalancedDefaultIfUnavailable();
 
             // Update both pass1 and pass2 segmenter dropdowns
             ['pass1-segmenter', 'pass2-segmenter'].forEach(selectId => {
@@ -7859,6 +7884,7 @@ const SettingsPersistence = {
         'failOnEmpty':      { key: 'failOnEmpty',    prop: 'checked' },
         'failOnSuspect':    { key: 'failOnSuspect',  prop: 'checked' },
         'asrTelemetry':     { key: 'asrTelemetry',   prop: 'checked' },
+        'modelRefreshAudioMinutes': { key: 'modelRefreshAudioMinutes', prop: 'value' },
     },
     _saveTimer: null,
     enabled: false,

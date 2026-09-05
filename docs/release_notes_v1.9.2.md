@@ -206,6 +206,21 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
 
 ## Changed defaults and installation
 
+- **The recognizer is reloaded fresh every 20 minutes of audio.** Two controlled observations in
+  the #394 investigation point at the recognizer instance rather than the audio: in #302 four minutes
+  that returned nothing inside a long run transcribed normally as a separate job, and the diagnostic
+  probe saw one instance transcribe identical audio 111 times and then return nothing for the rest of
+  the run. Whether cumulative use is the trigger is not established; bounding it is containment.
+  Balanced and Fidelity now count the scene audio each
+  recognizer instance has been given and, once it passes 20 minutes, unload it and load a fresh
+  instance at the next scene boundary. Balanced keeps its recognizer in a separate worker process for
+  this (the CTranslate2 model cannot be safely destroyed in-process on Windows); Fidelity reloads in
+  place. Cost: one model load per refresh — measured at 13–14 s for large-v2 on an RTX 3060, so
+  roughly 80 s over a two-hour film at the default, a few percent of a Balanced run. Adjust with
+  `--model-refresh-audio-minutes` (0 = never; the GUI has a matching Advanced-options field that
+  applies to Transcription and Ensemble runs). Balanced's per-scene telemetry records which instance
+  generation decoded each scene. This is containment, not a fix for the root cause, which is still
+  under investigation.
 - **Balanced mode uses a real speech detector again — FireRedVAD by default.** v1.9.0 switched
   Balanced to faster-whisper's built-in VAD for speed. v1.9.2 reverses that: Balanced now runs
   FireRedVAD (a tiny CPU model with the lowest false-alarm rate of the bundled VADs) and hands the
@@ -343,15 +358,14 @@ Not user-visible, but worth recording:
 
 ## Known limitations
 
-- **`--async-processing` with Balanced mode and more than one file ends the
-  process without a summary.** The async path was never actually running its
-  tasks before this release (see above); now that it does, the second file's
-  recognizer initialising after the first file's pipeline was torn down kills
-  the process natively, with no traceback, in the same way the ctranslate2
-  destructor crash the normal path deliberately avoids. One file works;
-  `faster` mode with several files works; the normal (non-async) path is
-  unaffected and is the recommended way to batch. The GUI reports such a run
-  as finished with failures and no run summary, which is the honest reading.
+- **`--async-processing` with Balanced mode, more than one file, and model refresh
+  switched off (`--model-refresh-audio-minutes 0`) ends the process without a
+  summary.** In that configuration the second file's recognizer initialising after
+  the first file's pipeline was torn down kills the process natively, the same way
+  the ctranslate2 destructor crash the normal path deliberately avoids. With the
+  default refresh setting the recognizer lives in a worker process and the same
+  two-file run completes normally (verified on two clips). The normal (non-async)
+  path is unaffected either way.
 - **The root cause behind #394 is still open.** The recognizer can enter a state
   where it returns nothing for the rest of a run, and the work above detects the
   *result* rather than preventing it. Investigation continues, with useful
@@ -363,6 +377,7 @@ Not user-visible, but worth recording:
 
 | Date | Change |
 |------|--------|
+| 2026-09-05 | Recognizer refreshed after 20 minutes of scene audio (`--model-refresh-audio-minutes`, GUI field): Balanced hosts its CTranslate2 model in a worker process and replaces it, Fidelity reloads in place; telemetry gains `model_epoch`; async + Balanced + several files now completes with refresh on |
 | 2026-09-05 | Qwen lone-line filter also drops 「はい。」 and 「うん。」 (exact lone token only; `--no-qwen-drop-nonverbal-lines` to keep) (#254) |
 | 2026-09-05 | Semantic scene-change threshold exposed: `--scene-clustering-threshold`, `--qwen-scene-clustering-threshold`, `--passN-qwen-params scene_clustering_threshold`, and a slider in both Customize modals |
 | 2026-09-05 | Balanced default segmenter → FireRedVAD (external; TEN, then Silero v3.1 if missing — never the built-in VAD); `--sensitivity` presets now resolved for FireRedVAD/TEN on single-pass balanced; `--speech-segmenter faster-whisper` restores the v1.9.0 behaviour; Balanced runs can be `suspect` |

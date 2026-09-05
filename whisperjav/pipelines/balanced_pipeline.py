@@ -18,6 +18,7 @@ from whisperjav.modules.srt_stitching import SRTStitcher
 from whisperjav.utils.logger import logger
 from whisperjav.utils.output_coverage import SpeechPositiveEmptyStreak
 from whisperjav.utils.asr_telemetry import AsrTelemetry, resolve_telemetry_path
+from whisperjav.utils.model_refresh import DEFAULT_MODEL_REFRESH_AUDIO_MINUTES
 
 from whisperjav.utils.progress_display import DummyProgress
 from whisperjav.utils.progress_aggregator import AsyncProgressReporter
@@ -185,6 +186,17 @@ class BalancedPipeline(BasePipeline):
         self.audio_extractor = AudioExtractor(sample_rate=extraction_sr)
         self.scene_detector = SceneDetectorFactory.safe_create_from_legacy_kwargs(**scene_opts)
 
+        # v1.9.2 (owner CFF1 / D2): unload and reload the recogniser after this
+        # many minutes of SCENE audio, at a scene boundary. 0 = never. The sync
+        # path overwrites the attribute after construction (like telemetry);
+        # async carries it in resolved_config; ensemble passes it as a kwarg.
+        self.model_refresh_audio_minutes = float(
+            kwargs.get(
+                "model_refresh_audio_minutes",
+                resolved_config.get("model_refresh_audio_minutes", DEFAULT_MODEL_REFRESH_AUDIO_MINUTES),
+            ) or 0.0
+        )
+
         # ASR CONFIG (model created lazily on first process() call)
         self._asr_config = {
             'model_config': effective_model_cfg,
@@ -225,6 +237,25 @@ class BalancedPipeline(BasePipeline):
         global _IMMORTAL_ASR_REFERENCE
 
         if self._asr is None:
+            if self.model_refresh_audio_minutes > 0:
+                # v1.9.2 (CFF1 / D5): the CTranslate2 model lives in a child
+                # process so it can be replaced with a fresh one when the refresh
+                # budget is spent — the only destructor-free way to "unload and
+                # reload" it (see asr_worker_proxy.py). Same seven-member surface
+                # as FasterWhisperProASR; the immortal reference is not needed.
+                from whisperjav.modules.asr_worker_proxy import RemoteFasterWhisperASR
+                from whisperjav.utils.model_refresh import ModelRefreshPolicy
+                logger.info(
+                    "Initializing ASR model in a worker process "
+                    "(fresh instance after every %.0f min of scene audio)",
+                    self.model_refresh_audio_minutes,
+                )
+                self._asr = RemoteFasterWhisperASR(
+                    self._asr_config,
+                    ModelRefreshPolicy.from_minutes(self.model_refresh_audio_minutes),
+                )
+                return self._asr
+
             logger.info("Initializing ASR model (exclusive VRAM block)")
             self._asr = FasterWhisperProASR(**self._asr_config)
 
@@ -235,6 +266,21 @@ class BalancedPipeline(BasePipeline):
             logger.debug("Reusing existing ASR model instance")
 
         return self._asr
+
+    def cleanup(self):
+        """End the ASR worker (refresh mode) before the base cleanup.
+
+        The in-process immortal instance is deliberately NOT destroyed here
+        (see the module header); the worker process simply exits.
+        """
+        asr = self._asr
+        if asr is not None and hasattr(asr, "shutdown"):
+            try:
+                asr.shutdown()
+            except Exception as e:  # noqa: BLE001 - cleanup is best-effort
+                logger.warning(f"ASR worker shutdown failed (non-fatal): {e}")
+            self._asr = None
+        super().cleanup()
 
     def process(self, media_info: Dict) -> Dict:
         """Process media file through balanced pipeline with scene detection and VAD-enhanced ASR."""
@@ -407,6 +453,8 @@ class BalancedPipeline(BasePipeline):
             # Reset per-file statistics (safe - just Python dict assignment)
             if hasattr(asr, "reset_statistics"):
                 asr.reset_statistics()
+            # v1.9.2 (CFF1): the proxy's refresh counter spans the batch; report per file.
+            _refreshes_at_file_start = int(getattr(asr, "refresh_count", 0) or 0)
 
             # Trace ASR config before transcription
             self.tracer.emit_asr_config(
@@ -555,6 +603,7 @@ class BalancedPipeline(BasePipeline):
                                 produced_output=bool(
                                     scene_srt_path.exists() and scene_srt_path.stat().st_size > 0
                                 ),
+                                model_epoch=getattr(asr, "epoch", None),
                             )
 
                         for seg in scene_vad:
@@ -571,6 +620,14 @@ class BalancedPipeline(BasePipeline):
                     master_metadata["scenes_detected"][idx]["transcribed"] = False
                     master_metadata["scenes_detected"][idx]["error"] = str(e)
                     self.progress.update_subtask(1)
+
+                # v1.9.2 (CFF1 / D2): every scene handed to the recogniser counts
+                # toward the refresh budget (failed ones included, same as
+                # Fidelity); the worker is replaced before the next scene once
+                # the budget is spent.
+                if hasattr(asr, "record_audio"):
+                    asr.record_audio(scene_paths[idx][3])
+                master_metadata["scenes_detected"][idx]["model_epoch"] = getattr(asr, "epoch", 1)
 
             self.progress.finish_subtask()
 
@@ -675,6 +732,12 @@ class BalancedPipeline(BasePipeline):
             self._active_telemetry = None
 
             master_metadata["summary"]["speech_positive_empty_streak"] = empty_streak.longest
+            # v1.9.2 (CFF1): how often the recogniser was replaced during this file
+            # (the proxy counts across the batch; the difference is this file's share).
+            master_metadata["summary"]["model_refresh_audio_minutes"] = self.model_refresh_audio_minutes
+            master_metadata["summary"]["model_refreshes"] = (
+                int(getattr(asr, "refresh_count", 0) or 0) - _refreshes_at_file_start
+            )
             if empty_streak.longest:
                 logger.warning(
                     "%d consecutive scene(s) produced no output while speech was "

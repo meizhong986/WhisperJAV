@@ -385,7 +385,7 @@ PACKAGES: List[Package] = [
         version=">=0.61.0",
         extra=Extra.CLI,
         order=22,
-        reason="JIT compilation for performance - 0.60.0+ required for numpy 2.x binary support",
+        reason="JIT compilation for performance - 0.61.0+ matches pyproject (numpy 2.x binary support)",
     ),
 
     # =========================================================================

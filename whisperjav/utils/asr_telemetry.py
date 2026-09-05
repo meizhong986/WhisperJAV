@@ -209,8 +209,14 @@ class AsrTelemetry:
         segments: Optional[list[dict[str, Any]]] = None,
         speech_detected: bool = False,
         produced_output: bool = False,
+        model_epoch: Optional[int] = None,
     ) -> None:
-        """Record one scene. Never raises."""
+        """Record one scene. Never raises.
+
+        ``model_epoch`` (v1.9.2, CFF1) is the 1-based generation of the recogniser
+        instance that decoded this scene; it increments at each model refresh. It
+        is context for reading a trend, not by itself evidence of the cause.
+        """
         try:
             rec: dict[str, Any] = {
                 "media": self.media_name,
@@ -221,6 +227,8 @@ class AsrTelemetry:
                 "speech_detected": bool(speech_detected),
                 "produced_output": bool(produced_output),
             }
+            if model_epoch is not None:
+                rec["model_epoch"] = int(model_epoch)
             if rec["audio_duration_s"] > 0:
                 rec["rtf"] = round(rec["wall_s"] / rec["audio_duration_s"], 3)
             rec.update(summarise_segments(segments or []))

@@ -10,6 +10,100 @@
 
 ---
 
+## 2026-09-05 — CFF1: the recogniser is unloaded and reloaded after 20 minutes of scene audio
+
+**Area:** new `whisperjav/utils/model_refresh.py` (policy), new `whisperjav/modules/asr_worker_proxy.py`
+(child-process recogniser for Balanced); `whisperjav/pipelines/balanced_pipeline.py` (`_ensure_asr`
+hook, per-scene accounting, `cleanup` override, metadata); `whisperjav/pipelines/fidelity_pipeline.py`
+(in-process `_release_asr` + `_load_fresh_asr`); `whisperjav/utils/asr_telemetry.py` (`model_epoch`); `whisperjav/main.py`
+(`--model-refresh-audio-minutes`, validation, sync/async/ensemble plumbing, dump echo); GUI
+`index.html` / `app.js` / `api.py` / `settings/gui_settings.py`; tests `tests/test_model_refresh_v192.py`
+(new, 16), `tests/fake_asr_for_proxy.py` (new), `tests/test_gui_settings.py` (count 34 → 35).
+
+**What changed**
+- `--model-refresh-audio-minutes MINUTES` (default **20**, `0` = never; negative → exit 2 at startup).
+  The budget is the sum of the durations of the scenes handed to one recogniser instance (owner D2:
+  scene granularity, nothing finer; a scene that failed was still handed over and counts). It is
+  counted per instance: a sync Balanced batch shares one instance across its files, while Fidelity
+  (per-file ASR) and `--async-processing` (per-file pipeline) start a new instance, and therefore a
+  new count, with each file. When it is spent, the instance is replaced *between* two scenes. Same flag for sync, `--async-processing` (via
+  `resolved_config`) and `--ensemble` (via `worker_kwargs`; Balanced/Fidelity passes honour it,
+  other pipelines ignore it). GUI: one Advanced-options field on the Transcription tab, read by both
+  the Transcription and Ensemble runs (like the source-language control), persisted.
+- **Balanced (owner D5):** with a non-zero budget the CTranslate2 model lives in a spawned worker
+  process behind `RemoteFasterWhisperASR`, which exposes the seven members the scene loop already
+  used on `FasterWhisperProASR` plus `record_audio` and `shutdown`. A refresh = ask the worker to
+  `os._exit(0)` (no destructor) and start a fresh one; the int8 fallback learned by one generation
+  is carried into the next. The worker serves every file of the batch until the budget is spent, so
+  the model reuse across files is kept. Telemetry, the #394 streak, the progress bar and metadata stay
+  in the parent (one telemetry writer per file). A worker that dies natively fails only the scene it
+  was on (its completed scenes keep counting in the filter statistics); the next scene starts a fresh
+  worker, which is a new telemetry generation (`model_epoch` +1) but not a refresh. After three
+  consecutive deaths or failed restarts the proxy stops restarting for the rest of that file: each
+  remaining scene is marked failed and the file is then classified by its output like any other
+  (usually `empty`, `suspect` if the segmenter kept detecting speech) — whether repeated recogniser
+  death should classify the file as `failed` is an owner decision on the exit-status contract, not
+  made here. The counter resets at the start of each file (the second adversary pass caught the
+  first version, where it did not, so one bad file could have blanked every later file of a batch).
+  With `--model-refresh-audio-minutes 0` the pre-v1.9.2 in-process immortal instance is used unchanged.
+- **Fidelity:** in-process, in two steps so the old model is really gone before the new one loads:
+  `_release_asr` (fold filter statistics, clean up the external segmenter the ASR owns, `cleanup()`),
+  then the loop drops its own reference (`asr = None`) — a reference held anywhere keeps the model
+  resident — then `_load_fresh_asr` (`gc.collect`, `empty_cache`, fresh `WhisperProASR`, which also
+  rebuilds its segmenter). A reload failure raises and fails the file, as a failed initial load would
+  (there is no instance left to continue on). The adversary pass caught the first version of this,
+  where `del asr` inside the helper deleted only a local name. Measured after the fix on the RTX 3060
+  with large-v2: `torch.cuda.memory_allocated()` around a release/load pair (see verification) — the
+  discriminating variable; the whole-run peak device memory (11 704 MiB with three refreshes vs
+  11 735 MiB with refresh off) is consistent but, being the caching allocator's reserved peak, not
+  by itself proof.
+- Records: per-scene `model_epoch` in `scenes_detected` (both pipelines) and in the telemetry JSONL
+  (Balanced only — Fidelity has no telemetry); `model_refreshes` (this file's share; the Balanced
+  proxy counts across the batch and the pipeline reports the per-file difference) and
+  `model_refresh_audio_minutes` in the run summary metadata. `model_epoch` is context for reading a
+  trend, not evidence of the cause (the `probe_failed` re-transcribe experiment remains unwired).
+
+**Verification (executed, CPU/GPU auto, `--model tiny`):**
+- 293 s clip, Balanced, budget 1 min: 14 scenes, refreshes after scenes 6/9/12 (worker PIDs 26344 →
+  2248 → 30416 → 13912), telemetry epochs `[1×6, 2×3, 3×3, 4×2]` in ONE file, 54 cues, exit 0.
+- Same clip, Fidelity, budget 1 min: 3 in-process refreshes ("Loading Whisper model" ×4), 38 cues, exit 0.
+- `--ensemble` with two Balanced passes, budget 1 min: each pass worker spawned its own recogniser
+  worker (grandchild) and refreshed three times; merged 55 cues, exit 0.
+- `--async-processing` with two Balanced files (the case that died natively with exit 127 on
+  2026-09-04): both files done, RUN SUMMARY, exit 0 — the parent never destroys a CT2 model now.
+- Kill test: `taskkill /F` on the worker during scene 7/14 → "Scene 7/14 failed: ASR worker process
+  died (exit code 1)", fresh worker for scene 8, file finished with 46 cues, exit 0.
+- Budget 0 → "Initializing ASR model (exclusive VRAM block)" (in-process path), exit 0.
+- GPU (RTX 3060): Fidelity large-v2, budget 1 min → 3 refreshes, 41 cues, exit 0; whole-run peak
+  device VRAM 11 704 MiB vs 11 735 MiB with refresh off (control). Direct measurement of the
+  release/load pair with `torch.cuda.memory_allocated()` (large-v2, fp32, same config path):
+  0 → 6 018 MiB after load A → 0 after `_release_asr` + `asr = None` + gc + empty_cache → 6 018 MiB
+  after load B (a resident second model would read ~12 036). Balanced large-v2, budget 1 min → 3
+  refreshes of 13–14 s each, 53 cues, 154 s wall, exit 0.
+- Two-file sync batch (293 s + 15 s clips, Balanced tiny, budget 1 min): one worker served both
+  files (4 "ASR worker ready" = 1 start + 3 refreshes); per-file metadata `model_refreshes` 3 and
+  0; the second file's scene carries `model_epoch` 4 (the instance continued across files).
+- `pytest tests/test_model_refresh_v192.py` 16 passed (policy; proxy against a fake recogniser in a
+  real spawned worker: handshake, refresh → new PID, statistics across generations and across a
+  worker death, learned compute type, ordinary error vs native death, give-up rule, shutdown, bad
+  model; CLI parse/validation/echo). The pipeline hook sites (`_ensure_asr` branch, the loop's
+  `record_audio`, `cleanup`, the Fidelity release/load pair) are covered by the real runs above, not
+  by unit tests.
+  `test_gui_settings` + `test_gui_run_summary` + `test_asr_telemetry_default` + `test_run_outcome`
+  149 passed. `--help` gate + exit 0. `node --check app.js`.
+
+**Cost measured (RTX 3060, this session):** one interpreter start + model load per Balanced refresh =
+13–14 s with large-v2 (three refreshes timed from "Model refresh" to "ASR worker ready": 14, 13, 13 s;
+about 8 s with `tiny`). At the 20-minute default a two-hour film refreshes at most about six times
+(the budget counts scene audio, which is less than the film length), i.e. at most roughly 80 s — a
+few percent of a Balanced run. Fidelity: one `whisper.load_model` plus its segmenter per
+refresh. Balanced peak VRAM with the worker: 4 447 MiB total on the device during the large-v2 run.
+
+**Decision:** owner (CFF1, 2026-09-05): mechanism on by default at 20 minutes, user-adjustable, at
+scene boundaries; D2 budget in scene-audio minutes; D5 child-process recogniser for Balanced. No
+over-engineering (owner): budget counted at scene granularity only; no per-scene timeouts; no
+re-transcribe probe. Not a fix for the #394 root cause — containment.
+
 ## 2026-09-05 — CFF5: Qwen lone-line filter also drops 「はい。」 and 「うん。」
 
 **Area:** `whisperjav/modules/subtitle_pipeline/cleaners/nonverbal_line_filter.py`,
@@ -53,7 +147,10 @@ description); tests `tests/test_scene_clustering_threshold_v192.py` (new, 8 test
   (written into `features["scene_detection"]`, so every legacy pipeline passes it to the factory;
   auditok/silero accept and ignore it, with a WARNING when the effective method is not semantic) and
   `--qwen-scene-clustering-threshold FLOAT` for `--mode qwen` (ctor param, applied independently of
-  safe chunking); `--pipeline decoupled` takes the legacy flag. Both echoed in `--dump-params`.
+  safe chunking); `--pipeline decoupled` takes the legacy flag. Both echoed in `--dump-params` `cli_args`
+  (`scene_clustering_threshold`, `qwen_scene_clustering_threshold`; the Qwen echo was missing in the
+  first version — caught by the adversary pass, added, and re-measured: `--mode qwen --dump-params
+  --qwen-scene-clustering-threshold 10` → `10.0`).
 - Ensemble: legacy passes already accepted `clustering_threshold` in `--passN-params`; Qwen passes
   now accept `scene_clustering_threshold` in `--passN-qwen-params` (mapped to
   `qwen_scene_clustering_threshold`, lifted only when set).
@@ -156,19 +253,25 @@ dropdowns), `README.md`; tests `tests/test_dependency_cross_match.py`.
   no existing pin moved (uv re-derived some environment markers). `kaldi-native-fbank` ships
   wheels for win/linux/macOS × cp310–cp313, so no platform marker is needed.
 - Every "experimental" label on FireRedVAD removed (display name is now `FireRedVAD`; the YAML
-  drops the `experimental` tag). The remaining truthful caveat is kept in words: detection presets
+  drops the `experimental` tag; `speech_segmentation/backends/__init__.py` was missed at first and
+  fixed after the adversary pass). The remaining truthful caveat is kept in words: detection presets
   are upstream-derived, the segment cap was JAV-tuned on 2026-08-14.
 - Preflight lists `fireredvad` as an optional dependency with an actionable message (it is the
   Balanced default from CFF3; without it Balanced falls back to another WhisperJAV segmenter).
 - Hygiene found by the sync gate while adding the entry: the registry pinned `numba>=0.60.0`
   while pyproject says `>=0.61.0`, and the fallback template disagreed with the registry on
-  `numba` and `transformers` — aligned to pyproject/registry so the sync and template tests pass.
+  `numba` and `transformers`. Aligned the registry and the fallback template to what pyproject
+  already ships (pyproject is what pip/uv and the conda-constructor requirements use, so no user
+  install changes); without this the sync gate could not confirm the new dependency. **Owner may
+  revert** — it is not traceable to CFF1–CFF6.
 
 **Verification:** `python -m whisperjav.installer.validation` → PASSED (was failing on the numba
 mismatch before); `pytest tests/test_installer.py tests/test_installation.py
 tests/test_dependency_cross_match.py` → 100 passed, 6 failed, all six identical on HEAD before this
 change (WJ env has numpy 1.26 / pip-check conflicts / a stale entry-point test); `uv lock` exit 0;
-`installer/build_release.py --dry-run` reports requirements generated from pyproject; YAML parses;
+the real generator `build_release.generate_requirements_from_pyproject()` executed against the current
+pyproject emits `fireredvad>=0.0.2` (a `--dry-run` alone prints no content, so it proves nothing);
+YAML parses;
 `tests/test_config_v4.py` 33 passed; `tests/test_speech_segmentation.py` 83 passed, 4 failed = the
 known stale silero-v6.2 set.
 
@@ -368,16 +471,13 @@ from that batch is superseded by the contract above.
 ## Open items carried on this branch
 
 - **Async + Balanced + more than one file dies natively** (exit 127 on
-  Windows, no traceback, no RUN SUMMARY) when the second task's
-  `FasterWhisperProASR` initialises after the first task's pipeline was
-  cleaned up in `AsyncPipelineProcessor._process_media`'s `finally`. Verified
-  2026-09-04 with `--mode balanced --model tiny` on two clips, both in an
-  ordinary output dir and in source mode; `--mode faster` with two files
-  works; one Balanced file works. Pre-existing (the async path never ran its
-  tasks before 2026-09-03), same family as the ctranslate2 destructor crash
-  the sync path avoids by never destroying the ASR. Not fixed; stated in the
-  release notes. Owner decision: keep async as-is with the limitation, or make
-  it reuse one pipeline per mode as the sync path does.
+  Windows) when the second task's `FasterWhisperProASR` initialises after the
+  first task's pipeline was cleaned up — verified 2026-09-04. **2026-09-05:**
+  with the CFF1 default (recogniser in a worker process) the same two-clip run
+  completes with both SRTs and a RUN SUMMARY, because the parent never
+  destroys a CT2 model. The limitation still applies with
+  `--model-refresh-audio-minutes 0` (in-process instance); stated as such in
+  the release notes.
 - Telemetry outside `BalancedPipeline` (the default ensemble pairing records
   nothing); a Transcribe-tab segmenter control (owner decision); a default cue
   ceiling for the default ensemble (owner decision); #394 containment.

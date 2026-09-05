@@ -422,6 +422,15 @@
                                     </label>
                                 </div>
                             </div>
+                            <!-- v1.9.2 (CFF1): Balanced and Fidelity reload the recognizer with a fresh instance
+                                 after this much scene audio, at a scene boundary. 0 = never. Same as
+                                 --model-refresh-audio-minutes. Read by both the Transcription and Ensemble runs. -->
+                            <div class="form-row" id="adv-row-5">
+                                <div class="form-group inline-field">
+                                    <label for="modelRefreshAudioMinutes" class="form-label" style="white-space: nowrap;" title="Balanced and Fidelity unload the recognizer and load a fresh instance after this many minutes of scene audio, at a scene boundary (containment for runs that stop producing subtitles late in a long file). 0 = never. Same as --model-refresh-audio-minutes.">Reload recognizer every (minutes of audio):</label>
+                                    <input type="number" id="modelRefreshAudioMinutes" class="form-input" value="20" min="0" step="1" style="max-width: 6em;">
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Tab 3: Two-Pass Ensemble Mode -->
