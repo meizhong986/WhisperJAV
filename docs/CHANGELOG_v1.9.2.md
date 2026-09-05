@@ -10,6 +10,28 @@
 
 ---
 
+## 2026-09-05 — research: `clustering_threshold` is not a scene-granularity lever (docs only)
+
+**Area:** new `docs/research/semantic_scene_premise/` (README, `semantic_lever_study.py`,
+`lever_study_results.json`). No product file changed.
+
+**What was found (measured on `test_media` audio, features extracted once, only the boundary logic
+varied):** the semantic detector's `clustering_threshold` sets the number of global texture clusters
+(4029 → 1 on the 65-minute file) but the final scene count stays 43–65 across thresholds 5–200 and
+*rises* over the exposed slider range 5–30 (43 → 58), then collapses to one scene above ~500. Owner's
+EKAI-023 runs: 119 scenes at 50, 121 at 90. Cause: at 0.48 s resolution 6060 of 6735 label runs are a
+single vector, so raw boundaries are label churn; the count is set by `min_duration` (5 → 354 scenes,
+60 → 12) and `snap_window` (1 s → 14, 12 s → 70). With a temporal connectivity constraint the same
+threshold is a monotone zoom above ~14; a change-point form gives window/magnitude levers. Options
+listed for the owner; the CFF2 "Scene Change Threshold" control and help text (dev, unreleased) are
+contradicted by the measurements and await the owner's choice.
+
+**Verification:** study re-run twice (second run adds fine sweeps, `snap_window`, label-run statistics);
+adversary pass reproduced the first run bit-for-bit and supplied the `snap_window` and label-run
+attacks, which the second run confirms; arm A is boundary-identical to `SemanticSegmenter.segment`.
+
+**Decision:** owner (2026-09-05) asked for the logic to be researched, not accuracy; no change made.
+
 ## 2026-09-05 — tools/scene_inspector.py: scene-detector statistics and per-scene screenshots
 
 **Area:** new `tools/scene_inspector.py` + `tools/scene_inspector.md`. Developer/user utility, no
