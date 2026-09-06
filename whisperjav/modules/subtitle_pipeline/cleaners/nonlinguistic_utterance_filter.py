@@ -277,6 +277,17 @@ def _is_japanese_sound_line(text: str) -> bool:
     return True
 
 
+def _normalizes_to_nothing(text: str) -> bool:
+    """True when nothing is left once whitespace and punctuation are removed.
+
+    Owner rule (2026-09-06, #413): an entry that is only punctuation — a lone
+    「。」 or 「、」, an ellipsis on its own, 「！？」 — carries no words and is
+    removed whole, the same way a sound-only line is. Inline punctuation inside
+    text (anime-whisper's ellipses) is untouched because the text remains.
+    """
+    return all(ch in PUNCTUATION_CHARS or ch in "\r\n" for ch in text)
+
+
 def _should_remove_entry(text: str) -> bool:
     """Decide whether a subtitle entry should be removed.
 
@@ -337,7 +348,8 @@ class NonlinguisticUtteranceFilter:
         kept: list = []
         for sub in subs:
             text = (sub.text or "").strip()
-            if not text:
+            if not text or _normalizes_to_nothing(text):
+                # empty, or nothing left after whitespace and punctuation (#413)
                 stats["dropped_empty"] += 1
                 continue
             if _should_remove_entry(text):

@@ -139,6 +139,32 @@ class PreflightChecker:
                     device_name = torch.cuda.get_device_name(0)
                     cuda_version = torch.version.cuda
 
+                    # #411: a card this build has no kernels for is not a usable GPU.
+                    from whisperjav.utils.device_detector import cuda_build_supports_device
+                    try:
+                        capability = tuple(torch.cuda.get_device_capability(0))
+                        arch_list = list(torch.cuda.get_arch_list())
+                    except Exception:  # noqa: BLE001 - cannot judge; report availability only
+                        capability, arch_list = None, []
+                    if capability and not cuda_build_supports_device(capability, arch_list):
+                        self.results.append(CheckResult(
+                            name="CUDA Availability",
+                            status=CheckStatus.FAIL,
+                            message="GPU present but not supported by this PyTorch build",
+                            details=[
+                                f"Primary GPU: {device_name} (compute capability "
+                                f"{capability[0]}.{capability[1]})",
+                                f"This build has kernels for: {', '.join(arch_list)}",
+                                "",
+                                "Solutions:",
+                                "1. Install a PyTorch build with kernels for this card",
+                                "   (see https://pytorch.org/get-started/locally/)",
+                                "2. Or use --accept-cpu-mode to run in CPU mode (slower)",
+                            ],
+                            fatal=True
+                        ))
+                        return
+
                     self.results.append(CheckResult(
                         name="CUDA Availability",
                         status=CheckStatus.PASS,
@@ -571,6 +597,11 @@ def enforce_gpu_requirement(accept_cpu_mode=False, timeout_seconds=30):
 
         print("WhisperJAV works best with GPU acceleration.")
         print("We detected that no compatible GPU is currently available.\n")
+        from whisperjav.utils import device_detector as _dd
+        if _dd.CUDA_UNUSABLE_REASON:
+            print(f"{Fore.CYAN}Why:{Style.RESET_ALL}")
+            print(f"  {_dd.CUDA_UNUSABLE_REASON}")
+            print("  Install a PyTorch build with kernels for this card, or continue on the CPU.\n")
 
         print(f"{Fore.CYAN}What this means:{Style.RESET_ALL}")
         print("  • CPU-only processing will be significantly slower (10-50x)")

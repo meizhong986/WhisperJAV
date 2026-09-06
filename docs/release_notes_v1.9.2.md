@@ -17,6 +17,23 @@ you find out something went wrong.
 
 ### Runs that crashed or aborted
 
+- **A graphics card this build cannot use is caught at start-up instead of after an empty
+  run.** One user with a GTX 1060 saw PyTorch warn that the card is not supported by the
+  installed build, then watched a twenty-minute run produce no subtitles and report
+  success. WhisperJAV now treats such a card as no usable GPU: the start-up warning says
+  which card, which compute capability, and which ones the build supports, and the run
+  continues on the CPU only if you accept that (the usual 30 s prompt, or
+  `--accept-cpu-mode`). `whisperjav --check` reports the same fact. If the Balanced
+  pipeline's CTranslate2 recognizer was working on such a card, it will now run on the CPU
+  too; there is no evidence it was. (#411, #326, #333)
+
+- **Subtitle lines that are only punctuation are removed.** The Qwen3-ASR pass can emit a
+  cue that is nothing but 「。」 for a stretch of sound without words; in one user's file a
+  quarter of the second pass was such lines. An entry whose text is only punctuation once
+  whitespace and punctuation are stripped is now dropped whole, the same way a line of
+  pure breathing is. Punctuation inside text is untouched: anime-whisper's ellipses are
+  part of how that model writes and are kept as they are. (#413)
+
 - **Downloaded models no longer wait on huggingface.co.** Every model load used to check
   huggingface.co for a newer version first. With the site unreachable (no VPN, a blocked
   network), each file was retried five times before the cached copy was used: in one user's
@@ -426,6 +443,8 @@ Not user-visible, but worth recording:
 
 | Date | Change |
 |------|--------|
+| 2026-09-06 | A GPU the PyTorch build has no kernels for is treated as no usable GPU: the start-up gate says why and offers CPU mode, `--check` reports it, every module falls back to the CPU (#411, #326, #333) |
+| 2026-09-06 | Subtitle entries that are only punctuation (a lone 「。」 or 「、」, an ellipsis alone) are dropped by the nonlinguistic filter; inline punctuation untouched (#413) |
 | 2026-09-06 | Cached Hugging Face models load without a hub round-trip (WhisperSeg, anime-whisper); `--offline` flag and GUI "Offline mode" checkbox set `HF_HUB_OFFLINE=1` for the run and its workers, off by default; a missing model fails at once (#415) |
 | 2026-09-05 | `tools/scene_inspector.py` added: scene-detector statistics, per-scene screenshots and contact sheet, loudness and speech ratio, SRT overlay, chapters, multi-detector comparison, `--sensitivity` / `--scene-threshold` presets (`tools/scene_inspector.md`) |
 | 2026-09-05 | Research notes on the semantic scene detector's threshold (not a granularity lever; slider kept, detector revision scheduled for 2.x) |

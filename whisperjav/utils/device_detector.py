@@ -23,21 +23,69 @@ import logging
 from whisperjav.utils.logger import logger
 
 
+# Set when the CUDA device is present but the installed PyTorch build has no
+# kernels for it (#411: GTX 1060, sm_61, cu128 wheel built for sm_75 and up).
+# Read by the start-up gate to say why the GPU is not used.
+CUDA_UNUSABLE_REASON: Optional[str] = None
+
+
+def cuda_build_supports_device(capability: Tuple[int, int], arch_list) -> bool:
+    """Can a PyTorch build compiled for ``arch_list`` run on a card of ``capability``?
+
+    PyTorch's own rule (``torch.cuda._check_capability``): an ``sm_XY`` binary runs
+    on hardware of the same major version with minor >= Y; a ``compute_XY`` PTX
+    runs on any hardware with compute capability >= X.Y. An empty list cannot be
+    judged and is treated as supported.
+    """
+    archs = [a for a in (arch_list or []) if isinstance(a, str) and "_" in a]
+    if not archs:
+        return True
+    major, minor = int(capability[0]), int(capability[1])
+    for arch in archs:
+        kind, _, num = arch.partition("_")
+        if not num.isdigit() or len(num) < 2:
+            continue
+        a_major, a_minor = int(num[:-1]), int(num[-1])
+        if kind == "sm" and a_major == major and a_minor <= minor:
+            return True
+        if kind == "compute" and (a_major, a_minor) <= (major, minor):
+            return True
+    return False
+
+
 def _check_cuda_available() -> Tuple[bool, Optional[str]]:
     """
-    Check if CUDA is available and get GPU name.
+    Check if CUDA is available AND usable by this PyTorch build, and get the GPU name.
 
-    Handles CUDA driver version mismatch errors gracefully.
+    Handles CUDA driver version mismatch errors gracefully. A card the build has
+    no kernels for (#411) is reported as not available, with the reason kept in
+    ``CUDA_UNUSABLE_REASON`` for the start-up gate and ``--check``.
 
     Returns:
         (is_available, gpu_name)
     """
+    global CUDA_UNUSABLE_REASON
+    CUDA_UNUSABLE_REASON = None
     try:
         import torch
         if torch.cuda.is_available():
             # get_device_name(0) can throw RuntimeError if driver is incompatible
             try:
                 gpu_name = torch.cuda.get_device_name(0)
+                try:
+                    capability = tuple(torch.cuda.get_device_capability(0))
+                    arch_list = list(torch.cuda.get_arch_list())
+                except Exception as e:  # noqa: BLE001 - cannot judge, keep the old answer
+                    logger.debug(f"CUDA capability check skipped: {e}")
+                    capability, arch_list = None, []
+                if capability and not cuda_build_supports_device(capability, arch_list):
+                    CUDA_UNUSABLE_REASON = (
+                        f"{gpu_name} has compute capability {capability[0]}.{capability[1]}, "
+                        f"but this PyTorch build has kernels only for "
+                        f"{', '.join(arch_list)}. The GPU cannot be used by this build."
+                    )
+                    logger.warning(CUDA_UNUSABLE_REASON)
+                    return False, None
                 return True, gpu_name
             except RuntimeError as e:
                 error_msg = str(e).lower()
