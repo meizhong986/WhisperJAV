@@ -436,6 +436,59 @@ Not user-visible, but worth recording:
 
 ---
 
+## CPU-only users
+
+Two situations look alike from the outside and behave differently.
+
+**No GPU at all.** At start-up WhisperJAV stops and asks, in a boxed prompt, whether to
+continue on the CPU. In the GUI tick *Accept CPU-only mode* on the Advanced tab (the GUI
+cannot ask, so without the box the run aborts and tells you to tick it); on the command
+line pass `--accept-cpu-mode` or `--device cpu`. Everything then runs on the CPU, because
+no component can find a card: the Whisper-family recognisers, the ChronosJAV models
+(Qwen3-ASR, anime-whisper, Cohere) and the transformers pipeline ask PyTorch; WhisperSeg
+asks ONNX Runtime; NeMo and ClearVoice leave the choice to their own libraries; FireRedVAD,
+TEN-VAD, Silero and the ffmpeg-dsp enhancer are CPU components by design. The
+Whisper-family pipelines (Balanced, Faster, Fast, Fidelity) are the practical choice; the
+README's rough figure of 30-60 minutes per hour of video is for them and was not
+re-measured for this release. The ChronosJAV models, the transformers pipeline, NeMo,
+WhisperVAD, WhisperSeg and the neural speech enhancers (ZipEnhancer, ClearVoice) were not
+timed on the CPU at all; expect them to be far slower and to need more memory.
+
+**A GPU that this PyTorch build cannot use**, such as a GTX 10-series card with the
+current installer (#411). WhisperJAV now recognises the card as unusable and asks the same
+question. Answering yes puts the Whisper-family pipelines on the CPU: their recognisers take
+their device from WhisperJAV's own detector, and their default speech segmenters
+(faster-whisper's built-in VAD, Silero) never leave the CPU. The components below do not
+consult the detector. They ask PyTorch, or their own library, whether a CUDA card exists,
+get yes because the card is present, and try to use it:
+
+- **Qwen3-ASR, anime-whisper and Cohere** fail there with a CUDA error unless their own
+  device setting says CPU. `--device cpu` does not reach them; it only answers the
+  start-up question. On the command line use `--qwen-device cpu` for a single pass, or
+  `--pass1-qwen-params '{"device": "cpu"}'` (and `--pass2-qwen-params`) in an ensemble.
+  In the GUI, open the pass's *Customize Parameters*, then *Model*, then *Hardware*, and set
+  *Device* to CPU.
+- **The transformers pipeline** likewise: `--hf-device cpu`, or `--pass1-hf-params
+  '{"device": "cpu"}'` in an ensemble. In the GUI this is reachable only through the
+  Ensemble tab's Customize panel; the Transcribe tab always sends auto.
+- **The NeMo speech segmenter, ZipEnhancer and ClearVoice** try the card and fail, and no
+  setting overrides that in this release. The GUI shows a Device control for the speech
+  enhancers, but it has no effect; that is recorded as a defect for a later release.
+- **WhisperSeg**, the default segmenter of the ChronosJAV pipelines, asks ONNX Runtime.
+  The standard install ships ONNX Runtime's CPU build, so WhisperSeg stays on the CPU; if
+  you installed the GPU build yourself, it will try the card.
+- **WhisperVAD** runs through CTranslate2, which has its own GPU kernels and supports these
+  cards, so it will use the card and is expected to work there.
+
+So on such a card either use Balanced, Faster, Fast or Fidelity with the default speech
+segmenter and speech enhancement off, or use a ChronosJAV pipeline with its Device set to
+CPU as above and no neural enhancer. The lasting fix is a PyTorch build with kernels for
+the card (https://pytorch.org/get-started/locally/). Making every component ask
+WhisperJAV's detector is not part of this release; this section is the documented
+behaviour instead.
+
+---
+
 ## Known limitations
 
 - **Offline mode covers Hugging Face downloads only.** Silero (torch.hub, see #263),

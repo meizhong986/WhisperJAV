@@ -396,6 +396,15 @@ Extras: `cli`, `gui`, `translate`, `llm`, `enhance`, `huggingface`, `analysis`, 
 
 Rough speed per hour of video: **RTX GPU** 5–10 min · **Apple Silicon** 8–15 min · **CPU** 30–60 min.
 
+### CPU-only users
+
+When WhisperJAV finds no usable GPU at start-up it stops and asks whether to continue on the CPU. In the GUI, tick **Accept CPU-only mode** on the Advanced tab (the GUI cannot ask, so without the box the run aborts and tells you to tick it); on the command line pass `--accept-cpu-mode` or `--device cpu`.
+
+- **No GPU at all:** everything then runs on the CPU. The Whisper-family pipelines (Balanced, Faster, Fast, Fidelity) are the practical choice at the rough speed above. The ChronosJAV models (Qwen3-ASR, anime-whisper, Cohere) and the neural speech enhancers also fall back to the CPU but were not timed there and will be far slower.
+- **A GPU the installed PyTorch cannot use** (a GTX 10-series card with the current installer): the Whisper-family pipelines honour the CPU choice. Qwen3-ASR, anime-whisper, Cohere and the transformers pipeline still try the card unless their own device setting says CPU: `--qwen-device cpu` / `--hf-device cpu` on the command line, or in the GUI the pass's *Customize Parameters* → *Model* → *Hardware* → *Device*. The NeMo segmenter and the ZipEnhancer and ClearVoice enhancers try the card and fail, with no override in this release. Simplest: use Balanced, Faster, Fast or Fidelity with speech enhancement off, or install a PyTorch build with kernels for the card.
+
+Details: [v1.9.2 release notes, "CPU-only users"](docs/release_notes_v1.9.2.md#cpu-only-users).
+
 ---
 
 ## Troubleshooting

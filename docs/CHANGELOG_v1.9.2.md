@@ -121,8 +121,39 @@ ChronosJAV generators (anime-whisper, Qwen3, Cohere), the transformers pipeline,
 speech-enhancement backends pick CUDA from `torch.cuda.is_available()` on their own and will still try
 the card (eleven files: `qwen_asr.py`, `generators/anime_whisper.py`, `generators/cohere.py`,
 `transformers_asr.py`, `backends/whisper_vad.py`, `backends/nemo.py`, `speech_enhancement/base.py`,
-`pipeline_helper.py`, `bs_roformer.py`, `clearvoice.py`, `zipenhancer.py`). Making them ask the detector is
-a separate, mechanical follow-up; the stop at the check is what closes #411. Trade-off also stated: CTranslate2 (Balanced) has its own GPU kernels and may
+`pipeline_helper.py`, `bs_roformer.py`, `clearvoice.py`, `zipenhancer.py`). **Owner decision 2026-09-06
+(item 6): not fixed in 1.9.2; documented instead** — a "CPU-only users" section in `docs/release_notes_v1.9.2.md`
+and `README.md` separates the no-GPU case (every component falls back to the CPU; ChronosJAV, transformers, NeMo,
+WhisperVAD, WhisperSeg and the neural enhancers untimed on the CPU) from the unsupported-GPU case, where the
+Whisper-family pipelines honour the CPU choice (`get_best_device()` in `faster_whisper_pro_asr.py:49`,
+`whisper_pro_asr.py:49-51`, `stable_ts_asr.py:153-155`, `resolver_v3.py:331`; default segmenters faster-whisper
+built-in VAD / Silero never leave the CPU) and the rest still try the card. Established for the text, code read
+this session: `--device cpu` does NOT reach the ChronosJAV pipelines — their device comes from `--qwen-device`
+(`main.py:1391` → `qwen_pipeline.py:493,505,515` `device=cfg["device"]`) and in an ensemble from
+`--passN-qwen-params {"device"}` (`pass_worker.py:398` → `:1202`); `pass_config["device"] = args.device`
+(`main.py:2828,2857`) is consumed only by `resolve_legacy_pipeline` (`pass_worker.py:1387`); the transformers
+pipeline takes `--hf-device` (`main.py:1301`) / `--passN-hf-params` (`pass_worker.py:312,341`). The GUI HAS a
+per-pass Device control for these pipelines (schema `api.py:2210`, control `app.js:3619-3624`, collected
+`app.js:4545-4560`, sent as `--pass1-qwen-params` `api.py:2944,2971`); the Transcribe tab's `--mode transformers`
+sends `hf_device: 'auto'` unconditionally (`app.js:737`). Enhancers: no flag carries a device
+(`pass_worker.py:1747-1766` writes only backend/model), auto-detect in `speech_enhancement/base.py:243`
+(`resolve_torch_device`); NeMo and ClearVoice leave the device to their libraries (`clearvoice.py:92` stores
+`_device` and never uses it). WhisperSeg picks ONNX Runtime's CUDA provider only when `onnxruntime-gpu` is
+installed (`whisperseg.py:381-393`; the standard install pins the CPU `onnxruntime`, `pyproject.toml:221`).
+WhisperVAD is CTranslate2 (`whisper_vad.py:254,270-273`). Kotoba is not a `--mode` choice (`main.py:205`) and is
+not listed. A first draft of the section told users `--device cpu` would fix the ChronosJAV pipelines and that
+the GUI had no device selector — both wrong, both caught by the adversary; the first would have turned a run
+that stops safely at the start-up check into one that starts and dies in CUDA.
+
+**Two defects found by the adversary while checking the section, for the owner (not fixed, not in the user
+text as fixes):** (1) `speech_enhancement/backends/bs_roformer.py:116` calls `BSRoformer(device=device)` and
+`:264` `self._separator.separate(...)`, but the installed `bs_roformer_infer 0.1.0` (unpinned in
+`pyproject.toml:218`) exports the raw model class with signature `BSRoformer(dim, *, depth, ...)` and no
+`separate` method — so in this environment BS-RoFormer fails to initialise on any device and returns the
+audio unchanged (error swallowed at `:137-139`). Needs a run on the shipped installer environment to confirm
+which package version users get. (2) The GUI's speech-enhancer *Device* dropdown is collected into
+`enhancerParams` (`app.js:4528,4543`, and `:4719,4729`) which is never read, so the control has no effect.
+The stop at the check is what closes #411. Trade-off also stated: CTranslate2 (Balanced) has its own GPU kernels and may
 have used such a card; those users now stop at the gate too, and continue only on the CPU.
 
 **Verification (executed 2026-09-06):** `tests/test_device_detector_arch.py` 38 passed — the rule table
