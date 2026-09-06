@@ -61,9 +61,30 @@ recorded once; the adversary caught the repeat.)
 - `--check` reports the same fact as a fatal FAIL, so on such a card it now exits 1 where it exited 0. That
   follows from "fail there and then"; it is an exit-code change and is stated here for the owner.
 
-**For the owner:** the pre-existing no-GPU path still auto-continues after 30 s. (A) as you stated it
-would also apply there; it was left as is because it is not the reported case and changes every CPU-only
-user's start-up. Say the word and it asks the same question.
+**Consent is recorded once.** The check runs at import time and again in `main()`, and every spawned
+worker (Balanced's recogniser worker, ensemble pass workers) re-runs `whisperjav.main`'s module level; a
+"yes", `--accept-cpu-mode` or `--device cpu` sets `WHISPERJAV_CPU_ACCEPTED=1`, which the check honours and
+children inherit, so the question is asked once per run (the adversary found it asked twice in the parent
+and again in each worker, where an unanswered prompt would have hung the run). `bypass_flags` now also
+covers `--check-verbose` and `--dump-params`; the dead `-v` entry is gone.
+
+**For the owner — the check judges by a PyTorch-build fact, and CTranslate2 does not depend on it.** The
+Balanced, Fast and Faster pipelines transcribe through CTranslate2, which ships its own CUDA kernels, and
+`resolver_v3.py:36-91,180` carries a deliberate Pascal path (float32 compute type, added for #123) whose
+log line appears in the #411 console. So those pipelines may have run on the GPU on a GTX 10-series card,
+and now stop at the check unless the user answers yes and continues on the CPU. Whether the PyTorch mismatch
+caused the #411 empty run is therefore a hypothesis, not established: the run used CTranslate2, and the
+discriminating measurement (the shipped faster-whisper wheel on an sm_61 card) cannot be made here. The
+stop itself is what the owner asked for; its scope across pipelines is his to confirm: keep it for every
+pipeline, or exempt the CTranslate2 pipelines, or treat an explicit `--device cuda` as consent to try the
+GPU.
+
+**For the owner — the GUI does not ask; it aborts and says which box to tick.** The reporter's environment
+is the GUI, whose worker has no console. There the check aborts with the instruction rather than asking;
+asking would need a dialog in the GUI itself. Abort-plus-instruction was chosen as the simple form; a dialog
+is a separate decision.
+
+**Kept as it was:** the no-GPU path (no CUDA, no MPS) still warns and auto-continues after 30 s.
 
 **Known limitation, stated:** `--accept-cpu-mode` on such a card is a full CPU mode only for the modules
 that ask `get_best_device()` (faster-whisper, openai-whisper, stable-ts, kotoba, the resolver). The

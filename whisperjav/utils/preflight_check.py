@@ -566,6 +566,12 @@ def _wait_for_keypress_with_timeout(timeout_seconds=30):
             return False
 
 
+# Set once the user has answered "yes" (or passed consent on the command line), so the
+# question is asked once per run: the check runs at import time and again in main(),
+# and spawned worker processes re-run the module level of whisperjav.main.
+CPU_ACCEPTED_ENV = "WHISPERJAV_CPU_ACCEPTED"
+
+
 def cpu_consent_in_argv(argv) -> bool:
     """True when the command line already answers "use the CPU": --accept-cpu-mode,
     or an explicit --device cpu (either spelling)."""
@@ -614,8 +620,12 @@ def enforce_gpu_requirement(accept_cpu_mode=False, timeout_seconds=30):
     """
     # Skip check entirely if user explicitly accepted CPU mode
     if accept_cpu_mode:
-        print(f"{Fore.YELLOW}ℹ GPU check bypassed via --accept-cpu-mode flag.{Style.RESET_ALL}")
+        if os.environ.get(CPU_ACCEPTED_ENV) != "1":
+            print(f"{Fore.YELLOW}ℹ GPU check bypassed via --accept-cpu-mode flag.{Style.RESET_ALL}")
+        os.environ[CPU_ACCEPTED_ENV] = "1"
         return True
+    if os.environ.get(CPU_ACCEPTED_ENV) == "1":
+        return True   # already answered in this run (or by the parent process)
 
     try:
         import torch
@@ -647,6 +657,7 @@ def enforce_gpu_requirement(accept_cpu_mode=False, timeout_seconds=30):
             if _stdin_is_interactive():
                 answer = _ask("Continue on the CPU anyway? [y/N] ")
                 if answer in ("y", "yes"):
+                    os.environ[CPU_ACCEPTED_ENV] = "1"   # remembered for this run and its workers
                     print(f"\n{Fore.GREEN}✓ Continuing on the CPU (you confirmed).{Style.RESET_ALL}\n")
                     return True
                 print(f"\n{Fore.RED}Aborted. Nothing was processed.{Style.RESET_ALL}")

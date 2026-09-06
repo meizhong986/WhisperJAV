@@ -161,7 +161,7 @@ def build_translation_context(args) -> str:
 # ensuring the check is never bypassed.
 # Bypass for help/version/check and accept-cpu-mode
 args = sys.argv[1:]
-bypass_flags = ['--check', '--help', '-h', '--version', '-v']
+bypass_flags = ['--check', '--check-verbose', '--help', '-h', '--version', '--dump-params']
 accept_cpu = cpu_consent_in_argv(args)   # --accept-cpu-mode, or an explicit --device cpu (#411)
 if not any(flag in args for flag in bypass_flags):
     enforce_gpu_requirement(accept_cpu_mode=accept_cpu)

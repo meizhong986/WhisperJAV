@@ -116,6 +116,7 @@ class TestStartupGate:
 
     def _gate(self, monkeypatch, interactive, answer=None):
         from whisperjav.utils import preflight_check as pf
+        monkeypatch.delenv(pf.CPU_ACCEPTED_ENV, raising=False)
         monkeypatch.setitem(sys.modules, "torch", _fake_torch((6, 1), CU128_LIST))
         monkeypatch.setattr(pf, "_stdin_is_interactive", lambda: interactive)
         asked = []
@@ -135,6 +136,26 @@ class TestStartupGate:
         pf, asked = self._gate(monkeypatch, interactive=True, answer="y")
         assert pf.enforce_gpu_requirement(accept_cpu_mode=False) is True
         assert asked and "Continuing on the CPU" in capsys.readouterr().out
+
+    def test_yes_is_remembered_for_the_run_and_its_workers(self, monkeypatch, capsys):
+        # The check runs at import time and again in main(), and every spawned
+        # worker re-runs whisperjav.main's module level: one answer must serve all.
+        import os
+        pf, asked = self._gate(monkeypatch, interactive=True, answer="y")
+        assert pf.enforce_gpu_requirement(accept_cpu_mode=False) is True
+        assert os.environ.get(pf.CPU_ACCEPTED_ENV) == "1"
+        assert pf.enforce_gpu_requirement(accept_cpu_mode=False) is True
+        assert len(asked) == 1
+        # a worker with no console inherits the answer and does not abort
+        monkeypatch.setattr(pf, "_stdin_is_interactive", lambda: False)
+        assert pf.enforce_gpu_requirement(accept_cpu_mode=False) is True
+        assert len(asked) == 1
+
+    def test_accept_cpu_mode_is_remembered_too(self, monkeypatch):
+        import os
+        pf, asked = self._gate(monkeypatch, interactive=False)
+        assert pf.enforce_gpu_requirement(accept_cpu_mode=True) is True
+        assert os.environ.get(pf.CPU_ACCEPTED_ENV) == "1"
 
     def test_gui_child_marker_means_nobody_can_answer(self, monkeypatch):
         from whisperjav.utils import preflight_check as pf
