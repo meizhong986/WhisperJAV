@@ -32,25 +32,31 @@ CUDA_UNUSABLE_REASON: Optional[str] = None
 def cuda_build_supports_device(capability: Tuple[int, int], arch_list) -> bool:
     """Can a PyTorch build compiled for ``arch_list`` run on a card of ``capability``?
 
-    PyTorch's own rule (``torch.cuda._check_capability``): an ``sm_XY`` binary runs
-    on hardware of the same major version with minor >= Y; a ``compute_XY`` PTX
-    runs on any hardware with compute capability >= X.Y. An empty list cannot be
-    judged and is treated as supported.
+    The rule is NVIDIA's binary-compatibility rule, applied per entry: an ``sm_XY``
+    cubin runs on hardware of the same major version with minor >= Y; a
+    ``compute_XY`` PTX is JIT-compiled for any hardware with capability >= X.Y.
+    Architecture-specific suffixes (``sm_90a``, ``sm_100f``) are stripped the way
+    ``torch.cuda._extract_arch_version`` strips them. PyTorch's own start-up
+    warning is looser (it compares against the list's min/max only), so this is
+    stricter than the warning and matches what actually loads. A list with no
+    parseable entry cannot be judged and is treated as supported.
     """
-    archs = [a for a in (arch_list or []) if isinstance(a, str) and "_" in a]
-    if not archs:
-        return True
     major, minor = int(capability[0]), int(capability[1])
-    for arch in archs:
+    judged = False
+    for arch in arch_list or []:
+        if not isinstance(arch, str) or "_" not in arch:
+            continue
         kind, _, num = arch.partition("_")
+        num = num.removesuffix("a").removesuffix("f")
         if not num.isdigit() or len(num) < 2:
             continue
+        judged = True
         a_major, a_minor = int(num[:-1]), int(num[-1])
         if kind == "sm" and a_major == major and a_minor <= minor:
             return True
         if kind == "compute" and (a_major, a_minor) <= (major, minor):
             return True
-    return False
+    return not judged
 
 
 def _check_cuda_available() -> Tuple[bool, Optional[str]]:

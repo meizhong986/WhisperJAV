@@ -15,51 +15,62 @@
 
 ---
 
-## 2026-09-06 — #411: a GPU the PyTorch build has no kernels for is not a usable GPU (owner C5)
+## 2026-09-06 — #411: a GPU the PyTorch build has no kernels for stops the run at start-up (owner C5)
 
 **Area:** `whisperjav/utils/device_detector.py` (`cuda_build_supports_device()`, `CUDA_UNUSABLE_REASON`,
-`_check_cuda_available`); `whisperjav/utils/preflight_check.py` (start-up gate prints the reason; `--check`
-reports the mismatch as a fatal FAIL); tests `tests/test_device_detector_arch.py` (new, 13).
+`_check_cuda_available`); `whisperjav/utils/preflight_check.py` (the unconditional gate
+`enforce_gpu_requirement` stops with the reason; `--check` reports a fatal FAIL); tests
+`tests/test_device_detector_arch.py` (new, 20).
 
 **Report (#411, GTX 1060 6 GB, sm_61, Windows installer v1.9.0):** PyTorch warned that the card's
 compute capability is not in the build (sm_75 … sm_120); the run continued, took ~2 min per 28 s scene,
-produced 0 cues and reported success. Owner: "instead of failing immediately, whisperjav continues … That
-is a bug."
+produced 0 cues and reported success. Owner on the thread: "Instead of failing immediately, whisperjav
+continues to process the movie. That is a bug." Owner C5: "if the preflight fails, then fail there and
+then … not yet another check … the preflight is the placeholder for the correct solution."
 
-**Mechanism (established, code read):** every device choice in the program derives from
-`get_best_device()`, and its CUDA branch answered "usable" whenever `torch.cuda.is_available()` was True —
-which it is for a card the build cannot run on. The unconditional start-up gate
-(`enforce_gpu_requirement`, every run) therefore let the run through; the fuller `--check` suite runs only
-on request and had the same blind spot.
+**Mechanism (established, code read):** every device choice derives from `get_best_device()`, whose CUDA
+branch answered "usable" whenever `torch.cuda.is_available()` was True — which it is for a card the build
+cannot run on. The unconditional start-up gate asks that function, so it let the run through. (An earlier
+draft of this fix put the failure in the `--check`-only suite, the mis-location the tracker had already
+recorded once; the adversary caught the repeat.)
 
-**What changed (owner C5: fix the one place, no new check):** `_check_cuda_available()` now applies
-PyTorch's own compatibility rule — an `sm_XY` binary runs on the same major version with minor ≥ Y; a
-`compute_XY` PTX on anything ≥ X.Y — via `cuda_build_supports_device(capability, torch.cuda.get_arch_list())`.
-A card the build cannot run on is reported as no usable GPU, with the reason kept in
-`CUDA_UNUSABLE_REASON`. Everything downstream then behaves exactly as for a machine without a GPU: the
-existing gate shows its warning, now with a "Why:" line naming the card, its capability and the build's
-kernel list, and continues on the CPU after the existing 30 s wait or `--accept-cpu-mode`; every ASR
-module picks `cpu` because they all ask `get_best_device()`; `--check` reports a fatal
-"GPU present but not supported by this PyTorch build" with the same facts. Empty or unreadable arch lists
-are not judged (the old answer stands), so nothing changes for builds that do not expose the list.
+**What changed — one honest answer, one existing gate, no new check:**
+- `_check_cuda_available()` now judges the card against `torch.cuda.get_arch_list()` with NVIDIA's
+  binary-compatibility rule (an `sm_XY` cubin runs on the same major version with minor ≥ Y; a
+  `compute_XY` PTX on anything ≥ X.Y; arch-specific suffixes `sm_90a`/`sm_100f` stripped as
+  `torch.cuda._extract_arch_version` does; a list with no parseable entry is not judged). This is stricter
+  than PyTorch's own start-up warning, which only compares against the list's minimum and maximum, and it
+  matches what actually loads. A card the build cannot run on is reported as no usable GPU, with the reason
+  in `CUDA_UNUSABLE_REASON`.
+- `enforce_gpu_requirement`, which every run passes through, then **stops with exit status 1** and prints
+  the card, its capability, the build's kernel list, and the two ways out: install a matching build, or
+  `--accept-cpu-mode` (which bypasses the gate exactly as it already did). Machines with no GPU at all keep
+  today's warn-and-continue behaviour; nothing changed for them.
+- `--check` reports the same fact as a fatal FAIL, so on such a card it now exits 1 where it exited 0. That
+  follows from "fail there and then"; it is an exit-code change and is stated here for the owner.
 
-**Decisions kept as they were (owner):** the gate still warns and continues rather than exiting — that is
-today's behaviour for every CPU-only user and was not asked to change. Known trade-off, stated: CTranslate2
-(Balanced) has its own GPU kernels and may have used such a card; those users now run on the CPU. The #411
-run on exactly that path produced nothing, so there is no evidence the GPU path worked.
+**Known limitation, stated:** `--accept-cpu-mode` on such a card is a full CPU mode only for the modules
+that ask `get_best_device()` (faster-whisper, openai-whisper, stable-ts, kotoba, the resolver). The
+ChronosJAV generators (anime-whisper, Qwen3, Cohere), the transformers pipeline, WhisperVAD, NeMo and the
+speech-enhancement backends pick CUDA from `torch.cuda.is_available()` on their own and will still try
+the card. Making them ask the detector is a separate, mechanical follow-up (eight modules); the stop at the
+gate is what closes #411. Trade-off also stated: CTranslate2 (Balanced) has its own GPU kernels and may
+have used such a card; those users now stop at the gate too, and continue only on the CPU.
 
-**Verification (executed 2026-09-06):** `tests/test_device_detector_arch.py` 13 passed (rule table for the
-cu128 wheel incl. sm_61 → False, sm_89 → True, PTX forward compatibility; detector with a stand-in torch:
-(6,1) → no GPU + reason, (8,6) → unchanged; `--check` FAIL/PASS); `tests/test_preflight_cuda_version.py`
-unchanged; real `--check` on the RTX 3060: PASS, exit 0; a simulated GTX 1060 (capability patched to 6.1)
-through the real `get_best_device()` → `cpu`, and through the real gate → the "Why:" block is printed and
-the run continues on the CPU.
+**Verification (executed 2026-09-06):** `tests/test_device_detector_arch.py` 20 passed — the rule table
+for the cu128 wheel (sm_61 and sm_70 → False, sm_75/86/89/120 → True), PTX forward compatibility,
+suffixed names, unparseable lists; the detector with a stand-in torch ((6,1) → no GPU + reason, (8,6)
+unchanged); `--check` FAIL/PASS; **the real gate**: (6,1) → `SystemExit(1)` with the reason and both ways
+out printed, `--accept-cpu-mode` → passes, (8,6) → passes silently. `tests/test_preflight_cuda_version.py`
+unchanged. Real `--check` on the RTX 3060: PASS, exit 0. Not executed: the GUI on a machine with such a
+card — the child exits 1 and the console shows the block; the GUI reports the failed exit as it does for any
+failed run.
 
 ## 2026-09-06 — #413: subtitle entries that are only punctuation are dropped (owner C1/i1/i2)
 
-**Area:** `whisperjav/modules/subtitle_pipeline/cleaners/nonlinguistic_utterance_filter.py`
-(`_normalizes_to_nothing()`; `filter_srt_file` counts such entries under `dropped_empty`); tests
-`tests/test_nonlinguistic_utterance_filter.py` (+17).
+**Area:** `whisperjav/modules/subtitle_pipeline/cleaners/nonverbal_line_filter.py` (`_normalizes_to_nothing()`;
+`filter_srt_file` counts such entries under `dropped_empty`); tests `tests/test_nonverbal_line_filter.py`
+(+16). The shared `NonlinguisticUtteranceFilter` is untouched.
 
 **Report (#413, weifu8435):** in his Qwen3-ASR pass file, 209 of 815 cues are a lone 「。」 (median 0.3 s;
 they come in runs at 2–3 s spacing, consistent with moan-only frames). His anime-whisper pass has an
@@ -67,22 +78,26 @@ ellipsis in 147 of 157 cues.
 
 **Owner decisions (i1, i2):** anime-whisper's inline ellipses are correct output in the style of anime
 text — nothing touches them, the existing post-processing for that pass is right as it is. Entries that
-consist of nothing but punctuation are removed whole. Rule (C1): normalise by removing whitespace and
-punctuation; if nothing remains, the entire entry goes — the same treatment the filter already gives a
-line that is purely nonverbal sound.
+consist of nothing but punctuation are removed whole. C1's "normalise, then check for nonverbal sound"
+was already what `NonlinguisticUtteranceFilter` does for lines with kana (「。あ。」 is already dropped);
+the case it could not judge is a line with no Japanese character at all, i.e. punctuation only.
 
-**What changed:** one clause in the existing nonlinguistic filter, which already normalises the same way
-before its sound-kana test but declined to judge a line with no Japanese in it. An entry whose text is
-only characters from `PUNCTUATION_CHARS` (plus line breaks) is dropped and counted as `dropped_empty`.
-Inline punctuation is untouched because text remains. The filter runs on the Qwen pipelines (Phase 8)
-and on the legacy pipelines' post-processing (`srt_postprocessing.py`), so a punctuation-only cue is
-gone everywhere; the legacy sanitizer already purged symbol-only lines, so the practical change is on the
-Qwen passes.
+**What changed:** one clause in `NonverbalLineFilter`, the Qwen-only Phase 8 filter (the tracker's
+recorded placement; a first draft put it in the shared filter, which the legacy pipelines also run — the
+adversary caught it, and it was moved so Balanced output cannot change). An entry whose text is only
+characters from the shared `PUNCTUATION_CHARS` set (plus line breaks) is dropped and counted as
+`dropped_empty`. Inline punctuation is untouched because text remains. In the ensemble both passes run
+the Qwen pipeline, so both get it.
 
-**Verification (executed 2026-09-06):** 99 passed across the filter, device-detector and preflight suites;
-the new SRT test drops 「。」, 「、」, 「…」 entries, keeps 「…やらしいことして欲し…」 and 「もっと」, and
-renumbers. Origin of the 「。」 cues (model output for non-speech vs. leftover after a removal) is not
-settled — the rule covers both.
+**Overridden on purpose, for the owner to confirm:** the anime-whisper pass-1 cleaner deliberately kept a
+lone 「?」, 「!」 or 「」」 (its comment: "Preserves (keep): '?' alone, '!' alone, '」' alone"). Under i2 those
+are punctuation-only entries and are now dropped later in Phase 8. Half-width katakana sound lines (「ﾊｧ」)
+remain outside the nonlinguistic filter's class — a separate follow-up, not part of this change.
+
+**Verification (executed 2026-09-06):** the nonverbal, nonlinguistic, device-detector and preflight suites
+plus the #324 symbol-purge suite pass (counts in the commit); the new SRT test drops 「。」, 「、」, 「…」
+entries, keeps 「…やらしいことして欲し…」 and 「もっと」, and renumbers. Origin of the 「。」 cues (model output
+for non-speech vs. leftover after a removal) is not settled — the rule covers both.
 
 ## 2026-09-06 — #415: cached Hugging Face models load without a hub round-trip; `--offline` / "Offline mode"
 

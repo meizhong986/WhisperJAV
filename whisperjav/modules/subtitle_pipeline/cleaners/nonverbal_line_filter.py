@@ -47,6 +47,22 @@ _NONVERBAL_RE = re.compile(
 )
 
 
+def _normalizes_to_nothing(text: str) -> bool:
+    """True when nothing is left once whitespace and punctuation are removed.
+
+    Owner rule (2026-09-06, #413, i2): an entry that is only punctuation — a lone
+    「。」 or 「、」, an ellipsis on its own, 「！？」 — carries no words and is
+    removed whole. Inline punctuation inside text (anime-whisper's ellipses, owner
+    i1) is untouched because the text remains. Lives in this Qwen-only filter on
+    purpose: the shared NonlinguisticUtteranceFilter also runs on the legacy
+    pipelines, whose sanitizer already handles symbol-only residue.
+    """
+    from whisperjav.modules.subtitle_pipeline.cleaners.nonlinguistic_utterance_filter import (
+        PUNCTUATION_CHARS,
+    )
+    return all(ch in PUNCTUATION_CHARS or ch in "\r\n" for ch in text)
+
+
 class NonverbalLineFilter:
     """Drops whole-line single-token nonverbal artifacts from an SRT file."""
 
@@ -95,7 +111,8 @@ class NonverbalLineFilter:
         kept: list = []
         for sub in subs:
             text = (sub.text or "").strip()
-            if not text:
+            if not text or _normalizes_to_nothing(text):
+                # empty, or nothing left after whitespace and punctuation (#413)
                 stats["dropped_empty"] += 1
                 continue
             if self.is_nonverbal_line(text):

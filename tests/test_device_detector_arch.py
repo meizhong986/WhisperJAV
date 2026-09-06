@@ -35,6 +35,16 @@ class TestRule:
     def test_unknown_list_is_not_judged(self):
         assert dd.cuda_build_supports_device((6, 1), []) is True
         assert dd.cuda_build_supports_device((6, 1), None) is True
+        assert dd.cuda_build_supports_device((6, 1), ["weird"]) is True
+
+    @pytest.mark.parametrize("capability,arch_list,expected", [
+        ((9, 0), ["sm_90a"], True),                 # Hopper arch-specific cubin
+        ((12, 0), ["sm_100f", "sm_120a"], True),    # family/arch-specific Blackwell names
+        ((10, 0), ["sm_90", "sm_100a"], True),
+        ((6, 1), ["sm_90a", "sm_120a"], False),
+    ])
+    def test_arch_specific_suffixes_are_stripped_like_torch(self, capability, arch_list, expected):
+        assert dd.cuda_build_supports_device(capability, arch_list) is expected
 
 
 def _fake_torch(capability, arch_list, name="NVIDIA GeForce GTX 1060 6GB"):
@@ -82,3 +92,28 @@ class TestCheckSuite:
         checker = PreflightChecker()
         checker._check_cuda_availability()
         assert checker.results[-1].status == CheckStatus.PASS
+
+
+class TestStartupGate:
+    """The unconditional gate every run passes through (owner C5: fail there and then)."""
+
+    def test_unusable_card_stops_the_run_with_the_reason(self, monkeypatch, capsys):
+        from whisperjav.utils import preflight_check as pf
+        monkeypatch.setitem(sys.modules, "torch", _fake_torch((6, 1), CU128_LIST))
+        with pytest.raises(SystemExit) as ei:
+            pf.enforce_gpu_requirement(accept_cpu_mode=False, timeout_seconds=1)
+        assert ei.value.code == 1
+        out = capsys.readouterr().out
+        assert "not supported by this PyTorch build" in out
+        assert "compute capability 6.1" in out and "--accept-cpu-mode" in out
+
+    def test_accept_cpu_mode_bypasses_the_gate(self, monkeypatch):
+        from whisperjav.utils import preflight_check as pf
+        monkeypatch.setitem(sys.modules, "torch", _fake_torch((6, 1), CU128_LIST))
+        assert pf.enforce_gpu_requirement(accept_cpu_mode=True) is True
+
+    def test_supported_card_passes_silently(self, monkeypatch, capsys):
+        from whisperjav.utils import preflight_check as pf
+        monkeypatch.setitem(sys.modules, "torch", _fake_torch((8, 6), CU128_LIST, "RTX 3060"))
+        assert pf.enforce_gpu_requirement(accept_cpu_mode=False) is True
+        assert capsys.readouterr().out == ""

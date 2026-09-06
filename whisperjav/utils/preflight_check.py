@@ -590,6 +590,26 @@ def enforce_gpu_requirement(accept_cpu_mode=False, timeout_seconds=30):
         if best_device in ('cuda', 'mps'):
             return True
 
+        # #411 (owner: "if the preflight fails, then fail there and then"): a GPU is
+        # present but this PyTorch build has no kernels for it. Continuing would
+        # produce an empty run reported as success, so stop here. --accept-cpu-mode
+        # (handled above) is the explicit way to run on the CPU instead.
+        from whisperjav.utils import device_detector as _dd
+        if _dd.CUDA_UNUSABLE_REASON:
+            print(f"\n{Fore.RED}{'='*70}{Style.RESET_ALL}")
+            print(f"{Fore.RED}❌ GPU not supported by this PyTorch build{Style.RESET_ALL}")
+            print(f"{Fore.RED}{'='*70}{Style.RESET_ALL}\n")
+            print(f"  {_dd.CUDA_UNUSABLE_REASON}\n")
+            print("Stopping so the run does not end as an empty file reported as success.\n")
+            print(f"{Fore.CYAN}What you can do:{Style.RESET_ALL}")
+            print("  1. Install a PyTorch build with kernels for this card")
+            print("     (see https://pytorch.org/get-started/locally/), or")
+            print("  2. Run with --accept-cpu-mode to use the CPU instead (much slower;")
+            print("     the ChronosJAV pipelines pick CUDA on their own and may still fail).")
+            print("\n  Run 'whisperjav --check' for detailed diagnostics")
+            print(f"{Fore.RED}{'='*70}{Style.RESET_ALL}\n")
+            sys.exit(1)
+
         # No GPU detected - show friendly warning
         print(f"\n{Fore.YELLOW}{'='*70}{Style.RESET_ALL}")
         print(f"{Fore.YELLOW}⚠  GPU Performance Warning{Style.RESET_ALL}")
@@ -597,11 +617,6 @@ def enforce_gpu_requirement(accept_cpu_mode=False, timeout_seconds=30):
 
         print("WhisperJAV works best with GPU acceleration.")
         print("We detected that no compatible GPU is currently available.\n")
-        from whisperjav.utils import device_detector as _dd
-        if _dd.CUDA_UNUSABLE_REASON:
-            print(f"{Fore.CYAN}Why:{Style.RESET_ALL}")
-            print(f"  {_dd.CUDA_UNUSABLE_REASON}")
-            print("  Install a PyTorch build with kernels for this card, or continue on the CPU.\n")
 
         print(f"{Fore.CYAN}What this means:{Style.RESET_ALL}")
         print("  • CPU-only processing will be significantly slower (10-50x)")

@@ -3,7 +3,6 @@
 import pytest
 
 from whisperjav.modules.subtitle_pipeline.cleaners.nonlinguistic_utterance_filter import (
-    _normalizes_to_nothing,
     NonlinguisticUtteranceFilter,
     _has_evidence_of_language,
     _is_japanese_sound_line,
@@ -330,39 +329,3 @@ class TestFilterSrtFile:
 
         assert stats["dropped_empty"] == 1
         assert stats["final_count"] == 1
-
-
-class TestNormalizedEmptyEntries:
-    """Owner rule (2026-09-06, #413): an entry that is only punctuation once
-    whitespace and punctuation are removed is dropped whole. Inline punctuation
-    inside text — anime-whisper's ellipses — is untouched because text remains."""
-
-    @pytest.mark.parametrize("text", ["。", "、", "…", "...", "。。。", "！？", " 。 ", "♪", "「」", "。\n…"])
-    def test_punctuation_only_normalizes_to_nothing(self, text):
-        assert _normalizes_to_nothing(text)
-
-    @pytest.mark.parametrize("text", ["はい。", "…やらしいことして欲し…", "あ。", "。\nOK", "a"])
-    def test_anything_with_text_does_not(self, text):
-        assert not _normalizes_to_nothing(text)
-
-    def test_filter_drops_lone_period_entries_and_keeps_inline_ellipses(self, tmp_path):
-        srt_content = (
-            "1\n00:00:01,000 --> 00:00:01,300\n。\n\n"
-            "2\n00:00:02,000 --> 00:00:03,000\n…やらしいことして欲し…\n\n"
-            "3\n00:00:04,000 --> 00:00:04,300\n、\n\n"
-            "4\n00:00:05,000 --> 00:00:06,000\nもっと\n\n"
-            "5\n00:00:07,000 --> 00:00:07,200\n…\n\n"
-        )
-        srt_path = tmp_path / "test.srt"
-        srt_path.write_text(srt_content, encoding="utf-8")
-
-        stats = NonlinguisticUtteranceFilter().filter_srt_file(srt_path)
-
-        assert stats["dropped_empty"] == 3
-        assert stats["dropped_nonlinguistic"] == 0
-        assert stats["final_count"] == 2
-
-        import pysrt
-        subs = pysrt.open(str(srt_path), encoding="utf-8")
-        assert [s.text for s in subs] == ["…やらしいことして欲し…", "もっと"]
-        assert [s.index for s in subs] == [1, 2]
