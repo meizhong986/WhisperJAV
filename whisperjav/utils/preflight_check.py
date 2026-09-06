@@ -566,6 +566,18 @@ def _wait_for_keypress_with_timeout(timeout_seconds=30):
             return False
 
 
+def cpu_consent_in_argv(argv) -> bool:
+    """True when the command line already answers "use the CPU": --accept-cpu-mode,
+    or an explicit --device cpu (either spelling)."""
+    argv = list(argv)
+    if "--accept-cpu-mode" in argv or "--device=cpu" in argv:
+        return True
+    for i, tok in enumerate(argv[:-1]):
+        if tok == "--device" and argv[i + 1] == "cpu":
+            return True
+    return False
+
+
 def _stdin_is_interactive() -> bool:
     """True when a person can answer a question on this console.
 

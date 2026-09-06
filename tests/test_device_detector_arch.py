@@ -36,6 +36,7 @@ class TestRule:
         assert dd.cuda_build_supports_device((6, 1), []) is True
         assert dd.cuda_build_supports_device((6, 1), None) is True
         assert dd.cuda_build_supports_device((6, 1), ["weird"]) is True
+        assert dd.cuda_build_supports_device((6, 1), ["SM_61", "gfx90a"]) is True   # unknown kinds are not judged
 
     @pytest.mark.parametrize("capability,arch_list,expected", [
         ((9, 0), ["sm_90a"], True),                 # Hopper arch-specific cubin
@@ -92,6 +93,20 @@ class TestCheckSuite:
         checker = PreflightChecker()
         checker._check_cuda_availability()
         assert checker.results[-1].status == CheckStatus.PASS
+
+
+class TestCpuConsent:
+    @pytest.mark.parametrize("argv,expected", [
+        (["x.mp4", "--accept-cpu-mode"], True),
+        (["x.mp4", "--device", "cpu"], True),
+        (["x.mp4", "--device=cpu"], True),
+        (["x.mp4", "--device", "cuda"], False),
+        (["x.mp4", "--device"], False),
+        (["x.mp4"], False),
+    ])
+    def test_command_line_answers(self, argv, expected):
+        from whisperjav.utils.preflight_check import cpu_consent_in_argv
+        assert cpu_consent_in_argv(argv) is expected
 
 
 class TestStartupGate:

@@ -394,9 +394,9 @@
                             <!-- Row 3: Accept CPU mode -->
                             <div class="form-row" id="adv-row-3">
                                 <div class="form-group">
-                                    <label class="checkbox-label" title="Skip GPU performance warning and accept CPU-only mode">
+                                    <label class="checkbox-label" title="Run on the CPU when no usable GPU is found. Also the answer to the start-up check that stops when the graphics card is present but this PyTorch build has no kernels for it: without this box such a run aborts. Applies to Transcription and Ensemble runs (same as --accept-cpu-mode).">
                                         <input type="checkbox" id="acceptCpuMode">
-                                        <span>Accept CPU-only mode (skip GPU warning)</span>
+                                        <span>Accept CPU-only mode (proceed on the CPU when the GPU is missing or unsupported)</span>
                                     </label>
                                 </div>
                                 <div class="form-group">

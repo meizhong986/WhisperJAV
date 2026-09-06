@@ -110,7 +110,7 @@ from whisperjav.config.segmenter_presets import (
 from whisperjav.__version__ import __version__, __version_display__
 
 
-from whisperjav.utils.preflight_check import enforce_gpu_requirement, run_preflight_checks
+from whisperjav.utils.preflight_check import enforce_gpu_requirement, run_preflight_checks, cpu_consent_in_argv
 from whisperjav.utils.progress_aggregator import VerbosityLevel, create_progress_handler
 from whisperjav.utils.async_processor import AsyncPipelineManager, ProcessingStatus
 from whisperjav.utils.parameter_tracer import create_tracer
@@ -162,7 +162,7 @@ def build_translation_context(args) -> str:
 # Bypass for help/version/check and accept-cpu-mode
 args = sys.argv[1:]
 bypass_flags = ['--check', '--help', '-h', '--version', '-v']
-accept_cpu = '--accept-cpu-mode' in args
+accept_cpu = cpu_consent_in_argv(args)   # --accept-cpu-mode, or an explicit --device cpu (#411)
 if not any(flag in args for flag in bypass_flags):
     enforce_gpu_requirement(accept_cpu_mode=accept_cpu)
 # --- END OF CHECK ---
@@ -2068,7 +2068,7 @@ def main():
         sys.exit(0)
 
     # Enforce GPU requirement (CUDA/MPS) with optional bypass
-    enforce_gpu_requirement(accept_cpu_mode=args.accept_cpu_mode)
+    enforce_gpu_requirement(accept_cpu_mode=args.accept_cpu_mode or args.device == "cpu")
 
     # Setup logging
     global logger

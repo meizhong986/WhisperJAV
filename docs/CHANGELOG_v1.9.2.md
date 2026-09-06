@@ -20,9 +20,12 @@
 **Area:** `whisperjav/utils/device_detector.py` (`cuda_build_supports_device()`, `CUDA_UNUSABLE_REASON`,
 `_check_cuda_available`); `whisperjav/utils/preflight_check.py` (the unconditional gate
 `enforce_gpu_requirement` stops with the reason; `--check` reports a fatal FAIL); tests
-`tests/test_device_detector_arch.py` (new, 23).
+`tests/test_device_detector_arch.py` (new, 30); `tests/test_gui_run_summary.py` (+1: the box reaches the
+Ensemble builders).
 
-**Report (#411, GTX 1060 6 GB, sm_61, Windows installer v1.9.0):** PyTorch warned that the card's
+**Report (#411, GTX 1060 6 GB, sm_61, Windows installer v1.9.0; #333 is the same mechanism from its
+reporter's own arch-list output; #326 is a bare "cuda errors on a 10-series" report, probably the same,
+unconfirmed):** PyTorch warned that the card's
 compute capability is not in the build (sm_75 … sm_120); the run continued, took ~2 min per 28 s scene,
 produced 0 cues and reported success. Owner on the thread: "Instead of failing immediately, whisperjav
 continues to process the movie. That is a bug." Owner C5: "if the preflight fails, then fail there and
@@ -36,12 +39,14 @@ recorded once; the adversary caught the repeat.)
 
 **What changed — one honest answer, one existing gate, no new check:**
 - `_check_cuda_available()` now judges the card against `torch.cuda.get_arch_list()` with NVIDIA's
-  binary-compatibility rule (an `sm_XY` cubin runs on the same major version with minor ≥ Y; a
+  per-entry cubin/PTX rule (an `sm_XY` cubin runs on the same major version with minor ≥ Y; a
   `compute_XY` PTX on anything ≥ X.Y; arch-specific suffixes `sm_90a`/`sm_100f` stripped as
-  `torch.cuda._extract_arch_version` does; a list with no parseable entry is not judged). This is stricter
-  than PyTorch's own start-up warning, which only compares against the list's minimum and maximum, and it
-  matches what actually loads. A card the build cannot run on is reported as no usable GPU, with the reason
-  in `CUDA_UNUSABLE_REASON`.
+  `torch.cuda._extract_arch_version` does; a list with no `sm`/`compute` entry is not judged). Recent
+  PyTorch's start-up warning (`_warn_unsupported_code`, the one in the reporter's console) applies the same
+  idea with family exceptions such as 8.7 and 10.1, which this rule does not model and treats as supported;
+  older PyTorch warned only on the list's min/max. Where they disagree this rule errs toward "usable", so it
+  never stops a run PyTorch would allow. A card the build cannot run on is reported as no usable GPU, with
+  the reason in `CUDA_UNUSABLE_REASON`.
 - `enforce_gpu_requirement`, which every run passes through, then **stops and asks** (owner, 2026-09-06:
   "the check has to stop the process and ask for the user input to proceed or to abort"). On a console it
   prints the card, its capability, the build's kernel list and the options, then asks "Continue on the CPU
@@ -49,8 +54,10 @@ recorded once; the adversary caught the repeat.)
   "Nothing was processed". Where nobody can answer — the GUI's child process (which the GUI now marks with
   `WHISPERJAV_NO_CONSOLE=1`, because on Windows even the null device reports itself as a terminal), or a
   run whose stdin is not a terminal — it aborts and says how to answer: `--accept-cpu-mode`, or the GUI's "Accept CPU-only mode" box, both of which the gate
-  already honoured at its top. Machines with no GPU at all keep today's behaviour (warn, keypress or 30 s
-  auto-continue); whether that path should also ask is stated for the owner below.
+  already honoured at its top; an explicit `--device cpu` counts as the same answer. The GUI's box now
+  reaches the Ensemble tab's builders too — the first version left that tab with no way to answer, caught by
+  the adversary. Machines with no GPU at all keep today's behaviour (warn, keypress or 30 s auto-continue);
+  whether that path should also ask is stated for the owner below.
 - `--check` reports the same fact as a fatal FAIL, so on such a card it now exits 1 where it exited 0. That
   follows from "fail there and then"; it is an exit-code change and is stated here for the owner.
 
@@ -62,11 +69,13 @@ user's start-up. Say the word and it asks the same question.
 that ask `get_best_device()` (faster-whisper, openai-whisper, stable-ts, kotoba, the resolver). The
 ChronosJAV generators (anime-whisper, Qwen3, Cohere), the transformers pipeline, WhisperVAD, NeMo and the
 speech-enhancement backends pick CUDA from `torch.cuda.is_available()` on their own and will still try
-the card. Making them ask the detector is a separate, mechanical follow-up (eight modules); the stop at the
-gate is what closes #411. Trade-off also stated: CTranslate2 (Balanced) has its own GPU kernels and may
+the card (eleven files: `qwen_asr.py`, `generators/anime_whisper.py`, `generators/cohere.py`,
+`transformers_asr.py`, `backends/whisper_vad.py`, `backends/nemo.py`, `speech_enhancement/base.py`,
+`pipeline_helper.py`, `bs_roformer.py`, `clearvoice.py`, `zipenhancer.py`). Making them ask the detector is
+a separate, mechanical follow-up; the stop at the check is what closes #411. Trade-off also stated: CTranslate2 (Balanced) has its own GPU kernels and may
 have used such a card; those users now stop at the gate too, and continue only on the CPU.
 
-**Verification (executed 2026-09-06):** `tests/test_device_detector_arch.py` 23 passed — the rule table
+**Verification (executed 2026-09-06):** `tests/test_device_detector_arch.py` 30 passed — the rule table
 for the cu128 wheel (sm_61 and sm_70 → False, sm_75/86/89/120 → True), PTX forward compatibility,
 suffixed names, unparseable lists; the detector with a stand-in torch ((6,1) → no GPU + reason, (8,6)
 unchanged); `--check` FAIL/PASS; **the real gate**: on a console the question is asked, "no" or Enter
@@ -97,8 +106,12 @@ the case it could not judge is a line with no Japanese character at all, i.e. pu
 recorded placement; a first draft put it in the shared filter, which the legacy pipelines also run — the
 adversary caught it, and it was moved so Balanced output cannot change). An entry whose text is only
 characters from the shared `PUNCTUATION_CHARS` set (plus line breaks) is dropped and counted as
-`dropped_empty`. Inline punctuation is untouched because text remains. In the ensemble both passes run
-the Qwen pipeline, so both get it.
+`dropped_empty`. Inline punctuation is untouched because text remains. Any pass that runs the Qwen
+pipeline gets it — the GUI's default pairing (anime-whisper, Qwen3) on both passes; a pass configured as
+balanced/fast/faster/fidelity/transformers does not and goes through the legacy sanitizer instead. The
+clause sits inside the `--qwen-drop-nonverbal-lines` switch (default on), so `--no-qwen-drop-nonverbal-lines`
+also keeps punctuation-only entries; the ensemble worker does not forward that switch (pre-existing), so
+ensemble runs always apply it.
 
 **Overridden on purpose, for the owner to confirm:** the anime-whisper pass-1 cleaner deliberately kept a
 lone 「?」, 「!」 or 「」」 (its comment: "Preserves (keep): '?' alone, '!' alone, '」' alone"). Under i2 those

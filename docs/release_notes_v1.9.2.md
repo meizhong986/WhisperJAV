@@ -24,14 +24,14 @@ you find out something went wrong.
   capability and the ones the build supports, and asks whether to continue on the CPU or
   abort; it waits for your answer and never continues on its own. In the GUI, where the
   worker cannot ask, the run aborts and tells you to tick *Accept CPU-only mode* if you
-  want it to proceed on the CPU; on the command line, `--accept-cpu-mode` answers in
-  advance. `whisperjav --check` reports the same fact and exits with an error on such a
+  want it to proceed on the CPU (the box now applies to Ensemble runs as well); on the
+  command line, `--accept-cpu-mode` or an explicit `--device cpu` answers in advance. `whisperjav --check` reports the same fact and exits with an error on such a
   card. Two things to
   know: with `--accept-cpu-mode` the ChronosJAV pipelines (anime-whisper, Qwen3, Cohere)
   and the speech enhancers still choose the GPU on their own and may fail there, so on
   such a card prefer the Whisper pipelines; and if the Balanced pipeline's CTranslate2
   recognizer was working on such a card, it now stops at the gate too, since there is no
-  evidence it was. Machines with no GPU at all behave as before. (#411, #326, #333)
+  evidence it was. Machines with no GPU at all behave as before. (#411, #333; probably #326)
 
 - **Subtitle lines that are only punctuation are removed on the ChronosJAV pipelines.**
   The Qwen3-ASR pass can emit a cue that is nothing but 「。」 for a stretch of sound

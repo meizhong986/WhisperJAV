@@ -70,6 +70,19 @@ class TestFailOnIsForwarded:
         assert WhisperJAVAPI._GUI_SETTINGS_MAP["fail_on_suspect"] == "failOnSuspect"
         assert WhisperJAVAPI._GUI_SETTINGS_MAP["asr_telemetry"] == "asrTelemetry"
 
+    def test_accept_cpu_mode_reaches_the_ensemble_builders(self, api, tmp_path):
+        """#411: the start-up check stops on an unsupported GPU; the shared box is the
+        GUI's only way to answer, so the Ensemble tab's builders must carry it too."""
+        cfg = _base_options(tmp_path, accept_cpu_mode=True)
+        cfg.update({"pass1_pipeline": "balanced", "pass1_sensitivity": "balanced"})
+        assert "--accept-cpu-mode" in api._build_twopass_args(cfg)
+        assert "--accept-cpu-mode" in api._build_ensemble_args(_base_options(tmp_path, accept_cpu_mode=True))
+        assert "--accept-cpu-mode" not in api._build_twopass_args(
+            dict(_base_options(tmp_path), pass1_pipeline="balanced", pass1_sensitivity="balanced"))
+        js = (__import__("pathlib").Path(__file__).resolve().parent.parent / "whisperjav" / "webview_gui" /
+              "assets" / "app.js").read_text(encoding="utf-8")
+        assert js.count("accept_cpu_mode: document.getElementById('acceptCpuMode').checked") == 2
+
     def test_telemetry_opt_out_reaches_every_builder(self, api, tmp_path):
         """On by default: nothing is emitted unless the checkbox is unticked."""
         assert "--no-asr-telemetry" not in api.build_args(_base_options(tmp_path))

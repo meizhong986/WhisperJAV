@@ -32,14 +32,17 @@ CUDA_UNUSABLE_REASON: Optional[str] = None
 def cuda_build_supports_device(capability: Tuple[int, int], arch_list) -> bool:
     """Can a PyTorch build compiled for ``arch_list`` run on a card of ``capability``?
 
-    The rule is NVIDIA's binary-compatibility rule, applied per entry: an ``sm_XY``
-    cubin runs on hardware of the same major version with minor >= Y; a
-    ``compute_XY`` PTX is JIT-compiled for any hardware with capability >= X.Y.
-    Architecture-specific suffixes (``sm_90a``, ``sm_100f``) are stripped the way
-    ``torch.cuda._extract_arch_version`` strips them. PyTorch's own start-up
-    warning is looser (it compares against the list's min/max only), so this is
-    stricter than the warning and matches what actually loads. A list with no
-    parseable entry cannot be judged and is treated as supported.
+    This is NVIDIA's per-entry cubin/PTX rule: an ``sm_XY`` cubin runs on hardware
+    of the same major version with minor >= Y; a ``compute_XY`` PTX is JIT-compiled
+    for any hardware with capability >= X.Y. Architecture-specific suffixes
+    (``sm_90a``, ``sm_100f``) are stripped the way ``torch.cuda._extract_arch_version``
+    does. Recent PyTorch applies the same idea in its start-up warning
+    (``_warn_unsupported_code``) with family exceptions such as 8.7 and 10.1, which
+    this rule does not model and therefore treats as supported; older PyTorch only
+    warned on the list's min/max (``_check_capability``) and on the major version
+    (``_check_cubins``). Where those disagree, this rule errs toward reporting the
+    card as usable. A list with no ``sm``/``compute`` entry cannot be judged and is
+    treated as supported.
     """
     major, minor = int(capability[0]), int(capability[1])
     judged = False
@@ -48,7 +51,7 @@ def cuda_build_supports_device(capability: Tuple[int, int], arch_list) -> bool:
             continue
         kind, _, num = arch.partition("_")
         num = num.removesuffix("a").removesuffix("f")
-        if not num.isdigit() or len(num) < 2:
+        if kind not in ("sm", "compute") or not num.isdigit() or len(num) < 2:
             continue
         judged = True
         a_major, a_minor = int(num[:-1]), int(num[-1])

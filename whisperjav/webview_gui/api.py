@@ -198,6 +198,10 @@ class WhisperJAVAPI:
         if options.get('offline_mode', False):
             args += ["--offline"]
 
+        # #411: the answer to the start-up check's proceed-or-abort question (shared box).
+        if options.get('accept_cpu_mode', False) and "--accept-cpu-mode" not in args:
+            args += ["--accept-cpu-mode"]
+
         # v1.9.2 (CFF1): recogniser refresh budget in minutes of scene audio (0 = never).
         _mr = options.get('model_refresh_audio_minutes')
         if _mr not in (None, ''):
@@ -1913,6 +1917,10 @@ class WhisperJAVAPI:
         if options.get('offline_mode', False):
             args += ["--offline"]
 
+        # #411: the answer to the start-up check's proceed-or-abort question (shared box).
+        if options.get('accept_cpu_mode', False) and "--accept-cpu-mode" not in args:
+            args += ["--accept-cpu-mode"]
+
         # v1.9.2 (CFF1): recogniser refresh budget in minutes of scene audio (0 = never).
         _mr = options.get('model_refresh_audio_minutes')
         if _mr not in (None, ''):
@@ -3187,6 +3195,10 @@ class WhisperJAVAPI:
         # #415: downloaded Hugging Face models only (HF_HUB_OFFLINE=1 in the child and its workers).
         if config.get('offline_mode', False):
             args += ["--offline"]
+
+        # #411: the answer to the start-up check's proceed-or-abort question (shared box).
+        if config.get('accept_cpu_mode', False):
+            args += ["--accept-cpu-mode"]
 
         # v1.9.2 (CFF1): recogniser refresh budget in minutes of scene audio (0 = never).
         _mr = config.get('model_refresh_audio_minutes')

@@ -5450,6 +5450,9 @@ const EnsembleManager = {
             asr_telemetry: document.getElementById('asrTelemetry').checked,
             // #415: shared Advanced-options checkbox (Transcription tab), like asrTelemetry
             offline_mode: document.getElementById('offlineMode').checked,
+            // #411: the start-up check stops on a GPU this build cannot use and, in the GUI,
+            // can only be answered by this shared box (Transcription tab, Advanced options).
+            accept_cpu_mode: document.getElementById('acceptCpuMode').checked,
             // v1.9.2 (CFF1): shared Advanced-options field (Transcription tab), like source-language
             model_refresh_audio_minutes: document.getElementById('modelRefreshAudioMinutes').value,
             temp_dir: document.getElementById('tempDir').value.trim(),
