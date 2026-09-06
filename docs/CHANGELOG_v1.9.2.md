@@ -8,8 +8,8 @@
 > Conventions: one entry per landed change, newest first. "Decision" lines
 > record who decided what, so a later reader can tell policy from mechanism.
 >
-> **SYNC** — pack r2 · 2026-09-06 | tracker rev 51.0 | change log through 2026-09-06 (N3) | `dev_v1.9.2` @ 1f82f21 |
-> GitHub 133 open · 231 closed · 12 PRs · 0 labels applied · 35 owed. Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
+> **SYNC** — pack r2.1 · 2026-09-06 | tracker rev 51.1 | change log through 2026-09-06 (N3) | `dev_v1.9.2` @ 940ba39 |
+> GitHub 133 open · 231 closed · 12 PRs · 0 labels applied · 30 owed (5 replies posted 02:21 UTC). Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
 > (updated in place; never a second page). Rule: a session that changes the pack, this file or the change
 > log brings the other two to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
 
