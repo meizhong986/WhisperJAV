@@ -53,7 +53,7 @@ WhisperJAV uses NVIDIA CUDA for GPU-accelerated transcription. The installer aut
 | 450 - 569 | CUDA 11.8 (universal) | All CUDA-capable NVIDIA GPUs |
 | No NVIDIA GPU | CPU-only (slower) | Any system (6-10x slower than GPU) |
 
-If you do not have an NVIDIA GPU, WhisperJAV will still work in CPU-only mode. Processing will be slower (approximately 30-60 minutes per hour of video, compared to 5-10 minutes with a GPU).
+If you do not have an NVIDIA GPU, WhisperJAV will still work in CPU-only mode: tick **Accept CPU-only mode** on the GUI's Advanced tab (or pass `--accept-cpu-mode` on the command line). Without it, the start-up check stops and asks whether to continue on the CPU, and in the GUI the run aborts with a message telling you to tick that box. Processing will be slower (approximately 30-60 minutes per hour of video, compared to 5-10 minutes with a GPU).
 
 ### Supported NVIDIA GPUs
 
@@ -513,7 +513,7 @@ cmd /C START /WAIT WhisperJAV-1.8.9-Windows-x86_64.exe /S /AddToPath=0 /InstallL
 
 ### Q: Do I need an NVIDIA GPU?
 
-**A:** No. WhisperJAV works on any Windows 10/11 system. Without an NVIDIA GPU, it runs in CPU-only mode, which is approximately 6-10 times slower. For occasional use, CPU mode is perfectly fine. For regular use or long videos, an NVIDIA GPU is strongly recommended.
+**A:** No. WhisperJAV works on any Windows 10/11 system. Without an NVIDIA GPU, it runs in CPU-only mode once you tick **Accept CPU-only mode** (Advanced tab); the start-up check otherwise stops and asks. CPU mode is approximately 6-10 times slower. For occasional use, CPU mode is perfectly fine. For regular use or long videos, an NVIDIA GPU is strongly recommended.
 
 ### Q: How much disk space do I need?
 

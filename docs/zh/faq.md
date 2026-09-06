@@ -28,7 +28,7 @@
 
 ### 没有 GPU 也能使用 WhisperJAV 吗？
 
-可以。进入 **Advanced**（高级）→ 勾选 **"Accept CPU-only mode"**（接受仅 CPU 模式）。使用 **Faster** 模式可获得最佳 CPU 速度。功能正常，只是明显较慢。
+可以。进入 **Advanced**（高级）→ 勾选 **"Accept CPU-only mode"**（接受仅 CPU 模式）。这个选项是必须的：找不到可用 GPU 时，启动检查会停下来询问是否改用 CPU 继续，而 GUI 无法提问，不勾选则运行会中止并提示您勾选。命令行请加 `--accept-cpu-mode`（或 `--device cpu`）。使用 **Faster** 模式可获得最佳 CPU 速度。功能正常，只是明显较慢。
 
 ---
 

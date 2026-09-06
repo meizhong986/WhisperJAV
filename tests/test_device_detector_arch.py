@@ -15,6 +15,18 @@ from whisperjav.utils import device_detector as dd
 CU128_LIST = ["sm_75", "sm_80", "sm_86", "sm_90", "sm_100", "sm_120"]
 
 
+@pytest.fixture(autouse=True)
+def _no_leaked_consent():
+    # enforce_gpu_requirement writes WHISPERJAV_CPU_ACCEPTED=1 into the real os.environ;
+    # monkeypatch.delenv(raising=False) records no undo when the name was absent, so
+    # the value would leak into later tests (and make the "passes silently" test vacuous).
+    import os
+    from whisperjav.utils import preflight_check as pf
+    os.environ.pop(pf.CPU_ACCEPTED_ENV, None)
+    yield
+    os.environ.pop(pf.CPU_ACCEPTED_ENV, None)
+
+
 class TestRule:
     @pytest.mark.parametrize("capability,expected", [
         ((6, 1), False),   # GTX 1060 (#411)
@@ -171,22 +183,87 @@ class TestStartupGate:
         out = capsys.readouterr().out
         assert "--accept-cpu-mode" in out and "Accept CPU-only mode" in out
 
-    def test_no_timeout_auto_continue_on_this_path(self, monkeypatch):
+    def test_nothing_continues_on_a_timer(self):
+        # The 30 s "auto-continue" helper is gone: nothing proceeds without an answer.
+        import inspect
         from whisperjav.utils import preflight_check as pf
-        pf_, _ = self._gate(monkeypatch, interactive=False)
-        waited = []
-        monkeypatch.setattr(pf, "_wait_for_keypress_with_timeout", lambda t: waited.append(t) or True)
+        assert not hasattr(pf, "_wait_for_keypress_with_timeout")
+        assert "timeout" not in str(inspect.signature(pf.enforce_gpu_requirement))
+
+    def test_end_of_input_means_nobody_answered(self, monkeypatch, capsys):
+        # Windows reports a piped stdin as a terminal; input() then hits EOF.
+        # That is "nobody can answer": abort and say how to answer in advance.
+        pf, _ = self._gate(monkeypatch, interactive=True)
+        monkeypatch.setattr(pf, "_ask", lambda prompt: None)
+        with pytest.raises(SystemExit) as ei:
+            pf.enforce_gpu_requirement(accept_cpu_mode=False)
+        assert ei.value.code == 1
+        out = capsys.readouterr().out
+        assert "input ended before you answered" in out and "--accept-cpu-mode" in out
+        assert "no console to ask on" not in out
+
+    def test_question_is_printed_in_a_box(self, monkeypatch, capsys):
+        pf, asked = self._gate(monkeypatch, interactive=True, answer="")
         with pytest.raises(SystemExit):
-            pf.enforce_gpu_requirement(accept_cpu_mode=False, timeout_seconds=30)
-        assert waited == []
+            pf.enforce_gpu_requirement(accept_cpu_mode=False)
+        out = capsys.readouterr().out
+        assert "╔" in out and "╚" in out and "YOUR ANSWER IS NEEDED" in out
+        assert out.index("YOUR ANSWER IS NEEDED") > out.index("compute capability 6.1")
 
     def test_accept_cpu_mode_answers_in_advance(self, monkeypatch):
         pf, asked = self._gate(monkeypatch, interactive=False)
         assert pf.enforce_gpu_requirement(accept_cpu_mode=True) is True
         assert asked == []
 
-    def test_supported_card_passes_silently(self, monkeypatch, capsys):
+    def _no_gpu(self, monkeypatch, interactive, answer=None):
+        # a machine with no GPU at all: CUDA absent, no MPS
         from whisperjav.utils import preflight_check as pf
+        monkeypatch.delenv(pf.CPU_ACCEPTED_ENV, raising=False)
+        cuda = types.SimpleNamespace(is_available=lambda: False)
+        backends = types.SimpleNamespace(mps=types.SimpleNamespace(is_available=lambda: False))
+        monkeypatch.setitem(sys.modules, "torch", types.SimpleNamespace(cuda=cuda, backends=backends))
+        monkeypatch.setattr(pf, "_stdin_is_interactive", lambda: interactive)
+        asked = []
+        monkeypatch.setattr(pf, "_ask", lambda prompt: (asked.append(prompt), answer or "")[1])
+        return pf, asked
+
+    def test_no_gpu_machine_is_asked_the_same_question(self, monkeypatch, capsys):
+        # owner, 2026-09-06 item 3: the no-GPU path asks too, in the same box
+        pf, asked = self._no_gpu(monkeypatch, interactive=True, answer="")
+        with pytest.raises(SystemExit) as ei:
+            pf.enforce_gpu_requirement(accept_cpu_mode=False)
+        assert ei.value.code == 1
+        assert asked == [pf.CPU_QUESTION]
+        out = capsys.readouterr().out
+        assert "No GPU found" in out and "YOUR ANSWER IS NEEDED" in out
+        assert "Aborted. Nothing was processed." in out
+        assert "Auto-continuing" not in out and "Press any key" not in out
+
+    def test_no_gpu_machine_yes_continues_and_is_remembered(self, monkeypatch, capsys):
+        import os
+        pf, asked = self._no_gpu(monkeypatch, interactive=True, answer="yes")
+        assert pf.enforce_gpu_requirement(accept_cpu_mode=False) is True
+        assert os.environ.get(pf.CPU_ACCEPTED_ENV) == "1"
+        assert "Continuing on the CPU" in capsys.readouterr().out
+
+    def test_no_gpu_machine_without_console_aborts_and_says_how(self, monkeypatch, capsys):
+        pf, asked = self._no_gpu(monkeypatch, interactive=False)
+        with pytest.raises(SystemExit) as ei:
+            pf.enforce_gpu_requirement(accept_cpu_mode=False)
+        assert ei.value.code == 1 and asked == []
+        out = capsys.readouterr().out
+        assert "--accept-cpu-mode" in out and "Accept CPU-only mode" in out
+
+    def test_no_gpu_machine_accept_cpu_mode_asks_nothing(self, monkeypatch, capsys):
+        pf, asked = self._no_gpu(monkeypatch, interactive=True)
+        assert pf.enforce_gpu_requirement(accept_cpu_mode=True) is True
+        assert asked == [] and "No GPU found" not in capsys.readouterr().out
+
+    def test_supported_card_passes_silently(self, monkeypatch, capsys):
+        import os
+        from whisperjav.utils import preflight_check as pf
+        assert pf.CPU_ACCEPTED_ENV not in os.environ   # must pass through the GPU branch, not the shortcut
         monkeypatch.setitem(sys.modules, "torch", _fake_torch((8, 6), CU128_LIST, "RTX 3060"))
         assert pf.enforce_gpu_requirement(accept_cpu_mode=False) is True
         assert capsys.readouterr().out == ""
+        assert pf.CPU_ACCEPTED_ENV not in os.environ

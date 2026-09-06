@@ -99,7 +99,7 @@ Files are processed sequentially. Each output SRT is saved next to its source vi
 
 ## CPU-Only Mode (No GPU)
 
-WhisperJAV works without a GPU, just slower.
+WhisperJAV works without a GPU, just slower. When no usable GPU is found, the start-up check stops and asks whether to continue on the CPU; the GUI cannot ask, so the box below is required (on the command line, `--accept-cpu-mode` or `--device cpu`).
 
 1. Go to the **Advanced** tab
 2. Check **"Accept CPU-only mode"**

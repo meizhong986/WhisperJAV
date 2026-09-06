@@ -326,7 +326,9 @@ def parse_arguments():
     parser.add_argument("--check", action="store_true", help="Run environment checks and exit")
     parser.add_argument("--check-verbose", action="store_true", help="Run verbose environment checks")
     parser.add_argument("--accept-cpu-mode", action="store_true",
-                       help="Accept CPU-only mode without GPU warning (skip GPU performance check)")
+                       help="Answer the start-up check in advance: when no usable GPU is found (none present, "
+                            "or the card is not supported by this PyTorch build) the run stops and asks "
+                            "whether to continue on the CPU; this flag says yes, so nothing is asked")
     parser.add_argument("--offline", action="store_true",
                        help="Use only the Hugging Face models already downloaded and make no "
                             "requests to huggingface.co (sets HF_HUB_OFFLINE=1 for this run and "
@@ -2067,8 +2069,10 @@ def main():
         run_preflight_checks(verbose=args.check_verbose)
         sys.exit(0)
 
-    # Enforce GPU requirement (CUDA/MPS) with optional bypass
-    enforce_gpu_requirement(accept_cpu_mode=args.accept_cpu_mode or args.device == "cpu")
+    # The start-up check (stop and ask when no usable GPU). --dump-params never
+    # transcribes, so it is not asked here either (it is in bypass_flags above).
+    if not args.dump_params:
+        enforce_gpu_requirement(accept_cpu_mode=args.accept_cpu_mode or args.device == "cpu")
 
     # Setup logging
     global logger

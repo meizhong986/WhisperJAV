@@ -21,8 +21,10 @@ you find out something went wrong.
   empty one.** One user with a GTX 1060 saw PyTorch warn that the card is not supported by
   the installed build, then watched a twenty-minute run produce no subtitles and report
   success. WhisperJAV now stops before doing anything, names the card, its compute
-  capability and the ones the build supports, and asks whether to continue on the CPU or
-  abort; it waits for your answer and never continues on its own. In the GUI, where the
+  capability and the ones the build supports, and asks, in a boxed prompt you cannot miss,
+  whether to continue on the CPU or abort; it waits for your answer and never continues on
+  its own. A machine with no GPU at all is asked the same question; the old thirty-second
+  countdown that then continued by itself is gone. In the GUI, where the
   worker cannot ask, the run aborts and tells you to tick *Accept CPU-only mode* if you
   want it to proceed on the CPU (the box now applies to Ensemble runs as well); on the
   command line, `--accept-cpu-mode` or an explicit `--device cpu` answers in advance, and
@@ -35,8 +37,10 @@ you find out something went wrong.
   CTranslate2, which has its own GPU kernels and for which WhisperJAV has carried a
   Pascal-specific setting since issue #123, so on a GTX 10-series card those pipelines may
   have been working on the GPU and now stop at this check unless you answer yes, after
-  which they run on the CPU. Machines with no GPU at all behave as before. (#411, #333;
-  probably #326)
+  which they run on the CPU. If you script WhisperJAV on a CPU-only machine, pass
+  `--accept-cpu-mode` (or `--device cpu`); without it the run now stops where it used to
+  continue after the countdown. `--dump-params` and the installer's own import check are
+  not asked. (#411, #333; probably #326)
 
 - **Subtitle lines that are only punctuation are removed on the ChronosJAV pipelines.**
   The Qwen3-ASR pass can emit a cue that is nothing but 「。」 for a stretch of sound

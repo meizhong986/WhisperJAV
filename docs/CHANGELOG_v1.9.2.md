@@ -20,7 +20,7 @@
 **Area:** `whisperjav/utils/device_detector.py` (`cuda_build_supports_device()`, `CUDA_UNUSABLE_REASON`,
 `_check_cuda_available`); `whisperjav/utils/preflight_check.py` (the unconditional gate
 `enforce_gpu_requirement` stops with the reason; `--check` reports a fatal FAIL); tests
-`tests/test_device_detector_arch.py` (new, 30); `tests/test_gui_run_summary.py` (+1: the box reaches the
+`tests/test_device_detector_arch.py` (new, 38); `tests/test_gui_run_summary.py` (+1: the box reaches the
 Ensemble builders).
 
 **Report (#411, GTX 1060 6 GB, sm_61, Windows installer v1.9.0; #333 is the same mechanism from its
@@ -56,8 +56,12 @@ recorded once; the adversary caught the repeat.)
   run whose stdin is not a terminal — it aborts and says how to answer: `--accept-cpu-mode`, or the GUI's "Accept CPU-only mode" box, both of which the gate
   already honoured at its top; an explicit `--device cpu` counts as the same answer. The GUI's box now
   reaches the Ensemble tab's builders too — the first version left that tab with no way to answer, caught by
-  the adversary. Machines with no GPU at all keep today's behaviour (warn, keypress or 30 s auto-continue);
-  whether that path should also ask is stated for the owner below.
+  the adversary. Machines with no GPU at all (no CUDA, no MPS) are asked the same question — owner,
+  2026-09-06 second round, item 3 — and the question is printed inside a double-ruled box on both paths so
+  it cannot be missed; the 30 s auto-continue, the "press any key" wait and their helper are gone. Where
+  nobody can answer, a boxed STOPPED message names `--accept-cpu-mode` and the GUI box instead; an
+  end-of-input on a piped stdin (which Windows reports as a terminal) reaches that same message rather
+  than counting as a silent "no".
 - `--check` reports the same fact as a fatal FAIL, so on such a card it now exits 1 where it exited 0. That
   follows from "fail there and then"; it is an exit-code change and is stated here for the owner.
 
@@ -66,25 +70,50 @@ worker (Balanced's recogniser worker, ensemble pass workers) re-runs `whisperjav
 "yes", `--accept-cpu-mode` or `--device cpu` sets `WHISPERJAV_CPU_ACCEPTED=1`, which the check honours and
 children inherit, so the question is asked once per run (the adversary found it asked twice in the parent
 and again in each worker, where an unanswered prompt would have hung the run). `bypass_flags` now also
-covers `--check-verbose` and `--dump-params`; the dead `-v` entry is gone.
+covers `--check-verbose` and `--dump-params`; the dead `-v` entry is gone. (`main()`'s own call of the check
+now also skips `--dump-params`; the adversary found the probe stopped there — see the second-round entry.)
 
-**For the owner — the check judges by a PyTorch-build fact, and CTranslate2 does not depend on it.** The
+**Owner decisions, 2026-09-06 second round (typed, items 1–5), all landed:** (1) the stop stays for every
+pipeline, the CTranslate2 ones included; no exemption, and `--device cuda` is not consent. (2) The GUI keeps
+abort-plus-instruction; no dialog. (3) No-GPU machines are asked too, and the question is boxed (above).
+(4) A lone 「?」/「!」 entry goes (#413). (5) The #413 follow-up was posted, 16:11 UTC. Consequence of (3),
+stated for the notes: a CPU-only machine run from a console is asked on every run until the user answers or
+passes `--accept-cpu-mode`; run from the GUI it aborts unless "Accept CPU-only mode" is ticked (the box is
+saved with the other GUI settings, so once); a script that used to proceed after 30 s on a CPU-only machine
+now needs `--accept-cpu-mode` or `--device cpu`.
+
+**Adversary pass on this round, seven findings adopted.** (a) `--dump-params` was in `bypass_flags` at the
+import-time gate but `main()` ran the check unconditionally, so the probe stopped on CPU-only machines —
+`main()` now skips the check for `--dump-params` (it never transcribes; verified by a real run with the GPU
+hidden). (b) The Windows installer's post-install verification imports `whisperjav.main` in a child process
+with no flags, which runs the check; on a CPU-only install that would now have blocked or exited 1 and printed
+a false "FAILED" — the template sets `WHISPERJAV_CPU_ACCEPTED=1` for that import check only (generated
+installer files are regenerated at release). (c) A piped run on Windows, where the null device reports itself
+as a terminal, printed the question and then "no console to ask on" — end-of-input now says "input ended
+before you answered", which is also the true message for a real Ctrl+Z / Ctrl+D. (d) The bypass line named
+`--accept-cpu-mode` even when the user passed `--device cpu` or ticked the box; reworded. (e) The consent
+variable leaked out of the test session and made `test_supported_card_passes_silently` vacuous; an autouse
+fixture clears it and the test asserts the GPU branch was taken. (f) The tracker still said "No-GPU machines
+unchanged"; corrected in the same sync. (g) The user docs (EN/ZH FAQ, GUI guide, workflows, Windows installation
+guide, CLI reference) presented the box as optional; they now say it is required on a CPU-only machine, and the
+CLI reference documented a non-existent `--cpu-only`, replaced by `--accept-cpu-mode`. **Stated, not changed
+(owner's call):** the Kaggle notebook (`notebook/WhisperJAV_kaggle_parallel_edition.ipynb`) and two developer
+suites (`tools/ensemble_failure_rate_suite.py`, `tools/vad_hypothesis_suite/configs.py`) launch
+`whisperjav.main` without consent; on a CPU-only session they now abort with the boxed instruction where they
+used to continue after 30 s.
+
+**Background to (1), kept for the record — the check judges by a PyTorch-build fact, and CTranslate2 does not depend on it.** The
 Balanced, Fast and Faster pipelines transcribe through CTranslate2, which ships its own CUDA kernels, and
 `resolver_v3.py:36-91,180` carries a deliberate Pascal path (float32 compute type, added for #123) whose
 log line appears in the #411 console. So those pipelines may have run on the GPU on a GTX 10-series card,
 and now stop at the check unless the user answers yes and continues on the CPU. Whether the PyTorch mismatch
 caused the #411 empty run is therefore a hypothesis, not established: the run used CTranslate2, and the
 discriminating measurement (the shipped faster-whisper wheel on an sm_61 card) cannot be made here. The
-stop itself is what the owner asked for; its scope across pipelines is his to confirm: keep it for every
-pipeline, or exempt the CTranslate2 pipelines, or treat an explicit `--device cuda` as consent to try the
-GPU.
+stop itself is what the owner asked for. Scope decided 2026-09-06 (item 1): keep it for every pipeline.
 
-**For the owner — the GUI does not ask; it aborts and says which box to tick.** The reporter's environment
-is the GUI, whose worker has no console. There the check aborts with the instruction rather than asking;
-asking would need a dialog in the GUI itself. Abort-plus-instruction was chosen as the simple form; a dialog
-is a separate decision.
-
-**Kept as it was:** the no-GPU path (no CUDA, no MPS) still warns and auto-continues after 30 s.
+**The GUI does not ask; it aborts and says which box to tick** (decided 2026-09-06, item 2). The reporter's
+environment is the GUI, whose worker has no console. There the check aborts with the boxed instruction rather
+than asking; a dialog in the GUI itself was offered and declined.
 
 **Known limitation, stated:** `--accept-cpu-mode` on such a card is a full CPU mode only for the modules
 that ask `get_best_device()` (faster-whisper, openai-whisper, stable-ts, kotoba, the resolver). The
@@ -96,13 +125,18 @@ the card (eleven files: `qwen_asr.py`, `generators/anime_whisper.py`, `generator
 a separate, mechanical follow-up; the stop at the check is what closes #411. Trade-off also stated: CTranslate2 (Balanced) has its own GPU kernels and may
 have used such a card; those users now stop at the gate too, and continue only on the CPU.
 
-**Verification (executed 2026-09-06):** `tests/test_device_detector_arch.py` 30 passed — the rule table
+**Verification (executed 2026-09-06):** `tests/test_device_detector_arch.py` 38 passed — the rule table
 for the cu128 wheel (sm_61 and sm_70 → False, sm_75/86/89/120 → True), PTX forward compatibility,
 suffixed names, unparseable lists; the detector with a stand-in torch ((6,1) → no GPU + reason, (8,6)
 unchanged); `--check` FAIL/PASS; **the real gate**: on a console the question is asked, "no" or Enter
 aborts with exit 1, "y" continues on the CPU; with no console it aborts and names `--accept-cpu-mode` and
-the GUI box; the 30 s keypress wait is never entered on this path; `--accept-cpu-mode` passes; (8,6)
-passes silently. `tests/test_preflight_cuda_version.py`
+the GUI box; the keypress-with-timeout helper no longer exists and the gate has no timeout parameter; the
+no-GPU path (stand-in torch with no CUDA and no MPS) asks the same question, "yes" continues and is
+remembered, no console aborts and says how, `--accept-cpu-mode` asks nothing; end-of-input reaches the
+STOPPED box; the box characters are in the output; `--accept-cpu-mode` passes; (8,6) passes silently.
+Real runs on this machine with the GPU hidden (`CUDA_VISIBLE_DEVICES=""`), stdin from the null device:
+the "No GPU found" block, the boxed STOPPED message, exit 1; with `--accept-cpu-mode` no box and the
+bypass line. `--help` lists the flag with its new text. `tests/test_preflight_cuda_version.py`
 unchanged. Real `--check` on the RTX 3060: PASS, exit 0. Not executed: the GUI on a machine with such a
 card — the child exits 1 and the console shows the block; the GUI reports the failed exit as it does for any
 failed run.

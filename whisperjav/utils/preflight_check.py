@@ -5,7 +5,6 @@ This module ensures the runtime environment meets all requirements,
 with special focus on CUDA availability and compatibility.
 """
 
-import time
 import sys
 import os
 import io
@@ -529,43 +528,6 @@ def run_preflight_checks(verbose: bool = False, exit_on_fail: bool = True) -> bo
     
     return success
 
-def _wait_for_keypress_with_timeout(timeout_seconds=30):
-    """
-    Cross-platform implementation to wait for any keypress with timeout.
-    Returns True if key was pressed, False if timeout occurred.
-    """
-    if sys.platform == 'win32':
-        # Windows implementation using msvcrt
-        try:
-            import msvcrt
-            start_time = time.time()
-            while (time.time() - start_time) < timeout_seconds:
-                if msvcrt.kbhit():
-                    msvcrt.getch()  # Consume the keypress
-                    return True
-                time.sleep(0.1)
-            return False
-        except ImportError:
-            # Fallback if msvcrt not available
-            time.sleep(timeout_seconds)
-            return False
-    else:
-        # Unix-like systems (Linux, macOS) using select
-        try:
-            import select
-            print("Press any key to continue immediately, or wait for auto-continue...")
-            # Use select to wait for stdin with timeout
-            rlist, _, _ = select.select([sys.stdin], [], [], timeout_seconds)
-            if rlist:
-                sys.stdin.readline()  # Consume the input
-                return True
-            return False
-        except (ImportError, OSError):
-            # Fallback if select not available or stdin not supported
-            time.sleep(timeout_seconds)
-            return False
-
-
 # Set once the user has answered "yes" (or passed consent on the command line), so the
 # question is asked once per run: the check runs at import time and again in main(),
 # and spawned worker processes re-run the module level of whisperjav.main.
@@ -599,29 +561,97 @@ def _stdin_is_interactive() -> bool:
         return False
 
 
-def _ask(prompt: str) -> str:
-    """Read one answer; EOF or an interrupt count as 'no'."""
+def _ask(prompt: str):
+    """Read one answer. None when there was nobody to answer (end of input on a
+    piped stdin, which Windows reports as a terminal); an interrupt is 'no'."""
     try:
         return input(prompt).strip().lower()
-    except (EOFError, KeyboardInterrupt):
+    except EOFError:
+        return None
+    except KeyboardInterrupt:
         return ""
 
 
-def enforce_gpu_requirement(accept_cpu_mode=False, timeout_seconds=30):
+BOX_WIDTH = 72
+CPU_QUESTION = "Continue on the CPU anyway? [y/N] "
+
+
+def _print_box(lines, colour):
+    """Print `lines` inside a double-ruled box so the question cannot be missed
+    (owner, 2026-09-06: "printed out in a very very visible manner")."""
+    inner = BOX_WIDTH - 2
+    print(f"{colour}╔{'═' * inner}╗")
+    print(f"║{' ' * inner}║")
+    for line in lines:
+        print(f"║  {line.ljust(inner - 2)}║")
+    print(f"║{' ' * inner}║")
+    print(f"╚{'═' * inner}╝{Style.RESET_ALL}")
+
+
+def _ask_to_continue_on_cpu(colour) -> bool:
+    """Stop and ask whether to proceed on the CPU or abort. Never decides alone,
+    never continues after a timeout. Returns True only on an explicit yes; a
+    "yes" is remembered for this run and its worker processes. Where nobody can
+    answer (the GUI's child process, a piped run) it aborts and says how to
+    answer in advance. Anything else exits with status 1."""
+    if _stdin_is_interactive():
+        _print_box([
+            "YOUR ANSWER IS NEEDED  -  nothing has been processed yet.",
+            "",
+            "Continue on the CPU anyway?  (much slower than a GPU)",
+            "",
+            "   type  y  then Enter   ->  continue on the CPU",
+            "   Enter, or  n          ->  abort",
+        ], colour)
+        answer = _ask(CPU_QUESTION)
+        if answer in ("y", "yes"):
+            os.environ[CPU_ACCEPTED_ENV] = "1"   # remembered for this run and its workers
+            print(f"\n{Fore.GREEN}✓ Continuing on the CPU (you confirmed).{Style.RESET_ALL}\n")
+            return True
+        if answer is not None:
+            print(f"\n{Fore.RED}Aborted. Nothing was processed.{Style.RESET_ALL}\n")
+            sys.exit(1)
+        print()
+        _print_box([
+            "NO ANSWER RECEIVED  -  input ended before you answered.",
+            "Nothing was processed.",
+            "",
+            "To continue on the CPU, run again with  --accept-cpu-mode",
+            "(in the GUI: tick 'Accept CPU-only mode', then Start again).",
+        ], Fore.RED)
+        print()
+        sys.exit(1)
+    _print_box([
+        "STOPPED  -  no console to ask on.  Nothing was processed.",
+        "",
+        "To continue on the CPU, run again with  --accept-cpu-mode",
+        "(in the GUI: tick 'Accept CPU-only mode', then Start again).",
+    ], Fore.RED)
+    print()
+    sys.exit(1)
+
+
+def enforce_gpu_requirement(accept_cpu_mode=False):
     """
-    Check for GPU (CUDA or MPS) availability with friendly warning and optional bypass.
+    The start-up check every run passes through. A usable GPU (CUDA or MPS)
+    passes silently. Otherwise the run STOPS and ASKS whether to proceed on the
+    CPU or abort (owner, 2026-09-06), both when no GPU is present and when one
+    is present but this PyTorch build has no kernels for it (#411).
 
     Args:
-        accept_cpu_mode: If True, skip the warning entirely (from --accept-cpu flag)
-        timeout_seconds: How long to wait for user acknowledgment (default: 30)
+        accept_cpu_mode: True when the command line already answered
+            (--accept-cpu-mode, --device cpu, or the GUI's "Accept CPU-only
+            mode" box): no question is asked.
 
     Returns:
-        bool: True if GPU is available or user accepted CPU mode, False otherwise
+        bool: True when a GPU is usable or the user chose the CPU; otherwise
+        the process exits with status 1 and nothing has been processed.
     """
     # Skip check entirely if user explicitly accepted CPU mode
     if accept_cpu_mode:
         if os.environ.get(CPU_ACCEPTED_ENV) != "1":
-            print(f"{Fore.YELLOW}ℹ GPU check bypassed via --accept-cpu-mode flag.{Style.RESET_ALL}")
+            print(f"{Fore.YELLOW}ℹ CPU mode accepted in advance (--accept-cpu-mode, --device cpu, or the "
+                  f"GUI's 'Accept CPU-only mode' box); the GPU check is skipped.{Style.RESET_ALL}")
         os.environ[CPU_ACCEPTED_ENV] = "1"
         return True
     if os.environ.get(CPU_ACCEPTED_ENV) == "1":
@@ -654,23 +684,12 @@ def enforce_gpu_requirement(accept_cpu_mode=False, timeout_seconds=30):
             print("  - Continue on the CPU instead (much slower; the ChronosJAV pipelines")
             print("    pick CUDA on their own and may still fail there).")
             print("\n  Run 'whisperjav --check' for detailed diagnostics\n")
-            if _stdin_is_interactive():
-                answer = _ask("Continue on the CPU anyway? [y/N] ")
-                if answer in ("y", "yes"):
-                    os.environ[CPU_ACCEPTED_ENV] = "1"   # remembered for this run and its workers
-                    print(f"\n{Fore.GREEN}✓ Continuing on the CPU (you confirmed).{Style.RESET_ALL}\n")
-                    return True
-                print(f"\n{Fore.RED}Aborted. Nothing was processed.{Style.RESET_ALL}")
-                print(f"{Fore.RED}{'='*70}{Style.RESET_ALL}\n")
-                sys.exit(1)
-            print(f"{Fore.RED}Aborted: no console to ask on. To continue on the CPU, run again "
-                  f"with --accept-cpu-mode (in the GUI, tick 'Accept CPU-only mode').{Style.RESET_ALL}")
-            print(f"{Fore.RED}{'='*70}{Style.RESET_ALL}\n")
-            sys.exit(1)
+            return _ask_to_continue_on_cpu(Fore.RED)
 
-        # No GPU detected - show friendly warning
+        # No GPU at all (no CUDA, no MPS): explain, then the same question
+        # (owner, 2026-09-06: this path asks too; the 30 s auto-continue is gone).
         print(f"\n{Fore.YELLOW}{'='*70}{Style.RESET_ALL}")
-        print(f"{Fore.YELLOW}⚠  GPU Performance Warning{Style.RESET_ALL}")
+        print(f"{Fore.YELLOW}⚠  No GPU found{Style.RESET_ALL}")
         print(f"{Fore.YELLOW}{'='*70}{Style.RESET_ALL}\n")
 
         print("WhisperJAV works best with GPU acceleration.")
@@ -708,22 +727,7 @@ def enforce_gpu_requirement(accept_cpu_mode=False, timeout_seconds=30):
             print("     See https://pytorch.org/get-started/locally/ for ROCm installation")
 
         print("\n  Run 'whisperjav --check' for detailed diagnostics\n")
-
-        print(f"{Fore.YELLOW}You can continue with CPU-only mode, but expect slower performance.{Style.RESET_ALL}\n")
-
-        print(f"{Fore.GREEN}Press any key to continue with CPU mode...{Style.RESET_ALL}")
-        print(f"(Auto-continuing in {timeout_seconds} seconds, or use --accept-cpu-mode to skip this warning)")
-        print(f"{Fore.YELLOW}{'='*70}{Style.RESET_ALL}\n")
-
-        # Wait for keypress or timeout
-        key_pressed = _wait_for_keypress_with_timeout(timeout_seconds)
-
-        if key_pressed:
-            print(f"\n{Fore.GREEN}✓ Continuing with CPU mode (user confirmed)...{Style.RESET_ALL}\n")
-        else:
-            print(f"\n{Fore.GREEN}✓ Auto-continuing with CPU mode after timeout...{Style.RESET_ALL}\n")
-
-        return True
+        return _ask_to_continue_on_cpu(Fore.YELLOW)
 
     except ImportError:
         # PyTorch not installed - this is a critical error

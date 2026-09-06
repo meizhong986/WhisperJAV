@@ -44,7 +44,7 @@ whisperjav [OPTIONS] INPUT [INPUT...]
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--cpu-only` | Off | Force CPU mode (no GPU) |
+| `--accept-cpu-mode` | Off | Continue on the CPU when no usable GPU is found. Without it, the start-up check stops and asks (and aborts where nobody can answer). `--device cpu` counts as the same answer. |
 | `--async` | Off | Enable async processing |
 | `--temp-dir` | System temp | Custom directory for temporary files |
 | `--keep-temp` | Off | Keep intermediate files |

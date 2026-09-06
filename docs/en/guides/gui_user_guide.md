@@ -152,7 +152,7 @@ The **Advanced** tab (Tab 2) provides additional controls for troubleshooting an
 | **Debug logging** | Off | Writes detailed debug logs to `whisperjav.log` |
 | **Keep temp files** | Off | Preserves intermediate audio chunks and processing artifacts |
 | **Custom temp dir** | System default | When "Keep temp files" is on, optionally choose where to store them |
-| **Accept CPU-only mode** | Off | Allows running without CUDA GPU (much slower, but works) |
+| **Accept CPU-only mode** | Off | Required on a machine without a usable GPU: the start-up check stops and asks whether to continue on the CPU, and the GUI cannot ask, so without this box such a run aborts. Much slower. |
 
 ---
 
@@ -495,6 +495,6 @@ Accessible from the **Translation Settings** button in the Ensemble tab's AI-tra
 ### CPU-Only Mode (No GPU)
 
 1. Go to **Advanced** tab
-2. Check **"Accept CPU-only mode"**
+2. Check **"Accept CPU-only mode"** (required: without it a run on a machine with no usable GPU stops at the start-up check and aborts, telling you to tick this box)
 3. Use **Faster** mode for best speed without GPU
 4. Processing will be significantly slower but functional

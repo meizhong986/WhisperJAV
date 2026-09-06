@@ -1463,9 +1463,14 @@ def run_post_install_verification() -> Tuple[int, int, list]:
     # Test the main entry point import
     python_exe = os.path.join(sys.prefix, 'python.exe')
     try:
+        # Importing whisperjav.main runs its start-up GPU check, which on a machine
+        # without a usable GPU stops and asks (v1.9.2). This is an import check, not
+        # a run, so answer for it; otherwise a CPU-only install would report a failure.
+        import_env = dict(os.environ, WHISPERJAV_CPU_ACCEPTED="1")
         result = subprocess.run(
             [python_exe, "-c", "from whisperjav.main import main; print('OK')"],
-            capture_output=True, text=True, timeout=120  # First import loads torch, whisper — slow on cold cache
+            capture_output=True, text=True, timeout=120,  # First import loads torch, whisper — slow on cold cache
+            env=import_env,
         )
         if result.returncode == 0:
             log("  ✓ from whisperjav.main import main: OK")
