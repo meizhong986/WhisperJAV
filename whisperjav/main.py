@@ -15,6 +15,16 @@ if (
     relaunch_for_utf8('whisperjav.main')
 
 # ===========================================================================
+# OFFLINE MODE (#415) — huggingface_hub reads HF_HUB_OFFLINE when it is
+# imported, so the flag must act here, before the pipeline imports below pull
+# the hub library in. Raw argv scan: argparse has not run yet.
+# ===========================================================================
+from whisperjav.utils.offline_mode import offline_requested as _offline_requested
+if _offline_requested(_sys.argv[1:]):
+    from whisperjav.utils.offline_mode import enable_offline_mode
+    enable_offline_mode()
+
+# ===========================================================================
 # EARLY WARNING SUPPRESSION - Must be before any library imports
 # ===========================================================================
 # Suppress noisy library warnings that don't affect functionality
@@ -91,6 +101,7 @@ from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 from whisperjav.pipelines.kotoba_faster_whisper_pipeline import KotobaFasterWhisperPipeline
 from whisperjav.config.legacy import resolve_legacy_pipeline, resolve_ensemble_config, apply_balanced_vad_defaults
 from whisperjav.utils.model_refresh import DEFAULT_MODEL_REFRESH_AUDIO_MINUTES
+from whisperjav.utils.offline_mode import is_offline
 from whisperjav.config.segmenter_presets import (
     BALANCED_DEFAULT_SEGMENTER,
     BALANCED_SINGLE_PASS_EXTERNAL,
@@ -316,6 +327,13 @@ def parse_arguments():
     parser.add_argument("--check-verbose", action="store_true", help="Run verbose environment checks")
     parser.add_argument("--accept-cpu-mode", action="store_true",
                        help="Accept CPU-only mode without GPU warning (skip GPU performance check)")
+    parser.add_argument("--offline", action="store_true",
+                       help="Use only the Hugging Face models already downloaded and make no "
+                            "requests to huggingface.co (sets HF_HUB_OFFLINE=1 for this run and "
+                            "its worker processes). A model that is not in the local cache fails "
+                            "immediately instead of retrying for minutes. Does not cover Silero "
+                            "via torch.hub, openai-whisper weights, ModelScope enhancers or NeMo "
+                            "configs, which have their own download paths.")
 
     # Hardware configuration (device and compute type override)
     hardware_group = parser.add_argument_group("Hardware Configuration")
@@ -2120,6 +2138,12 @@ def main():
         logger.debug(f"Task derived from --subs-language='{args.subs_language}' -> task='{task}'")
 
     # Log task determination for debugging translation issues
+    if is_offline():
+        logger.info("Offline mode: using downloaded Hugging Face models only; no requests to "
+                    "huggingface.co (HF_HUB_OFFLINE=1). A model that was never downloaded will fail at once.")
+    elif getattr(args, 'offline', False):
+        logger.warning("--offline was parsed but offline mode is not active in this process; "
+                       "the flag must appear on the command line as --offline.")
     logger.info(f"ASR task: {task}" + (" (translating to English)" if task == 'translate' else " (transcribing in source language)"))
     if task == 'translate':
         logger.info("Translation mode: Output subtitles will be in English")
@@ -2540,7 +2564,14 @@ def main():
             "subs_language": args.subs_language,
             "language_code": language_code,
             "resolved_config": dump_resolved,
+            "offline_mode": is_offline(),
+            # True only if HF_HUB_OFFLINE was set BEFORE huggingface_hub was imported
+            "hub_constant_offline": bool(
+                "huggingface_hub" in sys.modules
+                and getattr(sys.modules["huggingface_hub"].constants, "HF_HUB_OFFLINE", False)
+            ),
             "cli_args": {
+                "offline": bool(getattr(args, "offline", False)),
                 "model": args.model,
                 "ensemble": args.ensemble,
                 "asr": getattr(args, 'asr', None),

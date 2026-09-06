@@ -15,6 +15,127 @@
 
 ---
 
+## 2026-09-06 — #415: cached Hugging Face models load without a hub round-trip; `--offline` / "Offline mode"
+
+**Area:** new `whisperjav/utils/offline_mode.py`; `whisperjav/main.py` (raw-argv scan before the
+pipeline imports, `--offline`, start-up INFO line, `--dump-params` fields `offline_mode` and
+`cli_args.offline`); `whisperjav/cli.py` (same scan before `patch_hf_hub_downloads`);
+`whisperjav/utils/model_loader.py` (pass-through under `HF_HUB_OFFLINE`);
+`whisperjav/modules/speech_segmentation/backends/whisperseg.py` and
+`whisperjav/modules/subtitle_pipeline/generators/anime_whisper.py` (cache-first loads); GUI
+`index.html` (checkbox `offlineMode`, Advanced options row 3), `app.js` (both collectors,
+`SettingsPersistence.FIELDS`), `api.py` (four live `--offline` emission sites plus the dead `_build_ensemble_args`, `_GUI_SETTINGS_MAP`);
+`whisperjav/settings/gui_settings.py` (`offline_mode: False`); tests `tests/test_offline_mode.py` (new,
+14) and `tests/test_gui_settings.py` (count 36, drift list, S20).
+
+**Report (weifu8435, #415, v1.9.0, VPN off, pass-2 model `Qwen/Qwen3-ASR-0.6B`):** the reporter says
+pass 1 produced subtitles after long hub retries and that pass 2 "was skipped for the same reason"; he
+asked for an offline switch. His log (286 lines, read in full) covers pass 1 up to the anime-whisper load
+and **ends mid-retry**; it does not contain pass 2, so the pass-2 mechanism below comes from my
+reproduction, not from his log. Screenshot read.
+
+**Mechanism, established by code read and by reproduction on the 15 s test clip with the hub endpoint
+pointed at an unreachable address (`HF_ENDPOINT=http://127.0.0.1:9`):**
+- Every transformers `from_pretrained` performs a per-file freshness check against huggingface.co.
+  With the host unreachable, huggingface_hub retries each file five times with 1/2/4/8/8 s backoff
+  (`huggingface_hub/utils/_http.py`, 10 s connect timeout each), then serves cached files from the
+  local cache. WhisperSeg's `WhisperFeatureExtractor.from_pretrained("openai/whisper-base")` runs
+  twice per pass (Phase 4 and framing); in the reproduction anime-whisper's processor and model probed
+  nine distinct files. Reporter's log: two WhisperSeg loads of ~4.8 min each (11:40:49→11:45:38,
+  11:46:44→11:51:31), then the anime-whisper retries begin and the log ends. Reproduction (run A, before
+  the change, no flag, on `1to6arabic_16000_mono_bc_noise.wav`, 18.8 s audio): pass 1 alone 567 s, 75
+  retry lines; the run was stopped after pass 2 failed. **Run A is on a different clip from runs B–D**,
+  so the before/after below is directional; the mechanism (per-file retries) does not depend on the clip.
+- Pass 2 fails outright, not slowly: `qwen_asr`'s `Qwen3ASRModel.from_pretrained` calls
+  `AutoProcessor.from_pretrained(..., fix_mistral_regex=True)`; transformers 4.57.6's
+  `_patch_mistral_regex` then calls `huggingface_hub.model_info()` — a live API request with no cache
+  fallback — unless `is_offline_mode()` is true (`transformers/tokenization_utils_base.py:2409-2437`).
+  Reproduction: `requests.exceptions.ConnectionError … /api/models/Qwen/Qwen3-ASR-1.7B`; the run ends
+  `suspect` with pass 1's output. Established here, not in the reporter's log; it is the most likely
+  reading of his "pass 2 was skipped".
+- The `[HF Download] Step 2 FAILED — 'openai/whisper-base' not found in local cache` block in the
+  reporter's log is the resilience wrapper (#204) reporting on `processor_config.json`, a file that
+  does not exist in that repo (mirror 404); `preprocessor_config.json` was served from the cache. Noise,
+  not a missing model.
+- `HF_HUB_OFFLINE=1` already removed all of this with no code change (adversary finding, verified:
+  cached `preprocessor_config.json` resolved in 0.00 s with the hub unreachable). The switch is standard
+  huggingface_hub behaviour read at import time (`huggingface_hub/constants.py:165`); transformers
+  honours it (`transformers/utils/hub.py:81,420`).
+
+**What changed**
+1. **Cache-first loading (no flag):** `load_cached_first()` calls `from_pretrained` with
+   `local_files_only=True` first and falls back to a normal load only on a cache miss (`OSError`; any
+   other failure such as corrupt weights propagates from the first attempt, not re-run online). Applied to
+   WhisperSeg's feature extractor and anime-whisper's processor and model — the loaders on the reporter's
+   pass 1. A downloaded model therefore never waits on huggingface.co again. **Side effect, disclosed in
+   the notes and yours to keep or drop:** those two loaders are pinned to the cached copy and will not
+   pick up an upstream re-upload of the same model id on their own (harmless for whisper-base's
+   preprocessor config; a silent version pin for anime-whisper weights). The owner told the reporter on
+   the thread that this change was being made. Under offline mode a miss raises an `OSError` naming the
+   model and the cache directory (chained to the hub's own error).
+2. **`--offline` (CLI) and "Offline mode (downloaded Hugging Face models only)" (GUI Advanced options,
+   both tabs' runs), off by default.** Sets `HF_HUB_OFFLINE=1` from a raw `sys.argv` scan at the top of
+   `main.py` and `cli.py`, before any import that pulls huggingface_hub in (the pipeline imports at
+   `main.py:~95`; `cli.py`'s `patch_hf_hub_downloads`). Ensemble pass workers and the Balanced
+   recogniser worker are spawned with the parent's environment and inherit it. One INFO line announces
+   it. This is what makes pass 2 (external `qwen_asr` loader) work offline, and what makes a missing
+   model fail at once instead of retrying.
+3. Under offline mode the resilience wrapper passes straight through (its cache/mirror steps could only
+   add noise); the hub's own exception classes are preserved (transformers tolerates
+   `LocalEntryNotFoundError` for optional files — changing the class would break WhisperSeg). "Offline"
+   has one definition everywhere: `HF_HUB_OFFLINE` or `TRANSFORMERS_OFFLINE` truthy, exactly what
+   huggingface_hub reads; no WhisperJAV-private variable. `--dump-params` reports `offline_mode` and
+   `hub_constant_offline` (the hub's import-time constant — true only if the scan ran before the import).
+4. Scope stated in the flag help, the checkbox tooltip and the release notes: loads that go through
+   huggingface_hub. Silero via torch.hub (#263), openai-whisper weights, ModelScope enhancers and NeMo
+   configs have their own download paths and are not covered. The GUI's own update check is not affected
+   (it runs in the GUI process). The hallucination-list Gist is already cache-first (the reporter's log
+   shows "filter list: cache").
+
+**Verification (executed 2026-09-06, hub unreachable via `HF_ENDPOINT=http://127.0.0.1:9`; runs B–D on
+`015sec_test-966-00_01_45-00_01_59.wav`, 14 s audio; the reporter's pass configuration except that the
+cached `Qwen/Qwen3-ASR-1.7B` stands in for his `0.6B`, which is not cached here; times are the logs'
+own "Ensemble summary" figures):**
+- Run A (before the change, no flag, different clip — see above): pass 1 567 s, 75 retry lines; pass 2
+  failed at `model_info`.
+- Run C (`--offline`): **both passes done, 60.4 s, 0 retries**, RUN SUMMARY `done 1`.
+- Run D (`--offline`, pass-2 model `Qwen/Qwen3-ASR-0.6B`, never downloaded): pass 1 done, pass 2 failed
+  **at once** (0 retries); the hub's `LocalEntryNotFoundError: … outgoing traffic has been disabled` is
+  the chained cause, transformers' `OSError: We couldn't connect …` is the top-level message (the
+  external loader is not wrapped, so the WhisperJAV-worded message applies to WhisperSeg and
+  anime-whisper only); 52.0 s; RUN SUMMARY `suspect 1` with pass 1's output kept.
+- Run B (after the change, no flag): pass 1 done in 19.8 s with **0 retries** (run A's pass 1 on its
+  clip: 567 s / 75 retries), so cache-first loading alone removes the pass 1 stall; pass 2 still retries
+  six files five times each (100 retry lines) and fails at `model_info` as before, because that call is
+  inside the external `qwen_asr` loader — offline mode is the fix for that pass; 415.6 s; RUN SUMMARY
+  `suspect 1`, pass 1's output kept. **This is the default configuration: without the checkbox, the
+  Qwen3 pass still fails when the hub is unreachable.**
+- `python -m whisperjav.main --help | grep -- --offline` shows the flag; `--offline --help` exits 0;
+  `--offline --dump-params` and `--offl --dump-params` (argparse abbreviation) both report
+  `offline_mode: true` and `hub_constant_offline: true` and print the INFO line; without the flag both
+  are false.
+- `pytest tests/test_offline_mode.py tests/test_gui_settings.py`: 71 passed (14 + 57, re-measured after
+  the last edit). `py_compile` on every touched file; `node --check app.js`.
+- GUI not rendered here. Call-chain verifier: every hop PASS on both tabs (checkbox → both collectors →
+  four live builders → `--offline` → env set before the first hub import, proven with an import-order
+  probe → spawn children inherit, proven); it found the argparse-abbreviation gap (`--offl` parsed but
+  the exact-match scan missed it), fixed here with a prefix-aware scan and a test. Implementation
+  adversary: 11 findings, all folded in (headline, provenance, counts, `except OSError`, one offline
+  definition, the dump constant, the version-pin disclosure).
+
+**Owner decisions embedded, flagged for confirmation:** a new flag and checkbox exist (user-visible);
+default **off** (the reporter's own suggestion, chosen because a first-run user needs downloads);
+the name `--offline` (the word also appears in translation and WhisperSeg-decoder vocabulary);
+Hugging Face-only scope. Each is a one-line change if you decide otherwise.
+
+**Prior record:** the resilience wrapper and its mirror advice are #204's decided work, unchanged in
+substance. #263 (Silero via torch.hub in China) is the same user problem on a different download
+path and is not fixed here.
+
+**Not done:** WhisperSeg still loads its feature extractor twice per pass (Phase 4 and framing) — an
+inefficiency independent of networking; cohere generator not switched to cache-first (not on the
+reporter's path); no connectivity auto-detection (owner decision, not proposed).
+
 ## 2026-09-05 — research: `clustering_threshold` is not a scene-granularity lever (docs only)
 
 **Area:** new `docs/research/semantic_scene_premise/` (README, `semantic_lever_study.py`,

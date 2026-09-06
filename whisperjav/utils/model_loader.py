@@ -91,6 +91,15 @@ def _get_cache_dir():
         return "(unknown)"
 
 
+def _hub_offline() -> bool:
+    """True when huggingface_hub is in offline mode (HF_HUB_OFFLINE, however set)."""
+    try:
+        from huggingface_hub import constants
+        return bool(constants.HF_HUB_OFFLINE)
+    except Exception:
+        return False
+
+
 def _make_resilient_wrapper(original_fn, fn_name):
     """Create a resilient wrapper for a HuggingFace Hub download function.
 
@@ -103,8 +112,11 @@ def _make_resilient_wrapper(original_fn, fn_name):
     """
 
     def _resilient_wrapper(*args, **kwargs):
-        # If already requesting local-only, don't wrap
-        if kwargs.get("local_files_only"):
+        # If already requesting local-only, don't wrap. Same under offline mode
+        # (#415): the hub session refuses every request before a socket is
+        # opened, so the cache/mirror steps below could only add noise; let the
+        # original raise its own exception classes, which transformers tolerates.
+        if kwargs.get("local_files_only") or _hub_offline():
             return original_fn(*args, **kwargs)
 
         try:

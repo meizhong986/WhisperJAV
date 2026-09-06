@@ -194,6 +194,10 @@ class WhisperJAVAPI:
         if options.get('asr_telemetry', True) is False:
             args += ["--no-asr-telemetry"]
 
+        # #415: downloaded Hugging Face models only (HF_HUB_OFFLINE=1 in the child and its workers).
+        if options.get('offline_mode', False):
+            args += ["--offline"]
+
         # v1.9.2 (CFF1): recogniser refresh budget in minutes of scene audio (0 = never).
         _mr = options.get('model_refresh_audio_minutes')
         if _mr not in (None, ''):
@@ -320,6 +324,10 @@ class WhisperJAVAPI:
         if options.get('asr_telemetry', True) is False:
             args += ["--no-asr-telemetry"]
 
+        # #415: downloaded Hugging Face models only (HF_HUB_OFFLINE=1 in the child and its workers).
+        if options.get('offline_mode', False):
+            args += ["--offline"]
+
         if options.get('debug', False):
             args += ["--debug"]
 
@@ -376,6 +384,10 @@ class WhisperJAVAPI:
         # Per-scene ASR telemetry is on by default; the checkbox only opts out.
         if options.get('asr_telemetry', True) is False:
             args += ["--no-asr-telemetry"]
+
+        # #415: downloaded Hugging Face models only (HF_HUB_OFFLINE=1 in the child and its workers).
+        if options.get('offline_mode', False):
+            args += ["--offline"]
 
         # Common arguments
         temp_dir = options.get('temp_dir', '').strip()
@@ -1891,6 +1903,10 @@ class WhisperJAVAPI:
         if options.get('asr_telemetry', True) is False:
             args += ["--no-asr-telemetry"]
 
+        # #415: downloaded Hugging Face models only (HF_HUB_OFFLINE=1 in the child and its workers).
+        if options.get('offline_mode', False):
+            args += ["--offline"]
+
         # v1.9.2 (CFF1): recogniser refresh budget in minutes of scene audio (0 = never).
         _mr = options.get('model_refresh_audio_minutes')
         if _mr not in (None, ''):
@@ -3159,6 +3175,10 @@ class WhisperJAVAPI:
         if config.get('asr_telemetry', True) is False:
             args += ["--no-asr-telemetry"]
 
+        # #415: downloaded Hugging Face models only (HF_HUB_OFFLINE=1 in the child and its workers).
+        if config.get('offline_mode', False):
+            args += ["--offline"]
+
         # v1.9.2 (CFF1): recogniser refresh budget in minutes of scene audio (0 = never).
         _mr = config.get('model_refresh_audio_minutes')
         if _mr not in (None, ''):
@@ -3650,6 +3670,7 @@ class WhisperJAVAPI:
         "model_refresh_audio_minutes": "modelRefreshAudioMinutes",
         "temp_dir":                  "tempDir",
         "accept_cpu_mode":           "acceptCpuMode",
+        "offline_mode":              "offlineMode",
         "async_processing":          "asyncProcessing",
         "pass1_pipeline":            "pass1Pipeline",
         "pass1_sensitivity":         "pass1Sensitivity",

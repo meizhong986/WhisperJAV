@@ -146,6 +146,7 @@ class TestS01FirstLaunch:
             "keep_temp": False,
             "temp_dir": "",
             "accept_cpu_mode": False,
+            "offline_mode": False,
             "async_processing": False,
             "pass1_pipeline": "anime-whisper",
             "pass1_sensitivity": "aggressive",
@@ -534,6 +535,7 @@ class TestS20BooleanRoundtrip:
         ("debug_logging", True),
         ("keep_temp", True),
         ("accept_cpu_mode", True),
+        ("offline_mode", True),
         ("async_processing", True),
         ("pass2_enabled", True),
         ("pass2_enabled", False),
@@ -900,10 +902,10 @@ class TestCompleteness:
         data_keys = {
             k for k in DEFAULT_GUI_SETTINGS if k not in ("version", "_comment")
         }
-        # 19 Tab 1 keys + 14 Tab 3 keys + 2 preset keys = 35
+        # 20 Tab 1 keys + 14 Tab 3 keys + 2 preset keys = 36
         # (v1.9.0: +skip_existing, +remember_settings;
         #  v1.9.2: +fail_on_empty, +fail_on_suspect, +asr_telemetry,
-        #          +model_refresh_audio_minutes)
-        assert len(data_keys) == 35, (
-            f"Expected 35 settings keys, got {len(data_keys)}: {data_keys}"
+        #          +model_refresh_audio_minutes, +offline_mode (#415))
+        assert len(data_keys) == 36, (
+            f"Expected 36 settings keys, got {len(data_keys)}: {data_keys}"
         )

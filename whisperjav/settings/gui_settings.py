@@ -54,6 +54,7 @@ DEFAULT_GUI_SETTINGS = {
     "model_refresh_audio_minutes": 20,
     "temp_dir": "",
     "accept_cpu_mode": False,
+    "offline_mode": False,
     "async_processing": False,
 
     # Tab 3 — Ensemble  (values MUST match index.html `selected` attrs)

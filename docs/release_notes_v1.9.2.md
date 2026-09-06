@@ -17,6 +17,17 @@ you find out something went wrong.
 
 ### Runs that crashed or aborted
 
+- **Downloaded models no longer wait on huggingface.co.** Every model load used to check
+  huggingface.co for a newer version first. With the site unreachable (no VPN, a blocked
+  network), each file was retried five times before the cached copy was used: in one user's
+  log the WhisperSeg speech segmenter alone cost about ten minutes per run. WhisperSeg and
+  anime-whisper now load from the local cache first and contact the site only when a file
+  is genuinely missing. The trade-off: once a model is downloaded, these two loaders keep
+  that copy and will not pick up a later re-upload of the same model name on their own.
+  The Qwen3-ASR pass is a separate case: its loader makes one online query that has no
+  cached fallback, so with the site unreachable that pass still fails unless you switch on
+  *Offline mode* (below), which is what makes it work. (#415)
+
 - **Files on cloud-mounted drives no longer abort the run.** A video on a
   CloudDrive2-mapped drive would fail immediately with
   `OSError: [WinError 1005]`, before any processing started, even though the same
@@ -123,6 +134,21 @@ you find out something went wrong.
   matches the backend default instead of contradicting it. (#325, #382)
 
 With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
+
+### Convenience, continued
+
+- **Offline mode.** A new checkbox in the Transcription tab's Advanced options, *Offline
+  mode (downloaded Hugging Face models only)*, and the matching `--offline` flag, tell the
+  Hugging Face libraries to use only models that are already downloaded and to make no
+  requests to huggingface.co at all. It applies to Transcription and Ensemble runs and to
+  their worker processes. A model that was never downloaded then fails immediately instead
+  of retrying for minutes; for WhisperSeg and anime-whisper the message names the model and
+  the cache folder, for other models it is the Hugging Face library's own message, which
+  still mentions the connection. It is off by default, so a first run can still download
+  what it needs. Under the hood it sets `HF_HUB_OFFLINE=1`, which you can
+  also set yourself as an environment variable if you prefer. Not covered, because they
+  download through other channels: Silero via torch.hub, openai-whisper weights (Fidelity),
+  ModelScope speech enhancers and NeMo configs. (#415)
 
 ### Tools
 
@@ -378,6 +404,9 @@ Not user-visible, but worth recording:
 
 ## Known limitations
 
+- **Offline mode covers Hugging Face downloads only.** Silero (torch.hub, see #263),
+  openai-whisper weights, ModelScope enhancers and NeMo configs still reach their own
+  servers when a model is missing. Models must have been downloaded once while online.
 - **`--async-processing` with Balanced mode, more than one file, and model refresh
   switched off (`--model-refresh-audio-minutes 0`) ends the process without a
   summary.** In that configuration the second file's recognizer initialising after
@@ -397,6 +426,7 @@ Not user-visible, but worth recording:
 
 | Date | Change |
 |------|--------|
+| 2026-09-06 | Cached Hugging Face models load without a hub round-trip (WhisperSeg, anime-whisper); `--offline` flag and GUI "Offline mode" checkbox set `HF_HUB_OFFLINE=1` for the run and its workers, off by default; a missing model fails at once (#415) |
 | 2026-09-05 | `tools/scene_inspector.py` added: scene-detector statistics, per-scene screenshots and contact sheet, loudness and speech ratio, SRT overlay, chapters, multi-detector comparison, `--sensitivity` / `--scene-threshold` presets (`tools/scene_inspector.md`) |
 | 2026-09-05 | Research notes on the semantic scene detector's threshold (not a granularity lever; slider kept, detector revision scheduled for 2.x) |
 | 2026-09-05 | Recognizer refreshed after 20 minutes of scene audio (`--model-refresh-audio-minutes`, GUI field): Balanced hosts its CTranslate2 model in a worker process and replaces it, Fidelity reloads in place; telemetry gains `model_epoch`; async + Balanced + several files now completes with refresh on |

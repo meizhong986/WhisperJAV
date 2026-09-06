@@ -721,6 +721,8 @@ const FormManager = {
             model_refresh_audio_minutes: document.getElementById('modelRefreshAudioMinutes').value,
             temp_dir: document.getElementById('tempDir').value.trim(),
             accept_cpu_mode: document.getElementById('acceptCpuMode').checked,
+            // #415: downloaded Hugging Face models only (--offline)
+            offline_mode: document.getElementById('offlineMode').checked,
             output_format: document.getElementById('outputFormat').value,
         };
 
@@ -5446,6 +5448,8 @@ const EnsembleManager = {
             fail_on_empty: document.getElementById('failOnEmpty').checked,
             fail_on_suspect: document.getElementById('failOnSuspect').checked,
             asr_telemetry: document.getElementById('asrTelemetry').checked,
+            // #415: shared Advanced-options checkbox (Transcription tab), like asrTelemetry
+            offline_mode: document.getElementById('offlineMode').checked,
             // v1.9.2 (CFF1): shared Advanced-options field (Transcription tab), like source-language
             model_refresh_audio_minutes: document.getElementById('modelRefreshAudioMinutes').value,
             temp_dir: document.getElementById('tempDir').value.trim(),
@@ -7838,6 +7842,7 @@ const SettingsPersistence = {
         'keepTemp':         { key: 'keepTemp',       prop: 'checked' },
         'skipExisting':     { key: 'skipExisting',   prop: 'checked' },
         'acceptCpuMode':    { key: 'acceptCpuMode',  prop: 'checked' },
+        'offlineMode':      { key: 'offlineMode',    prop: 'checked' },
         'failOnEmpty':      { key: 'failOnEmpty',    prop: 'checked' },
         'failOnSuspect':    { key: 'failOnSuspect',  prop: 'checked' },
         'asrTelemetry':     { key: 'asrTelemetry',   prop: 'checked' },

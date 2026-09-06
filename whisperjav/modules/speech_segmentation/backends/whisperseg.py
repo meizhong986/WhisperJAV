@@ -415,12 +415,16 @@ class WhisperSegSpeechSegmenter:
             self._input_name = self._session.get_inputs()[0].name
             self._output_names = [o.name for o in self._session.get_outputs()]
 
-            # Feature extractor (downloads preprocessor config from HF on first use)
+            # Feature extractor: local cache first, hub only when a file is
+            # missing (#415 — a per-load hub check cost minutes when
+            # huggingface.co was unreachable). Downloads on first use.
+            from whisperjav.utils.offline_mode import load_cached_first
             try:
-                self._feature_extractor = WhisperFeatureExtractor.from_pretrained(
+                self._feature_extractor = load_cached_first(
+                    WhisperFeatureExtractor,
                     self._metadata.get(
                         "whisper_model_name", _WHISPER_BASE_MODEL_ID
-                    )
+                    ),
                 )
             except Exception as e:
                 raise ImportError(

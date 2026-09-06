@@ -399,6 +399,12 @@
                                         <span>Accept CPU-only mode (skip GPU warning)</span>
                                     </label>
                                 </div>
+                                <div class="form-group">
+                                    <label class="checkbox-label" title="Use only the Hugging Face models already downloaded and make no requests to huggingface.co (same as --offline). A model that has not been downloaded fails immediately instead of retrying for minutes. Silero via torch.hub, openai-whisper weights, ModelScope enhancers and NeMo configs are not covered.">
+                                        <input type="checkbox" id="offlineMode">
+                                        <span>Offline mode (downloaded Hugging Face models only)</span>
+                                    </label>
+                                </div>
                             </div>
                             <!-- Run outcome contract: every file ends as done / empty / suspect / failed / skipped.
                                  Only 'failed' fails the run by default; these promote the other two. Same as --fail-on. -->
