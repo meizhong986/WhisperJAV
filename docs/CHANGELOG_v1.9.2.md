@@ -20,7 +20,7 @@
 **Area:** `whisperjav/utils/device_detector.py` (`cuda_build_supports_device()`, `CUDA_UNUSABLE_REASON`,
 `_check_cuda_available`); `whisperjav/utils/preflight_check.py` (the unconditional gate
 `enforce_gpu_requirement` stops with the reason; `--check` reports a fatal FAIL); tests
-`tests/test_device_detector_arch.py` (new, 20).
+`tests/test_device_detector_arch.py` (new, 23).
 
 **Report (#411, GTX 1060 6 GB, sm_61, Windows installer v1.9.0):** PyTorch warned that the card's
 compute capability is not in the build (sm_75 … sm_120); the run continued, took ~2 min per 28 s scene,
@@ -42,12 +42,21 @@ recorded once; the adversary caught the repeat.)
   than PyTorch's own start-up warning, which only compares against the list's minimum and maximum, and it
   matches what actually loads. A card the build cannot run on is reported as no usable GPU, with the reason
   in `CUDA_UNUSABLE_REASON`.
-- `enforce_gpu_requirement`, which every run passes through, then **stops with exit status 1** and prints
-  the card, its capability, the build's kernel list, and the two ways out: install a matching build, or
-  `--accept-cpu-mode` (which bypasses the gate exactly as it already did). Machines with no GPU at all keep
-  today's warn-and-continue behaviour; nothing changed for them.
+- `enforce_gpu_requirement`, which every run passes through, then **stops and asks** (owner, 2026-09-06:
+  "the check has to stop the process and ask for the user input to proceed or to abort"). On a console it
+  prints the card, its capability, the build's kernel list and the options, then asks "Continue on the CPU
+  anyway? [y/N]" and waits — no timeout, no auto-continue; anything but yes aborts with exit status 1 and
+  "Nothing was processed". Where nobody can answer — the GUI's child process (which the GUI now marks with
+  `WHISPERJAV_NO_CONSOLE=1`, because on Windows even the null device reports itself as a terminal), or a
+  run whose stdin is not a terminal — it aborts and says how to answer: `--accept-cpu-mode`, or the GUI's "Accept CPU-only mode" box, both of which the gate
+  already honoured at its top. Machines with no GPU at all keep today's behaviour (warn, keypress or 30 s
+  auto-continue); whether that path should also ask is stated for the owner below.
 - `--check` reports the same fact as a fatal FAIL, so on such a card it now exits 1 where it exited 0. That
   follows from "fail there and then"; it is an exit-code change and is stated here for the owner.
+
+**For the owner:** the pre-existing no-GPU path still auto-continues after 30 s. (A) as you stated it
+would also apply there; it was left as is because it is not the reported case and changes every CPU-only
+user's start-up. Say the word and it asks the same question.
 
 **Known limitation, stated:** `--accept-cpu-mode` on such a card is a full CPU mode only for the modules
 that ask `get_best_device()` (faster-whisper, openai-whisper, stable-ts, kotoba, the resolver). The
@@ -57,11 +66,13 @@ the card. Making them ask the detector is a separate, mechanical follow-up (eigh
 gate is what closes #411. Trade-off also stated: CTranslate2 (Balanced) has its own GPU kernels and may
 have used such a card; those users now stop at the gate too, and continue only on the CPU.
 
-**Verification (executed 2026-09-06):** `tests/test_device_detector_arch.py` 20 passed — the rule table
+**Verification (executed 2026-09-06):** `tests/test_device_detector_arch.py` 23 passed — the rule table
 for the cu128 wheel (sm_61 and sm_70 → False, sm_75/86/89/120 → True), PTX forward compatibility,
 suffixed names, unparseable lists; the detector with a stand-in torch ((6,1) → no GPU + reason, (8,6)
-unchanged); `--check` FAIL/PASS; **the real gate**: (6,1) → `SystemExit(1)` with the reason and both ways
-out printed, `--accept-cpu-mode` → passes, (8,6) → passes silently. `tests/test_preflight_cuda_version.py`
+unchanged); `--check` FAIL/PASS; **the real gate**: on a console the question is asked, "no" or Enter
+aborts with exit 1, "y" continues on the CPU; with no console it aborts and names `--accept-cpu-mode` and
+the GUI box; the 30 s keypress wait is never entered on this path; `--accept-cpu-mode` passes; (8,6)
+passes silently. `tests/test_preflight_cuda_version.py`
 unchanged. Real `--check` on the RTX 3060: PASS, exit 0. Not executed: the GUI on a machine with such a
 card — the child exits 1 and the console shows the block; the GUI reports the failed exit as it does for any
 failed run.

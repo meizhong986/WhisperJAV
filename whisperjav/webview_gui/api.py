@@ -500,6 +500,9 @@ class WhisperJAVAPI:
             # Force UTF-8 stdio in the child so logging can print ✓ and JP chars
             env = os.environ.copy()
             env["PYTHONUTF8"] = "1"
+            # The child has no console a person can answer on; the start-up check
+            # must abort and say how to answer instead of waiting for input (#411).
+            env["WHISPERJAV_NO_CONSOLE"] = "1"
             env["PYTHONIOENCODING"] = "utf-8:replace"
 
             # Log command for debugging
@@ -1782,6 +1785,9 @@ class WhisperJAVAPI:
             # Force UTF-8 stdio
             env = os.environ.copy()
             env["PYTHONUTF8"] = "1"
+            # The child has no console a person can answer on; the start-up check
+            # must abort and say how to answer instead of waiting for input (#411).
+            env["WHISPERJAV_NO_CONSOLE"] = "1"
             env["PYTHONIOENCODING"] = "utf-8:replace"
 
             # Log command
@@ -2804,6 +2810,9 @@ class WhisperJAVAPI:
             # Force UTF-8 stdio
             env = os.environ.copy()
             env["PYTHONUTF8"] = "1"
+            # The child has no console a person can answer on; the start-up check
+            # must abort and say how to answer instead of waiting for input (#411).
+            env["WHISPERJAV_NO_CONSOLE"] = "1"
             env["PYTHONIOENCODING"] = "utf-8:replace"
 
             # Log command
@@ -4169,6 +4178,9 @@ class WhisperJAVAPI:
             env = os.environ.copy()
             env["PYTHONUNBUFFERED"] = "1"
             env["PYTHONUTF8"] = "1"
+            # The child has no console a person can answer on; the start-up check
+            # must abort and say how to answer instead of waiting for input (#411).
+            env["WHISPERJAV_NO_CONSOLE"] = "1"
             env["PYTHONIOENCODING"] = "utf-8:replace"
 
             self._translate_process = subprocess.Popen(

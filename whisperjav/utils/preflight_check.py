@@ -566,6 +566,29 @@ def _wait_for_keypress_with_timeout(timeout_seconds=30):
             return False
 
 
+def _stdin_is_interactive() -> bool:
+    """True when a person can answer a question on this console.
+
+    The GUI marks its child processes with WHISPERJAV_NO_CONSOLE=1 because on
+    Windows even the null device reports itself as a terminal, so isatty() alone
+    would leave a GUI worker waiting for an answer nobody can give.
+    """
+    if os.environ.get("WHISPERJAV_NO_CONSOLE") == "1":
+        return False
+    try:
+        return bool(sys.stdin) and sys.stdin.isatty()
+    except Exception:  # noqa: BLE001 - a broken stdin means nobody can answer
+        return False
+
+
+def _ask(prompt: str) -> str:
+    """Read one answer; EOF or an interrupt count as 'no'."""
+    try:
+        return input(prompt).strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        return ""
+
+
 def enforce_gpu_requirement(accept_cpu_mode=False, timeout_seconds=30):
     """
     Check for GPU (CUDA or MPS) availability with friendly warning and optional bypass.
@@ -590,23 +613,35 @@ def enforce_gpu_requirement(accept_cpu_mode=False, timeout_seconds=30):
         if best_device in ('cuda', 'mps'):
             return True
 
-        # #411 (owner: "if the preflight fails, then fail there and then"): a GPU is
-        # present but this PyTorch build has no kernels for it. Continuing would
-        # produce an empty run reported as success, so stop here. --accept-cpu-mode
-        # (handled above) is the explicit way to run on the CPU instead.
+        # #411 (owner, 2026-09-06): a GPU is present but this PyTorch build has no
+        # kernels for it. The check stops and ASKS whether to proceed on the CPU or
+        # abort; it never decides by itself and never continues after a timeout.
+        # Where nobody can answer (the GUI's child process, a piped run) it aborts
+        # and says how to answer: --accept-cpu-mode, or the GUI's "Accept CPU-only
+        # mode" box, both handled at the top of this function.
         from whisperjav.utils import device_detector as _dd
         if _dd.CUDA_UNUSABLE_REASON:
             print(f"\n{Fore.RED}{'='*70}{Style.RESET_ALL}")
             print(f"{Fore.RED}❌ GPU not supported by this PyTorch build{Style.RESET_ALL}")
             print(f"{Fore.RED}{'='*70}{Style.RESET_ALL}\n")
             print(f"  {_dd.CUDA_UNUSABLE_REASON}\n")
-            print("Stopping so the run does not end as an empty file reported as success.\n")
-            print(f"{Fore.CYAN}What you can do:{Style.RESET_ALL}")
-            print("  1. Install a PyTorch build with kernels for this card")
-            print("     (see https://pytorch.org/get-started/locally/), or")
-            print("  2. Run with --accept-cpu-mode to use the CPU instead (much slower;")
-            print("     the ChronosJAV pipelines pick CUDA on their own and may still fail).")
-            print("\n  Run 'whisperjav --check' for detailed diagnostics")
+            print("Running on this card would end as an empty file reported as success.\n")
+            print(f"{Fore.CYAN}Your options:{Style.RESET_ALL}")
+            print("  - Install a PyTorch build with kernels for this card")
+            print("    (see https://pytorch.org/get-started/locally/), or")
+            print("  - Continue on the CPU instead (much slower; the ChronosJAV pipelines")
+            print("    pick CUDA on their own and may still fail there).")
+            print("\n  Run 'whisperjav --check' for detailed diagnostics\n")
+            if _stdin_is_interactive():
+                answer = _ask("Continue on the CPU anyway? [y/N] ")
+                if answer in ("y", "yes"):
+                    print(f"\n{Fore.GREEN}✓ Continuing on the CPU (you confirmed).{Style.RESET_ALL}\n")
+                    return True
+                print(f"\n{Fore.RED}Aborted. Nothing was processed.{Style.RESET_ALL}")
+                print(f"{Fore.RED}{'='*70}{Style.RESET_ALL}\n")
+                sys.exit(1)
+            print(f"{Fore.RED}Aborted: no console to ask on. To continue on the CPU, run again "
+                  f"with --accept-cpu-mode (in the GUI, tick 'Accept CPU-only mode').{Style.RESET_ALL}")
             print(f"{Fore.RED}{'='*70}{Style.RESET_ALL}\n")
             sys.exit(1)
 

@@ -95,22 +95,59 @@ class TestCheckSuite:
 
 
 class TestStartupGate:
-    """The unconditional gate every run passes through (owner C5: fail there and then)."""
+    """The unconditional gate every run passes through (owner, 2026-09-06): an
+    unusable GPU stops the run and ASKS proceed-or-abort; nothing continues on its
+    own; where nobody can answer, it aborts and says how to answer."""
 
-    def test_unusable_card_stops_the_run_with_the_reason(self, monkeypatch, capsys):
+    def _gate(self, monkeypatch, interactive, answer=None):
         from whisperjav.utils import preflight_check as pf
         monkeypatch.setitem(sys.modules, "torch", _fake_torch((6, 1), CU128_LIST))
+        monkeypatch.setattr(pf, "_stdin_is_interactive", lambda: interactive)
+        asked = []
+        monkeypatch.setattr(pf, "_ask", lambda prompt: (asked.append(prompt), answer or "")[1])
+        return pf, asked
+
+    def test_console_user_is_asked_and_no_means_abort(self, monkeypatch, capsys):
+        pf, asked = self._gate(monkeypatch, interactive=True, answer="")
         with pytest.raises(SystemExit) as ei:
-            pf.enforce_gpu_requirement(accept_cpu_mode=False, timeout_seconds=1)
+            pf.enforce_gpu_requirement(accept_cpu_mode=False)
         assert ei.value.code == 1
+        assert asked == ["Continue on the CPU anyway? [y/N] "]
         out = capsys.readouterr().out
-        assert "not supported by this PyTorch build" in out
-        assert "compute capability 6.1" in out and "--accept-cpu-mode" in out
+        assert "compute capability 6.1" in out and "Aborted. Nothing was processed." in out
 
-    def test_accept_cpu_mode_bypasses_the_gate(self, monkeypatch):
+    def test_console_user_can_choose_to_continue_on_cpu(self, monkeypatch, capsys):
+        pf, asked = self._gate(monkeypatch, interactive=True, answer="y")
+        assert pf.enforce_gpu_requirement(accept_cpu_mode=False) is True
+        assert asked and "Continuing on the CPU" in capsys.readouterr().out
+
+    def test_gui_child_marker_means_nobody_can_answer(self, monkeypatch):
         from whisperjav.utils import preflight_check as pf
-        monkeypatch.setitem(sys.modules, "torch", _fake_torch((6, 1), CU128_LIST))
+        monkeypatch.setenv("WHISPERJAV_NO_CONSOLE", "1")
+        monkeypatch.setattr(sys, "stdin", types.SimpleNamespace(isatty=lambda: True))
+        assert pf._stdin_is_interactive() is False
+
+    def test_no_console_aborts_and_says_how_to_answer(self, monkeypatch, capsys):
+        pf, asked = self._gate(monkeypatch, interactive=False)
+        with pytest.raises(SystemExit) as ei:
+            pf.enforce_gpu_requirement(accept_cpu_mode=False)
+        assert ei.value.code == 1 and asked == []
+        out = capsys.readouterr().out
+        assert "--accept-cpu-mode" in out and "Accept CPU-only mode" in out
+
+    def test_no_timeout_auto_continue_on_this_path(self, monkeypatch):
+        from whisperjav.utils import preflight_check as pf
+        pf_, _ = self._gate(monkeypatch, interactive=False)
+        waited = []
+        monkeypatch.setattr(pf, "_wait_for_keypress_with_timeout", lambda t: waited.append(t) or True)
+        with pytest.raises(SystemExit):
+            pf.enforce_gpu_requirement(accept_cpu_mode=False, timeout_seconds=30)
+        assert waited == []
+
+    def test_accept_cpu_mode_answers_in_advance(self, monkeypatch):
+        pf, asked = self._gate(monkeypatch, interactive=False)
         assert pf.enforce_gpu_requirement(accept_cpu_mode=True) is True
+        assert asked == []
 
     def test_supported_card_passes_silently(self, monkeypatch, capsys):
         from whisperjav.utils import preflight_check as pf

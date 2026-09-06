@@ -21,9 +21,12 @@ you find out something went wrong.
   empty one.** One user with a GTX 1060 saw PyTorch warn that the card is not supported by
   the installed build, then watched a twenty-minute run produce no subtitles and report
   success. WhisperJAV now stops before doing anything, names the card, its compute
-  capability and the ones the build supports, and gives the two ways out: install a
-  matching PyTorch build, or pass `--accept-cpu-mode` to run on the CPU. `whisperjav
-  --check` reports the same fact and exits with an error on such a card. Two things to
+  capability and the ones the build supports, and asks whether to continue on the CPU or
+  abort; it waits for your answer and never continues on its own. In the GUI, where the
+  worker cannot ask, the run aborts and tells you to tick *Accept CPU-only mode* if you
+  want it to proceed on the CPU; on the command line, `--accept-cpu-mode` answers in
+  advance. `whisperjav --check` reports the same fact and exits with an error on such a
+  card. Two things to
   know: with `--accept-cpu-mode` the ChronosJAV pipelines (anime-whisper, Qwen3, Cohere)
   and the speech enhancers still choose the GPU on their own and may fail there, so on
   such a card prefer the Whisper pipelines; and if the Balanced pipeline's CTranslate2
@@ -448,7 +451,7 @@ Not user-visible, but worth recording:
 
 | Date | Change |
 |------|--------|
-| 2026-09-06 | A GPU the PyTorch build has no kernels for stops the run at start-up with the reason; `--accept-cpu-mode` is the way through; `--check` exits 1 on such a card (#411, #326, #333) |
+| 2026-09-06 | A GPU the PyTorch build has no kernels for stops the run at start-up and asks whether to continue on the CPU or abort (GUI: abort, tick "Accept CPU-only mode" to proceed); `--check` exits 1 on such a card (#411, #326, #333) |
 | 2026-09-06 | Subtitle entries that are only punctuation (a lone 「。」 or 「、」, an ellipsis alone) are dropped on the ChronosJAV pipelines; inline punctuation untouched (#413) |
 | 2026-09-06 | Cached Hugging Face models load without a hub round-trip (WhisperSeg, anime-whisper); `--offline` flag and GUI "Offline mode" checkbox set `HF_HUB_OFFLINE=1` for the run and its workers, off by default; a missing model fails at once (#415) |
 | 2026-09-05 | `tools/scene_inspector.py` added: scene-detector statistics, per-scene screenshots and contact sheet, loudness and speech ratio, SRT overlay, chapters, multi-detector comparison, `--sensitivity` / `--scene-threshold` presets (`tools/scene_inspector.md`) |
