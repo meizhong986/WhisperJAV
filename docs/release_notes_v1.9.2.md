@@ -124,6 +124,19 @@ you find out something went wrong.
 
 With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
 
+### Tools
+
+- **A scene inspector, for looking before you transcribe.** `tools/scene_inspector.py`
+  runs WhisperJAV's scene detectors (auditok, silero, semantic) on a media file
+  exactly as the pipelines do and writes, in a `scenes_info` folder next to the
+  file: a per-scene table, statistics about the split, loudness and speech
+  content per scene, how an existing SRT lands on the scenes, three screenshots
+  per scene plus a contact sheet, FFmetadata chapters you can load in a player,
+  and a side-by-side comparison when several detectors are run. Nothing is
+  transcribed and no setting is changed. Use it to judge a detector or a
+  parameter (`--sensitivity`, or `--scene-threshold` for the semantic detector)
+  before spending a full run. Guide: `tools/scene_inspector.md`.
+
 ### Failures that used to pass silently
 
 - **The sanitization summary inside the artifacts file told the truth again.**
@@ -249,7 +262,12 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
   and shorter scenes, 22 for fewer and longer. In the GUI it is the "Scene Change Threshold" slider
   in the Ensemble tab's Customize Parameters dialog (Scene tab for Whisper pipelines, Audio → Custom
   Scene Bounds for the ChronosJAV pipelines). It only affects the semantic detector; the CLI warns
-  if you set it with auditok or silero.
+  if you set it with auditok or silero. **Treat it as experimental:** measurements made while
+  preparing this release (`docs/research/semantic_scene_premise/`) show the scene count does not
+  follow this setting closely — on a 65-minute file it stayed between 43 and 65 scenes across the
+  whole range and even rose slightly as the value went up, because the number is a clustering
+  distance rather than a scene-length control. The control stays in this release as-is; the
+  detector's boundary logic is scheduled for a 2.x revision.
 - **ChronosJAV output drops lone 「はい。」 and 「うん。」 lines.** The Qwen pipelines' lone-line
   filter (v1.9.0) removed single-character artefacts such as 「あ。」 and 「は。」 but deliberately kept
   「はい。」 and 「うん。」 as backchannel. In JAV material almost all of those lone lines are moans, not
@@ -340,6 +358,11 @@ Not user-visible, but worth recording:
   both of its failure paths were verified by deliberately perturbing the markup.
 - Regression tests were added for every fix above, including the two real-world
   failures reported on #394 encoded as explicit cases.
+- Two research notes under `docs/research/semantic_scene_premise/` record why the
+  semantic scene detector's threshold sets the number of sound classes rather than
+  scene granularity (measurements, re-runnable) and what the audio-segmentation
+  literature establishes about the "same sound = same scene" premise. They inform
+  the 2.x work on the detector; nothing in this release changes because of them.
 
 ---
 
@@ -374,6 +397,8 @@ Not user-visible, but worth recording:
 
 | Date | Change |
 |------|--------|
+| 2026-09-05 | `tools/scene_inspector.py` added: scene-detector statistics, per-scene screenshots and contact sheet, loudness and speech ratio, SRT overlay, chapters, multi-detector comparison, `--sensitivity` / `--scene-threshold` presets (`tools/scene_inspector.md`) |
+| 2026-09-05 | Research notes on the semantic scene detector's threshold (not a granularity lever; slider kept, detector revision scheduled for 2.x) |
 | 2026-09-05 | Recognizer refreshed after 20 minutes of scene audio (`--model-refresh-audio-minutes`, GUI field): Balanced hosts its CTranslate2 model in a worker process and replaces it, Fidelity reloads in place; telemetry gains `model_epoch`; async + Balanced + several files now completes with refresh on |
 | 2026-09-05 | Qwen lone-line filter also drops 「はい。」 and 「うん。」 (exact lone token only; `--no-qwen-drop-nonverbal-lines` to keep) (#254) |
 | 2026-09-05 | Semantic scene-change threshold exposed: `--scene-clustering-threshold`, `--qwen-scene-clustering-threshold`, `--passN-qwen-params scene_clustering_threshold`, and a slider in both Customize modals |
