@@ -102,9 +102,10 @@ from whisperjav.pipelines.kotoba_faster_whisper_pipeline import KotobaFasterWhis
 from whisperjav.config.legacy import resolve_legacy_pipeline, resolve_ensemble_config, apply_balanced_vad_defaults
 from whisperjav.utils.model_refresh import DEFAULT_MODEL_REFRESH_AUDIO_MINUTES
 from whisperjav.utils.offline_mode import is_offline
+from whisperjav.modules.silero_vad_adapter import DEFAULT_VAD_VERSION, VAD_VERSIONS
 from whisperjav.config.segmenter_presets import (
     BALANCED_DEFAULT_SEGMENTER,
-    BALANCED_SINGLE_PASS_EXTERNAL,
+    DEFAULT_SCENE_DETECTOR,
     resolve_segmenter_sensitivity,
 )
 from whisperjav.__version__ import __version__, __version_display__
@@ -247,9 +248,14 @@ def parse_arguments():
                                help="JSON string of Qwen3-ASR parameters for pass 1 (when pipeline=qwen)")
     twopass_group.add_argument("--pass1-scene-detector", default=None,
                                choices=["auditok", "silero", "semantic", "none"],
-                               help="Scene detection method for pass 1 (default: auditok)")
+                               help="Scene detection method for pass 1 (default: semantic since v1.9.2)")
     twopass_group.add_argument("--pass1-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none)")
+                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none). Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
+    twopass_group.add_argument("--pass1-vad-version", default=None,
+                               choices=list(VAD_VERSIONS),
+                               help="Silero VAD build for pass 1 when --pass1-pipeline is balanced "
+                                    "(" + " | ".join(VAD_VERSIONS) + ", default " + DEFAULT_VAD_VERSION + "). "
+                                    "Ignored by every other pipeline.")
     twopass_group.add_argument("--pass1-speech-enhancer", default=None,
                                choices=SPEECH_ENHANCER_CHOICES,
                                help="Speech enhancer for pass 1 (default: none). An unrecognised name is rejected here rather than silently falling back mid-run (#306).")
@@ -278,9 +284,14 @@ def parse_arguments():
                                help="JSON string of Qwen3-ASR parameters for pass 2 (when pipeline=qwen)")
     twopass_group.add_argument("--pass2-scene-detector", default=None,
                                choices=["auditok", "silero", "semantic", "none"],
-                               help="Scene detection method for pass 2 (default: none)")
+                               help="Scene detection method for pass 2 (default: semantic since v1.9.2)")
     twopass_group.add_argument("--pass2-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none)")
+                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
+    twopass_group.add_argument("--pass2-vad-version", default=None,
+                               choices=list(VAD_VERSIONS),
+                               help="Silero VAD build for pass 2 when --pass2-pipeline is balanced "
+                                    "(" + " | ".join(VAD_VERSIONS) + ", default " + DEFAULT_VAD_VERSION + "). "
+                                    "Ignored by every other pipeline.")
     twopass_group.add_argument("--pass2-speech-enhancer", default=None,
                                choices=SPEECH_ENHANCER_CHOICES,
                                help="Speech enhancer for pass 2 (default: none). An unrecognised name is rejected here rather than silently falling back mid-run (#306).")
@@ -391,13 +402,15 @@ def parse_arguments():
     tuning_group.add_argument("--scene-detection-method",
                              type=str,
                              choices=["auditok", "silero", "semantic"],
-                             default=None,  # None = use config default
+                             default=None,  # None = DEFAULT_SCENE_DETECTOR (see help)
                              metavar="METHOD",
                              help=(
                                  "Scene detection method: "
-                                 "auditok (energy-based, default), "
-                                 "silero (VAD-based), or "
-                                 "semantic (texture-based clustering)"
+                                 "semantic (texture-based clustering, DEFAULT since v1.9.2 — "
+                                 "boundaries snap onto silence and are anchored to the following "
+                                 "sound onset, and short scenes are merged rather than dropped), "
+                                 "auditok (energy-based, the pre-v1.9.2 default), or "
+                                 "silero (VAD-based)"
                              ))
     tuning_group.add_argument("--scene-clustering-threshold",
                              type=float,
@@ -409,24 +422,37 @@ def parse_arguments():
                                  "more, shorter scenes; higher values fewer, longer ones. Default "
                                  "18 (aggressive preset 10, conservative 22). Ignored by auditok/silero."
                              ))
-    tuning_group.add_argument("--no-vad", action="store_true",
-                             help="Disable speech segmentation (balanced/fidelity: no external segmenter, the whole scene goes to the recognizer; kotoba: disable faster-whisper VAD)")
+    tuning_group.add_argument("--vad-version",
+                             type=str,
+                             choices=list(VAD_VERSIONS),
+                             default=None,  # None = the preset default (3.1)
+                             metavar="VERSION",
+                             help=(
+                                 "Which Silero VAD build the balanced pipeline's built-in VAD runs: "
+                                 + " | ".join(VAD_VERSIONS)
+                                 + f" (default {DEFAULT_VAD_VERSION}). All three ONNX models ship "
+                                 "inside WhisperJAV, so nothing is downloaded and nothing needs "
+                                 "the network. Applies to --mode balanced, and to balanced "
+                                 "ensemble passes via --pass1-vad-version / --pass2-vad-version; "
+                                 "other modes use an external speech segmenter and ignore it."
+                             ))
     tuning_group.add_argument("--speech-segmenter",
                              type=str,
                              choices=[
                                  "silero", "silero-v4.0", "silero-v3.1", "silero-v6.2",
                                  "nemo", "nemo-lite",
                                  "whisper-vad", "whisper-vad-tiny", "whisper-vad-base", "whisper-vad-medium",
-                                 "ten", "whisperseg", "firered-vad", "faster-whisper", "none"
+                                 "ten", "whisperseg", "firered-vad", "none"
                              ],
                              default=None,  # None = per-mode default (see help text)
                              metavar="BACKEND",
                              help=(
-                                 "Speech segmentation backend. Defaults: --mode balanced uses "
-                                 "faster-whisper (the recognizer's built-in VAD, one call per scene); "
-                                 "--ensemble and --mode qwen use whisperseg; other single-pass modes "
-                                 "use silero-v3.1. On --mode balanced, firered-vad and ten honour "
-                                 "--sensitivity (v1.9.2). Choices: "
+                                 "Speech segmentation backend, for the modes that use an EXTERNAL "
+                                 "segmenter. NOT accepted with --mode balanced since v1.9.2: "
+                                 "balanced runs faster-whisper's built-in VAD, and which Silero "
+                                 "build it runs is chosen with --vad-version. Defaults: --ensemble "
+                                 "and --mode qwen use whisperseg; other single-pass modes use "
+                                 "silero-v3.1. Choices: "
                                  "firered-vad (FireRedTeam DFSMN VAD, tiny, CPU), "
                                  "whisperseg (Whisper-encoder VAD trained on JA ASMR, ONNX, "
                                  "F1=0.787 on Netflix-GT JAV), "
@@ -436,9 +462,6 @@ def parse_arguments():
                                  "whisper-vad (neural VAD using Whisper small model ~500MB), "
                                  "whisper-vad-tiny/base/medium (other model sizes), "
                                  "ten (TEN Framework), "
-                                 "faster-whisper (faster-whisper's built-in VAD via vad_filter; "
-                                 "one transcribe call per scene -- the v1.9.0/v1.9.1 balanced "
-                                 "default, fastest), "
                                  "none (disable segmentation)"
                              ))
     tuning_group.add_argument("--initial-prompt",
@@ -2042,6 +2065,77 @@ def _finish_run(outcomes: List[FileOutcome], args: argparse.Namespace,
     return status
 
 
+def validate_balanced_vad_options(args) -> None:
+    """
+    Enforce requirements S2/S9: the balanced pipeline offers no external speech segmenter.
+
+    Balanced runs faster-whisper's built-in VAD, and v1.9.2 replaces the segmenter
+    choice with --vad-version (which Silero build that internal VAD runs). Passing an
+    external segmenter for a balanced pass is now a usage error rather than a silently
+    different pipeline: a script that asks for whisperseg on balanced must be told, not
+    quietly given something else.
+
+    Raises ValueError; main() turns it into exit status 2 before any transcription.
+    """
+    is_ensemble = bool(getattr(args, 'ensemble', False))
+    mode = getattr(args, 'mode', None)
+
+    if not is_ensemble and mode == "balanced" and getattr(args, 'speech_segmenter', None):
+        raise ValueError(
+            "--speech-segmenter is not available with --mode balanced (v1.9.2). "
+            "Balanced uses faster-whisper's built-in VAD; choose which Silero build "
+            "it runs with --vad-version {" + ",".join(VAD_VERSIONS) + "}."
+        )
+
+    for n in ("1", "2"):
+        pipeline = getattr(args, f"pass{n}_pipeline", None)
+        segmenter = getattr(args, f"pass{n}_speech_segmenter", None)
+        if pipeline == "balanced" and segmenter:
+            raise ValueError(
+                f"--pass{n}-speech-segmenter is not available when --pass{n}-pipeline is "
+                f"balanced (v1.9.2). That pass uses faster-whisper's built-in VAD; choose "
+                f"which Silero build it runs with --pass{n}-vad-version "
+                "{" + ",".join(VAD_VERSIONS) + "}."
+            )
+        # The mirror of the rule below: a version for a pass that does not run the
+        # built-in VAD is not a silent no-op either. Same flag family, same answer.
+        if getattr(args, f"pass{n}_vad_version", None) and pipeline not in (None, "balanced"):
+            raise ValueError(
+                f"--pass{n}-vad-version selects the build of the BUILT-IN VAD, which only "
+                f"the balanced pipeline uses; --pass{n}-pipeline is {pipeline}, which runs "
+                f"an external speech segmenter (see --pass{n}-speech-segmenter)."
+            )
+
+    # These two settings belong to an external speech segmenter: they decide how its
+    # detected speech is grouped. Balanced has no external speech segmenter any more, so
+    # they are rejected here rather than accepted and ignored. Owner, 2026-09-09 (O2):
+    # "omitted means omitted" -- a script that still passes them must be told, not
+    # quietly given a run where they did nothing.
+    if not is_ensemble and mode == "balanced":
+        for _flag, _attr in (("--max-group-duration", "max_group_duration"),
+                             ("--chunk-threshold", "chunk_threshold")):
+            if getattr(args, _attr, None) is not None:
+                raise ValueError(
+                    f"{_flag} is not available with --mode balanced (v1.9.2). It groups "
+                    "an external speech segmenter's output, and balanced has no external "
+                    "speech segmenter -- it uses the internal FW Silero VAD "
+                    "(see --vad-version)."
+                )
+
+    if getattr(args, 'vad_version', None) is not None:
+        if is_ensemble:
+            raise ValueError(
+                "--vad-version applies to a single-pass run. For --ensemble use "
+                "--pass1-vad-version / --pass2-vad-version on the balanced passes."
+            )
+        if mode != "balanced":
+            raise ValueError(
+                f"--vad-version selects the build of the BUILT-IN VAD, which only "
+                f"--mode balanced uses; --mode {mode} runs an external speech segmenter "
+                "(see --speech-segmenter)."
+            )
+
+
 def main():
     """Enhanced main entry point with all V3 improvements."""
     # Apply HuggingFace Hub network resilience patch (#204)
@@ -2060,6 +2154,8 @@ def main():
         _mr = getattr(args, 'model_refresh_audio_minutes', None)
         if _mr is not None and _mr < 0:
             raise ValueError(f"--model-refresh-audio-minutes: expected 0 (never) or a positive number of minutes, got {_mr}")
+        # S2/S9: balanced has no external segmenter any more (v1.9.2).
+        validate_balanced_vad_options(args)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         sys.exit(2)
@@ -2241,26 +2337,40 @@ def main():
             logger.debug("CrispASR mode: skipping legacy config resolution (uses --crispasr-* args)")
 
         else:
-            # Legacy mode: use pipeline resolver
+            # Legacy mode: use pipeline resolver.
+            #
+            # v1.9.2: the scene detector is resolved BEFORE the config, because the
+            # resolved parameter NAMES depend on which backend will run (semantic reads
+            # min_duration / max_duration; auditok and silero read the _s spellings).
+            # `--scene-detection-method` keeps default=None so an explicit choice stays
+            # distinguishable from the default, which the clustering-threshold warning
+            # below relies on.
+            _scene_method = getattr(args, 'scene_detection_method', None) or DEFAULT_SCENE_DETECTOR
             resolved_config = resolve_legacy_pipeline(
                 pipeline_name=args.mode,
                 sensitivity=args.sensitivity,
                 task=task,
                 device=args.device,
                 compute_type=args.compute_type,
+                scene_method=_scene_method,
             )
+            if not getattr(args, 'scene_detection_method', None):
+                logger.debug(
+                    "No --scene-detection-method passed; --mode %s uses %s",
+                    args.mode, _scene_method,
+                )
 
-        if args.scene_detection_method:
-            logger.info(f"Using scene detection method: {args.scene_detection_method}")
-            # Inject into resolved_config so pipelines (fidelity, balanced, fast)
-            # pick it up via features["scene_detection"]["method"].
-            # Without this, the factory defaults to auditok. (#269)
-            if resolved_config and "features" in resolved_config:
-                scene_cfg = resolved_config["features"].get("scene_detection")
-                if scene_cfg is None:
-                    scene_cfg = {}
-                    resolved_config["features"]["scene_detection"] = scene_cfg
-                scene_cfg["method"] = args.scene_detection_method
+        # Record the effective method in the resolved config so the pipelines pick it up
+        # via features["scene_detection"]["method"] (#269) — the factory would otherwise
+        # fall back to auditok. Only for pipelines that actually detect scenes: `faster`
+        # declares no scene feature and must not gain one.
+        _effective_scene_method = (
+            getattr(args, 'scene_detection_method', None) or DEFAULT_SCENE_DETECTOR
+        )
+        if resolved_config and resolved_config.get("features", {}).get("scene_detection") is not None:
+            if getattr(args, 'scene_detection_method', None):
+                logger.info(f"Using scene detection method: {args.scene_detection_method}")
+            resolved_config["features"]["scene_detection"]["method"] = _effective_scene_method
 
         # v1.9.2 (CFF2): semantic clustering threshold. Reaches every legacy
         # pipeline through features["scene_detection"] -> SceneDetectorFactory
@@ -2314,26 +2424,6 @@ def main():
         resolved_config["params"]["decoder"]["language"] = language_code
         logger.debug(f"Language override applied to decoder params: {language_code}")
 
-    # Apply --no-vad override for supported modes
-    if getattr(args, 'no_vad', False) and resolved_config is not None:
-        if "params" not in resolved_config:
-            resolved_config["params"] = {}
-
-        if args.mode == "kotoba-faster-whisper":
-            # Kotoba uses faster-whisper's internal vad_filter
-            if "asr" not in resolved_config["params"]:
-                resolved_config["params"]["asr"] = {}
-            resolved_config["params"]["asr"]["vad_filter"] = False
-            logger.info("Internal VAD disabled via --no-vad flag (kotoba mode)")
-        elif args.mode in ["balanced", "fidelity"]:
-            # Balanced/fidelity use Speech Segmenter - set backend to "none" to disable
-            if "params" not in resolved_config:
-                resolved_config["params"] = {}
-            if "speech_segmenter" not in resolved_config["params"]:
-                resolved_config["params"]["speech_segmenter"] = {}
-            resolved_config["params"]["speech_segmenter"]["backend"] = "none"
-            logger.info("Speech segmentation disabled via --no-vad flag (backend set to 'none')")
-
     # Apply --speech-segmenter (explicit override, or v1.8.13 default).
     #
     # v1.8.13 ships a SCOPED default flip. Whisperseg becomes the default only on
@@ -2379,42 +2469,29 @@ def main():
                 getattr(args, 'mode', None)
             )
 
-    # v1.9.0 fix (code-review): 'faster-whisper' means "use faster-whisper's
-    # NATIVE VAD (vad_filter=True)" and only the balanced pipeline's
-    # FasterWhisperProASR engine can honor it. On any other mode it would
-    # reach an engine that passes it verbatim to SpeechSegmenterFactory,
-    # which has no such backend — aborting the run mid-processing. Downgrade
-    # with a warning instead of crashing.
-    if speech_segmenter == "faster-whisper" and resolved_config is not None \
-            and getattr(args, 'mode', None) != "balanced":
-        _fw_fallback = "whisperseg" if _path_safe_for_whisperseg_default(args) else "silero-v3.1"
-        logger.warning(
-            "Speech segmenter 'faster-whisper' (native VAD) is only available with "
-            "--mode balanced; falling back to '%s' for --mode %s.",
-            _fw_fallback, getattr(args, 'mode', None)
-        )
-        speech_segmenter = _fw_fallback
+    # v1.9.2: 'faster-whisper' (the recognizer's built-in VAD) is no longer a
+    # --speech-segmenter choice. It reaches this variable only as the balanced
+    # default set just above, so the v1.9.0 "wrong mode" downgrade that used to sit
+    # here can no longer fire and was removed rather than left as dead code.
 
-    # Guard: explicit non-Silero choice on a path with the routing bug → downgrade with warning.
-    # v1.9.2: `--mode balanced` resolves the YAML sensitivity presets for
-    # firered-vad and ten below, so those two are exempt there. Other backends
-    # keep the downgrade.
-    _balanced_external_ok = (
-        getattr(args, 'mode', None) == "balanced"
-        and speech_segmenter in BALANCED_SINGLE_PASS_EXTERNAL
-    )
+    # Guard: explicit non-Silero choice on a path with the routing bug -> downgrade with warning.
+    #
+    # v1.9.2 removed the firered-vad / ten exemption that used to sit here. It only
+    # ever applied to `--mode balanced`, and balanced no longer accepts
+    # --speech-segmenter at all (validate_balanced_vad_options rejects it at parse
+    # time), so the exemption became unreachable. Fidelity and the other single-pass
+    # modes keep the downgrade unchanged.
     if speech_segmenter is not None and resolved_config is not None:
         if (not _path_safe_for_whisperseg_default(args)
-                and not _balanced_external_ok
                 and speech_segmenter != "none"
                 and speech_segmenter != "faster-whisper"
                 and not speech_segmenter.startswith("silero")):
             logger.warning(
                 "Speech segmenter '%s' is not wired for single-pass --mode %s: that "
                 "path does not resolve the segmenter's sensitivity presets. "
-                "Falling back to silero-v3.1. WhisperSeg / NeMo / whisper-vad are "
-                "fully supported via --ensemble; firered-vad and ten are supported "
-                "on --mode balanced, and silero-v6.2 works here.",
+                "Falling back to silero-v3.1. WhisperSeg / NeMo / whisper-vad / "
+                "firered-vad / ten are fully supported via --ensemble, and "
+                "silero-v6.2 works here.",
                 speech_segmenter, getattr(args, 'mode', None)
             )
             speech_segmenter = "silero-v3.1"
@@ -2425,7 +2502,13 @@ def main():
         if "speech_segmenter" not in resolved_config["params"]:
             resolved_config["params"]["speech_segmenter"] = {}
         resolved_config["params"]["speech_segmenter"]["backend"] = speech_segmenter
-        logger.info(f"Speech segmenter set to: {speech_segmenter}")
+        if speech_segmenter == "faster-whisper":
+            # Balanced has no speech segmenter to announce (owner S2/S9). Saying
+            # "Speech segmenter set to: faster-whisper" contradicts what the user was
+            # just told. The one line naming the VAD and its threshold is printed below.
+            logger.debug("Speech detection: Internal FW Silero VAD")
+        else:
+            logger.info(f"Speech segmenter set to: {speech_segmenter}")
         # Note: Speech Segmenter factory handles "none" backend internally
 
         # v1.9.2: resolve the backend's per-sensitivity YAML preset on the
@@ -2468,6 +2551,15 @@ def main():
                 resolved_config["params"]["provider"] = {}
             resolved_config["params"]["provider"]["initial_prompt"] = initial_prompt
             logger.info(f"Initial prompt set via CLI: {initial_prompt[:50]}{'...' if len(initial_prompt) > 50 else ''}")
+
+        # v1.9.2 (S6-S8): which Silero build the built-in VAD runs. The
+        # faster_whisper_vad preset already carries a version (default 3.1) via
+        # apply_balanced_vad_defaults above; an explicit --vad-version wins.
+        # FasterWhisperProASR reads params["vad"]["version"] and installs the adapter.
+        vad_version = getattr(args, 'vad_version', None)
+        if vad_version is not None:
+            resolved_config["params"].setdefault("vad", {})["version"] = vad_version
+            logger.debug("VAD version set via CLI: Silero v%s", vad_version)
 
         vad_threshold = getattr(args, 'vad_threshold', None)
         if vad_threshold is not None:
@@ -2528,6 +2620,21 @@ def main():
                 resolved_config["params"]["decoder"] = {}
             resolved_config["params"]["decoder"]["condition_on_previous_text"] = condition_bool
             logger.info(f"Condition on previous text set via CLI: {condition_bool}")
+
+        # C11 (owner): ONE INFO line naming the VAD that will run, printed once per run.
+        # Here rather than in the recognizer because the recognizer is rebuilt on every
+        # model refresh (a fresh worker process every 20 min of scene audio by default),
+        # which would repeat the line ~6 times on a feature-length film. The recognizer
+        # logs what it actually loaded at DEBUG, and WARNS if that is not this version.
+        # Last, so it reports the values after every override above.
+        if (resolved_config["params"].get("speech_segmenter") or {}).get("backend") == "faster-whisper":
+            _v = resolved_config["params"].get("vad") or {}
+            _thr = _v.get("threshold")
+            logger.info(
+                "VAD: Silero v%s, threshold %s",
+                _v.get("version", DEFAULT_VAD_VERSION),
+                f"{_thr:.2f}" if isinstance(_thr, (int, float)) else "default",
+            )
 
     # Handle --dump-params: dump resolved config to JSON and exit
     if args.dump_params:
@@ -2615,6 +2722,7 @@ def main():
                     "sensitivity": args.pass1_sensitivity,
                     "scene_detector": args.pass1_scene_detector,
                     "speech_segmenter": args.pass1_speech_segmenter,
+                    "vad_version": getattr(args, 'pass1_vad_version', None),
                     "speech_enhancer": args.pass1_speech_enhancer,
                     "enhance_for_vad": (
                         getattr(args, 'pass1_enhance_for_vad', False)
@@ -2643,6 +2751,7 @@ def main():
                     "sensitivity": args.pass2_sensitivity,
                     "scene_detector": args.pass2_scene_detector,
                     "speech_segmenter": args.pass2_speech_segmenter,
+                    "vad_version": getattr(args, 'pass2_vad_version', None),
                     "speech_enhancer": args.pass2_speech_enhancer,
                     "enhance_for_vad": (
                         getattr(args, 'pass2_enhance_for_vad', False)
@@ -2811,6 +2920,7 @@ def main():
                 'sensitivity': args.pass1_sensitivity,
                 'scene_detector': args.pass1_scene_detector,
                 'speech_segmenter': args.pass1_speech_segmenter,
+                'vad_version': getattr(args, 'pass1_vad_version', None),
                 'speech_enhancer': args.pass1_speech_enhancer,
                 'enhance_for_vad': getattr(args, 'pass1_enhance_for_vad', False) or getattr(args, 'enhance_for_vad', False),
                 'model': args.pass1_model,
@@ -2840,6 +2950,7 @@ def main():
                     'sensitivity': args.pass2_sensitivity,
                     'scene_detector': args.pass2_scene_detector,
                     'speech_segmenter': args.pass2_speech_segmenter,
+                    'vad_version': getattr(args, 'pass2_vad_version', None),
                     'speech_enhancer': args.pass2_speech_enhancer,
                     'enhance_for_vad': getattr(args, 'pass2_enhance_for_vad', False) or getattr(args, 'enhance_for_vad', False),
                     'model': args.pass2_model,
