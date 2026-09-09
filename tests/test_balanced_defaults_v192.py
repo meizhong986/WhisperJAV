@@ -3,11 +3,12 @@ v1.9.2: Balanced pipeline speech-segmenter default and single-pass preset resolu
 
 Owner decisions: CFF3 (2026-09-05) made FireRedVAD the Balanced default with a
 fallback chain; the owner reversed the default on 2026-09-05 (N3) — Balanced runs
-faster-whisper's built-in VAD again, as in v1.9.0/v1.9.1. Kept from CFF3 (owner,
-2026-09-06, "default only"): the single-pass path resolves a WhisperJAV segmenter's
-per-sensitivity YAML preset, and firered-vad / ten are exempt from the routing-guard
-downgrade on --mode balanced, so an explicit choice honours --sensitivity. Test-D
-grouping stays on top of the preset (D3).
+faster-whisper's built-in VAD again, as in v1.9.0/v1.9.1. His balanced requirements
+(S2/S9, 2026-09-09) then went further: Balanced accepts **no** external speech
+segmenter at all, so `--speech-segmenter` with `--mode balanced` is now a usage error
+and the firered-vad / ten routing-guard exemption that CFF3 added has been removed as
+unreachable. Both backends remain available through --ensemble; the per-sensitivity
+YAML resolution and the Test-D grouping overlay are unchanged there.
 
 Two layers are covered without importing any ML stack:
 1. `whisperjav.config.segmenter_presets` — the shared constants and resolver the
@@ -26,7 +27,6 @@ import pytest
 
 from whisperjav.config.segmenter_presets import (
     BALANCED_DEFAULT_SEGMENTER,
-    BALANCED_SINGLE_PASS_EXTERNAL,
     SEGMENTER_PARAMS,
     resolve_segmenter_sensitivity,
 )
@@ -49,12 +49,14 @@ class TestBalancedDefault:
         assert resolve_segmenter_sensitivity(BALANCED_DEFAULT_SEGMENTER, "balanced") == {}
         assert "none" in PASSTHROUGH_SEGMENTERS
 
-    def test_guard_exemption_is_firered_and_ten_only(self):
-        assert BALANCED_SINGLE_PASS_EXTERNAL == frozenset({"firered-vad", "ten"})
-        assert BALANCED_DEFAULT_SEGMENTER not in BALANCED_SINGLE_PASS_EXTERNAL
+    def test_the_balanced_exemption_constant_is_gone(self):
+        """v1.9.2 S2/S9: nothing exempts an external segmenter on Balanced any more."""
+        import whisperjav.config.segmenter_presets as sp
+        assert not hasattr(sp, "BALANCED_SINGLE_PASS_EXTERNAL")
 
-    def test_exempt_backends_are_real_segmenters_with_presets(self):
-        for name in BALANCED_SINGLE_PASS_EXTERNAL:
+    def test_firered_and_ten_are_still_real_segmenters_with_presets(self):
+        """They keep their presets — they are simply reached through --ensemble now."""
+        for name in ("firered-vad", "ten"):
             assert name.lower() not in PASSTHROUGH_SEGMENTERS
             assert resolve_segmenter_sensitivity(name, "balanced")  # non-empty preset
 
@@ -105,42 +107,50 @@ class TestBalancedCliDefaults:
         assert vad["threshold"] > 0
         assert "_dump_note" not in dump["resolved_config"]["params"]
 
-    @pytest.mark.parametrize("sensitivity,threshold", [
-        ("conservative", 0.5), ("balanced", 0.4), ("aggressive", 0.3),
-    ])
-    def test_explicit_firered_gets_preset_then_test_d(self, tmp_path, sensitivity, threshold):
-        dump, log = _dump(tmp_path, "--mode", "balanced", "--speech-segmenter", "firered-vad",
-                          "--sensitivity", sensitivity)
-        ss = _segmenter(dump)
-        assert ss["backend"] == "firered-vad"                 # not downgraded
-        assert ss["threshold"] == threshold                  # YAML preset
-        assert ss["max_group_duration_s"] == 9.0             # Test-D (D3) overrides YAML 7/6/5
-        assert ss["chunk_threshold_s"] == 0.1                # Test-D (D3) overrides YAML 1.0
-        assert "vad" not in dump["resolved_config"]["params"]
-        assert "_dump_note" in dump["resolved_config"]["params"]
-        assert "Falling back to silero-v3.1" not in log
+    @pytest.mark.parametrize("segmenter", ["firered-vad", "ten", "whisperseg", "silero-v3.1", "none"])
+    def test_balanced_rejects_every_external_segmenter(self, tmp_path, segmenter):
+        """S2/S9: the whole option is gone on Balanced, not just the awkward ones.
 
-    def test_ten_is_exempt_from_the_routing_guard_on_balanced(self, tmp_path):
-        dump, log = _dump(tmp_path, "--mode", "balanced", "--speech-segmenter", "ten",
-                          "--sensitivity", "aggressive")
-        ss = _segmenter(dump)
-        assert ss["backend"] == "ten"
-        assert "threshold" in ss                             # preset resolved
-        assert ss["max_group_duration_s"] == 9.0
-        assert "Falling back to silero-v3.1" not in log
+        Before v1.9.2 these either resolved (firered-vad, ten), silently downgraded to
+        silero-v3.1 (whisperseg), or quietly changed the pipeline. Now the run stops.
+        """
+        out = tmp_path / "never_written.json"
+        proc = subprocess.run(
+            [sys.executable, "-m", "whisperjav.main", "--dump-params", str(out),
+             "--mode", "balanced", "--speech-segmenter", segmenter],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600,
+        )
+        assert proc.returncode == 2
+        assert "--vad-version" in (proc.stdout + proc.stderr)
+        assert not out.exists()
 
-    def test_whisperseg_still_downgrades_on_single_pass_balanced(self, tmp_path):
-        dump, log = _dump(tmp_path, "--mode", "balanced", "--speech-segmenter", "whisperseg")
+    def test_the_native_vad_is_not_a_segmenter_choice_any_more(self):
+        """'faster-whisper' was only ever meaningful on Balanced, which now rejects it."""
+        proc = subprocess.run(
+            [sys.executable, "-m", "whisperjav.main", "--speech-segmenter", "faster-whisper", "x.wav"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600,
+        )
+        assert proc.returncode == 2
+        assert "invalid choice" in (proc.stdout + proc.stderr)
+
+    def test_ensemble_still_resolves_firered_preset_then_test_d(self, tmp_path):
+        """The CFF3 behaviour lives on where it was always fully wired: --ensemble."""
+        dump, log = _dump(tmp_path, "--ensemble", "--pass1-pipeline", "fidelity",
+                          "--pass1-speech-segmenter", "firered-vad",
+                          "--pass1-sensitivity", "aggressive")
+        p1 = dump["ensemble_config"]["pass1"]
+        assert p1["speech_segmenter"] == "firered-vad"
+        assert p1["sensitivity"] == "aggressive"
+
+    def test_fidelity_still_downgrades_an_unwired_segmenter(self, tmp_path):
+        dump, log = _dump(tmp_path, "--mode", "fidelity", "--speech-segmenter", "whisperseg")
         assert _segmenter(dump)["backend"] == "silero-v3.1"
         assert "Falling back to silero-v3.1" in log
 
-    def test_cli_overrides_win_over_preset_and_test_d(self, tmp_path):
-        dump, _ = _dump(tmp_path, "--mode", "balanced", "--speech-segmenter", "firered-vad",
-                        "--vad-threshold", "0.6", "--max-group-duration", "6")
-        ss = _segmenter(dump)
-        assert ss["backend"] == "firered-vad"
-        assert ss["threshold"] == 0.6
-        assert ss["max_group_duration_s"] == 6.0
+    def test_cli_overrides_still_win_on_a_mode_that_takes_a_segmenter(self, tmp_path):
+        dump, _ = _dump(tmp_path, "--mode", "fidelity", "--speech-segmenter", "silero-v3.1",
+                        "--vad-threshold", "0.6")
+        assert _segmenter(dump)["threshold"] == 0.6
 
     def test_fidelity_default_unchanged(self, tmp_path):
         dump, _ = _dump(tmp_path, "--mode", "fidelity")
