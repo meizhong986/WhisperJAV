@@ -72,12 +72,31 @@ SEGMENTER_TOOL_NAMES = {
 # development build defaulted to FireRedVAD with a fallback chain; the owner reversed
 # that on 2026-09-05 (N3). A WhisperJAV segmenter is selected explicitly with
 # --speech-segmenter (CLI), --passN-speech-segmenter (ensemble) or the GUI dropdown.
+#
+# v1.9.2 (owner S2/S9): on the BALANCED pipeline this is no longer a choice at all --
+# balanced runs the built-in VAD and the user picks which Silero build it runs
+# (--vad-version). The other pipelines are unaffected.
 BALANCED_DEFAULT_SEGMENTER = "faster-whisper"
 
-# WhisperJAV segmenters the single-pass Balanced path runs without the routing-guard
-# downgrade: their sensitivity presets are resolved by resolve_segmenter_sensitivity()
-# below (v1.9.2), so --sensitivity is honoured for them on --mode balanced.
-BALANCED_SINGLE_PASS_EXTERNAL = frozenset({"firered-vad", "ten"})
+# The default SCENE detector for every scene-detecting legacy pipeline (v1.9.2).
+#
+# The owner approved this flip on 2026-04-20 for v1.8.12; the CLI half was never
+# applied, while the GUI Ensemble tab has shipped semantic as its selected default
+# since v1.8.11 — so the two entry points disagreed until now. Single-sourced here and
+# read by main.py, ensemble/pass_worker.py and webview_gui/api.py so they cannot drift.
+#
+# Semantic is the only backend whose min_duration MERGES short segments, which is what
+# makes a scene-length floor expressible at all; auditok and silero discard them.
+DEFAULT_SCENE_DETECTOR = "semantic"
+
+# REMOVED in v1.9.2: BALANCED_SINGLE_PASS_EXTERNAL.
+#
+# It exempted firered-vad and ten from main.py's routing-guard downgrade on
+# `--mode balanced`, so an explicit choice there honoured --sensitivity (owner,
+# 2026-09-06, "default only"). The owner's balanced requirements (S2/S9,
+# 2026-09-09) supersede that: balanced runs faster-whisper's built-in VAD and
+# accepts no --speech-segmenter at all, so the exemption became unreachable.
+# Both backends remain fully available through --ensemble and --mode fidelity.
 
 
 def resolve_segmenter_sensitivity(
