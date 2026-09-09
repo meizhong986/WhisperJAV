@@ -227,7 +227,7 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
   |---|---|---|
   | `done` | a subtitle file with at least one cue was written | 0 |
   | `empty` | the run completed and produced no cues, and nothing contradicts that reading | 0 (reported; `--fail-on empty` makes it 1) |
-  | `suspect` | something does not add up: the output spans less than `--min-coverage` of the media, the recognizer returned nothing for consecutive scenes while speech was still detected (Balanced with an external segmenter only), or in ensemble pass 2 failed and the output is pass 1 alone. A zero-cue file with any of that evidence is `suspect`, not `empty` | 0 (reported; `--fail-on suspect` makes it 1) |
+  | `suspect` | something does not add up: the output spans less than `--min-coverage` of the media, the recognizer returned nothing for consecutive scenes while speech was still detected (needs a separate speech segmenter, so not on Balanced — see "Changed defaults"), or in ensemble pass 2 failed and the output is pass 1 alone. A zero-cue file with any of that evidence is `suspect`, not `empty` | 0 (reported; `--fail-on suspect` makes it 1) |
   | `failed` | an error: an exception, a crash, a translation that raised, or a subtitle file the pipeline reported writing that does not exist | 1 |
   | `skipped` | nothing was attempted because the output already existed | 0 |
 
@@ -294,25 +294,59 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
   applies to Transcription and Ensemble runs). Balanced's per-scene telemetry records which instance
   generation decoded each scene. This is containment, not a fix for the root cause, which is still
   under investigation.
-- **Balanced keeps faster-whisper's built-in VAD as its default speech segmenter**, as in
-  v1.9.0/v1.9.1 (one recognizer call per scene). A WhisperJAV segmenter is one flag away:
-  `--speech-segmenter firered-vad` (or `ten`, `silero-v3.1`, …); in the GUI, the Ensemble tab's
-  segmenter dropdown. Under the built-in VAD there is no independent speech detector, so the
-  run-outcome check cannot mark a zero-cue Balanced file `suspect`; it is reported `empty`.
-- **`--sensitivity` now applies to FireRedVAD and TEN on plain `--mode balanced`.** The
-  single-pass path previously never loaded a non-Silero segmenter's sensitivity preset (which is
-  why it used to downgrade those choices to Silero). It does now, in the same order as ensemble:
-  preset, then the fine-grained grouping overlay, then your explicit flags. Other segmenters
-  (WhisperSeg, NeMo, whisper-vad) are still routed through `--ensemble` only.
-- **Balanced runs with a WhisperJAV segmenter can be reported `suspect`.** The "speech kept being
-  detected but nothing came back" counter that corroborates a #394-style stall only works with a
-  real speech detector, so it is inert under the default built-in VAD. With `--speech-segmenter
-  firered-vad` (or any other WhisperJAV segmenter) it is active: a Balanced file with zero cues
-  while speech was detected for several scenes in a row is classified `suspect` instead of
-  `empty`. The exit code changes only if you use `--fail-on suspect` (CLI or the GUI checkbox).
+- **Balanced now runs faster-whisper's built-in VAD and nothing else, and you choose which Silero
+  build it uses.** Two things drove this. Running an external speech segmenter on Balanced was slow
+  — it splits every scene into many small groups and calls the recognizer once per group, and each
+  of those calls is padded to a 30-second window — which is why Balanced could fall to around
+  real-time on a feature-length file. And the model faster-whisper bundles is conservative on this
+  material: on one 293-second test clip it treated 21.8 % of the audio as speech, where Silero 3.1
+  treated 31.2 % and Silero 4.0 treated 44.8 %. Speech the VAD does not find is speech the
+  recognizer never sees, which is the mechanism behind output that skips long stretches.
+
+  So Balanced keeps the built-in VAD (one recognizer call per scene, the fast path), and
+  `--vad-version` selects the Silero build that VAD runs: **3.1** (the default), **4.0** or **6.2**.
+  In the Ensemble tab, a pass whose Pipeline is Balanced shows those three in the Speech Segmenter
+  column; the Transcription tab uses the default. For an ensemble pass on the command line the flags
+  are `--pass1-vad-version` and `--pass2-vad-version`. All three models ship inside WhisperJAV
+  (about 4.7 MB), so nothing is downloaded and nothing needs the network. The detection thresholds
+  are 0.5 conservative / 0.4 balanced / 0.3 aggressive, the same for every build.
+
+  **Which build suits your material is worth trying.** The numbers above are a single clip and are
+  not a recommendation; 3.1 is the default because it is the most conservative of the three about
+  what it calls speech.
+
+  **This breaks scripts that set a speech segmenter for Balanced, deliberately.**
+  `--speech-segmenter` is no longer accepted with `--mode balanced`, and
+  `--pass1/2-speech-segmenter` is no longer accepted for a Balanced pass. So are
+  `--max-group-duration` and `--chunk-threshold` on Balanced, which set how an external speech
+  segmenter groups what it found. All of them now stop the run with a message rather than quietly
+  giving you a different pipeline or doing nothing. Fidelity, Qwen, Anime-Whisper and any
+  non-Balanced ensemble pass keep their speech segmenters unchanged.
+
+  One consequence: the check that reports a file as `suspect` — speech kept being detected but no
+  subtitles came back — needs a separate speech detector to compare against, and Faster-Whisper's own
+  voice detection does not provide one. On Balanced a file with no subtitles is now always reported
+  `empty`, and choosing an external segmenter is no longer a way around that.
+
+  If the version you picked cannot be loaded, WhisperJAV falls back to the Silero model
+  Faster-Whisper ships with and says so in the log. If that one cannot be loaded either, the run
+  stops rather than transcribing with no voice detection at all.
+- **`--no-vad` is removed.** It only ever set the speech segmenter to "none", which
+  `--speech-segmenter none` already does on the modes that still take a segmenter. Balanced no
+  longer takes one at all.
+- **Faster-Whisper and CTranslate2 are fixed to exact versions.** CTranslate2 is `4.8.1` — 4.6.2 is
+  the version that reproduces the crash on exit reported in #125.
+
+  Faster-Whisper is taken from a specific commit on its development branch rather than from the 1.2.1
+  release, because the three commits made after that release are the ones WhisperJAV needs: the
+  bundled Silero voice-detection weights were updated to version 6.2, new voice-detection settings
+  were added, and a deprecated download option was removed. The 1.2.1 release still carries the older
+  weights. Taking a fixed commit rather than "the latest" means every install gets the same code,
+  and it is the same build WhisperJAV is developed and tested against.
 - **FireRedVAD is installed with WhisperJAV.** The `fireredvad` package is now part of the
   standard install (every extra that includes `cli`, the Windows installer, Colab and Kaggle).
-  It is no longer marked experimental in the CLI, the GUI or the docs. Its detection presets are
+  It is no longer marked experimental in the CLI, the GUI or the docs. It is available on Fidelity
+  and on the ChronosJAV pipelines; Balanced no longer takes an external segmenter (above). Its detection presets are
   the upstream defaults; the segment-length cap was tuned on JAV field tests in v1.9.0. The
   ~2 MB model weights still download from HuggingFace on first use. (#311)
 
@@ -513,6 +547,8 @@ behaviour instead.
 
 | Date | Change |
 |------|--------|
+| 2026-09-09 | Balanced runs the Internal FW Silero VAD and nothing else: `--vad-version 3.1|4.0|6.2` (default 3.1) picks the Silero build, all three models ship inside WhisperJAV, and `--speech-segmenter`, `--pass1/2-speech-segmenter`, `--max-group-duration` and `--chunk-threshold` now stop the run on Balanced instead of being accepted. `--no-vad` removed. Detection thresholds 0.5 / 0.4 / 0.3. Faster-Whisper fixed to SYSTRAN master @ ed9a06c (three commits past 1.2.1, for the Silero v6.2 weights) and `ctranslate2==4.8.1` |
+| 2026-09-09 | Semantic is the default scene detector, and each scene detector finally receives its own parameter names — every semantic run since v1.8.11 had silently used the engine's built-in 20 s/420 s. Balanced resolves 28 s minimum / 20 min maximum |
 | 2026-09-06 | A GPU the PyTorch build has no kernels for stops the run at start-up and asks whether to continue on the CPU or abort (GUI: abort, tick "Accept CPU-only mode" to proceed); `--check` exits 1 on such a card (#411, #326, #333) |
 | 2026-09-06 | Subtitle entries that are only punctuation (a lone 「。」 or 「、」, an ellipsis alone) are dropped on the ChronosJAV pipelines; inline punctuation untouched (#413) |
 | 2026-09-06 | Cached Hugging Face models load without a hub round-trip (WhisperSeg, anime-whisper); `--offline` flag and GUI "Offline mode" checkbox set `HF_HUB_OFFLINE=1` for the run and its workers, off by default; a missing model fails at once (#415) |
