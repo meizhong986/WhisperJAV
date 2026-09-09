@@ -1376,7 +1376,7 @@ wheels = [
 [[package]]
 name = "faster-whisper"
 version = "1.2.1"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/SYSTRAN/faster-whisper.git?rev=ed9a06cd89a93e47838f564998a6c09b655d7f43#ed9a06cd89a93e47838f564998a6c09b655d7f43" }
 dependencies = [
     { name = "av", version = "17.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "av", version = "18.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
@@ -1386,9 +1386,6 @@ dependencies = [
     { name = "onnxruntime", version = "1.29.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "tokenizers" },
     { name = "tqdm" },
-]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/05/99/49ee85903dee060d9f08297b4a342e5e0bcfca2f027a07b4ee0a38ab13f9/faster_whisper-1.2.1-py3-none-any.whl", hash = "sha256:79a66ad50688c0b794dd501dc340a736992a6342f7f95e5811be60b5224a26a7", size = 1118909, upload-time = "2025-10-31T11:35:47.794Z" },
 ]
 
 [[package]]
@@ -6115,6 +6112,7 @@ source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
     { name = "colorama" },
+    { name = "ctranslate2" },
     { name = "faster-whisper" },
     { name = "ffmpeg-python" },
     { name = "jsonschema" },
@@ -6551,10 +6549,11 @@ requires-dist = [
     { name = "bs-roformer-infer", marker = "extra == 'enhance'" },
     { name = "clearvoice", marker = "extra == 'enhance'", git = "https://github.com/meizhong986/ClearerVoice-Studio.git?subdirectory=clearvoice" },
     { name = "colorama" },
+    { name = "ctranslate2", specifier = "==4.8.1" },
     { name = "datasets", marker = "extra == 'enhance'", specifier = ">=3.0.0,<=3.6.0" },
     { name = "einops", marker = "extra == 'enhance'" },
     { name = "fastapi", marker = "extra == 'llm'", specifier = ">=0.100.0" },
-    { name = "faster-whisper", specifier = ">=1.1.0" },
+    { name = "faster-whisper", git = "https://github.com/SYSTRAN/faster-whisper.git?rev=ed9a06cd89a93e47838f564998a6c09b655d7f43" },
     { name = "ffmpeg-python", git = "https://github.com/kkroening/ffmpeg-python.git" },
     { name = "fireredvad", marker = "extra == 'cli'", specifier = ">=0.0.2" },
     { name = "gdown", marker = "extra == 'enhance'" },
