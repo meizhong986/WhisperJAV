@@ -18,15 +18,22 @@ These presets are the SINGLE SOURCE OF TRUTH for the native-VAD VadOptions.
 
 SCALE NOTE (important)
 ----------------------
-``threshold`` here is for faster-whisper's BUNDLED Silero VAD, whose probability
-scale differs from the external ``silero-v3.1`` segmenter. The values below were set
-deliberately (T2 decision, 2026-06-29) and must NOT be copied from the external
-silero presets (whose 0.18-0.41 thresholds would over-trigger here). The non-threshold
-millisecond parameters (min_speech / min_silence / speech_pad) ARE model-agnostic and
-are inherited from the JAV-tuned silero presets.
+``threshold`` here is on the scale of the Silero build the built-in VAD is running,
+which differs from the external ``silero-v3.1`` segmenter's scale — the external
+presets' 0.18-0.41 thresholds would over-trigger here. The owner set the v1.9.2
+values (conservative 0.5 / balanced 0.4 / aggressive 0.3) on 2026-09-09 and they
+apply to every selectable build.
 
-Only the keys consumed by ``FasterWhisperProASR._build_vad_parameters`` are defined
-(threshold, neg_threshold, min_speech_duration_ms, max_speech_duration_s,
+VERSION (v1.9.2, requirements S6-S8)
+------------------------------------
+``version`` selects WHICH Silero build the built-in VAD runs: 3.1 (default), 4.0 or
+6.2. WhisperJAV ships all three ONNX models in the wheel; ``FasterWhisperProASR``
+reads this field and installs ``whisperjav.modules.silero_vad_adapter``, which
+rebinds faster-whisper's model factory. It is NOT a faster-whisper VadOptions field
+and ``FasterWhisperProASR._build_vad_parameters`` whitelists it out.
+
+Apart from ``version``, only the keys consumed by ``_build_vad_parameters`` are
+defined (threshold, neg_threshold, min_speech_duration_ms, max_speech_duration_s,
 min_silence_duration_ms, speech_pad_ms). Grouping params (chunk_threshold_s,
 max_group_duration_s) are intentionally OMITTED — they belong to the external
 segmenter, not faster-whisper VadOptions.
@@ -34,18 +41,27 @@ segmenter, not faster-whisper VadOptions.
 
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from whisperjav.config.components.base import VADComponent, register_vad
+from whisperjav.modules.silero_vad_adapter import DEFAULT_VAD_VERSION, VAD_VERSIONS
 
 
 class FasterWhisperVADOptions(BaseModel):
     """faster-whisper native VadOptions (maps 1:1 to faster_whisper.vad.VadOptions)."""
 
+    version: str = Field(
+        DEFAULT_VAD_VERSION,
+        description="Which Silero VAD build faster-whisper's built-in VAD runs: "
+                    f"{' | '.join(VAD_VERSIONS)}. WhisperJAV ships all three ONNX models "
+                    "and selects one at runtime (v1.9.2, requirement S6-S8). NOT a "
+                    "faster-whisper VadOptions field -- consumed by "
+                    "FasterWhisperProASR, which installs the adapter.",
+    )
     threshold: float = Field(
         0.40,
         ge=0.0, le=1.0,
-        description="Speech probability threshold for faster-whisper's bundled Silero VAD. "
+        description="Speech probability threshold for the selected Silero VAD build. "
                     "Lower = more sensitive (captures quieter/breathier speech).",
     )
     neg_threshold: Optional[float] = Field(
@@ -76,6 +92,13 @@ class FasterWhisperVADOptions(BaseModel):
         description="Padding added around each detected speech chunk.",
     )
 
+    @field_validator("version")
+    @classmethod
+    def _known_version(cls, v: str) -> str:
+        if v not in VAD_VERSIONS:
+            raise ValueError(f"version must be one of {VAD_VERSIONS}, got {v!r}")
+        return v
+
 
 @register_vad
 class FasterWhisperVAD(VADComponent):
@@ -98,14 +121,18 @@ class FasterWhisperVAD(VADComponent):
     # === Schema ===
     Options = FasterWhisperVADOptions
 
-    # === Presets (T2 decision, 2026-06-29) ===
-    # threshold / max_speech_duration_s: locked T2 values, calibrated to the
-    #   fast references (XXL 0.45, notebook 0.35-0.40) and JAV recall needs.
+    # === Presets ===
+    # threshold: the owner settled these for v1.9.2 (2026-09-09) -- conservative
+    #   0.5 / balanced 0.4 / aggressive 0.3, the SAME range for every Silero
+    #   build. Do not re-measure them.  (They replace the T2 2026-06-29 values
+    #   0.45 / 0.40 / 0.25.)
+    # version: 3.1 on every sensitivity (requirement S8).
+    # max_speech_duration_s: locked T2 values (2026-06-29).
     # min_speech / min_silence / speech_pad: inherited from the JAV-tuned silero
     #   presets (model-agnostic millisecond params).
     presets = {
         "conservative": FasterWhisperVADOptions(
-            threshold=0.45,
+            threshold=0.50,
             min_speech_duration_ms=150,
             max_speech_duration_s=20.0,
             min_silence_duration_ms=300,
@@ -119,7 +146,7 @@ class FasterWhisperVAD(VADComponent):
             speech_pad_ms=400,
         ),
         "aggressive": FasterWhisperVADOptions(
-            threshold=0.25,
+            threshold=0.30,
             min_speech_duration_ms=30,
             max_speech_duration_s=9.0,
             min_silence_duration_ms=300,
