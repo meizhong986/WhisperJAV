@@ -107,6 +107,22 @@ LEGACY_PIPELINES = {
         # rest when whisperseg becomes the runtime default.
         "vad": "silero-v3.1",
         "features": ["auditok_scene_detection"],
+        # v1.9.2 (owner decision): Balanced scenes are at least 28 s and at most 20
+        # minutes. The keys differ by backend because the backends read different names,
+        # and 28 is only SAFE on semantic, whose min_duration merges. On auditok
+        # min_duration DISCARDS shorter regions, so only the ceiling is set there.
+        # fast and fidelity deliberately declare nothing here and keep the backend's own
+        # defaults (owner decision: balanced only).
+        "scene_overrides": {
+            "semantic": {
+                "scene_detection.min_duration": 28.0,
+                "scene_detection.max_duration": 1200.0,
+            },
+            "auditok": {
+                "scene_detection.max_duration_s": 1200.0,
+                "scene_detection.pass1_max_duration_s": 1200.0,
+            },
+        },
         "description": "Full feature set with scene detection and VAD. Best quality.",
     },
     "faster": {
@@ -141,6 +157,94 @@ LEGACY_PIPELINES = {
 }
 
 
+# Scene-detection feature component per runtime backend (v1.9.2).
+#
+# Before v1.9.2 every scene-detecting pipeline declared "auditok_scene_detection"
+# regardless of --scene-detection-method, so a semantic run was handed auditok's
+# parameter names (max_duration_s, min_duration_s, pass1_*) and silently fell back to
+# the engine's own hard-coded defaults -- the semantic backend reads min_duration /
+# max_duration without the _s suffix and ignores the rest.
+#
+# Resolving the feature from the effective method also closes a trap that appears once
+# a semantic component exists: the auditok backend falls back to the bare names when
+# the _s ones are absent, and its min_duration DISCARDS shorter regions, so handing
+# auditok a semantic min_duration of 28 would delete every region under 28 seconds.
+SCENE_FEATURE_BY_METHOD = {
+    "auditok": "auditok_scene_detection",
+    "silero": "silero_scene_detection",
+    "semantic": "semantic_scene_detection",
+    "none": None,          # no scene detection feature at all
+}
+
+_SCENE_FEATURE_NAMES = frozenset(
+    name for name in SCENE_FEATURE_BY_METHOD.values() if name
+)
+
+_METHOD_BY_SCENE_FEATURE = {
+    feature: method
+    for method, feature in SCENE_FEATURE_BY_METHOD.items()
+    if feature
+}
+
+
+def _select_scene_feature(
+    declared_features: List[str],
+    scene_method: Optional[str],
+) -> List[str]:
+    """Swap the declared scene-detection feature for the one matching ``scene_method``.
+
+    A pipeline that declares NO scene-detection feature (``faster``) never gains one,
+    whatever the method says -- it has no scene detector to configure. An unknown
+    method leaves the declaration untouched rather than guessing.
+
+    CONTRACT for ``scene_method="none"``: the scene feature is removed, so the resolved
+    config carries no ``features["scene_detection"]`` at all. The caller must then set
+    ``{"method": "none"}`` itself, because ``SceneDetectorFactory`` falls back to auditok
+    when no method is present. The ensemble worker does exactly that
+    (``_apply_gui_overrides``); ``--scene-detection-method`` deliberately does not offer
+    "none", so the single-pass path cannot reach this case.
+    """
+    if not scene_method:
+        return list(declared_features)
+
+    key = str(scene_method).strip().lower()
+    if key not in SCENE_FEATURE_BY_METHOD:
+        logger.warning(
+            "Unknown scene detection method '%s'; keeping the pipeline's declared "
+            "scene feature(s) %s", scene_method, list(declared_features),
+        )
+        return list(declared_features)
+
+    declares_scene = any(f in _SCENE_FEATURE_NAMES for f in declared_features)
+    if not declares_scene:
+        return list(declared_features)
+
+    kept = [f for f in declared_features if f not in _SCENE_FEATURE_NAMES]
+    target = SCENE_FEATURE_BY_METHOD[key]
+    if target:
+        kept.append(target)
+    return kept
+
+
+def _normalise_scene_method(
+    scene_method: Optional[str],
+    declared_features: List[str],
+) -> str:
+    """The method whose parameter names this resolution will produce.
+
+    Falls back to whatever the pipeline declares, so callers that pass no method keep
+    exactly the pre-v1.9.2 behaviour.
+    """
+    if scene_method:
+        key = str(scene_method).strip().lower()
+        if key in SCENE_FEATURE_BY_METHOD:
+            return key
+    for feature in declared_features:
+        if feature in _METHOD_BY_SCENE_FEATURE:
+            return _METHOD_BY_SCENE_FEATURE[feature]
+    return "none"
+
+
 def resolve_legacy_pipeline(
     pipeline_name: str,
     sensitivity: str = "balanced",
@@ -148,6 +252,7 @@ def resolve_legacy_pipeline(
     overrides: Optional[Dict[str, Any]] = None,
     device: Optional[str] = None,
     compute_type: Optional[str] = None,
+    scene_method: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Resolve configuration from legacy pipeline name.
@@ -161,6 +266,13 @@ def resolve_legacy_pipeline(
         overrides: Parameter overrides
         device: Device override (None/'auto' = auto-detect, 'cuda'/'cpu' = explicit)
         compute_type: Compute type override (None/'auto' = provider-specific default)
+        scene_method: Scene-detection backend that will actually run ('auditok',
+            'silero', 'semantic', 'none'). v1.9.2: selects the matching scene feature
+            component so the resolved parameter NAMES are the ones that backend reads,
+            and selects the pipeline's per-backend scene overrides. None means "whatever
+            the pipeline declares" (auditok for the legacy pipelines) -- the feature list
+            is left alone, and that backend's scene overrides still apply, because they
+            describe the backend that will actually run.
 
     Returns:
         Resolved configuration dictionary.
@@ -176,14 +288,27 @@ def resolve_legacy_pipeline(
 
     pipeline_def = LEGACY_PIPELINES[pipeline_name]
 
+    # v1.9.2: the scene-detection feature follows the backend that will actually run,
+    # so the resolved parameter names match the backend that reads them.
+    features = _select_scene_feature(pipeline_def["features"], scene_method)
+
+    # v1.9.2: a pipeline may declare its own scene bounds, per backend, because the
+    # parameter NAMES differ between backends. Merged under any caller overrides, which
+    # keep precedence.
+    effective_overrides = dict(pipeline_def.get("scene_overrides", {}).get(
+        _normalise_scene_method(scene_method, pipeline_def["features"]), {}
+    ))
+    if overrides:
+        effective_overrides.update(overrides)
+
     # Resolve using new system
     config = resolve_config_v3(
         asr=pipeline_def["asr"],
         vad=pipeline_def["vad"],
         sensitivity=sensitivity,
         task=task,
-        features=pipeline_def["features"],
-        overrides=overrides,
+        features=features,
+        overrides=effective_overrides or None,
         device=device,
         compute_type=compute_type,
     )
@@ -509,6 +634,12 @@ def apply_balanced_vad_defaults(
 
     elif is_balanced and backend not in (None, "", "none"):
         # Balanced + external segmenter → Test-D fine-grained grouping default.
+        #
+        # UNREACHABLE since v1.9.2 (owner S2/S9): both entry points normalise a balanced
+        # pipeline to the built-in VAD before calling this, so `backend` is always
+        # "faster-whisper" here and the first branch takes it. Kept, not deleted, because
+        # this helper is the shared contract for both entry points and the branch would
+        # be the correct behaviour again if balanced ever regained a segmenter.
         vad = params.setdefault("vad", {})
         ss = params.setdefault("speech_segmenter", {})
         vad["max_group_duration_s"] = 9.0
