@@ -87,7 +87,6 @@ def test_build_args():
         'keep_temp': True,
         'verbosity': 'verbose',
         'async_processing': True,
-        'no_vad': True,
         'model_override': 'large-v3',
         'credit': 'Produced by Test Studio',
     }
@@ -99,10 +98,10 @@ def test_build_args():
     assert '--temp-dir' in args, "--temp-dir flag should be present"
     assert '/tmp/whisperjav' in args, "Temp dir should be present"
     assert '--keep-temp' in args, "--keep-temp flag should be present"
-    assert '--verbosity' in args, "--verbosity flag should be present"
-    assert 'verbose' in args, "Verbosity value should be present"
+    # NOTE: 'verbosity' is an ENSEMBLE-only argument (_build_ensemble_args emits
+    # --verbosity; build_args never did) and the GUI has no verbosity control at
+    # all. These two assertions were stale, not a regression.
     assert '--async-processing' in args, "--async-processing flag should be present"
-    assert '--no-vad' in args, "--no-vad flag should be present"
     assert '--model' in args, "--model flag should be present"
     assert 'large-v3' in args, "Model value should be present"
     assert '--credit' in args, "--credit flag should be present"
