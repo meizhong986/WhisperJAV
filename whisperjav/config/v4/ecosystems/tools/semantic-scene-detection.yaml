@@ -126,9 +126,9 @@ gui:
   max_duration:
     widget: slider
     label: "Max Segment Duration"
-    description: "Maximum segment length in seconds. Longer segments are split."
+    description: "Merge ceiling in seconds: a merge that would exceed it is declined. Overlong segments are NOT split -- the engine keeps them and logs a warning."
     min: 60
-    max: 600
+    max: 1200
     step: 10
     data_type: float
     unit: "s"
