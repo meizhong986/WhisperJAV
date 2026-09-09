@@ -140,7 +140,10 @@ class FasterWhisperProASR:
                 config=merged_segmenter_config
             )
             if self._use_native_vad:
-                logger.info("Speech Segmenter: faster-whisper native VAD (vad_filter=True, single call/scene)")
+                # Owner O4 (2026-09-09): the user-facing name is "Internal FW Silero VAD".
+                # DEBUG, not INFO: main.py / the pass worker already print the one line
+                # C11 asked for, naming the version and the threshold.
+                logger.debug("Speech detection: Internal FW Silero VAD, one pass per scene")
             else:
                 logger.info(f"Speech Segmenter initialized: {self._external_segmenter.name}")
         except Exception as e:
@@ -203,6 +206,14 @@ class FasterWhisperProASR:
             logger.info("Translation mode enabled - output will be in English")
         self._logged_param_snapshot = False
         self._vad_parameters = self._build_vad_parameters(vad_params)
+        # v1.9.2 (S6-S8): choose WHICH Silero build the built-in VAD runs. Must happen
+        # before the first transcribe() call, and in whichever process hosts the model
+        # -- this constructor runs in the parent when the recognizer is in-process and
+        # in the spawned worker otherwise (asr_worker_proxy._asr_worker_main), so this
+        # single site covers both.
+        self.vad_version = None
+        if self._use_native_vad:
+            self.vad_version = self._install_vad_version(vad_params)
         self._reset_runtime_statistics()
         # --- END V3 PARAMETER UNPACKING ---
 
@@ -370,11 +381,60 @@ class FasterWhisperProASR:
             logger.debug(f"  Combined Whisper Params: {self.whisper_params}")
             logger.debug("----------------------------------------------------")
 
+    def _install_vad_version(self, vad_params: Dict[str, Any]) -> str:
+        """
+        Point the internal FW Silero VAD at the Silero build the user chose.
+
+        ``params["vad"]["version"]`` comes from the FasterWhisperVAD preset (default 3.1,
+        requirement S8) and is overridden by --vad-version, --passN-vad-version or the
+        GUI dropdown.
+
+        Owner decision O3 (2026-09-09): if the chosen build cannot be loaded, fall back to
+        the Silero model faster-whisper ships with, and say so loudly. If THAT cannot be
+        loaded either, stop the run -- do not transcribe with no voice detection at all.
+        """
+        from whisperjav.modules.silero_vad_adapter import install, active_version
+
+        requested = vad_params.get("version")
+        version = install(requested)
+        threshold = (self._vad_parameters or {}).get("threshold")
+        shown = f"{threshold:.2f}" if isinstance(threshold, (int, float)) else "default"
+        if active_version() == version:
+            # DEBUG, not INFO: this constructor runs again on every model refresh (a fresh
+            # worker process every 20 minutes of scene audio by default), so an INFO line
+            # here would repeat. C11 asked for ONE line per run and the entry point prints
+            # it -- main.py for a single-pass run, the pass worker for each ensemble pass.
+            logger.debug("VAD: Silero v%s, threshold %s", version, shown)
+            return version
+
+        # The chosen build did not load. install() has already logged why. Before
+        # continuing on faster-whisper's own model, prove that model actually works --
+        # otherwise the run would reach the first scene and fail there, or worse, run
+        # with no voice detection at all.
+        try:
+            import faster_whisper.vad as fw_vad
+            fw_vad.get_vad_model()
+        except Exception as exc:
+            raise RuntimeError(
+                f"Voice detection is unavailable: Silero v{version} could not be loaded, "
+                f"and neither could the model faster-whisper ships with ({exc}). "
+                "Reinstall WhisperJAV, or reinstall faster-whisper."
+            ) from exc
+
+        logger.warning(
+            "VAD: running the Silero model faster-whisper ships with, NOT the requested "
+            "v%s (threshold %s).", version, shown,
+        )
+        return active_version()
+
     def _build_vad_parameters(self, vad_params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Convert config VAD settings into faster-whisper VadOptions format."""
         if not vad_params:
             return None
 
+        # Whitelist: only real faster-whisper VadOptions fields survive. In
+        # particular 'version' (which Silero build to run, v1.9.2) is OURS and must
+        # never reach VadOptions -- it would raise TypeError there.
         mapping = {
             'threshold': 'threshold',  # faster-whisper VadOptions expects the raw threshold name
             'neg_threshold': 'neg_threshold',  # optional, only present if config defines it
@@ -577,7 +637,7 @@ class FasterWhisperProASR:
             # Check if this is because segmenter returned empty (no speech) or "none" backend
             if self._external_segmenter.name == "none":
                 if getattr(self, "_use_native_vad", False):
-                    logger.info("faster-whisper native VAD: single transcribe call per scene (vad_filter=True)")
+                    logger.debug("Internal FW Silero VAD: one pass over the whole scene")
                 else:
                     logger.info("Speech segmentation: disabled (none backend) - transcribing full audio directly")
                 all_segments = self._transcribe_full_audio(audio_data, sample_rate)
