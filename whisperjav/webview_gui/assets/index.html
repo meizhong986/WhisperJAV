@@ -531,8 +531,11 @@
                                         </div>
                                     </div>
                                     <div class="col-segmenter">
+                                        <!-- v1.9.2: the EXTERNAL speech segmenters. When a pass's
+                                             Pipeline is Balanced, app.js (populateSegmenterOptions)
+                                             swaps this list for the built-in VAD's Silero versions:
+                                             balanced offers no external segmenter (S2/S9). -->
                                         <select id="pass1-segmenter" class="form-select compact">
-                                            <option value="faster-whisper" title="faster-whisper's built-in VAD (vad_filter=True). Fastest — one transcribe call per scene. Pick an external segmenter instead to get the best-quality fine-grained grouping.">Faster-Whisper Native VAD (fast)</option>
                                             <option value="silero">Silero v4.0</option>
                                             <option value="silero-v3.1">Silero v3.1</option>
                                             <option value="silero-v6.2">Silero v6.2</option>
@@ -696,8 +699,11 @@
                                         </div>
                                     </div>
                                     <div class="col-segmenter">
+                                        <!-- v1.9.2: the EXTERNAL speech segmenters. When a pass's
+                                             Pipeline is Balanced, app.js (populateSegmenterOptions)
+                                             swaps this list for the built-in VAD's Silero versions:
+                                             balanced offers no external segmenter (S2/S9). -->
                                         <select id="pass2-segmenter" class="form-select compact" disabled>
-                                            <option value="faster-whisper" title="faster-whisper's built-in VAD (vad_filter=True). Fastest — one transcribe call per scene.">Faster-Whisper Native VAD (fast)</option>
                                             <option value="silero">Silero v4.0</option>
                                             <option value="silero-v3.1">Silero v3.1</option>
                                             <option value="silero-v6.2">Silero v6.2</option>
