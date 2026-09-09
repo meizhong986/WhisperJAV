@@ -94,6 +94,7 @@ DECODER_PARAMS = {
 from whisperjav.config.segmenter_presets import (  # noqa: E402
     SEGMENTER_PARAMS,
     BALANCED_DEFAULT_SEGMENTER,
+    DEFAULT_SCENE_DETECTOR,
     SEGMENTER_TOOL_NAMES as _SEGMENTER_TOOL_NAMES,
     resolve_segmenter_sensitivity as resolve_qwen_sensitivity,
 )
@@ -1379,6 +1380,20 @@ def _build_pipeline(
             )
             raise
 
+    # v1.9.2: resolve the scene detector BEFORE the config. The resolved parameter NAMES
+    # depend on the backend that will run — semantic reads min_duration / max_duration,
+    # auditok and silero read the _s spellings — so choosing the backend afterwards (as
+    # _apply_gui_overrides does for the "method" key) is too late to fix the names. Same
+    # default as main.py's single-pass path, for the same reason the speech-segmenter
+    # default is mirrored below: the same pipeline+sensitivity must resolve identically
+    # at all three entry points. An explicit --passN-scene-detector still wins.
+    _scene_method = pass_config.get("scene_detector") or DEFAULT_SCENE_DETECTOR
+    if not pass_config.get("scene_detector"):
+        logger.debug(
+            "Pass %s: no scene detector passed; defaulting to %s",
+            pass_number, _scene_method,
+        )
+
     resolved_config = resolve_legacy_pipeline(
         pipeline_name=pipeline_name,
         sensitivity=pass_config.get("sensitivity", "balanced"),
@@ -1386,6 +1401,7 @@ def _build_pipeline(
         overrides=pass_config.get("overrides"),
         device=pass_config.get("device"),  # None = auto-detect
         compute_type=pass_config.get("compute_type"),  # None = auto
+        scene_method=_scene_method,
     )
 
     # Apply source language from pass_config (fixes Issue #104)
@@ -1502,7 +1518,12 @@ def apply_custom_params(
                 # Silero backends read from params["vad"] (legacy path).
                 # Non-Silero backends read from params["speech_segmenter"].
                 seg_backend = params.get("speech_segmenter", {}).get("backend", "silero-v4.0")
-                if seg_backend.startswith("silero"):
+                # v1.9.2: "faster-whisper" is the recognizer's BUILT-IN VAD and its
+                # parameters ARE faster-whisper VadOptions, which FasterWhisperProASR
+                # reads from params["vad"] -- the same place the silero backends use.
+                # Routing them to params["speech_segmenter"] silently dropped every
+                # Customize > Segmenter edit on a balanced pass.
+                if seg_backend.startswith("silero") or seg_backend == "faster-whisper":
                     if "vad" not in params:
                         params["vad"] = {}
                     params["vad"][key] = value
@@ -1534,7 +1555,12 @@ def apply_custom_params(
             elif key in SEGMENTER_PARAMS:
                 # Route segmenter params based on backend type.
                 seg_backend = params.get("speech_segmenter", {}).get("backend", "silero-v4.0")
-                if seg_backend.startswith("silero"):
+                # v1.9.2: "faster-whisper" is the recognizer's BUILT-IN VAD and its
+                # parameters ARE faster-whisper VadOptions, which FasterWhisperProASR
+                # reads from params["vad"] -- the same place the silero backends use.
+                # Routing them to params["speech_segmenter"] silently dropped every
+                # Customize > Segmenter edit on a balanced pass.
+                if seg_backend.startswith("silero") or seg_backend == "faster-whisper":
                     vad_params[key] = value
                     logger.debug("Pass %s: Set vad.%s", pass_number, key)
                 else:
@@ -1688,12 +1714,23 @@ def _apply_gui_overrides(
     # apply_balanced_vad_defaults below keyed off the wrong backend. Default it
     # here so the same mode+sensitivity resolves identically at all three entry
     # points. An explicit --passN-speech-segmenter still wins.
-    if speech_segmenter is None and pass_config.get("pipeline") == "balanced":
-        # Same default as main.py's `--mode balanced` (owner N3, 2026-09-05:
-        # the built-in VAD, reversing the v1.9.2 development-build FireRedVAD default).
+    if pass_config.get("pipeline") == "balanced":
+        # v1.9.2 (S2/S9): a balanced pass has NO external speech segmenter. It runs
+        # faster-whisper's built-in VAD, and the user's choice is which Silero build
+        # that VAD uses (vad_version, below). main.py rejects an external segmenter
+        # for a balanced pass at parse time; this normalisation is what makes the
+        # behaviour true at the point it derives from, including for a stale saved
+        # preset or a hand-written pass_config that never went through argparse.
+        if speech_segmenter and speech_segmenter != BALANCED_DEFAULT_SEGMENTER:
+            logger.warning(
+                "Pass %s: speech segmenter '%s' is not available on the balanced "
+                "pipeline since v1.9.2 -- using faster-whisper's built-in VAD. "
+                "Select the Silero build with the VAD version option.",
+                pass_number, speech_segmenter,
+            )
         speech_segmenter = BALANCED_DEFAULT_SEGMENTER
         logger.debug(
-            "Pass %s: balanced pipeline defaults to %s (built-in VAD)",
+            "Pass %s: balanced pipeline uses %s (built-in VAD)",
             pass_number, speech_segmenter,
         )
     if speech_segmenter is not None:  # Allow empty string for default
@@ -1742,6 +1779,21 @@ def _apply_gui_overrides(
         sensitivity=pass_config.get("sensitivity", "balanced"),
         is_balanced=(pass_config.get("pipeline") == "balanced"),
     )
+
+    # v1.9.2 (S6-S8): which Silero build the built-in VAD runs for this pass.
+    # apply_balanced_vad_defaults above already put the preset's version (3.1) into
+    # params["vad"]; an explicit --passN-vad-version / GUI choice wins. Runs after
+    # that call for exactly that reason. FasterWhisperProASR reads it and installs
+    # the adapter inside the process that hosts the model.
+    vad_version = pass_config.get("vad_version")
+    if vad_version and pass_config.get("pipeline") == "balanced":
+        # Balanced ONLY. For any other pipeline params["vad"] is the external Silero
+        # segmenter's parameter block, which is merged into that segmenter's
+        # constructor config (whisper_pro_asr.py) -- and SileroSpeechSegmenter has a
+        # constructor parameter of its own literally called `version`. Writing a
+        # built-in-VAD key into a shared block is how that kind of collision starts.
+        resolved_config.setdefault("params", {}).setdefault("vad", {})["version"] = vad_version
+        logger.debug("Pass %s: Override vad_version = Silero v%s", pass_number, vad_version)
 
     # Override speech enhancer if specified
     speech_enhancer = pass_config.get("speech_enhancer")
@@ -1792,3 +1844,18 @@ def _apply_gui_overrides(
             resolved_config["params"]["speech_segmenter"] = {}
         resolved_config["params"]["speech_segmenter"]["speech_pad_ms"] = speech_pad_ms
         logger.debug("Pass %s: Override speech_pad_ms = %s", pass_number, speech_pad_ms)
+
+    # C11 (owner): ONE INFO line per pass naming the VAD that will run. Same reason as
+    # main.py -- the recognizer is rebuilt on every model refresh, so the line belongs at
+    # the entry point, not in the recognizer's constructor. Last in this function, so it
+    # reports the values after every override above.
+    if (resolved_config.get("params", {}).get("speech_segmenter") or {}).get("backend") == "faster-whisper":
+        _v = resolved_config.get("params", {}).get("vad") or {}
+        _thr = _v.get("threshold")
+        logger.info(
+            "Pass %s VAD: Silero v%s, threshold %s",
+            pass_number,
+            _v.get("version", "3.1"),
+            f"{_thr:.2f}" if isinstance(_thr, (int, float)) else "default",
+        )
+
