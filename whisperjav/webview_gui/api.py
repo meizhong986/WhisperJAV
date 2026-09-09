@@ -228,10 +228,22 @@ class WhisperJAVAPI:
         if options.get('async_processing', False):
             args += ["--async-processing"]
 
-        # Speech segmenter selection (replaces --no-vad)
+        # Speech segmenter selection.
+        # v1.9.2 (S2/S9): the balanced pipeline has no external speech segmenter --
+        # it runs faster-whisper's built-in VAD, and main.py rejects
+        # --speech-segmenter with --mode balanced. The Transcription tab never sends
+        # one (S9.2: it uses the defaults), so this only guards a caller that does.
         speech_segmenter = options.get('speech_segmenter', '').strip()
+        if speech_segmenter and options.get('mode') == 'balanced':
+            print(f"[api] Ignoring speech_segmenter={speech_segmenter!r}: the balanced "
+                  f"pipeline uses the built-in VAD (v1.9.2). Use vad_version instead.")
+            speech_segmenter = ''
         if speech_segmenter:
             args += ["--speech-segmenter", speech_segmenter]
+
+        # No --vad-version is emitted here on purpose: S9.2 says the Transcription tab
+        # "shall just use the default", and it has no VAD control. The version is chosen
+        # per pass in the Ensemble tab (_build_twopass_args).
 
         # Model override
         model_override = options.get('model_override', '').strip()
@@ -1230,6 +1242,76 @@ class WhisperJAVAPI:
         except Exception:
             return {}
 
+    # Widget hints for faster-whisper's built-in VAD. The DEFAULTS are not here --
+    # they come from the FasterWhisperVAD preset for the pass's sensitivity, so this
+    # table and the runtime cannot drift.
+    _NATIVE_VAD_GUI = {
+        "threshold": {
+            "widget": "slider", "min": 0.05, "max": 0.95, "step": 0.05,
+            "data_type": "float", "label": "Speech Threshold", "group": "detection",
+            "description": "Probability above which a 32 ms window counts as speech. "
+                           "Lower catches quieter, breathier speech and more noise.",
+        },
+        "min_speech_duration_ms": {
+            "widget": "spinner", "min": 0, "max": 5000, "step": 10,
+            "data_type": "int", "label": "Min Speech (ms)", "group": "detection",
+            "description": "Speech shorter than this is discarded.",
+        },
+        "min_silence_duration_ms": {
+            "widget": "spinner", "min": 0, "max": 5000, "step": 50,
+            "data_type": "int", "label": "Min Silence (ms)", "group": "detection",
+            "description": "Silence shorter than this does not split a speech chunk.",
+        },
+        "max_speech_duration_s": {
+            "widget": "slider", "min": 1.0, "max": 60.0, "step": 1.0,
+            "data_type": "float", "label": "Max Speech (s)", "group": "grouping",
+            "description": "A speech chunk longer than this is split. A subtitle-length "
+                           "knob: it does not change how fast the recognizer runs.",
+        },
+        "speech_pad_ms": {
+            "widget": "spinner", "min": 0, "max": 2000, "step": 50,
+            "data_type": "int", "label": "Speech Padding (ms)", "group": "grouping",
+            "description": "Padding kept on each side of a detected speech chunk.",
+        },
+    }
+
+    def _native_vad_schema(self, backend: str) -> Dict[str, Any]:
+        """Parameter schema for faster-whisper's built-in VAD (v1.9.2)."""
+        try:
+            from whisperjav.config.components.vad.faster_whisper_vad import FasterWhisperVAD
+            from whisperjav.modules.silero_vad_adapter import (
+                DEFAULT_VAD_VERSION, VAD_VERSION_LABELS,
+            )
+        except Exception as e:  # pragma: no cover - defensive
+            return {"success": False, "error": f"Could not load native VAD schema: {e}"}
+
+        presets = {
+            name: {k: v for k, v in FasterWhisperVAD.get_preset(name).model_dump().items()
+                   if k != "version" and v is not None}
+            for name in ("conservative", "balanced", "aggressive")
+        }
+        defaults = presets["balanced"]
+        parameters = self._convert_gui_hints_to_schema(self._NATIVE_VAD_GUI, defaults)
+        version_list = ", ".join(VAD_VERSION_LABELS)
+        return {
+            "success": True,
+            "backend": backend,
+            "display_name": "Internal FW Silero VAD",
+            "description": (
+                "Faster-Whisper finds the speech itself, in one pass over each scene. "
+                "The Balanced pipeline uses this and nothing else since v1.9.2."
+            ),
+            "info_message": (
+                f"Pick the version in this pass's row above ({version_list}). "
+                f"The default is {DEFAULT_VAD_VERSION}. The settings below apply to "
+                "whichever version you pick."
+            ),
+            "parameters": parameters,
+            "defaults": defaults,
+            "presets": presets,
+            "groups": self._extract_groups(self._NATIVE_VAD_GUI),
+        }
+
     def _convert_gui_hints_to_schema(self, gui_hints: Dict, spec: Dict) -> Dict[str, Any]:
         """Convert YAML gui hints to frontend schema format."""
         schema = {}
@@ -1313,6 +1395,16 @@ class WhisperJAVAPI:
             "whisperseg": "whisperseg-speech-segmentation.yaml",
             "firered-vad": "firered-vad-speech-segmentation.yaml",  # v1.9.0; installed by default since v1.9.2
         }
+
+        # v1.9.2: "faster-whisper" is not an external segmenter and has no tool YAML
+        # -- it is the recognizer's OWN VAD, and its parameters are faster-whisper
+        # VadOptions. The balanced pipeline uses nothing else since v1.9.2, so this
+        # branch is what the Customize > Segmenter tab shows for every balanced pass.
+        # Built from the FasterWhisperVAD Pydantic component, the single source of
+        # truth for those values; before this the tab returned "Unknown segmenter
+        # backend: faster-whisper".
+        if backend == "faster-whisper":
+            return self._native_vad_schema(backend)
 
         # Handle "none" backend
         if backend == "none":
@@ -2608,13 +2700,19 @@ class WhisperJAVAPI:
     # Two-Pass Ensemble Methods
     # ========================================================================
 
-    def get_pipeline_defaults(self, pipeline: str, sensitivity: str, segmenter: str = None) -> Dict[str, Any]:
+    def get_pipeline_defaults(self, pipeline: str, sensitivity: str, segmenter: str = None,
+                              scene_detector: str = None) -> Dict[str, Any]:
         """
         Get resolved parameters for a pipeline+sensitivity combination.
 
         Args:
             pipeline: Pipeline name ('balanced', 'fast', 'faster', 'fidelity', 'kotoba-faster-whisper', 'transformers')
             sensitivity: Sensitivity level ('conservative', 'balanced', 'aggressive')
+            segmenter: Speech segmenter the pass will use (drives the balanced VAD overlay)
+            scene_detector: Scene backend the pass will use ('semantic', 'auditok',
+                'silero', 'none'). v1.9.2: decides which scene parameter NAMES the panel
+                shows, because the backends read different ones. Empty/None = the shared
+                DEFAULT_SCENE_DETECTOR, the same default the CLI and the pass worker use.
 
         Returns:
             dict with resolved parameters that can be customized
@@ -2647,10 +2745,18 @@ class WhisperJAVAPI:
         try:
             from whisperjav.config.legacy import resolve_legacy_pipeline
 
+            # v1.9.2: resolve with the scene backend the pass will actually use, so the
+            # panel shows that backend's own parameter names and values (semantic reads
+            # min_duration / max_duration; auditok and silero read the _s spellings).
+            # Same default as main.py and pass_worker, from the one shared constant.
+            from whisperjav.config.segmenter_presets import DEFAULT_SCENE_DETECTOR
+            effective_scene_method = (scene_detector or '').strip() or DEFAULT_SCENE_DETECTOR
+
             config = resolve_legacy_pipeline(
                 pipeline_name=pipeline,
                 sensitivity=sensitivity,
-                task='transcribe'
+                task='transcribe',
+                scene_method=effective_scene_method,
             )
 
             # v1.9.0: reflect the runtime balanced VAD defaults in the Customize
@@ -2681,11 +2787,11 @@ class WhisperJAVAPI:
                 if segmenter not in ('none', 'faster-whisper') and not segmenter.startswith('silero'):
                     config['params']['vad'] = {k: v for k, v in ss.items() if k != 'backend'}
 
-            # Determine scene detection method (default: auditok)
-            scene_detection_method = 'auditok'
-            if 'features' in config and config['features'].get('scene_detection'):
-                # Could be enhanced to read from config if specified
-                pass
+            # The scene method that will actually run. Before v1.9.2 this was hardcoded
+            # to 'auditok' beside an empty `if ... : pass`, so the panel reported auditok
+            # whatever the pass was configured to use.
+            scene_cfg = (config.get('features') or {}).get('scene_detection') or {}
+            scene_detection_method = scene_cfg.get('method') or effective_scene_method
 
             # M11: Detect V3 config by structure, not pipeline name string
             # V3 configs (like kotoba) have 'params.asr', legacy have 'params.decoder'
@@ -2745,7 +2851,13 @@ class WhisperJAVAPI:
                     "vad": config['params']['vad']
                 },
                 "model": config['model'],
-                "scene_detection_method": scene_detection_method
+                "scene_detection_method": scene_detection_method,
+                # v1.9.2: the RESOLVED scene parameters, so the Customize panel seeds the
+                # Scene tab with what will actually run. Without this the tab fell back to
+                # the tool YAML's defaults, and saving a customised pass wrote those back
+                # over the pipeline's own values (Balanced resolves 28 s / 1200 s, while
+                # the semantic YAML declares 20 / 420).
+                "scene_params": {k: v for k, v in scene_cfg.items() if k != 'method'}
             }
         except Exception as e:
             return {
@@ -2996,7 +3108,16 @@ class WhisperJAVAPI:
                 # Both Qwen and Legacy use --pass1-speech-segmenter
                 # For Qwen: pass_worker.py translates to qwen_segmenter (post-ASR VAD filter)
                 # For Legacy: used as pre-ASR speech segmentation
-                if segmenter1:  # Pass any value including "none" to disable
+                #
+                # v1.9.2 (S2/S9): a BALANCED pass has no external segmenter -- it runs
+                # faster-whisper's built-in VAD, and main.py rejects
+                # --pass1-speech-segmenter for it. What the user picks in that row is
+                # the Silero VERSION, sent as --pass1-vad-version instead.
+                if pass1.get('pipeline') == 'balanced':
+                    version1 = str(pass1.get('vadVersion') or '').strip()
+                    if version1:
+                        args += ["--pass1-vad-version", version1]
+                elif segmenter1:  # Pass any value including "none" to disable
                     args += ["--pass1-speech-segmenter", segmenter1]
 
             # Pass 1: Speech Enhancer
@@ -3106,7 +3227,16 @@ class WhisperJAVAPI:
                     # Both Qwen and Legacy use --pass2-speech-segmenter
                     # For Qwen: pass_worker.py translates to qwen_segmenter (post-ASR VAD filter)
                     # For Legacy: used as pre-ASR speech segmentation
-                    if segmenter2:  # Pass any value including "none" to disable
+                    #
+                    # v1.9.2 (S2/S9): a BALANCED pass has no external segmenter -- it runs
+                    # faster-whisper's built-in VAD, and main.py rejects
+                    # --pass2-speech-segmenter for it. What the user picks in that row is
+                    # the Silero VERSION, sent as --pass2-vad-version instead.
+                    if pass2.get('pipeline') == 'balanced':
+                        version2 = str(pass2.get('vadVersion') or '').strip()
+                        if version2:
+                            args += ["--pass2-vad-version", version2]
+                    elif segmenter2:  # Pass any value including "none" to disable
                         args += ["--pass2-speech-segmenter", segmenter2]
 
                 # Pass 2: Speech Enhancer
@@ -3759,6 +3889,7 @@ class WhisperJAVAPI:
         "scene_detector":    "sceneDetector",
         "speech_enhancer":   "speechEnhancer",
         "speech_segmenter":  "speechSegmenter",
+        "vad_version":       "vadVersion",
         "model":             "model",
         "customized":        "customized",
         "params":            "params",       # nested dict — passed as-is
