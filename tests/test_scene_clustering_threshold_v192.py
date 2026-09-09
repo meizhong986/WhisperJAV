@@ -75,12 +75,29 @@ class TestCli:
         assert "only affects the semantic" not in log
 
     def test_threshold_without_semantic_warns(self, tmp_path):
-        dump, log = _dump(tmp_path, "--mode", "balanced", "--scene-clustering-threshold", "10")
+        # v1.9.2: semantic is the DEFAULT scene detector, so the warning is now keyed to
+        # an explicitly non-semantic choice rather than to "no --scene-detection-method".
+        dump, log = _dump(tmp_path, "--mode", "balanced",
+                          "--scene-detection-method", "auditok",
+                          "--scene-clustering-threshold", "10")
         assert "only affects the semantic scene detector" in log
         # Still injected (harmless: auditok/silero ignore it), so switching the
         # method later in the same config picks it up.
         assert dump["resolved_config"]["features"]["scene_detection"]["clustering_threshold"] == 10.0
 
-    def test_absent_flag_leaves_features_untouched(self, tmp_path):
-        dump, _ = _dump(tmp_path, "--mode", "balanced", "--scene-detection-method", "semantic")
-        assert "clustering_threshold" not in dump["resolved_config"]["features"]["scene_detection"]
+    def test_threshold_with_the_default_detector_does_not_warn(self, tmp_path):
+        # The v1.9.2 default is semantic, so the knob applies and must not warn.
+        dump, log = _dump(tmp_path, "--mode", "balanced", "--scene-clustering-threshold", "10")
+        assert "only affects the semantic" not in log
+        sd = dump["resolved_config"]["features"]["scene_detection"]
+        assert sd["method"] == "semantic"
+        assert sd["clustering_threshold"] == 10.0
+
+    def test_absent_flag_leaves_the_preset_value(self, tmp_path):
+        # Before v1.9.2 the resolved feature was auditok's, which has no such field, so
+        # "absent" meant "key missing". The semantic component declares the parameter, so
+        # absence now means "still the sensitivity preset's value, not an injected one".
+        dump, _ = _dump(tmp_path, "--mode", "balanced", "--sensitivity", "balanced",
+                        "--scene-detection-method", "semantic")
+        sd = dump["resolved_config"]["features"]["scene_detection"]
+        assert sd["clustering_threshold"] == 18.0
