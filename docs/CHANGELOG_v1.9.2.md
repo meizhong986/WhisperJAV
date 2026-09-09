@@ -8,10 +8,252 @@
 > Conventions: one entry per landed change, newest first. "Decision" lines
 > record who decided what, so a later reader can tell policy from mechanism.
 >
-> **SYNC** — pack r2.6 · 2026-09-06 | tracker rev 51.6 | change log through 2026-09-06 (#411 round 2, CPU-only users section) | `dev_v1.9.2` @ 20ea6f3 |
+> **SYNC** — pack r2.6 · 2026-09-06 | tracker rev 51.6 | change log through 2026-09-09 (balanced pipeline: semantic scene default + Silero VAD version selection, **uncommitted**) | `dev_v1.9.2` @ bc2474b + 24 modified / 3 new files, uncommitted |
 > GitHub 134 open · 231 closed · 12 PRs · 0 labels applied · 32 owed (8 replies posted 2026-09-06; #413 follow-up at 16:11 UTC). Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
 > (updated in place; never a second page). Rule: a session that changes the pack, this file or the change
 > log brings the other two to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
+
+---
+
+## 2026-09-09 — the balanced pipeline picks which Silero VAD it runs, and drops the external speech segmenter
+
+**Owner requirements:** `Requirements_balanced_pipeline_v192.txt` S2, S6, S7, S8, S9, S9.1, S9.2, plus
+the clarifications typed the same day. The owner stated the two user-facing problems this addresses:
+external VAD makes balanced run at 0.7-1x realtime, and the internal VAD skips major spoken stretches.
+S4/S5 (offload and reload the model per scene) he withdrew — the existing 20-minute refresh stands.
+
+**Decision (owner, 2026-09-09):** a NEW `--vad-version` flag rather than overloading
+`--speech-segmenter`; the trimming is BALANCED-ONLY, so fidelity, qwen, anime-whisper and non-balanced
+ensemble passes keep their segmenters; thresholds are settled at conservative 0.5 / balanced 0.4 /
+aggressive 0.3 for every version and are not to be re-measured; all three models ship inside the
+wheel; `faster-whisper` and `ctranslate2` are pinned exactly; `--no-vad` goes; one INFO line names the
+running version, with no checksums or model probing.
+
+**His premise S6B1/S6B2 is false, and the correction is the whole design.** faster-whisper does not
+choose its Silero model from any cache that can be pre-populated. It builds a hard-coded path inside
+its own package — `vad.py` → `os.path.join(get_assets_path(), "silero_vad_v6.onnx")` — verified in
+1.0.2, PyPI 1.2.1, SYSTRAN git master and the 2.1.1 fork. There is no environment variable, no cache
+directory and no hook, and the file cannot simply be swapped because the three Silero generations have
+different ONNX input signatures. The reference script the owner cited pre-populates *stable-ts*'s
+`cached_model_instances['silero_vad']`, a different library on a code path balanced does not take.
+So the choice is made one level up: `whisperjav/modules/silero_vad_adapter.py` rebinds the module-level
+`faster_whisper.vad.get_vad_model`. Everything above the model — `get_speech_timestamps`, the
+hysteresis, the padding, the chunk assembly — stays faster-whisper's own code, untouched, and it is the
+only consumer of that function in the package.
+
+**Three traps decided correctness, and each produces plausible-looking wrong output rather than an
+error.** v3.1's ONNX output is two-class and index 1 is speech (index 0 gives a smooth, believable
+series that is not speech probability). All three builds are stateful and batch-1, so the LSTM state
+carries window to window and must reset per audio. And the 64-sample context concatenation is a v5/v6
+input convention that belongs to 6.2 alone. The 6.2 adapter reproduces faster-whisper's own bundled
+model to three decimal places on a real clip (mean probability 0.129, 12.1 % of windows above 0.40,
+identical), which is the independent check that the context handling is right.
+
+**Area:** `modules/silero_vad_adapter.py` (new); `assets/vad/*.onnx` (new, 4.7 MB, MIT);
+`config/components/vad/faster_whisper_vad.py` (`version` field + the owner's thresholds);
+`modules/faster_whisper_pro_asr.py` (`_install_vad_version`, the C11 INFO line);
+`main.py` (`--vad-version`, `--pass1/2-vad-version`, `validate_balanced_vad_options`, `--no-vad`
+removed); `ensemble/pass_worker.py`; `webview_gui/{api.py,assets/app.js,assets/index.html}`;
+`pyproject.toml`; `installer/core/registry.py`; tests.
+
+**C11, one INFO line per run.** `VAD: Silero v3.1, threshold 0.40`, printed by the entry point --
+`main.py` for a single-pass run, the pass worker for each ensemble pass. Not by the recogniser: it is
+rebuilt on every model refresh (a fresh worker process every 20 minutes of scene audio by default), so
+a line there repeated about six times on a feature-length film. The recogniser logs what it actually
+loaded at DEBUG and **warns** if that is not the requested build, so the one INFO line cannot become a
+claim about a version that is not running.
+
+**Where the adapter is installed, and why there.** `FasterWhisperProASR.__init__` installs it when the
+backend is the built-in VAD. That constructor runs in whichever process hosts the model — the parent
+when `--model-refresh-audio-minutes 0`, the spawned worker otherwise
+(`modules/asr_worker_proxy.py:_asr_worker_main`), and its own worker again for each ensemble pass — so
+one site covers every case. It is process-global by nature; balanced runs nothing else in that process.
+
+**S2/S9, the external segmenter.** `--speech-segmenter` with `--mode balanced`, and
+`--passN-speech-segmenter` with a balanced pass, are now usage errors (exit 2, before any
+transcription) instead of silently producing a different pipeline. `pass_worker._apply_gui_overrides`
+additionally normalises a balanced pass to the built-in VAD with a warning, so a stale saved preset or
+a hand-written `pass_config` that never passed argparse behaves the same way. In the Ensemble tab the
+Speech Segmenter dropdown becomes the VAD *version* selector for a balanced pass — Silero 3.1
+(selected), 4.0, 6.2 and nothing else — and switches back to the external list for any other pipeline.
+
+**Two defects found on the way, both fixed here.** `get_segmenter_schema("faster-whisper")` returned
+"Unknown segmenter backend", so the Customize → Segmenter tab has been showing an error for every
+balanced pass; it now returns a schema built from the Pydantic component. And
+`_apply_custom_params` routed segmenter parameters by `seg_backend.startswith("silero")`, sending the
+built-in VAD's parameters to `params["speech_segmenter"]` where nothing reads them — so every
+Customize edit on a balanced pass was silently dropped. Both are pre-existing, neither was reported.
+
+**Verified by running it, not by reading it** (the owner does not accept reported tests otherwise):
+
+| what | evidence |
+|---|---|
+| the INFO line, in the spawned worker | `VAD: Silero v3.1, threshold 0.40` on a real 293 s run |
+| the version actually changes transcription | same clip, same settings: 3.1 → 32 cues, 4.0 → 50, 6.2 → 28 |
+| ensemble matches single-pass | `--ensemble --pass1-pipeline balanced --pass1-vad-version 4.0` → 50 cues, identical |
+| thresholds | `--dump-params` balanced × 3 sensitivities → 0.5 / 0.4 / 0.3, version 3.1 |
+| the rejections | balanced + `--speech-segmenter` → exit 2; balanced pass + `--passN-speech-segmenter` → exit 2; `--vad-version` off balanced → exit 2; a qwen pass keeps `ten` |
+| `--no-vad` | absent from `--help`; `--no-vad file.wav` → exit 2, "unrecognized arguments" |
+| the GUI dropdown | app.js driven against the real `index.html` option lists: Balanced → `3.1, 4.0, 6.2` with 3.1 selected; Fidelity → the external list back; the choice survives a round trip; the run payload sends `speechSegmenter: null` + `vadVersion` |
+| tests | `tests/test_vad_version_v192.py` 32 passed; `test_scene_clustering_threshold_v192.py` 9 passed; `webview_gui/test_api.py` 9 passed |
+
+**Measured, and relevant to the second user problem.** On a 293 s clip at threshold 0.40, the model
+faster-whisper bundles finds 21.8 % of the audio to be speech; Silero 3.1 finds 31.2 % and 4.0 finds
+44.8 %. That is the mechanism behind "the output skips over major parts of the movie", and it is now a
+user-facing choice. **This is one clip and it is not a recommendation** — the default stays 3.1 per S8,
+and no claim about which version is better belongs in the release notes until a feature-length A/B exists.
+
+**Throughput.** ONNX only, never the torch-JIT: measured per 60 s of audio, single thread, JIT v3.1 12×
+realtime against ONNX v3.1 87×. In the pipeline the adapters run at 77× (3.1), 146× (4.0) and 188×
+(6.2) realtime, so a two-hour film costs roughly 90-140 s of CPU for the VAD pass.
+
+**Pins (owner decision, 2026-09-10).** `ctranslate2==4.8.1` exactly, and **faster-whisper pinned to a
+COMMIT rather than a release**: SYSTRAN master @ `ed9a06cd89a93e47838f564998a6c09b655d7f43`, which is
+exactly three commits past the v1.2.1 tag — `cf42429` (drops a deprecated download argument, #1389),
+`2eeafe0` (**replaces the bundled Silero weights with v6.2**, #1390) and `ed9a06c` (adds VAD
+parameters, #1386). The owner runs that build, it is what he tests against, and #1390 is the reason:
+the 1.2.1 release still carries the older Silero v6 weights.
+
+Established, not inferred: his installed `vad.py` and `transcribe.py` are byte-identical to
+`upstream/master`, and the bundled `silero_vad_v6.onnx` (md5 `67e11e5a`) is the file master added in
+#1390. It produces the same probabilities as the Silero 6.2 model WhisperJAV ships — measured on a
+real clip, mean 0.129 and 12.1 % of windows above 0.40 for both, and the same 31 speech chunks — so
+`--vad-version 6.2` and this build's own default are the same weights.
+
+Pinning the commit rather than the branch is what keeps installs reproducible: `master.tar.gz` moves,
+a commit does not. `pyproject.toml`, `whisperjav/installer/core/registry.py` (as a git source) and
+`uv.lock` all carry it, and the installer validation passes. **This also closes the note that used to
+sit here:** the development environment and what users receive are now the same code.
+
+**Both gates ran, and both found real defects.** `call-chain-verifier` returned WIRED on all three
+chains but caught two pieces of CLI surface that S2/S9 had made unreachable while still advertising
+themselves: `faster-whisper` was still a `--speech-segmenter` choice whose help said "balanced only"
+(balanced rejects it), and the firered-vad / ten routing-guard exemption still told users those
+backends work on `--mode balanced`. Both removed. Its third finding, that `init()` never calls
+`populateSegmenterOptions`, is wrong -- it does, at `app.js:1687`; the agent read the file before that
+call landed.
+
+`assessment-adversary` was given **the owner's requirements file**, not a plan written here. It could
+not break the adapter: it reproduced all three builds against reference implementations (torch-JIT
+v3.1, torch-JIT v4.0, the `silero_vad` pip package) on real audio at correlation 1.00000, and found no
+path where a balanced run still receives an external segmenter. What it did find, all now fixed:
+`pass_worker` wrote `vad_version` into `params["vad"]` for **any** pipeline, where for a non-balanced
+pass that block belongs to the external Silero segmenter -- which has a constructor argument of its own
+called `version`; `--passN-vad-version` was accepted and silently ignored on a non-balanced pass while
+`--vad-version` exits 2 on a non-balanced mode; **C11 was violated** (two lines, the second once per
+model refresh); `--max-group-duration` and `--chunk-threshold` were live no-ops on balanced, which the
+prior investigation had named "to trim"; `install()` returned the requested version even after falling
+back; four pieces of over-engineering (a prefix-tolerant `normalise_version` no producer can exercise,
+a `VAD_VERSION_LABELS` comment claiming two consumers it does not have, an `is_available()` with no
+production caller, and a `--vad-version` emitter on a GUI tab that has no VAD control) -- all cut; the
+adapter's `__call__` is not reentrant where the code it replaces is; and `uv.lock` still carried
+`faster-whisper>=1.1.0` with no ctranslate2 entry, so the exact pins existed in two manifests of three
+(`uv lock` regenerated, a 3-line change).
+
+**Owner decisions, typed 2026-09-09 after those asks were put to him.** *"'omitted' mean omitted...
+If a CLI user script tries to use those old APIs, that shall be a failure. Ie backward compatibility
+shall be broken."* So `--speech-segmenter` on `--mode balanced` stops the run, and so do
+`--max-group-duration` and `--chunk-threshold` there — they set how an external speech segmenter
+groups what it found, and Balanced has none, so they were changed from a warning to a stop. On the
+fallback: *"The fall back shall be to use the original faster whisper. If that too fails then it is a
+failure and the process shall stop!"* — a Silero build that will not load now falls back to the model
+faster-whisper ships with, loudly, and if that will not load either the run stops with a message
+telling the user to reinstall. And the user-facing name is his: **"Internal FW Silero VAD"**, in the
+Customize panel and in the dropdown.
+
+Two of the six asks he could not read, because they were written in a metaphor ("escape hatch") and
+in an internal constant name. Rewritten in plain language in
+`docs/plans/V192_BALANCED_IMPLEMENTATION_PLAN.md` §6 and both answered on 2026-09-10: his 6 September
+decision letting FireRedVAD and TEN be chosen on Balanced is superseded — *"removed speech segmnenters
+is correct. No exceptions."* — and the loss of the "suspect" result on Balanced he treats as following
+from his own requirement rather than a separate decision: *"The question is mute as no external speech
+segmente is available for balanced mode."* The rule that came out of the wording failure is recorded in
+memory: no metaphors, no internal names, no jargon he has not used himself.
+
+Its most important finding is not a bug: **product decisions were being presented as implementation.**
+Failing a run, the exit-code contract and anything a user scripts against are the owner's, not an
+implementation detail (CLAUDE.md A4). All six were put to him and all six are answered —
+`docs/plans/V192_BALANCED_IMPLEMENTATION_PLAN.md` §6 carries the question, his words and the state.
+
+**Not done / open:** the process-global rebind also reaches kotoba and stable-ts's batched path if one
+of them runs in the same process as a balanced recogniser — balanced does not, but scoping it is an
+owner decision. The "suspect" result is gone from Balanced for good: the check
+needs a second speech detector to compare against and the built-in VAD provides none, and choosing an
+external segmenter -- the only way a user could switch it back on -- no longer exists. Owner
+2026-09-10: *"The question is mute as no external speech segmente is available for balanced mode."* Four pre-existing test failures in `tests/config/{test_resolver_v3,test_legacy}.py` assert
+old *silero* component values and are unrelated to this change.
+
+---
+
+## 2026-09-09 — scene detection: semantic becomes the default, and each backend finally gets its own parameters
+
+**Owner decisions (typed 2026-09-09):** flip the default scene detector to semantic; make it the
+default for every Transcription-tab pipeline and the matching CLI; raise the `le=300` bound;
+`fast`/`fidelity` keep semantic's own 20 s/420 s while **balanced** gets 28 s/1200 s; a 1200 s ceiling
+equal to the 20-minute model-refresh budget is accepted while #394 is open; add a semantic *component*
+rather than post-mutating the resolved config. The flip itself was first approved on 2026-04-20 for
+v1.8.12 (`memory/project_v1812_default_backends_flip.md`) and never applied to the CLI, while the GUI
+Ensemble tab has shipped `semantic selected` since v1.8.11 — the two entry points disagreed until now.
+
+**Area:** `config/components/features/scene_detection.py` (new `SemanticSceneDetectionOptions` +
+`SemanticSceneDetection`; `max_duration_s` bound `le=300` → `le=1200` on the auditok **and** silero
+option classes); `config/components/features/__init__.py`; `config/legacy.py`
+(`SCENE_FEATURE_BY_METHOD`, `_select_scene_feature`, `_normalise_scene_method`, new `scene_method`
+parameter on `resolve_legacy_pipeline`, per-backend `scene_overrides` on the balanced entry);
+`config/segmenter_presets.py` (`DEFAULT_SCENE_DETECTOR`); `main.py`; `ensemble/pass_worker.py`;
+`webview_gui/api.py`; `webview_gui/assets/app.js`;
+`config/v4/ecosystems/tools/semantic-scene-detection.yaml`; tests.
+
+**Mechanism it fixes (established, executed not read):** every scene-detecting pipeline declared
+`auditok_scene_detection` regardless of `--scene-detection-method`, so a semantic run received
+auditok's parameter names. The semantic backend reads `min_duration`/`max_duration` without the `_s`
+suffix (`semantic_backend.py:68-73`) and the factory passes kwargs through untranslated
+(`factory.py:239`), so **every semantic run since v1.8.11 — including every GUI ensemble pass — ran on
+the engine's hard-coded 20/420 defaults**, whatever the configuration said. The feature component is
+now selected from the backend that will actually run.
+
+**The trap this closes:** auditok's config builder falls back to the bare names when the `_s` ones are
+absent (`auditok_backend.py:152-153`), and its `min_duration` *discards* shorter regions rather than
+merging them (`:437` falls through, `:466` drops). Handing auditok a semantic `min_duration` of 28
+would therefore delete every region under 28 seconds, with its audio. Verified by `--dump-params`:
+`--scene-detection-method auditok --mode balanced` resolves the `_s` names at 1200/1200 and carries no
+bare `min_duration` at all.
+
+**Verified by execution:** `--help`; `--dump-params` for balanced/fast/fidelity/faster × 3
+sensitivities (balanced 28/1200 on all three, fast/fidelity 30/420·20/420·10/180, `faster` gains no
+scene feature); explicit `auditok`/`silero`/`semantic` on balanced; the clustering-threshold warning
+now keys off the *effective* method; two end-to-end balanced runs, exit 0.
+`tests/test_scene_clustering_threshold_v192.py` 9 passed after updating two tests whose premise was the
+old default. `tests/config/test_resolver_v3.py` has 2 failures that are **pre-existing** — identical
+with these changes stashed out.
+
+**Not verified, and it is the open question:** what the new default does to output at feature length.
+Two single-run A/Bs, same command but for the flag:
+
+| clip | detector | cues | speech span | last cue | characters |
+|---|---|---|---|---|---|
+| Netflix drama, 293 s (GT: 68 cues, 46.9%) | semantic | 13 | 11.7% | 1:48 | 210 |
+| | auditok | 24 | 13.6% | 3:02 | 312 |
+| JAV SONE-966, 464 s | semantic | 17 | 7.7% | 2:53 | 369 |
+| | auditok | 16 | 7.4% | 4:11 | 200 |
+
+They disagree: auditok is clearly better on the drama clip, semantic yields more text on the JAV clip.
+The only pattern common to both is that **semantic's last cue is earlier**, which is an observation,
+not a cause. n=2, one run each, both far below ground truth for reasons that pre-date this change.
+A feature-length A/B on `EKAI-023` (179 min) is the test that speaks to the reported failure mode
+(output stopping after 60-110 minutes) and has **not** been run. The default flip should not be
+described to users as an improvement until it has.
+
+**Deliberately not done:** `SceneOverlapResolver` is NOT wired into balanced/fast/fidelity. Semantic
+returns padded, overlapping scenes — measured on EKAI-023: 51 seams, 0.100-0.700 s each, median
+0.414 s, 18.0 s total, 0.168% of the film — while the resolver's Rule 1a drops any fully nested cue on
+geometry alone with no text comparison (`scene_overlap_resolver.py:104-107`). On balanced a stitched
+cue can run to 30 s, so a short interjection at a scene head could be deleted. The fix is larger than
+the exposure; revisit with a kill switch if duplicate cues are observed.
+
+**Follow-ups:** the feature-length A/B above; `brute_force_chunk_s` stays 29 s (bounded `le=120`), so
+that rare auditok fallback still chunks at 29 s regardless of the ceiling; `pass1_max_silence_s` stays
+2.5 (measured inert on both films at auditok's energy threshold).
 
 ---
 
