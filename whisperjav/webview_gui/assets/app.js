@@ -1279,6 +1279,7 @@ const EnsembleManager = {
             sceneDetector: 'semantic',
             speechEnhancer: 'none',
             speechSegmenter: 'whisperseg',  // v1.9.0: WhisperSeg pairs with anime-whisper
+            vadVersion: '3.1',  // v1.9.2: which Silero build the BUILT-IN VAD runs (balanced only)
             model: 'litagin/anime-whisper',
             customized: false,
             params: null,  // null = use defaults, object = full custom config
@@ -1299,6 +1300,7 @@ const EnsembleManager = {
             sceneDetector: 'semantic',
             speechEnhancer: 'none',
             speechSegmenter: 'ten',  // v1.9.0: TEN VAD on pass 2 for segmentation diversity vs pass 1's WhisperSeg
+            vadVersion: '3.1',  // v1.9.2: which Silero build the BUILT-IN VAD runs (balanced only)
             model: 'Qwen/Qwen3-ASR-1.7B',
             customized: false,
             params: null,
@@ -1386,7 +1388,12 @@ const EnsembleManager = {
         this.state.pass1.sensitivity = document.getElementById('pass1-sensitivity').value;
         this.state.pass1.sceneDetector = document.getElementById('pass1-scene').value;
         this.state.pass1.speechEnhancer = document.getElementById('pass1-enhancer').value;
-        this.state.pass1.speechSegmenter = document.getElementById('pass1-segmenter').value;
+        const seg1 = document.getElementById('pass1-segmenter');
+        if (seg1.dataset.mode === 'vad-version') {
+            this.state.pass1.vadVersion = seg1.value;
+        } else {
+            this.state.pass1.speechSegmenter = seg1.value;
+        }
         this.state.pass1.model = document.getElementById('pass1-model').value;
 
         // Pass 2 state sync
@@ -1395,7 +1402,12 @@ const EnsembleManager = {
         this.state.pass2.sensitivity = document.getElementById('pass2-sensitivity').value;
         this.state.pass2.sceneDetector = document.getElementById('pass2-scene').value;
         this.state.pass2.speechEnhancer = document.getElementById('pass2-enhancer').value;
-        this.state.pass2.speechSegmenter = document.getElementById('pass2-segmenter').value;
+        const seg2 = document.getElementById('pass2-segmenter');
+        if (seg2.dataset.mode === 'vad-version') {
+            this.state.pass2.vadVersion = seg2.value;
+        } else {
+            this.state.pass2.speechSegmenter = seg2.value;
+        }
         this.state.pass2.model = document.getElementById('pass2-model').value;
 
         this.state.mergeStrategy = document.getElementById('merge-strategy').value;
@@ -1522,7 +1534,13 @@ const EnsembleManager = {
             this.state.pass1.enhanceForVad = e.target.checked;
         });
         document.getElementById('pass1-segmenter').addEventListener('change', (e) => {
-            this.state.pass1.speechSegmenter = e.target.value;
+            // v1.9.2: on a balanced pass this dropdown selects the built-in VAD's
+            // Silero version, not an external segmenter.
+            if (e.target.dataset.mode === 'vad-version') {
+                this.state.pass1.vadVersion = e.target.value;
+            } else {
+                this.state.pass1.speechSegmenter = e.target.value;
+            }
         });
         document.getElementById('pass1-model').addEventListener('change', (e) => {
             this.state.pass1.model = e.target.value;
@@ -1547,7 +1565,13 @@ const EnsembleManager = {
             this.state.pass2.enhanceForVad = e.target.checked;
         });
         document.getElementById('pass2-segmenter').addEventListener('change', (e) => {
-            this.state.pass2.speechSegmenter = e.target.value;
+            // v1.9.2: on a balanced pass this dropdown selects the built-in VAD's
+            // Silero version, not an external segmenter.
+            if (e.target.dataset.mode === 'vad-version') {
+                this.state.pass2.vadVersion = e.target.value;
+            } else {
+                this.state.pass2.speechSegmenter = e.target.value;
+            }
         });
 
         // BYOP: Browse for XXL executable
@@ -1657,6 +1681,11 @@ const EnsembleManager = {
         });
 
         // Initialize UI state based on synced values
+        // v1.9.2: the browser can restore a pass's Pipeline to Balanced across a
+        // reload without firing a change event, so the segmenter dropdown is put in
+        // the right mode here too, not only in handlePipelineChange.
+        this.populateSegmenterOptions('pass1');
+        this.populateSegmenterOptions('pass2');
         this.updatePass2State();
         this.updateBadges();
         this.updateRowGreyingState('pass1');
@@ -1732,8 +1761,71 @@ const EnsembleManager = {
         }
     },
 
+    // v1.9.2 (S7/S8): the Silero builds the balanced pipeline's BUILT-IN VAD can run.
+    // Order and default come from whisperjav/modules/silero_vad_adapter.py.
+    // Labels must match VAD_VERSION_LABELS in whisperjav/modules/silero_vad_adapter.py.
+    vadVersionOptions: [
+        { value: '3.1', label: 'Internal FW Silero VAD 3.1 (default)' },
+        { value: '4.0', label: 'Internal FW Silero VAD 4.0' },
+        { value: '6.2', label: 'Internal FW Silero VAD 6.2 (latest)' },
+    ],
+    defaultVadVersion: '3.1',
+
+    // The external-segmenter option list, captured from index.html the first time a
+    // dropdown is swapped, so the markup stays the single source for that list.
+    _externalSegmenterHTML: {},
+
+    /**
+     * Rebuild a pass's Speech Segmenter dropdown for the pipeline it now runs.
+     *
+     * v1.9.2 (S2/S9/S9.1): the balanced pipeline has NO external speech segmenter.
+     * It runs faster-whisper's built-in VAD, so for a balanced pass this dropdown
+     * becomes the VAD *version* selector -- Silero 3.1 (default), 4.0, 6.2 and
+     * nothing else. Every other pipeline gets the external list back unchanged.
+     * `dataset.mode` tells the change handler, the DOM sync and the availability
+     * check which of the two things the select currently means.
+     */
+    populateSegmenterOptions(passKey) {
+        const select = document.getElementById(`${passKey}-segmenter`);
+        if (!select) return;
+        if (this._externalSegmenterHTML[passKey] === undefined) {
+            this._externalSegmenterHTML[passKey] = select.innerHTML;
+        }
+        const passState = this.state[passKey];
+        const isBalanced = passState.pipeline === 'balanced';
+
+        if (isBalanced) {
+            if (select.dataset.mode !== 'vad-version') {
+                select.innerHTML = this.vadVersionOptions.map(o =>
+                    `<option value="${o.value}">${o.label}</option>`).join('');
+                select.dataset.mode = 'vad-version';
+            }
+            const version = passState.vadVersion || this.defaultVadVersion;
+            passState.vadVersion = version;
+            select.value = version;
+            select.title = 'Which version of the internal FW Silero VAD to use. '
+                + 'Balanced has no external speech segmenter since v1.9.2.';
+            // Keep the backend name consistent for everything that still reads it
+            // (Customize > Segmenter tab, get_pipeline_defaults, saved presets).
+            passState.speechSegmenter = 'faster-whisper';
+        } else if (select.dataset.mode === 'vad-version') {
+            select.innerHTML = this._externalSegmenterHTML[passKey];
+            delete select.dataset.mode;
+            select.title = '';
+            // Availability marking was applied to the options we just replaced.
+            this.updateSegmenterAvailability();
+        }
+    },
+
     // Set scene detector, segmenter, and sensitivity to appropriate defaults for the pipeline type
     applyPipelinePresets(passKey, pipelineType) {
+        // v1.9.2: put the right OPTION LIST in the segmenter dropdown before anything
+        // below assigns a value to it -- balanced gets the Silero VAD versions,
+        // everything else gets the external segmenters back. Ahead of the CrispASR
+        // return below, so switching Balanced -> CrispASR does not leave a greyed-out
+        // dropdown still showing VAD versions.
+        this.populateSegmenterOptions(passKey);
+
         // CrispASR is a self-contained external provider: WhisperJAV's
         // scene/segmenter/sensitivity controls are inert (greyed by
         // updateRowGreyingState), so there is nothing to preset here.
@@ -1787,11 +1879,16 @@ const EnsembleManager = {
                 // transcribe call per scene), the same default as main.py and the
                 // ensemble pass worker. Picking a WhisperJAV segmenter instead
                 // auto-applies the fine-grained grouping (handled in main.py).
-                // Scene detection stays auditok.
-                sceneSelect.value = 'auditok';
-                segmenterSelect.value = 'faster-whisper';
-                this.state[passKey].sceneDetector = 'auditok';
+                // v1.9.2: scene detection is SEMANTIC, like every other pipeline and
+                // like DEFAULT_SCENE_DETECTOR on the CLI. This branch used to force
+                // auditok, which silently overrode the new default the moment a user
+                // picked Balanced in the Ensemble tab.
+                // v1.9.2 (S2/S9): balanced offers no external segmenter. The
+                // dropdown becomes the Silero VERSION selector, default 3.1 (S8).
+                sceneSelect.value = 'semantic';
+                this.state[passKey].sceneDetector = 'semantic';
                 this.state[passKey].speechSegmenter = 'faster-whisper';
+                this.populateSegmenterOptions(passKey);
             } else if (pipeline === 'fidelity') {
                 // v1.8.13: whisperseg + semantic for fidelity (unchanged)
                 sceneSelect.value = 'semantic';
@@ -1969,7 +2066,12 @@ const EnsembleManager = {
             // Re-enable segmenter (unless pass2 is disabled)
             // Note: Qwen uses segmenter as post-ASR VAD filter
             segmenterSelect.disabled = isPass2Disabled;
-            segmenterSelect.title = passState.isQwen ? `Post-ASR VAD filter for ${passState.isAnimeWhisper ? 'Anime-Whisper' : (passState.isCohere ? 'Cohere-Transcribe' : 'Qwen3-ASR')}` : '';
+            if (segmenterSelect.dataset.mode === 'vad-version') {
+                segmenterSelect.title = 'Which version of the internal FW Silero VAD to use. '
+                    + 'Balanced has no external speech segmenter since v1.9.2.';
+            } else {
+                segmenterSelect.title = passState.isQwen ? `Post-ASR VAD filter for ${passState.isAnimeWhisper ? 'Anime-Whisper' : (passState.isCohere ? 'Cohere-Transcribe' : 'Qwen3-ASR')}` : '';
+            }
         }
 
         // Parameter guide button: visible only for Qwen pipelines
@@ -2284,7 +2386,11 @@ const EnsembleManager = {
             // Get resolved pipeline parameters. v1.9.0: pass the pass's segmenter so
             // the panel reflects the actual balanced VAD defaults (native
             // faster_whisper_vad preset, or Test-D grouping for an external segmenter).
-            const result = await pywebview.api.get_pipeline_defaults(pipeline, sensitivity, passState.speechSegmenter || '');
+            // v1.9.2: also pass the pass's scene detector, so the panel shows that
+            // backend's own scene parameters rather than auditok's names for every pass.
+            const result = await pywebview.api.get_pipeline_defaults(
+                pipeline, sensitivity, passState.speechSegmenter || '', passState.sceneDetector || ''
+            );
 
             if (!result.success) {
                 ErrorHandler.show('Error', 'Failed to load pipeline parameters: ' + result.error);
@@ -2297,7 +2403,13 @@ const EnsembleManager = {
                 decoder: {},
                 engine: {},
                 vad: {},
-                scene: { scene_detection_method: passState.sceneDetector || 'auditok' }
+                // v1.9.2: seed the Scene tab from the RESOLVED scene parameters, not from
+                // the tool YAML's defaults — otherwise saving a customised pass writes the
+                // YAML values back over the pipeline's own (Balanced resolves 28 s / 1200 s).
+                scene: {
+                    scene_detection_method: passState.sceneDetector || 'semantic',
+                    ...(result.scene_params || {})
+                }
             };
 
             // Categorize decoder params (from API's decoder section)
@@ -2408,7 +2520,7 @@ const EnsembleManager = {
             await this.generateEnhancerTab('tab-enhancer', enhancerBackend, passState.dspEffects || ['loudnorm']);
 
             // Generate Scene tab (backend-specific parameters)
-            const sceneBackend = passState.sceneDetector || 'auditok';
+            const sceneBackend = passState.sceneDetector || 'semantic';
             await this.generateSceneTab('tab-scene', sceneBackend, currentValues);
 
             // Reset to first tab
@@ -5183,6 +5295,7 @@ const EnsembleManager = {
             sceneDetector: passState.sceneDetector,
             speechEnhancer: passState.speechEnhancer,
             speechSegmenter: passState.speechSegmenter,
+            vadVersion: passState.vadVersion || '3.1',
             model: passState.model,
             customized: true,
             params: params,
@@ -5275,6 +5388,7 @@ const EnsembleManager = {
             if (preset.sceneDetector) passState.sceneDetector = preset.sceneDetector;
             if (preset.speechEnhancer !== undefined) passState.speechEnhancer = preset.speechEnhancer;
             if (preset.speechSegmenter) passState.speechSegmenter = preset.speechSegmenter;
+            if (preset.vadVersion) passState.vadVersion = preset.vadVersion;
             if (preset.model) passState.model = preset.model;
             if (preset.framer) passState.framer = preset.framer;
             if (preset.dspEffects) passState.dspEffects = preset.dspEffects;
@@ -5296,7 +5410,16 @@ const EnsembleManager = {
             setSilent(`${prefix}-sensitivity`, preset.sensitivity);
             setSilent(`${prefix}-scene`, preset.sceneDetector);
             setSilent(`${prefix}-enhancer`, preset.speechEnhancer);
-            setSilent(`${prefix}-segmenter`, preset.speechSegmenter);
+            // v1.9.2: a preset saved before this release can hold an external
+            // segmenter for a balanced pass. That combination no longer exists, so
+            // rebuild the dropdown for the preset's pipeline and show the VAD
+            // version instead of writing a value the list no longer contains.
+            this.populateSegmenterOptions(passKey);
+            if (passState.pipeline === 'balanced') {
+                setSilent(`${prefix}-segmenter`, passState.vadVersion || this.defaultVadVersion);
+            } else {
+                setSilent(`${prefix}-segmenter`, preset.speechSegmenter);
+            }
 
             if (oldType !== newType) {
                 // Pipeline type changed — swap model options first, then set model
@@ -5397,7 +5520,10 @@ const EnsembleManager = {
                 sceneDetector: this.state.pass1.sceneDetector,
                 speechEnhancer: this.state.pass1.speechEnhancer,
                 dspEffects: this.state.pass1.speechEnhancer === 'ffmpeg-dsp' ? this.state.pass1.dspEffects : null,
-                speechSegmenter: disableSegmenter(this.state.pass1) ? null : this.state.pass1.speechSegmenter,
+                // v1.9.2 (S2): a balanced pass sends NO segmenter -- the CLI rejects
+                // --pass1-speech-segmenter there -- and sends the VAD version instead.
+                speechSegmenter: (disableSegmenter(this.state.pass1) || this.state.pass1.pipeline === 'balanced') ? null : this.state.pass1.speechSegmenter,
+                vadVersion: this.state.pass1.pipeline === 'balanced' ? (this.state.pass1.vadVersion || '3.1') : null,
                 model: this.state.pass1.model,
                 customized: this.state.pass1.customized,
                 params: this.state.pass1.customized ? this.state.pass1.params : null,
@@ -5417,7 +5543,10 @@ const EnsembleManager = {
                 sceneDetector: this.state.pass2.sceneDetector,
                 speechEnhancer: this.state.pass2.speechEnhancer,
                 dspEffects: this.state.pass2.speechEnhancer === 'ffmpeg-dsp' ? this.state.pass2.dspEffects : null,
-                speechSegmenter: disableSegmenter(this.state.pass2) ? null : this.state.pass2.speechSegmenter,
+                // v1.9.2 (S2): a balanced pass sends NO segmenter -- the CLI rejects
+                // --pass2-speech-segmenter there -- and sends the VAD version instead.
+                speechSegmenter: (disableSegmenter(this.state.pass2) || this.state.pass2.pipeline === 'balanced') ? null : this.state.pass2.speechSegmenter,
+                vadVersion: this.state.pass2.pipeline === 'balanced' ? (this.state.pass2.vadVersion || '3.1') : null,
                 model: this.state.pass2.model,
                 customized: this.state.pass2.customized,
                 params: this.state.pass2.customized ? this.state.pass2.params : null,
@@ -5566,6 +5695,9 @@ const EnsembleManager = {
             ['pass1-segmenter', 'pass2-segmenter'].forEach(selectId => {
                 const select = document.getElementById(selectId);
                 if (!select) return;
+                // v1.9.2: when the dropdown is showing Silero VAD versions it is not
+                // listing segmenter backends, so backend availability does not apply.
+                if (select.dataset.mode === 'vad-version') return;
 
                 Array.from(select.options).forEach(option => {
                     const backend = option.value;
