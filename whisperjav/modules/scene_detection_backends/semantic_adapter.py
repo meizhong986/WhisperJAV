@@ -42,9 +42,11 @@ class SemanticClusteringConfig:
     Attributes:
         min_duration: Minimum segment duration in seconds (segments shorter
                       than this will be merged with neighbors)
-        max_duration: Merge ceiling in seconds — merges that would exceed it
-                      are declined. NOTE: overlong segments are NOT split;
-                      the engine logs a warning if clustering produces one.
+        max_duration: Scene ceiling in seconds, honoured while the engine
+                      stitches its 0.5 s clusters upward (merges past it are
+                      declined). No splitter: only a raw cluster longer than
+                      the ceiling or the final clean-up absorbing a sub-minimum
+                      neighbour can exceed it, and the engine logs a warning.
         snap_window: Window size in seconds for snapping boundaries to silence
         clustering_threshold: Distance threshold for agglomerative clustering
                               (lower = more segments, higher = fewer segments)
