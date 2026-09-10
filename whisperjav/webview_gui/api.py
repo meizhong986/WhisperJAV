@@ -2855,8 +2855,8 @@ class WhisperJAVAPI:
                 # v1.9.2: the RESOLVED scene parameters, so the Customize panel seeds the
                 # Scene tab with what will actually run. Without this the tab fell back to
                 # the tool YAML's defaults, and saving a customised pass wrote those back
-                # over the pipeline's own values (Balanced resolves 28 s / 1200 s, while
-                # the semantic YAML declares 20 / 420).
+                # over the pipeline's own values (Balanced resolves 28 s / 240 s and
+                # Fidelity a 240 s ceiling, while the semantic YAML declares 20 / 420).
                 "scene_params": {k: v for k, v in scene_cfg.items() if k != 'method'}
             }
         except Exception as e:
