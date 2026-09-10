@@ -207,7 +207,6 @@ class AsrTelemetry:
         audio_duration_s: float,
         wall_s: float,
         segments: Optional[list[dict[str, Any]]] = None,
-        speech_detected: bool = False,
         produced_output: bool = False,
         model_epoch: Optional[int] = None,
     ) -> None:
@@ -216,6 +215,14 @@ class AsrTelemetry:
         ``model_epoch`` (v1.9.2, CFF1) is the 1-based generation of the recogniser
         instance that decoded this scene; it increments at each model refresh. It
         is context for reading a trend, not by itself evidence of the cause.
+
+        v1.9.2 (owner in1): the ``speech_detected`` field is gone. It was derived
+        from the passthrough segmenter's fabricated whole-scene region, so under the
+        built-in VAD it was a constant True -- a field that read as a detection and
+        was not one. faster-whisper does not report the regions its internal VAD
+        used, so there is nothing truthful to put in its place. What remains --
+        ``wall_s``, ``rtf`` and ``produced_output`` -- is measured, and together they
+        distinguish a cheap genuine silence from an expensive one.
         """
         try:
             rec: dict[str, Any] = {
@@ -224,7 +231,6 @@ class AsrTelemetry:
                 "elapsed_s": round(time.time() - self._t0, 2),
                 "audio_duration_s": round(float(audio_duration_s or 0), 3),
                 "wall_s": round(float(wall_s), 3),
-                "speech_detected": bool(speech_detected),
                 "produced_output": bool(produced_output),
             }
             if model_epoch is not None:
