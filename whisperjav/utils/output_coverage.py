@@ -108,7 +108,6 @@ def assess_coverage(
     *,
     min_coverage: float = DEFAULT_MIN_COVERAGE,
     speech_positive_empty_streak: int = 0,
-    probe_failed: bool = False,
     empty_streak_threshold: int = DEFAULT_EMPTY_STREAK_THRESHOLD,
 ) -> CoverageReport:
     """Measure whether *srt_path* plausibly covers *media_duration_s*.
@@ -123,31 +122,23 @@ def assess_coverage(
             speech*.
 
             **Only pass a non-zero value when an external segmenter is in use.**
-            Under faster-whisper's native VAD -- the balanced default since
-            v1.9.0 -- segmentation is bypassed by ``NullSpeechSegmenter``, which
-            returns the whole scene as one segment unconditionally. That is a
-            passthrough, not a speech detection, so counting it as
-            speech-positive would invent corroboration where none exists.
+            Under faster-whisper's built-in VAD -- the balanced default -- no
+            external detection happens at all, so there is no speech signal to
+            count against. v1.9.2 removed the counter that used to feed this;
+            nothing in production passes a non-zero value any more.
             Issue #324 is the cautionary case: 33 consecutive empty scenes on a
             music performance where the audio genuinely held no dialogue.
-        probe_failed: True if a same-instance health probe failed -- the signal
-            @AlanZ-Git identified, where a known-good clip returns nothing from
-            the already-loaded model but transcribes correctly in a fresh
-            process.
         empty_streak_threshold: streak length that counts as corroboration.
 
     Returns:
         A :class:`CoverageReport`. Never raises.
     """
-    corroborated = bool(probe_failed) or (
-        speech_positive_empty_streak >= empty_streak_threshold
-    )
+    corroborated = speech_positive_empty_streak >= empty_streak_threshold
     # A noun phrase, so it reads after "corroborated by ..." wherever it is used.
     why = ""
     if corroborated:
-        why = ("a failed health probe" if probe_failed
-               else f"{speech_positive_empty_streak} consecutive empty results "
-                    "while speech was still being detected")
+        why = (f"{speech_positive_empty_streak} consecutive empty results "
+               "while speech was still being detected")
 
     def _report(verdict, ratio, last_end, count, detail):
         return CoverageReport(
@@ -190,46 +181,15 @@ def assess_coverage(
 
 # Segmenter names that are passthroughs rather than genuine speech detection.
 # Under faster-whisper's native VAD -- the balanced default since v1.9.0 -- the
-# external segmenter is NullSpeechSegmenter, which returns the whole scene as a
-# single segment unconditionally. Counting that as "speech was detected" would
-# manufacture corroboration; #324 is the case that would have been wrongly
-# flagged.
+# Segmenter names that are not real detections. Retained for callers that
+# still need to ask; v1.9.2 removed its only production consumer.
 PASSTHROUGH_SEGMENTERS = frozenset({"none", ""})
 
 
-class SpeechPositiveEmptyStreak:
-    """Counts consecutive scenes where speech was detected but nothing came back.
-
-    This is the corroborating signal that distinguishes "the recogniser stopped
-    working" from "the speech stopped". Span alone cannot make that distinction.
-
-    A scene is only counted when an external segmenter genuinely reported speech.
-    Scenes where the detector found nothing are neutral: they neither extend the
-    streak (silence is not a malfunction) nor reset it (a quiet gap between two
-    broken stretches should not disguise them as two short ones).
-    """
-
-    def __init__(self, segmenter_name: Optional[str] = None):
-        self._trustworthy = (segmenter_name or "").lower() not in PASSTHROUGH_SEGMENTERS
-        self.current = 0
-        self.longest = 0
-
-    @property
-    def is_meaningful(self) -> bool:
-        """False when no external detector is running, so the signal is unusable."""
-        return self._trustworthy
-
-    def record(self, produced_output: bool, speech_detected: bool) -> None:
-        """Record one scene's outcome."""
-        if not self._trustworthy:
-            return
-        if produced_output:
-            self.current = 0
-        elif speech_detected:
-            self.current += 1
-            self.longest = max(self.longest, self.current)
-        # else: detector found no speech and none was produced -- consistent, neutral
-
-    def __repr__(self) -> str:  # pragma: no cover - debugging aid
-        return (f"SpeechPositiveEmptyStreak(longest={self.longest}, "
-                f"current={self.current}, meaningful={self._trustworthy})")
+# v1.9.2 (owner V1/V3): SpeechPositiveEmptyStreak was removed. Its signal --
+# "the detector reported speech and nothing came back" -- is produced identically
+# by a recogniser that has stopped working and by a scene with no intelligible
+# speech in it, and it cannot separate the two. It was also inert under the
+# built-in VAD, recording a reassuring zero for the runs that actually failed.
+# `assess_coverage`'s speech_positive_empty_streak parameter is kept (default 0)
+# so the exit-status contract is unchanged, but nothing feeds it any more.

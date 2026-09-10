@@ -112,7 +112,6 @@ def classify_output(
     *,
     min_coverage: Optional[float] = None,
     speech_positive_empty_streak: int = 0,
-    probe_failed: bool = False,
     degraded: bool = False,
     degraded_reason: str = "",
     processing_time_s: Optional[float] = None,
@@ -148,7 +147,6 @@ def classify_output(
             media_duration_s,
             min_coverage=mc,
             speech_positive_empty_streak=speech_positive_empty_streak,
-            probe_failed=probe_failed,
             empty_streak_threshold=DEFAULT_EMPTY_STREAK_THRESHOLD,
         )
     except Exception as exc:  # noqa: BLE001 - see docstring
