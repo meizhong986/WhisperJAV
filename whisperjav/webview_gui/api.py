@@ -2373,10 +2373,10 @@ class WhisperJAVAPI:
                     "scene_clustering_threshold": {
                         "type": "slider",
                         "label": "Scene Change Threshold",
-                        "description": "Semantic detector only: clustering distance that separates scenes. Lower values tend to give more, shorter scenes (default: 18)",
+                        "description": "Semantic detector only: clustering distance that separates scenes. Lower values tend to give more, shorter scenes (default: 22, the same value every pipeline uses)",
                         "group": "scene_bounds",
                         "min": 5, "max": 30, "step": 1,
-                        "default": 18,
+                        "default": 22,
                     },
                     "chunk_threshold_ms": {
                         "type": "slider",

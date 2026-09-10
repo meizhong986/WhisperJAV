@@ -256,7 +256,7 @@ const QwenManager = {
         safe_chunking: true,
         scene_min_duration: 12,
         scene_max_duration: 48,
-        scene_clustering_threshold: 18,  // v1.9.2 CFF2 (semantic detector)
+        scene_clustering_threshold: 22,  // v1.9.2 CFF2 (semantic detector); O1 made 22 the one product-wide value
         chunk_threshold_ms: 300,
         max_group_duration: 3,
         vad_threshold: 0.25,
