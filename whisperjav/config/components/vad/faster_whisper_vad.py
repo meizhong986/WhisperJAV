@@ -75,7 +75,7 @@ class FasterWhisperVADOptions(BaseModel):
         description="Speech chunks shorter than this are discarded.",
     )
     max_speech_duration_s: float = Field(
-        15.0,
+        6.0,
         ge=0.0, le=300.0,
         description="Maximum duration of a single speech chunk before a forced split. "
                     "Does NOT affect encoder-pass count (faster-whisper still batches "
@@ -127,28 +127,34 @@ class FasterWhisperVAD(VADComponent):
     #   build. Do not re-measure them.  (They replace the T2 2026-06-29 values
     #   0.45 / 0.40 / 0.25.)
     # version: 3.1 on every sensitivity (requirement S8).
-    # max_speech_duration_s: locked T2 values (2026-06-29).
-    # min_speech / min_silence / speech_pad: inherited from the JAV-tuned silero
-    #   presets (model-agnostic millisecond params).
+    # max_speech_duration_s: the owner set these for v1.9.2 (2026-09-10, O3) after his
+    #   feature-length manual test -- conservative 7.0 / balanced 6.0 / aggressive 6.0.
+    #   They replace the T2 2026-06-29 values 20.0 / 15.0 / 9.0. This is a subtitle-
+    #   granularity knob: it forces a split inside a long unbroken speech chunk and does
+    #   NOT change the encoder-pass count.
+    # min_speech_duration_ms: aggressive raised 30 -> 80 (owner O3, 2026-09-10);
+    #   conservative and balanced keep the JAV-tuned silero values.
+    # min_silence / speech_pad: inherited from the JAV-tuned silero presets
+    #   (model-agnostic millisecond params).
     presets = {
         "conservative": FasterWhisperVADOptions(
             threshold=0.50,
             min_speech_duration_ms=150,
-            max_speech_duration_s=20.0,
+            max_speech_duration_s=7.0,
             min_silence_duration_ms=300,
             speech_pad_ms=500,
         ),
         "balanced": FasterWhisperVADOptions(
             threshold=0.40,
             min_speech_duration_ms=100,
-            max_speech_duration_s=15.0,
+            max_speech_duration_s=6.0,
             min_silence_duration_ms=300,
             speech_pad_ms=400,
         ),
         "aggressive": FasterWhisperVADOptions(
             threshold=0.30,
-            min_speech_duration_ms=30,
-            max_speech_duration_s=9.0,
+            min_speech_duration_ms=80,
+            max_speech_duration_s=6.0,
             min_silence_duration_ms=300,
             speech_pad_ms=300,
         ),
