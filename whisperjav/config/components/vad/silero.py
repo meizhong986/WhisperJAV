@@ -91,11 +91,21 @@ class SileroVAD(VADComponent):
     # === research (majority of JA subs <3s with ~800ms gaps). Sensitivity
     # === gradient inverted: aggressive=tightest caps, conservative=loosest.
     # === Mirrors v4 YAML config/v4/ecosystems/tools/silero-speech-segmentation.yaml.
+    # === v1.9.2 (owner O3, 2026-09-10) ===
+    # He applied the same two changes here as on the balanced pipeline's built-in VAD:
+    # min_speech_duration_ms 80 on aggressive, and max_speech_duration_s 7.0 / 6.0 / 6.0.
+    #
+    # ⚠ max_speech_duration_s IS NOT ENFORCED BY THIS BACKEND. The silero v3.1/v4.0
+    # library API has no such parameter, so SileroSpeechSegmenter stores it and never
+    # forwards it (`modules/speech_segmentation/backends/silero.py:258-267`, and the
+    # note at `:259-260`). Changing it here alters what the Customize panel shows and
+    # nothing else. min_speech_duration_ms IS forwarded (`silero.py:264`) and is live.
+    # The separately tuned silero-v6.2 backend, which does enforce both, is untouched.
     presets = {
         "conservative": SileroVADOptions(
             threshold=0.41,
             min_speech_duration_ms=150,
-            max_speech_duration_s=6.0,         # v1.8.12: 6.0→6.0 (kept)
+            max_speech_duration_s=7.0,         # v1.9.2 (O3): 6.0→7.0 (display only, see note above)
             min_silence_duration_ms=300,
             # neg_threshold: None — let VAD internal logic handle
             speech_pad_ms=500,
@@ -105,7 +115,7 @@ class SileroVAD(VADComponent):
         "balanced": SileroVADOptions(
             threshold=0.28,
             min_speech_duration_ms=100,
-            max_speech_duration_s=5.0,         # v1.8.12: 7.0→5.0
+            max_speech_duration_s=6.0,         # v1.9.2 (O3): 5.0→6.0 (display only, see note above)
             min_silence_duration_ms=300,
             # neg_threshold: None — let VAD internal logic handle
             speech_pad_ms=400,
@@ -114,8 +124,8 @@ class SileroVAD(VADComponent):
         ),
         "aggressive": SileroVADOptions(
             threshold=0.18,
-            min_speech_duration_ms=30,
-            max_speech_duration_s=4.0,         # v1.8.12: 8.0→4.0
+            min_speech_duration_ms=80,         # v1.9.2 (O3): 30→80 — this one IS live
+            max_speech_duration_s=6.0,         # v1.9.2 (O3): 4.0→6.0 (display only, see note above)
             min_silence_duration_ms=300,
             # neg_threshold: None — let VAD internal logic handle
             speech_pad_ms=300,
