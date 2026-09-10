@@ -295,6 +295,12 @@ class RemoteFasterWhisperASR:
         self._retire_live_stats()
         self._stop()
         self.policy.reset()
+        # v1.9.2: clear the per-scene stats BEFORE the restart. _start() can raise
+        # (the fresh model may not load), and that exception propagates out of
+        # transcribe_to_srt -- so without this the caller would attribute the
+        # PREVIOUS scene's decode statistics to the scene that failed.
+        self._last_decode_stats = []
+        self._last_vad_segments = []
         self._start()
 
     def shutdown(self) -> None:
