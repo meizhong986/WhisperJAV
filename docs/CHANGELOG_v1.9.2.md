@@ -8,10 +8,344 @@
 > Conventions: one entry per landed change, newest first. "Decision" lines
 > record who decided what, so a later reader can tell policy from mechanism.
 >
-> **SYNC** — pack r2.6 · 2026-09-06 | tracker rev 51.6 | change log through 2026-09-09 (balanced pipeline: semantic scene default + Silero VAD version selection, **uncommitted**) | `dev_v1.9.2` @ 90d65c1 (27 one-file commits e8f80e3..90d65c1, not pushed) |
+> **SYNC** — pack r2.7 · 2026-09-10 | tracker rev 51.7 | change log through 2026-09-10 (O1/O3/O4/O6 preset retune + the O2/O5 examination + the speech-detection failover purge, **all uncommitted**) | `dev_v1.9.2` @ d754a35 (28 one-file commits e8f80e3..d754a35, not pushed) |
 > GitHub 134 open · 231 closed · 12 PRs · 0 labels applied · 32 owed (8 replies posted 2026-09-06; #413 follow-up at 16:11 UTC). Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
 > (updated in place; never a second page). Rule: a session that changes the pack, this file or the change
 > log brings the other two to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
+
+---
+
+## 2026-09-10 (later) — the speech-detection failover is removed; Balanced goes straight from scene to recogniser
+
+**Owner instructions:** `clarification and instructions O2-Section3.txt` (Parts A/B/C) plus his
+in1-in6 and V1-V6. He approved the five-item list in in1, set the acceptance test himself in in5
+("if stitching works and timestamp works after purge then we are good to do the purge on fidelity"),
+and in in6 explicitly left the zero-scene substitution alone. V1 ruled that the empty-streak counter
+must have **no authority during execution** and is a status report only.
+
+### The defect
+
+Balanced delegates speech detection to faster-whisper's built-in VAD. To arrange that, it used to
+construct a passthrough segmenter and ask it to segment the scene; the passthrough returned one
+fabricated region spanning the whole scene (`speech_segmentation/backends/none.py:84-91`). The
+recogniser's "no segments -> transcribe the whole scene in one call" branch therefore **never
+executed once**, and control fell instead to a heuristic written for a different situation: a check
+that decided whether a real detector's output looked broken. Handed the fabrication, its only
+reachable rule fired on scene length alone, at **480 s** -- a value nobody chose, being
+`min_duration_for_fallback * 4`. Above it: the intended path plus a WARNING claiming a speech-
+detection failure that never happened. Below it: the group path with one group.
+
+Historically: the check landed 2025-12-05 (`1fb44bb`) when Balanced used a real external segmenter;
+Balanced moved to the built-in VAD on 2026-06-30 (`d8648e0`) by remapping the segmenter to `none`.
+The check was never revisited. It is not buggy code -- it is correct code reading a value whose
+meaning changed underneath it. It shipped because `tests/test_vad_failover.py` had three tests and
+none covered the passthrough case.
+
+In the owner's EKAI-023 aggressive run, **7 scenes** tripped it (durations 480.6 s to 1200.3 s),
+consuming **49 min 44 s of the 71-minute aborted run -- 70%** -- and all 7 of the run's WARNING lines
+were this false one.
+
+### What changed
+
+| File | Change |
+|---|---|
+| `modules/vad_failover.py`, `tests/test_vad_failover.py` | **DELETED** |
+| `modules/faster_whisper_pro_asr.py` | No segmenter is constructed under the built-in VAD (`_external_segmenter = None`) -- the same short-circuit qwen/transformers/decoupled already use, so Balanced stops being the outlier. `transcribe()` routes every scene to the whole-scene path with **no length branch**. Both failover call sites and the unreachable `name == "none"` branch removed. The whole-scene path now captures `_last_full_results`, closing the telemetry hole. Two stale "VAD bypassed" strings corrected. |
+| `modules/whisper_pro_asr.py` | "No segmentation" honoured up front via a new `get_segmenter_name()` (the module had none -- see the defect note below). Failover branches and `fallback_triggered` removed. Both routes return through one new `_finalise()`. |
+| `pipelines/balanced_pipeline.py` | Empty-streak counter removed entirely (V1/V3). `speech_detected` no longer passed. Telemetry write **moved outside the per-scene `try`** and given its own guard, so an observer can never mark a scene failed; `_scene_wall` is now set in the `except` too, so a scene that burned minutes before failing does not record `wall_s 0.0`. `vad_method` reports the actual segmenter name instead of a hard-coded `"silero"`. Part C per-scene status line added, including a line for failed scenes. |
+| `utils/asr_telemetry.py` | `speech_detected` parameter and output field removed -- it was derived from the fabrication, so under the built-in VAD it was a constant `True`. In the owner's run **26 of 26 scenes reported `speech_detected: true`, including all 20 that produced nothing.** |
+| `utils/output_coverage.py` | `SpeechPositiveEmptyStreak` class removed; `probe_failed` removed (in1 item 3 -- it was never wired: no production caller ever passed `True`). `assess_coverage`'s `speech_positive_empty_streak` parameter kept at default 0, so the exit-status contract is unchanged. |
+| `utils/run_outcome.py` | `probe_failed` parameter removed. |
+| `modules/asr_worker_proxy.py` | `_last_decode_stats` / `_last_vad_segments` cleared in `_refresh()` **before** the restart. `_start()` can raise, and that exception propagates out of `transcribe_to_srt`, so without this the previous scene's decode statistics were attributed to the scene that failed -- a false "10 segments, no output" record, arising at a model refresh, i.e. every 20 minutes of the long runs the instrument exists to diagnose. |
+| tests | `test_vad_failover.py` deleted; `test_output_coverage.py`, `test_run_outcome.py`, `test_asr_telemetry.py`, `test_asr_telemetry_default.py` updated for the removals; `test_balanced_defaults_v192.py` comment corrected; `modules/AGENTS.md` dossier corrected. |
+
+### Why the empty-streak counter had to go, not be repaired (owner V1/V3)
+
+Its signal was "the detector reported speech and nothing came back". That single pattern is produced
+by two opposite situations it cannot separate: a recogniser that has stopped working, and a scene
+with **no intelligible speech in it**. The owner's V2 case is the second -- a 12+ minute action scene
+of continuous non-verbal human sound, which at aggressive's 0.3 threshold is admitted essentially in
+full and legitimately yields nothing. Demonstrated by execution: five such scenes under an external
+detector give `longest = 5`, which reaches the corroboration threshold and escalates the file to
+`suspect`; with `--fail-on suspect` it would fail the run. Under the built-in VAD it instead recorded
+a permanent 0, so it was silent for exactly the run that failed. Wrong in both directions, and no
+threshold fixes it because the discriminator is not in the signal. Issue #324 is the other
+cautionary case: 33 consecutive empty scenes on a music performance that genuinely held no dialogue.
+
+**No replacement detector was built** (owner V1: do not over-engineer, no authority). The telemetry
+already records `produced_output`, `wall_s` and `rtf` per scene, which is enough to tell a cheap
+genuine silence from an expensive one.
+
+### Timestamps and stitching — in5's acceptance test
+
+The stitcher takes a scene SRT and a number and adds the number
+(`modules/srt_stitching.py:54-55`). **That number comes from the scene detector**
+(`pipelines/fidelity_pipeline.py:238-241`, registered at `:411`), never from the ASR, and both ASR
+routes emit scene-relative times -- the group route adds the group's start *within the scene*, the
+whole-scene route adds `0.0`. For a fabricated whole-clip group those are the same operation.
+
+Verified by re-deriving every stitched cue from the per-scene SRTs plus each scene's absolute offset:
+
+| Configuration | Cues | Max timestamp error |
+|---|---|---|
+| fidelity + `--speech-segmenter none` + auditok, 1500 s, 62 scenes | 175 | **0.0000 s** |
+| fidelity **default** segmenter (silero-v3.1), 293 s, 7 scenes, non-zero offsets, multiple groups per scene | 40 | **0.0000 s** |
+| balanced semantic, post-purge | 30 | **0.0000 s** |
+
+A/B on the same input, before versus after: fidelity default stitched **identical** (40 cues);
+fidelity + none, 1500 s, stitched **identical** (175 cues); balanced semantic, all scenes **under**
+480 s so all of them changed route, final SRT **identical** (26 cues); balanced + auditok with a
+**1200 s scene** -- the exact case that used to trip the failover -- final SRT **identical** (20
+cues), warnings 1 -> 0.
+
+Telemetry hole closed, same 1200 s scene: `n_segments` 0 -> **10**, `max_temperature` null -> **0.0**,
+`min_avg_logprob` null -> **-0.910**, `max_compression_ratio` null -> **1.316**.
+
+### Behaviour that DOES change — say this plainly
+
+Two of the deleted heuristic's three arms were live on **fidelity with a real external segmenter**:
+zero segments on a clip >= 120 s, and under 1% coverage on a clip >= 120 s. When either fired, the
+scene used to be decoded whole and could yield cues; now it yields none and the condition is reported
+at DEBUG. Fidelity's scene bounds are 20/420 s, so both arms were reachable on ordinary scenes. The
+A/Bs above do not cover this -- they show the failover did not fire on those clips, not that it never
+fires. **This is a recall loss on fidelity, authorised by the owner (in1 item 2, V5), not a neutral
+change.**
+
+It also composes with the zero-scene substitution the owner has deliberately left alone
+(`scene_detection_backends/factory.py:381-393`, his in6). If scene detection finds nothing, the whole
+film becomes one scene; if the external segmenter then also finds nothing -- the correlated case --
+the old code rescued the run with a full-file pass and the new code returns empty. **Recorded, not
+acted on, per in6.**
+
+Also: `_transcribe_full_audio` has no translate-output validation (the group route does, at
+`faster_whisper_pro_asr.py:1104-1119`), so under `--task translate` Balanced no longer emits that
+warning. Not fixed here; noted.
+
+### A defect introduced and fixed during this change
+
+The first fidelity edit called `self.get_segmenter_name()`, which did not exist on `WhisperProASR`.
+Every scene raised `AttributeError`, the pipeline's per-scene handler swallowed it, and the run
+**exited 0 having produced 0 cues instead of 40**. Caught by the A/B, method added, 40 cues
+re-verified. Worth recording for its own sake: that per-scene catch converts a hard code error into
+a silent zero-output success.
+
+### A change reverted before shipping
+
+A minimal-parameter retry was added to the whole-scene path and then **reverted**. It was not in the
+owner's list, and the adversary gate showed three defects: it bypassed the shared segment filter
+(`suppress_high`, the `suppress_low` penalty, the logprob and nonverbal gates), it returned `[]`
+where the old code re-raised -- turning a decode failure into `no_speech_detected: True` with exit 0
+-- and it never fed `_last_full_results`, reopening the telemetry hole on the new path. It also
+hard-coded `beam_size: 3` above the tuned aggressive value of 2. The original asymmetry it was meant
+to fix no longer exists, because the built-in VAD now always takes one path.
+
+### Verification
+
+- Tests: `test_asr_telemetry.py` 11, `test_asr_telemetry_default.py` 15, `test_output_coverage.py` +
+  `test_run_outcome.py` 71, `test_balanced_defaults_v192.py` 21, `test_vad_version_v192.py` 37,
+  `test_scene_clustering_threshold_v192.py` 10, `test_ensemble_params.py` 32,
+  `test_v192_small_fixes.py` 27, `test_pass_worker_utils.py` 5,
+  `test_gui_custom_params_simulation.py` 36 -- all pass.
+- Pre-existing failures, unchanged: 4 in `test_speech_segmentation.py`
+  (`TestSileroV6SpeechSegmenter` / `TestParameterSanitizationSileroV6`), plus the config-suite
+  failures recorded in the earlier entry.
+- Adversary gate ran on the purge. It refuted "behaviour is unchanged on output" (the fidelity recall
+  loss above), found the stale-decode-stats path through `_refresh()`, found the `wall_s 0.0` field,
+  found a test file I had broken without running (`test_asr_telemetry_default.py`), found
+  `probe_failed` still present, and found the retry's three defects. All acted on; each refutation
+  re-verified against the code before acceptance.
+
+### Still unsolved — the owner's reported failure
+
+The purge does not touch it. Measured on his own scene files with his Pass-1 settings: the built-in
+VAD admits **91.0%**, **90.3%** and **98.4%** of scenes 0006, 0011 and 0014, so 1000-1180 s of audio
+reaches the decoder in one call, at a steady ~2.05x realtime, for **zero** usable output. Seven such
+scenes were 70% of the aborted run. The levers are the aggressive VAD threshold, the 1200 s scene
+ceiling, and the absence of any per-scene cost bound. What the purge bought is that those scenes now
+record their decode statistics and the terminal says `NO OUTPUT` against the time spent, instead of a
+false VAD warning.
+
+---
+
+## 2026-09-10 — preset retune from the owner's feature-length manual test (O1, O3, O4, O6), and the O2/O5 examination
+
+**Owner requirements:** `v1.9.2_observations_and_requiremets_and_instructions.txt`, clauses O1-O6,
+written after he ran the Ensemble tab on a ~3 hour film with both passes on the balanced pipeline
+(Pass 1 Silero 4.0, Pass 2 Silero 3.1) at all three sensitivities. Balanced finished in 34.0 min
+(1949 cues), conservative in 33.7 min (1874 cues); **aggressive never finished Pass 1 and was aborted
+after 73.1 minutes with no output.**
+
+**Decisions (owner, typed 2026-09-10):**
+- O1 — one `clustering_threshold` (22.0) and one `snap_window` (6.0 s) for every sensitivity.
+- O3 — VAD `min_speech_duration_ms` 80 on aggressive; `max_speech_duration_s` 7.0 / 6.0 / 6.0.
+  Asked which component: he answered **both** (the balanced built-in VAD and the external Silero one).
+- O4 — `temperature` 0.0 on every sensitivity. Asked whether that reaches the engines he did not
+  test: he answered **all engines**.
+- O6 — a seven-row aggressive decoding table for balanced and fidelity.
+
+### What changed
+
+| File | Change |
+|---|---|
+| `config/components/features/scene_detection.py` | `SemanticSceneDetectionOptions`: `snap_window` 5.0 to **6.0**, `clustering_threshold` 18.0 to **22.0** as the field defaults; both keys REMOVED from the conservative and aggressive presets so the field default is the only place either is written. Presets keep only the scene-length bounds. |
+| `config/v4/ecosystems/tools/semantic-scene-detection.yaml` | same two values in `spec:`; removed from the conservative and aggressive presets; slider description corrected (it said "default 18"). |
+| `modules/scene_detection_backends/semantic_adapter.py` | engine fallback `SemanticClusteringConfig` brought to 6.0 / 22.0 so a caller that supplies nothing cannot run on a value we no longer ship — the trap that made every semantic run before v1.9.2 use 20/420. `SEMANTIC_PRESETS` aligned and documented as unreachable. |
+| `config/components/vad/faster_whisper_vad.py` | `max_speech_duration_s` 20.0/15.0/9.0 to **7.0/6.0/6.0**; aggressive `min_speech_duration_ms` 30 to **80**; field default 15.0 to 6.0. |
+| `config/components/vad/silero.py` | same two O3 changes on the external segmenter (6.0/5.0/4.0 to 7.0/6.0/6.0; aggressive 30 to 80). |
+| `config/v4/ecosystems/tools/silero-speech-segmentation.yaml` | mirrored, as its own header requires. |
+| `config/components/asr/faster_whisper.py` | aggressive: `beam_size` 3 to **2**, `patience` 1.3 to **1.0**, `temperature` [0.0,0.2] to **[0.0]**, `compression_ratio_threshold` 2.6 to **2.2**, `repetition_penalty` 1.3 to **1.5**. `no_speech_threshold` 0.72 and `logprob_threshold` -1.00 already matched his table. |
+| `config/components/asr/openai_whisper.py` | aggressive: same, plus `logprob_threshold` -1.55 to **-1.00** and `no_speech_threshold` 0.84 to **0.72**. |
+| `config/components/asr/stable_ts.py` | O4: balanced [0.0,0.1] to **[0.0]**, aggressive [0.0,0.15,0.3,0.5] to **[0.0]**. |
+| `config/components/asr/kotoba_faster_whisper.py` | O4: balanced [0.0,0.3] to **[0.0]**, aggressive [0.0,0.1,0.3,0.5] to **[0.0]**. |
+| `tests/test_scene_clustering_threshold_v192.py` | three tests retargeted, one added: no sensitivity preset may carry either uniform key, and all three sensitivities must resolve to 22.0 / 6.0. 10 pass. |
+| `tests/config/test_resolver_v3.py` | `test_presets_differ` no longer asserts on beam width — O6 deliberately makes conservative and aggressive equal there. It now asserts on the axes that still separate them. |
+
+### Three things the owner's table could not do, or does not do
+
+1. **`repetition_penalty=1.50` cannot be applied to fidelity.** openai-whisper has no such parameter —
+   neither `whisper.transcribe.transcribe()` nor `whisper.decoding.DecodingOptions` accepts it,
+   verified against the installed package. It is a CTranslate2 feature. The other six rows are applied.
+2. **`max_speech_duration_s` on the external Silero segmenter is display-only.** The v3.1/v4.0 library
+   API has no such parameter; `SileroSpeechSegmenter` stores it and never forwards it
+   (`backends/silero.py:259-267`). `min_speech_duration_ms` IS forwarded and is live.
+3. **fast and faster never receive the external Silero presets at all** — pre-existing. They declare
+   `"vad": "none"` (`config/legacy.py:131`, `:137`), so their resolved config has no VAD block
+   (confirmed: `params.vad == {}` in `--dump-params`). *Corrected mechanism, after the adversary pass:*
+   they do not fall back to the segmenter's own defaults either — they build no segmenter at all.
+   `fast_pipeline.py:96` and `faster_pipeline.py:88` construct `StableTSASR`, which contains no
+   `SpeechSegmenterFactory` call site. O3's external change therefore reaches **fidelity only** among
+   running pipelines.
+4. **silero-v6.2 IS affected, contrary to what was first written here.** Fidelity pins its VAD
+   component to `silero-v3.1` whatever segmenter is chosen (`config/legacy.py:143`), and
+   `whisper_pro_asr.py:106-107` merges that component into any backend named `silero*`. The v6.2
+   backend, unlike v3.1/v4.0, **does** enforce `max_speech_duration_s`
+   (`backends/silero_v6.py:109-110`, forwarded `:192`). Verified by running the resolver:
+   `--mode fidelity --sensitivity aggressive --speech-segmenter silero-v6.2` resolves
+   `max_speech_duration_s 6.0`, `min_speech_duration_ms 80`. So aggressive on v6.2 moves 4.0 to 6.0 —
+   cues get LONGER there, the opposite direction from the rest of O3 — and
+   `config/v4/ecosystems/tools/silero-v6-speech-segmentation.yaml` (which serves that backend's
+   Customize panel via `api.py:1394`) still says 100 ms / 4.0 s, so panel and run disagree.
+   **Left as-is pending the owner's decision:** align that YAML, or pin v6.2 back to its own values.
+
+**A side effect on Qwen, deliberately resolved toward consistency.** Qwen leaves the clustering
+threshold unset and relies on the fall-through (`pipelines/qwen_pipeline.py:673-674`), which used to
+land on 18.0 and now lands on 22.0. Its Customize panel still said 18, so it would have displayed a
+value no run would use. Panel and schema defaults moved to 22
+(`webview_gui/assets/app.js:259`, `webview_gui/api.py:2373-2379`); the "YAML 18" comments in
+`qwen_pipeline.py` and `decoupled_pipeline.py` corrected; `test_qwen_schema_exposes_the_slider`
+retargeted. Net: Qwen's clustering threshold moves 18 to 22. Effect should be small — safe chunking
+pins its scenes to 12-48 s and the bounds, not the threshold, drive granularity — but it is a default
+change to a mode the owner did not name, and he can have it pinned back to 18 explicitly on request.
+The vendored engine keeps 18.0/5.0 in its own dataclass
+(`vendor/semantic_audio_clustering.py:172`, `:185`); untouched, and unreachable because the adapter
+passes both values on every call (`semantic_adapter.py:301-302`).
+
+Also worth recording: O1 necessarily lands on fast and fidelity as well as balanced — there is one
+semantic detector and one preset set, and scoping it to balanced alone would need a per-pipeline
+override. And after O4+O6 the conservative and aggressive faster-whisper presets are identical on
+`beam_size`, `patience`, `compression_ratio_threshold` and `temperature`; they still differ on
+`no_speech_threshold`, `logprob_threshold`, `repetition_penalty` and `chunk_length`.
+
+### O2 — the full-clip fallback, examined
+
+Full write-up: `docs/plans/V192_O2_O5_EXAMINATION_AND_INVENTORY.md` (gitignored). In short, and all
+reproduced by execution:
+
+The balanced pipeline installs a passthrough segmenter and expects it to return nothing, so the
+recogniser takes its single-call whole-scene path. The passthrough instead returns the whole scene as
+one segment (`backends/none.py:75-91`), so `if not vad_segments` at `faster_whisper_pro_asr.py:636`
+is never true and **the branch the balanced throughput design was built around has never executed**.
+Control falls to the VAD-failure safety net at `:655`, whose only reachable rule fires at exactly
+**480 seconds** of scene length. Under that, every scene runs the group path with one group; at or
+above it, the intended path runs and logs a warning claiming a speech-detection failure that did not
+happen.
+
+- **VAD is not bypassed.** `vad_filter=True` and `vad_parameters` reach the call on both paths
+  (`:197-198`, `:523`, `:525-526`); a real DEBUG run shows them. The "(VAD bypassed)" string at `:707`
+  is stale text.
+- **It is not a speed cause.** Both paths make one `transcribe()` call with identical parameters. If
+  anything the group path is marginally slower — it deep-copies every segment at `:1000-1004`.
+- **It does cost diagnostics.** `_last_full_results` is filled only on the group path (`:1014-1019`),
+  so a scene at or above 480 s records nulls in the per-scene telemetry despite producing subtitles.
+  Verified: a forced 1200 s scene logged `n_segments 0, max_temperature null` while producing 10
+  segments. Frequency under the default detector is **unmeasured** — neither test file produced a
+  scene that long (longest 426 s).
+- **No per-scene time limit exists.** `asr_worker_proxy.py:325-330` and `:306-323` wait without a
+  deadline, so a slow scene and a hung scene are indistinguishable from outside.
+
+**On why aggressive was slow: the owner had already diagnosed it himself**, in his own O6 rationale
+("temperature 0.00 — Critical: Disables multi-pass temperature retries, capping worst-case execution
+time"). Two measured factors size the effect, on `1500sec-HODV-22019.wav` with the shipped presets:
+aggressive sends **1.3x** the audio of balanced to the decoder, and **Silero 4.0 sends 2.1-2.3x the
+audio of 3.1 at the same threshold** — and his Pass 1 was on 4.0. Combined with the pre-retune
+decoder costs that puts a 34-minute balanced run at 85-100 minutes; he stopped at 73.1. Estimate, not
+measurement — the per-scene telemetry file from his aborted run settles it and has been requested.
+
+Ruled out so they do not come back: `chunk_length=30` does nothing on this path, and the O3 VAD change
+moves aggressive kept-audio only 260.7 s to 255.7 s. **O3 is a granularity change, not a speed fix.**
+
+**No fix applied to O2 — it is the owner's call.** Recommendation: leave the routing alone, make the
+safety net ignore a passthrough result so the false warning stops, and fill in the per-scene
+diagnostics on the full-clip path. Changing the routing so balanced finally takes its intended path
+should wait for a measured comparison.
+
+### Also corrected while checking the above
+
+- `main.py:422-423` and `:709` — both `--help` strings still described the abolished per-sensitivity
+  regime ("Default 18 (aggressive preset 10, conservative 22)" and "Default 18 (YAML)"). Now 22.
+  Verified by running `python -m whisperjav.main --help`; no "Default 18" remains, both flags exit 0.
+- `config/v4/ecosystems/presets/aggressive.yaml:47` (0.17), and the aggressive blocks of
+  `transformers/models/whisper-large-v3.yaml:74` (0.2) and `kotoba-whisper-v2.yaml:83` (0.1) — three
+  shipped counter-examples to "temperature 0.0 everywhere". No Python reads `decode.temperature` on a
+  transcription path, so these were display/authority only; set to 0.0.
+- `config/schemas/presets.py:59` — the v2 mirror still held `[0.0, 0.2]` and `2.6` in a file whose own
+  docstring claims to mirror the faster-whisper component. Nothing imports these tables outside
+  `schemas/__init__.py`; aligned anyway so a future reader cannot pick up a retired value, and the
+  docstring's note about an openai-whisper `logprob_threshold` divergence removed — O6 sets both
+  engines to -1.00.
+- `ensemble/safety_caps.py:111-117` — the rationale printed to users on a capped ensemble run said the
+  downgrade "removes the temperature=0.17 fallback path". After O4 there is no such path on any
+  sensitivity. Sentence corrected; the rule itself left alone and flagged to the owner.
+
+### Owner decisions now open
+
+1. **silero-v6.2** — align its YAML to 80 / 6.0, or pin the backend back to its own values (item 4 above).
+2. **The O3 ceilings do not order as the table implies.** faster-whisper subtracts padding from the
+   ceiling (`faster_whisper/vad.py:83-87`): conservative 7.0 s / 500 ms pad = **5.97 s** effective,
+   balanced 6.0 / 400 = **5.17 s**, aggressive 6.0 / 300 = **5.37 s**. Balanced ends up tightest.
+3. **Should the ensemble safety cap still fire** now that half its premise is gone?
+4. **Qwen 18 to 22** (above) — reversible on request.
+
+### Verification
+
+- Resolved-parameter diff across all 12 mode-by-sensitivity combinations, before and after: **35
+  changed values, every one traceable to O1/O3/O4/O6, nothing else moved.**
+- The owner's exact ensemble configuration resolved through `pass_worker` (both passes balanced,
+  Pass 1 on 4.0, Pass 2 on 3.1, all three sensitivities): every value lands.
+- GUI: Customize then Segmenter for a balanced pass shows 7.0/6.0/6.0 and 150/100/80; Customize then
+  Scene shows 22.0 and 6.0 on every sensitivity; `get_pipeline_defaults` returns the same.
+- End-to-end, all exit 0: balanced (3 runs on the 1500 s file — aggressive now costs the same wall
+  time as balanced, 52 s against 53 s), fidelity, fast, faster.
+- Tests: 10 + 21 + 37 + 37 + 32 + 27 pass. Exactly one test broke and was repaired
+  (`test_presets_differ`). Pre-existing failures unchanged, confirmed by stashing: 2 in
+  `config/test_resolver_v3.py`, 2 in `config/test_legacy.py`, 20 in `config/test_presets.py`,
+  4 in `test_speech_segmentation.py` (all silero-v6.2, untouched).
+- Adversary gate ran on the O2 assessment. It refuted three claims (a failing long scene does not kill
+  the file; fidelity does have a minimal-parameter retry; the recogniser has one instantiation site),
+  caught the temperature diagnosis being presented as mine rather than the owner's, and found the
+  telemetry file. All corrected; each refutation re-verified against the code before acceptance.
+
+### Follow-ups, not done
+
+- Delete the unreachable `SEMANTIC_PRESETS` table rather than maintain a fourth copy.
+- Reconcile the auditok and silero scene presets between the Pydantic components and the tool YAML —
+  they already disagree (e.g. silero aggressive `silero_threshold` 0.05 against 0.005), so the
+  Customize panel shows numbers a run will not use.
+- `main.py:1297` and `:1783` still fall back to `auditok` while everywhere else reads the shared
+  semantic constant. Probably inert on the parallel path; not traced to every consumer.
+- `webview_gui/api.py:2703` returns the external Silero VAD block for balanced when called without a
+  segmenter argument. The GUI always passes one, so it is latent.
+- fast and faster ignore the tuned Silero presets entirely (above).
 
 ---
 
