@@ -42,10 +42,10 @@ class TestBalancedDefault:
 
     def test_built_in_vad_has_no_external_preset(self):
         # Consequence for the run-outcome contract: under the built-in VAD the
-        # recogniser reports its segmenter as "none" (NullSpeechSegmenter), which
-        # SpeechPositiveEmptyStreak treats as a passthrough, so a zero-cue Balanced
-        # file is `empty`, never `suspect`, unless a WhisperJAV segmenter is chosen
-        # (tests/test_output_coverage.py covers the counter itself).
+        # recogniser reports its segmenter as "none" -- v1.9.2 builds no external
+        # segmenter there at all -- so a zero-cue Balanced file is `empty`, never
+        # `suspect`. Nothing corroborates it, because there is no external speech
+        # signal to corroborate against.
         assert resolve_segmenter_sensitivity(BALANCED_DEFAULT_SEGMENTER, "balanced") == {}
         assert "none" in PASSTHROUGH_SEGMENTERS
 
