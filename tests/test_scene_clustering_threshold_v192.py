@@ -33,9 +33,13 @@ class TestBackendAcceptsTheKnob:
         det = SemanticSceneDetector(clustering_threshold=10)
         assert det._adapter.config.clustering_threshold == 10.0
 
-    def test_yaml_default_is_18(self):
+    def test_engine_fallback_matches_the_shipped_value(self):
+        # v1.9.2 (owner O1): 22.0 / 6.0 everywhere, including the engine's own
+        # last-resort fallback, so a caller that supplies nothing cannot run on a
+        # value the product no longer ships.
         from whisperjav.modules.scene_detection_backends.semantic_adapter import SemanticClusteringConfig
-        assert SemanticClusteringConfig().clustering_threshold == 18.0
+        assert SemanticClusteringConfig().clustering_threshold == 22.0
+        assert SemanticClusteringConfig().snap_window == 6.0
 
     def test_gui_schema_exposes_the_slider(self):
         # The legacy Customize modal renders from the YAML gui hints.
@@ -44,14 +48,35 @@ class TestBackendAcceptsTheKnob:
         schema = WhisperJAVAPI.get_scene_detector_schema(api, "semantic")
         assert schema["success"], schema
         assert "clustering_threshold" in schema["parameters"]
-        assert schema["defaults"]["clustering_threshold"] == 18.0
+        assert schema["defaults"]["clustering_threshold"] == 22.0
+        assert schema["defaults"]["snap_window"] == 6.0
+
+    def test_no_sensitivity_preset_overrides_the_uniform_values(self):
+        # v1.9.2 (owner O1): the two values are uniform, so no sensitivity preset --
+        # in the Pydantic component or in the tool YAML -- may carry either key.
+        from whisperjav.config.components.features.scene_detection import SemanticSceneDetection
+        from whisperjav.webview_gui.api import WhisperJAVAPI
+
+        for name, preset in SemanticSceneDetection.presets.items():
+            assert preset.clustering_threshold == 22.0, name
+            assert preset.snap_window == 6.0, name
+
+        api = WhisperJAVAPI.__new__(WhisperJAVAPI)
+        yaml_presets = WhisperJAVAPI.get_scene_detector_schema(api, "semantic")["presets"]
+        for name in ("conservative", "balanced", "aggressive"):
+            assert "clustering_threshold" not in yaml_presets[name], name
+            assert "snap_window" not in yaml_presets[name], name
 
     def test_qwen_schema_exposes_the_slider(self):
+        # v1.9.2 (owner O1): 22.0 is the one product-wide value, so the Qwen panel must
+        # show it too. Qwen leaves the knob unset by default (qwen_pipeline.py:673-674),
+        # which falls through to the engine default -- so a panel still saying 18 would
+        # have been displaying a number no run would use.
         from whisperjav.webview_gui.api import WhisperJAVAPI
         api = WhisperJAVAPI.__new__(WhisperJAVAPI)
         base = WhisperJAVAPI._get_qwen_schema_base(api)
         audio = (base.get("schema") or base)["audio"]
-        assert audio["scene_clustering_threshold"]["default"] == 18
+        assert audio["scene_clustering_threshold"]["default"] == 22
 
 
 @pytest.mark.slow
@@ -93,11 +118,17 @@ class TestCli:
         assert sd["method"] == "semantic"
         assert sd["clustering_threshold"] == 10.0
 
-    def test_absent_flag_leaves_the_preset_value(self, tmp_path):
+    def test_absent_flag_leaves_the_uniform_value_on_every_sensitivity(self, tmp_path):
         # Before v1.9.2 the resolved feature was auditok's, which has no such field, so
         # "absent" meant "key missing". The semantic component declares the parameter, so
-        # absence now means "still the sensitivity preset's value, not an injected one".
-        dump, _ = _dump(tmp_path, "--mode", "balanced", "--sensitivity", "balanced",
-                        "--scene-detection-method", "semantic")
-        sd = dump["resolved_config"]["features"]["scene_detection"]
-        assert sd["clustering_threshold"] == 18.0
+        # absence now means "still the shipped value, not an injected one".
+        #
+        # v1.9.2 (owner O1): that shipped value is the SAME on every sensitivity --
+        # clustering_threshold 22.0 and snap_window 6.0. Only the scene-length bounds
+        # still vary. This is the end-to-end guard for the uniformity requirement.
+        for sensitivity in ("conservative", "balanced", "aggressive"):
+            dump, _ = _dump(tmp_path, "--mode", "balanced", "--sensitivity", sensitivity,
+                            "--scene-detection-method", "semantic")
+            sd = dump["resolved_config"]["features"]["scene_detection"]
+            assert sd["clustering_threshold"] == 22.0, sensitivity
+            assert sd["snap_window"] == 6.0, sensitivity
