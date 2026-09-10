@@ -125,7 +125,7 @@ gui:
   max_duration:
     widget: slider
     label: "Max Segment Duration"
-    description: "Merge ceiling in seconds: a merge that would exceed it is declined. Overlong segments are NOT split -- the engine keeps them and logs a warning."
+    description: "Scene ceiling in seconds. The engine clusters at 0.5 s granularity and merges upward, never past this value; a scene can only exceed it if one raw cluster is longer than the ceiling (a warning is logged). Balanced and Fidelity resolve 240 s."
     min: 60
     max: 1200
     step: 10
