@@ -4,7 +4,9 @@ Covers the four modifications (see vendor module docstring):
   A. per-chunk anchored time axis (drift fix)
   B. silence-aware onset-anchored snapping
   C. silence-clamped per-boundary padding
-  D. overlong-scene warning (no splitter) — via the E2E metadata run
+  D. max_duration honoured while stitching (no splitter; a warning if a raw
+     cluster or the final clean-up still exceeds it) — the E2E run asserts
+     the ceiling
 
 Synthetic-signal tests exercise the module-level helpers and the snapper
 directly; the E2E test runs the real process_movie_v7 + adapter on generated
@@ -248,6 +250,15 @@ class TestEndToEnd:
         for a, b in zip(segs, segs[1:]):
             overlap = a["asr_processing"]["end"] - b["asr_processing"]["start"]
             assert overlap <= 0.70 + 1e-6
+
+        # 4. CEILING (v1.9.2, 2026-09-11): max_duration is honoured while stitching.
+        #    The true bound is max + min (the final clean-up may absorb one
+        #    sub-minimum neighbour); on this fixture nothing should reach even
+        #    that, so also pin the practical bound of max plus one frame.
+        durs = [s["timestamps"]["duration"] for s in segs]
+        assert max(durs) <= cfg.max_duration + cfg.min_duration
+        assert max(durs) <= cfg.max_duration + FRAME_DT + 1e-6, durs
+        assert min(durs) >= cfg.min_duration - FRAME_DT or len(segs) == 1
 
     def test_adapter_transform(self, synthetic_wav, tmp_path):
         from whisperjav.modules.scene_detection_backends.semantic_adapter import (
