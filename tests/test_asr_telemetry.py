@@ -65,7 +65,7 @@ class TestTelemetryFile:
         t = AsrTelemetry(tmp_path / "t.jsonl", "CLIP-001")
         for i in range(3):
             t.record_scene(index=i, audio_duration_s=28.0, wall_s=5.0,
-                           segments=[_segment()], speech_detected=True,
+                           segments=[_segment()],
                            produced_output=True)
         path = t.write()
         assert path and path.exists()
@@ -82,7 +82,7 @@ class TestTelemetryFile:
         """Telemetry failure must stay a telemetry failure."""
         t = AsrTelemetry(tmp_path / "t.jsonl", "x")
         t.record_scene(index=0, audio_duration_s=None, wall_s=1.0,
-                       segments=[{"bad": object()}], speech_detected=True)
+                       segments=[{"bad": object()}])
         t.record_scene(index=1, audio_duration_s="nonsense", wall_s=1.0)
         # Whatever happened, the run continues.
         assert isinstance(t.records, list)
@@ -99,13 +99,13 @@ class TestTrendSummary:
         t = AsrTelemetry(tmp_path / "t.jsonl", "x")  # records go to disk as they happen
         for i in range(10):                      # healthy
             t.record_scene(index=i, audio_duration_s=28.0, wall_s=1.05,
-                           segments=[_segment()], speech_detected=True,
+                           segments=[_segment()],
                            produced_output=True)
         for i in range(10, 20):                  # degraded
             t.record_scene(index=i, audio_duration_s=28.0, wall_s=31.65,
                            segments=[_segment(temperature=0.17),
                                      _segment(temperature=0.17)],
-                           speech_detected=True, produced_output=False)
+                           produced_output=False)
 
         trend = t.trend_summary(window=10)
         assert trend is not None

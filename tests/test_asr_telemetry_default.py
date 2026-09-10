@@ -55,8 +55,8 @@ class TestRecordsReachDiskAsTheyHappen:
         from whisperjav.utils.asr_telemetry import AsrTelemetry
 
         t = AsrTelemetry(tmp_path / "sub" / "m.asr_telemetry.jsonl", "m")
-        t.record_scene(index=1, audio_duration_s=28.0, wall_s=1.0, segments=[], speech_detected=True, produced_output=True)
-        t.record_scene(index=2, audio_duration_s=28.0, wall_s=1.2, segments=[], speech_detected=True, produced_output=False)
+        t.record_scene(index=1, audio_duration_s=28.0, wall_s=1.0, segments=[], produced_output=True)
+        t.record_scene(index=2, audio_duration_s=28.0, wall_s=1.2, segments=[], produced_output=False)
         # no finalize() yet -- simulate a crash here
         lines = (tmp_path / "sub" / "m.asr_telemetry.jsonl").read_text(encoding="utf-8").splitlines()
         assert len(lines) == 2
