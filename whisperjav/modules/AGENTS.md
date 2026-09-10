@@ -51,7 +51,7 @@ Constructor convention (Dict/WhisperResult engines): `__init__(model_config: Dic
 
 `tests/test_qwen_asr.py` (init, device/dtype fallback, WhisperResult return, translation→transcribe
 fallback), `tests/test_qwen_pipeline_integration.py`, `tests/test_qwen_japanese_postprocess.py`,
-`tests/test_speech_segmentation.py`, `tests/test_hardening.py`, `tests/test_vad_failover.py`.
+`tests/test_speech_segmentation.py`, `tests/test_hardening.py`.
 
 ## Active context
 
