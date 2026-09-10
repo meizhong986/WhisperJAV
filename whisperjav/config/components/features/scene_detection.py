@@ -459,9 +459,12 @@ class SemanticSceneDetectionOptions(BaseModel):
         420.0,
         ge=10.0, le=1200.0,
         description=(
-            "Merge ceiling in seconds: a merge that would exceed it is declined. NOTE: this is "
-            "NOT a splitter -- the engine logs a warning if clustering produces an overlong "
-            "segment and keeps it (WJAV mod D)."
+            "Scene ceiling in seconds. It is honoured while pieces are stitched together: the "
+            "engine clusters at 0.5 s granularity and merges upward, declining any merge that "
+            "would exceed this value. Two ways a scene can still end up longer: a single raw "
+            "cluster longer than the ceiling (never observed; the longest seen on three films "
+            "is 18 s), or the final clean-up absorbing a sub-minimum neighbour (at most "
+            "min_duration over). The engine logs a WARNING when either happens."
         )
     )
     snap_window: float = Field(
@@ -526,8 +529,9 @@ class SemanticSceneDetection(FeatureComponent):
     # sensitivity -- 6.0 s and 22.0. They are therefore deliberately ABSENT from the
     # preset constructors below, so the field defaults on SemanticSceneDetectionOptions
     # are the single place either value is written. Only the scene-length bounds still
-    # vary by sensitivity, and on the balanced pipeline even those are replaced by
-    # LEGACY_PIPELINES["balanced"]["scene_overrides"] (28 s / 1200 s).
+    # vary by sensitivity; the balanced pipeline replaces both with
+    # LEGACY_PIPELINES["balanced"]["scene_overrides"] (28 s / 240 s) and fidelity
+    # replaces the ceiling only (240 s) via its own scene_overrides.
     presets = {
         "conservative": SemanticSceneDetectionOptions(
             min_duration=30.0,
