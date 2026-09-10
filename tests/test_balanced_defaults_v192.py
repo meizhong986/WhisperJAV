@@ -35,6 +35,44 @@ from whisperjav.utils.output_coverage import PASSTHROUGH_SEGMENTERS
 
 # ─── helper layer ────────────────────────────────────────────────────────────
 
+class TestSceneBoundsOverrides:
+    """v1.9.2 (owner, 2026-09-11): scene ceiling 240 s on Balanced and Fidelity (semantic).
+
+    These read the override tables directly so the values are pinned even when the
+    slow --dump-params tests are skipped. The CLI-level guard is
+    tests/test_scene_clustering_threshold_v192.py::TestSceneCeiling.
+    """
+
+    def test_balanced_semantic_bounds(self):
+        from whisperjav.config.legacy import LEGACY_PIPELINES
+        sem = LEGACY_PIPELINES["balanced"]["scene_overrides"]["semantic"]
+        assert sem == {
+            "scene_detection.min_duration": 28.0,
+            "scene_detection.max_duration": 240.0,
+        }
+
+    def test_balanced_auditok_untouched(self):
+        # Owner decision 2026-09-11: semantic first; auditok stays at 20 minutes and
+        # keeps its own (_s) parameter names.
+        from whisperjav.config.legacy import LEGACY_PIPELINES
+        aud = LEGACY_PIPELINES["balanced"]["scene_overrides"]["auditok"]
+        assert aud == {
+            "scene_detection.max_duration_s": 1200.0,
+            "scene_detection.pass1_max_duration_s": 1200.0,
+        }
+        assert "silero" not in LEGACY_PIPELINES["balanced"]["scene_overrides"]
+
+    def test_fidelity_semantic_ceiling_only(self):
+        from whisperjav.config.legacy import LEGACY_PIPELINES
+        assert LEGACY_PIPELINES["fidelity"]["scene_overrides"] == {
+            "semantic": {"scene_detection.max_duration": 240.0},
+        }
+
+    def test_fast_declares_no_override(self):
+        from whisperjav.config.legacy import LEGACY_PIPELINES
+        assert "scene_overrides" not in LEGACY_PIPELINES["fast"]
+
+
 class TestBalancedDefault:
     def test_default_is_the_built_in_vad(self):
         # Owner N3 (2026-09-05): reversal of CFF3.
