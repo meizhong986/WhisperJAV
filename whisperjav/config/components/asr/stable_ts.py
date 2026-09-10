@@ -385,7 +385,7 @@ class StableTSASR(ASRComponent):
             without_timestamps=False,
             max_initial_timestamp=None,
             # Transcriber options - same as faster_whisper
-            temperature=[0.0, 0.1],
+            temperature=[0.0],                  # v1.9.2 (owner O4): [0.0, 0.1] -> [0.0], no temperature retries
             compression_ratio_threshold=2.4,
             logprob_threshold=-1.2,
             logprob_margin=0.2,
@@ -447,7 +447,7 @@ class StableTSASR(ASRComponent):
             without_timestamps=False,
             max_initial_timestamp=None,
             # Transcriber options - aligned with openai_whisper aggressive
-            temperature=[0.0, 0.15, 0.3, 0.5],  # v1.8.10: 4-step fallback matching Pass 2
+            temperature=[0.0],                  # v1.9.2 (owner O4): 4-step fallback -> [0.0], caps worst-case run time
             compression_ratio_threshold=2.6,  # v1.8.10: 3.0→2.6, tuner-validated (run5: fastest, best overlap)
             logprob_threshold=-2.0,  # v1.8.10: -2.5→-2.0, quality floor
             logprob_margin=0.0,
