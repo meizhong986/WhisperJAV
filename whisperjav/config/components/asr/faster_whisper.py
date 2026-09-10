@@ -313,13 +313,17 @@ class FasterWhisperASR(ASRComponent):
             # Exclusive options
             hallucination_silence_threshold=None,  # v1.8.10-hf1: 2.0→None, disabled
         ),
+        # v1.9.2 aggressive retune (owner O4 + O6, 2026-09-10), after his feature-length
+        # manual test in which the aggressive run had to be abandoned at 73 minutes.
+        # Every value below marked "v1.9.2" comes from his table, verbatim; the stated
+        # intent is to cap worst-case execution time while keeping intake wide.
         "aggressive": FasterWhisperOptions(
             # Decoder options
             task="transcribe",
             language="ja",
-            beam_size=3,                          # v1.8.10-hf3: 4→2; v1.8.12: 2→3, engine-split retune
+            beam_size=2,                          # v1.9.2: 3→2, ~95% of the beam-search gain at half the compute
             best_of=2,                            # v1.8.10-hf3: 3→2; v1.8.12: 2→1; v1.8.12.post1: 1→2, fix F5 empty-output regression
-            patience=1.3,                         # v1.8.10-hf3: 2.5→2.0; v1.8.14: 2.0→1.3, speed/quality tune (catastrophe arc)
+            patience=1.0,                         # v1.9.2: 1.3→1.0, standard beam termination
             length_penalty=None,
             prefix=None,
             suppress_blank=True,
@@ -327,11 +331,11 @@ class FasterWhisperASR(ASRComponent):
             without_timestamps=False,
             max_initial_timestamp=0.0,
             # Transcriber options
-            temperature=[0.0, 0.2],               # v1.8.10-hf3: [0.0]→[0.0, 0.17]; v1.8.14: 0.17→0.2, lighter fallback (catastrophe arc)
-            compression_ratio_threshold=2.6,
-            logprob_threshold=-1.00,              # v1.8.10-hf3: -1.30→-1.00, uniform across sensitivities
+            temperature=[0.0],                    # v1.9.2 (O4+O6): [0.0, 0.2]→[0.0], no temperature retries, caps worst-case run time
+            compression_ratio_threshold=2.2,      # v1.9.2: 2.6→2.2, drops repetitive decoder loops earlier
+            logprob_threshold=-1.00,              # v1.8.10-hf3: -1.30→-1.00, uniform across sensitivities; v1.9.2 confirms -1.00
             logprob_margin=0.0,
-            no_speech_threshold=0.72,             # v1.8.10-hf3: 0.90→0.77; v1.8.12: 0.77→0.84; v1.8.14: 0.84→0.72, gate relaxation (catastrophe arc)
+            no_speech_threshold=0.72,             # v1.8.14: 0.84→0.72, gate relaxation; v1.9.2 confirms 0.72
             drop_nonverbal_vocals=False,
             condition_on_previous_text=False,      # v1.8.10-hf1: True→False, prevents hallucination propagation
             initial_prompt=None,
@@ -341,7 +345,7 @@ class FasterWhisperASR(ASRComponent):
             clip_timestamps=None,
             # Engine options
             chunk_length=30,
-            repetition_penalty=1.3,
+            repetition_penalty=1.5,               # v1.9.2: 1.3→1.5, penalises immediate token repetition
             no_repeat_ngram_size=3,               # v1.8.10-hf1: 2→3, prevents repetition loops
             prompt_reset_on_temperature=None,
             hotwords=None,
