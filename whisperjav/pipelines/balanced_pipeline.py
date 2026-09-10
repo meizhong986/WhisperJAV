@@ -16,7 +16,6 @@ from whisperjav.modules.scene_detection_backends import SceneDetectorFactory
 
 from whisperjav.modules.srt_stitching import SRTStitcher
 from whisperjav.utils.logger import logger
-from whisperjav.utils.output_coverage import SpeechPositiveEmptyStreak
 from whisperjav.utils.asr_telemetry import AsrTelemetry, resolve_telemetry_path
 from whisperjav.utils.model_refresh import DEFAULT_MODEL_REFRESH_AUDIO_MINUTES
 
@@ -491,14 +490,22 @@ class BalancedPipeline(BasePipeline):
             # Accumulate VAD segments across all scenes for visualization data contract
             all_vad_segments = []
 
-            # #394: track consecutive scenes where the detector reported speech
-            # but nothing came back. This is the corroborating signal that tells
-            # "the recogniser stopped" apart from "the speech stopped" -- span
-            # alone cannot, which is why span alone only warns. The tracker
-            # disables itself when no external segmenter is running.
-            empty_streak = SpeechPositiveEmptyStreak(
-                asr.get_segmenter_name() if hasattr(asr, 'get_segmenter_name') else None
+            # v1.9.2 (owner Part C): name the mechanism actually in use, so the
+            # terminal states what ran instead of leaving the user to infer it.
+            _seg_name = asr.get_segmenter_name() if hasattr(asr, 'get_segmenter_name') else "none"
+            _detection_label = (
+                "Internal FW Silero VAD" if _seg_name == "none"
+                else f"speech segmenter '{_seg_name}'"
             )
+
+            # v1.9.2 (owner V1/V3): the consecutive-empty-scene tracker is gone.
+            # Its signal was "the detector reported speech and nothing came back",
+            # which is produced identically by two opposite situations it cannot
+            # separate -- a recogniser that has stopped working, and a scene with
+            # no intelligible speech in it (a long continuous action scene, or the
+            # music performance in #324). It was also inert under the built-in VAD,
+            # so it recorded a reassuring zero for exactly the runs that failed.
+            # The per-scene telemetry below records the facts instead.
 
             # #394 diagnostics: per-scene record of decode behaviour and
             # memory, so the *approach* to a failure is visible and not only its
@@ -560,6 +567,7 @@ class BalancedPipeline(BasePipeline):
 
                     last_update_time = time.time()
 
+                _scene_wall = 0.0
                 try:
                     _scene_t0 = time.time()
                     # Use unified progress manager's external suppression if available
@@ -570,6 +578,26 @@ class BalancedPipeline(BasePipeline):
                         asr.transcribe_to_srt(scene_path, scene_srt_path, task=self.asr_task)
                     _scene_wall = time.time() - _scene_t0
 
+                    # v1.9.2 (owner Part C): report what this scene actually yielded.
+                    # A scene that cost real time and returned nothing is called out,
+                    # because that is the condition worth noticing.
+                    _yield = 0
+                    try:
+                        if scene_srt_path.exists() and scene_srt_path.stat().st_size > 0:
+                            _yield = scene_srt_path.read_text(encoding='utf-8').count(' --> ')
+                    except Exception:  # noqa: BLE001 - reporting must never break a run
+                        _yield = -1
+                    # One line per scene, newline-terminated. No carriage return and
+                    # no padding: the progress bar above draws in place with \r and
+                    # redraws on its next update, so a plain line cannot tear it.
+                    print(
+                        f"  Scene {scene_num}/{total_scenes} "
+                        f"({scene_paths[idx][3]:.0f}s, {_detection_label}): "
+                        f"{_yield} subtitle(s) in {_scene_wall:.0f}s"
+                        f"{'  <-- NO OUTPUT' if _yield == 0 else ''}",
+                        flush=True,
+                    )
+
                     # Process results - simplified to reduce message spam
                     if scene_srt_path.exists() and scene_srt_path.stat().st_size > 0:
                         scene_srt_info.append((scene_srt_path, start_time_sec))
@@ -579,47 +607,56 @@ class BalancedPipeline(BasePipeline):
                         master_metadata["scenes_detected"][idx]["transcribed"] = True
                         master_metadata["scenes_detected"][idx]["no_speech_detected"] = True
 
-                    # Collect VAD segments from ASR (adjusted by scene start offset)
+                    # Speech regions, when an external detector actually produced
+                    # any. Under the built-in VAD this is empty by design: the
+                    # recogniser does its own detection and does not report the
+                    # regions it used, so there is nothing honest to record here.
                     if hasattr(asr, 'get_last_vad_segments'):
-                        scene_vad = asr.get_last_vad_segments()
-
-                        # #394: did the detector find speech here, and did the
-                        # recogniser return anything for it?
-                        empty_streak.record(
-                            produced_output=bool(
-                                scene_srt_path.exists() and scene_srt_path.stat().st_size > 0
-                            ),
-                            speech_detected=bool(scene_vad),
-                        )
-
-                        if telemetry is not None:
-                            telemetry.record_scene(
-                                index=scene_num,
-                                audio_duration_s=scene_paths[idx][3],
-                                wall_s=_scene_wall,
-                                segments=(asr.get_last_decode_stats()
-                                          if hasattr(asr, 'get_last_decode_stats') else []),
-                                speech_detected=bool(scene_vad),
-                                produced_output=bool(
-                                    scene_srt_path.exists() and scene_srt_path.stat().st_size > 0
-                                ),
-                                model_epoch=getattr(asr, "epoch", None),
-                            )
-
-                        for seg in scene_vad:
+                        for seg in asr.get_last_vad_segments():
                             all_vad_segments.append({
                                 "start_sec": round(start_time_sec + seg["start_sec"], 3),
                                 "end_sec": round(start_time_sec + seg["end_sec"], 3),
                             })
 
+                    _scene_produced = bool(
+                        scene_srt_path.exists() and scene_srt_path.stat().st_size > 0
+                    )
                     self.progress.update_subtask(1)
 
                 except Exception as e:
+                    # The time was really spent, so record it. Leaving it at 0.0
+                    # would make the telemetry report rtf 0.0 for a scene that may
+                    # have burned minutes before failing.
+                    _scene_wall = time.time() - _scene_t0
                     # Show errors with scene context
                     self.progress.show_message(f"Scene {scene_num}/{len(scene_paths)} failed: {str(e)}", "error", 2.0)
                     master_metadata["scenes_detected"][idx]["transcribed"] = False
                     master_metadata["scenes_detected"][idx]["error"] = str(e)
+                    _scene_produced = False
+                    print(
+                        (f"  Scene {scene_num}/{total_scenes} "
+                         f"({scene_paths[idx][3]:.0f}s, {_detection_label}): "
+                         f"FAILED after {_scene_wall:.0f}s -- {e}")[:160],
+                        flush=True,
+                    )
                     self.progress.update_subtask(1)
+
+                # v1.9.2 (owner in1): the recorder sits OUTSIDE the try above. It
+                # only observes, so it must never be able to mark a scene failed --
+                # which it could when it lived inside the same block.
+                if telemetry is not None:
+                    try:
+                        telemetry.record_scene(
+                            index=scene_num,
+                            audio_duration_s=scene_paths[idx][3],
+                            wall_s=_scene_wall,
+                            segments=(asr.get_last_decode_stats()
+                                      if hasattr(asr, 'get_last_decode_stats') else []),
+                            produced_output=_scene_produced,
+                            model_epoch=getattr(asr, "epoch", None),
+                        )
+                    except Exception as _te:  # noqa: BLE001 - an observer never fails a run
+                        logger.debug("Telemetry record failed for scene %s: %s", scene_num, _te)
 
                 # v1.9.2 (CFF1 / D2): every scene handed to the recogniser counts
                 # toward the refresh budget (failed ones included, same as
@@ -632,9 +669,13 @@ class BalancedPipeline(BasePipeline):
             self.progress.finish_subtask()
 
             # Save accumulated ASR-level VAD segments to metadata for visualization
+            # Only recorded when an external detector actually reported regions.
+            # This used to write vad_method "silero" and a set of Silero parameters
+            # for every run, including runs where no external detector ran at all.
             if all_vad_segments:
                 master_metadata["vad_segments"] = all_vad_segments
-                master_metadata["vad_method"] = "silero"
+                master_metadata["vad_method"] = asr.get_segmenter_name() if hasattr(
+                    asr, 'get_segmenter_name') else "unknown"
                 master_metadata["vad_params"] = self.vad_params
 
             # Print completion message for scene transcription (always visible)
@@ -731,18 +772,12 @@ class BalancedPipeline(BasePipeline):
                 telemetry.finalize()
             self._active_telemetry = None
 
-            master_metadata["summary"]["speech_positive_empty_streak"] = empty_streak.longest
             # v1.9.2 (CFF1): how often the recogniser was replaced during this file
             # (the proxy counts across the batch; the difference is this file's share).
             master_metadata["summary"]["model_refresh_audio_minutes"] = self.model_refresh_audio_minutes
             master_metadata["summary"]["model_refreshes"] = (
                 int(getattr(asr, "refresh_count", 0) or 0) - _refreshes_at_file_start
             )
-            if empty_streak.longest:
-                logger.warning(
-                    "%d consecutive scene(s) produced no output while speech was "
-                    "still being detected (issue #394).", empty_streak.longest
-                )
             master_metadata["metadata_master"]["updated_at"] = datetime.now().isoformat() + "Z"
 
             self.metadata_manager.save_master_metadata(master_metadata, media_basename)
