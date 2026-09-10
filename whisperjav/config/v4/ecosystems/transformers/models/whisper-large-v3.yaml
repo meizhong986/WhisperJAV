@@ -71,7 +71,7 @@ presets:
 
   aggressive:
     decode.beam_size: 7
-    decode.temperature: 0.2
+    decode.temperature: 0.0      # v1.9.2 (owner O4): 0.2 -> 0.0, temperature 0 everywhere
     quality.no_speech: 0.4
     chunk.batch_size: 12
 
