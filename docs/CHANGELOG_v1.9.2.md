@@ -8,7 +8,7 @@
 > Conventions: one entry per landed change, newest first. "Decision" lines
 > record who decided what, so a later reader can tell policy from mechanism.
 >
-> **SYNC** — pack r2.7 · 2026-09-10 | tracker rev 51.8 | change log through 2026-09-11 (semantic scene ceiling 240 s on Balanced and Fidelity, **uncommitted**; the 2026-09-10 retune + failover purge are committed as d754a35..22ef1a1) | `dev_v1.9.2` @ 22ef1a1 (58 one-file commits e8f80e3..22ef1a1, not pushed) |
+> **SYNC** — pack r2.7 · 2026-09-10 | tracker rev 51.8 | change log through 2026-09-11 (semantic scene ceiling 240 s on Balanced and Fidelity, **committed** as 13 one-file commits 834b42c..afeed71 plus this sync update) | `dev_v1.9.2` @ afeed71+ (71 one-file commits e8f80e3..HEAD, not pushed) |
 > GitHub 134 open · 231 closed · 12 PRs · 0 labels applied · 32 owed (8 replies posted 2026-09-06; #413 follow-up at 16:11 UTC). Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
 > (updated in place; never a second page). Rule: a session that changes the pack, this file or the change
 > log brings the other two to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
@@ -16,6 +16,12 @@
 ---
 
 ## 2026-09-11 — the semantic scene ceiling drops to 240 s on Balanced and Fidelity
+
+**Committed 2026-09-11 as 13 one-file commits `834b42c..afeed71` on `dev_v1.9.2`, not pushed.**
+In order: `834b42c` the two ceilings in `config/legacy.py`; `91fd5b0` the logger fix;
+`c82887a` / `87fd8ca` / `febd65b` / `2dd7dbe` the corrected descriptions (engine, adapter,
+component, GUI hint); `ec01361` / `3e3a38c` the GUI comments; `6e896cd` / `18e0587` / `9115a6b`
+the three test files; `21ea93c` the release notes; `afeed71` this entry.
 
 **Owner instructions (typed 2026-09-10/11):** the maximum scene length must shrink a lot; target
 240 s; start with the semantic detector, other backends after user feedback. Decisions in the same
