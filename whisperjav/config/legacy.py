@@ -107,16 +107,20 @@ LEGACY_PIPELINES = {
         # rest when whisperseg becomes the runtime default.
         "vad": "silero-v3.1",
         "features": ["auditok_scene_detection"],
-        # v1.9.2 (owner decision): Balanced scenes are at least 28 s and at most 20
-        # minutes. The keys differ by backend because the backends read different names,
-        # and 28 is only SAFE on semantic, whose min_duration merges. On auditok
-        # min_duration DISCARDS shorter regions, so only the ceiling is set there.
-        # fast and fidelity deliberately declare nothing here and keep the backend's own
-        # defaults (owner decision: balanced only).
+        # v1.9.2 (owner decision): Balanced scenes are at least 28 s and at most 240 s
+        # (4 minutes) on the semantic detector, at every sensitivity. The ceiling was 20
+        # minutes until 2026-09-11; measured on a 179-minute film, 1200 s left 60% of the
+        # film in scenes over 240 s, and each such scene is decoded as one long chain of
+        # 30 s recogniser windows. The keys differ by backend because the backends read
+        # different names, and 28 is only SAFE on semantic, whose min_duration merges. On
+        # auditok min_duration DISCARDS shorter regions, so only the ceiling is set there,
+        # and auditok's own ceiling deliberately stays at 20 minutes (owner decision:
+        # semantic first; other backends after user feedback). fast declares nothing here
+        # and keeps the backend's own defaults.
         "scene_overrides": {
             "semantic": {
                 "scene_detection.min_duration": 28.0,
-                "scene_detection.max_duration": 1200.0,
+                "scene_detection.max_duration": 240.0,
             },
             "auditok": {
                 "scene_detection.max_duration_s": 1200.0,
@@ -142,6 +146,16 @@ LEGACY_PIPELINES = {
         # See balanced note above — same architecture applies.
         "vad": "silero-v3.1",
         "features": ["auditok_scene_detection"],
+        # v1.9.2 (owner decision 2026-09-11): Fidelity's semantic scene ceiling is 240 s at
+        # every sensitivity, for the same reason as Balanced -- OpenAI Whisper decodes a
+        # scene as the same chain of 30 s windows. The semantic presets' minimums
+        # (30/20/10 s) are kept; only the ceiling is overridden. Note this LOOSENS the
+        # aggressive preset (180 s -> 240 s) and tightens the other two (420 s -> 240 s).
+        "scene_overrides": {
+            "semantic": {
+                "scene_detection.max_duration": 240.0,
+            },
+        },
         "description": "OpenAI Whisper with VAD and scene detection. Maximum fidelity.",
     },
     "kotoba-faster-whisper": {
