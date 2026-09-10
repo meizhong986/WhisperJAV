@@ -420,7 +420,7 @@ def parse_arguments():
                                  "Semantic scene detector only: the clustering distance that "
                                  "separates one scene from the next. Lower values tend to give "
                                  "more, shorter scenes; higher values fewer, longer ones. Default "
-                                 "18 (aggressive preset 10, conservative 22). Ignored by auditok/silero."
+                                 "22, the same on every sensitivity (v1.9.2). Ignored by auditok/silero."
                              ))
     tuning_group.add_argument("--vad-version",
                              type=str,
@@ -706,7 +706,8 @@ def parse_arguments():
     qwen_audio_group.add_argument("--qwen-scene-clustering-threshold", type=float, default=None,
                            metavar="FLOAT",
                            help="Semantic scene detector only: clustering distance separating "
-                                "scenes. Lower values tend to give more, shorter scenes. Default 18 (YAML).")
+                                "scenes. Lower values tend to give more, shorter scenes. Default 22 "
+                                "(v1.9.2: the same value every pipeline uses).")
     qwen_audio_group.add_argument("--qwen-enhancer", type=str, default="none",
                            choices=["none", "clearvoice", "bs-roformer", "zipenhancer", "ffmpeg-dsp"],
                            help="Speech enhancement backend (default: none)")
