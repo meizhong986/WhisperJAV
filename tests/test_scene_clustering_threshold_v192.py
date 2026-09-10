@@ -132,3 +132,47 @@ class TestCli:
             sd = dump["resolved_config"]["features"]["scene_detection"]
             assert sd["clustering_threshold"] == 22.0, sensitivity
             assert sd["snap_window"] == 6.0, sensitivity
+
+
+class TestSceneCeiling:
+    """v1.9.2 (owner, 2026-09-11): the semantic scene ceiling is 240 s on Balanced and
+    Fidelity, at every sensitivity. Balanced keeps its 28 s floor; Fidelity keeps the
+    semantic presets' floors. auditok on Balanced is deliberately untouched (semantic
+    first; other backends after user feedback), and its parameter names must stay
+    separate -- a bare ``min_duration`` reaching auditok would DISCARD every region
+    under 28 s.
+    """
+
+    @pytest.mark.parametrize("sensitivity", ["conservative", "balanced", "aggressive"])
+    def test_balanced_resolves_28_and_240(self, tmp_path, sensitivity):
+        dump, _ = _dump(tmp_path, "--mode", "balanced", "--sensitivity", sensitivity)
+        sd = dump["resolved_config"]["features"]["scene_detection"]
+        assert sd["method"] == "semantic"
+        assert sd["min_duration"] == 28.0
+        assert sd["max_duration"] == 240.0
+
+    @pytest.mark.parametrize("sensitivity,floor", [
+        ("conservative", 30.0), ("balanced", 20.0), ("aggressive", 10.0),
+    ])
+    def test_fidelity_resolves_240_and_keeps_its_floor(self, tmp_path, sensitivity, floor):
+        dump, _ = _dump(tmp_path, "--mode", "fidelity", "--sensitivity", sensitivity)
+        sd = dump["resolved_config"]["features"]["scene_detection"]
+        assert sd["method"] == "semantic"
+        assert sd["max_duration"] == 240.0
+        assert sd["min_duration"] == floor
+
+    def test_fast_is_unchanged(self, tmp_path):
+        dump, _ = _dump(tmp_path, "--mode", "fast", "--sensitivity", "aggressive")
+        sd = dump["resolved_config"]["features"]["scene_detection"]
+        assert sd["method"] == "semantic"
+        assert sd["max_duration"] == 180.0
+        assert sd["min_duration"] == 10.0
+
+    def test_balanced_auditok_keeps_its_own_ceiling_and_names(self, tmp_path):
+        dump, _ = _dump(tmp_path, "--mode", "balanced", "--scene-detection-method", "auditok")
+        sd = dump["resolved_config"]["features"]["scene_detection"]
+        assert sd["method"] == "auditok"
+        assert sd["max_duration_s"] == 1200.0
+        assert sd["pass1_max_duration_s"] == 1200.0
+        assert "max_duration" not in sd
+        assert "min_duration" not in sd
