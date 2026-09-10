@@ -52,8 +52,14 @@ class SemanticClusteringConfig:
     """
     min_duration: float = 20.0
     max_duration: float = 420.0
-    snap_window: float = 5.0
-    clustering_threshold: float = 18.0
+    # v1.9.2 (owner O1): 6.0 / 22.0 on every sensitivity. These are the engine's
+    # last-resort fallbacks, used when a caller supplies no value at all
+    # (semantic_backend.py:66-90, scene_detection.py:263-272). They are kept equal to
+    # the shipped presets so a caller that falls through cannot silently run on a
+    # value the product no longer uses -- the exact trap that made every semantic run
+    # before v1.9.2 use 20/420 (see scene_detection.py:434-440).
+    snap_window: float = 6.0
+    clustering_threshold: float = 22.0
     sample_rate: int = 16000
 
     # Additional options for WhisperJAV integration
@@ -85,17 +91,22 @@ SEMANTIC_PRESETS = {
         snap_window=8.0,
         clustering_threshold=22.0,
     ),
+    # v1.9.2 (owner O1): snap_window and clustering_threshold are uniform, so these
+    # two entries carry only the scene-length bounds, matching the shipped presets in
+    # config/components/features/scene_detection.py.
+    #
+    # NOTE: this whole table is UNREACHABLE from the pipeline. Both production call
+    # sites pass a fully built ``config=`` (semantic_backend.py:91-94 and
+    # scene_detection.py:275-278), so the ``if config is None`` branch below that
+    # consults it never runs. It survives only for direct instantiation. It is a
+    # duplicate of two other preset stores and is a candidate for deletion.
     "conservative": SemanticClusteringConfig(
         min_duration=30.0,
         max_duration=420.0,
-        snap_window=6.0,
-        clustering_threshold=22.0,
     ),
     "aggressive": SemanticClusteringConfig(
         min_duration=10.0,
         max_duration=180.0,
-        snap_window=2.0,
-        clustering_threshold=10.0,
     ),
 }
 
