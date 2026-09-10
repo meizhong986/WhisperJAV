@@ -195,7 +195,7 @@ class DecoupledPipeline(BasePipeline):
         safe_chunking: bool = True,
         scene_min_duration: float = 12.0,
         scene_max_duration: float = 48.0,
-        scene_clustering_threshold: Optional[float] = None,  # v1.9.2: semantic only; None = YAML 18
+        scene_clustering_threshold: Optional[float] = None,  # v1.9.2: semantic only; None = the engine default (22 since O1)
 
         # Speech enhancement (Phase 3)
         speech_enhancer: str = "none",

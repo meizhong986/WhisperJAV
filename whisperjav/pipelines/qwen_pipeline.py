@@ -98,7 +98,7 @@ class QwenPipeline(BasePipeline):
         qwen_safe_chunking: bool = True,  # Enforce 12-48s scene boundaries for ForcedAligner
         scene_min_duration: Optional[float] = None,  # Override min scene duration (default: 12s)
         scene_max_duration: Optional[float] = None,  # Override max scene duration (default: 48s)
-        scene_clustering_threshold: Optional[float] = None,  # v1.9.2: semantic clustering distance (default: YAML 18)
+        scene_clustering_threshold: Optional[float] = None,  # v1.9.2: semantic clustering distance (None = the engine default, 22 since O1)
 
         # Temporal framing for assembly mode (GAP-5)
         qwen_framer: str = "vad-grouped",  # "vad-grouped", "full-scene", "srt-source"
@@ -233,7 +233,7 @@ class QwenPipeline(BasePipeline):
         self.safe_chunking = qwen_safe_chunking
         self.scene_min_override = scene_min_duration  # None = use default (12s)
         self.scene_max_override = scene_max_duration  # None = use default (48s)
-        self.scene_clustering_threshold = scene_clustering_threshold  # None = YAML default (18)
+        self.scene_clustering_threshold = scene_clustering_threshold  # None = the engine default (22 since O1)
 
         # Temporal framing for assembly mode (GAP-5)
         self.framer_backend = qwen_framer
