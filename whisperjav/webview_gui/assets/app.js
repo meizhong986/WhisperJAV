@@ -2405,7 +2405,7 @@ const EnsembleManager = {
                 vad: {},
                 // v1.9.2: seed the Scene tab from the RESOLVED scene parameters, not from
                 // the tool YAML's defaults — otherwise saving a customised pass writes the
-                // YAML values back over the pipeline's own (Balanced resolves 28 s / 1200 s).
+                // YAML values back over the pipeline's own (Balanced resolves 28 s / 240 s).
                 scene: {
                     scene_detection_method: passState.sceneDetector || 'semantic',
                     ...(result.scene_params || {})
