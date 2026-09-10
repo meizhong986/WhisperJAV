@@ -22,7 +22,6 @@ from whisperjav.utils.logger import logger
 from whisperjav.utils.device_detector import get_best_device
 from whisperjav.utils.parameter_tracer import NullTracer
 from whisperjav.modules.segment_filters import SegmentFilterConfig, SegmentFilterHelper
-from whisperjav.modules.vad_failover import should_force_full_transcribe
 from whisperjav.modules.speech_segmentation import SpeechSegmenterFactory
 
 
@@ -269,7 +268,13 @@ class WhisperProASR:
             logger.error(f"Failed to read audio file {audio_path}: {e}")
             raise
 
-        audio_duration = len(audio_data) / sample_rate if sample_rate else 0.0
+        # v1.9.2 (owner in1): "no segmentation" is honoured up front rather than
+        # inferred from a passthrough segmenter's fabricated whole-clip region.
+        if self.get_segmenter_name() == "none":
+            self._last_vad_segments = []
+            logger.info("Speech segmentation disabled: transcribing the whole clip in one call")
+            all_segments = self._transcribe_full_audio(audio_data)
+            return self._finalise(all_segments)
 
         # Run speech segmentation through the Speech Segmenter contract
         vad_segments = self._run_speech_segmentation(audio_data, sample_rate)
@@ -288,53 +293,33 @@ class WhisperProASR:
             total_segments = sum(len(group) for group in vad_segments)
             logger.info(f"Speech segmentation complete: {total_segments} segments in {len(vad_segments)} groups")
 
-        fallback_triggered = False
-
-        # Handle "none" backend case - no segments means transcribe full audio
+        # The segmenter's answer is used as given.
+        #
+        # v1.9.2 (owner in1): the "insufficient coverage" failover that used to sit
+        # here is gone. It discarded the detector's answer and transcribed the whole
+        # clip instead whenever the result looked implausible to it, on a threshold
+        # (480 s) that was a side effect of an unrelated constant rather than a
+        # chosen value. A detector that genuinely finds no speech is now believed --
+        # on this material that is a normal outcome, not a malfunction (#324).
         if not vad_segments:
-            if self._external_segmenter.name == "none":
-                logger.info("Speech segmentation: disabled (none backend) - transcribing full audio directly")
-                all_segments = self._transcribe_full_audio(audio_data)
-            elif should_force_full_transcribe(vad_segments, audio_duration):
-                logger.warning(
-                    "Speech segmentation produced insufficient coverage (segments=%s, duration=%.1fs). "
-                    "Falling back to full-clip transcription.",
-                    0,
-                    audio_duration,
-                )
-                fallback_triggered = True
-                all_segments = self._transcribe_full_audio(audio_data)
-            else:
-                logger.debug(f"No speech detected in {audio_path.name}")
-                return {"segments": [], "text": "", "language": self.whisper_params.get('language', 'ja')}
-        elif should_force_full_transcribe(vad_segments, audio_duration):
-            logger.warning(
-                "Speech segmentation produced insufficient coverage (segments=%s, duration=%.1fs). "
-                "Falling back to full-clip transcription.",
-                sum(len(group or []) for group in (vad_segments or [])),
-                audio_duration,
-            )
-            fallback_triggered = True
-            all_segments = self._transcribe_full_audio(audio_data)
-        else:
-            all_segments = []
-            for i, vad_group in enumerate(vad_segments, 1):
-                group_start = vad_group[0]["start_sec"]
-                group_end = vad_group[-1]["end_sec"]
-                logger.info(
-                    f"Transcribing group {i}/{len(vad_segments)} "
-                    f"({group_start:.1f}s - {group_end:.1f}s)"
-                )
-                segments = self._transcribe_vad_group(audio_data, sample_rate, vad_group)
-                all_segments.extend(segments)
+            logger.debug(f"No speech detected in {audio_path.name}")
+            return {"segments": [], "text": "", "language": self.whisper_params.get('language', 'ja')}
 
-        if fallback_triggered and not all_segments:
-            # Safety net: if fallback still produced nothing, log explicitly for debugging.
-            logger.warning(
-                "Full-clip fallback for %s emitted no segments. Returning empty result.",
-                audio_path.name,
+        all_segments = []
+        for i, vad_group in enumerate(vad_segments, 1):
+            group_start = vad_group[0]["start_sec"]
+            group_end = vad_group[-1]["end_sec"]
+            logger.info(
+                f"Transcribing group {i}/{len(vad_segments)} "
+                f"({group_start:.1f}s - {group_end:.1f}s)"
             )
+            segments = self._transcribe_vad_group(audio_data, sample_rate, vad_group)
+            all_segments.extend(segments)
 
+        return self._finalise(all_segments)
+
+    def _finalise(self, all_segments: List[Dict]) -> Dict:
+        """Validate and package the result. Shared by both transcription routes."""
         # Validate translation output - warn if translation was requested but output appears Japanese
         if self.task == 'translate' and all_segments:
             # Check if output contains significant Japanese characters
@@ -356,6 +341,15 @@ class WhisperProASR:
             "text": " ".join(seg["text"] for seg in all_segments),
             "language": self.whisper_params.get('language', 'ja')
         }
+
+    def get_segmenter_name(self) -> str:
+        """Name of the speech segmenter actually in use, or "none".
+
+        Mirrors ``FasterWhisperProASR.get_segmenter_name`` so the two recognisers
+        answer the same question the same way.
+        """
+        seg = getattr(self, "_external_segmenter", None)
+        return getattr(seg, "name", "none") if seg is not None else "none"
 
     def _run_speech_segmentation(self, audio_data: np.ndarray, sample_rate: int) -> List[List[Dict]]:
         """
