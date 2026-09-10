@@ -112,8 +112,12 @@ CAP_RULES: list[_CapRule] = [
             "pass1=fidelity + pass2=balanced + sensitivity=aggressive is empirically "
             "known to produce intermittent catastrophic ASR truncation in pass 2 "
             "(~67% rate in early trials). Auto-downgrading sensitivity to 'balanced' "
-            "removes the temperature=0.17 fallback path and the high no_speech_threshold, "
-            "eliminating the catastrophic-empty-scene manifestation."
+            "lowers no_speech_threshold from 0.72 to 0.65 and relaxes the beam settings, "
+            "which removed the catastrophic-empty-scene manifestation when this cap was "
+            "introduced. NOTE (v1.9.2, owner O4): the other half of the original rationale "
+            "-- a temperature=0.17 fallback path on aggressive -- no longer exists, because "
+            "every sensitivity now decodes once at temperature 0. Whether this cap should "
+            "still fire is an open question for the owner."
         ),
         memo_section="§15",
     ),
