@@ -48,10 +48,13 @@ contract:
 # =============================================================================
 spec:
   # --- Core Segmentation Options ---
+  # v1.9.2 (owner O1): snap_window and clustering_threshold are UNIFORM across every
+  # sensitivity. They are set here and nowhere else -- the conservative/balanced/
+  # aggressive presets below deliberately do not carry them.
   min_duration: 20.0
   max_duration: 420.0
-  snap_window: 5.0
-  clustering_threshold: 18.0
+  snap_window: 6.0
+  clustering_threshold: 22.0
   sample_rate: 16000
 
   # --- Audio Handling ---
@@ -70,8 +73,6 @@ presets:
   conservative:
     min_duration: 30.0
     max_duration: 420.0
-    snap_window: 6.0
-    clustering_threshold: 22.0
 
   # Balanced: Default settings
   balanced: {}
@@ -81,8 +82,6 @@ presets:
   aggressive:
     min_duration: 10.0
     max_duration: 180.0
-    snap_window: 2.0
-    clustering_threshold: 10.0
 
   # Dialogue-heavy: Optimized for conversation
   # Good for: Movies, TV shows with lots of dialogue
@@ -148,7 +147,7 @@ gui:
   clustering_threshold:
     widget: slider
     label: "Scene Change Threshold"
-    description: "Clustering distance that separates one scene from the next. Lower values tend to give more, shorter scenes; higher fewer, longer (default 18). CLI: --scene-clustering-threshold."
+    description: "Clustering distance that separates one scene from the next. Lower values tend to give more, shorter scenes; higher fewer, longer (default 22, the same on every sensitivity). CLI: --scene-clustering-threshold."
     min: 5
     max: 30
     step: 1
