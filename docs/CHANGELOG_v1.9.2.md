@@ -8,10 +8,99 @@
 > Conventions: one entry per landed change, newest first. "Decision" lines
 > record who decided what, so a later reader can tell policy from mechanism.
 >
-> **SYNC** — pack r2.7 · 2026-09-10 | tracker rev 51.7 | change log through 2026-09-10 (O1/O3/O4/O6 preset retune + the O2/O5 examination + the speech-detection failover purge, **all uncommitted**) | `dev_v1.9.2` @ d754a35 (28 one-file commits e8f80e3..d754a35, not pushed) |
+> **SYNC** — pack r2.7 · 2026-09-10 | tracker rev 51.8 | change log through 2026-09-11 (semantic scene ceiling 240 s on Balanced and Fidelity, **uncommitted**; the 2026-09-10 retune + failover purge are committed as d754a35..22ef1a1) | `dev_v1.9.2` @ 22ef1a1 (58 one-file commits e8f80e3..22ef1a1, not pushed) |
 > GitHub 134 open · 231 closed · 12 PRs · 0 labels applied · 32 owed (8 replies posted 2026-09-06; #413 follow-up at 16:11 UTC). Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
 > (updated in place; never a second page). Rule: a session that changes the pack, this file or the change
 > log brings the other two to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
+
+---
+
+## 2026-09-11 — the semantic scene ceiling drops to 240 s on Balanced and Fidelity
+
+**Owner instructions (typed 2026-09-10/11):** the maximum scene length must shrink a lot; target
+240 s; start with the semantic detector, other backends after user feedback. Decisions in the same
+thread: auditok and the silero scene backend on Balanced stay as they are; Fidelity gets 240 as
+well; Fast is unchanged.
+
+### What changed
+
+| File | Change |
+|---|---|
+| `config/legacy.py` (balanced `scene_overrides`) | semantic `scene_detection.max_duration` **1200 → 240**; `min_duration` stays 28. Not keyed by sensitivity, so 240 applies to conservative, balanced and aggressive. auditok's two Balanced values stay at 1200. |
+| `config/legacy.py` (fidelity) | NEW `scene_overrides` → semantic `max_duration` **240** at every sensitivity. Fidelity's floors stay the semantic presets (30/20/10). This LOOSENS fidelity + aggressive (180 → 240) and tightens the other two (420 → 240); flagged to the owner in the review. |
+| `modules/scene_detection_backends/semantic_backend.py` | passes `logger_instance=logger` to the adapter. Before this the engine ran with `logger=None` on the pipeline path and fell back to `print()`, so its WARNING about a scene exceeding `max_duration` (and every other engine line) never reached `whisperjav.log`. |
+| `vendor/semantic_audio_clustering.py`, `semantic_adapter.py`, `components/features/scene_detection.py`, `semantic-scene-detection.yaml`, `webview_gui/api.py`, `assets/app.js` | descriptions corrected (below); comments that said "28 s / 1200 s" now say 240. |
+| `tests/test_scene_clustering_threshold_v192.py` | NEW `TestSceneCeiling`: `--dump-params` pins Balanced 28/240 and Fidelity 240 on all three sensitivities, Fast unchanged (10/180 at aggressive), and Balanced + auditok keeps `max_duration_s` 1200 with no bare `min_duration`/`max_duration` key. |
+| `tests/test_balanced_defaults_v192.py` | NEW `TestSceneBoundsOverrides`: the override tables asserted directly. |
+| `tests/test_semantic_segmenter_v72.py` | the engine end-to-end test finally asserts the ceiling (it never had). |
+
+### A claim I made and retracted, and the measurement that replaced it
+
+I told the owner the semantic detector "cannot enforce any ceiling" because it has no splitter and
+that a splitter had to be built. He said the engine clusters finely and stitches upward, and asked
+for a double-check. Measured on EKAI-023 (179 min) with the shipped values (min 28, snap 6,
+clustering 22), replaying only the stitch on one feature extraction:
+
+| ceiling | scenes | longest | scenes over 240 s | film in scenes over 240 s | cuts landing in silence |
+|---|---|---|---|---|---|
+| 1200 (before) | 67 | 1122 s | 13 | 60% | 62/66 (94%) |
+| 300 | 81 | 300 s | 18 | 48% | 76/80 (95%) |
+| **240** | **89** | **240 s** | **0** | **0%** | 84/88 (95%) |
+| 180 | 101 | 180 s | 0 | 0% | 97/100 (97%) |
+
+Raw clustering yields 20,393 pieces, median 0.5 s, longest 18 s; `_smart_merge` never merges past
+the ceiling. The adversary reproduced this on the 1500 s and 3630 s HODV-22019 files (raw pieces
+≤ 17 s; longest scene 240.0 / 239.9 s at ceiling 240). Duplicated speech at boundaries (adaptive
+pads) stays ≤ 0.10 s per cut at every ceiling. The owner was right; the number alone is the change.
+
+**Precision:** the ceiling holds to within +`min_duration` (28 s on Balanced): `_forced_cleanup`
+absorbs a sub-minimum neighbour without a ceiling check. Never observed on three films. A raw
+cluster longer than the ceiling would also survive (longest seen: 18 s). The engine's WARNING
+covers both, and now reaches the log.
+
+### What it buys, and what is unmeasured
+
+Balanced and Fidelity decode a scene as a chain of 30 s recogniser windows whose placement follows
+the model's own predicted timestamps (`condition_on_previous_text` is already False on both). A
+240 s ceiling bounds that chain to about 8 windows on continuous content, bounds what one failed or
+hung scene costs to about 4 minutes of audio (was 20), and bounds the recogniser-refresh overshoot
+(refresh fires at the first scene boundary after 20 minutes of audio, so one instance could receive
+up to ~40 minutes at a 1200 s ceiling; at most ~24 at 240). **The effect on total run time is
+unmeasured** — nobody has run a full film at 240 s. The decisive run is the owner's: Balanced +
+aggressive on EKAI-023 at 240 against his cancelled 1200 run. More scenes also mean more seams:
+about 88 instead of 66 on that film, each 0.1–0.7 s of overlap (median 0.41 s measured earlier),
+roughly 36 s of duplicated audio, 0.3% of the film.
+
+Facts for the record, established this session: the silero *scene* backend's effective ceiling is
+its own `silero_max_speech_s` (`silero_backend.py:236`), not `max_duration_s`; and fast/fidelity at
+aggressive already resolved 180 s before this change, so Balanced was the outlier.
+
+**Decision:** owner. Semantic only; Fidelity included; Fast, auditok and silero untouched.
+**Relation to the approved next-cycle plan** (`docs/plans/V2X_SPEECH_BUDGET_SCENE_DETECTION.md`):
+this is the wall-clock secondary bound that plan calls for; it does not replace its Phase 0.
+
+### Verification (all executed 2026-09-11, WJ env)
+- `--dump-params` × {balanced, fidelity, fast} × {conservative, balanced, aggressive}: Balanced
+  28/240 on all three; Fidelity 30/240, 20/240, 10/240; Fast unchanged (30/420, 20/420, 10/180);
+  Balanced + `--scene-detection-method auditok` keeps `max_duration_s` 1200 / `pass1_max_duration_s`
+  1200 and carries no bare `min_duration`/`max_duration` key.
+- GUI: `WhisperJAVAPI.get_pipeline_defaults(pipeline, sensitivity, scene_detector="semantic")`
+  returns `scene_params.max_duration == 240` for Balanced and Fidelity at every sensitivity (the
+  value the Ensemble Customize → Scene slider is seeded from). `node --check app.js` clean.
+- Logger fix: `SemanticSceneDetector(min_duration=1, max_duration=2)` on the 20 s piano clip →
+  one 20.1 s scene and the WARNING `1 scene(s) exceed max_duration=2s (longest 20s)` captured on
+  the `whisperjav` logger (it also demonstrates the raw-cluster-longer-than-ceiling path).
+- pytest, per file: `test_semantic_segmenter_v72.py` 13 passed, `test_balanced_defaults_v192.py`
+  25 passed, `test_scene_clustering_threshold_v192.py` 18 passed. ruff: finding counts per edited
+  file identical to HEAD (no new findings).
+- Real run, Balanced / balanced sensitivity on `1500sec-HODV-22019.wav`: exit 0; 10 scenes,
+  longest 240.0 s, shortest 31.5 s (was 7 scenes, longest 426 s, on 2026-09-10); 32 stitched cues
+  re-derived from the per-scene SRTs plus each scene's padded start with **0.0000 s** error and
+  identical text; 26 cues in the final SRT — the same count as the 2026-09-10 run at 1200 s.
+- Real run, Fidelity / balanced sensitivity, same file: exit 0; 16 scenes, longest 239.5 s,
+  shortest 20.5 s; 85 stitched cues re-derived with **0.0000 s** error; 54 cues in the final SRT
+  (no earlier Fidelity run at the old ceiling exists on this file to compare against).
+- Not measured: run time on a feature-length film at 240 s (owner's EKAI-023 rerun).
 
 ---
 
