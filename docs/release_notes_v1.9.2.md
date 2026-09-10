@@ -279,6 +279,80 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
 
 ## Changed defaults and installation
 
+- **A false alarm is gone from long scenes, and the diagnostics for them now work.** On any scene of
+  eight minutes or more, Balanced used to print `Speech segmentation produced insufficient coverage
+  ... Falling back to full-clip transcription`. Nothing had failed. Balanced hands speech detection to
+  faster-whisper itself, and a placeholder standing in for the old external detector was being
+  misread as a detector failure — on a threshold that was an accident of an unrelated setting rather
+  than a chosen value. On one 3-hour test film, seven scenes produced that warning and it accounted
+  for every warning the run printed, so a real problem would have been indistinguishable from it.
+  Balanced now goes straight from scene detection to the recogniser with no such check, the message
+  is gone, and the per-scene diagnostics — which used to record nothing at all for those long scenes,
+  even when they produced subtitles — record them properly. Subtitles are unchanged: on the same
+  inputs the output files are byte-for-byte identical.
+
+- **The terminal now says what it is doing to each scene, and what it got back.** Each scene reports
+  its length, the detection method actually in use, how many subtitles it produced and how long it
+  took, and a scene that produced nothing is marked `NO OUTPUT` — for example
+  `Scene 4/10 (426s, Internal FW Silero VAD): 7 subtitle(s) in 7s`. A scene that fails now prints a
+  line too, where before it only appeared in a transient status message.
+
+- **One diagnostic field was removed because it was never true.** The per-scene record carried
+  `speech_detected`, derived from that same placeholder, so on Balanced it was always `true` — in one
+  test run all 26 scenes reported speech detected, including the 20 that produced nothing.
+  faster-whisper does not report the regions its internal detector used, so there is nothing truthful
+  to put in its place; what remains is measured. The "consecutive empty scenes" warning was removed
+  for the same reason: it could not tell a recogniser that had stopped working from a scene with no
+  intelligible speech in it, which on this material is a perfectly normal thing to find.
+
+- **On Fidelity, a rescue behaviour was removed.** If Fidelity's speech detector reported almost no
+  speech in a scene, that scene used to be transcribed from end to end anyway on the assumption the
+  detector had malfunctioned. It no longer is: a detector that reports no speech is believed. This
+  removes a source of long, expensive passes over scenes that hold no dialogue, and it does mean a
+  scene whose detector genuinely fails now yields nothing instead of being salvaged. Balanced is
+  unaffected — it has no external detector.
+
+
+- **Aggressive is retuned so it cannot run away with your time.** On a three-hour film an
+  Aggressive run took more than twice as long as Balanced and had to be abandoned before it
+  finished. The cause was not one setting but a stack of them, and the largest was that
+  Aggressive was allowed to decode a passage a second time at a higher temperature whenever a
+  quality check tripped — which on continuous, repetitive audio is often. Aggressive now decodes
+  once, at temperature 0, with a narrower beam (2 instead of 3), standard beam termination
+  (patience 1.0) and a stricter repetition check (compression ratio 2.2 instead of 2.6), and it
+  penalises immediate token repetition more firmly (1.5 instead of 1.3). It still admits quiet
+  audio into the recognizer as before — the no-speech and log-probability gates are unchanged on
+  Balanced. The same retune is applied to Fidelity, except the repetition penalty, which the
+  OpenAI Whisper engine Fidelity uses does not support. On a 25-minute test file Aggressive now
+  costs the same wall-clock time as Balanced. Expect it to be faster and more repeatable; expect
+  it to explore slightly fewer alternative readings of a difficult passage.
+
+- **The Whisper pipelines now decode at temperature 0 and never retry at a higher one.** Previously
+  Fast, Faster and the Kotoba pipeline fell back through as many as four temperatures. That
+  fallback is what made a run's duration unpredictable — a bad stretch could quietly cost four
+  decodes instead of one. Balanced, Fast, Faster, Fidelity and Kotoba now decode once, at all three
+  sensitivities. Output is reproducible run to run and worst-case run time is bounded. The
+  ChronosJAV pipelines (anime-whisper, Qwen3, CrispASR) have their own decoders and are unaffected.
+
+- **Scene detection uses one sensitivity threshold instead of three.** The semantic scene detector
+  had a different clustering threshold and silence-snap window for each sensitivity (22/18/10 and
+  6/5/2 seconds). Measurement during v1.9.2 showed the clustering threshold is not the lever its
+  name suggests — scene count barely moves across most of its range, and the scene-length bounds
+  are what actually decide granularity. Carrying three values implied a control that was not
+  there. All sensitivities now use 22.0 and a 6-second snap window. The scene-length bounds still
+  vary by sensitivity, and on Balanced they remain 28 seconds to 20 minutes.
+
+- **Subtitle cues are shorter by default on Balanced.** The speech detector's ceiling on a single
+  unbroken speech chunk drops from 20/15/9 seconds to 7/6/6 seconds across Conservative, Balanced and
+  Aggressive, and Aggressive no longer keeps speech shorter than 80 milliseconds (it was 30). Longer
+  chunks are split at an internal silence, so this affects how lines are divided rather than how much
+  speech is found; it is a readability change, not a speed change. Two caveats. On Fidelity the same
+  ceilings are set but the Silero v3.1 and v4.0 library does not enforce them, so only the 80
+  millisecond floor takes effect there. And if you explicitly select the Silero v6.2 segmenter, which
+  does enforce the ceiling, Aggressive moves the other way — from 4 seconds to 6 — so cues get longer,
+  not shorter.
+
+
 - **The recognizer is reloaded fresh every 20 minutes of audio.** Two controlled observations in
   the #394 investigation point at the recognizer instance rather than the audio: in #302 four minutes
   that returned nothing inside a long run transcribed normally as a separate job, and the diagnostic
