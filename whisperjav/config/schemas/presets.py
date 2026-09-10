@@ -13,10 +13,16 @@ is the per-engine component file:
     whisperjav/config/components/asr/stable_ts.py
 
 Values in this file mirror the **faster-whisper** component for the most common
-runtime paths (balanced pipeline). One known engine divergence is NOT reflected
-here — openai-whisper uses ``logprob_threshold = -1.55`` for the Aggressive
-sensitivity (vs. faster-whisper's ``-1.00``). For the openai-whisper canonical
-values, read ``components/asr/openai_whisper.py`` directly.
+runtime paths (balanced pipeline).
+
+v1.9.2 status
+-------------
+Nothing reads these tables — they are re-exported by ``schemas/__init__.py`` and
+``settings/__init__.py`` and have no other consumer. They are kept in step with the
+components only so a future reader does not pick up a value the product no longer
+ships. The v1.8.12 note about an openai-whisper divergence on Aggressive
+``logprob_threshold`` no longer applies: the owner's O6 retune (2026-09-10) sets both
+engines to ``-1.00``. Canonical values remain the component files.
 """
 
 from .base import Sensitivity
@@ -56,9 +62,9 @@ TRANSCRIBER_PRESETS = {
         clip_timestamps=None
     ),
     Sensitivity.AGGRESSIVE: TranscriberOptions(
-        temperature=[0.0, 0.2],                   # v1.8.10-hf3: [0.0, 0.3]→[0.0, 0.17]; v1.8.14: 0.17→0.2, lighter fallback (catastrophe arc)
-        compression_ratio_threshold=2.6,          # v1.8.10-hf3: 3.0→2.6
-        logprob_threshold=-1.00,                  # v1.8.10-hf3: -2.5→-1.00 (faster-whisper aligned; openai-whisper uses -1.55, see module docstring)
+        temperature=[0.0],                        # v1.9.2 (owner O4): [0.0, 0.2]→[0.0]. Every engine decodes once now.
+        compression_ratio_threshold=2.2,          # v1.9.2 (owner O6): 2.6→2.2
+        logprob_threshold=-1.00,                  # v1.8.10-hf3: -2.5→-1.00; v1.9.2 (O6) sets BOTH engines to -1.00, so the openai-whisper divergence noted in the module docstring is gone
         logprob_margin=0.0,
         drop_nonverbal_vocals=False,
         no_speech_threshold=0.72,                 # v1.8.10-hf3: 0.22→0.77; v1.8.12: 0.77→0.84; v1.8.14: 0.84→0.72, gate relaxation (catastrophe arc)
