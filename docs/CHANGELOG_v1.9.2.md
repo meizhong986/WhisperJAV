@@ -8,7 +8,7 @@
 > Conventions: one entry per landed change, newest first. "Decision" lines
 > record who decided what, so a later reader can tell policy from mechanism.
 >
-> **SYNC** — pack r2.6 · 2026-09-06 | tracker rev 51.6 | change log through 2026-09-09 (balanced pipeline: semantic scene default + Silero VAD version selection, **uncommitted**) | `dev_v1.9.2` @ bc2474b + 24 modified / 3 new files, uncommitted |
+> **SYNC** — pack r2.6 · 2026-09-06 | tracker rev 51.6 | change log through 2026-09-09 (balanced pipeline: semantic scene default + Silero VAD version selection, **uncommitted**) | `dev_v1.9.2` @ 90d65c1 (27 one-file commits e8f80e3..90d65c1, not pushed) |
 > GitHub 134 open · 231 closed · 12 PRs · 0 labels applied · 32 owed (8 replies posted 2026-09-06; #413 follow-up at 16:11 UTC). Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
 > (updated in place; never a second page). Rule: a session that changes the pack, this file or the change
 > log brings the other two to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
