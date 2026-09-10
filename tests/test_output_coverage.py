@@ -15,7 +15,6 @@ from whisperjav.utils.output_coverage import (
     DEFAULT_EMPTY_STREAK_THRESHOLD,
     DEFAULT_MIN_COVERAGE,
     MIN_ASSESSABLE_DURATION_S,
-    SpeechPositiveEmptyStreak,
     assess_coverage,
 )
 
@@ -91,13 +90,18 @@ def test_corroboration_is_reported_separately(tmp_path):
     assert "corroborated" in report.detail
 
 
-def test_probe_failure_corroborates_even_full_length_output(tmp_path):
-    """@13e5t: SRT stopped at ~6 min of a 10 min file; span alone cannot see it."""
+def test_corroboration_can_flag_even_full_length_output(tmp_path):
+    """@13e5t: SRT stopped at ~6 min of a 10 min file; span alone cannot see it.
+
+    v1.9.2: the health-probe arm was removed (it was never wired in production).
+    The surviving corroboration route is the empty-result streak.
+    """
     srt = _write_srt(tmp_path / "ok.srt", [(1, 2, "a"), (3500, 3590, "b")])
-    report = assess_coverage(srt, media_duration_s=3600.0, probe_failed=True)
+    report = assess_coverage(srt, media_duration_s=3600.0,
+                             speech_positive_empty_streak=99)
     assert report.verdict == "ok"
     assert report.corroborated
-    assert "health probe" in report.corroboration_detail
+    assert "consecutive empty results" in report.corroboration_detail
 
 
 def test_short_empty_streak_is_not_corroboration(tmp_path):
@@ -145,41 +149,3 @@ def test_threshold_boundary_is_ok(tmp_path):
 # The corroborating signal itself (#394)
 # ---------------------------------------------------------------------------
 
-class TestSpeechPositiveEmptyStreak:
-    def test_counts_consecutive_speech_positive_empties(self):
-        s = SpeechPositiveEmptyStreak("silero-v3.1")
-        for _ in range(4):
-            s.record(produced_output=False, speech_detected=True)
-        assert s.longest == 4
-
-    def test_output_resets_the_streak(self):
-        s = SpeechPositiveEmptyStreak("silero-v3.1")
-        for _ in range(3):
-            s.record(produced_output=False, speech_detected=True)
-        s.record(produced_output=True, speech_detected=True)
-        s.record(produced_output=False, speech_detected=True)
-        assert s.current == 1
-        assert s.longest == 3
-
-    def test_silence_is_neutral(self):
-        s = SpeechPositiveEmptyStreak("silero-v3.1")
-        s.record(produced_output=False, speech_detected=True)
-        s.record(produced_output=False, speech_detected=False)  # quiet gap
-        s.record(produced_output=False, speech_detected=True)
-        assert s.current == 2
-
-    def test_no_speech_and_no_output_never_counts(self):
-        s = SpeechPositiveEmptyStreak("silero-v3.1")
-        for _ in range(10):
-            s.record(produced_output=False, speech_detected=False)
-        assert s.longest == 0
-
-    @pytest.mark.parametrize("name", ["none", "", None])
-    def test_passthrough_segmenter_produces_no_signal(self, name):
-        """NullSpeechSegmenter returns the whole scene as 'speech' unconditionally
-        (#324): under native VAD there is no detector, so no corroboration."""
-        s = SpeechPositiveEmptyStreak(name)
-        assert not s.is_meaningful
-        for _ in range(40):
-            s.record(produced_output=False, speech_detected=True)
-        assert s.longest == 0

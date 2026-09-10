@@ -93,10 +93,10 @@ class TestVocabulary:
     def test_corroborated_full_length_output_is_suspect(self, tmp_path):
         """@13e5t's case: 60% span, which no threshold catches, but a probe failed."""
         srt = _write_srt(tmp_path / "a.srt", [(1, 2, "a"), (3500, 3590, "b")])
-        o = classify_output("a.mp4", srt, 3600.0, probe_failed=True)
+        o = classify_output("a.mp4", srt, 3600.0, speech_positive_empty_streak=99)
         assert o.state == "suspect"
         assert o.coverage == "ok"
-        assert "health probe" in o.detail
+        assert "consecutive empty results" in o.detail
 
     def test_degraded_ensemble_output_is_suspect(self, tmp_path):
         srt = _write_srt(tmp_path / "a.srt", [(1, 2, "a"), (3500, 3590, "b")])
@@ -168,7 +168,7 @@ class TestVocabulary:
         o = classify_output("a.mp4", srt, 3600.0, speech_positive_empty_streak=99)
         assert o.state == "suspect"
         assert "consecutive empty results" in o.detail
-        o2 = classify_output("a.mp4", None, 3600.0, probe_failed=True)
+        o2 = classify_output("a.mp4", None, 3600.0, speech_positive_empty_streak=99)
         assert o2.state == "suspect"
 
     def test_zero_cues_after_pass2_failure_is_suspect(self):
