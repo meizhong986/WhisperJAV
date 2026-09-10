@@ -465,14 +465,22 @@ class SemanticSceneDetectionOptions(BaseModel):
         )
     )
     snap_window: float = Field(
-        5.0,
+        6.0,
         ge=0.5, le=15.0,
-        description="Window in seconds searched either side of a raw boundary when snapping it onto silence."
+        description=(
+            "Window in seconds searched either side of a raw boundary when snapping it onto silence. "
+            "v1.9.2 (owner O1): ONE value for every sensitivity -- this field default is the only "
+            "place it is set. Do not re-introduce a per-sensitivity value."
+        )
     )
     clustering_threshold: float = Field(
-        18.0,
+        22.0,
         ge=1.0, le=50.0,
-        description="Agglomerative clustering distance separating one scene from the next. Lower = more scenes."
+        description=(
+            "Agglomerative clustering distance separating one scene from the next. Lower = more scenes. "
+            "v1.9.2 (owner O1): ONE value for every sensitivity -- this field default is the only "
+            "place it is set. Do not re-introduce a per-sensitivity value."
+        )
     )
     sample_rate: int = Field(
         16000,
@@ -513,18 +521,21 @@ class SemanticSceneDetection(FeatureComponent):
     # Identical to the conservative/balanced/aggressive presets already declared in
     # semantic-scene-detection.yaml, so the YAML-driven GUI panel and this component
     # cannot disagree. "balanced" is the spec default (an empty preset in the YAML).
+    #
+    # v1.9.2 (owner O1): snap_window and clustering_threshold are UNIFORM across every
+    # sensitivity -- 6.0 s and 22.0. They are therefore deliberately ABSENT from the
+    # preset constructors below, so the field defaults on SemanticSceneDetectionOptions
+    # are the single place either value is written. Only the scene-length bounds still
+    # vary by sensitivity, and on the balanced pipeline even those are replaced by
+    # LEGACY_PIPELINES["balanced"]["scene_overrides"] (28 s / 1200 s).
     presets = {
         "conservative": SemanticSceneDetectionOptions(
             min_duration=30.0,
             max_duration=420.0,
-            snap_window=6.0,
-            clustering_threshold=22.0,
         ),
         "balanced": SemanticSceneDetectionOptions(),
         "aggressive": SemanticSceneDetectionOptions(
             min_duration=10.0,
             max_duration=180.0,
-            snap_window=2.0,
-            clustering_threshold=10.0,
         ),
     }
