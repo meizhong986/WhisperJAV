@@ -340,7 +340,20 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
   name suggests — scene count barely moves across most of its range, and the scene-length bounds
   are what actually decide granularity. Carrying three values implied a control that was not
   there. All sensitivities now use 22.0 and a 6-second snap window. The scene-length bounds still
-  vary by sensitivity, and on Balanced they remain 28 seconds to 20 minutes.
+  vary by sensitivity on Fast; on Balanced they are 28 seconds to 4 minutes (see the next entry).
+
+- **Scenes are at most 4 minutes long on Balanced and Fidelity.** The ceiling was 20 minutes on
+  Balanced and 7 minutes (3 at Aggressive) on Fidelity. On a 3-hour test film the 20-minute ceiling
+  left 60% of the running time inside scenes longer than 4 minutes, and each such scene is decoded
+  as one long chain of 30-second recogniser windows, so one bad stretch could cost up to 20 minutes
+  of audio and there was no progress line for the whole of it. At 4 minutes the same film splits
+  into 89 scenes instead of 67, the longest exactly 240 seconds, with the same share of cuts landing
+  in silence (95%). What you will see: more, shorter per-scene status lines, and any scene that
+  produces nothing costs at most 4 minutes of audio. Whether a whole run finishes faster is not
+  yet measured. Fast, and the auditok and silero scene detectors on Balanced, are unchanged; the
+  Balanced minimum stays 28 seconds. If the detector ever leaves a scene longer than the ceiling
+  (possible only when one unbroken stretch of identical texture exceeds it, never seen so far), a
+  warning now appears in the log — previously that warning went only to the console.
 
 - **Subtitle cues are shorter by default on Balanced.** The speech detector's ceiling on a single
   unbroken speech chunk drops from 20/15/9 seconds to 7/6/6 seconds across Conservative, Balanced and
@@ -622,6 +635,7 @@ behaviour instead.
 | Date | Change |
 |------|--------|
 | 2026-09-09 | Balanced runs the Internal FW Silero VAD and nothing else: `--vad-version 3.1|4.0|6.2` (default 3.1) picks the Silero build, all three models ship inside WhisperJAV, and `--speech-segmenter`, `--pass1/2-speech-segmenter`, `--max-group-duration` and `--chunk-threshold` now stop the run on Balanced instead of being accepted. `--no-vad` removed. Detection thresholds 0.5 / 0.4 / 0.3. Faster-Whisper fixed to SYSTRAN master @ ed9a06c (three commits past 1.2.1, for the Silero v6.2 weights) and `ctranslate2==4.8.1` |
+| 2026-09-11 | Semantic scene ceiling 240 s on Balanced (all sensitivities; minimum stays 28 s) and Fidelity (all sensitivities; floors unchanged). Fast, auditok and silero untouched. The engine's overlong-scene warning now reaches the log |
 | 2026-09-09 | Semantic is the default scene detector, and each scene detector finally receives its own parameter names — every semantic run since v1.8.11 had silently used the engine's built-in 20 s/420 s. Balanced resolves 28 s minimum / 20 min maximum |
 | 2026-09-06 | A GPU the PyTorch build has no kernels for stops the run at start-up and asks whether to continue on the CPU or abort (GUI: abort, tick "Accept CPU-only mode" to proceed); `--check` exits 1 on such a card (#411, #326, #333) |
 | 2026-09-06 | Subtitle entries that are only punctuation (a lone 「。」 or 「、」, an ellipsis alone) are dropped on the ChronosJAV pipelines; inline punctuation untouched (#413) |
