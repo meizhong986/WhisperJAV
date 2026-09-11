@@ -8,7 +8,7 @@
 > Conventions: one entry per landed change, newest first. "Decision" lines
 > record who decided what, so a later reader can tell policy from mechanism.
 >
-> **SYNC** — pack r3.3 · 2026-09-11 (second acceptance run SNOS-388, §0.3b) | tracker rev 51.12 | change log through 2026-09-11 (scene ceiling 240 s, committed 834b42c..afeed71; readiness findings below) | `dev_v1.9.2` @ edf88c0+ (72 one-file commits e8f80e3..HEAD, not pushed; origin/main has c8dae7a, notebook only, not yet merged) |
+> **SYNC** — pack r3.4 · 2026-09-11 (SNOS-388 sanitizer tally corrected) | tracker rev 51.12 | change log through 2026-09-11 (scene ceiling 240 s, committed 834b42c..afeed71; readiness findings below) | `dev_v1.9.2` @ edf88c0+ (72 one-file commits e8f80e3..HEAD, not pushed; origin/main has c8dae7a, notebook only, not yet merged) |
 > GitHub 138 open · 12 PRs · 0 labels applied · new #416 #417 #418 #419. Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
 > (updated in place; never a second page). Rule: a session that changes the pack, this file or the change
 > log brings the other two to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
@@ -57,6 +57,14 @@ merge pass2_primary, `--debug`: exit 0, 533 cues / 99.4%, 40.0 min, no warnings.
 (28/240), decode 327 s = 21× realtime, 455→432 cues, 9 scenes empty — all genuine (first 10 min of the
 film, ambient/high-energy; Fidelity found nothing in the same ranges either). Pass 2: **252 scenes**
 (aggressive preset floor 10 s; 187 under 30 s), 1,938 s = 3.6× realtime, 464→434 cues, 5 reloads.
+**Correction (owner caught it):** the "Pass completed: N subtitles" lines are AFTER the sanitizer. The
+stitched files hold **652** (pass 1) and **600** (pass 2) recognizer lines, so the cleanup was 652→455→432
+(34%) and 600→464→434 (28%). Per the sanitizer's artifact files: Balanced's removals are 175 "hallucination"
+tags but 139 of 216 entries are 1–2 character vocalisations (ん, うん, あー…); Fidelity's are 94 hallucination
++ 67 repetition tags, 143 of 222 entries longer than 6 chars — repetition loops of hundreds of ん/あ゛/うぅ and
+stock phrases (おやすみなさい ×9, 【はじめしゃちょーエンディング】 ×3). **Hypothesis to check:** Fidelity
+aggressive's compression_ratio_threshold 2.2 should have rejected those loops at the recognizer; 66 reached
+the stitched file.
 Measured from per-scene timestamps: scenes <30 s cost 0.36 s per audio-second vs 0.12 for >120 s; the
 187 short scenes = 47% of audio, 64% of the pass. **Recommendation (owner, a default): a Fidelity scene
 floor near 28 s** (one override beside today's 240 s ceiling). Not done.
