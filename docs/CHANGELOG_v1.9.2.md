@@ -195,6 +195,66 @@ thread, on the owner's approval; no issue closed without a reporter retest.
 
 ---
 
+### Item 2, the measurement — what it established, and what it did not
+
+**Established, and decisive: 62 scenes instead of 252.** Same film (SNOS-388, 6,979 s), same semantic
+detector, same aggressive sensitivity, same 240 s ceiling; only the floor changed, 10 s → 28 s. Scene
+detection completed in 52.8 s and does not involve the recogniser, so this number stands on its own.
+It is the effect the change was made for.
+
+**NOT established: pass time and cue count.** Two reasons, and the first is a fact about the tool
+worth recording:
+
+1. **The plan's command cannot reproduce the baseline.** It asks for
+   `--mode fidelity --speech-segmenter whisperseg`, but on a SINGLE-PASS Fidelity run WhisperJAV
+   refuses WhisperSeg and falls back to silero-v3.1 with a warning (`main.py:2491`, observed in this
+   run's log at 14:15:13). The owner's baseline used WhisperSeg because it was **pass 2 of an
+   ensemble**, where it is supported. So the run differs from the baseline in the speech segmenter as
+   well as the scene floor. The release notes already state this restriction (`silero-v6.2` is the
+   single-pass option); the plan's command was written without it.
+2. **I spoiled the timing myself.** Between 14:28 and 14:35 I ran three test files that start their
+   own `whisperjav.main` subprocesses, each initialising CUDA on the same 12 GB card the run was
+   using. One scene went from about 30 s to about 15 minutes. Those timings are worthless.
+
+**The run was stopped at scene 27 of 62** rather than left to finish: the numbers it would have
+produced are not comparable to the baseline for reason 1 regardless, and it was holding the owner's
+GPU. 26 scene SRTs are in the scratch temp directory.
+
+**An observation, offered as an observation and not a diagnosis.** While the Fidelity pass ran, the
+card held 11.96 GB of 12.29 GB and `nvidia-smi` reported 100% utilisation at 50 °C and 51 W — idle
+power, not working power. A `py-spy` stack sample at that moment was inside Whisper's word-timestamp
+alignment (`whisper/timing.py` `find_alignment` → `qkv_attention` at `whisper/model.py:133`), the
+most memory-hungry step of the pass. Scenes with many speech groups (22, 17, 33) were much slower
+than earlier ones (5 to 9 groups). When the process was killed the card dropped to 1.4 GB and 17 W,
+confirming the memory was that process's.
+**What this does NOT show:** whether that is normal for Fidelity on a 12 GB card, because my own
+concurrent GPU work overlapped part of it. **And it is not caused by tonight's change:** the 240 s
+ceiling that sets the peak scene length was already in place before tonight (committed
+834b42c..afeed71), and the readiness session ran Fidelity at balanced on a 1,500 s file with a
+239.5 s scene to exit 0. The floor only changes how many SHORT scenes there are.
+
+**The run that would give the comparable numbers** is the ensemble the owner ran on 2026-09-11
+(Balanced/balanced/Silero 4.0 → Fidelity/aggressive/WhisperSeg) with nothing changed but the floor.
+That keeps WhisperSeg and matches his baseline exactly. It belongs to item 8.
+
+### Test sweep (item 7), run one file at a time with nothing else on the GPU
+
+Green: the four new files (drift 8, post-install verification 14, ensemble safety cap 13,
+post-processing logging 5); installer comprehensive 74 (was 2 red at the start of the session, both
+now fixed); scene clustering 18; balanced defaults 25; v1.9.2 small fixes 27; model refresh 16; VAD
+version 37; run outcome 58; offline 14; telemetry 11 and 15; ensemble params 32; ensemble merge 23;
+GUI settings 57; GUI run summary 21; presets 37; and the eight green files under `tests/config/`.
+
+Red, all pre-existing and each matching the recorded count exactly: `tests/config/test_presets.py`
+20 (transcriber, decoder, VAD and engine values changed by the O1–O6 retune — none about scene
+detection), `tests/config/test_legacy.py` 2 (both `'silero-v3.1' != 'silero'`, from the VAD-version
+work), `tests/config/test_resolver_v3.py` 2, `tests/config/test_schemas_vad_engine.py` 2,
+`test_scene_detection_issue129.py` 4, `test_speech_segmentation.py` 4, and
+`test_dependency_cross_match.py` **4, down from 5** — the drift line went green as predicted; the
+remaining four are the dev environment (numpy 1.26 against a `>=2.0.0` pin).
+
+---
+
 ## 2026-09-11 (later) — release-readiness assessment; the installer would ship without faster-whisper
 
 **Owner instructions:** i1 he continues manual testing; i2 assess readiness to release 1.9.2; i3
