@@ -190,7 +190,14 @@ that VAD as worse than Silero on his files), and each names the pipeline, sensit
 is talking about. Every one asks for `whisperjav_run.json`, the `*.asr_telemetry.jsonl` files and the
 console instead. #413 is a ship notification: the punctuation-only-line gap he reported is fixed.
 The 6 September ship-notification list (#311, #254, #395, #340, #341, #306, #323, #325, #382, #328,
-#96) is unchanged and governed by the tracker's existing section. Posted only after release, per
+#96) is drafted too — eleven more, each opened with `gh issue view` first and each saying only what
+the release notes actually claim for that issue number. Three carry a warning for the owner: **#306**
+is credited in the notes to the mistyped-enhancer-name check, NOT to the anime-whisper truncation in
+its title (the typo `zipenhance` is in the reporter's own command, so the fix does come from the
+thread, but the draft must not claim the truncation is solved); **#323** changed in two directions at
+once (Fidelity gains silero-v6.2, Balanced refuses external segmenters outright) and both have to be
+said; **#96** is "in part" only, and an earlier reply on that thread already had to be corrected for
+over-claiming persistence, so the draft states what still resets on launch. Posted only after release, per
 thread, on the owner's approval; no issue closed without a reporter retest.
 
 ---
