@@ -8,7 +8,7 @@
 > Conventions: one entry per landed change, newest first. "Decision" lines
 > record who decided what, so a later reader can tell policy from mechanism.
 >
-> **SYNC** — pack r3.4 · 2026-09-11 (SNOS-388 sanitizer tally corrected) | tracker rev 51.12 | change log through 2026-09-11 (scene ceiling 240 s, committed 834b42c..afeed71; readiness findings below) | `dev_v1.9.2` @ edf88c0+ (72 one-file commits e8f80e3..HEAD, not pushed; origin/main has c8dae7a, notebook only, not yet merged) |
+> **SYNC** — pack r3.5 · 2026-09-11 (owner decisions + plan to stable) | tracker rev 51.13 | change log through 2026-09-11 (scene ceiling 240 s, committed 834b42c..afeed71; readiness findings below) | `dev_v1.9.2` @ edf88c0+ (72 one-file commits e8f80e3..HEAD, not pushed; origin/main has c8dae7a, notebook only, not yet merged) |
 > GitHub 138 open · 12 PRs · 0 labels applied · new #416 #417 #418 #419. Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
 > (updated in place; never a second page). Rule: a session that changes the pack, this file or the change
 > log brings the other two to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
@@ -68,6 +68,14 @@ the stitched file.
 Measured from per-scene timestamps: scenes <30 s cost 0.36 s per audio-second vs 0.12 for >120 s; the
 187 short scenes = 47% of audio, 64% of the pass. **Recommendation (owner, a default): a Fidelity scene
 floor near 28 s** (one override beside today's 240 s ceiling). Not done.
+
+**Owner decisions (2026-09-11, night) and the plan to stable:** straight to stable, no beta; installer
+fails loudly on a failed core import; Fidelity scene floor 28 s at every sensitivity; #372 INFO lines on the
+Japanese post-processing path; ensemble downgrade rule KEPT and stated; NO compression-ratio gate (established:
+in both recognizers `compression_ratio_threshold` only triggers a retry — `whisper/transcribe.py:184-224`,
+`faster_whisper/transcribe.py:1479-1530` — so with temperature [0.0] it never rejects; loops reach the
+sanitizer); no Transcription-tab Silero dropdown; Kaggle told after release. Plan: readiness document §10
+(nine items). Not started; awaits the owner's typed go-ahead.
 
 **Readiness register (2026-09-11, night, adversary-checked; pack §0.8):** 2 blockers (B1 installer
 drops faster-whisper — affects Balanced, Fast, Faster, Kotoba, not Fidelity; B2 never built/installed
