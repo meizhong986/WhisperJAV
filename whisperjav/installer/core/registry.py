@@ -438,6 +438,12 @@ PACKAGES: List[Package] = [
     # CT2 4.6.2 reproduces the #125 crash on exit (0xC0000409); 4.8.1 does not.
     # ctranslate2 is listed first so the pinned version is in place when
     # faster-whisper is resolved.
+    #
+    # The Windows installer runs them the other way round -- faster-whisper is
+    # installed in Phase 3.5 from git, ctranslate2 in Phase 4 from the generated
+    # requirements file. That is safe only because Phase 3.5 passes --no-deps, so
+    # faster-whisper never resolves ctranslate2 for itself; it needs it at run
+    # time, not at install time.
     Package(
         name="ctranslate2",
         version="==4.8.1",
