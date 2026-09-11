@@ -220,6 +220,7 @@ class ReleaseBuilder:
 # - Phase 3.5: Git-based packages (require git, benefit from retry logic):
 #   - openai-whisper (core ASR)
 #   - stable-ts (WhisperJAV fork for Japanese)
+#   - faster-whisper (pinned to SYSTRAN master @ ed9a06c)
 #   - ffmpeg-python (audio/video processing)
 #   - clearvoice (speech enhancement)
 #
