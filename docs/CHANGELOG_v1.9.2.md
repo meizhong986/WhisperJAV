@@ -8,7 +8,7 @@
 > Conventions: one entry per landed change, newest first. "Decision" lines
 > record who decided what, so a later reader can tell policy from mechanism.
 >
-> **SYNC** — pack r3.0 · 2026-09-11 (release-readiness assessment, updated in place) | tracker rev 51.9 | change log through 2026-09-11 (scene ceiling 240 s, committed 834b42c..afeed71; readiness findings below) | `dev_v1.9.2` @ edf88c0+ (72 one-file commits e8f80e3..HEAD, not pushed; origin/main has c8dae7a, notebook only, not yet merged) |
+> **SYNC** — pack r3.1 · 2026-09-11 (readiness + the owner's acceptance run, updated in place) | tracker rev 51.10 | change log through 2026-09-11 (scene ceiling 240 s, committed 834b42c..afeed71; readiness findings below) | `dev_v1.9.2` @ edf88c0+ (72 one-file commits e8f80e3..HEAD, not pushed; origin/main has c8dae7a, notebook only, not yet merged) |
 > GitHub 138 open · 12 PRs · 0 labels applied · new #416 #417 #418 #419. Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
 > (updated in place; never a second page). Rule: a session that changes the pack, this file or the change
 > log brings the other two to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
@@ -50,6 +50,17 @@ auditok ran despite `--pass1-scene-detector silero`, model loaded from cache). B
 weifu8435 (exclusion overturned by his #416 comment).
 
 **Decision:** owner — fix shape for the installer, beta yes/no, invitations per thread.
+
+**Owner's acceptance run (later on 2026-09-11, `F:\MEDIA_DLNA\EKAI-023\192_acceptancetest_1\5-LOG-…`):**
+two-pass ensemble on EKAI-023 (10,729 s), Balanced conservative → Balanced aggressive, semantic, Silero
+4.0, large-v2, RTX 3060, v1.9.2: exit 0, 1,961 merged cues spanning 99.8%, 40.9 min; 89 scenes per pass,
+longest 240 s; 8 refreshes per pass; no warnings. Pass 2 (aggressive): 10,760 s decoded in 1,222 s =
+**8.8× realtime**, slowest scene 49 s, **0 of 89 scenes without output**, worst compression ratio 1.71,
+temperature 0 throughout, 1,908 cues after filters. Pass 1 (conservative): 10.8×, one 29 s scene empty.
+The 2026-09-10 cancelled run on the same film/pipeline/sensitivity (1200 s ceiling, 30 scenes, pre-retune):
+2.4× realtime, slowest scene 574 s, 20 of 26 scenes empty, compression ratio 11.15. **Not isolated:** the
+retune, the failover removal and the ceiling all changed between the runs; the run proves the combination,
+not the share of each. Semantic-vs-auditok on this film is still untested.
 
 ---
 
