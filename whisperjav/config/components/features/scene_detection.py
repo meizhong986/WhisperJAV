@@ -529,9 +529,10 @@ class SemanticSceneDetection(FeatureComponent):
     # sensitivity -- 6.0 s and 22.0. They are therefore deliberately ABSENT from the
     # preset constructors below, so the field defaults on SemanticSceneDetectionOptions
     # are the single place either value is written. Only the scene-length bounds still
-    # vary by sensitivity; the balanced pipeline replaces both with
-    # LEGACY_PIPELINES["balanced"]["scene_overrides"] (28 s / 240 s) and fidelity
-    # replaces the ceiling only (240 s) via its own scene_overrides.
+    # vary by sensitivity, and both the balanced and the fidelity pipeline replace both
+    # of them with 28 s / 240 s at every sensitivity, through their own scene_overrides
+    # in LEGACY_PIPELINES. So on those two pipelines the bounds below are never the
+    # values that run; they apply to any other caller of this component.
     presets = {
         "conservative": SemanticSceneDetectionOptions(
             min_duration=30.0,
