@@ -193,3 +193,73 @@ class TestRequirementsTemplateDrift:
             f"ctranslate2 pin drift: template='{template_lines[0]}' vs "
             f"registry='{registry_spec}'"
         )
+
+class TestGeneratedRequirements:
+    """The list the .exe actually installs, built from pyproject.toml.
+
+    This is the path the real build takes. The fallback template tested above is
+    used only when pyproject.toml cannot be read, so a test that only reads the
+    template proves nothing about what ships. The generator is called directly
+    rather than reading installer/generated/, which is gitignored and may hold a
+    stale build.
+    """
+
+    @staticmethod
+    def _generate() -> str:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "whisperjav_build_release", PROJECT_ROOT / "installer" / "build_release.py"
+        )
+        build_release = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(build_release)
+
+        content = build_release.ReleaseBuilder(dry_run=True).generate_requirements_from_pyproject()
+        assert content, "the generator fell back to the template — pyproject.toml unreadable?"
+        return content
+
+    @staticmethod
+    def _names(content: str) -> dict:
+        names = {}
+        for line in content.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            names[re.split(r"[>=<\[@ ;]", line)[0].strip().lower()] = line
+        return names
+
+    def test_the_generated_list_has_no_faster_whisper(self):
+        """It is installed from a pinned commit in Phase 3.5, not from this list.
+
+        The generator drops every git-addressed dependency, which is why Phase
+        3.5 has to install it — and why it was missing from the 1.9.2 installer
+        until the entry was added there.
+        """
+        names = self._names(self._generate())
+        assert "faster-whisper" not in names, (
+            f"faster-whisper must not reach the requirements file: {names.get('faster-whisper')}"
+        )
+
+    def test_the_generated_list_pins_ctranslate2(self):
+        """faster-whisper is installed --no-deps, so nothing else brings it in."""
+        from whisperjav.installer.core.registry import PACKAGES
+
+        ct2 = next(p for p in PACKAGES if p.name == "ctranslate2")
+        names = self._names(self._generate())
+
+        assert "ctranslate2" in names, (
+            "ctranslate2 is missing from the generated requirements file; "
+            "faster-whisper would have no inference engine"
+        )
+        assert names["ctranslate2"] == ct2.pyproject_spec().split(";")[0].strip()
+
+    def test_the_generated_list_contains_no_git_addresses(self):
+        offenders = [
+            line for line in self._generate().splitlines()
+            if line.strip() and not line.strip().startswith("#")
+            and ("git+" in line or " @ " in line)
+        ]
+        assert not offenders, (
+            "pip resolving a git URL from requirements.txt can replace the CUDA "
+            f"torch installed in Phase 3: {offenders}"
+        )
