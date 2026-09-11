@@ -244,6 +244,8 @@ class SubtitleSanitizer:
 
         try:
 
+            logger.info(f"Post-processing: reading {input_srt_path.name}")
+
             original_subtitles = list(pysrt.open(str(input_srt_path), encoding='utf-8'))
 
             if not original_subtitles:
@@ -328,11 +330,15 @@ class SubtitleSanitizer:
 
             if self.config.save_original:
 
+                logger.info(f"Post-processing: saving a copy of the original to {paths['original_backup']}")
+
                 shutil.copy2(input_srt_path, paths['original_backup'])
 
             
 
             output_path = paths['original'] if not self.config.preserve_original_file else paths['sanitized']
+
+            logger.info(f"Post-processing: writing {output_path.name}")
 
             self._save_srt(final_subtitles, output_path)
 
@@ -342,6 +348,8 @@ class SubtitleSanitizer:
 
             if self.config.save_artifacts and self.artifact_entries:
 
+                logger.info(f"Post-processing: writing the artifacts file {paths['artifacts'].name}")
+
                 self._save_artifacts_srt(paths['artifacts'], len(final_subtitles))
 
             
@@ -350,7 +358,10 @@ class SubtitleSanitizer:
 
             statistics = self._calculate_statistics(len(original_subtitles), len(final_subtitles))
 
-            logger.debug(f"Sanitization complete in {processing_time:.2f}s. Subtitles: {len(original_subtitles)} -> {len(final_subtitles)}")
+            logger.info(
+                f"Post-processing: cleaned {len(original_subtitles)} subtitles down to "
+                f"{len(final_subtitles)} in {processing_time:.2f}s"
+            )
 
             
 
@@ -384,7 +395,16 @@ class SubtitleSanitizer:
 
     def _process_with_validation(self, input_srt_path: Path, start_time: datetime) -> SanitizationResult:
 
-        """Internal process with validation and error handling."""
+        """Internal process with validation and error handling.
+
+        NOT CALLED. Nothing in the project calls this method -- process() above
+        is the only entry point, and it does the same work differently. Left in
+        place rather than deleted because removing it also orphans
+        _process_phase1_refactored, _process_phase2_with_validation,
+        _log_phase1_results and _log_hallucination_database_info, which is a
+        larger change than this release should carry. Deliberately NOT given the
+        progress lines added to process() in v1.9.2: nothing would ever print them.
+        """
 
         if not input_srt_path.exists():
 
