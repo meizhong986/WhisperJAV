@@ -8,10 +8,81 @@
 > Conventions: one entry per landed change, newest first. "Decision" lines
 > record who decided what, so a later reader can tell policy from mechanism.
 >
-> **SYNC** — pack r3.6 · 2026-09-11 night (plan items 1-7 implemented) | tracker rev 51.14 (18 reply drafts for after the release) | change log through 2026-09-11 night (plan items 1-7, 29 one-file commits cb8e170..a9a73d0 plus the merge e7e11f4) | `dev_v1.9.2` @ a9a73d0, 158 ahead of `origin/main` @ c8dae7a; origin/main is MERGED IN (0 commits left on it). Nothing pushed, nothing posted. (Counts measured at the parent of the commit that carries this line, so the branch is one commit further on.)
+> **SYNC** — pack r3.6 · 2026-09-11 night (plan items 1-7 implemented) | tracker rev 51.14 (18 reply drafts for after the release) | change log through 2026-09-11 night (plan items 1-7, 35 one-file commits cb8e170..5be3e1b plus the merge e7e11f4) | `dev_v1.9.2` @ 5be3e1b, 164 ahead of `origin/main` @ c8dae7a; origin/main is MERGED IN (0 commits left on it). Nothing pushed, nothing posted.
 > GitHub 138 open · 12 PRs · 0 labels applied · new #416 #417 #418 #419. Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
 > (updated in place; never a second page). Rule: a session that changes the pack, this file or the change
 > log brings the other two to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
+
+---
+
+## 2026-09-11 (night, later) — the install now stops on a core failure; severity re-ranked from the user's seat
+
+**Owner decision, typed:** *"the installer should actually abort when a core package fails and any
+error that is fundamental to the user. Please always assess the impact from the user perspective:
+does the deficiency/missing/error affect the user as such that their core use would be broken? Or is
+it a minor item that can be remedied by a novice non-technical user after the fact?"*
+
+This corrects a judgement of mine, not just a gap in the code. I had established that the install
+script's non-zero exit was discarded by conda-constructor and classified it as a limitation to
+document and a decision to put to him. From the user's seat that is the same defect the release
+exists to remove: they are told an unusable install worked. Recorded as a standing rule in
+`memory/feedback_user_centric_severity.md`.
+
+### What changed
+
+`installer/templates/custom_template.nsi.tmpl.template`:
+
+1. Sets `NSIS_SCRIPTS_RAISE_ERRORS` before invoking the post-install script. conda-constructor's
+   `constructor/nsis/_nsis.py:197-221` catches the `CalledProcessError`, writes one line to stderr
+   and returns normally unless that variable is set. It is constructor's own documented switch
+   (`constructor/construct.py:300`), not a workaround.
+2. After the post-install step, checks for `INSTALLATION_FAILED_v{VERSION}.txt` and, if it exists,
+   shows a message naming the marker and the log and calls `Abort`. **The check sits before the
+   desktop-shortcut block** (`CreateShortCut "$DESKTOP\…`), so a failed install no longer leaves a
+   shortcut that opens onto an error.
+
+The marker file is checked rather than the exit code because the exit code can be lost twice over:
+the user answering *Ignore* to the abort/retry/ignore dialog, and a silent install, where `/SD
+IDIGNORE` answers that dialog itself.
+
+`installer/templates/post_install.py.template`: `main()` deletes a marker left by an earlier attempt
+before any phase can write a new one. Without that, the standard advice after a failure — run the
+installer again — would abort on the previous run's marker.
+
+### What stops an install now, exactly
+
+Fails: `import whisperjav`; `from whisperjav.main import main`; `whisperjav.exe` or
+`whisperjav-gui.exe` not created; any of torch, whisper, stable_whisper, faster_whisper, webview,
+srt, yaml failing to import.
+Warns only: llama-cpp-python, ClearVoice, Transformers (optional features, addable later); a missing
+non-critical entry point; **and any check that times out** — a slow first import of torch is not
+evidence of breakage, and commit `63936e1` records that the earlier 30 s limit already produced false
+failures in the field. That distinction matters more now than it did this morning, because a false
+failure now costs the user their install rather than one line in a log.
+
+### Tests
+
+Five, in `tests/test_installer_comprehensive.py::TestInstallAbortsOnCoreFailure`. **They are text
+checks on the NSIS template and the class docstring says so:** NSIS cannot be compiled or run here,
+so they prove the instructions are present and correctly ordered, not that the installer behaves.
+Only the clean-machine install (item 8) proves that. All five were mutation-checked; the first could
+not fail as written — it matched the variable name, which also appears in the comment above the line
+that sets it — and now matches the `System::Call` that sets it. That is the second guard test this
+session that matched a comment instead of code.
+
+### Severity re-ranked by core-use impact
+
+| Item | Breaks core use? | Recoverable by a non-technical user? | State |
+|---|---|---|---|
+| Installer did not install faster-whisper | **Yes** — Balanced, Fast, Faster, Kotoba all fail on first run | No | **Fixed** |
+| Broken install reported as success | **Yes** — they get an error with no cause and no reason to suspect the install | No | **Fixed: it stops** |
+| A timed-out check aborting a good install | **Yes**, if it fired — costs them the install | Re-run, but they would not know why | **Fixed: timeout is a warning** |
+| No `.exe` built, no clean install run | Verification gap over a core-breaking risk | — | **Owner, item 8 — must happen before release** |
+| Balanced returning no subtitles (#394, #416, #419) | **Yes** | No | **Open** — the run is now reported `empty` instead of success; cause unknown |
+| #372 batch stops early | **Yes** | No | **Partly:** Japanese runs now print their post-processing steps. The stop itself is not fixed, and the English path is still silent |
+| No Silero version choice on the Transcription tab | No — the default works | Yes, via the command line, but not for a GUI-only user | Known limitation |
+| Ensemble lowers a typed "aggressive" | No — it produces subtitles, just not at the typed setting | Yes, once told | Kept, now announced and explained |
+| Async + Balanced + several files + refresh off | Yes for that combination | Yes — it is not the default; changing one setting avoids it | Known limitation |
 
 ---
 
@@ -60,7 +131,10 @@ Kotoba — not Fidelity.
   `registry.py:438` notes that the installer installs ctranslate2 *after* faster-whisper, which is
   safe only because Phase 3.5 passes `--no-deps`.
 
-**⛔ Not fixed, and an owner decision (A4).** The `.exe` still finishes green. conda-constructor's
+**FIXED after the owner's decision of 2026-09-11 — see the entry above this one.** What follows is
+the state before that, kept because it records the mechanism.
+
+**The `.exe` used to finish green.** conda-constructor's
 `constructor/nsis/_nsis.py:197-221` discards the post-install exit code unless the environment
 variable `NSIS_SCRIPTS_RAISE_ERRORS` is set, and nothing in `installer/` sets it; the NSIS section
 then continues and still creates the desktop shortcut (`custom_template_v1.9.2.nsi.tmpl:1697`).
