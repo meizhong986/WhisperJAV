@@ -62,10 +62,17 @@ class TestSceneBoundsOverrides:
         }
         assert "silero" not in LEGACY_PIPELINES["balanced"]["scene_overrides"]
 
-    def test_fidelity_semantic_ceiling_only(self):
+    def test_fidelity_semantic_floor_and_ceiling(self):
+        # Owner decision 2026-09-11 (night): Fidelity gets the same 28 s floor as
+        # Balanced, at every sensitivity, on the semantic detector only. auditok is
+        # deliberately absent -- its min_duration DISCARDS shorter regions instead of
+        # merging them, so a 28 s floor there would drop speech.
         from whisperjav.config.legacy import LEGACY_PIPELINES
         assert LEGACY_PIPELINES["fidelity"]["scene_overrides"] == {
-            "semantic": {"scene_detection.max_duration": 240.0},
+            "semantic": {
+                "scene_detection.min_duration": 28.0,
+                "scene_detection.max_duration": 240.0,
+            },
         }
 
     def test_fast_declares_no_override(self):
