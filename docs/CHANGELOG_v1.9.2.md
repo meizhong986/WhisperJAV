@@ -8,7 +8,7 @@
 > Conventions: one entry per landed change, newest first. "Decision" lines
 > record who decided what, so a later reader can tell policy from mechanism.
 >
-> **SYNC** — pack r3.6 · 2026-09-11 (plan items 1-5 implemented) | tracker rev 51.13 | change log through 2026-09-11 night (plan items 1-5, committed cb8e170..dc7f707, 19 commits) | `dev_v1.9.2` @ dc7f707 (98 one-file commits e8f80e3..HEAD, not pushed; origin/main has c8dae7a, notebook only, not yet merged) |
+> **SYNC** — pack r3.6 · 2026-09-11 (plan items 1-5 implemented) | tracker rev 51.14 (reply drafts for after release) | change log through 2026-09-11 night (plan items 1-5, committed cb8e170..dc7f707, 19 commits) | `dev_v1.9.2` @ dc7f707 (98 one-file commits e8f80e3..HEAD, not pushed; origin/main has c8dae7a, notebook only, not yet merged) |
 > GitHub 138 open · 12 PRs · 0 labels applied · new #416 #417 #418 #419. Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
 > (updated in place; never a second page). Rule: a session that changes the pack, this file or the change
 > log brings the other two to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
@@ -181,9 +181,17 @@ Transcription tab has no Silero version control (Ensemble tab and the command li
 said Fidelity's floors were unchanged. The status line still says "in development" — it becomes a
 release status at tagging time, which is item 9 and the owner's.
 
-**Reply drafts for #329/#330 and the recipe threads are NOT written yet** (item 6 of the plan, second
-half); they belong in `docs/ISSUE_TRACKER_v1.9.x.md` and are posted only after release, per thread,
-on the owner's approval.
+**Reply drafts written, nothing posted** (item 6 of the plan, second half).
+`docs/ISSUE_TRACKER_v1.9.x.md` rev 51.14 carries one draft per thread for #329, #330, #374, #390,
+#413, #416 and #419, each in the reporter's language with an English half, each after reading the
+whole thread with `gh issue view`. Two constraints held in all of them: no draft claims 1.9.2 fixes
+an empty-Balanced report (the owner's own cancelled run used the BUILT-IN VAD, and daoran9 measured
+that VAD as worse than Silero on his files), and each names the pipeline, sensitivity and setting it
+is talking about. Every one asks for `whisperjav_run.json`, the `*.asr_telemetry.jsonl` files and the
+console instead. #413 is a ship notification: the punctuation-only-line gap he reported is fixed.
+The 6 September ship-notification list (#311, #254, #395, #340, #341, #306, #323, #325, #382, #328,
+#96) is unchanged and governed by the tracker's existing section. Posted only after release, per
+thread, on the owner's approval; no issue closed without a reporter retest.
 
 ---
 
