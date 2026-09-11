@@ -120,7 +120,8 @@ you find out something went wrong.
   moaning content)"*. It is describing an intentional guard against a routing
   limitation, not a defect in the build you are running. The wording now says
   that, and points at the two configurations that do work: `--ensemble` for full
-  segmenter support, or `silero-v6.2` for single-pass. (#323)
+  segmenter support, or `silero-v6.2` for single-pass on Fidelity. On Balanced no
+  external segmenter can be chosen at all (see "Changed defaults"). (#323)
 
 ### Documentation that broke installs
 
@@ -547,16 +548,6 @@ Not user-visible, but worth recording:
 
 ---
 
-## Planned for this release, not yet landed
-
-- **Corroboration beyond Balanced with a WhisperJAV segmenter.** Balanced reports the
-  speech-positive empty-scene signal only when a WhisperJAV segmenter is selected
-  (`--speech-segmenter firered-vad`, `ten`, …); under its default built-in VAD, and in
-  Fidelity, Fast, Faster and the ChronosJAV pipelines, `suspect` can only come from the
-  span check (or, in ensemble, from a pass-2 failure).
-
----
-
 ## CPU-only users
 
 Two situations look alike from the outside and behave differently.
@@ -623,6 +614,11 @@ behaviour instead.
   default refresh setting the recognizer lives in a worker process and the same
   two-file run completes normally (verified on two clips). The normal (non-async)
   path is unaffected either way.
+- **A Balanced file that produced no subtitles is flagged `suspect` only by its span.**
+  On Balanced the only check is whether the subtitles cover less than `--min-coverage`
+  of the video. The second check, "speech was detected but nothing came back", needs a
+  separate speech segmenter, and Balanced no longer has one. In ensemble runs a failed
+  pass 2 also makes the file `suspect`.
 - **The root cause behind #394 is still open.** The recognizer can enter a state
   where it returns nothing for the rest of a run, and the work above detects the
   *result* rather than preventing it. Investigation continues, with useful
@@ -636,7 +632,7 @@ behaviour instead.
 |------|--------|
 | 2026-09-09 | Balanced runs the Internal FW Silero VAD and nothing else: `--vad-version 3.1|4.0|6.2` (default 3.1) picks the Silero build, all three models ship inside WhisperJAV, and `--speech-segmenter`, `--pass1/2-speech-segmenter`, `--max-group-duration` and `--chunk-threshold` now stop the run on Balanced instead of being accepted. `--no-vad` removed. Detection thresholds 0.5 / 0.4 / 0.3. Faster-Whisper fixed to SYSTRAN master @ ed9a06c (three commits past 1.2.1, for the Silero v6.2 weights) and `ctranslate2==4.8.1` |
 | 2026-09-11 | Semantic scene ceiling 240 s on Balanced (all sensitivities; minimum stays 28 s) and Fidelity (all sensitivities; floors unchanged). Fast, auditok and silero untouched. The engine's overlong-scene warning now reaches the log |
-| 2026-09-09 | Semantic is the default scene detector, and each scene detector finally receives its own parameter names — every semantic run since v1.8.11 had silently used the engine's built-in 20 s/420 s. Balanced resolves 28 s minimum / 20 min maximum |
+| 2026-09-09 | Semantic is the default scene detector, and each scene detector finally receives its own parameter names — every semantic run since v1.8.11 had silently used the engine's built-in 20 s/420 s. Balanced resolved 28 s minimum / 20 min maximum at the time (superseded by the 240 s ceiling, 2026-09-11) |
 | 2026-09-06 | A GPU the PyTorch build has no kernels for stops the run at start-up and asks whether to continue on the CPU or abort (GUI: abort, tick "Accept CPU-only mode" to proceed); `--check` exits 1 on such a card (#411, #326, #333) |
 | 2026-09-06 | Subtitle entries that are only punctuation (a lone 「。」 or 「、」, an ellipsis alone) are dropped on the ChronosJAV pipelines; inline punctuation untouched (#413) |
 | 2026-09-06 | Cached Hugging Face models load without a hub round-trip (WhisperSeg, anime-whisper); `--offline` flag and GUI "Offline mode" checkbox set `HF_HUB_OFFLINE=1` for the run and its workers, off by default; a missing model fails at once (#415) |

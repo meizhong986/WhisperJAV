@@ -8,7 +8,7 @@
 > Conventions: one entry per landed change, newest first. "Decision" lines
 > record who decided what, so a later reader can tell policy from mechanism.
 >
-> **SYNC** — pack r3.1 · 2026-09-11 (readiness + the owner's acceptance run, updated in place) | tracker rev 51.10 | change log through 2026-09-11 (scene ceiling 240 s, committed 834b42c..afeed71; readiness findings below) | `dev_v1.9.2` @ edf88c0+ (72 one-file commits e8f80e3..HEAD, not pushed; origin/main has c8dae7a, notebook only, not yet merged) |
+> **SYNC** — pack r3.2 · 2026-09-11 (readiness register §0.8 added, in place) | tracker rev 51.11 | change log through 2026-09-11 (scene ceiling 240 s, committed 834b42c..afeed71; readiness findings below) | `dev_v1.9.2` @ edf88c0+ (72 one-file commits e8f80e3..HEAD, not pushed; origin/main has c8dae7a, notebook only, not yet merged) |
 > GitHub 138 open · 12 PRs · 0 labels applied · new #416 #417 #418 #419. Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
 > (updated in place; never a second page). Rule: a session that changes the pack, this file or the change
 > log brings the other two to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
@@ -50,6 +50,18 @@ auditok ran despite `--pass1-scene-detector silero`, model loaded from cache). B
 weifu8435 (exclusion overturned by his #416 comment).
 
 **Decision:** owner — fix shape for the installer, beta yes/no, invitations per thread.
+
+**Readiness register (2026-09-11, night, adversary-checked; pack §0.8):** 2 blockers (B1 installer
+drops faster-whisper — affects Balanced, Fast, Faster, Kotoba, not Fidelity; B2 never built/installed
+clean), 17 concerns, 2 additions (M1 GUI users cannot choose the Silero version outside the Ensemble
+tab; M2 the ensemble safety cap still silently downgrades Fidelity→Balanced aggressive and today's run
+is no evidence on it), 4 dilemmas. Corrected in the same session: release notes (the "Planned" section
+described an impossible Balanced configuration; the #323 paragraph pointed Balanced users at
+`silero-v6.2`; the 2026-09-09 row said 20 min beside 240 s) and the local bug list (#382, #341, #334,
+curated model list are fixed on dev). Adversary refutations adopted: Fidelity does not use
+faster-whisper; #372's markers are on the English-only path, so promoting them helps no Japanese run;
+reverting the semantic default is five places, not one; Silero 4.0 admits 1.4–2.3× (not "twice");
+`gpu_constraints.txt` pins only the torch family; c8dae7a UNPINS the community 0.7b notebook.
 
 **Owner's acceptance run (later on 2026-09-11, `F:\MEDIA_DLNA\EKAI-023\192_acceptancetest_1\5-LOG-…`):**
 two-pass ensemble on EKAI-023 (10,729 s), Balanced conservative → Balanced aggressive, semantic, Silero
