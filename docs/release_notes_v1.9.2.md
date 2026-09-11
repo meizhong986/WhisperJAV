@@ -550,7 +550,22 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
   and of greetings being rewritten as explicit content. The Gist was corrected on
   2026-08-29. Because instructions are fetched on each run, **this reached
   everyone immediately** — no update or reinstall needed. Diagnosed by
-  @yhxkry on #397. (#397, #339, #347, #305)
+  @yhxkry on #397, who confirmed the fix, as did @SangenBR on #339. (#397, #339)
+
+  **This is not the whole of the English-output problem.** On #347 the reporter
+  re-tested afterwards with a local model through Ollama and measured 167 of 994
+  lines still coming back in English. He traced it to three things the Gist fix
+  does not touch: the instruction file still contains a worked example whose
+  translation is in English, the target language reaches the model as a single
+  lowercase word, and — the part that makes it spread — the running summary and
+  scene description are carried into the next batch, so once one batch answers in
+  English it pulls the following ones with it. That is why the English passages
+  come in blocks rather than scattered lines, and why changing the temperature
+  does not help. It is not fixed in this release. If you translate into a
+  non-English language with a local model and see blocks of English, that is this,
+  and a custom instruction file that names the target language explicitly and
+  requires the summary to be written in it as well is the workaround for now.
+  (#347, and the same mechanism is the likely cause on #305)
 
 ---
 
