@@ -314,9 +314,11 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
   unaffected — it has no external detector.
 
 
-- **Aggressive is retuned so it cannot run away with your time.** On a three-hour film an
-  Aggressive run took more than twice as long as Balanced and had to be abandoned before it
-  finished. The cause was not one setting but a stack of them, and the largest was that
+- **Aggressive is retuned on Balanced and Fidelity so it cannot run away with your time.** On a
+  three-hour film an Aggressive run took more than twice as long as Balanced and had to be
+  abandoned before it finished. (Fast, Faster and Kotoba keep their own decoder settings at
+  Aggressive — beam 5, patience 2.5, compression ratio 2.6. What changed for them is the single
+  temperature, in the next entry.) The cause was not one setting but a stack of them, and the largest was that
   Aggressive was allowed to decode a passage a second time at a higher temperature whenever a
   quality check tripped — which on continuous, repetitive audio is often. Aggressive now decodes
   once, at temperature 0, with a narrower beam (2 instead of 3), standard beam termination
