@@ -1429,7 +1429,7 @@ def verify_import(module_name: str, display_name: str) -> Tuple[bool, Optional[s
         return False, str(e)
 
 
-def run_post_install_verification() -> Tuple[int, int, list]:
+def run_post_install_verification() -> Tuple[int, int, list, list]:
     """
     Phase 6: Post-install verification.
 
@@ -1441,11 +1441,16 @@ def run_post_install_verification() -> Tuple[int, int, list]:
     5. GPU VRAM info
 
     Returns:
-        (pass_count, fail_count, warnings_list)
+        (pass_count, fail_count, warnings_list, failures_list)
+
+    failures_list names the checks that failed, so the caller can say which
+    ones in the failure marker file. A failure here means WhisperJAV will not
+    run; warnings mean an optional feature is unavailable.
     """
     passes = 0
     fails = 0
     warnings = []
+    failures = []
 
     # --- 6.1: WhisperJAV import smoke test ---
     log("")
@@ -1459,6 +1464,7 @@ def run_post_install_verification() -> Tuple[int, int, list]:
     else:
         log(f"  ✗ import whisperjav FAILED: {detail}")
         fails += 1
+        failures.append("import whisperjav")
 
     # Test the main entry point import
     python_exe = os.path.join(sys.prefix, 'python.exe')
@@ -1479,9 +1485,11 @@ def run_post_install_verification() -> Tuple[int, int, list]:
             error = result.stderr.strip().split('\n')[-1] if result.stderr else "unknown"
             log(f"  ✗ from whisperjav.main import main FAILED: {error}")
             fails += 1
+            failures.append("from whisperjav.main import main")
     except Exception as e:
         log(f"  ✗ from whisperjav.main import main FAILED: {e}")
         fails += 1
+        failures.append("from whisperjav.main import main")
 
     # --- 6.2: Entry point executables ---
     log("")
@@ -1504,6 +1512,7 @@ def run_post_install_verification() -> Tuple[int, int, list]:
             if is_critical:
                 log(f"  ✗ {exe_name}: NOT FOUND (critical)")
                 fails += 1
+                failures.append(f"{exe_name} was not created")
             else:
                 log(f"  ⚠ {exe_name}: not found (optional)")
                 warnings.append(f"{exe_name} not found")
@@ -1550,6 +1559,7 @@ def run_post_install_verification() -> Tuple[int, int, list]:
         else:
             log(f"  ✗ {display}: FAILED ({detail})")
             fails += 1
+            failures.append(f"{display} could not be imported")
 
     # Optional packages (non-critical)
     optional_packages = [
@@ -1601,11 +1611,11 @@ def run_post_install_verification() -> Tuple[int, int, list]:
     else:
         log("  Could not determine installation size")
 
-    return passes, fails, warnings
+    return passes, fails, warnings, failures
 
 
 def print_installation_summary(install_start_time: float,
-                               verification_results: Optional[Tuple[int, int, list]] = None):
+                               verification_results: Optional[Tuple[int, int, list, list]] = None):
     """Print a comprehensive installation summary"""
     install_duration = int(time.time() - install_start_time)
     minutes = install_duration // 60
@@ -1660,7 +1670,7 @@ def print_installation_summary(install_start_time: float,
 
     # Verification results
     if verification_results:
-        passes, fails, warnings = verification_results
+        passes, fails, warnings, failures = verification_results
         if fails == 0:
             log(f"  ✓ Verification: {passes} checks passed")
         else:
@@ -2618,6 +2628,14 @@ def main() -> int:
         # Core ASR packages (order matters - whisper before stable-ts)
         ("openai-whisper @ git+https://github.com/openai/whisper@main", "OpenAI Whisper"),
         ("stable-ts @ git+https://github.com/meizhong986/stable-ts-fix-setup.git@main", "Stable-TS (WhisperJAV fork)"),
+        # faster-whisper is pinned to a commit on SYSTRAN master, not to the 1.2.1
+        # release: that commit carries the Silero v6.2 weights and the new VAD
+        # parameters. Because it is a git address, the requirements generator
+        # filters it out of requirements_v{{VERSION}}.txt, so it has to be
+        # installed here or it is never installed at all.
+        # --no-deps is safe: faster-whisper needs ctranslate2 only at run time,
+        # and Phase 4 installs the pinned ctranslate2==4.8.1 from requirements.
+        ("faster-whisper @ git+https://github.com/SYSTRAN/faster-whisper.git@ed9a06cd89a93e47838f564998a6c09b655d7f43", "Faster-Whisper (SYSTRAN master @ ed9a06c)"),
         # FFmpeg Python bindings
         ("ffmpeg-python @ git+https://github.com/kkroening/ffmpeg-python.git", "FFmpeg-Python"),
         # Speech enhancement (enhance extra - included in standalone installer)
@@ -2773,7 +2791,7 @@ def main() -> int:
     log_section("Phase 6: Post-Install Verification")
     log("Verifying installation integrity...")
     verification_results = run_post_install_verification()
-    passes, fails, warnings = verification_results
+    passes, fails, warnings, failures = verification_results
 
     log("")
     log("  " + "=" * 40)
@@ -2784,6 +2802,27 @@ def main() -> int:
         log("  Some components may not work correctly.")
         log(f"  Check {LOG_FILE} for details.")
     log("  " + "=" * 40)
+
+    # A failed check in Phase 6 means a package WhisperJAV needs is missing or
+    # broken, so the install is not usable. Say so and stop, rather than print
+    # "Installation completed successfully!" over the top of it. Optional
+    # packages are warnings and never reach here.
+    if fails > 0:
+        failed_list = ", ".join(failures) if failures else f"{fails} checks"
+        log("")
+        log("  The installation is NOT usable. These checks failed:")
+        for item in failures:
+            log(f"    - {item}")
+        log("")
+        log("  Re-running the installer usually fixes this; if it does not,")
+        log("  attach the install log to a report at")
+        log("  https://github.com/meizhong986/WhisperJAV/issues")
+        create_failure_file(
+            f"Core package verification failed after install: {failed_list}"
+        )
+        # Deliberately not printing the installation summary here: its heading
+        # says "Installation Complete!", which this is not.
+        return 1
 
     # === Installation Complete ===
     # Note: Desktop shortcut is now created by NSIS installer during installation
