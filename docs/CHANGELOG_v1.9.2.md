@@ -8,7 +8,7 @@
 > Conventions: one entry per landed change, newest first. "Decision" lines
 > record who decided what, so a later reader can tell policy from mechanism.
 >
-> **SYNC** — pack r3.6 · 2026-09-11 night (plan items 1-7 implemented) | tracker rev 51.14 (reply drafts for after release) | change log through 2026-09-11 night (plan items 1-7, committed cb8e170..1b3f0c5, 25 one-file commits) | `dev_v1.9.2` @ 1b3f0c5, 154 ahead of `origin/main` @ 085388e, **origin/main merged in** (c8dae7a, notebook only) — nothing left on main, nothing pushed |
+> **SYNC** — pack r3.6 · 2026-09-11 night (plan items 1-7 implemented) | tracker rev 51.14 (18 reply drafts for after the release) | change log through 2026-09-11 night (plan items 1-7, 29 one-file commits cb8e170..a9a73d0 plus the merge e7e11f4) | `dev_v1.9.2` @ a9a73d0, 158 ahead of `origin/main` @ c8dae7a; origin/main is MERGED IN (0 commits left on it). Nothing pushed, nothing posted.
 > GitHub 138 open · 12 PRs · 0 labels applied · new #416 #417 #418 #419. Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
 > (updated in place; never a second page). Rule: a session that changes the pack, this file or the change
 > log brings the other two to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
@@ -204,7 +204,16 @@ thread, on the owner's approval; no issue closed without a reporter retest.
 
 ### Item 2, the measurement — what it established, and what it did not
 
-**Established, and decisive: 62 scenes instead of 252.** Same film (SNOS-388, 6,979 s), same semantic
+**Established, and decisive — and the scene count is the weakest part of it.** Read from the engine's
+own output (`<temp>/scenes/SNOS-388_semantic.json`, `meta.config` = min 28.0 / max 240.0 / snap 6.0 /
+threshold 22.0): **62 segments; shortest 28.51 s; longest 239.33 s; none under the floor; none over
+the ceiling; zero gap between consecutive scenes; the first starts at 0.00 and the last ends at
+6978.92, and the durations sum to 6978.9 s against a file duration of 6978.923 s.** Every second of a
+116-minute film is inside exactly one scene. That is the direct measurement that a 28 s floor loses
+nothing on real JAV audio — better evidence than the count, and better than the code-reading argument
+that the semantic detector merges rather than discards.
+
+**The count itself: 62 instead of 252.** Same film (SNOS-388, 6,979 s), same semantic
 detector, same aggressive sensitivity, same 240 s ceiling; only the floor changed, 10 s → 28 s. Scene
 detection completed in 52.8 s and does not involve the recogniser, so this number stands on its own.
 It is the effect the change was made for.
@@ -245,6 +254,13 @@ ceiling that sets the peak scene length was already in place before tonight (com
 That keeps WhisperSeg and matches his baseline exactly. It belongs to item 8.
 
 ### Test sweep (item 7), run one file at a time with nothing else on the GPU
+
+**One gap to state plainly: #372 is addressed for Japanese runs only.** The new lines are on the
+CJK path. The English path (`srt_postprocessing.py:219-247`, reached when the target is English)
+still logs every step at DEBUG — including the two that can block, the network fetch of the
+hallucination list and the file move, which the code comment itself names as the failure mode #372
+describes. A `--subs-language direct-to-english` batch still goes quiet in the same place. Not
+fixed; the owner decided INFO lines on the Japanese path and that is what was done.
 
 Green: the four new files (drift 8, post-install verification 14, ensemble safety cap 13,
 post-processing logging 5); installer comprehensive 74 (was 2 red at the start of the session, both
