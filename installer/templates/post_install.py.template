@@ -2570,6 +2570,18 @@ def main() -> int:
     """Main installation workflow"""
     install_start_time = time.time()
 
+    # The installer stops the install when this marker exists, so it has to mean
+    # "THIS run failed". A marker left behind by an earlier attempt in the same
+    # folder would otherwise fail a install that actually worked.
+    stale_marker = os.path.join(sys.prefix, "INSTALLATION_FAILED_v{{VERSION}}.txt")
+    if os.path.exists(stale_marker):
+        try:
+            os.remove(stale_marker)
+        except Exception:
+            # Leave it: better to fail an install that worked than to pass one
+            # that did not. The log records why.
+            pass
+
     log_section("WhisperJAV v{{VERSION}} Post-Install Started")
     log(f"Installation prefix: {sys.prefix}")
     log(f"Python executable: {sys.executable}")
