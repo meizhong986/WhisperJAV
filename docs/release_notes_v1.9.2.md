@@ -320,7 +320,8 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
   Aggressive was allowed to decode a passage a second time at a higher temperature whenever a
   quality check tripped — which on continuous, repetitive audio is often. Aggressive now decodes
   once, at temperature 0, with a narrower beam (2 instead of 3), standard beam termination
-  (patience 1.0) and a stricter repetition check (compression ratio 2.2 instead of 2.6), and it
+  (patience 1.0) and a stricter repetition check on paper (compression ratio 2.2 instead of 2.6 —
+  but see the next entry: with a single decode that limit no longer rejects anything), and it
   penalises immediate token repetition more firmly (1.5 instead of 1.3). It still admits quiet
   audio into the recognizer as before — the no-speech and log-probability gates are unchanged on
   Balanced. The same retune is applied to Fidelity, except the repetition penalty, which the
@@ -335,15 +336,25 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
   sensitivities. Output is reproducible run to run and worst-case run time is bounded. The
   ChronosJAV pipelines (anime-whisper, Qwen3, CrispASR) have their own decoders and are unaffected.
 
+  One consequence is worth knowing, because the setting is still in the presets and still has a
+  number beside it. **The compression-ratio limit no longer rejects anything on its own.** In both
+  recognisers it only ever decided whether to decode the passage again at a higher temperature; it
+  never dropped a result. With a single decode there is nothing to retry, so a passage that trips
+  the limit is kept. Repeated-character loops — a line of two hundred ん, a stock phrase repeating —
+  are removed afterwards by the subtitle cleaner instead, and are listed with their reason in the
+  `.artifacts.srt` file beside your subtitles. On a 116-minute test film the cleaner removed all 66
+  of them. Lowering the number in the presets would not change what you get.
+
 - **Scene detection uses one sensitivity threshold instead of three.** The semantic scene detector
   had a different clustering threshold and silence-snap window for each sensitivity (22/18/10 and
   6/5/2 seconds). Measurement during v1.9.2 showed the clustering threshold is not the lever its
   name suggests — scene count barely moves across most of its range, and the scene-length bounds
   are what actually decide granularity. Carrying three values implied a control that was not
   there. All sensitivities now use 22.0 and a 6-second snap window. The scene-length bounds still
-  vary by sensitivity on Fast; on Balanced they are 28 seconds to 4 minutes (see the next entry).
+  vary by sensitivity on Fast; on Balanced and Fidelity they are 28 seconds to 4 minutes (see the
+  next entry).
 
-- **Scenes are at most 4 minutes long on Balanced and Fidelity.** The ceiling was 20 minutes on
+- **Scenes are between 28 seconds and 4 minutes on Balanced and Fidelity.** The ceiling was 20 minutes on
   Balanced and 7 minutes (3 at Aggressive) on Fidelity. On a 3-hour test film the 20-minute ceiling
   left 60% of the running time inside scenes longer than 4 minutes, and each such scene is decoded
   as one long chain of 30-second recogniser windows, so one bad stretch could cost up to 20 minutes
@@ -351,8 +362,21 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
   into 89 scenes instead of 67, the longest exactly 240 seconds, with the same share of cuts landing
   in silence (95%). What you will see: more, shorter per-scene status lines, and any scene that
   produces nothing costs at most 4 minutes of audio. Whether a whole run finishes faster is not
-  yet measured. Fast, and the auditok and silero scene detectors on Balanced, are unchanged; the
-  Balanced minimum stays 28 seconds. If the detector ever leaves a scene longer than the ceiling
+  yet measured.
+
+  **The minimum is 28 seconds on both, at every sensitivity.** Balanced already had it; Fidelity
+  used the detector's own 30, 20 and 10 seconds for Conservative, Balanced and Aggressive. On a
+  116-minute test film, Fidelity at Aggressive cut 252 scenes, 187 of them shorter than 30 seconds,
+  and a short scene is expensive: the recogniser pads it out to a whole 30-second window, so a scene
+  under 30 seconds cost three times as much time per second of audio as a scene over two minutes.
+  Forty-seven per cent of the audio took sixty-four per cent of the pass. What you will see on
+  Fidelity at Aggressive: fewer, longer scenes, and the pass should finish sooner. Nothing is lost
+  at a scene boundary — the semantic detector merges a short piece into its neighbour rather than
+  discarding it.
+
+  Fast, and the auditok and silero scene detectors on Balanced and Fidelity, are unchanged: on
+  auditok a minimum duration discards the shorter region instead of merging it, so the same floor
+  there would lose speech. If the detector ever leaves a scene longer than the ceiling
   (possible only when one unbroken stretch of identical texture exceeds it, never seen so far), a
   warning now appears in the log — previously that warning went only to the console.
 
@@ -415,6 +439,17 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
   subtitles came back — needs a separate speech detector to compare against, and Faster-Whisper's own
   voice detection does not provide one. On Balanced a file with no subtitles is now always reported
   `empty`, and choosing an external segmenter is no longer a way around that.
+
+- **An ensemble that runs Fidelity first and Balanced second still lowers a typed "aggressive" to
+  "balanced" for the second pass.** That exact combination produced empty or badly truncated
+  second-pass subtitles in about two thirds of the runs that led to this rule; running the second
+  pass at balanced instead stopped it. The rule is unchanged in v1.9.2 and it announces itself in
+  the log when it fires, so you can see that the sensitivity you chose was not the one used. Half of
+  the original reason has gone — the higher-temperature retry it also blamed no longer exists, since
+  every sensitivity now decodes once at temperature 0 — but the failure it prevents was measured and
+  nothing has yet measured that removing the rule is safe. If you want a pass at aggressive, run it
+  on its own rather than as the second pass after Fidelity. No other combination of passes is
+  touched.
 
   If the version you picked cannot be loaded, WhisperJAV falls back to the Silero model
   Faster-Whisper ships with and says so in the log. If that one cannot be loaded either, the run
@@ -619,6 +654,13 @@ behaviour instead.
   of the video. The second check, "speech was detected but nothing came back", needs a
   separate speech segmenter, and Balanced no longer has one. In ensemble runs a failed
   pass 2 also makes the file `suspect`.
+- **The Transcription tab always uses Silero 3.1; only the Ensemble tab lets you choose.**
+  `--vad-version 3.1|4.0|6.2` works on the command line, and in the Ensemble tab a pass whose
+  pipeline is Balanced offers the three builds in its Speech Segmenter column. The Transcription
+  tab has no such control, so a single-pass Balanced run started from it gets the default, 3.1. If
+  you want 4.0 or 6.2 for a single-pass run, use the command line.
+- **Kaggle support (#329, #330) has moved to a release after this one.** It was expected in
+  September; it is not in v1.9.2. Colab is unaffected.
 - **The root cause behind #394 is still open.** The recognizer can enter a state
   where it returns nothing for the rest of a run, and the work above detects the
   *result* rather than preventing it. Investigation continues, with useful
@@ -631,7 +673,7 @@ behaviour instead.
 | Date | Change |
 |------|--------|
 | 2026-09-09 | Balanced runs the Internal FW Silero VAD and nothing else: `--vad-version 3.1|4.0|6.2` (default 3.1) picks the Silero build, all three models ship inside WhisperJAV, and `--speech-segmenter`, `--pass1/2-speech-segmenter`, `--max-group-duration` and `--chunk-threshold` now stop the run on Balanced instead of being accepted. `--no-vad` removed. Detection thresholds 0.5 / 0.4 / 0.3. Faster-Whisper fixed to SYSTRAN master @ ed9a06c (three commits past 1.2.1, for the Silero v6.2 weights) and `ctranslate2==4.8.1` |
-| 2026-09-11 | Semantic scene ceiling 240 s on Balanced (all sensitivities; minimum stays 28 s) and Fidelity (all sensitivities; floors unchanged). Fast, auditok and silero untouched. The engine's overlong-scene warning now reaches the log |
+| 2026-09-11 | Semantic scene bounds are 28 s to 240 s on Balanced and Fidelity, at every sensitivity. The ceiling was 20 min on Balanced and 7 min (3 at aggressive) on Fidelity; Fidelity's floor was 30/20/10 s. Fast, auditok and silero untouched. The engine's overlong-scene warning now reaches the log |
 | 2026-09-09 | Semantic is the default scene detector, and each scene detector finally receives its own parameter names — every semantic run since v1.8.11 had silently used the engine's built-in 20 s/420 s. Balanced resolved 28 s minimum / 20 min maximum at the time (superseded by the 240 s ceiling, 2026-09-11) |
 | 2026-09-06 | A GPU the PyTorch build has no kernels for stops the run at start-up and asks whether to continue on the CPU or abort (GUI: abort, tick "Accept CPU-only mode" to proceed); `--check` exits 1 on such a card (#411, #326, #333) |
 | 2026-09-06 | Subtitle entries that are only punctuation (a lone 「。」 or 「、」, an ellipsis alone) are dropped on the ChronosJAV pipelines; inline punctuation untouched (#413) |
