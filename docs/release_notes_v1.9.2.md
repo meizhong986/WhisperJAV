@@ -123,6 +123,35 @@ you find out something went wrong.
   segmenter support, or `silero-v6.2` for single-pass on Fidelity. On Balanced no
   external segmenter can be chosen at all (see "Changed defaults"). (#323)
 
+### Installs that said they worked when they had not
+
+- **A Windows install that cannot run WhisperJAV now stops and says so, instead of finishing
+  normally.** Two things had to be true at once for this to matter, and both were. The installer was
+  not installing Faster-Whisper at all — it is pinned to an exact build, and the step that writes the
+  package list drops anything pinned that way, so nothing installed it. Balanced, Fast, Faster and
+  Kotoba all need it, so on a fresh install from the `.exe` they would have failed on the first
+  transcription. And the installer checked for exactly this at the end, printed
+  `✗ Faster-Whisper: FAILED`, and then finished with "Installation completed successfully!", a green
+  final page and a desktop shortcut. You would have had a shortcut that opened onto an error and no
+  reason to suspect the installer.
+
+  Faster-Whisper is now installed from the pinned build alongside the other GitHub packages. And when
+  the end-of-install check finds that something WhisperJAV cannot run without is missing or will not
+  load, **the installation stops**: you get a dialog naming what failed and where the details are, no
+  desktop shortcut is created, and a file called `INSTALLATION_FAILED_v1.9.2.txt` is left in the
+  installation folder with the specifics. Running the installer again usually fixes it, because the
+  usual cause is a download that did not finish. If it happens twice, that file and
+  `install_log_v1.9.2.txt` are what to attach to a report.
+
+  **What will stop an install:** WhisperJAV itself not importing; `whisperjav.exe` or
+  `whisperjav-gui.exe` not being created; or any of PyTorch, OpenAI Whisper, Stable-TS,
+  Faster-Whisper, PyWebView, SRT or PyYAML failing to import. **What will not:** llama-cpp-python,
+  ClearVoice and Transformers are optional and only produce a warning — local LLM translation, speech
+  enhancement and the ChronosJAV pipelines are features you can add later, not things the program
+  needs to start. A check that simply runs out of time is also only a warning, not a failure: on a
+  slow disk the first import of PyTorch can take minutes, and that is not evidence of anything being
+  wrong.
+
 ### Documentation that broke installs
 
 - **The Windows manual-install guide no longer replaces your GPU PyTorch with
