@@ -8,10 +8,48 @@
 > Conventions: one entry per landed change, newest first. "Decision" lines
 > record who decided what, so a later reader can tell policy from mechanism.
 >
-> **SYNC** — pack r2.7 · 2026-09-10 | tracker rev 51.8 | change log through 2026-09-11 (semantic scene ceiling 240 s on Balanced and Fidelity, **committed** as 13 one-file commits 834b42c..afeed71 plus this sync update) | `dev_v1.9.2` @ afeed71+ (71 one-file commits e8f80e3..HEAD, not pushed) |
-> GitHub 134 open · 231 closed · 12 PRs · 0 labels applied · 32 owed (8 replies posted 2026-09-06; #413 follow-up at 16:11 UTC). Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
+> **SYNC** — pack r3.0 · 2026-09-11 (release-readiness assessment, updated in place) | tracker rev 51.9 | change log through 2026-09-11 (scene ceiling 240 s, committed 834b42c..afeed71; readiness findings below) | `dev_v1.9.2` @ edf88c0+ (72 one-file commits e8f80e3..HEAD, not pushed; origin/main has c8dae7a, notebook only, not yet merged) |
+> GitHub 138 open · 12 PRs · 0 labels applied · new #416 #417 #418 #419. Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
 > (updated in place; never a second page). Rule: a session that changes the pack, this file or the change
 > log brings the other two to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
+
+---
+
+## 2026-09-11 (later) — release-readiness assessment; the installer would ship without faster-whisper
+
+**Owner instructions:** i1 he continues manual testing; i2 assess readiness to release 1.9.2; i3
+consider a beta for advanced users known from the issues. Assessment delivered in the owner pack
+(r3.0, section 0) after the adversary gate; nothing implemented, nothing posted.
+
+**BLOCKER (established by execution, not fixed):** `installer/build_release.py:193-195` skips every
+git-addressed dependency when generating `requirements_v{VERSION}.txt`. faster-whisper became a
+git pin in 1.9.2 (`pyproject.toml:82`), so the generated list for 1.9.2 (88 lines) has **no
+faster-whisper**; the installer's git-package step (`post_install.py.template:2618-2624`) does not
+list it; the final step installs the wheel `--no-deps` (`:2687`). The install would log
+`✗ Faster-Whisper: FAILED` and still report success. `tests/test_dependency_cross_match.py::
+test_template_matches_registry` is red for exactly this (`installer/templates/requirements.txt.template:26`
+still says `faster-whisper>=1.1.0`). Recommended fix (owner to choose): add faster-whisper to the
+git-package step after ctranslate2, align the template, build once and read the generated file.
+
+**Executed today:** `--check` exit 0; Balanced and Fidelity on 1500 s HODV (see the entry below);
+Fast (26 cues) and Faster (19) on the 293 s clip; ensemble Balanced aggressive→balanced on the same
+clip (26 / 31 → 35 merged, 98% span), all exit 0; installer validation passed (it does not inspect
+the generated requirements); 36 test files run one at a time — every v1.9.2 file green; 34 failures
+in 7 files, all reproduced at 22ef1a1 (pre-session), incl. config presets 20 (v1.8.x values; some
+deliberately changed by the O6 temperature retune) and dependency cross-match 5.
+
+**Other findings:** #372 stage markers landed (`srt_postprocessing.py:212-252`) but at DEBUG — a
+normal run still shows nothing; #314 still not landed; #340/#306/#323 are fixed on dev and the
+local bug list was stale; `whisperjav-upgrade` installs from `main` for installer/pip installs
+(`upgrade.py:63-66`), the live Colab path installs from `main` (`installer/install_colab.sh:26,179`),
+so **dev must not be merged into main for a beta**; the update prompt reads `/releases/latest`
+(pre-releases invisible) and `compare_versions('1.9.2b1','1.9.2') == -1`. New reports #419 (v1.9.0,
+Balanced + TEN + aggressive, 0 cues, SUCCESS; that command now exits 2) and #416 (v1.8.13/14 logs,
+auditok ran despite `--pass1-scene-detector silero`, model loaded from cache). Beta recommended as
+`v1.9.2b1` pre-release once the blocker is fixed; 21 invitees from `reporters.md` + Timi2028 +
+weifu8435 (exclusion overturned by his #416 comment).
+
+**Decision:** owner — fix shape for the installer, beta yes/no, invitations per thread.
 
 ---
 
