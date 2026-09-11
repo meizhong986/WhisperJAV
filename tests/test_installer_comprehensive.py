@@ -1109,6 +1109,124 @@ class TestPostInstallTemplate:
             "Phase 3.5 must be between Phase 3 (PyTorch) and Phase 4 (requirements)"
 
 
+class TestInstallAbortsOnCoreFailure:
+    """The installer must stop when a package WhisperJAV cannot run without is missing.
+
+    Owner decision, 2026-09-11. Until v1.9.2 the install script's exit code was
+    thrown away by conda-constructor's own runner, the installer reached its
+    normal finish page, and a desktop shortcut was created that opened onto an
+    error. A user was told an unusable install had worked.
+
+    These are text checks on the NSIS template, and that is a real limit: NSIS
+    cannot be compiled or run here, so they prove the instructions are present
+    and in the right order, not that the installer behaves correctly. Only the
+    clean-machine install proves that.
+    """
+
+    @staticmethod
+    def _nsis() -> str:
+        project_root = Path(__file__).parent.parent
+        path = project_root / "installer" / "templates" / "custom_template.nsi.tmpl.template"
+        assert path.exists(), "NSIS template not found"
+        return path.read_text(encoding="utf-8")
+
+    @staticmethod
+    def _post_install() -> str:
+        project_root = Path(__file__).parent.parent
+        path = project_root / "installer" / "templates" / "post_install.py.template"
+        return path.read_text(encoding="utf-8")
+
+    def test_constructor_is_told_to_propagate_a_failed_post_install(self):
+        """conda-constructor swallows the exit code unless this variable is set.
+
+        Its _nsis.py catches the CalledProcessError, writes to stderr and returns
+        normally; only `if os.environ.get("NSIS_SCRIPTS_RAISE_ERRORS")` makes it
+        exit non-zero. Without this line NSIS never learns the install failed.
+        """
+        content = self._nsis()
+
+        # Match the instruction that sets it, not the comment that explains it:
+        # a name mentioned in a comment sets no variable. (The same weakness made
+        # test_git_packages_in_template unable to fail until v1.9.2.)
+        setter = 'SetEnvironmentVariable(t,t)i("NSIS_SCRIPTS_RAISE_ERRORS", "1")'
+        assert setter in content, (
+            "The NSIS script does not SET NSIS_SCRIPTS_RAISE_ERRORS, so a failed "
+            "post-install would be silently discarded by constructor's runner"
+        )
+
+        var_pos = content.find(setter)
+        call_pos = content.find('_nsis.py" post_install')
+        assert call_pos != -1, "post_install invocation not found"
+        assert var_pos < call_pos, (
+            "NSIS_SCRIPTS_RAISE_ERRORS must be set BEFORE post_install runs"
+        )
+
+    def test_the_install_aborts_when_the_failure_marker_exists(self):
+        content = self._nsis()
+
+        marker_check = content.find("INSTALLATION_FAILED_v{{VERSION}}.txt")
+        assert marker_check != -1, (
+            "Nothing checks for the failure marker, so a broken install would still finish"
+        )
+
+        tail = content[marker_check:]
+        abort_pos = tail.find("Abort")
+        assert abort_pos != -1 and abort_pos < 2000, (
+            "The failure-marker branch does not Abort the installation"
+        )
+
+    def test_no_desktop_shortcut_is_created_after_a_failed_install(self):
+        """A shortcut that opens onto an error is worse than no shortcut.
+
+        The abort must come first in the script, so the shortcut block is never
+        reached. This also covers the silent-install case, where the retry
+        dialog answers itself with "Ignore".
+        """
+        content = self._nsis()
+
+        marker_check = content.find('${FileExists} "$INSTDIR\INSTALLATION_FAILED')
+        shortcut = content.find('CreateShortCut "$DESKTOP')
+
+        assert marker_check != -1, "failure-marker check not found in the NSIS template"
+        assert shortcut != -1, "desktop shortcut creation not found in the NSIS template"
+        assert marker_check < shortcut, (
+            "The failure check must come BEFORE the desktop shortcut is created, "
+            "or a broken install still puts a shortcut on the desktop"
+        )
+
+    def test_the_failure_message_tells_the_user_what_to_do(self):
+        """The user is not technical. The dialog has to say what happened, where
+        the details are, and what to try -- re-running fixes the usual cause."""
+        content = self._nsis()
+        marker_check = content.find('${FileExists} "$INSTDIR\INSTALLATION_FAILED')
+        block = content[marker_check:marker_check + 2000]
+
+        assert "MessageBox" in block, "the user is not shown anything"
+        assert "install_log_v{{VERSION}}.txt" in block, "the log file is not named"
+        assert "github.com/meizhong986/WhisperJAV/issues" in block, "no way to report it"
+        assert "again" in block.lower(), "does not tell the user to try again"
+
+    def test_a_stale_marker_from_an_earlier_attempt_is_cleared(self):
+        """Otherwise a marker left by a previous failed attempt in the same folder
+        would abort an install that actually worked."""
+        content = self._post_install()
+
+        main_pos = content.find("def main() -> int:")
+        assert main_pos != -1
+        block = content[main_pos:main_pos + 1200]
+
+        assert "INSTALLATION_FAILED_v{{VERSION}}.txt" in block, (
+            "main() does not clear a stale failure marker before the install runs"
+        )
+        assert "os.remove" in block, "the stale marker is found but not removed"
+
+        first_phase = content.find("Phase 1: Preflight Checks", main_pos)
+        clear_pos = content.find("INSTALLATION_FAILED_v{{VERSION}}.txt", main_pos)
+        assert clear_pos < first_phase, (
+            "the stale marker must be cleared before any phase can write a new one"
+        )
+
+
 class TestKnownIssues:
     """Tests for known issues that have been fixed."""
 
