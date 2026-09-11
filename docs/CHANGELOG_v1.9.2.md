@@ -8,7 +8,7 @@
 > Conventions: one entry per landed change, newest first. "Decision" lines
 > record who decided what, so a later reader can tell policy from mechanism.
 >
-> **SYNC** — pack r3.2 · 2026-09-11 (readiness register §0.8 added, in place) | tracker rev 51.11 | change log through 2026-09-11 (scene ceiling 240 s, committed 834b42c..afeed71; readiness findings below) | `dev_v1.9.2` @ edf88c0+ (72 one-file commits e8f80e3..HEAD, not pushed; origin/main has c8dae7a, notebook only, not yet merged) |
+> **SYNC** — pack r3.3 · 2026-09-11 (second acceptance run SNOS-388, §0.3b) | tracker rev 51.12 | change log through 2026-09-11 (scene ceiling 240 s, committed 834b42c..afeed71; readiness findings below) | `dev_v1.9.2` @ edf88c0+ (72 one-file commits e8f80e3..HEAD, not pushed; origin/main has c8dae7a, notebook only, not yet merged) |
 > GitHub 138 open · 12 PRs · 0 labels applied · new #416 #417 #418 #419. Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
 > (updated in place; never a second page). Rule: a session that changes the pack, this file or the change
 > log brings the other two to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
@@ -50,6 +50,16 @@ auditok ran despite `--pass1-scene-detector silero`, model loaded from cache). B
 weifu8435 (exclusion overturned by his #416 comment).
 
 **Decision:** owner — fix shape for the installer, beta yes/no, invitations per thread.
+
+**Owner's second manual test (2026-09-11, `F:\MEDIA_DLNA\SNOS-388\LOG-TESTRUN balanced+fidleity.txt`):**
+SNOS-388 (6,979 s), Balanced/balanced/Silero 4.0 → Fidelity/aggressive/WhisperSeg, semantic, large-v2,
+merge pass2_primary, `--debug`: exit 0, 533 cues / 99.4%, 40.0 min, no warnings. Pass 1: 62 scenes
+(28/240), decode 327 s = 21× realtime, 455→432 cues, 9 scenes empty — all genuine (first 10 min of the
+film, ambient/high-energy; Fidelity found nothing in the same ranges either). Pass 2: **252 scenes**
+(aggressive preset floor 10 s; 187 under 30 s), 1,938 s = 3.6× realtime, 464→434 cues, 5 reloads.
+Measured from per-scene timestamps: scenes <30 s cost 0.36 s per audio-second vs 0.12 for >120 s; the
+187 short scenes = 47% of audio, 64% of the pass. **Recommendation (owner, a default): a Fidelity scene
+floor near 28 s** (one override beside today's 240 s ceiling). Not done.
 
 **Readiness register (2026-09-11, night, adversary-checked; pack §0.8):** 2 blockers (B1 installer
 drops faster-whisper — affects Balanced, Fast, Faster, Kotoba, not Fidelity; B2 never built/installed
