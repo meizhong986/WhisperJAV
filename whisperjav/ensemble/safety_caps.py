@@ -109,15 +109,17 @@ CAP_RULES: list[_CapRule] = [
         pass2_sensitivity_match="aggressive",
         pass2_sensitivity_replacement="balanced",
         rationale=(
-            "pass1=fidelity + pass2=balanced + sensitivity=aggressive is empirically "
-            "known to produce intermittent catastrophic ASR truncation in pass 2 "
-            "(~67% rate in early trials). Auto-downgrading sensitivity to 'balanced' "
-            "lowers no_speech_threshold from 0.72 to 0.65 and relaxes the beam settings, "
-            "which removed the catastrophic-empty-scene manifestation when this cap was "
-            "introduced. NOTE (v1.9.2, owner O4): the other half of the original rationale "
-            "-- a temperature=0.17 fallback path on aggressive -- no longer exists, because "
-            "every sensitivity now decodes once at temperature 0. Whether this cap should "
-            "still fire is an open question for the owner."
+            "A Fidelity pass 1 followed by a Balanced pass 2 at aggressive produced "
+            "empty or badly truncated pass-2 subtitles in about two thirds of the "
+            "trials that led to this rule. Running pass 2 at balanced instead lowers "
+            "the no-speech threshold from 0.72 to 0.65 and relaxes the beam search, "
+            "which stopped it happening. KEPT for v1.9.2 (owner decision, 11 September "
+            "2026) even though half of the original explanation no longer applies: the "
+            "temperature 0.17 retry it also blamed is gone, because every sensitivity "
+            "now decodes once at temperature 0. It stays because the failure it prevents "
+            "was measured, and nothing has yet measured that removing the rule is safe. "
+            "To transcribe at aggressive, run that pass on its own rather than as pass 2 "
+            "after Fidelity."
         ),
         memo_section="§15",
     ),
