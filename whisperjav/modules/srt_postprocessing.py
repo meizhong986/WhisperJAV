@@ -165,9 +165,12 @@ class SRTPostProcessor:
             from whisperjav.modules.subtitle_pipeline.cleaners.nonlinguistic_utterance_filter import (
                 NonlinguisticUtteranceFilter,
             )
+            logger.info("Post-processing: looking for non-linguistic lines")
             nonlinguistic_stats = NonlinguisticUtteranceFilter().filter_srt_file(
                 result.sanitized_path
             )
+            dropped = (nonlinguistic_stats or {}).get('dropped_nonlinguistic', 0)
+            logger.info(f"Post-processing: dropped {dropped} non-linguistic lines")
 
         # Return in expected format
         stats = result.statistics
