@@ -55,9 +55,14 @@ it drifted to a four-week-old "134 open" against a real 139.
 | Never received any reply | **6** — down from 62 |
 | Labels applied | **0** of nine that exist |
 
-v1.9.2 against those 139: **12 FIXED, 19 PARTIAL, 10 MITIGATED, 19 CHANGED, 2 WORSE, 77 UNTOUCHED.**
-v1.9.0 touched 28 of 134 with 6 rated likely or better, so the ratio is better — but 19 of the 62
-touched are changes that take something away rather than give something.
+v1.9.2 against those 139: **11 FIXED, 20 PARTIAL, 10 MITIGATED, 19 CHANGED, 2 WORSE, 77 UNTOUCHED.**
+v1.9.0 touched 28 of 134 with 6 rated likely or better, so the ratio is better — but two things matter
+more than the count. 19 of the 62 touched take something away rather than give it. And **37 of the 62
+are marked (inferred)**: the notes do not name that issue, so the verdict is a reading of what the
+release does to it rather than a claim the project has made. Only 25 are named outright. That
+distinction is on every row of both documents, and it is why #287 is recorded as PARTIAL rather than
+FIXED — the inference is good, but putting it to a reporter as a fix would be a promise we have not
+earned.
 
 ### The four findings that matter
 
@@ -83,9 +88,10 @@ touched are changes that take something away rather than give something.
    screenshots, and #419's exact command now exits 2. weifu8435 alone has written 154 comments across
    the open issues; yangming2027 44.
 
-4. **A win nobody connected.** #287 ("every line comes out as `!!`") is unnamed in the notes, but the
-   #413 punctuation-only filter now drops a lone `!` that the anime-whisper pass used to keep — his
-   exact symptom.
+4. **A probable win nobody connected.** #287 ("every line comes out as `!!`") is unnamed in the
+   notes, so it is recorded as PARTIAL and inferred, but the #413 punctuation-only filter now drops
+   a lone `!` that the anime-whisper pass used to keep — his exact symptom. Confirm his pipeline
+   before telling him anything.
 
 ### Readiness, group by group
 
