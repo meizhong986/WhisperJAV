@@ -146,13 +146,24 @@ LEGACY_PIPELINES = {
         # See balanced note above — same architecture applies.
         "vad": "silero-v3.1",
         "features": ["auditok_scene_detection"],
-        # v1.9.2 (owner decision 2026-09-11): Fidelity's semantic scene ceiling is 240 s at
-        # every sensitivity, for the same reason as Balanced -- OpenAI Whisper decodes a
-        # scene as the same chain of 30 s windows. The semantic presets' minimums
-        # (30/20/10 s) are kept; only the ceiling is overridden. Note this LOOSENS the
-        # aggressive preset (180 s -> 240 s) and tightens the other two (420 s -> 240 s).
+        # v1.9.2 (owner decision 2026-09-11): Fidelity's semantic scenes are at least 28 s
+        # and at most 240 s at every sensitivity, the same bounds as Balanced, because
+        # OpenAI Whisper decodes a scene as the same chain of 30 s windows.
+        #
+        # The ceiling LOOSENS the aggressive preset (180 s -> 240 s) and tightens the other
+        # two (420 s -> 240 s). The floor replaces the semantic presets' 30/20/10 s.
+        # Measured on SNOS-388 (a 116-minute film) on 2026-09-11: at the aggressive floor
+        # of 10 s the pass cut 252 scenes, 187 of them under 30 s, and a scene under 30 s
+        # cost 0.36 s of compute per second of audio against 0.12 s for a scene over 120 s,
+        # so 47% of the audio took 64% of the pass. A short scene still costs a whole
+        # padded 30 s window.
+        #
+        # 28 is only SAFE on the semantic detector, whose min_duration merges short pieces
+        # into their neighbour. On auditok min_duration DISCARDS a shorter region, which
+        # would lose speech, so nothing is set for auditok here.
         "scene_overrides": {
             "semantic": {
+                "scene_detection.min_duration": 28.0,
                 "scene_detection.max_duration": 240.0,
             },
         },
