@@ -8,10 +8,122 @@
 > Conventions: one entry per landed change, newest first. "Decision" lines
 > record who decided what, so a later reader can tell policy from mechanism.
 >
-> **SYNC** — pack r3.6 · 2026-09-11 night (plan items 1-7 implemented) | tracker rev 51.14 (18 reply drafts for after the release) | change log through 2026-09-11 night (plan items 1-7, 35 one-file commits cb8e170..5be3e1b plus the merge e7e11f4) | `dev_v1.9.2` @ 5be3e1b, 164 ahead of `origin/main` @ c8dae7a; origin/main is MERGED IN (0 commits left on it). Nothing pushed, nothing posted.
+> **SYNC** — pack r3.8 · 2026-09-11 night | tracker rev **52.0** | change log through 2026-09-11 night | `dev_v1.9.2` @ `7443528`, 166 ahead of `origin/main` @ `c8dae7a`; origin/main merged in. Nothing pushed, nothing posted. (Counts measured 2026-09-11.)
 > GitHub 138 open · 12 PRs · 0 labels applied · new #416 #417 #418 #419. Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
 > (updated in place; never a second page). Rule: a session that changes the pack, this file or the change
 > log brings the other two to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
+
+---
+
+## 2026-09-11 (night, later still) — backlog re-read from GitHub, ranked by what it costs a user
+
+Owner instruction: refresh the tracker from GitHub, analyse the tally, group and rank every issue by
+user pain, take the release's own contribution into account, and produce a fresh readiness
+assessment. He also gave the user priority order: Windows GUI on the `.exe` installer with an NVIDIA
+card first, then macOS on Apple Silicon, Linux, Colab, China behind the firewall, non-NVIDIA PCs,
+laptops.
+
+**Deliverable (his choice): a second owner-facing page,** `docs/plans/V192_BACKLOG_REVIEW.html`
+(gitignored). It carries the same SYNC block as the tracker and this file, so rule A7's one-state
+requirement still holds even though A7 says never to make a second page — he overrode that
+deliberately and the substance is preserved.
+
+### Method
+
+All 139 open issues re-fetched with `gh` and read; where a title did not settle the environment the
+thread was opened. Two axes per issue: **user group** (his order) and **category** (INSTALL, CRASH,
+NO-OUTPUT, WRONG-OUTPUT, SLOW, TRANSLATION, GUI, MODEL-REQUEST, FEATURE, QUESTION, DOCS, RECIPE).
+**Pain rank within group**, ordered by: what it costs the user; then whether v1.9.2 leaves it unfixed
+(a defect the release makes *worse* ranks above one it ignores, which ranks above one it fixes); then
+distinct non-maintainer voices on the thread; then days waiting.
+
+Everything is generated from one dataset (`scratchpad/backlog.json`) and checked before use: all 139
+present exactly once against a live fetch, every row carrying a group, category, blocking judgement,
+release verdict and rank, ranks forming a clean 1..n inside each group, and no `BLOCKED` issue ranked
+below a `DEGRADED` one. The stats block in the tracker is **regenerated, not edited** — editing is how
+it drifted to a four-week-old "134 open" against a real 139.
+
+### What the numbers say
+
+| | |
+|---|---|
+| Open / closed / PRs | 139 / 231 / 12 |
+| **BLOCKED** (cannot install, cannot get subtitles, cannot use the feature) | **44** |
+| DEGRADED | 27 |
+| ANNOYED / INFO | 44 / 24 |
+| You owe a reply | **41**, of which **16 have waited over 100 days** (oldest 303, #43) |
+| Never received any reply | **6** — down from 62 |
+| Labels applied | **0** of nine that exist |
+
+v1.9.2 against those 139: **12 FIXED, 19 PARTIAL, 10 MITIGATED, 19 CHANGED, 2 WORSE, 77 UNTOUCHED.**
+v1.9.0 touched 28 of 134 with 6 rated likely or better, so the ratio is better — but 19 of the 62
+touched are changes that take something away rather than give something.
+
+### The four findings that matter
+
+1. **#347 was over-claimed in the release notes, and is not fixed.** The notes listed it among the
+   threads the `pornify` Gist correction closed. On 2026-09-09 skysstst retested on **v1.9.1** with
+   Ollama `gemma3:12b` and measured **167 of 994 lines (16.8%) still returning English**, then
+   verified a custom instruction file that gave **0 of 997**. Three causes, one of them new to us: the
+   running `summary`/`scene` are carried into the next batch
+   (`PySubtrans/TranslationPrompt.py:9`), so one English answer drags the following batches with it —
+   which is why the English arrives in contiguous blocks and why temperature makes no difference. The
+   other two: a worked example in `pornify.txt` whose translation is English (the word "English" never
+   appears, so grep misses it), and the target language arriving as one lowercase token
+   (`PySubtrans/Options.py:305`). **Release notes corrected in commit 7443528.** This is the
+   best-evidenced and cheapest-to-fix defect in the backlog and a user has already done the work.
+
+2. **Two live complaints this release makes worse.** #400 *"Fidelity Mode misses a lot of lines"* — ten
+   participants, unanswered 15 days — meets the removal of Fidelity's rescue path, which this project's
+   own change log calls "a recall loss on fidelity … not a neutral change". #215 asks why Qwen3-ASR
+   returns so few lines, and two filters now remove more. Both should hear it from us first.
+
+3. **The recipes break.** Balanced refusing an external speech segmenter is deliberate, but #374, #390
+   and #413 are the threads other users copy settings from, #386/#387 are the "recommended settings"
+   screenshots, and #419's exact command now exits 2. weifu8435 alone has written 154 comments across
+   the open issues; yangming2027 44.
+
+4. **A win nobody connected.** #287 ("every line comes out as `!!`") is unnamed in the notes, but the
+   #413 punctuation-only filter now drops a lone `!` that the anime-whisper pass used to keep — his
+   exact symptom.
+
+### Readiness, group by group
+
+- **Windows / NVIDIA / .exe** (59 open, 25 blocking) — **clear net gain**, and the largest part of it is
+  not on the issue list: the installer was shipping without Faster-Whisper and reporting success.
+- **macOS Apple Silicon** (3 open, 2 blocking) — **nothing**. Neither #227 nor #320 is touched.
+- **Linux** (7, 3 blocking) — small gain: #366's documentation fix. #313 and #33 untouched.
+- **Colab** (1, 0 blocking) — inherits the whole release when dev reaches main.
+- **China** (6, 3 blocking) — offline mode is real and is theirs, **but it is a run-time flag and all
+  three blocking issues are at install time** (#317, #392, #284); #314, the missing download progress,
+  did not land. Helped after the wall they are stuck at.
+- **AMD / Intel** (5, all blocking) — all five CHANGED, none fixed: a clearer refusal, not support.
+- **Laptop** (1) — nothing specific; the refresh and scene-ceiling changes are unmeasured on a 4 GB card.
+- **Kaggle** (7, 5 blocking) — nothing, by decision; #329/#330 were promised for September.
+
+**Verdict: ship, once the `.exe` has been built and installed on a clean machine.** The argument is not
+the feature list — it is that today's installer hands the primary user a program that cannot transcribe
+and says it worked. Holding fixes none of the 17 blocking issues the release does not address. The gate
+is that the installer fix is the one part of this release never executed end to end.
+
+### Recommendations, in order of what they are worth to a user
+
+1. Build the `.exe` (`--clean` first) and install it on a clean machine.
+2. Tell #400 and #215 before they find out.
+3. Update the recipe threads at release time — #374, #390, #413, #386, #387, #419; four already drafted.
+4. Close #397 and #339 — both reporters confirmed the fix in their own words.
+5. Take #347's verified fix into 1.9.3.
+6. Ask #420 for the error text rather than diagnosing from a screenshot.
+7. Work the 41 owed replies oldest-first, starting with the 16 over 100 days.
+8. Apply the nine labels that already exist; every pass currently re-derives the classification by hand.
+9. Decide what to do about the public `v1.9.1` tag — its release page was never published, but the tag
+   is fetchable and a user has already installed from it and is filing measurements against it.
+
+Not recommended: holding the release for #347 (shipping does not worsen it, holding does not fix it);
+opening Apple Silicon or Kaggle work now (both would delay the installer fix, which costs more users
+more).
+
+**Nothing posted, no issue closed, no label applied, nothing pushed.**
 
 ---
 
