@@ -1403,12 +1403,19 @@ def get_gpu_vram_mb() -> Optional[Tuple[str, int]]:
     return None
 
 
-def verify_import(module_name: str, display_name: str) -> Tuple[bool, Optional[str]]:
+def verify_import(module_name: str, display_name: str) -> Tuple[bool, Optional[str], bool]:
     """
-    Try to import a module and return (success, version_or_error).
+    Try to import a module and return (success, version_or_error, timed_out).
 
     Uses subprocess to avoid polluting the installer's own process with
     heavy imports (torch, whisper, etc. consume memory and may conflict).
+
+    timed_out is reported separately because a check that ran out of time has
+    not shown that anything is wrong -- the first import of torch off a freshly
+    written site-packages, with antivirus reading every file, is slow. Since a
+    failed check now ends the install, a slow machine must not be told its
+    install is broken. See commit 63936e1: the earlier 30 s limit caused false
+    failures on real installs.
     """
     python_exe = os.path.join(sys.prefix, 'python.exe')
     try:
@@ -1421,12 +1428,14 @@ def verify_import(module_name: str, display_name: str) -> Tuple[bool, Optional[s
         )
         if result.returncode == 0:
             version = result.stdout.strip() or "OK"
-            return True, version
+            return True, version, False
         else:
             error = result.stderr.strip().split('\n')[-1] if result.stderr else "unknown error"
-            return False, error
+            return False, error, False
+    except subprocess.TimeoutExpired:
+        return False, "check did not finish within 120s", True
     except Exception as e:
-        return False, str(e)
+        return False, str(e), False
 
 
 def run_post_install_verification() -> Tuple[int, int, list, list]:
@@ -1457,10 +1466,13 @@ def run_post_install_verification() -> Tuple[int, int, list, list]:
     log("  6.1 WhisperJAV Import Smoke Test")
     log("  " + "-" * 40)
 
-    ok, detail = verify_import("whisperjav", "WhisperJAV")
+    ok, detail, timed_out = verify_import("whisperjav", "WhisperJAV")
     if ok:
         log(f"  ✓ import whisperjav: {detail}")
         passes += 1
+    elif timed_out:
+        log(f"  ⚠ import whisperjav: {detail} — not treated as a failure")
+        warnings.append("import whisperjav did not finish in time; could not be checked")
     else:
         log(f"  ✗ import whisperjav FAILED: {detail}")
         fails += 1
@@ -1486,6 +1498,10 @@ def run_post_install_verification() -> Tuple[int, int, list, list]:
             log(f"  ✗ from whisperjav.main import main FAILED: {error}")
             fails += 1
             failures.append("from whisperjav.main import main")
+    except subprocess.TimeoutExpired:
+        log("  ⚠ from whisperjav.main import main: did not finish within 120s "
+            "— not treated as a failure")
+        warnings.append("whisperjav.main import did not finish in time; could not be checked")
     except Exception as e:
         log(f"  ✗ from whisperjav.main import main FAILED: {e}")
         fails += 1
@@ -1552,10 +1568,13 @@ def run_post_install_verification() -> Tuple[int, int, list, list]:
     ]
 
     for module, display in key_packages:
-        ok, detail = verify_import(module, display)
+        ok, detail, timed_out = verify_import(module, display)
         if ok:
             log(f"  ✓ {display}: {detail}")
             passes += 1
+        elif timed_out:
+            log(f"  ⚠ {display}: {detail} — not treated as a failure")
+            warnings.append(f"{display} did not finish importing in time; could not be checked")
         else:
             log(f"  ✗ {display}: FAILED ({detail})")
             fails += 1
@@ -1568,7 +1587,7 @@ def run_post_install_verification() -> Tuple[int, int, list, list]:
         ("transformers", "Transformers"),
     ]
     for module, display in optional_packages:
-        ok, detail = verify_import(module, display)
+        ok, detail, _timed_out = verify_import(module, display)
         if ok:
             log(f"  ✓ {display}: {detail}")
             passes += 1
