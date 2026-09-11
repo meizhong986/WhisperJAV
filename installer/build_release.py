@@ -31,8 +31,13 @@ except ImportError:
     except ImportError:
         tomllib = None
 
-# Configure UTF-8 encoding for Windows console
-if sys.platform == 'win32':
+# Configure UTF-8 encoding for Windows console.
+#
+# Only when this file is run as a script. Doing it on import replaced the
+# importer's stdout with a wrapper over the raw buffer, which broke anything
+# that had redirected stdout -- pytest's output capture, for one, so the
+# generator could not be tested at all ("I/O operation on closed file").
+if sys.platform == 'win32' and __name__ == '__main__':
     try:
         import io
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
