@@ -10,6 +10,7 @@
 # - Phase 3.5: Git-based packages (require git, benefit from retry logic):
 #   - openai-whisper (core ASR)
 #   - stable-ts (WhisperJAV fork for Japanese)
+#   - faster-whisper (pinned to SYSTRAN master @ ed9a06c)
 #   - ffmpeg-python (audio/video processing)
 #   - clearvoice (speech enhancement)
 #
@@ -22,8 +23,8 @@ auditok
 av>=13.0.0
 bs-roformer-infer
 colorama
+ctranslate2==4.8.1
 datasets>=3.0.0,<=3.6.0
-faster-whisper>=1.1.0
 google-genai>=1.39.0
 hf_xet
 httpx>=0.27.0
