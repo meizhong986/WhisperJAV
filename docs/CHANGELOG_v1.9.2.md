@@ -8,10 +8,182 @@
 > Conventions: one entry per landed change, newest first. "Decision" lines
 > record who decided what, so a later reader can tell policy from mechanism.
 >
-> **SYNC** — pack r3.5 · 2026-09-11 (owner decisions + plan to stable) | tracker rev 51.13 | change log through 2026-09-11 (scene ceiling 240 s, committed 834b42c..afeed71; readiness findings below) | `dev_v1.9.2` @ edf88c0+ (72 one-file commits e8f80e3..HEAD, not pushed; origin/main has c8dae7a, notebook only, not yet merged) |
+> **SYNC** — pack r3.6 · 2026-09-11 (plan items 1-5 implemented) | tracker rev 51.13 | change log through 2026-09-11 night (plan items 1-5, committed cb8e170..dc7f707, 19 commits) | `dev_v1.9.2` @ dc7f707 (98 one-file commits e8f80e3..HEAD, not pushed; origin/main has c8dae7a, notebook only, not yet merged) |
 > GitHub 138 open · 12 PRs · 0 labels applied · new #416 #417 #418 #419. Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
 > (updated in place; never a second page). Rule: a session that changes the pack, this file or the change
 > log brings the other two to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
+
+---
+
+## 2026-09-11 (night) — implementation to the stable release: items 1 to 5 of the plan
+
+Owner typed authorisation on 2026-09-11: "yes I want you to implement the plan"
+(`docs/plans/V192_STABLE_RELEASE_IMPLEMENTATION_PLAN.md`). Items 1-5 landed as 21 one-file commits
+`cb8e170..dc7f707`. Items 7 (merge origin/main), 8 (his own runs) and 9 (release mechanics) are not
+done. Nothing pushed, nothing posted.
+
+### Item 1 (B1) — the installer ships faster-whisper, and a failed core check ends the install
+
+**Mechanism of the blocker, re-read this session.** `installer/build_release.py:193-195` (core) and
+`:198-205` (extras) drop every dependency whose spec contains `git+` or `@` when generating
+`requirements_v{VERSION}.txt`. `pyproject.toml:82` pins faster-whisper to
+`git+https://github.com/SYSTRAN/faster-whisper.git@ed9a06cd89a93e47838f564998a6c09b655d7f43`, so it
+was filtered out; `installer/templates/post_install.py.template` Phase 3.5 listed only
+openai-whisper, stable-ts, ffmpeg-python and clearvoice; and Phase 5 installs the wheel `--no-deps`.
+Nothing installed faster-whisper. Affects Balanced, Fast (stable-ts `turbo_mode=True`), Faster and
+Kotoba — not Fidelity.
+
+- **Phase 3.5 now installs the pinned faster-whisper** (`post_install.py.template`, after stable-ts),
+  `--no-deps` like its neighbours. Safe: faster-whisper needs CTranslate2 at run time only, and
+  Phase 4 installs `ctranslate2==4.8.1` from the generated requirements. Proved by the adversary
+  with the bundled `installer/generated/uv.exe` (uv 0.9.26) against a throwaway venv:
+  `uv pip install --no-deps --dry-run "faster-whisper @ git+…@ed9a06c…"` → `Resolved 1 package`.
+  uv accepts the 40-character SHA in PEP 508 direct-reference form.
+- **Phase 6 now ends the install when a core check fails** (owner decision, 2026-09-11: fail
+  loudly). `run_post_install_verification()` returns a fourth value, the list of failed checks;
+  `main()` logs them, writes `INSTALLATION_FAILED_v{VERSION}.txt` naming them, and returns 1.
+  Optional packages (llama-cpp-python, ClearVoice, Transformers) remain warnings.
+- **A check that TIMED OUT is not a failure.** Added after the adversary raised it as a
+  severity-increasing risk this work created. Every core check is a 120 s subprocess; commit
+  `63936e1` raised that limit from 30 s with the message "The 30s timeout caused false failures
+  during standalone installer verification". Until this change a false fire cost one `✗` line; it
+  would now abort an install. `verify_import()` reports a timeout as its own outcome and all three
+  callers record it as a warning.
+- **Fallback requirements template** (`requirements.txt.template`): stale `faster-whisper>=1.1.0`
+  removed (a different build from the pinned commit — older Silero weights), `ctranslate2==4.8.1`
+  added. This is the path taken only when pyproject.toml cannot be parsed; it did **not** fix B1.
+  It does turn `tests/test_dependency_cross_match.py::test_template_matches_registry` green.
+- **`build_release.py` no longer replaces the caller's stdout on import** (the wrapping now happens
+  only under `__name__ == "__main__"`). It had made the generator untestable: importing it inside
+  pytest failed with "I/O operation on closed file".
+- Comment corrections: the generated requirements header now lists faster-whisper;
+  `registry.py:438` notes that the installer installs ctranslate2 *after* faster-whisper, which is
+  safe only because Phase 3.5 passes `--no-deps`.
+
+**⛔ Not fixed, and an owner decision (A4).** The `.exe` still finishes green. conda-constructor's
+`constructor/nsis/_nsis.py:197-221` discards the post-install exit code unless the environment
+variable `NSIS_SCRIPTS_RAISE_ERRORS` is set, and nothing in `installer/` sets it; the NSIS section
+then continues and still creates the desktop shortcut (`custom_template_v1.9.2.nsi.tmpl:1697`).
+What a user with a broken install sees today: `INSTALLATION FAILED` scrolling through the details
+list, a 60-second pause, `INSTALLATION_FAILED_v1.9.2.txt` in `%LOCALAPPDATA%\WhisperJAV` that
+nothing points them to, then the normal completion page and a desktop shortcut. Options for the
+owner: set `NSIS_SCRIPTS_RAISE_ERRORS`, and/or gate the shortcut block on the absence of the marker
+file. Neither implemented.
+
+**Tests.** `tests/test_installer_comprehensive.py`: faster-whisper added to the required list;
+`test_git_packages_in_template` rewritten to parse the `git_packages` block (it searched the whole
+file, so a name in a comment satisfied it — proved by deleting the entry and watching it stay
+green); `test_git_packages_after_pytorch` fixed (it matched "Phase 3.5" in a CUDA comment 2,000
+lines above "Phase 3: PyTorch" and had been red since March for an unrelated reason); new
+`test_every_git_dependency_is_installed_by_phase_35` (set equality, both directions, on exact spec
+strings) and `test_failed_core_check_ends_the_install`. New
+`tests/test_post_install_verification_v192.py` (14 tests) execs the template as a module and calls
+`run_post_install_verification()` with the import check replaced — what the function decides, not
+what the file contains. New `tests/test_dependency_drift_v192.py` (8 tests) ties pyproject,
+registry, the fallback template and **the generated list** together; the last three call the
+generator directly, closing the gap the adversary found (removing `ctranslate2` from pyproject.toml
+had slipped past every other new test).
+
+Every new test was mutation-checked: the guarded condition was broken and the test confirmed red.
+
+**Verification run.** `pytest tests/test_installer_comprehensive.py tests/test_dependency_cross_match.py
+tests/test_dependency_drift_v192.py` → 140 passed, 4 failed, all four dev-environment noise (numpy
+1.26 installed against a `>=2.0.0` pin; `pip check` reports ~12 unrelated conflicts in the WJ env).
+`test_template_matches_registry` went green as predicted. `python installer/build_release.py --clean`
+then `python installer/build_release.py`: validation passed; `installer/generated/requirements_v1.9.2.txt`
+= 71 dependency lines, `ctranslate2==4.8.1` present, no faster-whisper; `post_install_v1.9.2.py`
+carries the Phase 3.5 entry and the Phase 6 branch and passes `py_compile`.
+`whisperjav/__version__.py` regenerated identically (no diff).
+
+**NOT DONE:** no `.exe` built, no install run. The faster-whisper arm is proved as a uv resolution,
+not as an executed install (item 8 is the owner's). `installer/generated/` is gitignored, so none of
+this exists as a built artifact in the commits — **the build must be `--clean` first**, or
+constructor packages whatever `post_install_v1.9.2.py` is already in `generated/`, which on a
+machine that built before today is the version without faster-whisper.
+
+### Item 2 — Fidelity scene floor 28 s at every sensitivity
+
+Owner decision, 2026-09-11. `whisperjav/config/legacy.py` fidelity `scene_overrides["semantic"]`
+gains `"scene_detection.min_duration": 28.0` beside the 240 s ceiling, replacing the presets'
+30/20/10 s. Only semantic: on auditok `min_duration` DISCARDS a shorter region rather than merging
+it, so the same floor there would lose speech. Comment in
+`config/components/features/scene_detection.py` corrected (it said fidelity replaces the ceiling
+only). Evidence: SNOS-388 (116 min), 2026-09-11 — Fidelity/aggressive/WhisperSeg cut 252 scenes,
+187 under 30 s; a scene under 30 s cost 0.36 s per audio-second against 0.12 for one over 120 s;
+47% of the audio took 64% of the pass.
+
+Verified with `--dump-params`: fidelity now 28.0/240.0 at conservative, balanced and aggressive
+(was 30/240, 20/240, 10/240); balanced unchanged 28/240; fast unchanged 30/420, 20/420, 10/180;
+fidelity on auditok unchanged (different parameter names, override keyed on `semantic`).
+`tests/test_scene_clustering_threshold_v192.py` and `tests/test_balanced_defaults_v192.py` updated
+and green (18 and 25 tests).
+
+### Item 3 — progress lines on the Japanese post-processing path (#372)
+
+Owner decision, 2026-09-11: yes, at INFO. `subtitle_sanitizer.py` `process()` prints a line at each
+file operation — reading the stitched file, saving the untouched copy, writing the cleaned file,
+writing the artifacts file — and the closing `Sanitization complete` DEBUG line becomes
+`Post-processing: cleaned N subtitles down to M in X.XXs` at INFO. `srt_postprocessing.py`
+`_process_cjk` announces the non-linguistic filter before and after with its count; that filter's
+own INFO line only printed when it dropped something, so a file where it dropped nothing went
+silent at the very end.
+
+The near-identical `_process_with_validation()` (`subtitle_sanitizer.py:385`) is **not called from
+anywhere in the project** (grep: only its own definition and the stale `build/lib/` copy). It was
+therefore NOT given the lines — they would never print — and its docstring now records that it is
+unreachable, and that deleting it would also orphan `_process_phase1_refactored`,
+`_process_phase2_with_validation`, `_log_phase1_results` and `_log_hallucination_database_info`.
+Removing it is a 1.9.3 question for the owner.
+
+Verified on a real run, not only by test: Balanced on
+`test_media/Othere_test_media/293sec-S01E04-scene4_extracted.wav`, exit 0, all seven lines on the
+console at INFO in work order, 26 subtitles — the same count as the readiness run recorded for this
+clip. New `tests/test_postprocessing_stage_logging_v192.py` (5 tests) attaches its own handler
+because the `whisperjav` logger sets `propagate = False`, so caplog sees nothing from it.
+
+### Item 4 — the ensemble sensitivity rule kept, and stated
+
+Owner decision, 2026-09-11: keep. `whisperjav/ensemble/safety_caps.py` rule
+`fid_bal_aggressive_downgrade` (pass 1 fidelity + pass 2 balanced + aggressive → balanced) — its
+`rationale` text ended "Whether this cap should still fire is an open question for the owner", and
+that text is **printed to the user** when the rule fires. Replaced with the decision, its date, why
+it stands (the failure was measured; nothing has measured that removing it is safe) and what to do
+instead (run the aggressive pass on its own). Behaviour unchanged.
+
+Confirmed the downgrade is already announced: `apply_ensemble_safety_caps` logs at WARNING, and
+both call sites (`main.py:2785`, `:2989`) pass `logger=logger`. No new line needed.
+
+The rule had **no test at all** — the plan pointed at `tests/test_hardening.py::test_has_safety_caps`
+(`:532`), which is about the stable-ts `REGROUP_VAD_ONLY` string and unrelated. New
+`tests/test_ensemble_safety_cap_v192.py` (13 tests): fires for that one shape; leaves six
+neighbouring shapes alone, including the Balanced→Balanced shape both of the owner's acceptance runs
+used; does not mutate the caller's dict; changes nothing but the sensitivity; announces at WARNING,
+falling back to stderr without a logger; single-pass ensemble untouched; exactly one rule active;
+the user-facing text records a decision rather than a doubt.
+
+### Item 5 — the compression-ratio limit: notes only, no code (owner decision: no gate)
+
+Established by reading both recognisers: `whisper/transcribe.py:184-224` `decode_with_fallback` uses
+`compression_ratio_threshold` only to set `needs_fallback`; `faster_whisper/transcribe.py:1479-1530`
+`generate_with_fallback` keeps the result (`below_cr_threshold_results or all_results`). With
+`temperature=[0.0]` on every sensitivity since this release, the loop runs once and the result is
+kept: **the limit no longer rejects anything.** Repetition loops are removed afterwards by the
+sanitizer (SNOS-388: all 66 removed, listed in `.artifacts.srt`). Stated in the release notes, in
+the temperature entry and cross-referenced from the "Aggressive is retuned" entry, which described
+the 2.2 value as "a stricter repetition check" without saying it is inert. Preset value left alone.
+
+### Item 6 — release notes
+
+Added: the compression-ratio paragraph (item 5); the Fidelity floor, with the SNOS-388 numbers and
+the reason auditok is excluded; the ensemble rule paragraph (item 4); two known limitations — the
+Transcription tab has no Silero version control (Ensemble tab and the command line do), and Kaggle
+(#329, #330) moves to a release after this one. Corrected: the changelog table row of 2026-09-11
+said Fidelity's floors were unchanged. The status line still says "in development" — it becomes a
+release status at tagging time, which is item 9 and the owner's.
+
+**Reply drafts for #329/#330 and the recipe threads are NOT written yet** (item 6 of the plan, second
+half); they belong in `docs/ISSUE_TRACKER_v1.9.x.md` and are posted only after release, per thread,
+on the owner's approval.
 
 ---
 
