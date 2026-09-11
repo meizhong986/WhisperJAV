@@ -8,10 +8,102 @@
 > Conventions: one entry per landed change, newest first. "Decision" lines
 > record who decided what, so a later reader can tell policy from mechanism.
 >
-> **SYNC** — pack r3.8 · 2026-09-11 night | tracker rev **52.0** | change log through 2026-09-11 night | `dev_v1.9.2` @ `14ae1f3`, 168 ahead of `origin/main` @ `c8dae7a`; origin/main merged in. Nothing pushed, nothing posted. (Counts measured 2026-09-11, at the parent of the commit carrying this line.)
+> **SYNC** — pack r3.8 · 2026-09-11 night | tracker rev **52.0** | change log through 2026-09-11 night | `dev_v1.9.2` @ `148259b`, 169 ahead of `origin/main` @ `c8dae7a`; origin/main merged in. Nothing pushed, nothing posted. (Counts measured 2026-09-11, at the parent of the commit carrying this line.)
 > GitHub 138 open · 12 PRs · 0 labels applied · new #416 #417 #418 #419. Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
 > (updated in place; never a second page). Rule: a session that changes the pack, this file or the change
 > log brings the other two to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
+
+---
+
+## 2026-09-11 (night, last) — the backlog review corrected after an adversary pass
+
+The adversary was run on the ranking and the readiness verdict before either reached the owner
+(rule A6). It refuted a great deal of it. Every finding below was verified against the thread, the
+code or git before being acted on; the review, the tracker and this file now carry the corrected
+figures, and the review states the corrections in its own method section so the first draft cannot be
+quoted back.
+
+### The error that would have reached a user
+
+**#287 was recorded FIXED and I recommended telling the reporter so.** Wrong three ways, all of it
+already in the repository:
+
+- the rule credited with fixing it was added **for this very issue** in v1.8.11 —
+  `whisperjav/modules/subtitle_sanitizer.py:965`, whose comment names `'!!'` explicitly;
+- the maintainer announced that rule on the thread and asked for a retest, and zoqapopita93 replied
+  "sorry, the same";
+- `docs/release_notes_v1.9.2.md:52` says the Whisper pipelines are unchanged because their sanitizer
+  already handled this — so if he ran Balanced, Fast or Faster, nothing reaches him at all;
+- and in the one pipeline where the new filter *would* reach him, dropping every punctuation-only line
+  turns his wrong output into a 0-byte file. That is not a fix.
+
+Recorded UNTOUCHED. This is the failure the adversary gate exists for: an inference dressed as a
+completion claim, contradicting an investigation the project had already recorded.
+
+### The recommendation that would have broken a standing rule
+
+**Close #339 was wrong.** Its reporter, cbl19961214-sudo, never came back. The confirmation on that
+thread is SangenBR — a different user, a different target language. The release notes state this
+correctly ("as did @SangenBR on #339"); I misread it as the reporter. Closing it would have violated
+the "no closing a shipped-fix issue without a reporter retest" rule, and the review's own #347 row
+holds the evidence that the Chinese-target case still fails. Only #397 is closeable on its reporter's
+word — plus #320 and #337, both of which turned out to be resolved on their threads already.
+
+### The shipping argument was built on something that is not true
+
+I wrote that the current installer "hands your primary user a program that cannot transcribe… every
+day this sits unreleased, that is what a new user gets." **False.** `git show v1.9.0:pyproject.toml`
+line 72 is `faster-whisper>=1.1.0` — a plain version, which passes the generator's filter at
+`installer/build_release.py:199,209` and lands in the requirements file. No released installer has
+ever shipped without faster-whisper. The breakage is a regression introduced inside this cycle when
+the pin became a git commit. That is a real reason to fix it and no reason to hurry, and the verdict
+now says so.
+
+### The risk that was under-weighted, pointing the other way
+
+**#414.** `whisperjav/config/resolver_v3.py:188-193` forces `float16` on Blackwell (RTX 50), and
+`:334` discards `--compute-type auto`. yyyanlei measured on **CTranslate2 4.8.1, the exact version this
+release pins**: float16 gave 0 segments on six consecutive runs of a 196 s clip; int8_float16 and int8
+gave a stable 62. This release also moves Balanced onto faster-whisper's built-in VAD. Building this
+installer may hand every buyer of a current-generation NVIDIA card a program that installs perfectly
+and produces almost nothing on the default mode. It is now recommendation 2: check it before shipping,
+an hour's work or one comment asking him to re-run.
+
+### Severity was being judged from the code's seat
+
+Nine of about twenty sampled severities were wrong or stale. Two systematic causes, both fixed:
+
+1. **Feature requests were graded BLOCKED.** A thing that has never existed is an unmet want, not a
+   user blocked by a defect — #114, #213, #239, #319 and #142 can all transcribe on the CPU. Regraded
+   DEGRADED.
+2. **"You owe a reply" was computed from the last comment's author, not its content.** #320's last
+   word is "this failure doesn't appear now"; #99's is a thank-you. Both were counted as neglected
+   users and both were in the start-here list.
+
+Plus rows where the maintainer had already answered and I had not read it: #317 (proxy answered and in
+the v1.8.14 FAQ), #337 (README rewritten), #324 (the filter half fixed in v1.8.14 and
+reporter-confirmed; what remains is Korean recall), #403 and #406 (both answered, no user reply).
+
+### Corrected figures
+
+| | First draft | Corrected |
+|---|---:|---:|
+| BLOCKED | 44 | **33** |
+| DEGRADED | 27 | 37 |
+| FIXED by v1.9.2 | 12 | **9** |
+| Owed replies | 41 | 39 |
+| …over 100 days | 16 | 14 |
+
+Also now stated in both documents: group totals are a floor, because an issue is tabled under its
+first group tag only (all tags give WIN-GPU 68 not 59, CHINA 9 not 6, LAPTOP 6 not 1, SOURCE 11 not
+3); and 35 of the 60 release verdicts are inferred rather than claimed by the notes.
+
+**Findings I checked and did not adopt as stated:** the adversary called the whole ranking method
+"presentation, not judgement" because severity is a hand-typed constant. That is true and is now
+stated in the method section, but the sort still does useful work once the constants are right — the
+correction moved China's first problem from #317 to #284, which is what it argued the answer should
+be. It also read #324 as stale; the filter half is, but the reporter is actively testing the Korean
+recall problem and is owed a reply, so it stays open and blocking with a corrected description.
 
 ---
 
@@ -51,11 +143,11 @@ it drifted to a four-week-old "134 open" against a real 139.
 | **BLOCKED** (cannot install, cannot get subtitles, cannot use the feature) | **44** |
 | DEGRADED | 27 |
 | ANNOYED / INFO | 44 / 24 |
-| You owe a reply | **41**, of which **16 have waited over 100 days** (oldest 303, #43) |
+| You owe a reply | **39**, of which **14 over 100 days** (oldest 303, #43) |
 | Never received any reply | **6** — down from 62 |
 | Labels applied | **0** of nine that exist |
 
-v1.9.2 against those 139: **11 FIXED, 20 PARTIAL, 10 MITIGATED, 19 CHANGED, 2 WORSE, 77 UNTOUCHED.**
+v1.9.2 against those 139: **9 FIXED, 20 PARTIAL, 10 MITIGATED, 19 CHANGED, 2 WORSE, 79 UNTOUCHED.** (Corrected after the adversary pass — see the entry above.)
 v1.9.0 touched 28 of 134 with 6 rated likely or better, so the ratio is better — but two things matter
 more than the count. 19 of the 62 touched take something away rather than give it. And **37 of the 62
 are marked (inferred)**: the notes do not name that issue, so the verdict is a reading of what the
