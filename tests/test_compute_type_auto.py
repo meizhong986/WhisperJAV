@@ -6,13 +6,18 @@ Tests the device-aware compute_type selection implemented in:
 - whisperjav/config/resolver_v3.py  (primary logic)
 - whisperjav/modules/faster_whisper_pro_asr.py  (safety net)
 
-v1.8.9-hotfix2 changes:
-- CTranslate2 providers on CUDA: "float16" (was "auto") for best accuracy
-- CTranslate2 providers on non-CUDA: "auto" (lets CTranslate2 pick for device)
-- Pascal exception (sm_6x): "float32" (conservative, no tensor cores)
-- Blackwell exception (sm_120+): "float16" (CTranslate2 auto bug)
+v1.9.2 changes (owner decision, 2026-09-11):
+- CTranslate2 on Blackwell (sm_120+, RTX 50): "auto" -- CTranslate2 picks, which is
+  int8_float16 there. The float16 these cards used to be forced onto is what garbles
+  their output (issue #414)
+- CTranslate2 on every other CUDA GPU (Turing, Ampere, Ada): "float16", unchanged.
+  "auto" there is a wash on accuracy but 14-30% slower, 32% on JAV audio
+- CTranslate2 providers on non-CUDA: "auto" (unchanged)
+- Pascal exception (sm_6x): "float32" -- kept. CTranslate2 raises ValueError for an
+  explicitly requested float16 there; that crash is issue #123 (Quadro P620)
+- PyTorch providers (openai_whisper, stable_ts): unchanged, float16/float32
 - Safety net: float16 on CPU → auto (catches MPS→CPU downgrade)
-- See: https://github.com/meizhong986/WhisperJAV/issues/241
+- See: https://github.com/meizhong986/WhisperJAV/issues/241 and .../issues/414
 
 Run with: pytest tests/test_compute_type_auto.py -v
 """
@@ -29,7 +34,13 @@ class TestResolverComputeType:
     """Tests for resolver_v3.py compute_type selection."""
 
     def test_ctranslate2_cuda_returns_float16(self):
-        """CTranslate2 providers on CUDA (normal GPU) return 'float16'."""
+        """Turing, Ampere and Ada CUDA GPUs stay on 'float16'.
+
+        Owner decision 2026-09-11: 'auto' loads int8_float16 on these cards, which
+        was measured as a wash on accuracy (CER difference +0.012, 95% CI crossing
+        zero) but 14-30% slower on the scored clips and 32% slower on JAV audio.
+        The largest user group keeps its speed; only Blackwell switches.
+        """
         from whisperjav.config.resolver_v3 import _get_compute_type_for_device
 
         with patch('whisperjav.config.resolver_v3._is_pascal_gpu', return_value=False), \
@@ -55,14 +66,21 @@ class TestResolverComputeType:
             assert _get_compute_type_for_device("cuda", "faster_whisper") == "float32"
             assert _get_compute_type_for_device("cuda", "kotoba_faster_whisper") == "float32"
 
-    def test_ctranslate2_cuda_blackwell_returns_float16(self):
-        """CTranslate2 on Blackwell GPU (sm_120+) returns 'float16'."""
+    def test_ctranslate2_cuda_blackwell_returns_auto(self):
+        """CTranslate2 on Blackwell (RTX 50, sm_120+) returns 'auto' like any other GPU.
+
+        Until v1.9.2 these cards were forced to float16 to dodge a CTranslate2
+        crash (issue #113). CTranslate2 disabled int8 for sm_120 in 4.6.2 and it
+        works again in the 4.8.1 this release pins, which the reporter of issue
+        #414 confirmed on an RTX 5070 -- where the forced float16 was itself
+        producing garbled windows and almost no subtitles.
+        """
         from whisperjav.config.resolver_v3 import _get_compute_type_for_device
 
         with patch('whisperjav.config.resolver_v3._is_pascal_gpu', return_value=False), \
              patch('whisperjav.config.resolver_v3._is_blackwell_gpu', return_value=True):
-            assert _get_compute_type_for_device("cuda", "faster_whisper") == "float16"
-            assert _get_compute_type_for_device("cuda", "kotoba_faster_whisper") == "float16"
+            assert _get_compute_type_for_device("cuda", "faster_whisper") == "auto"
+            assert _get_compute_type_for_device("cuda", "kotoba_faster_whisper") == "auto"
 
     def test_pytorch_providers_return_explicit_types(self):
         """PyTorch providers get explicit float16/float32 based on device."""
@@ -98,7 +116,7 @@ class TestResolverIntegration:
             yield mock
 
     def test_resolve_config_faster_whisper_cuda(self, mock_device_detector):
-        """faster_whisper on CUDA gets compute_type='float16'."""
+        """faster_whisper on a non-Pascal CUDA GPU gets compute_type='auto'."""
         mock_device_detector.return_value = "cuda"
 
         with patch('whisperjav.config.resolver_v3.get_asr_registry') as mock_asr, \
@@ -156,7 +174,7 @@ class TestFasterWhisperProASR:
         pass  # Tested via integration tests
 
     def test_cuda_default_is_float16(self):
-        """Default compute_type for CUDA is 'float16'."""
+        """Default compute_type for a Turing/Ampere/Ada CUDA GPU is 'float16'."""
         from whisperjav.config.resolver_v3 import _get_compute_type_for_device
 
         with patch('whisperjav.config.resolver_v3._is_pascal_gpu', return_value=False), \
@@ -173,7 +191,7 @@ class TestKotobaFasterWhisperASR:
     """Tests for KotobaFasterWhisperASR compute_type handling."""
 
     def test_cuda_default_is_float16(self):
-        """Default compute_type for CUDA is 'float16'."""
+        """Default compute_type for a Turing/Ampere/Ada CUDA GPU is 'float16'."""
         from whisperjav.config.resolver_v3 import _get_compute_type_for_device
 
         with patch('whisperjav.config.resolver_v3._is_pascal_gpu', return_value=False), \
@@ -432,11 +450,11 @@ class TestCLIDeviceOverride:
                 compute_type="auto",  # "auto" = use device-aware default
             )
 
-            # "auto" is treated same as None → device-aware default (float16 on CUDA)
+            # "auto" falls through to the device-aware default: float16 on these cards
             assert config["model"]["compute_type"] == "float16"
 
     def test_compute_type_none_uses_device_aware_default(self, mock_registries):
-        """compute_type=None uses device-aware default (float16 on CUDA)."""
+        """compute_type=None uses the device-aware default, float16 on a non-Blackwell CUDA GPU."""
         with patch('whisperjav.config.resolver_v3.get_best_device', return_value="cuda"), \
              patch('whisperjav.config.resolver_v3._is_pascal_gpu', return_value=False), \
              patch('whisperjav.config.resolver_v3._is_blackwell_gpu', return_value=False):
