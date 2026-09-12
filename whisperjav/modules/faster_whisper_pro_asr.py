@@ -392,7 +392,7 @@ class FasterWhisperProASR:
         """
         Point the internal FW Silero VAD at the Silero build the user chose.
 
-        ``params["vad"]["version"]`` comes from the FasterWhisperVAD preset (default 3.1,
+        ``params["vad"]["version"]`` comes from the FasterWhisperVAD preset (default 4.0,
         requirement S8) and is overridden by --vad-version, --passN-vad-version or the
         GUI dropdown.
 

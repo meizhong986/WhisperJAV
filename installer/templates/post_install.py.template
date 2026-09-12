@@ -1438,6 +1438,59 @@ def verify_import(module_name: str, display_name: str) -> Tuple[bool, Optional[s
         return False, str(e), False
 
 
+def fetch_firered_vad_model() -> bool:
+    """
+    Download FireRedVAD's weights now, so the first Fidelity run needs no network.
+
+    Runs in the INSTALLED interpreter, not this one, so it uses the environment the
+    user will actually run. It calls WhisperJAV's own resolver, which is the single
+    place that knows the repository, and applies the HuggingFace resilience patch
+    first so this inherits the hf-mirror.com fallback that users in China rely on.
+
+    Returns True on success. A failure is logged and ignored: see the phase comment.
+    """
+    python_exe = os.path.join(sys.prefix, 'python.exe')
+    code = (
+        "from whisperjav.utils.model_loader import patch_hf_hub_downloads; "
+        "patch_hf_hub_downloads(); "
+        "from whisperjav.modules.speech_segmentation.backends.firered_vad "
+        "import ensure_model_downloaded; "
+        "print(ensure_model_downloaded())"
+    )
+    log("Downloading the FireRedVAD speech-detection model (about 2.3 MB)...")
+    log("  Source: https://huggingface.co/FireRedTeam/FireRedVAD (VAD subfolder)")
+    try:
+        result = subprocess.run(
+            [python_exe, "-c", code],
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+    except subprocess.TimeoutExpired:
+        log("  WARNING: the download did not finish within 300s - skipping")
+        log("  WhisperJAV will fetch it at the start of the first Fidelity run.")
+        return False
+    except Exception as e:
+        log(f"  WARNING: could not run the download step: {e}")
+        return False
+
+    if result.returncode == 0:
+        location = (result.stdout or "").strip().splitlines()
+        log(f"  OK Model ready: {location[-1] if location else 'downloaded'}")
+        return True
+
+    detail = (result.stderr or "").strip().splitlines()
+    log(f"  WARNING: the model was not downloaded: {detail[-1] if detail else 'unknown error'}")
+    log("  This does NOT break the installation. Balanced, Fast and Faster do not")
+    log("  use this model. WhisperJAV will try again at the start of the first")
+    log("  Fidelity run and tell you what to do if it still cannot be fetched.")
+    log("  If this machine cannot reach Hugging Face, download it once elsewhere:")
+    log("    huggingface-cli download FireRedTeam/FireRedVAD --local-dir <folder>")
+    log("    (in China: modelscope download --model xukaituo/FireRedVAD --local_dir <folder>)")
+    log("  then set WHISPERJAV_FIREREDVAD_MODEL_DIR to that folder.")
+    return False
+
+
 def run_post_install_verification() -> Tuple[int, int, list, list]:
     """
     Phase 6: Post-install verification.
@@ -2796,6 +2849,23 @@ def main() -> int:
     # === Phase 5.5: Copy Launcher to Root ===
     log_section("Phase 5.5: User-Friendly Launcher Setup")
     launcher_exe = copy_launcher_to_root()
+
+    # === Phase 5.6: Speech Detection Model ===
+    #
+    # WHY THIS IS AT INSTALL TIME (owner, 2026-09-12).
+    # The Fidelity pipeline finds speech with FireRedVAD. The pip package holds the
+    # code only -- upstream's README is explicit that the weights are a separate
+    # download. Fetching them on first run means a user behind a firewall needs their
+    # proxy up when they transcribe; fetching them here means they need it once, now,
+    # while they are already installing over the network. It is ~2.3 MB.
+    #
+    # NOT FATAL. A user who only runs Balanced never needs this model, and WhisperJAV
+    # checks for it again at the start of any run that does need it, stopping there
+    # with instructions. Failing the whole install over an optional 2.3 MB file would
+    # be the opposite of the "a failure that breaks the user's core use stops the
+    # install" rule -- this breaks nothing at install time.
+    log_section("Phase 5.6: Speech Detection Model (FireRedVAD)")
+    fetch_firered_vad_model()
 
     # === Phase 5.8: Verify Icon File ===
     log_section("Phase 5.8: Icon File Verification")

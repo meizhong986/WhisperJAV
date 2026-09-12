@@ -47,6 +47,10 @@ SEGMENTER_PARAMS = {
     # FireRedVAD-specific (v1.9.0)
     "smooth_window_size",
     "use_gpu",
+    # FireRedVAD model directory (2026-09-12). Here so a model_dir set in the
+    # segmenter config survives resolve_segmenter_sensitivity, which drops every
+    # key not in this set.
+    "model_dir",
 }
 
 # Backend name → YAML tool name mapping for ConfigManager.get_tool_config()
@@ -78,6 +82,38 @@ SEGMENTER_TOOL_NAMES = {
 # (--vad-version). The other pipelines are unaffected.
 BALANCED_DEFAULT_SEGMENTER = "faster-whisper"
 
+# The Fidelity pipeline's default speech segmenter (owner, 2026-09-12).
+#
+# Before this, the two entry points disagreed: `--mode fidelity` (and the GUI
+# Transcription tab, which sends no --speech-segmenter) fell through main.py's
+# else-branch to silero-v3.1, while an --ensemble fidelity pass with no explicit
+# segmenter left params["speech_segmenter"] unset and landed on WhisperProASR's
+# own "whisperseg" fallback. Single-sourced here and read by main.py,
+# ensemble/pass_worker.py and modules/whisper_pro_asr.py so they cannot drift;
+# the GUI Ensemble tab carries its own copy in assets/app.js
+# (applyPipelinePresets, the `pipeline === 'fidelity'` branch).
+#
+# fireredvad ships with the [cli] extra since v1.9.2, so this default needs no
+# extra install; its model weights download from HuggingFace on first use.
+FIDELITY_DEFAULT_SEGMENTER = "firered-vad"
+
+# Non-Silero segmenters that main.py must NOT downgrade on a single-pass run.
+#
+# main.py's routing guard sends every non-Silero backend back to silero-v3.1 on a
+# single-pass mode, because that path used not to resolve a segmenter's
+# per-sensitivity preset -- whisperseg then ran with its own 29 s
+# max_group_duration_s and triggered the Whisper repetition pathology on JAV
+# audio. v1.9.2 added that resolution to the single-pass path
+# (main.py, "resolve the backend's per-sensitivity YAML preset on the
+# single-pass path too"), and firered-vad's tool YAML carries a complete set of
+# grouping params (chunk_threshold_s, max_group_duration_s) in its spec AND in
+# all three sensitivity presets, so it reaches the segmenter fully configured.
+# Only backends verified to be in that state belong here, and only for the mode
+# they were verified on: keyed by --mode, because `fast` and `faster` run
+# stable_ts with no speech segmenter at all (config/legacy.py: "vad": "none"), so
+# exempting them buys nothing and costs a run stopped over a model they never load.
+SINGLE_PASS_EXTERNAL_OK = {"fidelity": frozenset({"firered-vad"})}
+
 # The default SCENE detector for every scene-detecting legacy pipeline (v1.9.2).
 #
 # The owner approved this flip on 2026-04-20 for v1.8.12; the CLI half was never
@@ -97,6 +133,57 @@ DEFAULT_SCENE_DETECTOR = "semantic"
 # 2026-09-09) supersede that: balanced runs faster-whisper's built-in VAD and
 # accepts no --speech-segmenter at all, so the exemption became unreachable.
 # Both backends remain fully available through --ensemble and --mode fidelity.
+
+
+def effective_segmenter_for_pass(
+    pipeline: Optional[str],
+    speech_segmenter: Optional[str],
+) -> Optional[str]:
+    """
+    The speech segmenter a pass will actually run, given its pipeline and whatever
+    the user asked for (which is usually nothing).
+
+    ONE rule, used by ensemble/pass_worker.py when it resolves the pass and by
+    main.py's start-up check when it decides whether a model has to be fetched
+    before the run. Those two answering differently is how a start-up check ends up
+    guarding a segmenter the run does not use -- or missing the one it does.
+
+    Balanced ignores the request entirely (v1.9.2, S2/S9: no external segmenter
+    exists there). Fidelity falls back to FireRedVAD. Everything else takes what it
+    was given, including None, which leaves the decision to the ASR module.
+    """
+    if pipeline == "balanced":
+        return BALANCED_DEFAULT_SEGMENTER
+    if pipeline == "fidelity" and not speech_segmenter:
+        return FIDELITY_DEFAULT_SEGMENTER
+    return speech_segmenter
+
+
+def segmenter_accepts(segmenter_backend: Optional[str], param_name: str) -> bool:
+    """
+    True if ``param_name`` actually reaches ``segmenter_backend``.
+
+    The segmenter factory strips any parameter that is not in the backend's own
+    schema (``speech_segmentation/factory.py``, the foreign-key gate), and it does so
+    at DEBUG level. A caller that has just told the user "setting applied" needs to
+    know whether that is true. ``speech_pad_ms`` is the live case: every Silero
+    backend takes it, firered-vad and ten do not -- they pad with start_pad_ms /
+    end_pad_ms instead.
+
+    Fails OPEN. An unknown backend, or one that is not an external segmenter at all
+    ("faster-whisper" = the recogniser's built-in VAD, "none" = no segmentation),
+    returns True, so a caller never warns about something it could not check.
+    """
+    if not segmenter_backend or segmenter_backend in ("none", "faster-whisper"):
+        return True
+    try:
+        from whisperjav.modules.speech_segmentation.factory import _PARAM_SCHEMAS
+    except Exception:  # pragma: no cover - defensive
+        return True
+    schema = _PARAM_SCHEMAS.get(segmenter_backend)
+    if schema is None:
+        return True
+    return param_name in schema
 
 
 def resolve_segmenter_sensitivity(

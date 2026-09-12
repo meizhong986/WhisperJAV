@@ -38,7 +38,7 @@ Start WhisperJAV transcription process.
     async_processing: false,
 
     // VAD (balanced): which Silero build the built-in VAD runs (v1.9.2)
-    vad_version: '3.1',                    // '3.1' | '4.0' | '6.2'; balanced only
+    vad_version: '4.0',                    // '3.1' | '4.0' | '6.2'; balanced only
 
     // Model override
     model_override: 'large-v3',           // 'large-v3' | 'large-v2' | 'turbo'

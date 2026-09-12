@@ -21,10 +21,19 @@ The vocabulary
              does not exist
 ``skipped``  nothing was attempted: the output already existed
 
-Coverage is reported alongside the state as ``ok``, ``low`` or
+Mileage is reported alongside the state as ``ok``, ``low`` or
 ``not assessed`` (unknown duration, media shorter than the assessable minimum,
 or an execution path where the check cannot run). "Not assessed" is printed;
 it is never left to mean "fine".
+
+MILEAGE is the printed heading (owner, 2026-09-12; it read COVERAGE before).
+The percentage beside the word is how far into the file the subtitles reach --
+the end of the last cue divided by the media duration -- NOT the share of the
+file that carries subtitles. A two-hour film whose subtitles stop at seven
+minutes reads 6%; one with a line at the start, a line at the end and silence
+between reads ~100%. The ``coverage`` field in the JSON manifest and the
+``--min-coverage`` flag keep their names: they are a parsing and a scripting
+contract, and renaming them would break both.
 
 The contract
 ------------
@@ -316,7 +325,12 @@ def format_summary(outcomes: Sequence[FileOutcome], fail_on: Iterable[str],
     lines.append(bar)
     if note:
         lines.append(note)
-    lines.append(f"{'STATE':<8} {'COVERAGE':<14} FILE")
+    # MILEAGE, not COVERAGE (owner, 2026-09-12). The number under it is how far
+    # into the file the subtitles reach -- the end of the LAST cue over the media
+    # duration -- not the share of the file that carries subtitles. "Coverage"
+    # promised the second. The JSON manifest keeps its `coverage` field name so
+    # anything parsing it keeps working; only the printed heading changed.
+    lines.append(f"{'STATE':<8} {'MILEAGE':<14} FILE")
     for o in outcomes:
         target = ""
         if o.output and o.state != "skipped":

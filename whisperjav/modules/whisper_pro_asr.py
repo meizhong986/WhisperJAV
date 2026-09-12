@@ -55,14 +55,17 @@ class WhisperProASR:
 
         # Determine speech segmenter backend FIRST (needed for firewall below)
         speech_segmenter_config = params.get("speech_segmenter", {})
-        # v1.8.13: default flipped silero-v3.1 -> whisperseg to align with
-        # LEGACY_PIPELINES["fidelity"]["vad"] = "whisperseg" (resolver-level
-        # default). The fallback only fires when speech_segmenter.backend is
-        # not set (e.g., direct module instantiation bypassing the resolver).
-        # v1.8.12 history: aligned with v3.1 to fix prior silent override to
-        # silero-v4.0 — that alignment is preserved by keeping resolver and
-        # fallback in sync.
-        segmenter_backend = speech_segmenter_config.get("backend", "whisperseg")
+        # This engine runs the fidelity pipeline, so its fallback is fidelity's
+        # default segmenter, shared with main.py and the ensemble pass worker
+        # (owner, 2026-09-12: FireRedVAD). The fallback fires only when
+        # speech_segmenter.backend is not set -- an --ensemble fidelity pass that
+        # names no segmenter, or direct module instantiation that bypasses the
+        # resolver. Before 2026-09-12 it was "whisperseg" (v1.8.13), which is why
+        # ensemble fidelity and `--mode fidelity` used to resolve differently.
+        from whisperjav.config.segmenter_presets import FIDELITY_DEFAULT_SEGMENTER
+        segmenter_backend = speech_segmenter_config.get(
+            "backend", FIDELITY_DEFAULT_SEGMENTER
+        )
 
         # v1.9.0 fix (code-review): 'faster-whisper' means "use faster-whisper's
         # NATIVE VAD" — only FasterWhisperProASR can honor it (it intercepts the
@@ -75,9 +78,9 @@ class WhisperProASR:
             logger.warning(
                 "Speech segmenter 'faster-whisper' (native VAD) is only available "
                 "with the balanced pipeline's Faster-Whisper engine; falling back "
-                "to 'whisperseg' for this pipeline."
+                "to '%s' for this pipeline.", FIDELITY_DEFAULT_SEGMENTER
             )
-            segmenter_backend = "whisperseg"
+            segmenter_backend = FIDELITY_DEFAULT_SEGMENTER
 
         # --- CONSTRUCTOR FIREWALL ---
         # The resolver unconditionally produces Silero VAD presets (threshold=0.068,

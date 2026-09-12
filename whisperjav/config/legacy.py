@@ -99,12 +99,13 @@ LEGACY_PIPELINES = {
         # NOTE: this `vad` field names a VAD Pydantic component (registry has
         # only "silero" — defines the preset values that flow into
         # params["vad"]). It is NOT the runtime speech-segmenter backend
-        # selector. The runtime segmenter default (v1.8.13: whisperseg) is
-        # set in whisper_pro_asr.py / faster_whisper_pro_asr.py fallbacks
-        # and gates params["vad"] via the firewall (clears silero presets
-        # for non-silero runtime backends). Keep this as silero-v3.1 so the
-        # resolver loads the v3.1 preset values; the firewall handles the
-        # rest when whisperseg becomes the runtime default.
+        # selector. The runtime segmenter default is decided by the entry point
+        # (main.py / ensemble/pass_worker.py) from the shared constants in
+        # config/segmenter_presets.py -- balanced: the built-in VAD; fidelity:
+        # firered-vad since 2026-09-12 -- with the ASR modules' own fallbacks
+        # behind them, and gates params["vad"] via the firewall (clears silero
+        # presets for non-silero runtime backends). Keep this as silero-v3.1 so
+        # the resolver loads the v3.1 preset values; the firewall handles the rest.
         "vad": "silero-v3.1",
         "features": ["auditok_scene_detection"],
         # v1.9.2 (owner decision): Balanced scenes are at least 28 s and at most 240 s
@@ -143,7 +144,9 @@ LEGACY_PIPELINES = {
     },
     "fidelity": {
         "asr": "openai_whisper",
-        # See balanced note above — same architecture applies.
+        # See balanced note above — same architecture applies. Fidelity's RUNTIME
+        # segmenter is FIDELITY_DEFAULT_SEGMENTER (firered-vad since 2026-09-12),
+        # not this field.
         "vad": "silero-v3.1",
         "features": ["auditok_scene_detection"],
         # v1.9.2 (owner decision 2026-09-11): Fidelity's semantic scenes are at least 28 s

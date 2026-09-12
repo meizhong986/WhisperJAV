@@ -1279,7 +1279,9 @@ const EnsembleManager = {
             sceneDetector: 'semantic',
             speechEnhancer: 'none',
             speechSegmenter: 'whisperseg',  // v1.9.0: WhisperSeg pairs with anime-whisper
-            vadVersion: '3.1',  // v1.9.2: which Silero build the BUILT-IN VAD runs (balanced only)
+            vadVersion: '4.0',  // v1.9.2: which Silero build the BUILT-IN VAD runs (balanced only).
+                                // Keep in step with defaultVadVersion below and with
+                                // DEFAULT_VAD_VERSION in modules/silero_vad_adapter.py.
             model: 'litagin/anime-whisper',
             customized: false,
             params: null,  // null = use defaults, object = full custom config
@@ -1300,7 +1302,9 @@ const EnsembleManager = {
             sceneDetector: 'semantic',
             speechEnhancer: 'none',
             speechSegmenter: 'ten',  // v1.9.0: TEN VAD on pass 2 for segmentation diversity vs pass 1's WhisperSeg
-            vadVersion: '3.1',  // v1.9.2: which Silero build the BUILT-IN VAD runs (balanced only)
+            vadVersion: '4.0',  // v1.9.2: which Silero build the BUILT-IN VAD runs (balanced only).
+                                // Keep in step with defaultVadVersion below and with
+                                // DEFAULT_VAD_VERSION in modules/silero_vad_adapter.py.
             model: 'Qwen/Qwen3-ASR-1.7B',
             customized: false,
             params: null,
@@ -1765,11 +1769,11 @@ const EnsembleManager = {
     // Order and default come from whisperjav/modules/silero_vad_adapter.py.
     // Labels must match VAD_VERSION_LABELS in whisperjav/modules/silero_vad_adapter.py.
     vadVersionOptions: [
-        { value: '3.1', label: 'Internal FW Silero VAD 3.1 (default)' },
-        { value: '4.0', label: 'Internal FW Silero VAD 4.0' },
+        { value: '3.1', label: 'Internal FW Silero VAD 3.1' },
+        { value: '4.0', label: 'Internal FW Silero VAD 4.0 (default)' },
         { value: '6.2', label: 'Internal FW Silero VAD 6.2 (latest)' },
     ],
-    defaultVadVersion: '3.1',
+    defaultVadVersion: '4.0',
 
     // The external-segmenter option list, captured from index.html the first time a
     // dropdown is swapped, so the markup stays the single source for that list.
@@ -1780,7 +1784,7 @@ const EnsembleManager = {
      *
      * v1.9.2 (S2/S9/S9.1): the balanced pipeline has NO external speech segmenter.
      * It runs faster-whisper's built-in VAD, so for a balanced pass this dropdown
-     * becomes the VAD *version* selector -- Silero 3.1 (default), 4.0, 6.2 and
+     * becomes the VAD *version* selector -- Silero 3.1, 4.0 (default), 6.2 and
      * nothing else. Every other pipeline gets the external list back unchanged.
      * `dataset.mode` tells the change handler, the DOM sync and the availability
      * check which of the two things the select currently means.
@@ -1835,9 +1839,11 @@ const EnsembleManager = {
         const segmenterSelect = document.getElementById(`${passKey}-segmenter`);
         const sensitivitySelect = document.getElementById(`${passKey}-sensitivity`);
 
-        // v1.8.13: WhisperSeg is the system-wide segmenter default. All branches
-        // below set whisperseg as the per-pipeline preset; users can manually
-        // override via the dropdown (e.g., switch to silero-v3.1 for non-JA audio).
+        // v1.8.13: WhisperSeg is the system-wide segmenter default, and most branches
+        // below set it as the per-pipeline preset. Two do not: a Balanced pass has no
+        // external segmenter at all (v1.9.2), and Fidelity uses FireRedVAD
+        // (2026-09-12). Users can override via the dropdown (e.g. switch to
+        // silero-v3.1 for non-JA audio).
         if (pipelineType === 'anime-whisper') {
             // v1.9.0: pass 1 anime-whisper defaults to aggressive — the tuned
             // WhisperSeg row (wide-net capture). Pass 2 keeps balanced.
@@ -1884,17 +1890,23 @@ const EnsembleManager = {
                 // auditok, which silently overrode the new default the moment a user
                 // picked Balanced in the Ensemble tab.
                 // v1.9.2 (S2/S9): balanced offers no external segmenter. The
-                // dropdown becomes the Silero VERSION selector, default 3.1 (S8).
+                // dropdown becomes the Silero VERSION selector, default 4.0
+                // (S8; 4.0 since 2026-09-12, was 3.1).
                 sceneSelect.value = 'semantic';
                 this.state[passKey].sceneDetector = 'semantic';
                 this.state[passKey].speechSegmenter = 'faster-whisper';
                 this.populateSegmenterOptions(passKey);
             } else if (pipeline === 'fidelity') {
-                // v1.8.13: whisperseg + semantic for fidelity (unchanged)
+                // Owner, 2026-09-12: fidelity's default speech segmenter is
+                // FireRedVAD (was whisperseg since v1.8.13). Same default as
+                // `--mode fidelity` and an --ensemble fidelity pass -- keep in step
+                // with FIDELITY_DEFAULT_SEGMENTER in
+                // whisperjav/config/segmenter_presets.py. The option itself is in
+                // index.html for both passes.
                 sceneSelect.value = 'semantic';
-                segmenterSelect.value = 'whisperseg';
+                segmenterSelect.value = 'firered-vad';
                 this.state[passKey].sceneDetector = 'semantic';
-                this.state[passKey].speechSegmenter = 'whisperseg';
+                this.state[passKey].speechSegmenter = 'firered-vad';
             } else {
                 // faster, fast — runtime has vad=none per LEGACY_PIPELINES, but
                 // dropdown still gets the system-wide default for UI consistency
@@ -5295,7 +5307,7 @@ const EnsembleManager = {
             sceneDetector: passState.sceneDetector,
             speechEnhancer: passState.speechEnhancer,
             speechSegmenter: passState.speechSegmenter,
-            vadVersion: passState.vadVersion || '3.1',
+            vadVersion: passState.vadVersion || this.defaultVadVersion,
             model: passState.model,
             customized: true,
             params: params,
@@ -5523,7 +5535,7 @@ const EnsembleManager = {
                 // v1.9.2 (S2): a balanced pass sends NO segmenter -- the CLI rejects
                 // --pass1-speech-segmenter there -- and sends the VAD version instead.
                 speechSegmenter: (disableSegmenter(this.state.pass1) || this.state.pass1.pipeline === 'balanced') ? null : this.state.pass1.speechSegmenter,
-                vadVersion: this.state.pass1.pipeline === 'balanced' ? (this.state.pass1.vadVersion || '3.1') : null,
+                vadVersion: this.state.pass1.pipeline === 'balanced' ? (this.state.pass1.vadVersion || this.defaultVadVersion) : null,
                 model: this.state.pass1.model,
                 customized: this.state.pass1.customized,
                 params: this.state.pass1.customized ? this.state.pass1.params : null,
@@ -5546,7 +5558,7 @@ const EnsembleManager = {
                 // v1.9.2 (S2): a balanced pass sends NO segmenter -- the CLI rejects
                 // --pass2-speech-segmenter there -- and sends the VAD version instead.
                 speechSegmenter: (disableSegmenter(this.state.pass2) || this.state.pass2.pipeline === 'balanced') ? null : this.state.pass2.speechSegmenter,
-                vadVersion: this.state.pass2.pipeline === 'balanced' ? (this.state.pass2.vadVersion || '3.1') : null,
+                vadVersion: this.state.pass2.pipeline === 'balanced' ? (this.state.pass2.vadVersion || this.defaultVadVersion) : null,
                 model: this.state.pass2.model,
                 customized: this.state.pass2.customized,
                 params: this.state.pass2.customized ? this.state.pass2.params : null,

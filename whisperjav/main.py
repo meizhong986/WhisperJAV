@@ -106,12 +106,21 @@ from whisperjav.modules.silero_vad_adapter import DEFAULT_VAD_VERSION, VAD_VERSI
 from whisperjav.config.segmenter_presets import (
     BALANCED_DEFAULT_SEGMENTER,
     DEFAULT_SCENE_DETECTOR,
+    FIDELITY_DEFAULT_SEGMENTER,
+    SINGLE_PASS_EXTERNAL_OK,
+    effective_segmenter_for_pass,
     resolve_segmenter_sensitivity,
+    segmenter_accepts,
 )
 from whisperjav.__version__ import __version__, __version_display__
 
 
-from whisperjav.utils.preflight_check import enforce_gpu_requirement, run_preflight_checks, cpu_consent_in_argv
+from whisperjav.utils.preflight_check import (
+    enforce_gpu_requirement,
+    ensure_segmenter_model_available,
+    run_preflight_checks,
+    cpu_consent_in_argv,
+)
 from whisperjav.utils.progress_aggregator import VerbosityLevel, create_progress_handler
 from whisperjav.utils.async_processor import AsyncPipelineManager, ProcessingStatus
 from whisperjav.utils.parameter_tracer import create_tracer
@@ -425,7 +434,7 @@ def parse_arguments():
     tuning_group.add_argument("--vad-version",
                              type=str,
                              choices=list(VAD_VERSIONS),
-                             default=None,  # None = the preset default (3.1)
+                             default=None,  # None = the preset default (DEFAULT_VAD_VERSION)
                              metavar="VERSION",
                              help=(
                                  "Which Silero VAD build the balanced pipeline's built-in VAD runs: "
@@ -450,9 +459,10 @@ def parse_arguments():
                                  "Speech segmentation backend, for the modes that use an EXTERNAL "
                                  "segmenter. NOT accepted with --mode balanced since v1.9.2: "
                                  "balanced runs faster-whisper's built-in VAD, and which Silero "
-                                 "build it runs is chosen with --vad-version. Defaults: --ensemble "
-                                 "and --mode qwen use whisperseg; other single-pass modes use "
-                                 "silero-v3.1. Choices: "
+                                 "build it runs is chosen with --vad-version. Defaults: --mode fidelity "
+                                 "and a fidelity ensemble pass use firered-vad; --ensemble "
+                                 "and --mode qwen use whisperseg; --mode fast and --mode "
+                                 "faster use silero-v3.1. Choices: "
                                  "firered-vad (FireRedTeam DFSMN VAD, tiny, CPU), "
                                  "whisperseg (Whisper-encoder VAD trained on JA ASMR, ONNX, "
                                  "F1=0.787 on Netflix-GT JAV), "
@@ -2458,6 +2468,17 @@ def main():
             # segmenter; firered-vad and ten then honour --sensitivity here.
             speech_segmenter = BALANCED_DEFAULT_SEGMENTER
             logger.debug("No --speech-segmenter passed; --mode balanced uses %s (built-in VAD)", speech_segmenter)
+        elif getattr(args, 'mode', None) == "fidelity":
+            # Owner, 2026-09-12: Fidelity's default speech segmenter is FireRedVAD.
+            # It survives the routing guard below via SINGLE_PASS_EXTERNAL_OK, and
+            # its per-sensitivity YAML preset is resolved further down, so the
+            # grouping params reach the segmenter. Same default as an --ensemble
+            # fidelity pass and as the GUI Ensemble tab.
+            speech_segmenter = FIDELITY_DEFAULT_SEGMENTER
+            logger.debug(
+                "No --speech-segmenter passed; --mode fidelity uses %s",
+                speech_segmenter,
+            )
         elif _path_safe_for_whisperseg_default(args):
             speech_segmenter = "whisperseg"
             logger.debug("No --speech-segmenter passed; using v1.8.13 default: whisperseg")
@@ -2486,13 +2507,16 @@ def main():
         if (not _path_safe_for_whisperseg_default(args)
                 and speech_segmenter != "none"
                 and speech_segmenter != "faster-whisper"
+                and speech_segmenter not in SINGLE_PASS_EXTERNAL_OK.get(
+                    getattr(args, 'mode', None), frozenset())
                 and not speech_segmenter.startswith("silero")):
             logger.warning(
                 "Speech segmenter '%s' is not wired for single-pass --mode %s: that "
                 "path does not resolve the segmenter's sensitivity presets. "
                 "Falling back to silero-v3.1. WhisperSeg / NeMo / whisper-vad / "
-                "firered-vad / ten are fully supported via --ensemble, and "
-                "silero-v6.2 works here.",
+                "ten are fully supported via --ensemble; firered-vad works on "
+                "--mode fidelity, where it is the default; the Silero builds work "
+                "on every single-pass mode.",
                 speech_segmenter, getattr(args, 'mode', None)
             )
             speech_segmenter = "silero-v3.1"
@@ -2586,7 +2610,21 @@ def main():
             if "speech_segmenter" not in resolved_config["params"]:
                 resolved_config["params"]["speech_segmenter"] = {}
             resolved_config["params"]["speech_segmenter"]["speech_pad_ms"] = speech_pad_ms
-            logger.info(f"Speech pad set via CLI: {speech_pad_ms}ms")
+            # Not every segmenter has a speech_pad_ms. The factory drops the ones that
+            # do not at DEBUG level, so confirming it unconditionally told the user a
+            # setting had been applied when it had not. Live since 2026-09-12, when
+            # fidelity's default became firered-vad, which pads with start_pad_ms /
+            # end_pad_ms instead.
+            _seg_backend = (resolved_config["params"].get("speech_segmenter") or {}).get("backend")
+            if segmenter_accepts(_seg_backend, "speech_pad_ms"):
+                logger.info(f"Speech pad set via CLI: {speech_pad_ms}ms")
+            else:
+                logger.warning(
+                    "--speech-pad-ms %dms is ignored: the '%s' speech segmenter has no "
+                    "speech-pad setting. It pads the start and end of each segment "
+                    "separately, and this run keeps the values --sensitivity chose.",
+                    speech_pad_ms, _seg_backend,
+                )
 
         # Group-sizing knobs for external segmenters (silero/nemo/etc). These
         # control the encoder-pass count: each <=30s GROUP is one transcribe()
@@ -2806,6 +2844,26 @@ def main():
         except Exception as e:
             logger.error(f"Failed to dump parameters: {e}")
             sys.exit(1)
+
+    # Start-up check: a speech segmenter whose model is downloaded on first use is
+    # fetched HERE, before any audio is read (owner, 2026-09-12). Reaching the
+    # pipeline without it is not a graceful failure -- fidelity catches a segmenter
+    # error per scene and carries on, so the user gets an empty subtitle file from a
+    # run that exits 0. Everything above this point either exits (--check,
+    # --dump-params) or does no work, so nothing is wasted when this stops the run.
+    if args.ensemble:
+        for _n in (1, 2):
+            _pipe = getattr(args, f"pass{_n}_pipeline", None)
+            if not _pipe:
+                continue  # pass 2 is optional
+            ensure_segmenter_model_available(effective_segmenter_for_pass(
+                _pipe, getattr(args, f"pass{_n}_speech_segmenter", None)
+            ))
+    elif resolved_config:
+        _seg_cfg = resolved_config.get("params", {}).get("speech_segmenter") or {}
+        ensure_segmenter_model_available(
+            _seg_cfg.get("backend"), model_dir=_seg_cfg.get("model_dir")
+        )
 
     # Setup temp directory
     if args.temp_dir:

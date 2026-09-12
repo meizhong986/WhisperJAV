@@ -99,6 +99,7 @@ class PreflightChecker:
         self._check_ffmpeg()
         self._check_disk_space()
         self._check_dependencies()
+        self._check_downloaded_segmenter_models()
         
         # Display results
         self._display_results()
@@ -413,9 +414,13 @@ class PreflightChecker:
 
         optional_deps = {
             'stable_whisper': "Required only for legacy fast/faster pipelines",
-            # v1.9.2: FireRedVAD ships in the [cli] extra. Only an explicit
-            # --speech-segmenter firered-vad needs it.
-            'fireredvad': "FireRedVAD speech segmenter (--speech-segmenter firered-vad); "
+            # v1.9.2: FireRedVAD ships in the [cli] extra. Since 2026-09-12 it is
+            # also the DEFAULT speech segmenter for the fidelity pipeline, so a
+            # plain `--mode fidelity` needs it -- not just an explicit
+            # --speech-segmenter firered-vad.
+            'fireredvad': "FireRedVAD speech segmenter -- the default for --mode "
+                          "fidelity and for a fidelity ensemble pass, and selectable "
+                          "anywhere with --speech-segmenter firered-vad; "
                           "pip install fireredvad",
         }
         
@@ -457,6 +462,40 @@ class PreflightChecker:
                 fatal=False
             ))
     
+    def _check_downloaded_segmenter_models(self):
+        """Are the speech-segmenter models that are fetched at runtime present?
+
+        FireRedVAD is the fidelity pipeline's speech segmenter since 2026-09-12 and
+        its model is downloaded on first use. A WARN, not a FAIL: a user who only
+        runs Balanced never needs it, and --check has no pipeline to go on.
+        """
+        for backend, (_m, _f, display) in _RUNTIME_DOWNLOADED_SEGMENTERS.items():
+            # download=False: --check reports, it does not change the machine.
+            ok = ensure_segmenter_model_available(
+                backend, download=False, exit_on_fail=False)
+            if ok:
+                self.results.append(CheckResult(
+                    name=f"{display} model",
+                    status=CheckStatus.PASS,
+                    message="Downloaded and ready",
+                ))
+            else:
+                self.results.append(CheckResult(
+                    name=f"{display} model",
+                    status=CheckStatus.WARN,
+                    message="Not downloaded yet",
+                    details=[
+                        f"{display} finds the speech for the fidelity pipeline. Its "
+                        "model is downloaded once from Hugging Face, and it is not "
+                        "on this machine yet. --check does not download it.",
+                        "It is fetched during installation, or at the start of the "
+                        "first fidelity run. To avoid needing the network then, run "
+                        "one fidelity job while online, or use "
+                        "--speech-segmenter silero-v3.1, which needs no download.",
+                    ],
+                    fatal=False,
+                ))
+
     def _display_results(self):
         """Display all check results in a formatted manner."""
         print()
@@ -508,6 +547,100 @@ class PreflightChecker:
                     print(f"  {detail}")
                 else:
                     print()
+
+
+# Speech segmenters whose model is downloaded on first use instead of shipping in
+# the wheel. Name → the callable that fetches it (raising on failure) and the
+# human name used in the message.
+#
+# WHY THIS EXISTS AT START-UP. The fidelity pipeline catches a segmenter failure
+# PER SCENE and carries on (pipelines/fidelity_pipeline.py). A model that cannot be
+# fetched therefore fails every scene, produces an empty subtitle file, and the run
+# summary calls the file "empty" -- which the default --fail-on does not fail on.
+# The user is handed an empty .srt by a run that exited 0. Fetching here turns that
+# into one message before any audio is read. (Owner, 2026-09-12, his option 3.)
+_RUNTIME_DOWNLOADED_SEGMENTERS = {
+    "firered-vad": (
+        "whisperjav.modules.speech_segmentation.backends.firered_vad",
+        "ensure_model_downloaded",
+        "FireRedVAD",
+    ),
+}
+
+
+def ensure_segmenter_model_available(backend, *, model_dir=None,
+                                     download: bool = True,
+                                     exit_on_fail: bool = True) -> bool:
+    """
+    Make sure a speech segmenter's model is on this machine before a run starts.
+
+    Returns True when there is nothing to do (the segmenter ships its model, or is
+    not one we know) or when the fetch succeeded. On failure it prints what the user
+    can do about it and, by default, ends the run with status 1 -- the same status
+    the GPU start-up check uses when it cannot proceed. Pass exit_on_fail=False to
+    get False back instead, which is what --check does.
+
+    ``model_dir`` is the directory the run's segmenter config names, if any, so this
+    check looks in the same place the segmenter will and cannot pass while the run
+    then fails, or the reverse.
+
+    ``download=False`` reports what is already on the machine without fetching
+    anything -- what ``--check`` wants, since a diagnostic must not change the
+    machine it is diagnosing.
+
+    This is a better MESSAGE, earlier; it is not the guarantee. The guarantee is in
+    ``FireRedVadSpeechSegmenter.__init__``, which resolves the model when the
+    segmenter is actually built and so cannot be walked around by a path this check
+    does not predict.
+    """
+    entry = _RUNTIME_DOWNLOADED_SEGMENTERS.get(backend or "")
+    if entry is None:
+        return True
+    module_name, func_name, display = entry
+    try:
+        import importlib
+        getattr(importlib.import_module(module_name), func_name)(
+            model_dir, download=download)
+        return True
+    except Exception as exc:
+        if not exit_on_fail:
+            return False
+        offline = bool(os.environ.get("HF_HUB_OFFLINE"))
+        lines = [
+            f"{display}'s speech-detection model is not on this machine",
+            "",
+            f"This run needs {display} to find the speech in your audio, and its",
+            "model is downloaded once from Hugging Face. That did not work:",
+            "",
+            f"  {((str(exc).splitlines() or ['unknown error'])[0])[:BOX_WIDTH - 8]}",
+            "",
+            "Nothing has been transcribed. Without the model every scene would",
+            "fail and you would be handed an empty subtitle file.",
+            "",
+            "What you can do:",
+            "  - Connect to the internet and run this once. The download is",
+            "    small (about 2 MB) and is kept for every run after it.",
+            "  - Or pick a speech segmenter that needs no download:",
+            "      --speech-segmenter silero-v3.1",
+            "    In the Ensemble tab, set that pass's Speech Segmenter to",
+            "    Silero v3.1.",
+            "  - Or download the model on another machine and point at it:",
+            "      huggingface-cli download FireRedTeam/FireRedVAD \\",
+            "        --local-dir <folder>",
+            "    In China, ModelScope serves the same files:",
+            "      modelscope download --model xukaituo/FireRedVAD \\",
+            "        --local_dir <folder>",
+            "    Then set WHISPERJAV_FIREREDVAD_MODEL_DIR to <folder>.",
+        ]
+        if offline:
+            lines += [
+                "",
+                "Downloads are switched off for this run (HF_HUB_OFFLINE is set,",
+                "which is what --offline does), so nothing can be fetched now.",
+                "The model has to have been downloaded once beforehand.",
+            ]
+        _print_box(lines, Fore.RED)
+        sys.exit(1)
 
 
 def run_preflight_checks(verbose: bool = False, exit_on_fail: bool = True) -> bool:

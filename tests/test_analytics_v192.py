@@ -109,7 +109,13 @@ def test_render_states_quiet_for_the_whole_file_with_advice():
     text = "\n".join(analytics.render(_result_with(findings)))
     assert "This file appears to be unusually quiet" in text
     assert "--vad-threshold 0.15" in text
-    assert "--speech-enhancement ffmpeg-dsp" in text
+    # 2026-09-12: this used to assert `--speech-enhancement ffmpeg-dsp`, a flag that
+    # does not exist — argparse rejects it with exit 2 — so the test was holding the
+    # bug in place rather than catching it. Enhancement is only reachable on a
+    # two-pass run or --mode qwen, and the advice now says so.
+    assert "--speech-enhancement" not in text
+    assert "--pass1-speech-enhancer ffmpeg-dsp" in text
+    assert "--qwen-enhancer ffmpeg-dsp" in text
 
 
 def test_render_never_lists_scenes_for_the_quiet_finding():
@@ -289,3 +295,43 @@ def test_mmss_formats_offsets_a_user_can_seek_to():
     assert analytics._mmss(1467.4) == "24:27"
     assert analytics._mmss(7382) == "2:03:02"   # a feature film needs the hour
     assert analytics._mmss(-5) == "0:00"
+
+
+class TestTheAdviceNamesRealFlags:
+    """The notice tells the user what to type. Until 2026-09-12 it told them to type
+    `--speech-enhancement ffmpeg-dsp`, which argparse rejects with exit 2 — and on the
+    single-pass Balanced and Fidelity runs where the notice appears, there is no
+    speech-enhancement control at all, on the command line or in the GUI."""
+
+    def _advice_lines(self):
+        from whisperjav.modules.analytics import AudioAnalytics, Finding, render
+        r = AudioAnalytics(filename="x.mp4", scene_count=4, total_duration_sec=1500.0,
+                           speech_duration_sec=90.0, scenes_measured=4)
+        r.findings.append(Finding("quiet", None, 0.0, 1500.0, {"ratio": 2.54}))
+        return render(r)
+
+    def test_every_flag_in_the_advice_is_a_real_flag(self):
+        import re
+        import subprocess
+        import sys
+        help_text = subprocess.run(
+            [sys.executable, "-m", "whisperjav.main", "--help"],
+            capture_output=True, encoding="utf-8", errors="replace", timeout=600,
+        ).stdout or ""
+        assert "--mode" in help_text, "could not read --help"
+
+        flags = set()
+        for line in self._advice_lines():
+            flags.update(re.findall(r"--[a-z0-9][a-z0-9-]+", line))
+        assert flags, "the advice named no flags at all"
+        unknown = sorted(f for f in flags if f not in help_text)
+        assert not unknown, f"advice names flags that do not exist: {unknown}"
+
+    def test_it_does_not_offer_enhancement_as_a_single_pass_option(self):
+        """There is no single-pass enhancer flag, so the advice must not imply one."""
+        text = "\n".join(self._advice_lines())
+        assert "--speech-enhancement" not in text
+        assert "--vad-threshold" in text
+        # If enhancement is mentioned it must be the reachable forms.
+        if "enhancer" in text:
+            assert "--pass1-speech-enhancer" in text or "--qwen-enhancer" in text

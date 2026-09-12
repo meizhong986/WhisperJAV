@@ -8,10 +8,530 @@
 > Conventions: one entry per landed change, newest first. "Decision" lines
 > record who decided what, so a later reader can tell policy from mechanism.
 >
-> **SYNC** — pack r3.8 · 2026-09-11 night | tracker rev **52.0** | change log through 2026-09-11 night | `dev_v1.9.2` @ `148259b`, 169 ahead of `origin/main` @ `c8dae7a`; origin/main merged in. Nothing pushed, nothing posted. (Counts measured 2026-09-11, at the parent of the commit carrying this line.)
+> **SYNC** — pack **r4.0** · 2026-09-12 (section 0.12) | tracker rev **52.2** | change log through **2026-09-12** | `dev_v1.9.2` @ `effed13`; the 2026-09-12 work is in the working tree, **UNCOMMITTED**. Nothing pushed, nothing posted. (GitHub counts measured 2026-09-11 and carried forward.)
 > GitHub 138 open · 12 PRs · 0 labels applied · new #416 #417 #418 #419. Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
 > (updated in place; never a second page). Rule: a session that changes the pack, this file or the change
 > log brings the other two to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
+
+---
+
+## 2026-09-12 — three last-minute defaults, changed during the owner's RC testing
+
+The owner was hand-testing the release-candidate .exe and asked for three changes. All three are
+landed in the working tree; nothing is committed or pushed.
+
+### 1. The installer's constructor config no longer carries an obsolete key
+
+`install_in_dependency_order: true` was removed from `installer/templates/construct.yaml.template`
+(and from the gitignored `installer/generated/construct_v1.9.2.yaml`, so a constructor-only rebuild
+is quiet too). constructor 3.11.3 logs `key 'install_in_dependency_order' is obsolete. Its value
+'True' is being ignored.` and carries on — `constructor/construct.py:165-174` documents the key as
+obsolete, `:1085-1098` logs and continues. Nothing about the built installer changes.
+
+**Why remove it rather than leave it.** `verify()` exits with `Error: unknown key '<x>' in
+construct.yaml` for a key that is not in its `KEYS` table at all, and
+`installer/templates/build_installer.bat.template:52-70` does not pin a constructor version — it
+tells the builder to `conda install constructor -c conda-forge`. A future constructor that deletes
+the obsolete entry instead of keeping it as a warning would stop the build dead.
+
+### 2. Balanced's built-in VAD defaults to Silero 4.0 (was 3.1)
+
+One constant: `DEFAULT_VAD_VERSION` in `whisperjav/modules/silero_vad_adapter.py:74`. The Pydantic
+`FasterWhisperVADOptions.version` field, both `--passN-vad-version` help strings, the `--vad-version`
+help string and the "The default is …" half of the GUI's Customize > Segmenter info line
+(`webview_gui/api.py:1306`) all read it, so they moved together. The GUI Ensemble tab keeps its own
+copy of the list (`assets/app.js:vadVersionOptions` / `defaultVadVersion`) — updated by hand.
+
+`VAD_VERSION_LABELS` also moved its "(default)" marker to 4.0, but **that string is displayed
+nowhere**, and the comment on the dict claiming `webview_gui/api.py` as a consumer was false.
+`api.py:1295` does `", ".join(VAD_VERSION_LABELS)` — joining a dict iterates its KEYS, so that line
+renders "3.1, 4.0, 6.2". Measured, not inferred. The comment now says so; the marker is kept only so
+the dict does not contradict the constant. (A previous adversary pass already cut one wrong claim
+about this dict's consumers — see the 2026-09-11 entry. This is the same dict, a second time.)
+
+Three hard-coded `'3.1'` fallbacks inside app.js methods now read `this.defaultVadVersion` instead of
+repeating the literal; the two that sit in the `state` object literal, where `this` is not available,
+are spelled out with a comment pointing at the constant.
+
+**Decision: the owner, 2026-09-12, during RC testing.** It matches the configuration of his accepted
+run on 2026-09-11 (EKAI-023, Balanced, semantic 240 s, Silero 4.0 — exit 0, 1,961 cues). The
+user-visible consequence is in the release notes: on the 293-second clip already quoted there, 4.0
+treats 44.8 % of the audio as speech where 3.1 treats 31.2 %.
+
+### 3. Fidelity's default speech segmenter is FireRedVAD (was silero-v3.1 / whisperseg)
+
+**The two entry points disagreed before this.** `--mode fidelity` fell through `main.py`'s
+else-branch to `silero-v3.1`, while an `--ensemble` fidelity pass with no explicit segmenter left
+`params["speech_segmenter"]` unset — `resolve_legacy_pipeline` does not create the key, verified by
+calling it — and landed on `WhisperProASR`'s own `"whisperseg"` fallback. Both now resolve
+`firered-vad`.
+
+New shared constants in `whisperjav/config/segmenter_presets.py`, the module that exists so the three
+entry points cannot drift:
+
+- `FIDELITY_DEFAULT_SEGMENTER = "firered-vad"` — read by `main.py`, `ensemble/pass_worker.py` and
+  `modules/whisper_pro_asr.py`. The GUI Ensemble tab carries its own copy in `assets/app.js`
+  (`applyPipelinePresets`, the `pipeline === 'fidelity'` branch).
+- `SINGLE_PASS_EXTERNAL_OK = frozenset({"firered-vad"})` — the routing guard in `main.py` sends every
+  non-Silero backend back to `silero-v3.1` on a single-pass mode, so without an exemption the new
+  default would have been downgraded the instant it was set, with a warning. This is the same
+  mechanism the removed `BALANCED_SINGLE_PASS_EXTERNAL` used to provide for `--mode balanced`.
+
+**Why the exemption is safe for this backend and not for whisperseg.** The guard exists because the
+single-pass path did not resolve a segmenter's per-sensitivity preset, so whisperseg ran on its own
+29 s `max_group_duration_s` and triggered the Whisper repetition pathology on JAV audio. v1.9.2 added
+that resolution to the single-pass path, and
+`config/v4/ecosystems/tools/firered-vad-speech-segmentation.yaml` carries `chunk_threshold_s` and
+`max_group_duration_s` in its spec AND in all three sensitivity presets. whisperseg, NeMo, whisper-vad
+and TEN still downgrade, unchanged.
+
+`--speech-segmenter`'s help text said "other single-pass modes use silero-v3.1"; it now names
+fidelity's default separately.
+
+### Verified
+
+- `--mode fidelity` at conservative / balanced / aggressive resolves
+  `speech_segmenter = {backend: firered-vad, threshold 0.5/0.4/0.3, max_group_duration_s 7/6/5,
+  chunk_threshold_s 1.0, ...}`, with no "Falling back to silero-v3.1" line
+  (`--dump-params`).
+- `--mode balanced` at all three sensitivities resolves `params["vad"]["version"] == "4.0"`;
+  `--vad-version 6.2` still wins.
+- Unchanged: `--mode fast` and `--mode faster` still `silero-v3.1`; `--mode fidelity
+  --speech-segmenter whisperseg` still downgrades with the warning; `--mode balanced
+  --speech-segmenter <anything>` still exits 2.
+- Ensemble, by calling `ensemble/pass_worker._apply_gui_overrides` directly: a fidelity pass with no
+  segmenter resolves firered-vad plus its per-sensitivity preset at all three sensitivities; an
+  explicit `whisperseg` still wins; a balanced pass is untouched and carries version 4.0.
+- GUI, `node tools/gui_ensemble_dropdown_check.js`: Balanced turns the dropdown into the VAD-version
+  selector with 4.0 selected; Fidelity restores the external list with firered-vad selected and
+  `state.speechSegmenter = 'firered-vad'`. `firered-vad` is a real `<option>` for both passes in
+  `assets/index.html:551,719`, so the assignment binds.
+- `python -m whisperjav.main --help` exits 0 and shows "default 4.0" for both `--passN-vad-version`
+  and `--vad-version`, and the corrected `--speech-segmenter` defaults sentence.
+- `pytest tests/test_vad_version_v192.py` 38 passed; `pytest tests/test_balanced_defaults_v192.py`
+  28 passed (both files updated to the new values, plus two new fidelity tests).
+- `ruff check` on the changed files: zero findings on changed lines (the file totals are
+  pre-existing).
+
+### Not done, and the owner's to decide
+
+- **Nothing above reaches the RC he is testing until it is rebuilt.** Measured, not assumed:
+  `installer/generated/whisperjav-1.9.2-py3-none-any.whl` was built at 12:03 today and still carries
+  `DEFAULT_VAD_VERSION = "3.1"` and no `FIDELITY_DEFAULT_SEGMENTER` at all; the .exe next to it is
+  from 12:05. Every change above landed after 13:00.
+- **`installer/generated/` is now in a mixed state.** `construct_v1.9.2.yaml` is 13:03 (my edit);
+  every other artefact in that directory is 12:03. It is gitignored and regenerated, so
+  `build_release.py --clean` first — without `--clean`, constructor packages the stale scripts.
+- **The RUN SUMMARY's `COVERAGE` column heading.** He asked what it means and proposed `COVERED`.
+  Answered, not changed — the heading is user-visible text and the wording is his call.
+
+- **⛔ Fidelity now needs the network once, and fails silently without it. HIS DECISION.**
+  `modules/speech_segmentation/backends/firered_vad.py:143-150` calls `snapshot_download` with no
+  `local_files_only` handling and no `try`/`except`. Under `--offline` (which sets
+  `HF_HUB_OFFLINE=1`) or on a machine with no network and no cached weights, it raises,
+  `pipelines/fidelity_pipeline.py:433-438` catches the exception **per scene** and continues, so
+  every scene fails, the SRT is empty, and the RUN SUMMARY classifies the file `empty`. `empty`
+  fails a run only with `--fail-on empty`, and `--fail-on` has no default (`main.py:543`; its
+  only choices are `empty` and `suspect` — `run_outcome.py:79` — `failed` always fails and is
+  not selectable). **So by default: exit 0 with an empty subtitle file.** The previous
+  default, `silero-v3.1`, loads through `torch.hub`, which `HF_HUB_OFFLINE` does not gate, so
+  `--mode fidelity --offline` used to work.
+
+  The adversary measured the A/B on one clip with an empty HF cache: FireRedVAD 0 cues / exit 0,
+  silero-v3.1 1 cue / exit 0. I confirmed the mechanism by reading all three files named above. It
+  affects `--mode fidelity` at every sensitivity, the GUI Transcription tab with Fidelity selected,
+  and any Ensemble pass whose pipeline is Fidelity.
+
+  **This ground was walked before.** CFF3 (2026-09-05) made FireRedVAD the BALANCED default *with a
+  fallback chain* — firered-vad → ten → silero-v3.1, with a WARNING naming the pip command — and the
+  owner reversed that default on 2026-09-06 (N3). `config/segmenter_presets.py:72-74` still records
+  it. This change re-introduces FireRedVAD as a default without that chain.
+
+  Options, all his: pre-download the weights during preflight; restore a fallback to silero-v3.1
+  with a warning; make a total segmenter failure `failed` rather than `empty` (an exit-code-contract
+  change, his alone); or accept it and say so in the release notes. **Nothing was changed here.**
+  The release notes and the installer-facing notes now state the caveat, and
+  `utils/preflight_check.py` no longer calls `fireredvad` optional.
+
+### 4. The offline hole is closed at start-up, and the column is renamed (owner, same day, second round)
+
+He read the adversary's offline finding and chose **option 3: fetch the model during the start-up
+check**. He also asked for option 4 — a run whose speech detector never worked should exit 1 — to be
+recorded as a feature for the next iteration, not built now.
+
+**`utils/preflight_check.ensure_segmenter_model_available(backend)`** fetches the model before any
+audio is read, and on failure prints a box naming what the user can do (connect once; or
+`--speech-segmenter silero-v3.1`; plus an extra line when `HF_HUB_OFFLINE` is set) and exits 1 — the
+same status the GPU start-up check uses when it cannot proceed. It is a no-op for every segmenter
+that ships its model. `main.py` calls it after config resolution and before the temp directory and
+media discovery, for the single-pass backend and for each ensemble pass. `--check` gained a
+`FireRedVAD model` row: PASS when present, WARN (never fatal) when not, because `--check` has no
+pipeline to go on and a Balanced-only user never needs it.
+
+Two supporting pieces, both about not letting two places disagree:
+
+- `firered_vad.ensure_model_downloaded()` is now the ONE place that names the HuggingFace repo;
+  `_resolve_model_dir` delegates to it.
+- `segmenter_presets.effective_segmenter_for_pass(pipeline, requested)` is the ONE rule for which
+  segmenter a pass will run. `pass_worker` now reads it instead of carrying its own copy, so the
+  start-up check cannot guard a segmenter the run does not use, or miss the one it does.
+
+**The RUN SUMMARY column `COVERAGE` is now `MILEAGE`** (`utils/run_outcome.py:333`). His word. The
+number is unchanged and so is everything it drives: it is where the last subtitle ends as a share of
+the media duration, not the share of the file carrying subtitles. The `coverage` field in
+`whisperjav_run.json` and the `--min-coverage` flag keep their names — a parsing and a scripting
+contract — and a test now pins that.
+
+Option 4 is recorded at `docs/plans/PRODUCT_VISION_AND_ROADMAP_v1.9_v2.md` §3.3 with his words, the
+mechanism, and a note that it changes the exit-code contract and so is his to approve.
+
+**Verified:** `--mode fidelity` with an empty HF cache and `HF_HUB_OFFLINE=1` stops at start-up with
+exit 1 before media discovery; the same for `--ensemble --pass1-pipeline fidelity`; `--mode balanced`
+with the same empty cache is untouched and reaches media discovery; `--mode fidelity` with the real
+cache reaches media discovery. `--check` shows PASS with the model and WARN without it. The rendered
+RUN SUMMARY prints `MILEAGE` (its own rules are 60 characters wide and its rows vary with the
+file names; the 72-character object is the preflight failure box, `BOX_WIDTH` at
+`preflight_check.py:681`, whose every line was measured at exactly 72). `pytest` —
+test_run_outcome 59, test_balanced_defaults_v192 35, test_vad_version_v192 38, test_output_coverage
+13, all passing; ensemble re-probed after the pass_worker refactor and unchanged. Ruff on changed
+lines: one finding, `main.py:118` E402, which is pre-existing style in that file (64 E402 in the file
+at HEAD, 64 now).
+
+### 5. The model is fetched during installation, and a user can point at their own copy
+
+The owner read the start-up fetch and asked the right question: FireRedVAD is a pip
+install — which of upstream's methods do we use? Checked against
+`https://github.com/FireRedTeam/FireRedVAD/blob/main/README.md`:
+
+- **The pip package is code only.** The README is explicit that the weights are a
+  separate download. We install the package at install time (`pyproject.toml:144`,
+  `installer/templates/requirements.txt.template:31`), plain rather than `[gpu]`, which
+  is right: that extra only adds PyTorch, which Phase 3 already installs, and this
+  backend runs on the CPU by default.
+- **The weights** come from ModelScope (`xukaituo/FireRedVAD`, upstream's recommendation
+  **for users in China**) or Hugging Face (`FireRedTeam/FireRedVAD`), and the API takes a
+  directory: `FireRedVad.from_pretrained("pretrained_models/FireRedVAD/VAD", config)`.
+  We used the Hugging Face route only, at run time, into the hub cache. 2.3 MB, measured.
+
+His point: for a user who needs a proxy to reach Hugging Face, the download belongs at
+**install** time, when they are online anyway. He is right, and nothing was downloaded at
+install time at all — there is no model step anywhere in the installer.
+
+**One thing I had not checked and should have.** `utils/model_loader.py` already patches
+`snapshot_download` globally with Hugging Face → cache → **hf-mirror.com**, written for
+#204 for exactly this user group. I verified the FireRedVAD fetch inherits it rather than
+assuming: `main.py:2154` applies the patch before the start-up check at `:2857`, both in
+`main()`, and the late `from huggingface_hub import snapshot_download` inside
+`ensure_model_downloaded` resolves to the patched wrapper — run, same object.
+
+**What was built.**
+
+- **Installer Phase 5.6** (`installer/templates/post_install.py.template`,
+  `fetch_firered_vad_model()`): runs in the installed interpreter, applies the mirror
+  patch, calls WhisperJAV's own resolver. **Not fatal** — a user who only runs Balanced
+  never needs this model, and a failure prints the manual `huggingface-cli` and
+  `modelscope` commands and the environment variable to set.
+- **A local directory.** `model_dir` in the segmenter's config (tool YAML, so it survives
+  the preset filter and the factory's foreign-key gate) or
+  `WHISPERJAV_FIREREDVAD_MODEL_DIR`. Accepts **either** the repo root or its `VAD/`
+  subfolder, because upstream's two commands both produce `<root>/VAD/`, and validates by
+  the two files upstream actually ships (`model.pth.tar`, `cmvn.ark`, read off the real
+  download). An explicit directory that is not a model directory **raises** rather than
+  quietly downloading instead.
+- **Cache before network.** `local_files_only=True` first. A populated cache alone does
+  not avoid the network: measured on this machine with the hub unreachable and the cache
+  full, the old call took **21.0 s** (retries, then the cache) against **0.60 s** now.
+- **ModelScope was NOT adopted**, deliberately. `modelscope` is in the `enhance` extra
+  only; adding it to `cli` for a 2.3 MB file would pull `datasets`, `oss2`, `Pillow` and a
+  `setuptools<82` pin into every install. hf-mirror.com serves the same repository, and a
+  user who prefers ModelScope can run upstream's command and point `model_dir` at it.
+
+### Where the adversary refuted this round, and what changed
+
+**The guarantee was in the wrong place, and I had re-opened the hole with my own edit.**
+`main.py`'s start-up check has to PREDICT which segmenter a run will build. It cannot see
+every path, and the adversary found three, each measured: `--mode qwen
+--qwen-segmenter firered-vad` and the decoupled pipeline both set `resolved_config = None`
+so the check is skipped; and worse, `--pass1-speech-segmenter` has no `choices=`
+(`main.py:261`), so `--ensemble --pass1-pipeline fidelity --pass1-speech-segmenter
+faster-whisper` walks past the check and then `whisper_pro_asr.py:83` — **a line I wrote
+in round 1** — substitutes FireRedVAD inside the ASR module. On an offline machine that is
+the empty `.srt` at exit 0 all over again. I reproduced all three.
+
+**Fixed by moving the guarantee to where it is provable.**
+`FireRedVadSpeechSegmenter.__init__` now resolves the model directory instead of waiting
+for the first `segment()` call. That is not cosmetic: the fidelity pipeline builds the ASR
+**outside** its per-scene `try` (`fidelity_pipeline.py:335`) and calls `segment()`
+**inside** it (`:433-438`), so the old timing was swallowed per scene. Every path that
+reaches this backend goes through the factory, so the constructor is the one place that
+sees what is actually built. Verified: building it with an empty cache and no network now
+raises `LocalEntryNotFoundError`; with a warm cache it builds. The start-up check stays,
+demoted to what it honestly is — a better message, earlier.
+
+**A false block I introduced.** `SINGLE_PASS_EXTERNAL_OK` was a flat set, so it exempted
+firered-vad from the routing guard on *every* single-pass mode, and `--mode fast
+--speech-segmenter firered-vad` stopped with exit 1 over a model `fast` never loads
+(`fast`/`faster` run stable_ts with `"vad": "none"`). At HEAD it warned and ran. It is now
+keyed by mode — `{"fidelity": {"firered-vad"}}` — which is what the test's own docstring
+already claimed. Measured before and after.
+
+**`--check` was downloading.** It called the real fetch, so a diagnostic wrote 2.3 MB to
+the machine it was diagnosing. `download=False` now reports without fetching; measured, 0
+cache entries written.
+
+**Smaller, all confirmed and fixed:** the constants block was pasted twice in
+`firered_vad.py` (my edit script applied it, raised on a later step, and was re-run — the
+`edit()` helper writes each file as it goes, so the first pass was not rolled back);
+`Fetching 2 files: 100%` printed into every run's log and the GUI console, now suppressed
+around our own calls; `str(exc).splitlines()[0]` could `IndexError` on an empty message;
+the box said "you are running with `--offline`" when only `HF_HUB_OFFLINE` was set.
+
+**Documentation errors it found in what I had already written, all corrected:** the
+release notes still said "Coverage is shown next to the state" sixty lines before
+announcing MILEAGE; the 2026-09-09 timeline row still read "(default 3.1)" with no
+supersession note; **"the default `--fail-on failed`" is wrong twice over** — `--fail-on`
+has no default (`main.py:543`) and `failed` is not one of its choices (`run_outcome.py:79`
+— it always fails); the MILEAGE heading is at `run_outcome.py:333`, not 319; and "every
+box line measures exactly 72 characters" conflated the RUN SUMMARY (60-character rules,
+variable rows) with the preflight box (`BOX_WIDTH = 72`).
+
+**Two of its findings I did not adopt, with reasons.**
+
+- It reported `DEFAULT_VAD_VERSION = "4.0"` as an owner decision with only a paraphrase
+  behind it. There is a verbatim instruction: *"The default VAD speech segmenter preset
+  for balanced pipeline in ensemble and GUI ensemble TAB balanced pipeline shall be
+  slilero vad 4.0. Currently it is Silero 3.1."* The change log now quotes it.
+- It asked for the `empty`-versus-`failed` classification to be settled. That is the
+  exit-code contract and the owner's; it is the roadmap entry above.
+
+**One behaviour change worth stating on its own:** on a fidelity pass,
+`speech_segmenter == ""` now resolves to firered-vad, where `SPEECH_SEGMENTER_MAP[""]`
+used to give Silero v4.0. Only a hand-written pass config can produce it — the GUI cannot
+(`api.py:3120`) — and the test pins it, but it is a change.
+
+### Verified (this round)
+
+`--mode fast --speech-segmenter firered-vad` warns and runs again instead of stopping;
+building the segmenter with an empty offline cache raises, with a warm cache succeeds;
+`--check` reports without writing; no `Fetching` line in a fidelity run; `--mode fidelity`
+with an empty offline cache still exits 1 before media discovery, and with the real cache
+runs on; `--mode balanced` unaffected. The local-directory option: repo root and `VAD/`
+both accepted, an empty or half-populated directory rejected, the environment variable
+read, a wrong explicit path raising with both download commands in the message, the value
+surviving preset resolution and the factory gate and reaching the constructor.
+`pytest tests/test_balanced_defaults_v192.py` — 49 passed, including new tests for the
+CLI wiring and the exit-1 arm, which the adversary correctly said nothing covered.
+
+**Not verified:** no .exe was built, so Phase 5.6 has never run in a real installation —
+its template parses and the guard test matches the call site, and that is all. The
+roadmap file carrying the next-iteration feature is gitignored, so it lives on the owner's
+machine and will not survive a clean checkout.
+
+### Review gates (rule A6)
+
+Both ran before any of this reached the owner, on the full diff and the claimed verification.
+
+**`call-chain-verifier`** — reported both chains fully wired across the five entry points that
+carry the DEFAULT (this is not the same question as "can anything reach FireRedVAD without
+passing the start-up check", which a later adversary pass answered with three paths — see the
+2026-09-12 later entry): (CLI
+balanced, GUI Ensemble balanced, CLI fidelity, GUI Transcription fidelity, GUI Ensemble fidelity),
+with every one of FireRedVAD's ten preset parameters traced to the line that consumes it. It found
+three defects, all confirmed by my own reading and all **fixed**:
+
+- `ensemble/pass_worker.py:1874` hard-coded `"3.1"` as the fallback in the per-pass
+  `Pass N VAD: Silero vX` INFO line while its twin at `main.py:2651` used the constant. In the
+  degraded case where the preset lookup fails, the user was told 3.1 while 4.0 was installed. Now
+  reads `DEFAULT_VAD_VERSION`; verified printing `Pass 1 VAD: Silero v4.0, threshold 0.40`.
+- **`--speech-pad-ms` became a silent no-op on `--mode fidelity`.** FireRedVAD's schema
+  (`speech_segmentation/factory.py:183-194`) has no `speech_pad_ms`; the factory's foreign-key gate
+  deletes it at DEBUG while `main.py` printed `Speech pad set via CLI: 250ms` at INFO. Under the old
+  silero-v3.1 default the setting did apply. New shared helper
+  `config/segmenter_presets.segmenter_accepts()` (fails open) now gates that message on both the
+  single-pass and the ensemble path: the run says the setting is ignored and why. **The setting
+  still does nothing on FireRedVAD — only the message changed.** Whether to map it onto
+  `start_pad_ms`/`end_pad_ms` is the owner's call.
+- Two stale doc lines (`config/components/vad/faster_whisper_vad.py:29`,
+  `webview_gui/API_REFERENCE.md:41`) still naming 3.1 as the default.
+
+**`assessment-adversary`** — could not refute the resolution results, the parameter survival through
+the constructor firewall, the `elif` placement, the GUI dropdown behaviour, the test counts or the
+ruff claim; it re-ran all of them. It refuted three of my claims, each confirmed and fixed:
+
+- the offline regression above, which I had not looked for;
+- the `VAD_VERSION_LABELS` claim, corrected above;
+- **"no other place hard-codes the old values" was wrong.** `docs/release_notes_v1.9.2_for_users.md`
+  — a second, committed, user-facing release note I had not opened — said "The Transcription tab
+  always uses Silero 3.1", contradicting the file I had updated. Also
+  `utils/preflight_check.py:416-419` (called `fireredvad` optional), `main.py:430`,
+  `config/legacy.py:100-108` and `:146-147`, and `webview_gui/assets/app.js:1842-1844`. All fixed.
+
+Two of its findings were **not** acted on, deliberately: `faster_whisper_pro_asr.py:92` still
+hard-codes a `"whisperseg"` fallback, but that is the BALANCED engine, whose default is the built-in
+VAD — fidelity's constant does not belong there; and the `empty` vs `failed` classification is the
+exit-code contract, which is the owner's.
+
+---
+
+## 2026-09-12 (later still) — the adversary on the release note, and the headline claim it refuted
+
+Rule A6 run on `docs/release_notes_v1.9.2_for_users.md` before it reaches a public page. It
+refuted a great deal of it. **Every finding below I re-verified myself before acting.**
+
+### The error that would have cost users an upgrade
+
+**"This affects Balanced, Fast and Faster."** Wrong. `--dump-params` on all four Whisper
+modes, run this session:
+
+| mode | `max_initial_timestamp` |
+|---|---|
+| balanced | **1.0** (fixed) |
+| fast | **ABSENT** |
+| faster | **ABSENT** |
+| fidelity | 0.0 (unchanged) |
+
+Fast and Faster resolve `asr: "stable_ts"` (`config/legacy.py:133,141`), whose component
+carried `max_initial_timestamp=None` at v1.9.1 already; commit `5771903` touched only
+`components/asr/faster_whisper.py`. **The headline fix of the release reaches Balanced and
+nothing else.** A Fast or Faster user with empty output would have read the note, upgraded,
+and got the same result. The error originated in this file (the 2026-09-12 entry) and the note
+inherited it; both are corrected.
+
+**Kotoba was wrong three ways in one sentence.** `kotoba_faster_whisper.py` has no
+`max_initial_timestamp` field at all, so it cannot "still carry the old setting"; its own
+docstring says it uses the **faster-whisper** backend, so "a different recogniser" was wrong;
+and it is not a `--mode` choice (`main.py:215`), so a user cannot act on it. All three
+mentions removed from the user note.
+
+### Measurements stated with more confidence than the evidence
+
+- **"The main cause was..."** — this file says, verbatim, *"the retune, the failover removal
+  and the ceiling all changed between the runs; the run proves the combination, not the share
+  of each."* The note had promoted one of the three to "the main cause". Replaced with the
+  non-isolation sentence.
+- **"On a two-hour film... the same run finished in 41 minutes at 8.8× real time... covering
+  99.8%."** Four errors in one sentence: EKAI-023 is **179 minutes**, not two hours; it was a
+  **two-pass ensemble**, not "the same run"; 41 minutes is the **total for both passes** while
+  8.8× is **pass 2 alone** (the whole run is 4.4×); and 99.8% is mileage — where the last
+  subtitle lands — which the note itself defines correctly 180 lines later.
+- **"Aggressive is three to four times faster on Balanced and Fidelity."** No Fidelity run
+  time was ever measured. Now says so.
+- **"a quality check then threw away"** — the wrong mechanism, and contradicted by this file:
+  with a single temperature the compression-ratio check **keeps** the result
+  (`faster_whisper/transcribe.py:1520`). The window is skipped as non-speech at `:1215-1234`.
+- **"14–32% of the speed"** — `resolver_v3.py:206-210` says 14–30% slower on the scored clips
+  and 32% slower on JAV audio. "of the speed" also reads as "runs at 14%", i.e. 7× slower.
+
+### The largest behaviour change in the release was missing from the note entirely
+
+The default scene detector changed from **auditok to semantic** (commit `ef99043`). The word
+"semantic" appeared once in 577 lines, as a parenthetical. Worse, the note's scene bullet
+compared 4 minutes against **20 minutes** — a ceiling introduced *inside this cycle* by commit
+`80be6da`. What a user actually upgrades from is v1.9.1's auditok at ~29 s
+(`git show v1.9.1:whisperjav/main.py`: "auditok (energy-based, **default**)"). So scenes get
+**longer**, not shorter, and the note said the opposite. Rewritten against v1.9.1, with the
+detector flip as its own item and its unproven status stated.
+
+### Both sample blocks
+
+The **RUN SUMMARY** sample was invented: no rules, no tally line, no `Manifest:` line, and
+`ok 99%` is unreachable — `f"{0.998:.0%}"` renders `100%`. Re-rendered from
+`format_summary()`. The **Audio analytics** sample is byte-identical to `render()` (re-checked
+after every edit) — but it goes out through `logger.info` (`analytics.py:402`) and the console
+formatter prefixes every line (`utils/logger.py:86-88`), so on screen the 66-character box is
+112 characters and the frame does not line up. The note now says the timestamps are omitted.
+
+### Credits and issue table
+
+- **@Timi2028** was credited with "that exact command now stops with an explanation". Our own
+  drafted reply to him says the opposite: *"I am not going to tell you the segmenter caused
+  it... the cause is still open."* Softened, and #419 added to the issue table.
+- **@yangming2027** was called "the reason the run summary exists". The contract shipped
+  2026-08-30/09-03; #416 was filed 2026-09-07 or later. Removed.
+- **#339** was the only unconfirmed row presented as done — the exact mistake this cycle
+  already caught once. Split out with "its reporter has not retested".
+- **#306** and **#323** gained the caveats this file already recorded for them.
+
+### Eight further changes the note was missing
+
+`--speech-pad-ms` now a no-op on Fidelity; the #372 Japanese progress lines; Balanced running
+its recogniser in a separate process by default; the Qwen scene threshold 18 → 22; the
+`--check` FireRedVAD row; scene warnings moved to the log; `silero-v6.2` on Fidelity making
+cues *longer*; and `--min-coverage` as the control behind `suspect`. All added.
+
+Also corrected: the RTX 50 list named four model numbers where the check is on the chip
+generation (`resolver_v3.py:117-118`, `major >= 12`), so Ti and mobile Blackwell parts were
+wrongly excluded; and `tools/whisperjav_env_report.py` was offered to `.exe` users who have no
+`tools/` directory — `pyproject.toml:363` packages `whisperjav*` only.
+
+### What I did NOT put in the note, and why it matters to the owner
+
+The adversary is right that **every claim about the `.exe` is unverified**: the failed-install
+dialog, the suppressed shortcut, and the install-time FireRedVAD fetch have never been
+executed, because no 1.9.2 installer has been built. I did not write "never executed" into a
+public release note — a release note describes the release — but **the owner is building and
+testing the .exe now, and those three are exactly what that test has to confirm before this
+page is published.**
+
+### Could not refute
+
+The analytics sample block; the `--speech-enhancement` correction; the 24-flag audit; the
+three Balanced flag rejections (all exit 2 when run); `20/15/9 → 7/6/6`; `44.8% / 31.2%`;
+`zero on all seven, twice / ~32 each`; `28 s / 240 s`; every file name and the environment
+variable; and both model-download commands.
+
+---
+
+## 2026-09-12 (later) — the user-facing release note, and four landed changes this log never recorded
+
+The owner asked for the user-facing release note to be made complete from this change log.
+Building it surfaced a gap in **this file**: four changes were committed and are in the
+branch, and none of them was written here. Three are among the most user-visible things in
+the release. Recorded now, from the commits and the code rather than from memory.
+
+| Commit | What landed | Why it matters to a user |
+|---|---|---|
+| `5771903` | `max_initial_timestamp` 0.0 → 1.0 on the faster-whisper presets | **The root cause of empty subtitle files.** 0.0 left a decoding window exactly one legal opening timestamp; with beam search the second beam had no legal alternative, kept its initialisation score and won, and the window decoded to a long run of `!` that the compression-ratio check discarded. Measured on 7 Netflix clips at float32: **0 subtitles on all 7, twice, 60 of 60 windows discarded**. At 1.0: 32.4 subtitles per clip, nothing discarded. Six of the seven clips come out byte-identical where the fault does not fire. **Balanced only** — corrected 2026-09-12 after the adversary refuted the original claim. `--dump-params` on all four Whisper modes: balanced 1.0, **fast ABSENT, faster ABSENT**, fidelity 0.0. Fast and Faster resolve `asr: "stable_ts"` (`config/legacy.py:133,141`), whose component carried `max_initial_timestamp=None` at v1.9.1 already and still does; commit 5771903 touched only `components/asr/faster_whisper.py`. Kotoba has no such field at all and uses the faster-whisper backend, so the "different recogniser" reasoning was wrong too — and Kotoba is not a `--mode` choice. |
+| `b7fc2c9`, `cf76cb5` | RTX 50 (Blackwell) compute type: `auto` instead of forced `float16` | The force existed to dodge a CTranslate2 crash (#113) that was fixed upstream; CTranslate2 disabled int8 for sm_120 in 4.6.2 and runs it again in the 4.8.1 pinned here. #414's reporter measured forced float16 producing garbled windows and almost no subtitles on an RTX 5070. **Every other NVIDIA card deliberately unchanged**: `auto` is a wash on accuracy (CER +0.012, 95% CI crossing zero) and costs 14–30% of the speed on the scored clips, 32% on JAV audio. Pascal keeps float32 (#123). |
+| `034c540`, `1d14ea8`, `98b8d67`, `6470783`, `146ecb1` | Audio analytics | **The only new user-visible feature in the release.** Two findings from Silero VAD at two fixed thresholds: *quiet* (whole file, speech at 0.15 ÷ speech at 0.40 ≥ 2.0) and *difficult* (per scene, SNR ≤ 3 dB, rank correlation −0.89 against measured CER on the seven scored clips). Balanced, Fidelity and the Qwen pipelines, semantic scene detection only. |
+| `b002af5`, `92ee065` | `tools/whisperjav_env_report.py` and a PowerShell wrapper | A user can now produce the package/GPU/CUDA/compute-type report that most bug reports lack. |
+
+### A bug in the new feature, found while writing the note and fixed
+
+The analytics notice told the user to type **`--speech-enhancement ffmpeg-dsp`**. That flag
+does not exist — `python -m whisperjav.main --speech-enhancement ffmpeg-dsp x.wav` exits 2
+with `unrecognized arguments`. Worse, on the single-pass Balanced and Fidelity runs where
+the notice appears there is **no way to enable speech enhancement at all**: there is no
+single-pass enhancer flag (`main.py:268,304,721` — only `--pass1/2-speech-enhancer` and
+`--qwen-enhancer`), and the GUI's Speech Enhancer control exists only in the Ensemble tab
+(`index.html:458,506`). The advice now names `--vad-threshold 0.15`, which works everywhere,
+and says plainly that raising the level is available on a two-pass run or `--mode qwen` only.
+
+**A test was holding the bug in place.** `tests/test_analytics_v192.py:112` asserted that the
+non-existent flag was printed. It now asserts the opposite, and a new test renders the notice
+and checks **every** flag in it against `--help`, so advice a user cannot follow fails the
+suite. The same audit was run over the whole release note: 24 flags named, all of them real.
+
+### The release note itself
+
+`docs/release_notes_v1.9.2_for_users.md` rewritten as the complete user-facing note:
+what to install and how, what is new, what is fixed (grouped by what the user experienced,
+not by subsystem), what changed that they will notice, what will break a script, known
+limitations, and a table mapping every GitHub issue this release touches to what changed —
+including the ones it does **not** fix (#347, #305, #329, #330) and the ones where the fix is
+plausible but unconfirmed (#287, #326).
+
+Two honesty corrections carried into it. The earlier draft said the empty-subtitle fix leaves
+subtitles unchanged; that is true of the Netflix test clips and **not** of JAV audio, where
+the transcript changes (0.70 similarity) and is unscored because no JAV ground truth exists.
+And #287 is described as *possibly* resolved with a request to retest — it was retested after
+a previous fix and the reporter answered "sorry, the same".
+
+**Still open for the owner:** there are now two release-note files.
+`docs/release_notes_v1.9.2.md` is the long technical record (776 lines) and
+`docs/release_notes_v1.9.2_for_users.md` is the one a user reads. They have already
+contradicted each other once this cycle. Whether to keep both, or fold the long one into an
+appendix, is his call.
 
 ---
 

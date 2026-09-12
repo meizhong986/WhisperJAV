@@ -28,9 +28,6 @@ specs:
   - menuinst        # Desktop/Start Menu shortcut creation
 
 
-# Install in dependency order for reliability
-install_in_dependency_order: true
-
 # Default installation path (user can override during install)
 default_prefix: '%LOCALAPPDATA%\WhisperJAV'
 

@@ -44,10 +44,141 @@ logger = logging.getLogger("whisperjav")
 _HF_REPO_ID = "FireRedTeam/FireRedVAD"
 _HF_SUBFOLDER = "VAD"
 
+# The two files upstream ships in the offline-VAD directory (checked against the
+# real download, 2026-09-12). Used to tell a genuine model directory from a path
+# that merely exists -- pointing at an empty folder must say so, not fail later
+# inside the model loader.
+_VAD_FILES = ("model.pth.tar", "cmvn.ark")
+
+# A directory the user downloaded themselves. Upstream's README gives two commands
+# for this, both writing the same layout:
+#   huggingface-cli download FireRedTeam/FireRedVAD --local-dir ./pretrained_models/FireRedVAD
+#   modelscope download --model xukaituo/FireRedVAD --local_dir ./pretrained_models/FireRedVAD
+# (ModelScope is upstream's recommendation for users in China.) Either the repo
+# root or its VAD/ subfolder is accepted. Set as an environment variable, or as
+# `model_dir` in the segmenter's config.
+_ENV_MODEL_DIR = "WHISPERJAV_FIREREDVAD_MODEL_DIR"
+
 # FireRedVAD frame length. Upstream README defaults (min_speech_frame=20
 # ≈ 200ms, max_speech_frame=2000 ≈ 20s, chunk_max_frame=30000 ≈ 300s) are
 # consistent with the standard 10ms DFSMN frame.
 _FRAME_MS = 10
+
+
+def local_model_dir(candidate: Optional[str]) -> Optional[str]:
+    """
+    Return the model directory inside ``candidate``, or None if there is not one.
+
+    Accepts either spelling a user can end up with from upstream's own download
+    commands: the repo root (which contains ``VAD/``) or the ``VAD`` directory
+    itself. Both files must be present -- a path that exists but is empty is not a
+    model directory, and saying so here is much clearer than a failure inside the
+    loader three steps later.
+    """
+    if not candidate:
+        return None
+    base = Path(str(candidate)).expanduser()
+    for cand in (base, base / _HF_SUBFOLDER):
+        if all((cand / name).is_file() for name in _VAD_FILES):
+            return str(cand)
+    return None
+
+
+def _snapshot(local_files_only: bool) -> str:
+    """One ``snapshot_download`` of the offline-VAD subfolder.
+
+    The hub's progress bar is suppressed for the duration: two files totalling
+    2.3 MB produce a bare ``Fetching 2 files: 100%`` with no label, in the middle
+    of the run's own log and of the GUI console pane, even on a cache hit. The
+    installer prints its own line for the one place the progress is wanted.
+    """
+    from huggingface_hub import snapshot_download
+    from huggingface_hub.utils import (
+        are_progress_bars_disabled,
+        disable_progress_bars,
+        enable_progress_bars,
+    )
+
+    _was_off = are_progress_bars_disabled()
+    disable_progress_bars()
+    try:
+        snapshot_dir = snapshot_download(
+            repo_id=_HF_REPO_ID,
+            allow_patterns=[f"{_HF_SUBFOLDER}/*"],
+            local_files_only=local_files_only,
+        )
+    finally:
+        if not _was_off:
+            enable_progress_bars()
+    model_dir = os.path.join(snapshot_dir, _HF_SUBFOLDER)
+    if not os.path.isdir(model_dir):
+        raise FileNotFoundError(
+            f"FireRedVAD snapshot at {snapshot_dir} has no '{_HF_SUBFOLDER}/' "
+            "subfolder — upstream repo layout may have changed."
+        )
+    return model_dir
+
+
+def ensure_model_downloaded(model_dir: Optional[str] = None,
+                            download: bool = True) -> str:
+    """
+    Return the FireRedVAD offline-VAD directory, fetching it only if it is needed.
+
+    Module level, and the ONLY place that names the HuggingFace repo, so the
+    installer and the start-up check
+    (``utils/preflight_check.ensure_segmenter_model_available``) can both get the
+    model without constructing a segmenter.
+
+    Order, and why:
+
+    1. **A directory the user gave us** -- the ``model_dir`` argument, else
+       ``WHISPERJAV_FIREREDVAD_MODEL_DIR``. If it is set but is not a model
+       directory this RAISES rather than quietly downloading instead: a setting
+       that is silently ignored is worse than one that fails.
+    2. **The local cache, with no network at all** (``local_files_only=True``).
+       A populated cache alone is not enough to avoid the network: a plain
+       ``snapshot_download`` still contacts the hub to check for a newer revision,
+       and behind a firewall that is five retries with backoff before it gives up
+       and uses the cache -- the #415 stall, in miniature. Asking for the cache
+       first turns that into no request at all.
+    3. **A download.** ``utils/model_loader.patch_hf_hub_downloads`` (applied at
+       start-up in ``main.py``, ``cli.py``, the GUI and the pass workers) wraps
+       ``snapshot_download``, so this step already falls back to hf-mirror.com on a
+       network or SSL error. That patch deliberately does nothing when
+       ``local_files_only`` is set, which is why step 2 is a separate call.
+
+    Raises whatever huggingface_hub raises. This matters: the fidelity pipeline
+    catches a segmenter failure PER SCENE and carries on, so a failure reaching the
+    pipeline means every scene fails and the user gets an empty subtitle file from a
+    run that reports success. The owner chose (2026-09-12) to fetch during the
+    Windows installation and again at start-up, where one message can stop the run.
+
+    Under ``--offline`` (HF_HUB_OFFLINE=1) step 3 looks only in the cache too and
+    raises if the model was never downloaded.
+    """
+    explicit = model_dir or os.environ.get(_ENV_MODEL_DIR, "").strip() or None
+    if explicit:
+        found = local_model_dir(explicit)
+        if found:
+            logger.info("FireRedVAD model: using %s", found)
+            return found
+        raise FileNotFoundError(
+            f"FireRedVAD model directory {explicit!r} does not contain "
+            f"{' and '.join(_VAD_FILES)} (looked there and in its "
+            "VAD subfolder). Download it with: huggingface-cli "
+            "download FireRedTeam/FireRedVAD --local-dir <dir>  (or, in China, "
+            "modelscope download --model xukaituo/FireRedVAD --local_dir <dir>), "
+            "or unset it to use the copy WhisperJAV downloads itself."
+        )
+
+    try:
+        return _snapshot(local_files_only=True)
+    except Exception as exc:  # noqa: BLE001 - a cache miss is not an error yet
+        if not download:
+            raise
+        logger.debug("FireRedVAD model not in the local cache (%s); fetching", exc)
+
+    return _snapshot(local_files_only=False)
 
 
 class FireRedVadSpeechSegmenter:
@@ -78,6 +209,7 @@ class FireRedVadSpeechSegmenter:
         start_pad_ms: int = 50,
         end_pad_ms: int = 150,
         use_gpu: bool = False,
+        model_dir: Optional[str] = None,
         **kwargs,
     ):
         """
@@ -104,6 +236,10 @@ class FireRedVadSpeechSegmenter:
             end_pad_ms: Milliseconds to pad after segment end.
             use_gpu: Run the DFSMN model on GPU. Default False — the model is
                 ~0.6M params and CPU inference avoids competing with ASR VRAM.
+            model_dir: A FireRedVAD model directory you downloaded yourself,
+                either the repo root or its VAD/ subfolder. None (the default)
+                uses WHISPERJAV_FIREREDVAD_MODEL_DIR if it is set, else the
+                copy WhisperJAV downloads. See ensure_model_downloaded.
             **kwargs: Ignored (forward compatibility with factory splats).
         """
         self.threshold = float(threshold)
@@ -120,6 +256,30 @@ class FireRedVadSpeechSegmenter:
         self.start_pad_ms = int(start_pad_ms)
         self.end_pad_ms = int(end_pad_ms)
         self.use_gpu = bool(use_gpu)
+        # A model directory the user downloaded themselves; None = cache, then
+        # download. Resolved lazily in _resolve_model_dir, not here, so that a
+        # wrong path is reported when the model is needed rather than at import.
+        self.model_dir = model_dir or None
+
+        # Resolve (and if necessary fetch) the model directory HERE, in the
+        # constructor, rather than on the first segment() call.
+        #
+        # WHY IT MATTERS WHERE THIS HAPPENS. The fidelity pipeline builds the ASR --
+        # and with it this segmenter -- OUTSIDE its per-scene try/except
+        # (pipelines/fidelity_pipeline.py:335), and calls segment() INSIDE it
+        # (:433-438). A missing model raised from the first scene was therefore
+        # caught per scene and the run carried on to produce an empty subtitle file
+        # and exit 0. Raised from here it propagates and the run fails.
+        #
+        # This is also what makes the guarantee independent of main.py's start-up
+        # check. That check has to PREDICT which segmenter a run will build, and it
+        # cannot see every path: --mode qwen and the decoupled pipeline resolve
+        # their segmenter elsewhere, and whisper_pro_asr.py substitutes this backend
+        # for 'faster-whisper' on a fidelity pass after the check has run. Only the
+        # constructor sees what is actually built.
+        #
+        # Loading the weights into memory stays lazy -- this resolves a path.
+        self._model_path = ensure_model_downloaded(self.model_dir)
 
         # Lazy-loaded model with thread lock (mirrors TenSpeechSegmenter)
         self._model = None
@@ -138,20 +298,8 @@ class FireRedVadSpeechSegmenter:
     # ------------------------------------------------------------------
 
     def _resolve_model_dir(self) -> str:
-        """Download (or reuse cached) FireRedVAD offline-VAD weights from HF."""
-        from huggingface_hub import snapshot_download
-
-        snapshot_dir = snapshot_download(
-            repo_id=_HF_REPO_ID,
-            allow_patterns=[f"{_HF_SUBFOLDER}/*"],
-        )
-        model_dir = os.path.join(snapshot_dir, _HF_SUBFOLDER)
-        if not os.path.isdir(model_dir):
-            raise FileNotFoundError(
-                f"FireRedVAD snapshot at {snapshot_dir} has no '{_HF_SUBFOLDER}/' "
-                "subfolder — upstream repo layout may have changed."
-            )
-        return model_dir
+        """The directory resolved in __init__. See ``ensure_model_downloaded``."""
+        return self._model_path
 
     def _build_config(self):
         """Map WhisperJAV ms/s parameters onto FireRedVadConfig frame counts."""

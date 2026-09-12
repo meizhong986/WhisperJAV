@@ -244,6 +244,23 @@ class TestReporting:
             assert word in text
         assert "done 1  empty 1  suspect 1  failed 1  skipped 1  total 5" in text
         assert "ok 97%" in text and "low 4%" in text and "not assessed" in text
+        # Owner, 2026-09-12: the column is MILEAGE. "Coverage" claimed the share of
+        # the file that carries subtitles; the number is how far in they reach.
+        assert "MILEAGE" in text
+        assert "COVERAGE" not in text
+
+    def test_the_manifest_keeps_the_coverage_field_name(self, tmp_path):
+        """The heading changed; the machine-readable name did not. Anything parsing
+        whisperjav_run.json, and any script passing --min-coverage, keeps working."""
+        outs = [FileOutcome(path="/x/a.mp4", state="done", output="/x/a.ja.srt",
+                            subtitle_count=12, coverage="ok", coverage_ratio=0.97)]
+        p = write_manifest(outs, tmp_path / MANIFEST_NAME, mode="balanced",
+                           fail_on=set(), status=0, version="test")
+        import json
+        data = json.loads(Path(p).read_text(encoding="utf-8"))
+        entry = data["files"][0]
+        assert entry["coverage"] == "ok"
+        assert entry["coverage_ratio"] == 0.97
 
     def test_count_states(self):
         c = count_states([skipped_outcome("a"), failed_outcome("b", "x"), skipped_outcome("c")])

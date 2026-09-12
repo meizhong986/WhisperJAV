@@ -1,4 +1,16 @@
-# WhisperJAV v1.9.2 — Release Notes
+# WhisperJAV v1.9.2 — Release Notes (detailed record)
+
+> ## ⚠ This is NOT the note to publish
+>
+> The release note for users is **`docs/release_notes_v1.9.2_for_users.md`**. That one is
+> complete, written for someone installing WhisperJAV, and is what belongs on the GitHub
+> release page.
+>
+> **This file is the detailed record and is knowingly incomplete.** Three of the most
+> user-visible changes in the release are described only in the user note and not here: the
+> root-cause fix for empty subtitle files (`max_initial_timestamp`), the RTX 50 compute-type
+> change, and the new audio-analytics notice. See `docs/CHANGELOG_v1.9.2.md`
+> (2026-09-12, later) for why.
 
 > **Status: in development, not yet released.** This document is updated as work
 > lands on `dev_v1.9.2`, so it is complete up to the last entry in the changelog
@@ -119,8 +131,9 @@ you find out something went wrong.
   describing a *"known v1.9.0 routing bug (catastrophic empty output on JAV
   moaning content)"*. It is describing an intentional guard against a routing
   limitation, not a defect in the build you are running. The wording now says
-  that, and points at the two configurations that do work: `--ensemble` for full
-  segmenter support, or `silero-v6.2` for single-pass on Fidelity. On Balanced no
+  that, and points at the configurations that do work: `--ensemble` for full
+  segmenter support, or `firered-vad` (Fidelity's default since 2026-09-12) and
+  the Silero builds for single-pass on Fidelity. On Balanced no
   external segmenter can be chosen at all (see "Changed defaults"). (#323)
 
 ### Installs that said they worked when they had not
@@ -265,7 +278,7 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
   recognizer could not use all end there, and the run says so instead of
   guessing. Warnings never change the exit status. Scripts that want a stricter
   contract opt in with `--fail-on empty`, `--fail-on suspect`, or both.
-  Coverage is shown next to the state as `ok`, `low` or `not assessed`
+  Mileage is shown next to the state as `ok`, `low` or `not assessed`
   (unknown duration, media under two minutes), so a check that could not run is
   visible rather than silent.
 
@@ -308,6 +321,29 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
 ---
 
 ## Changed defaults and installation
+
+- **Two speech-detection defaults changed just before release.**
+  **Balanced** runs the Internal FW Silero VAD, and the build it runs is now **4.0**
+  instead of 3.1 — on the command line, in the Transcription tab and for a Balanced pass in
+  the Ensemble tab. 4.0 calls more of the audio speech than 3.1 does, so expect the recognizer
+  to be shown more of the file. `--vad-version 3.1` puts the old build back.
+  **Fidelity** now uses **FireRedVAD** as its speech segmenter instead of Silero v3.1 — with
+  `--mode fidelity`, in the Transcription tab, and for a Fidelity pass in the Ensemble tab and
+  on the `--ensemble` command line. It follows `--sensitivity` like the other segmenters do.
+  `fireredvad` is installed with WhisperJAV, but its model downloads from Hugging Face the first
+  time you run Fidelity, so that one run needs the network. **WhisperJAV now fetches that model
+  during the start-up check**, before it reads any audio: if it cannot be downloaded — no network,
+  or `--offline` on a machine that never fetched it — the run stops there and tells you, instead of
+  failing every scene and handing you an empty subtitle file. On such a machine use
+  `--speech-segmenter silero-v3.1`, which loads its model a different way and works offline, or run
+  Fidelity online once. `--speech-segmenter silero-v3.1` also puts the old segmenter back generally.
+
+- **The RUN SUMMARY's `COVERAGE` column is now `MILEAGE`.** The number under it has not changed and
+  neither has anything it does: it is how far into the file your subtitles reach — where the last
+  subtitle ends, as a share of the video's length — not how much of the video carries subtitles. A
+  two-hour film whose subtitles stop at seven minutes reads 6%. "Coverage" suggested the second
+  thing. The `--min-coverage` option and the `coverage` field in `whisperjav_run.json` keep their
+  names, so scripts and anything reading the manifest are unaffected.
 
 - **A false alarm is gone from long scenes, and the diagnostics for them now work.** On any scene of
   eight minutes or more, Balanced used to print `Speech segmentation produced insufficient coverage
@@ -447,7 +483,7 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
   recognizer never sees, which is the mechanism behind output that skips long stretches.
 
   So Balanced keeps the built-in VAD (one recognizer call per scene, the fast path), and
-  `--vad-version` selects the Silero build that VAD runs: **3.1** (the default), **4.0** or **6.2**.
+  `--vad-version` selects the Silero build that VAD runs: **3.1**, **4.0** (the default) or **6.2**.
   In the Ensemble tab, a pass whose Pipeline is Balanced shows those three in the Speech Segmenter
   column; the Transcription tab uses the default. For an ensemble pass on the command line the flags
   are `--pass1-vad-version` and `--pass2-vad-version`. All three models ship inside WhisperJAV
@@ -455,8 +491,11 @@ With thanks to **@Mimic-me**, who contributed these as a reviewable batch.
   are 0.5 conservative / 0.4 balanced / 0.3 aggressive, the same for every build.
 
   **Which build suits your material is worth trying.** The numbers above are a single clip and are
-  not a recommendation; 3.1 is the default because it is the most conservative of the three about
-  what it calls speech.
+  not a recommendation. **4.0 is the default.** It finds more speech than 3.1 — on that clip, 44.8 %
+  of the audio against 31.2 % — and speech the VAD does not find is speech the recognizer never
+  sees. If you would rather the detector erred the other way, 3.1 is the most conservative of the
+  three about what it calls speech: `--vad-version 3.1`, or the Speech Segmenter column of a
+  Balanced pass in the Ensemble tab.
 
   **This breaks scripts that set a speech segmenter for Balanced, deliberately.**
   `--speech-segmenter` is no longer accepted with `--mode balanced`, and
@@ -700,11 +739,11 @@ behaviour instead.
   of the video. The second check, "speech was detected but nothing came back", needs a
   separate speech segmenter, and Balanced no longer has one. In ensemble runs a failed
   pass 2 also makes the file `suspect`.
-- **The Transcription tab always uses Silero 3.1; only the Ensemble tab lets you choose.**
+- **The Transcription tab always uses Silero 4.0; only the Ensemble tab lets you choose.**
   `--vad-version 3.1|4.0|6.2` works on the command line, and in the Ensemble tab a pass whose
   pipeline is Balanced offers the three builds in its Speech Segmenter column. The Transcription
-  tab has no such control, so a single-pass Balanced run started from it gets the default, 3.1. If
-  you want 4.0 or 6.2 for a single-pass run, use the command line.
+  tab has no such control, so a single-pass Balanced run started from it gets the default, 4.0. If
+  you want 3.1 or 6.2 for a single-pass run, use the command line.
 - **Kaggle support (#329, #330) has moved to a release after this one.** It was expected in
   September; it is not in v1.9.2. Colab is unaffected.
 - **The root cause behind #394 is still open.** The recognizer can enter a state
@@ -718,7 +757,8 @@ behaviour instead.
 
 | Date | Change |
 |------|--------|
-| 2026-09-09 | Balanced runs the Internal FW Silero VAD and nothing else: `--vad-version 3.1|4.0|6.2` (default 3.1) picks the Silero build, all three models ship inside WhisperJAV, and `--speech-segmenter`, `--pass1/2-speech-segmenter`, `--max-group-duration` and `--chunk-threshold` now stop the run on Balanced instead of being accepted. `--no-vad` removed. Detection thresholds 0.5 / 0.4 / 0.3. Faster-Whisper fixed to SYSTRAN master @ ed9a06c (three commits past 1.2.1, for the Silero v6.2 weights) and `ctranslate2==4.8.1` |
+| 2026-09-12 | Balanced's built-in VAD defaults to Silero **4.0** (was 3.1); Fidelity's default speech segmenter is **FireRedVAD** (was silero-v3.1 on `--mode fidelity` and whisperseg on an `--ensemble` fidelity pass — the two entry points now agree). Both follow `--sensitivity`. FireRedVAD's model is now fetched during the start-up check, so a machine that cannot download it stops before transcribing instead of writing an empty file. The RUN SUMMARY's `COVERAGE` column is renamed **`MILEAGE`**. The obsolete `install_in_dependency_order` key was dropped from the installer's constructor config |
+| 2026-09-09 | Balanced runs the Internal FW Silero VAD and nothing else: `--vad-version 3.1|4.0|6.2` (default 3.1 — **superseded 2026-09-12, the default is now 4.0**) picks the Silero build, all three models ship inside WhisperJAV, and `--speech-segmenter`, `--pass1/2-speech-segmenter`, `--max-group-duration` and `--chunk-threshold` now stop the run on Balanced instead of being accepted. `--no-vad` removed. Detection thresholds 0.5 / 0.4 / 0.3. Faster-Whisper fixed to SYSTRAN master @ ed9a06c (three commits past 1.2.1, for the Silero v6.2 weights) and `ctranslate2==4.8.1` |
 | 2026-09-11 | Semantic scene bounds are 28 s to 240 s on Balanced and Fidelity, at every sensitivity. The ceiling was 20 min on Balanced and 7 min (3 at aggressive) on Fidelity; Fidelity's floor was 30/20/10 s. Fast, auditok and silero untouched. The engine's overlong-scene warning now reaches the log |
 | 2026-09-09 | Semantic is the default scene detector, and each scene detector finally receives its own parameter names — every semantic run since v1.8.11 had silently used the engine's built-in 20 s/420 s. Balanced resolved 28 s minimum / 20 min maximum at the time (superseded by the 240 s ceiling, 2026-09-11) |
 | 2026-09-06 | A GPU the PyTorch build has no kernels for stops the run at start-up and asks whether to continue on the CPU or abort (GUI: abort, tick "Accept CPU-only mode" to proceed); `--check` exits 1 on such a card (#411, #326, #333) |

@@ -71,6 +71,19 @@ spec:
   # --- Compute ---
   use_gpu: false               # 0.6M params — CPU is fast and spares ASR VRAM
 
+  # --- Model location ---
+  # null = use the copy WhisperJAV downloads (the Windows installer fetches it
+  # during installation; otherwise it is fetched at the start of the first run
+  # that needs it, and kept).
+  #
+  # Set this to a directory you downloaded yourself if this machine cannot reach
+  # Hugging Face. Either the repo root or its VAD/ subfolder works:
+  #   huggingface-cli download FireRedTeam/FireRedVAD --local-dir ./pretrained_models/FireRedVAD
+  #   modelscope download --model xukaituo/FireRedVAD --local_dir ./pretrained_models/FireRedVAD
+  # (ModelScope is upstream's recommendation for users in China.)
+  # The environment variable WHISPERJAV_FIREREDVAD_MODEL_DIR does the same thing.
+  model_dir: null
+
 # =============================================================================
 # Sensitivity Presets
 # =============================================================================

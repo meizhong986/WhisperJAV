@@ -71,15 +71,26 @@ from whisperjav.utils.logger import logger
 VAD_VERSIONS = ("3.1", "4.0", "6.2")
 
 # S8: the default VAD version for the balanced pipeline.
-DEFAULT_VAD_VERSION = "3.1"
+# 4.0 since 2026-09-12 (owner, release-candidate testing); it was 3.1 from the
+# v1.9.2 development cycle up to that point. Read by the Pydantic
+# FasterWhisperVADOptions default, by main.py / pass_worker.py help text and by
+# the GUI's Customize > Segmenter info line, so this is the only place it is set
+# on the Python side. The GUI Ensemble tab carries its own copy -- see
+# VAD_VERSION_LABELS below.
+DEFAULT_VAD_VERSION = "4.0"
 
-# Human labels for the GUI's Customize > Segmenter info line (webview_gui/api.py).
-# NOT the source for the CLI help (which builds its list from VAD_VERSIONS) nor for the
-# Ensemble-tab dropdown (which carries its own copy at app.js:vadVersionOptions) --
-# keep that copy in step by hand.
+# Human labels for the Silero builds.
+#
+# NOTHING CURRENTLY DISPLAYS THESE STRINGS (checked 2026-09-12). The one reader,
+# webview_gui/api.py:1295, does `", ".join(VAD_VERSION_LABELS)` -- joining a dict
+# iterates its KEYS, so the Customize > Segmenter info line renders "3.1, 4.0, 6.2".
+# The "(default)" marker below is therefore dead text kept only so the dict does not
+# contradict DEFAULT_VAD_VERSION; do not cite it as a consumer of that constant.
+# The CLI help builds its list from VAD_VERSIONS, and the Ensemble-tab dropdown carries
+# its own copy at app.js:vadVersionOptions -- keep that copy in step by hand.
 VAD_VERSION_LABELS: Dict[str, str] = {
-    "3.1": "Internal FW Silero VAD 3.1 (default)",
-    "4.0": "Internal FW Silero VAD 4.0",
+    "3.1": "Internal FW Silero VAD 3.1",
+    "4.0": "Internal FW Silero VAD 4.0 (default)",
     "6.2": "Internal FW Silero VAD 6.2 (latest)",
 }
 

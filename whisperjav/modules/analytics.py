@@ -356,9 +356,18 @@ def render(result: AudioAnalytics) -> List[str]:
 
     if quiet:
         lines.append("")
-        lines.append("  If the subtitles do look sparse, either of these may help:")
-        lines.append("     --vad-threshold 0.15             pick up quieter speech")
-        lines.append("     --speech-enhancement ffmpeg-dsp  raise the level first")
+        # Name flags that EXIST. `--speech-enhancement` never did: argparse rejects it
+        # with exit 2, and on a single-pass Balanced or Fidelity run there is no way to
+        # turn enhancement on at all -- no CLI flag, and the GUI's Speech Enhancer
+        # control lives only in the Ensemble tab. Advice a user cannot follow is worse
+        # than no advice. (Found 2026-09-12 while writing the release notes.)
+        lines.append("  If the subtitles do look sparse, this may help:")
+        lines.append("     --vad-threshold 0.15   pick up quieter speech")
+        lines.append("")
+        lines.append("  Raising the level first also helps, but it is only available on")
+        lines.append("  two-pass runs (--pass1-speech-enhancer ffmpeg-dsp, or the Speech")
+        lines.append("  Enhancer column in the GUI's Ensemble tab) and on --mode qwen")
+        lines.append("  (--qwen-enhancer ffmpeg-dsp).")
 
     lines.append(_RULE)
     return lines

@@ -45,16 +45,19 @@ class TestAdapter:
         for v in VAD_VERSIONS:
             assert model_path(v).is_file(), f"missing bundled model: {model_path(v)}"
 
-    def test_default_is_3_1(self):
+    def test_default_is_4_0(self):
+        """Owner, 2026-09-12: the balanced pipeline's built-in VAD runs Silero 4.0.
+        It was 3.1 for the rest of the v1.9.2 development cycle."""
         from whisperjav.modules.silero_vad_adapter import DEFAULT_VAD_VERSION
-        assert DEFAULT_VAD_VERSION == "3.1"
+        assert DEFAULT_VAD_VERSION == "4.0"
 
     @pytest.mark.parametrize("given,expected", [
-        (None, "3.1"),            # the common case: no override
+        (None, "4.0"),            # the common case: no override
+        ("3.1", "3.1"),
         ("4.0", "4.0"),
         ("6.2", "6.2"),
-        ("silero-v6.2", "3.1"),   # not a version string -- warn and default
-        ("nonsense", "3.1"),      # falls back, never raises
+        ("silero-v6.2", "4.0"),   # not a version string -- warn and default
+        ("nonsense", "4.0"),      # falls back, never raises
     ])
     def test_normalise_version(self, given, expected):
         from whisperjav.modules.silero_vad_adapter import normalise_version
@@ -112,10 +115,12 @@ class TestAdapter:
 # The preset (single source of truth)
 # =============================================================================
 class TestPreset:
-    def test_version_defaults_to_3_1_on_every_sensitivity(self):
+    def test_version_defaults_to_4_0_on_every_sensitivity(self):
+        """The presets do not spell the version out; they inherit
+        DEFAULT_VAD_VERSION, so all three move together (owner, 2026-09-12)."""
         from whisperjav.config.components.vad.faster_whisper_vad import FasterWhisperVAD
         for name in ("conservative", "balanced", "aggressive"):
-            assert FasterWhisperVAD.get_preset(name).version == "3.1"
+            assert FasterWhisperVAD.get_preset(name).version == "4.0"
 
     def test_owner_thresholds(self):
         """conservative 0.5 / balanced 0.4 / aggressive 0.3 (owner, 2026-09-09)."""
@@ -167,7 +172,7 @@ class TestCli:
         for sensitivity, threshold in (("conservative", 0.5), ("balanced", 0.4), ("aggressive", 0.3)):
             cfg = _dump(tmp_path, "--mode", "balanced", "--sensitivity", sensitivity)
             vad = cfg["resolved_config"]["params"]["vad"]
-            assert vad["version"] == "3.1"
+            assert vad["version"] == "4.0"
             assert vad["threshold"] == threshold
 
     def test_explicit_version_wins(self, tmp_path):

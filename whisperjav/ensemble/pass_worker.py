@@ -97,7 +97,10 @@ from whisperjav.config.segmenter_presets import (  # noqa: E402
     DEFAULT_SCENE_DETECTOR,
     SEGMENTER_TOOL_NAMES as _SEGMENTER_TOOL_NAMES,
     resolve_segmenter_sensitivity as resolve_qwen_sensitivity,
+    effective_segmenter_for_pass,
+    segmenter_accepts,
 )
+from whisperjav.modules.silero_vad_adapter import DEFAULT_VAD_VERSION  # noqa: E402
 
 # Provider params - common transcriber options shared by all backends
 PROVIDER_PARAMS_COMMON = {
@@ -1733,6 +1736,26 @@ def _apply_gui_overrides(
             "Pass %s: balanced pipeline uses %s (built-in VAD)",
             pass_number, speech_segmenter,
         )
+    elif effective_segmenter_for_pass(pass_config.get("pipeline"), speech_segmenter) \
+            != speech_segmenter:
+        # Owner, 2026-09-12: a fidelity pass defaults to FireRedVAD.
+        # Without this the block below was skipped entirely, resolve_legacy_pipeline
+        # leaves params["speech_segmenter"] unset, and WhisperProASR's own fallback
+        # decided the backend -- so an ensemble fidelity pass and `--mode fidelity`
+        # resolved to different segmenters. Setting it here also means the pass gets
+        # its per-sensitivity preset resolved below, which the fallback path never
+        # did. An explicit --passN-speech-segmenter still wins.
+        #
+        # The rule itself lives in config/segmenter_presets.effective_segmenter_for_pass
+        # so main.py's start-up model check cannot disagree with what runs here.
+        speech_segmenter = effective_segmenter_for_pass(
+            pass_config.get("pipeline"), speech_segmenter
+        )
+        logger.debug(
+            "Pass %s: fidelity pipeline uses %s (no segmenter specified)",
+            pass_number, speech_segmenter,
+        )
+
     if speech_segmenter is not None:  # Allow empty string for default
         segmenter_backend = SPEECH_SEGMENTER_MAP.get(speech_segmenter, speech_segmenter)
 
@@ -1781,7 +1804,8 @@ def _apply_gui_overrides(
     )
 
     # v1.9.2 (S6-S8): which Silero build the built-in VAD runs for this pass.
-    # apply_balanced_vad_defaults above already put the preset's version (3.1) into
+    # apply_balanced_vad_defaults above already put the preset's version
+    # (DEFAULT_VAD_VERSION, 4.0 since 2026-09-12) into
     # params["vad"]; an explicit --passN-vad-version / GUI choice wins. Runs after
     # that call for exactly that reason. FasterWhisperProASR reads it and installs
     # the adapter inside the process that hosts the model.
@@ -1843,7 +1867,19 @@ def _apply_gui_overrides(
         if "speech_segmenter" not in resolved_config["params"]:
             resolved_config["params"]["speech_segmenter"] = {}
         resolved_config["params"]["speech_segmenter"]["speech_pad_ms"] = speech_pad_ms
-        logger.debug("Pass %s: Override speech_pad_ms = %s", pass_number, speech_pad_ms)
+        # Same check as main.py: the factory silently drops speech_pad_ms for a
+        # backend whose schema has no such key (firered-vad, ten), so a pass that
+        # carries the GUI's "Speech pad" value must say when it will not be used.
+        _seg_backend = (resolved_config["params"].get("speech_segmenter") or {}).get("backend")
+        if segmenter_accepts(_seg_backend, "speech_pad_ms"):
+            logger.debug("Pass %s: Override speech_pad_ms = %s", pass_number, speech_pad_ms)
+        else:
+            logger.warning(
+                "Pass %s: the speech pad of %dms is ignored -- the '%s' speech "
+                "segmenter has no speech-pad setting. It pads the start and end of "
+                "each segment separately, at the values this pass's sensitivity chose.",
+                pass_number, speech_pad_ms, _seg_backend,
+            )
 
     # C11 (owner): ONE INFO line per pass naming the VAD that will run. Same reason as
     # main.py -- the recognizer is rebuilt on every model refresh, so the line belongs at
@@ -1855,7 +1891,7 @@ def _apply_gui_overrides(
         logger.info(
             "Pass %s VAD: Silero v%s, threshold %s",
             pass_number,
-            _v.get("version", "3.1"),
+            _v.get("version", DEFAULT_VAD_VERSION),
             f"{_thr:.2f}" if isinstance(_thr, (int, float)) else "default",
         )
 

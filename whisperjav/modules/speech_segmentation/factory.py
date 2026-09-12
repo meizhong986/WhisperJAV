@@ -191,6 +191,9 @@ _PARAM_SCHEMAS = {
         "chunk_threshold_s":       (float, 1.0,   True),
         "max_group_duration_s":    (float, 6.0,   True),
         "use_gpu":                 (bool,  False, False),
+        # A model directory the user downloaded themselves. Nullable with no
+        # default: absent or None means "use the cache, then download".
+        "model_dir":               (str,   None,  True),
     },
 }
 

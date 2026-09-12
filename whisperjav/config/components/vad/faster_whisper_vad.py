@@ -26,7 +26,7 @@ apply to every selectable build.
 
 VERSION (v1.9.2, requirements S6-S8)
 ------------------------------------
-``version`` selects WHICH Silero build the built-in VAD runs: 3.1 (default), 4.0 or
+``version`` selects WHICH Silero build the built-in VAD runs: 3.1, 4.0 (default) or
 6.2. WhisperJAV ships all three ONNX models in the wheel; ``FasterWhisperProASR``
 reads this field and installs ``whisperjav.modules.silero_vad_adapter``, which
 rebinds faster-whisper's model factory. It is NOT a faster-whisper VadOptions field
@@ -126,7 +126,9 @@ class FasterWhisperVAD(VADComponent):
     #   0.5 / balanced 0.4 / aggressive 0.3, the SAME range for every Silero
     #   build. Do not re-measure them.  (They replace the T2 2026-06-29 values
     #   0.45 / 0.40 / 0.25.)
-    # version: 3.1 on every sensitivity (requirement S8).
+    # version: DEFAULT_VAD_VERSION on every sensitivity (requirement S8) -- 4.0
+    #   since 2026-09-12, 3.1 before that. Not spelled out in the presets below:
+    #   they inherit the field default so there is one place to change it.
     # max_speech_duration_s: the owner set these for v1.9.2 (2026-09-10, O3) after his
     #   feature-length manual test -- conservative 7.0 / balanced 6.0 / aggressive 6.0.
     #   They replace the T2 2026-06-29 values 20.0 / 15.0 / 9.0. This is a subtitle-
