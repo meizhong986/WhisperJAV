@@ -1,0 +1,2341 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/WhisperJAV/architecture/WHISPERSEG_TRADEOFF_INFO_PACK/">
+      
+      
+      
+      
+        
+          <link rel="alternate" href="./" hreflang="en">
+        
+          <link rel="alternate" href="../../zh/architecture/WHISPERSEG_TRADEOFF_INFO_PACK/" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>WhisperSeg VAD Tradeoff Analysis — Information Pack - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#whisperseg-vad-tradeoff-analysis-information-pack" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              WhisperSeg VAD Tradeoff Analysis — Information Pack
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Select language">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="../../zh/architecture/WHISPERSEG_TRADEOFF_INFO_PACK/" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/crispasr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CrispASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV Upgrade Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-context-what-is-whisperjav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. CONTEXT: What is WhisperJAV?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-background-the-mechanical-split-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. BACKGROUND: The Mechanical Split Problem
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. BACKGROUND: The Mechanical Split Problem">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-symptom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Symptom
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-root-cause-verified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Root Cause (Verified)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-upstream-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Upstream Verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-chickenrices-solution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 ChickenRice's Solution
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-what-we-changed-i2-fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. WHAT WE CHANGED (i2 Fix)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. WHAT WE CHANGED (i2 Fix)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-cla1-max_speech_duration_s-40-35" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 CLA1: max_speech_duration_s 4.0 → 3.5
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-fix-1-decouple-neg_threshold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Fix 1: Decouple neg_threshold
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-fix-2-smart-force-split-chickenrice-inspired" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Fix 2: Smart force-split (ChickenRice-inspired)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-previous-old-parameter-state-for-aggressive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Previous (old) parameter state for aggressive
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-new-parameter-state-for-aggressive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 New parameter state for aggressive
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-e2e-test-results-the-tradeoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. E2E TEST RESULTS — THE TRADEOFF
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. E2E TEST RESULTS — THE TRADEOFF">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-old-code-threshold015-no-explicit-neg_threshold-001-max_speech40-naive-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Old code (threshold=0.15, no explicit neg_threshold → 0.01, max_speech=4.0, naive split)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-new-code-threshold015-neg_threshold010-max_speech35-smart-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 New code (threshold=0.15, neg_threshold=0.10, max_speech=3.5, smart split)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Analysis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-goal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. GOAL
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. GOAL">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#possible-directions-not-exhaustive-the-analyst-should-evaluate-independently" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Possible directions (not exhaustive — the analyst should evaluate independently):
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-reference-chickenrice-upstream-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. REFERENCE: ChickenRice Upstream Sources
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. REFERENCE: ChickenRice Upstream Sources">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-inferencepy-transwithaiwhisper-vad-encdec-asmr-onnx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 inference.py (TransWithAI/Whisper-Vad-EncDec-ASMR-onnx)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-vad_managerpy-faster-whisper-transwithai-chickenrice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 vad_manager.py (Faster-Whisper-TransWithAI-ChickenRice)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-inferpy-faster-whisper-transwithai-chickenrice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 infer.py (Faster-Whisper-TransWithAI-ChickenRice)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-download_modelspy-faster-whisper-transwithai-chickenrice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 download_models.py (Faster-Whisper-TransWithAI-ChickenRice)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-file-locations-in-whisperjav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. FILE LOCATIONS IN WHISPERJAV
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. FILE LOCATIONS IN WHISPERJAV">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#modified-for-i2-uncommitted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modified for i2 (uncommitted):
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-architecture-files-unmodified-for-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key architecture files (unmodified, for context):
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-machine-location" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State machine location:
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tests:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-parameter-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. PARAMETER REFERENCE
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. PARAMETER REFERENCE">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#aggressive-sensitivity-current-uncommitted-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aggressive sensitivity — current uncommitted state:
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conservative-and-balanced-unchanged" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conservative and balanced — unchanged:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-constraints-and-non-negotiables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. CONSTRAINTS AND NON-NEGOTIABLES
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-what-the-analyst-should-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. WHAT THE ANALYST SHOULD DO
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/en/architecture/WHISPERSEG_TRADEOFF_INFO_PACK.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="whisperseg-vad-tradeoff-analysis-information-pack">WhisperSeg VAD Tradeoff Analysis — Information Pack<a class="headerlink" href="#whisperseg-vad-tradeoff-analysis-information-pack" title="Permanent link">&para;</a></h1>
+<h2 id="1-context-what-is-whisperjav">1. CONTEXT: What is WhisperJAV?<a class="headerlink" href="#1-context-what-is-whisperjav" title="Permanent link">&para;</a></h2>
+<p>WhisperJAV is a subtitle generation tool for Japanese Adult Videos (JAV). It uses
+OpenAI Whisper with custom enhancements for Japanese language processing, scene
+detection, and voice activity detection (VAD).</p>
+<p>The <strong>anime-whisper</strong> ASR backend (inside the "qwen" / ChronosJAV pipeline) uses
+<strong>WhisperSeg</strong> — a Whisper encoder-decoder model fine-tuned on ~500h Japanese ASMR audio,
+exported to ONNX. It provides frame-level (20ms resolution) speech probabilities across
+30-second input windows. These probabilities are post-processed by a Silero-compatible
+dual-threshold hysteresis state machine to produce speech segments.</p>
+<p>In anime-whisper mode, <code>timestamp_mode="vad_only"</code> — meaning VAD segments directly
+become subtitle timing boundaries. This makes VAD segmentation quality absolutely
+critical for subtitle accuracy.</p>
+<hr />
+<h2 id="2-background-the-mechanical-split-problem">2. BACKGROUND: The Mechanical Split Problem<a class="headerlink" href="#2-background-the-mechanical-split-problem" title="Permanent link">&para;</a></h2>
+<h3 id="21-symptom">2.1 Symptom<a class="headerlink" href="#21-symptom" title="Permanent link">&para;</a></h3>
+<p>When running anime-whisper ensemble pass 1 with <strong>aggressive</strong> sensitivity, <strong>all</strong>
+subtitles were exactly 4.020s long with 0.020s (one frame) gaps between them. The VAD
+was operating as a fixed-interval chopper, not a probabilistic speech detector.</p>
+<h3 id="22-root-cause-verified">2.2 Root Cause (Verified)<a class="headerlink" href="#22-root-cause-verified" title="Permanent link">&para;</a></h3>
+<p>Two converging issues in <code>whisperseg.py::_probs_to_segments()</code>:</p>
+<p><strong>Issue A — neg_threshold cliff:</strong>
+The offset (hysteresis) threshold is derived as:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">neg_threshold</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">threshold</span> <span class="o">-</span> <span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.01</span><span class="p">)</span>
+</code></pre></div>
+This formula works fine at the upstream default <code>threshold=0.50</code> (gives neg_threshold=0.35).
+But our aggressive preset uses <code>threshold=0.15</code> (intentionally low to capture all possible
+dialogue, including quiet/whispered speech). At 0.15, the formula gives
+<code>neg_threshold=0.01</code> — functionally "never end a segment naturally." The hysteresis is dead.</p>
+<p><strong>Issue B — Naive force-split:</strong>
+When a speech segment exceeds <code>max_speech_duration_s</code> (was 4.0s), it's chopped at an
+exact interval. After each split, <code>triggered=False</code> resets the state machine, which
+immediately re-triggers onset (any probability &gt;= 0.15 is guaranteed in continuous speech).
+Result: perfectly regular 4.020s segments with mechanical 0.020s gaps. No intelligent
+boundary seeking.</p>
+<h3 id="23-upstream-verification">2.3 Upstream Verification<a class="headerlink" href="#23-upstream-verification" title="Permanent link">&para;</a></h3>
+<p>Our state machine is a faithful line-for-line port of two upstream sources:</p>
+<ol>
+<li>
+<p><strong>TransWithAI/Whisper-Vad-EncDec-ASMR-onnx/inference.py</strong> — <code>get_speech_timestamps()</code>
+https://raw.githubusercontent.com/TransWithAI/Faster-Whisper-TransWithAI-ChickenRice/62104884d8553be1c30bc88c157d82b2b8d0792b/src/faster_whisper_transwithai_chickenrice/infer.py</p>
+</li>
+<li>
+<p><strong>TransWithAI/Faster-Whisper-TransWithAI-ChickenRice/vad_manager.py</strong> — <code>get_speech_timestamps_onnx()</code>
+https://raw.githubusercontent.com/TransWithAI/Faster-Whisper-TransWithAI-ChickenRice/62104884d8553be1c30bc88c157d82b2b8d0792b/src/faster_whisper_transwithai_chickenrice/vad_manager.py</p>
+</li>
+</ol>
+<p>Both upstreams use the same <code>neg_threshold</code> formula, the same naive force-split, and
+the same defaults (threshold=0.50, max_speech=infinity). Our problem is a parameter
+interaction at the extreme low end of threshold, not a porting error.</p>
+<h3 id="24-chickenrices-solution">2.4 ChickenRice's Solution<a class="headerlink" href="#24-chickenrices-solution" title="Permanent link">&para;</a></h3>
+<p>The ChickenRice repo has a <strong>POST-VAD</strong> smart splitter that our code lacked:
+<code>infer.py::create_contiguous_chunks()</code> with <code>split_window_factor=0.4</code>.</p>
+<p>How it works:
+- Groups VAD speech spans into contiguous chunks up to a maximum duration
+- When a chunk would exceed the maximum, searches the <strong>last 40%</strong> for the
+  <strong>largest silence gap</strong> (gap between consecutive speech spans)
+- Splits at the midpoint of that gap
+- Falls back to exact chop if no gap &gt; 100ms is found</p>
+<p>Key distinction: ChickenRice's splitter operates on <strong>speech spans</strong> (post-VAD),
+not raw probabilities (in-VAD). It looks for gaps between spans, not probability dips.</p>
+<hr />
+<h2 id="3-what-we-changed-i2-fix">3. WHAT WE CHANGED (i2 Fix)<a class="headerlink" href="#3-what-we-changed-i2-fix" title="Permanent link">&para;</a></h2>
+<p>Three changes were made to address the mechanical split:</p>
+<h3 id="31-cla1-max_speech_duration_s-40-35">3.1 CLA1: max_speech_duration_s 4.0 → 3.5<a class="headerlink" href="#31-cla1-max_speech_duration_s-40-35" title="Permanent link">&para;</a></h3>
+<p>Owner-directed. Typical JAV dialogue is ~2.7s, so 4.0s was too long. 3.5s is a tighter
+ceiling that still accommodates longer natural sentences.</p>
+<p><strong>File:</strong> <code>whisperjav/config/anime_whisper_vad.py</code> line 67</p>
+<h3 id="32-fix-1-decouple-neg_threshold">3.2 Fix 1: Decouple neg_threshold<a class="headerlink" href="#32-fix-1-decouple-neg_threshold" title="Permanent link">&para;</a></h3>
+<p>Added explicit <code>neg_threshold</code> parameter to WhisperSeg so onset and offset thresholds
+can be set independently.</p>
+<ul>
+<li><code>whisperseg.py __init__</code>: added <code>neg_threshold: Optional[float] = None</code> (line 83)</li>
+<li><code>whisperseg.py _probs_to_segments</code>: if <code>self.neg_threshold is not None</code>, uses it
+  directly; else derives from formula (lines 457-460)</li>
+<li><code>anime_whisper_vad.py</code>: added <code>"neg_threshold": 0.10</code> to aggressive row (line 64)</li>
+<li><code>factory.py</code>: added <code>"neg_threshold": (float, None, True)</code> to whisperseg schema (line 151)</li>
+</ul>
+<p>The idea: keep <code>threshold=0.15</code> for wide-net onset (captures quiet dialogue), but use
+<code>neg_threshold=0.10</code> for offset so segments can END naturally when probability drops
+below 0.10. This restores hysteresis without sacrificing recall.</p>
+<h3 id="33-fix-2-smart-force-split-chickenrice-inspired">3.3 Fix 2: Smart force-split (ChickenRice-inspired)<a class="headerlink" href="#33-fix-2-smart-force-split-chickenrice-inspired" title="Permanent link">&para;</a></h3>
+<p>When a segment hits <code>max_speech_duration_s</code>, instead of chopping at the exact boundary,
+search the <strong>last 40%</strong> of the segment for the <strong>lowest-probability frame</strong> and split
+there. This is an adaptation of ChickenRice's <code>split_window_factor=0.4</code> logic, translated
+from "silence gaps between spans" (post-VAD) to "probability dips within continuous speech"
+(in-VAD).</p>
+<p><strong>Implementation</strong> (<code>whisperseg.py</code> lines 492-522):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">if</span> <span class="n">triggered</span> <span class="ow">and</span> <span class="s2">"start"</span> <span class="ow">in</span> <span class="n">current</span><span class="p">:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">duration</span> <span class="o">=</span> <span class="n">i</span> <span class="o">-</span> <span class="n">current</span><span class="p">[</span><span class="s2">"start"</span><span class="p">]</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="k">if</span> <span class="n">duration</span> <span class="o">&gt;</span> <span class="n">max_speech_frames</span><span class="p">:</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>        <span class="n">window_start</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">max_speech_frames</span> <span class="o">*</span> <span class="mf">0.6</span><span class="p">)</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>        <span class="n">window_probs</span> <span class="o">=</span> <span class="n">current_probs</span><span class="p">[</span><span class="n">window_start</span><span class="p">:</span><span class="n">max_speech_frames</span><span class="p">]</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="k">if</span> <span class="n">window_probs</span><span class="p">:</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>            <span class="n">min_prob</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">window_probs</span><span class="p">))</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>            <span class="n">mean_prob</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">window_probs</span><span class="p">))</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>            <span class="k">if</span> <span class="n">min_prob</span> <span class="o">&lt;</span> <span class="n">mean_prob</span> <span class="o">*</span> <span class="mf">0.85</span><span class="p">:</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>                <span class="n">best_offset</span> <span class="o">=</span> <span class="n">window_start</span> <span class="o">+</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">window_probs</span><span class="p">))</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>            <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>                <span class="n">best_offset</span> <span class="o">=</span> <span class="n">max_speech_frames</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>        <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>            <span class="n">best_offset</span> <span class="o">=</span> <span class="n">max_speech_frames</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>        <span class="n">split_frame</span> <span class="o">=</span> <span class="n">current</span><span class="p">[</span><span class="s2">"start"</span><span class="p">]</span> <span class="o">+</span> <span class="n">best_offset</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>        <span class="n">current</span><span class="p">[</span><span class="s2">"end"</span><span class="p">]</span> <span class="o">=</span> <span class="n">split_frame</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>        <span class="c1"># ... stats ...</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>        <span class="n">speeches</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">current</span><span class="p">)</span>
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>        <span class="n">current</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"start"</span><span class="p">:</span> <span class="n">split_frame</span><span class="p">}</span>
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>        <span class="n">current_probs</span> <span class="o">=</span> <span class="n">current_probs</span><span class="p">[</span><span class="n">best_offset</span><span class="p">:]</span>
+<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>        <span class="n">temp_end</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>        <span class="k">continue</span>
+</code></pre></div>
+<p>Key design decisions:
+- <strong><code>triggered</code> stays True</strong> across splits — no re-onset needed, no audio gap
+- <strong>Probability array carried forward</strong> — the remainder of the speech continues
+- <strong>Quality gate</strong>: <code>min_prob &lt; mean_prob * 0.85</code> — only splits at a dip if it's
+  meaningfully below the window mean. With flat probabilities (all 0.8), argmin
+  returns index 0, which would cause ALL splits at 60% of max_speech. The 85%
+  gate prevents this, falling back to the full <code>max_speech_frames</code> ceiling instead.
+- <strong>No gap inserted</strong> — segments are contiguous, unlike the old code which reset
+  <code>triggered=False</code> and created a 0.020s gap.</p>
+<h3 id="34-previous-old-parameter-state-for-aggressive">3.4 Previous (old) parameter state for aggressive<a class="headerlink" href="#34-previous-old-parameter-state-for-aggressive" title="Permanent link">&para;</a></h3>
+<p>Prior to the i2 fix, the aggressive row (set in commit <code>09f0eb3</code>, the cross-clip VAD
+sweep retune) was:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="s2">"aggressive"</span><span class="p">:</span> <span class="p">{</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="s2">"chunk_threshold_s"</span><span class="p">:</span> <span class="mf">0.2</span><span class="p">,</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="s2">"max_group_duration_s"</span><span class="p">:</span> <span class="mf">2.0</span><span class="p">,</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="s2">"threshold"</span><span class="p">:</span> <span class="mf">0.15</span><span class="p">,</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="c1"># neg_threshold: NOT SET → formula gives max(0.15-0.15, 0.01) = 0.01</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="s2">"start_pad_ms"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="s2">"end_pad_ms"</span><span class="p">:</span> <span class="mi">30</span><span class="p">,</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="s2">"max_speech_duration_s"</span><span class="p">:</span> <span class="mf">4.0</span><span class="p">,</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="35-new-parameter-state-for-aggressive">3.5 New parameter state for aggressive<a class="headerlink" href="#35-new-parameter-state-for-aggressive" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="s2">"aggressive"</span><span class="p">:</span> <span class="p">{</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="s2">"chunk_threshold_s"</span><span class="p">:</span> <span class="mf">0.2</span><span class="p">,</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="s2">"max_group_duration_s"</span><span class="p">:</span> <span class="mf">2.0</span><span class="p">,</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="s2">"threshold"</span><span class="p">:</span> <span class="mf">0.15</span><span class="p">,</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="s2">"neg_threshold"</span><span class="p">:</span> <span class="mf">0.10</span><span class="p">,</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="s2">"start_pad_ms"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="s2">"end_pad_ms"</span><span class="p">:</span> <span class="mi">30</span><span class="p">,</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="s2">"max_speech_duration_s"</span><span class="p">:</span> <span class="mf">3.5</span><span class="p">,</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="p">}</span>
+</code></pre></div>
+<hr />
+<h2 id="4-e2e-test-results-the-tradeoff">4. E2E TEST RESULTS — THE TRADEOFF<a class="headerlink" href="#4-e2e-test-results-the-tradeoff" title="Permanent link">&para;</a></h2>
+<p>The owner tested both old and new code on the same content using anime-whisper ensemble
+mode with aggressive sensitivity, semantic scene detection (default), and WhisperSeg
+(default).</p>
+<h3 id="41-old-code-threshold015-no-explicit-neg_threshold-001-max_speech40-naive-split">4.1 Old code (threshold=0.15, no explicit neg_threshold → 0.01, max_speech=4.0, naive split)<a class="headerlink" href="#41-old-code-threshold015-no-explicit-neg_threshold-001-max_speech40-naive-split" title="Permanent link">&para;</a></h3>
+<p><strong>Strengths:</strong>
+- Better dialogue capture — more subtitles generated, including dialogue in quiet/noisy areas
+- <strong>Better transcription accuracy</strong> — more characters captured per subtitle, fewer
+  truncations at word boundaries. The dialogue content itself is more correct and complete.</p>
+<p><strong>Weaknesses:</strong>
+- Timestamps start ~1 second too early
+- Timestamps finish slightly too soon
+- Two-way dialogues sometimes blended into a single subtitle line
+- All segments exactly 4.020s (mechanical, not probabilistic)</p>
+<h3 id="42-new-code-threshold015-neg_threshold010-max_speech35-smart-split">4.2 New code (threshold=0.15, neg_threshold=0.10, max_speech=3.5, smart split)<a class="headerlink" href="#42-new-code-threshold015-neg_threshold010-max_speech35-smart-split" title="Permanent link">&para;</a></h3>
+<p><strong>Strengths:</strong>
+- Better timestamp accuracy — segments align more naturally with speech
+- No more mechanical 4.020s uniform segments</p>
+<p><strong>Weaknesses (CRITICAL):</strong>
+- <strong>Worse transcription accuracy</strong> — characters missing at the beginning and/or end
+  of transcriptions. The dialogue that IS captured is less accurate / less complete
+  than the old code. <strong>This is the most important regression.</strong>
+- Fewer captured dialogues overall — dialogue in quiet or noisy areas is missed entirely</p>
+<h3 id="43-analysis">4.3 Analysis<a class="headerlink" href="#43-analysis" title="Permanent link">&para;</a></h3>
+<p><strong>The primary concern is transcription accuracy degradation, not just missed subtitles.</strong>
+The new code doesn't just capture fewer dialogues — the dialogues it DOES capture are
+transcribed less accurately (truncated beginnings/endings). This suggests the VAD
+segment boundaries are cutting into speech, not just failing to reach distant speech.</p>
+<p>Why this happens: The old code's dead hysteresis (neg_threshold=0.01) kept the state
+machine triggered through EVERYTHING — noise, silence, background music — which
+accidentally created very long segments that contained all the dialogue with generous
+margins. The Whisper ASR had more audio context around each speech passage, and the
+segment boundaries never cut into speech (they were always in non-speech territory,
+just far away from it). The segment boundaries were meaningless (all 4.020s), but the
+transcription quality was high because nothing was clipped.</p>
+<p>The new code's restored hysteresis (neg_threshold=0.10) allows the state machine to
+properly end segments when probability drops, which gives accurate timestamps. But it
+also ends segments during quiet passages, noise dips, and brief pauses — AND it may
+be ending segments too aggressively, clipping the edges of actual speech. When a
+segment boundary falls inside or too close to speech, the ASR truncates characters
+at the boundary.</p>
+<p><strong>The core tension:</strong> We want the wide-net dialogue capture AND transcription accuracy
+of the dead hysteresis, WITH the timestamp accuracy of the live hysteresis. These appear
+contradictory with the current architecture — but note that the accuracy problem may
+specifically point to neg_threshold=0.10 being too high, or min_silence_duration_ms=100
+being too short, or end_pad_ms=30 being insufficient to protect speech edges.</p>
+<hr />
+<h2 id="5-goal">5. GOAL<a class="headerlink" href="#5-goal" title="Permanent link">&para;</a></h2>
+<p>Find a solution that achieves ALL THREE:
+1. <strong>High transcription accuracy</strong> — the dialogue that IS captured must be complete and
+   correct, with no characters truncated at segment boundaries (like the old code).
+   <strong>This is the highest priority.</strong>
+2. <strong>High dialogue capture</strong> — don't miss dialogue in quiet/noisy areas (like the old code)
+3. <strong>Accurate timestamps</strong> — segments should align with actual speech boundaries (like the new code)</p>
+<p>The ideal outcome is a VAD configuration or algorithmic change that:
+- Keeps <code>threshold=0.15</code> for wide-net onset (non-negotiable — owner requirement)
+- Produces variable-length segments that follow natural speech boundaries
+- Does NOT clip into speech at segment edges (protects transcription accuracy)
+- Doesn't drop dialogue in challenging audio conditions
+- Doesn't pad 1s too early or truncate endings</p>
+<h3 id="possible-directions-not-exhaustive-the-analyst-should-evaluate-independently">Possible directions (not exhaustive — the analyst should evaluate independently):<a class="headerlink" href="#possible-directions-not-exhaustive-the-analyst-should-evaluate-independently" title="Permanent link">&para;</a></h3>
+<ol>
+<li>
+<p><strong>Lower neg_threshold further</strong> (e.g., 0.05 instead of 0.10) — keeps more segments
+   alive through dips but still allows SOME natural endings</p>
+</li>
+<li>
+<p><strong>Longer min_silence_duration_ms</strong> — even when prob &lt; neg_threshold, require a longer
+   sustained silence before ending. Currently 100ms. Increasing to 200-300ms would let
+   brief dips pass without ending the segment.</p>
+</li>
+<li>
+<p><strong>Two-pass approach</strong> — first pass with dead hysteresis (old code) for maximum recall,
+   second pass to trim/refine timestamps. Owner previously asked about this; conclusion
+   was single-pass should suffice, but the E2E results reopen the question.</p>
+</li>
+<li>
+<p><strong>Post-VAD merging</strong> — run with live hysteresis (new code), then merge segments that
+   are separated by very short gaps (&lt; some threshold) into contiguous segments.</p>
+</li>
+<li>
+<p><strong>ChickenRice's actual post-VAD approach</strong> — run VAD at higher neg_threshold to get
+   many small segments with accurate boundaries, then use <code>create_contiguous_chunks</code>
+   logic to group them up to max_group_duration_s. This is closer to how ChickenRice
+   actually works: short accurate segments → smart grouping. Currently our code groups
+   at the segment level (gap-based grouping in <code>group_segments</code> from <code>ten.py</code>), but the
+   grouping logic may not be optimal for this use case.</p>
+</li>
+<li>
+<p><strong>Adaptive neg_threshold</strong> — start with low neg_threshold for high recall, but if a
+   segment is getting very long (approaching max_speech), temporarily raise neg_threshold
+   to find a natural break before forced split.</p>
+</li>
+</ol>
+<hr />
+<h2 id="6-reference-chickenrice-upstream-sources">6. REFERENCE: ChickenRice Upstream Sources<a class="headerlink" href="#6-reference-chickenrice-upstream-sources" title="Permanent link">&para;</a></h2>
+<h3 id="61-inferencepy-transwithaiwhisper-vad-encdec-asmr-onnx">6.1 inference.py (TransWithAI/Whisper-Vad-EncDec-ASMR-onnx)<a class="headerlink" href="#61-inferencepy-transwithaiwhisper-vad-encdec-asmr-onnx" title="Permanent link">&para;</a></h3>
+<p>The original WhisperSeg inference script. Key function: <code>get_speech_timestamps()</code>.
+- Dual-threshold state machine (threshold / neg_threshold via <code>max(threshold-0.15, 0.01)</code>)
+- Naive force-split at max_speech_duration (exact interval chop, triggered=False after)
+- Default threshold=0.50, default max_speech=infinity
+- MIT License</p>
+<h3 id="62-vad_managerpy-faster-whisper-transwithai-chickenrice">6.2 vad_manager.py (Faster-Whisper-TransWithAI-ChickenRice)<a class="headerlink" href="#62-vad_managerpy-faster-whisper-transwithai-chickenrice" title="Permanent link">&para;</a></h3>
+<p>ChickenRice's version of the same state machine. Nearly identical to inference.py.
+Key function: <code>get_speech_timestamps_onnx()</code>.
+- Same formula, same naive split, same defaults
+- Additionally wraps the result in a pandas-friendly format</p>
+<h3 id="63-inferpy-faster-whisper-transwithai-chickenrice">6.3 infer.py (Faster-Whisper-TransWithAI-ChickenRice)<a class="headerlink" href="#63-inferpy-faster-whisper-transwithai-chickenrice" title="Permanent link">&para;</a></h3>
+<p>Contains <code>create_contiguous_chunks()</code> — the POST-VAD smart splitter:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">create_contiguous_chunks</span><span class="p">(</span><span class="n">speeches</span><span class="p">,</span> <span class="n">max_duration</span><span class="p">,</span> <span class="n">split_window_factor</span><span class="o">=</span><span class="mf">0.4</span><span class="p">):</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="c1"># Groups speech spans into chunks up to max_duration</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="c1"># When a chunk exceeds max_duration:</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="c1">#   - Searches the last (split_window_factor * 100)% for the largest silence GAP</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="c1">#   - Splits at the midpoint of that gap</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="c1">#   - Falls back to exact chop if no gap &gt; 100ms</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="c1"># Returns list of (start_sec, end_sec) chunks</span>
+</code></pre></div>
+<p>This operates on completed speech spans (the output of <code>get_speech_timestamps_onnx</code>),
+NOT on raw probabilities. It's looking for gaps BETWEEN segments, not dips WITHIN a
+single continuous-speech segment.</p>
+<h3 id="64-download_modelspy-faster-whisper-transwithai-chickenrice">6.4 download_models.py (Faster-Whisper-TransWithAI-ChickenRice)<a class="headerlink" href="#64-download_modelspy-faster-whisper-transwithai-chickenrice" title="Permanent link">&para;</a></h3>
+<p>Contains model download and configuration. Less relevant to the VAD tradeoff, but
+documents the default parameters and model revision used by ChickenRice.</p>
+<hr />
+<h2 id="7-file-locations-in-whisperjav">7. FILE LOCATIONS IN WHISPERJAV<a class="headerlink" href="#7-file-locations-in-whisperjav" title="Permanent link">&para;</a></h2>
+<h3 id="modified-for-i2-uncommitted">Modified for i2 (uncommitted):<a class="headerlink" href="#modified-for-i2-uncommitted" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>What changed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>whisperjav/config/anime_whisper_vad.py</code></td>
+<td>max_speech 4.0→3.5, added neg_threshold=0.10 in aggressive</td>
+</tr>
+<tr>
+<td><code>whisperjav/modules/speech_segmentation/backends/whisperseg.py</code></td>
+<td>neg_threshold param, decoupled offset, smart force-split</td>
+</tr>
+<tr>
+<td><code>whisperjav/modules/speech_segmentation/factory.py</code></td>
+<td>neg_threshold in whisperseg param schema</td>
+</tr>
+</tbody>
+</table>
+<h3 id="key-architecture-files-unmodified-for-context">Key architecture files (unmodified, for context):<a class="headerlink" href="#key-architecture-files-unmodified-for-context" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>whisperjav/modules/speech_segmentation/backends/ten.py</code></td>
+<td><code>group_segments()</code> — post-VAD gap/duration grouping</td>
+</tr>
+<tr>
+<td><code>whisperjav/modules/speech_segmentation/base.py</code></td>
+<td><code>SpeechSegment</code>, <code>SegmentationResult</code> dataclasses</td>
+</tr>
+<tr>
+<td><code>whisperjav/pipelines/qwen_pipeline.py</code></td>
+<td>ChronosJAV pipeline using anime-whisper</td>
+</tr>
+<tr>
+<td><code>whisperjav/ensemble/pass_worker.py</code></td>
+<td>Ensemble pass orchestration</td>
+</tr>
+<tr>
+<td><code>whisperjav/config/v4/ecosystems/</code></td>
+<td>YAML config files</td>
+</tr>
+</tbody>
+</table>
+<h3 id="state-machine-location">State machine location:<a class="headerlink" href="#state-machine-location" title="Permanent link">&para;</a></h3>
+<p><code>whisperseg.py::_probs_to_segments()</code> — lines 434-601. This is the function that
+converts the raw frame probability stream into speech segments. It contains:
+- Lines 457-460: neg_threshold derivation (or explicit value)
+- Lines 462-470: Duration/frame conversions
+- Lines 479-555: Main state machine loop (onset, force-split, hysteresis offset)
+- Lines 557-575: Post-hoc padding with overlap prevention
+- Lines 577-601: Frame indices → SpeechSegment conversion</p>
+<h3 id="tests">Tests:<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h3>
+<p>7 synthetic probability tests in the prior session (inline, not in a test file — they
+were run as verification, not committed as permanent tests). These test:
+1. neg_threshold storage when explicit
+2. Formula fallback when None
+3. Smart split seeks probability minimum
+4. Flat-probability fallback to full ceiling
+5. Natural offset with decoupled neg_threshold
+6. Old behavior confirmed at neg_threshold=0.01
+7. neg_threshold appears in _get_parameters()</p>
+<hr />
+<h2 id="8-parameter-reference">8. PARAMETER REFERENCE<a class="headerlink" href="#8-parameter-reference" title="Permanent link">&para;</a></h2>
+<h3 id="aggressive-sensitivity-current-uncommitted-state">Aggressive sensitivity — current uncommitted state:<a class="headerlink" href="#aggressive-sensitivity-current-uncommitted-state" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>threshold</code></td>
+<td>0.15</td>
+<td>Onset: speech starts when prob &gt;= 0.15</td>
+</tr>
+<tr>
+<td><code>neg_threshold</code></td>
+<td>0.10</td>
+<td>Offset: speech CANDIDATE end when prob &lt; 0.10</td>
+</tr>
+<tr>
+<td><code>min_silence_duration_ms</code></td>
+<td>100</td>
+<td>Silence confirmation: candidate end confirmed after 100ms sustained</td>
+</tr>
+<tr>
+<td><code>min_speech_duration_ms</code></td>
+<td>100</td>
+<td>Segments shorter than 100ms are dropped</td>
+</tr>
+<tr>
+<td><code>max_speech_duration_s</code></td>
+<td>3.5</td>
+<td>Force-split ceiling (smart split in last 40%)</td>
+</tr>
+<tr>
+<td><code>chunk_threshold_s</code></td>
+<td>0.2</td>
+<td>Post-VAD grouping: merge segments with gap &lt; 0.2s</td>
+</tr>
+<tr>
+<td><code>max_group_duration_s</code></td>
+<td>2.0</td>
+<td>Post-VAD grouping: groups capped at 2.0s</td>
+</tr>
+<tr>
+<td><code>start_pad_ms</code></td>
+<td>0</td>
+<td>No padding before speech onset</td>
+</tr>
+<tr>
+<td><code>end_pad_ms</code></td>
+<td>30</td>
+<td>30ms padding after speech offset</td>
+</tr>
+</tbody>
+</table>
+<h3 id="conservative-and-balanced-unchanged">Conservative and balanced — unchanged:<a class="headerlink" href="#conservative-and-balanced-unchanged" title="Permanent link">&para;</a></h3>
+<p><strong>Conservative:</strong> threshold=0.35, no neg_threshold (formula gives 0.20), chunk_threshold_s=0.3,
+max_group_duration_s=3.0, start_pad=100, end_pad=100</p>
+<p><strong>Balanced:</strong> threshold=0.30, no neg_threshold (formula gives 0.15), chunk_threshold_s=0.25,
+max_group_duration_s=2.5, start_pad=50, end_pad=50</p>
+<hr />
+<h2 id="9-constraints-and-non-negotiables">9. CONSTRAINTS AND NON-NEGOTIABLES<a class="headerlink" href="#9-constraints-and-non-negotiables" title="Permanent link">&para;</a></h2>
+<ol>
+<li>
+<p><strong>threshold=0.15 for aggressive is non-negotiable</strong> — owner explicitly chose this for
+   maximum dialogue recall. The low threshold is the whole point of aggressive mode.</p>
+</li>
+<li>
+<p><strong>Single-pass VAD preferred</strong> — owner was asked about two-pass and concluded single
+   pass should suffice. This conclusion may be revisited given the E2E results.</p>
+</li>
+<li>
+<p><strong>anime-whisper <code>timestamp_mode="vad_only"</code></strong> — VAD boundaries directly become subtitle
+   times. Any VAD improvement directly improves subtitles; any VAD regression directly
+   degrades subtitles.</p>
+</li>
+<li>
+<p><strong>Changes must be confined to aggressive sensitivity</strong> — conservative and balanced rows
+   must not be touched (they have their own validated defaults).</p>
+</li>
+<li>
+<p><strong>The WhisperSeg model itself is frozen</strong> — we cannot retrain or modify the ONNX model.
+   We can only change how its output probabilities are processed.</p>
+</li>
+<li>
+<p><strong>Smart force-split is a good direction</strong> — the mechanical 4.020s splits were the
+   original complaint. Any solution must avoid returning to uniform-length segments.</p>
+</li>
+</ol>
+<hr />
+<h2 id="10-what-the-analyst-should-do">10. WHAT THE ANALYST SHOULD DO<a class="headerlink" href="#10-what-the-analyst-should-do" title="Permanent link">&para;</a></h2>
+<ol>
+<li>
+<p><strong>Analyze the tradeoff deeply</strong> — why does the new code produce worse transcription
+   accuracy? Is it because segment boundaries cut into speech (clipping)? Is it because
+   shorter segments give the ASR less context? Or both? Understanding the mechanism is
+   essential before proposing a fix.</p>
+</li>
+<li>
+<p><strong>Evaluate the possible directions</strong> listed in Section 5, and propose others if they
+   identify better approaches.</p>
+</li>
+<li>
+<p><strong>Consider the interaction between parameters</strong> — neg_threshold, min_silence_duration_ms,
+   max_speech_duration_s, end_pad_ms, and chunk_threshold_s all interact. A change in one
+   may compensate for another.</p>
+</li>
+<li>
+<p><strong>Consider architectural alternatives</strong> — is the fix better applied at the state machine
+   level (in-VAD), or at the post-VAD grouping level (like ChickenRice's approach), or at
+   the ASR input level (feeding larger audio context regardless of VAD boundaries)?</p>
+</li>
+<li>
+<p><strong>Propose a specific recommendation</strong> with exact parameter values or code changes,
+   along with reasoning for why it should resolve the tradeoff.</p>
+</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

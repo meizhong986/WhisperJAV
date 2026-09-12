@@ -1,0 +1,2496 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/WhisperJAV/zh/architecture/WHISPERSEG_TRADEOFF_ANALYSIS_AND_RECOMMENDATION/">
+      
+      
+      
+      
+        
+          <link rel="alternate" href="../../../architecture/WHISPERSEG_TRADEOFF_ANALYSIS_AND_RECOMMENDATION/" hreflang="en">
+        
+          <link rel="alternate" href="./" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>WhisperSeg VAD Tradeoff — Analysis and Recommendation - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#whisperseg-vad-tradeoff-analysis-and-recommendation" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../../" title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              WhisperSeg VAD Tradeoff — Analysis and Recommendation
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="选择当前语言">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="../../../architecture/WHISPERSEG_TRADEOFF_ANALYSIS_AND_RECOMMENDATION/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../" title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/crispasr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CrispASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV 升级指南
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Executive Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-verified-finding-the-neg_threshold-call-chain-is-broken" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Verified Finding: the neg_threshold Call Chain Is Broken
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Verified Finding: the neg_threshold Call Chain Is Broken">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#corrected-effective-parameters-for-the-owners-e2e-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Corrected effective parameters for the owner's E2E runs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-why-the-old-code-transcribed-well-confirmed-mechanism" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Why the Old Code Transcribed Well (confirmed mechanism)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-why-the-new-run-regressed-hypotheses-consistent-with-all-four-symptoms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Why the New Run Regressed (hypotheses, consistent with all four symptoms)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-synthetic-evidence-what-live-hysteresis-will-do-and-why-010-is-wrong" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Synthetic Evidence: what live hysteresis will do (and why 0.10 is wrong)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-recommendation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Recommendation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Recommendation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#r1-wire-neg_threshold-end-to-end-bug-fix-required-regardless-of-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R1 — Wire neg_threshold end-to-end (bug fix, required regardless of values)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#r2-aggressive-row-values-informed-by-section-5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R2 — Aggressive row (values informed by Section 5)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#r3-verification-gate-before-e2e" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R3 — Verification gate before E2E
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#r4-e2e-watchpoints-and-fallback-knobs-one-change-at-a-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R4 — E2E watchpoints and fallback knobs (one change at a time)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-info-pack-directions-evaluated-5-of-the-pack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Info-Pack Directions Evaluated (§5 of the pack)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-stage-2-options-only-if-r1r2-e2e-still-shows-edge-clipping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Stage-2 Options (only if R1+R2 E2E still shows edge clipping)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-implementation-2026-07-30-and-the-gui-ensemble-path-owner-c1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Implementation (2026-07-30) and the GUI Ensemble Path (owner C1)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-what-was-verified-and-how" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. What Was Verified and How
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-ground-truth-benchmark-2026-07-30-owner-c2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Ground-Truth Benchmark (2026-07-30, owner C2)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11. Ground-Truth Benchmark (2026-07-30, owner C2)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Findings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-the-3a-refined-display-start-implemented-and-benchmarked-2026-07-30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. The "3a" Refined Display Start — Implemented and Benchmarked (2026-07-30)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="12. The &#34;3a&#34; Refined Display Start — Implemented and Benchmarked (2026-07-30)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#benchmark-netflix-gt-start-error-signed-vs-max-overlap-gt-sub" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Benchmark (Netflix GT; start-error = signed vs max-overlap GT sub)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-correction-2026-07-31-faithful-pre-i2-capture-restored-current-candidate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Correction (2026-07-31): Faithful Pre-i2 Capture Restored — CURRENT CANDIDATE
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="13. Correction (2026-07-31): Faithful Pre-i2 Capture Restored — CURRENT CANDIDATE">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#e2e-acceptance-results-netflix-gt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E2E acceptance results (Netflix GT)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-the-offline-two-level-decoder-new-default-2026-07-31-owner-approved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. The Offline Two-Level Decoder — NEW DEFAULT (2026-07-31, owner-approved)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/en/architecture/WHISPERSEG_TRADEOFF_ANALYSIS_AND_RECOMMENDATION.md" title="编辑此页" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="whisperseg-vad-tradeoff-analysis-and-recommendation">WhisperSeg VAD Tradeoff — Analysis and Recommendation<a class="headerlink" href="#whisperseg-vad-tradeoff-analysis-and-recommendation" title="Permanent link">&para;</a></h1>
+<p><strong>Companion to:</strong> <code>WHISPERSEG_TRADEOFF_INFO_PACK.md</code> (commit <code>d41571e</code>)
+<strong>Date:</strong> 2026-07-30
+<strong>Status:</strong> R1 (wiring) + R2 (aggressive row) IMPLEMENTED per owner instruction
+(2026-07-30, "go ahead with your R1, R2, and R3"). R3 verification results in
+§10. Awaiting owner E2E quality assessment.</p>
+<hr />
+<h2 id="1-executive-summary">1. Executive Summary<a class="headerlink" href="#1-executive-summary" title="Permanent link">&para;</a></h2>
+<p><strong>The central finding invalidates the premise of the E2E comparison: Fix 1
+(<code>neg_threshold=0.10</code>) never reached the segmenter.</strong> The value sits in the
+anime table, the <code>WhisperSegSpeechSegmenter.__init__</code> signature, and the
+factory schema — but no entry point lifts it from the table into
+<code>segmenter_config</code>, and the <code>SEGMENTER_PARAMS</code> filter that every qwen
+segmenter config passes through does not contain <code>"neg_threshold"</code>. Both E2E
+runs therefore executed with <strong>dead hysteresis</strong> (derived
+<code>neg_threshold = max(0.15 − 0.15, 0.01) = 0.01</code>).</p>
+<p>Consequences:</p>
+<ol>
+<li>The observed regression (worse transcription accuracy, fewer captured
+   dialogues) was <strong>not</strong> caused by restored hysteresis. It can only have come
+   from the two changes that <em>did</em> bind: <code>max_speech</code> 4.0 → 3.5 and the smart
+   force-split. Section 4 gives the mechanism.</li>
+<li>The intended live-hysteresis behavior has <strong>never been observed E2E</strong>. The
+   "core tension" in the info pack (§4.3) is between the old code and a
+   configuration that never ran.</li>
+<li>Separately, synthetic tests against the real state machine show that
+   <code>neg_threshold=0.10</code> — had it bound — would truncate quiet tails and drop
+   quiet replies (Section 5). The intended value was too high anyway.</li>
+</ol>
+<p><strong>Recommendation (Section 6):</strong> wire <code>neg_threshold</code> end-to-end; set the
+aggressive row to <code>neg_threshold=0.05</code>, <code>min_silence_duration_ms=250</code>,
+<code>start_pad_ms=100</code>, <code>end_pad_ms=150</code> (threshold 0.15, max_speech 3.5,
+grouping values unchanged); re-run E2E with verification that the values
+actually bind.</p>
+<hr />
+<h2 id="2-verified-finding-the-neg_threshold-call-chain-is-broken">2. Verified Finding: the neg_threshold Call Chain Is Broken<a class="headerlink" href="#2-verified-finding-the-neg_threshold-call-chain-is-broken" title="Permanent link">&para;</a></h2>
+<p>Chain for the ensemble path the owner tested (standalone <code>main.py</code> path is
+broken identically):</p>
+<table>
+<thead>
+<tr>
+<th>Hop</th>
+<th>File / lines</th>
+<th>What happens to <code>neg_threshold</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Anime table</td>
+<td><code>config/anime_whisper_vad.py:64</code></td>
+<td>Present: <code>0.10</code> in aggressive row</td>
+</tr>
+<tr>
+<td>2. Override lift</td>
+<td><code>ensemble/pass_worker.py:1200-1211</code></td>
+<td><strong>NOT lifted.</strong> Only <code>threshold</code> and <code>max_speech_duration_s</code> are copied from the table into <code>user_segmenter_overrides</code></td>
+</tr>
+<tr>
+<td>3. Sensitivity resolve</td>
+<td><code>ensemble/pass_worker.py:1215-1217</code> → <code>resolve_qwen_sensitivity()</code> (<code>:491-542</code>)</td>
+<td>Resolved config is filtered to <code>SEGMENTER_PARAMS</code> keys (<code>:535</code>)</td>
+</tr>
+<tr>
+<td>4. The filter</td>
+<td><code>ensemble/pass_worker.py:89-105</code></td>
+<td><strong><code>"neg_threshold"</code> is not in <code>SEGMENTER_PARAMS</code></strong> — stripped even if a user/GUI override supplied it</td>
+</tr>
+<tr>
+<td>5. YAML preset</td>
+<td><code>config/v4/.../whisperseg-speech-segmentation.yaml:57-59</code></td>
+<td>Does not define it either ("auto-derived … Not user-tunable")</td>
+</tr>
+<tr>
+<td>6. Backend</td>
+<td><code>backends/whisperseg.py:457-460</code></td>
+<td><code>self.neg_threshold is None</code> → formula → <strong>0.01</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Standalone path: <code>main.py:1197-1201</code> lifts only <code>threshold</code> +
+<code>max_speech_duration_s</code>, then the same filtered resolve at <code>main.py:1207-1209</code>.</p>
+<p>The factory schema entry (<code>factory.py:151</code>) and the <code>__init__</code> parameter are
+real but unreachable from any user-facing entry point. This is exactly the
+dead-flag failure class the CLAUDE.md call-chain mandate targets; the prior
+session's 7 synthetic tests exercised the backend directly and could not catch
+it.</p>
+<h3 id="corrected-effective-parameters-for-the-owners-e2e-runs">Corrected effective parameters for the owner's E2E runs<a class="headerlink" href="#corrected-effective-parameters-for-the-owners-e2e-runs" title="Permanent link">&para;</a></h3>
+<p>Both runs: <code>threshold=0.15</code>, <strong><code>neg_threshold=0.01</code> (dead)</strong>,
+<code>min_speech=80 ms</code>, <code>min_silence=80 ms</code> (YAML aggressive preset — the info
+pack's §8 values of 100/100 were the backend defaults, which the YAML
+overrides), <code>start_pad=0</code>, <code>end_pad=30</code>, <code>chunk_threshold=0.2</code>,
+<code>max_group=2.0</code>.</p>
+<p>Only differences between "old" and "new" runs:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Old run</th>
+<th>New run</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>max_speech_duration_s</code></td>
+<td>4.0</td>
+<td>3.5</td>
+</tr>
+<tr>
+<td>Force-split</td>
+<td>Naive chop at exact interval; <code>triggered=False</code> after; 20 ms gap</td>
+<td>Split at lowest-prob frame in last 40%; <code>triggered</code> stays True; contiguous</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-why-the-old-code-transcribed-well-confirmed-mechanism">3. Why the Old Code Transcribed Well (confirmed mechanism)<a class="headerlink" href="#3-why-the-old-code-transcribed-well-confirmed-mechanism" title="Permanent link">&para;</a></h2>
+<p>With dead hysteresis, a segment ends only at force-split. The naive chop set
+<code>triggered=False</code>, and re-onset requires <code>prob ≥ 0.15</code>. Two properties follow:</p>
+<ul>
+<li><strong>Every frame begins at a strong onset</strong> (a ≥ 0.15 probability event) and
+  contains up to 4 s of following audio. Quiet speech (prob 0.01–0.15) rides
+  inside these frames with generous acoustic context → good recall, good
+  per-character accuracy.</li>
+<li><strong>Noise-only stretches are pruned</strong>: after a chop lands in a long non-speech
+  stretch, the machine stays untriggered until the next ≥ 0.15 event, so pure
+  noise/music frames are mostly not sent to the ASR.</li>
+</ul>
+<p>The cost was meaningless boundaries (all 4.020 s, starts ~1 s early).</p>
+<h2 id="4-why-the-new-run-regressed-hypotheses-consistent-with-all-four-symptoms">4. Why the New Run Regressed (hypotheses, consistent with all four symptoms)<a class="headerlink" href="#4-why-the-new-run-regressed-hypotheses-consistent-with-all-four-symptoms" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p>The following are hypotheses — mechanically verified against the code, but
+not yet confirmed on the owner's audio.</p>
+</blockquote>
+<p><strong>H1 — Loss of onset anchoring (primary).</strong> The smart split keeps
+<code>triggered=True</code> forever. Under dead hysteresis nothing else ends a segment,
+so from the first onset in a scene <em>every</em> frame goes to the ASR in ~3.5 s
+contiguous chunks — including pure noise/music chunks, and chunks that start
+mid-noise rather than at a speech onset. Quiet dialogue is no longer packaged
+with a strong-onset anchor; a frame that is mostly noise plus faint dialogue
+gets an empty/garbage transcription → "dialogue in quiet or noisy areas missed
+entirely". Noise-only frames produce empty output and are dropped, so the
+<em>surviving</em> subs have boundaries at probability minima → "timestamps align
+more naturally" — the two observations are the same mechanism seen from both
+sides.</p>
+<p><strong>H2 — Split-at-dip targets the quietest syllables.</strong> When the 40% window
+contains no true silence, <code>argmin</code> lands on the quietest <em>speech</em> frame
+(devoiced/whispered syllables — common in JAV). The split cuts exactly there,
+and because split segments are contiguous, the overlap-prevention clamp
+(<code>whisperseg.py:557-575</code>) reduces effective padding at split boundaries to
+<strong>zero</strong>. Characters at those boundaries are clipped on both sides →
+"characters missing at beginning/end".</p>
+<p><strong>H3 — 3.5 s vs 4.0 s context (minor).</strong> ~12% less audio context per frame.</p>
+<p>Note the corollary: <strong>wiring live hysteresis fixes H1 at the root</strong> — segments
+end in real silence again, re-onset requires ≥ 0.15, noise stretches are
+excluded, frames re-anchor at onsets, and the smart split only fires for
+genuinely long continuous speech (its intended role).</p>
+<hr />
+<h2 id="5-synthetic-evidence-what-live-hysteresis-will-do-and-why-010-is-wrong">5. Synthetic Evidence: what live hysteresis will do (and why 0.10 is wrong)<a class="headerlink" href="#5-synthetic-evidence-what-live-hysteresis-will-do-and-why-010-is-wrong" title="Permanent link">&para;</a></h2>
+<p>Six synthetic probability tests run against the real <code>_probs_to_segments</code>
+(same method as the prior session's 7 tests; script:
+<code>scratchpad/test_tradeoff_mechanisms.py</code>, results 2026-07-30). Frame = 20 ms.</p>
+<ol>
+<li><strong>Tail truncation at neg=0.10.</strong> Loud speech, one 20 ms dip to 0.08, then
+   0.5 s of quiet trailing speech at 0.12: end is stamped at the <em>dip</em>
+   (<code>end=1.02s</code>), quiet tail lost. At neg=0.05: tail kept (<code>end=1.54s</code>).
+   Root cause in code: <code>current["end"] = temp_end</code> (first sub-neg frame), and
+   <code>temp_end</code> only resets when prob climbs back above <strong>threshold</strong> (0.15),
+   not neg (<code>whisperseg.py:525-543</code>). Quiet speech in the 0.10–0.15 band after
+   any momentary dip is cut off wholesale.</li>
+<li><strong>Recall loss at neg=0.10.</strong> Loud sentence, 200 ms pause at 0.07, quiet
+   reply at 0.12: segment ends at the pause and the reply — which never
+   reaches the 0.15 onset — is <strong>lost entirely</strong>. At neg=0.05 the pause
+   doesn't end the segment and the reply is captured. This is precisely the
+   mechanism by which dead hysteresis won its recall: the effective in-segment
+   capture threshold was 0.01. The hysteresis floor must sit <em>below</em> the
+   quiet-speech band (~0.10–0.15) that <code>threshold=0.15</code> exists to capture.</li>
+<li><strong>min_silence robustness.</strong> A 150 ms hard dip mid-speech splits the segment
+   at <code>min_silence=100</code> but survives at 250.</li>
+<li><strong>min_silence does not move end timestamps.</strong> Clean speech→silence: end is
+   identical at 100 vs 250 (end = silence start + end_pad, because the end is
+   stamped at <code>temp_end</code>, not at confirmation time). Raising it costs nothing
+   in timestamp accuracy.</li>
+<li><strong>Generous pads are safe.</strong> start_pad=100/end_pad=150 on two segments
+   200 ms apart: no overlap (clamped by design).</li>
+<li><strong>Composite scene.</strong> Current row (neg .10, sil 100, pads 0/30): loses the
+   quiet tail <em>and</em> the entire quiet reply — 1.4 s of dialogue. Proposed row
+   (neg .05, sil 250, pads 100/150): captures everything; boundaries within
+   ~0.15 s of ground truth.</li>
+</ol>
+<p>Honest limitation: <strong>isolated</strong> quiet utterances (never ≥ 0.15, not within
+<code>min_silence</code> of a triggered segment) are lost under <em>any</em> live hysteresis.
+The old code caught them only as riders inside noise frames. If E2E shows this
+recall loss matters, the options are lowering the aggressive onset below 0.15
+(owner decision) or a recall second pass — not more hysteresis tuning.</p>
+<hr />
+<h2 id="6-recommendation">6. Recommendation<a class="headerlink" href="#6-recommendation" title="Permanent link">&para;</a></h2>
+<h3 id="r1-wire-neg_threshold-end-to-end-bug-fix-required-regardless-of-values">R1 — Wire <code>neg_threshold</code> end-to-end (bug fix, required regardless of values)<a class="headerlink" href="#r1-wire-neg_threshold-end-to-end-bug-fix-required-regardless-of-values" title="Permanent link">&para;</a></h3>
+<ol>
+<li><code>ensemble/pass_worker.py:89-105</code> — add <code>"neg_threshold"</code> to
+   <code>SEGMENTER_PARAMS</code>. (Leak risk to other backends is nil in the qwen paths:
+   it is only injected for anime-whisper below, the YAMLs don't define it, and
+   the factory sanitizer drops keys absent from a backend's schema.)</li>
+<li><code>ensemble/pass_worker.py</code> anime branch (~line 1208) — lift it from the
+   table exactly like <code>max_speech_duration_s</code>:
+   <code>if "neg_threshold" not in overrides and table.get("neg_threshold") is not None: inject</code>.</li>
+<li><code>main.py</code> anime branch (~line 1198) —
+   <code>_user_vad_overrides.setdefault("neg_threshold", _aw["neg_threshold"])</code>
+   guarded by presence in the table row.</li>
+<li>Same lift for <strong><code>min_silence_duration_ms</code></strong> (already in <code>SEGMENTER_PARAMS</code>
+   and the factory schema — only the table→overrides lift is missing; without
+   it the YAML's 80 ms wins over any table value).</li>
+</ol>
+<h3 id="r2-aggressive-row-values-informed-by-section-5">R2 — Aggressive row (values informed by Section 5)<a class="headerlink" href="#r2-aggressive-row-values-informed-by-section-5" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="s2">"aggressive"</span><span class="p">:</span> <span class="p">{</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="s2">"chunk_threshold_s"</span><span class="p">:</span> <span class="mf">0.2</span><span class="p">,</span>        <span class="c1"># keep</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="s2">"max_group_duration_s"</span><span class="p">:</span> <span class="mf">2.0</span><span class="p">,</span>     <span class="c1"># keep</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="s2">"threshold"</span><span class="p">:</span> <span class="mf">0.15</span><span class="p">,</span>               <span class="c1"># keep (non-negotiable)</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="s2">"neg_threshold"</span><span class="p">:</span> <span class="mf">0.05</span><span class="p">,</span>           <span class="c1"># was 0.10 (never bound); floor below the quiet-speech band</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="s2">"min_silence_duration_ms"</span><span class="p">:</span> <span class="mi">250</span><span class="p">,</span>  <span class="c1"># new; YAML preset 80ms is far too twitchy; free (test 4)</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="s2">"start_pad_ms"</span><span class="p">:</span> <span class="mi">100</span><span class="p">,</span>             <span class="c1"># was 0; protects onset-ramp characters</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="s2">"end_pad_ms"</span><span class="p">:</span> <span class="mi">150</span><span class="p">,</span>               <span class="c1"># was 30; protects trailing characters</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="s2">"max_speech_duration_s"</span><span class="p">:</span> <span class="mf">3.5</span><span class="p">,</span>    <span class="c1"># keep</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">}</span>
+</code></pre></div>
+<p>How each goal is served: <strong>accuracy</strong> — pads protect both edges (the slicer
+cuts exactly at frame boundaries, <code>orchestrator.py:405-409</code>, so pad = ASR
+context); neg=0.05 + sil=250 stop ends from landing inside quiet speech.
+<strong>Capture</strong> — the effective in-segment threshold drops to 0.05, recovering
+most of what dead hysteresis caught (test 2/6). <strong>Timestamps</strong> — ends stamp at
+silence start (+150 ms), starts at onset (−100 ms); worst case ~0.25 s of
+slack vs the old ~1 s, and slightly-early subtitle starts are desirable.</p>
+<h3 id="r3-verification-gate-before-e2e">R3 — Verification gate before E2E<a class="headerlink" href="#r3-verification-gate-before-e2e" title="Permanent link">&para;</a></h3>
+<p><code>neg_threshold</code> appears in <code>_get_parameters()</code> (<code>whisperseg.py:718</code>), which is
+written into the debug metadata JSON and the <code>[VadGroupedFramer]</code> result
+metadata. Run one file with <code>--debug</code> and confirm the segmenter params show
+<code>neg_threshold: 0.05</code> and <code>min_silence_duration_ms: 250</code> <strong>before</strong> judging
+subtitle quality. If they still read <code>null</code>/80, the wiring is not done.</p>
+<h3 id="r4-e2e-watchpoints-and-fallback-knobs-one-change-at-a-time">R4 — E2E watchpoints and fallback knobs (one change at a time)<a class="headerlink" href="#r4-e2e-watchpoints-and-fallback-knobs-one-change-at-a-time" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Symptom after R1+R2</th>
+<th>Knob</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Endings still truncated</td>
+<td><code>end_pad_ms</code> 150→200, then <code>neg_threshold</code> 0.05→0.03</td>
+</tr>
+<tr>
+<td>Quiet dialogues still missed</td>
+<td><code>min_silence_duration_ms</code> 250→350 (extends the capture reach around triggered segments)</td>
+</tr>
+<tr>
+<td>Two-way dialogue blending returns</td>
+<td><code>min_silence_duration_ms</code> 250→180, or <code>chunk_threshold_s</code> 0.2→0.15</td>
+</tr>
+<tr>
+<td>Segments run long through music/noise</td>
+<td><code>neg_threshold</code> 0.05→0.08 (accuracy tradeoff — prefer the max_speech smart split handle it)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="7-info-pack-directions-evaluated-5-of-the-pack">7. Info-Pack Directions Evaluated (§5 of the pack)<a class="headerlink" href="#7-info-pack-directions-evaluated-5-of-the-pack" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Lower neg further (0.05)</strong> — adopted; evidence in tests 1/2/6.</li>
+<li><strong>Longer min_silence</strong> — adopted (250 ms); test 4 shows it is free w.r.t.
+   timestamps. This knob was misdiagnosed as 100 ms; it was actually 80.</li>
+<li><strong>Two-pass</strong> — not needed now; the E2E that reopened the question tested a
+   configuration that never ran. Revisit only if R1+R2 fails on recall.</li>
+<li><strong>Post-VAD merging of close segments</strong> — <code>group_segments</code> already does this
+   (<code>chunk_threshold_s=0.2</code>); frames span merged segments including inner gaps.
+   No change needed.</li>
+<li><strong>ChickenRice post-VAD grouping</strong> — we already have the equivalent
+   (VAD → segments → gap/duration grouping → frames). What we lack is its
+   <em>gap-midpoint</em> split behavior; see Stage-2 below.</li>
+<li><strong>Adaptive neg near max_speech</strong> — unnecessary complexity once the smart
+   split exists; the split already finds the best boundary when the ceiling is
+   hit.</li>
+</ol>
+<h2 id="8-stage-2-options-only-if-r1r2-e2e-still-shows-edge-clipping">8. Stage-2 Options (only if R1+R2 E2E still shows edge clipping)<a class="headerlink" href="#8-stage-2-options-only-if-r1r2-e2e-still-shows-edge-clipping" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Silence-run split refinement.</strong> The smart split currently hands both sides
+  a shared boundary frame at the argmin; if the dip is a real silence run, end
+  segment 1 at the run's start and begin segment 2 at the run's end (the true
+  analog of ChickenRice's gap-midpoint split). This restores speech-edge
+  boundaries <em>and</em> creates room for pads at split points (today the contiguity
+  clamps effective pad to zero there — H2).</li>
+<li><strong>Context-margin slicing.</strong> Decouple ASR audio from subtitle timestamps in
+  <code>_step1_frame_and_slice</code>: slice <code>frame ± ~250 ms</code> clamped to neighboring
+  frames, keep <code>frame.start/end</code> for timing. This is the architectural answer
+  to "dead-hysteresis accuracy with live-hysteresis timestamps", but it
+  touches all qwen backends — hold unless needed.</li>
+</ul>
+<h2 id="9-implementation-2026-07-30-and-the-gui-ensemble-path-owner-c1">9. Implementation (2026-07-30) and the GUI Ensemble Path (owner C1)<a class="headerlink" href="#9-implementation-2026-07-30-and-the-gui-ensemble-path-owner-c1" title="Permanent link">&para;</a></h2>
+<p>R1/R2 were implemented with a structural change beyond the minimal lifts: the
+table→segmenter_config lift now lives in ONE place —
+<code>anime_whisper_vad.py::apply_anime_segmenter_defaults()</code> +
+<code>SEGMENTER_CONFIG_KEYS</code> — called by both entry points. The original bug was
+two entry points each hand-copying keys; the helper removes that failure mode.</p>
+<p>Changed files:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>config/anime_whisper_vad.py</code></td>
+<td>Aggressive row → neg 0.05, min_silence 250, pads 100/150; new <code>SEGMENTER_CONFIG_KEYS</code> + <code>apply_anime_segmenter_defaults()</code></td>
+</tr>
+<tr>
+<td><code>ensemble/pass_worker.py</code></td>
+<td><code>"neg_threshold"</code> added to <code>SEGMENTER_PARAMS</code>; anime branch uses the helper (was per-key copies)</td>
+</tr>
+<tr>
+<td><code>main.py</code></td>
+<td>Anime branch uses the helper (was per-key copies)</td>
+</tr>
+<tr>
+<td><code>config/v4/.../whisperseg-speech-segmentation.yaml</code></td>
+<td>Stale "Not user-tunable" comment corrected (no behavioral change)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>GUI Ensemble tab path (scrutinized per owner C1).</strong> The Ensemble tab spawns
+<code>pass_worker</code>; there were TWO hops dropping <code>neg_threshold</code> in that path —
+the Customize-dialog param extraction (<code>pass_worker.py:1171-1175</code>, filtered by
+<code>SEGMENTER_PARAMS</code> at collection time) and the resolve filter. Both are opened
+by the single <code>SEGMENTER_PARAMS</code> addition. Precedence is preserved: GUI
+Customize params and sliders are collected into <code>user_segmenter_overrides</code>
+<em>before</em> the helper runs, and the helper only <code>setdefault</code>s — user values win.
+The Customize dialog's five displayed VAD fields (api.py:1954-1961) read the
+table directly, so the dialog now shows start_pad=100 / end_pad=150 for
+aggressive automatically. <code>neg_threshold</code> / <code>min_silence_duration_ms</code> are not
+displayed in the dialog (segmenter_config-only keys); adding widgets for them
+is possible follow-up work if the owner wants them tunable from the GUI.
+The lift is gated to <code>generator_backend == "anime-whisper"</code> — cohere (which
+also defaults to whisperseg) and qwen3 are untouched, and the
+balanced/conservative anime rows carry none of the new keys, so only
+aggressive changes behavior.</p>
+<h2 id="10-what-was-verified-and-how">10. What Was Verified and How<a class="headerlink" href="#10-what-was-verified-and-how" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Read end-to-end:</strong> <code>anime_whisper_vad.py</code>, <code>whisperseg.py</code> (full),
+  <code>factory.py</code> schema, <code>ten.py::group_segments</code>, <code>vad_grouped.py</code> (full),
+  <code>orchestrator.py</code> slicing, <code>pass_worker.py:75-120/491-542/1120-1300</code>,
+  <code>main.py:1160-1320</code>, <code>api.py</code> qwen schema + Customize flow,
+  <code>whisperseg-speech-segmentation.yaml</code>, plus a repo-wide grep for every
+  <code>neg_threshold</code> occurrence.</li>
+<li><strong>Executed (analysis):</strong> 6 synthetic probability tests against the real
+  <code>_probs_to_segments</code> in the WJ env (all behaved as predicted; §5).</li>
+<li><strong>Executed (post-implementation, R3):</strong></li>
+<li><code>py_compile</code> on the three edited Python files — pass.</li>
+<li><code>python -m whisperjav.main --help</code> — exit 0.</li>
+<li>19-check chain-simulation test (<code>scratchpad/test_wiring_chain.py</code>): parses
+    the REAL <code>SEGMENTER_PARAMS</code> set out of <code>pass_worker.py</code> source via <code>ast</code>
+    (the module cannot be imported lightly), then runs the actual
+    <code>ConfigManager.get_tool_config</code> layering, the actual filter, and the
+    actual <code>SpeechSegmenterFactory.create("whisperseg", ...)</code>. Confirms:
+    backend receives threshold 0.15, neg_threshold 0.05, min_silence 250,
+    max_speech 3.5, pads 100/150; user overrides win over table values;
+    balanced/conservative resolve with NO neg_threshold (formula fallback);
+    <code>SEGMENTER_CONFIG_KEYS ⊆ SEGMENTER_PARAMS</code>. All pass.</li>
+<li>Real E2E CLI run on the Netflix benchmark
+    (<code>test_media/Ground_Truths/Netflix/293sec-The.Naked.Director...mkv</code>,
+    standalone <code>--mode qwen --qwen-generator anime-whisper
+    --qwen-sensitivity aggressive --debug</code>) with debug-metadata inspection of
+    the bound segmenter parameters — result recorded below when the run
+    completed.</li>
+<li><strong>Not verified by me:</strong> the GUI Ensemble tab E2E (cannot launch the GUI
+  here — the pass_worker hops were verified by the chain simulation + code
+  trace; owner should confirm one ensemble run shows the new values in its
+  debug output), and subtitle <em>quality</em> vs ground truth, which is the owner's
+  E2E judgment.</li>
+</ul>
+<h2 id="11-ground-truth-benchmark-2026-07-30-owner-c2">11. Ground-Truth Benchmark (2026-07-30, owner C2)<a class="headerlink" href="#11-ground-truth-benchmark-2026-07-30-owner-c2" title="Permanent link">&para;</a></h2>
+<p>All runs: standalone CLI, anime-whisper aggressive, Netflix benchmark
+<code>test_media/Ground_Truths/Netflix/293sec-The.Naked.Director.S01E04.Scene4.mkv</code>
+scored with <code>tools/vad_hypothesis_suite/score.py</code> against the sanitized GT
+(68 subs). Runs are deterministic. The <strong>pre-i2 old code</strong> was run from a
+detached git worktree at <code>0921b97</code> (naive force-split, max_speech 4.0, dead
+neg 0.01, pads 0/30 — the exact state the owner's original E2E praised for
+transcription accuracy; includes the i1 filter, so the output pipeline is
+identical to current).</p>
+<table>
+<thead>
+<tr>
+<th>Config</th>
+<th>CER↓</th>
+<th>sub↓</th>
+<th>del↓</th>
+<th>char_recall↑</th>
+<th>time_recall↑</th>
+<th>time_prec↑</th>
+<th>mean_dur</th>
+<th>segs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>PRE-I2 old code</strong> (naive split, max 4.0, dead neg)</td>
+<td><strong>0.539</strong></td>
+<td>0.258</td>
+<td><strong>0.277</strong></td>
+<td><strong>0.723</strong></td>
+<td><strong>0.740</strong></td>
+<td>0.750</td>
+<td>3.88s</td>
+<td>35</td>
+</tr>
+<tr>
+<td>PRE-SESSION (smart split, max 3.5, dead neg, sil 80, pads 0/30)</td>
+<td>0.586</td>
+<td>0.244</td>
+<td>0.334</td>
+<td>0.666</td>
+<td>0.622</td>
+<td>0.751</td>
+<td>2.93s</td>
+<td>39</td>
+</tr>
+<tr>
+<td>VAR neg=.02, sil 250, pads 100/150, max 3.5</td>
+<td>0.586</td>
+<td>0.239</td>
+<td>0.339</td>
+<td>0.661</td>
+<td>0.620</td>
+<td>0.758</td>
+<td>2.89s</td>
+<td>39</td>
+</tr>
+<tr>
+<td>VAR neg=.03, sil 250, pads 100/150, max 3.5</td>
+<td>0.583</td>
+<td>0.193</td>
+<td>0.384</td>
+<td>0.617</td>
+<td>0.609</td>
+<td>0.778</td>
+<td>2.84s</td>
+<td>38</td>
+</tr>
+<tr>
+<td><strong>R2 as implemented</strong> (neg=.05, sil 250, pads 100/150, max 3.5)</td>
+<td>0.583</td>
+<td><strong>0.192</strong></td>
+<td>0.387</td>
+<td>0.613</td>
+<td>0.596</td>
+<td><strong>0.790</strong></td>
+<td>2.81s</td>
+<td>37</td>
+</tr>
+<tr>
+<td>VAR sil=350 (else R2)</td>
+<td>0.583</td>
+<td>0.192</td>
+<td>0.387</td>
+<td>0.613</td>
+<td>0.600</td>
+<td>0.787</td>
+<td>2.84s</td>
+<td>37</td>
+</tr>
+<tr>
+<td><strong>VAR max=4.0 (else R2)</strong></td>
+<td>0.563</td>
+<td>0.222</td>
+<td>0.338</td>
+<td>0.662</td>
+<td>0.615</td>
+<td>0.766</td>
+<td>3.35s</td>
+<td>33</td>
+</tr>
+</tbody>
+</table>
+<h3 id="findings">Findings<a class="headerlink" href="#findings" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>The old code's E2E-observed capture advantage is real and quantified:</strong>
+   char_recall 0.723 vs 0.613 for R2 (+11 points), deletions 0.277 vs 0.387.
+   Its regional wins are exactly the quiet/noisy stretches (4:00–4:20 region
+   recall 0.52 vs 0.20; 1:40–2:00 and 2:40–3:00 similar). Its cost: worst
+   substitution rate (0.258), mean sub length 3.88s ≈ the mechanical 4s
+   chunks (the original complaint), and no time-precision advantage (0.750).</li>
+<li><strong>Capture attribution is two roughly additive effects (~5 points each):</strong>
+   (a) max_speech 3.5 vs 4.0 — costs ~5 points capture even with live
+   hysteresis (compare R2 0.613 vs max=4.0 0.662); (b) live hysteresis
+   (neg ≥ 0.03) vs dead — costs ~5 points (compare neg .02 0.661 vs
+   neg .05 0.613). The remaining ~0.06 vs old code is naive-vs-smart split
+   mechanics. min_silence and neg fine-tuning (0.03 vs 0.05) barely move it.</li>
+<li><strong>The frontier is monotonic — no config dominates.</strong> Capture trades
+   against substitution accuracy, time precision, and sub length at every
+   step. R2 is the max-precision end; old code is the max-capture end;
+   R2-with-max=4.0 is the midpoint (0.662 recall / 0.222 sub / 0.766 prec /
+   3.35s subs).</li>
+<li><strong>The two hard regions (4:20–4:40 ≈ 0.10, 1:20–1:40 = 0.15) are bad in
+   every config including old code</strong> — content the VAD/ASR cannot get under
+   any post-processing setting; not a tuning target.</li>
+<li><strong>Owner decision point:</strong> if the capture loss matters more than sub length,
+   raising the row's <code>max_speech_duration_s</code> back to 4.0 is the single
+   biggest recoverable lever (+5 points capture, subs lengthen 2.81→3.35s
+   mean, still no 4.020s mechanical wall). Beyond that, capture parity with
+   old code requires giving the ASR wide audio while keeping tight subtitle
+   times — the Stage-2 context-margin slicing (§8), which this benchmark now
+   supports with data.</li>
+</ol>
+<h2 id="12-the-3a-refined-display-start-implemented-and-benchmarked-2026-07-30">12. The "3a" Refined Display Start — Implemented and Benchmarked (2026-07-30)<a class="headerlink" href="#12-the-3a-refined-display-start-implemented-and-benchmarked-2026-07-30" title="Permanent link">&para;</a></h2>
+<p>Owner-approved package ("I agree"): wide capture for content + probability-
+derived display starts for timing, decoupled. The RAW VAD boundary still feeds
+the ASR audio slice; the subtitle's displayed start moves to the first frame
+whose probability reaches <code>speech_start_threshold</code> (unchanged if the segment
+already starts at/above it; fallback to raw when never reached). Empirical
+basis: sweeping refinement thresholds over the pre-i2 output showed T=0.30
+moves median start error −0.489s → −0.026s; dynamic thresholds (Otsu, p95)
+overshoot (+0.211s late), so a fixed 0.30 ships.</p>
+<h3 id="implementation">Implementation<a class="headerlink" href="#implementation" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>backends/whisperseg.py</code></td>
+<td><code>speech_start_threshold</code> param; first-crossing computed at all three segment-append sites (natural end / force-split / end-of-audio); emitted as <code>metadata["speech_start_sec"]</code>; in <code>_get_parameters()</code></td>
+</tr>
+<tr>
+<td><code>factory.py</code></td>
+<td>schema: <code>speech_start_threshold: (float, None, True)</code></td>
+</tr>
+<tr>
+<td><code>framers/vad_grouped.py</code></td>
+<td>per-frame refined start (first segment in group with one) → <code>metadata["speech_starts"]</code></td>
+</tr>
+<tr>
+<td><code>orchestrator.py</code></td>
+<td>Step-1 returns <code>frame_speech_starts</code>; Step-9 applies them to subtitle starts in <strong>Branch B only, <code>vad_only</code> only</strong> (aligner paths untouched); starts only move later → cannot create overlaps; diag gains <code>frame_timing</code></td>
+</tr>
+<tr>
+<td><code>types.py</code></td>
+<td><code>SceneDiagnostics.frame_timing</code>: per-frame <code>{vad_start, vad_end, speech_start, internal_breaks}</code> — the owner's two-timestamp JSON; <code>internal_breaks</code> reserved for the future "3b" splitter</td>
+</tr>
+<tr>
+<td><code>anime_whisper_vad.py</code></td>
+<td>aggressive row → wide-capture package: <code>neg 0.05</code>, <code>max_speech 4.0</code>, <code>speech_start_threshold 0.30</code> (sil 250 / pads 100/150 kept); key added to <code>SEGMENTER_CONFIG_KEYS</code></td>
+</tr>
+<tr>
+<td><code>pass_worker.py</code></td>
+<td><code>speech_start_threshold</code> added to <code>SEGMENTER_PARAMS</code></td>
+</tr>
+</tbody>
+</table>
+<p>Verified: 14-check synthetic unit suite (ramp onset, loud onset, never-reached
+fallback, disabled, force-split per-side starts, padding independence, framer
+grouping) — all pass; 26-check wiring chain — all pass; E2E on the Netflix
+benchmark with sidecar inspection — 40/68 frames refined, median shift 0.16s,
+raw + refined both recorded in <code>frame_timing</code>.</p>
+<h3 id="benchmark-netflix-gt-start-error-signed-vs-max-overlap-gt-sub">Benchmark (Netflix GT; start-error = signed vs max-overlap GT sub)<a class="headerlink" href="#benchmark-netflix-gt-start-error-signed-vs-max-overlap-gt-sub" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Config</th>
+<th>CER↓</th>
+<th>sub↓</th>
+<th>char_recall↑</th>
+<th>start err (median)</th>
+<th>early&gt;0.5s</th>
+<th>mean_dur</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PRE-I2 old code</td>
+<td><strong>0.539</strong></td>
+<td>0.258</td>
+<td><strong>0.723</strong></td>
+<td>−0.489s</td>
+<td>17</td>
+<td>3.88s</td>
+</tr>
+<tr>
+<td>R2 (neg .05, max 3.5)</td>
+<td>0.583</td>
+<td><strong>0.192</strong></td>
+<td>0.613</td>
+<td>+0.045s</td>
+<td><strong>5</strong></td>
+<td>2.81s</td>
+</tr>
+<tr>
+<td>PKG neg=.02, max 4.0, sst .30</td>
+<td>0.563</td>
+<td>0.198</td>
+<td>0.639</td>
+<td>+0.133s</td>
+<td>9</td>
+<td>3.22s</td>
+</tr>
+<tr>
+<td><strong>SHIPPED: neg=.05, max 4.0, sst .30</strong></td>
+<td>0.563</td>
+<td>0.222</td>
+<td>0.662</td>
+<td><strong>+0.063s</strong></td>
+<td>11</td>
+<td>3.18s</td>
+</tr>
+</tbody>
+</table>
+<p>The shipped row is the best all-around point measured: +5 capture points over
+R2, substitutions well below old code, and start timing transformed from half
+a second early to GT-aligned. Notes:</p>
+<ul>
+<li><strong>neg=0.02 anomaly:</strong> near-dead hysteresis LOST capture vs 0.05 at
+  max_speech 4.0 (0.639 vs 0.662) — opposite of the max 3.5 interaction.
+  Hypothesis (unverified): with no natural ends, the no-re-onset smart split
+  floods frames with noise (the §4 H1 dilution); pre-i2's naive chop pruned
+  noise via its <code>triggered=False</code> re-onset requirement. A future "hybrid
+  split" (smart dip boundary + re-anchor) is the candidate lever for the
+  remaining ~6-point capture gap to pre-i2 — alongside the 3b splitter.</li>
+<li>Residual start-error tail (11 subs &gt;0.5s early) = merged multi-turn frames;
+  that is the 3b splitting problem, out of scope for 3a by design.</li>
+<li>All effect sizes are single-clip (Netflix drama); owner will judge on JAV
+  content E2E. The GUI Ensemble path inherits everything (shared orchestrator</li>
+<li><code>SEGMENTER_PARAMS</code> lift); owner should eyeball one ensemble run.</li>
+</ul>
+<h2 id="13-correction-2026-07-31-faithful-pre-i2-capture-restored-current-candidate">13. Correction (2026-07-31): Faithful Pre-i2 Capture Restored — CURRENT CANDIDATE<a class="headerlink" href="#13-correction-2026-07-31-faithful-pre-i2-capture-restored-current-candidate" title="Permanent link">&para;</a></h2>
+<p>The owner's design was "pre-i2 for content + start adjustment ONLY", but the
+§12 candidate paired 3a with a <em>different</em> capture engine (smart split, live
+neg 0.05) — hence char_recall 0.662 instead of pre-i2's 0.723. The owner
+correctly flagged this. Fixed by restoring the exact pre-i2 capture path:</p>
+<ul>
+<li><strong><code>force_split_mode</code> parameter</strong> on WhisperSeg: <code>"dip"</code> (default; v1.9.0
+  smart split, unchanged for other presets) vs <code>"chop"</code> — the vendor-faithful
+  pre-i2 behavior copied verbatim from <code>0921b97</code>: end at exactly
+  <code>start + max_speech</code>, full state reset (<code>triggered=False</code>), re-onset
+  ≥ threshold required. Wired through factory schema, <code>SEGMENTER_CONFIG_KEYS</code>,
+  <code>SEGMENTER_PARAMS</code>.</li>
+<li><strong>Aggressive row (current candidate, uncommitted):</strong> threshold .15,
+  neg .01 (explicit; the value the pre-i2 formula produced), sil 80,
+  pads 0/30, max_speech 4.0, <code>force_split_mode="chop"</code>,
+  <code>speech_start_threshold=0.30</code>. Capture = exact pre-i2; only display
+  starts differ.</li>
+</ul>
+<h3 id="e2e-acceptance-results-netflix-gt">E2E acceptance results (Netflix GT)<a class="headerlink" href="#e2e-acceptance-results-netflix-gt" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Text identity: PASS</strong> — 35 subs, output text byte-identical to the pre-i2
+  benchmark run; all ends unchanged; 14/35 starts moved later. Content
+  metrics equal pre-i2 exactly: CER 0.539, sub 0.258, del 0.277,
+  char_recall <strong>0.723</strong>.</li>
+<li><strong>Start errors:</strong> median −0.489s → <strong>−0.026s</strong> — matching the offline 3a
+  sweep prediction to the millisecond (deterministic pipeline). mean|e|
+  1.092→1.087; early&gt;0.5s 17→15 (the surviving tail is the merged-turn
+  problem = 3b scope; a within-sub split mechanism is required to fix it, no
+  start-threshold can).</li>
+<li>time_recall 0.740→0.716 (removed leading-silence span coverage — intended),
+  time_precision 0.750.</li>
+</ul>
+<p>This is the owner's design delivered literally: pre-i2 content, ends
+untouched, starts refined. The §12 configuration (smart split + neg .05,
+char_recall 0.662 but a cleaner sub-rate and shorter subs) remains available
+by flipping <code>force_split_mode</code> back to <code>"dip"</code> — a one-key table change —
+if the owner ever prefers that operating point after JAV E2E.</p>
+<h2 id="14-the-offline-two-level-decoder-new-default-2026-07-31-owner-approved">14. The Offline Two-Level Decoder — NEW DEFAULT (2026-07-31, owner-approved)<a class="headerlink" href="#14-the-offline-two-level-decoder-new-default-2026-07-31-owner-approved" title="Permanent link">&para;</a></h2>
+<p>Owner findings drove a decoder replacement: (a) ≥400ms dialog gaps were never
+cut (measured: 0/21 GT gaps under any hysteresis value; 11/35 subs spanned a
+gap); (b) frame-level separability is fundamentally poor (WhisperSeg AUC
+0.791, speech p10 = 0.04 &lt; gap p50 = 0.11 — no single threshold can work;
+Silero 0.673 and RMS 0.622 are WORSE); (c) the TEN backend demonstrated the
+offline pipeline decoder shape in-repo. The state machine's <code>neg_threshold</code>
+is WhisperJAV post-processing, not part of the model — fully replaceable.</p>
+<p><strong>Design</strong> (<code>whisperseg.py::_probs_to_segments_offline</code>,
+<code>segmentation_decoder="offline"</code>): SEED segments at prob ≥ <code>threshold</code>
+(0.15); GROW edges while prob ≥ <code>grow_floor</code> (0.05) — attached quiet speech
+rides along, floor-runs without a seed are dropped as noise; MERGE gaps
+&lt; <code>gap_merge_ms</code> (350) — longer gaps become dialog cuts; DROP micro-segments;
+SPLIT overlong segments at minima of the smoothed probability curve
+(<code>split_smooth_ms</code>=120, near-tie → latest, 0.6s sliver guard, even-split
+fallback). Padding/conversion shared with the hysteresis decoder
+(<code>_pad_and_convert</code>); 3a <code>speech_start</code> computed per final part. <code>grow_floor</code>
+is the capture-vs-cut dial; <code>gap_merge_ms</code> is the pause-length knob.</p>
+<p><strong>Second option preserved:</strong> <code>segmentation_decoder="hysteresis"</code> keeps the
+vendor/ChickenRice state machine intact; the aggressive row retains
+<code>neg .01</code> / <code>chop</code> / <code>sil 80</code> so flipping back reproduces exact pre-i2
+capture. New keys wired through factory schema, <code>SEGMENTER_CONFIG_KEYS</code>,
+<code>SEGMENTER_PARAMS</code>, AND the GUI: four new Customize-modal fields
+(VAD Decoder, Grow Floor, Gap Cut ms, Max Speech Duration) →
+<code>prepare_qwen_params</code> mapping → segmenter-override lift (user wins over
+table). Modal collection is schema-generic (app.js:4517), sensitivity-aware
+defaults via <code>get_qwen_schema</code>.</p>
+<p><strong>Netflix GT benchmark (all four timing/content dimensions):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Config</th>
+<th>char_recall↑</th>
+<th>CER↓</th>
+<th>start err median</th>
+<th>early&gt;0.5s</th>
+<th><strong>subs spanning ≥0.4s gap</strong></th>
+<th>mean_dur</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pre-i2 + 3a (§13)</td>
+<td><strong>0.723</strong></td>
+<td><strong>0.539</strong></td>
+<td>−0.026s</td>
+<td>15</td>
+<td>11/35</td>
+<td>3.76s</td>
+</tr>
+<tr>
+<td><strong>OFFLINE default</strong></td>
+<td>0.699</td>
+<td>0.569</td>
+<td>+0.147s</td>
+<td>9</td>
+<td><strong>2/36</strong></td>
+<td>2.90s</td>
+</tr>
+</tbody>
+</table>
+<p>The offline decoder gives up 2.4 points of capture vs pre-i2 (0.699 — far
+above every previous live-cutting config: R2 0.613, neg.02 0.639, max4.0
+0.662) and in exchange: <strong>the spanned-gap symptom drops 11 → 2</strong>, subs
+starting &gt;0.5s early drop 15 → 9, mean|start error| is the best measured
+(0.665s), and mean sub length moves toward GT (2.90s vs 3.76s). Verified by
+18-check unit suite, 33-check wiring chain, and E2E with sidecar inspection.
+Owner judgment on JAV content pending; the R4-style fallback: raise
+<code>grow_floor</code> to cut more/capture less, lower it (or raise <code>gap_merge_ms</code>)
+for the reverse — all from the GUI.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
