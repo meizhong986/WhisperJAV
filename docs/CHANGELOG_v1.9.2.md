@@ -373,6 +373,62 @@ exit-code contract, which is the owner's.
 
 ---
 
+## 2026-09-12 (last) — the README, reviewed from a user's seat and corrected
+
+Owner: *"is the readme up to date? please review from user perspective."* Three things in it
+were wrong in a way that would cost a user a working command, and one section was missing.
+
+### The three errors
+
+| Where | Was | Is |
+|---|---|---|
+| Scene-detection table | Semantic described as the "ChronosJAV default" | **The default everywhere since v1.9.2** (`DEFAULT_SCENE_DETECTOR`), with the caveat that the flip is unproven on a feature-length film; auditok now labelled the pre-1.9.2 default |
+| Speech-segmentation table | Seven backends presented as choosable on any mode | A note above the table: **Balanced accepts none of them.** `--speech-segmenter` with `--mode balanced` exits 2 (run, this session), as do `--max-group-duration` and `--chunk-threshold`; what you pick instead is the Silero build via `--vad-version` |
+| FireRedVAD row | "installed by default since v1.9.2" | **Fidelity's default**, with the one-time model download and the `silero-v3.1` way round it |
+
+A user following the VAD table on Balanced got an error instead of subtitles, and a user
+comparing 1.9.2 output to 1.9.0 had nothing in the README explaining why their scenes changed.
+
+### The missing section
+
+A **"New in v1.9.2"** section after Quick start, because none of the release's user-visible
+additions were findable from the README: the per-file run summary and what `done` / `empty` /
+`suspect` / `failed` / `skipped` mean, the exit-status rule, `MILEAGE` and `--min-coverage`,
+the difficult-audio notice, and a table of the new switches (`--offline`, `--vad-version`,
+`--fail-on`, `--model-refresh-audio-minutes`, `--skip-existing`). Plus the breaking changes a
+scripted user needs: `--no-vad` removed, `--accept-cpu-mode` now required on a machine with no
+usable GPU, and the scene-detector flip.
+
+Two Troubleshooting entries added: **the installer now stopping on a failed install** (with
+`INSTALLATION_FAILED_v1.9.2.txt` and the advice to re-run first), which is the most likely new
+support question, and empty output with a success message. The bug-report entry now points at
+`tools/whisperjav_env_report.py`.
+
+### Verified, not asserted
+
+- The run-summary sample is **rendered from `format_summary()`**, not written by hand — after
+  the release-note review found an invented one. The caption says the framing rules and the
+  totals line are omitted, and they are.
+- All 33 flags in the README checked against `--help`. The five not in it are correct:
+  `--cpu-only` (`install_windows.bat`), `--index-url` (pip), `--install` (xcode-select),
+  `--provider` (`whisperjav-translate`) and `--rollback` (`whisperjav-upgrade`) — each
+  confirmed present in its own CLI — plus `--no-vad`, named only as removed.
+- Every file link resolves; both internal anchors match real headings.
+- The exit-status sentence was corrected mid-edit: it is 1 if any file failed **or the run did
+  not finish**, which the first draft omitted.
+
+### Note on the branch
+
+Between the review and the fix the owner committed the whole session as `5834f50` on
+`dev_v1.9.2` and checked out `main`. The README differs between the branches (11 insertions),
+and two of the three errors exist only on dev, so the edits were held until he returned to
+`dev_v1.9.2` rather than applied to the wrong branch. Also confirmed while there: `origin/main`
+is one commit ahead of local `main` (`c8dae7a`, the retired 0.7b notebook), but
+`git log origin/main ^dev_v1.9.2` is empty — dev already contains it, merged in `e7e11f4`.
+Nothing to handle for the release.
+
+---
+
 ## 2026-09-12 (later still) — the adversary on the release note, and the headline claim it refuted
 
 Rule A6 run on `docs/release_notes_v1.9.2_for_users.md` before it reaches a public page. It

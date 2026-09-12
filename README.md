@@ -60,6 +60,41 @@ Any input FFmpeg can read works: MP4, MKV, AVI, WMV, MP3, WAV, FLAC, and so on. 
 
 ---
 
+## New in v1.9.2
+
+Full detail, including every bug fixed and who reported it: [**release notes**](docs/release_notes_v1.9.2_for_users.md).
+
+**Every run now tells you whether it worked.** It ends with a table, one line per file:
+
+```
+STATE    MILEAGE        FILE
+done     ok 100%        movie1.mp4 -> movie1.ja.srt (1961 cue(s))
+suspect  low 6%         movie2.mp4 -> movie2.ja.srt (82 cue(s)); subtitles stop at 400s of 7000s (5.7% of the file); 82 cue(s) produced
+empty    not assessed   movie3.mp4 -> movie3.ja.srt; movie3.ja.srt contains no subtitles
+```
+
+(The framing rules and the totals line are omitted here.)
+
+`done` · `empty` · `suspect` · `failed` · `skipped` mean the same thing in every mode, and the exit status follows them: **1 if any file failed, or if the run did not finish** (interrupted, or stopped by an error), 0 otherwise. Zero subtitles is an observation, not a failure — silence and music both end there — so `empty` and `suspect` exit 0 unless you ask otherwise with `--fail-on empty` / `--fail-on suspect`, or the two matching checkboxes on the GUI's *Transcription Adv. Options* tab. A `whisperjav_run.json` next to your subtitles carries the same result for scripts.
+
+**MILEAGE** is how far into the file your subtitles reach — where the last one ends, as a share of the video's length. It is *not* how much of the video carries subtitles. `--min-coverage` sets how low that can go before a file is called `suspect` (a quarter, by default).
+
+**It warns you when your audio looks difficult.** After working out the scenes and before the long part, a run on Balanced, Fidelity or `--mode qwen` says how much of the file is speech, and flags the file as unusually quiet, or names the scenes where speech sits close in level to everything around it. If your audio looks normal you get one line and nothing else.
+
+**Other things you can now do:**
+
+| | |
+|---|---|
+| `--offline` | Use only Hugging Face models already downloaded; a missing one fails at once instead of retrying for minutes. Also a checkbox on *Transcription Adv. Options*. |
+| `--vad-version 3.1\|4.0\|6.2` | Which Silero build Balanced's voice detection runs. Default 4.0. |
+| `--fail-on empty` / `suspect` | Make those states fail the run. |
+| `--model-refresh-audio-minutes` | The recogniser is reloaded every 20 minutes of audio on Balanced and Fidelity, to bound a fault where it stops returning anything (#394). `0` turns it off. |
+| `--skip-existing` | Skip files that already have subtitles — now in the GUI too, and in two-pass runs. |
+
+**Changes you may notice:** Aggressive is much faster on Balanced and no longer decodes a passage twice, so run times are predictable and the same file gives the same subtitles every time. Scene detection changed default (above), so your scenes — and your subtitles — will differ from 1.9.0/1.9.1 output. `--no-vad` is removed; `--speech-segmenter none` does the same thing on the modes that still take one. On a machine with no usable GPU a script now needs `--accept-cpu-mode` or `--device cpu`, where it used to continue by itself after a countdown.
+
+---
+
 ## How a video becomes subtitles
 
 Every pipeline follows the same overall shape; modes differ in which components they use and how aggressively they are tuned.
@@ -168,8 +203,8 @@ Where the long file gets cut into workable pieces.
 
 | Method | Strength | Watch out |
 |---|---|---|
-| **Semantic** | Groups acoustically similar audio; best for full-length features; ChronosJAV default | Occasionally cuts inside speech on very uniform audio |
-| **Auditok** | Energy-based: fast, simple, dependable | Constant background music can mask the pauses it needs |
+| **Semantic** | Groups acoustically similar audio; best for full-length features. **The default everywhere since v1.9.2** (it was auditok) | Occasionally cuts inside speech on very uniform audio; the flip has not been proven better on a feature-length film |
+| **Auditok** | Energy-based: fast, simple, dependable. The pre-1.9.2 default — `--scene-detection-method auditok` | Constant background music can mask the pauses it needs |
 | **Silero** | Neural; holds up on noisy audio | Slower than auditok |
 | **None** | No cutting at all | Only sensible for short clips |
 
@@ -189,14 +224,16 @@ Off by default — remember the pre-processing paradox. The **"Enhance for VAD o
 
 Decides what the model hears — and in ChronosJAV pipelines, where your timestamps come from. Probably the highest-leverage swap on this list.
 
+> **Not on Balanced, since v1.9.2.** The Balanced pipeline uses Faster-Whisper's own voice detection and accepts **none** of the backends below — `--speech-segmenter` with `--mode balanced` stops the run with an error, as do `--max-group-duration` and `--chunk-threshold`. What you choose there instead is which **Silero build** that detection runs: `--vad-version 3.1 | 4.0 | 6.2` (default **4.0**), or the *Speech Segmenter* column of a Balanced pass in the Ensemble Mode tab. Every other pipeline takes the table below unchanged.
+
 | Backend | Strength | Watch out |
 |---|---|---|
 | **WhisperSeg** | Trained on Japanese ASMR-style audio; tuned against our ground truth; the JA default | Japanese-specialised — switch it for other languages |
 | **TEN VAD** | Light and quick; good general performer; pass-2 default for diversity | Less JA-specialised than WhisperSeg |
 | **Silero v3.1 / v4.0** | Solid general-purpose; the recommendation for non-Japanese audio | Tends to miss very quiet Japanese speech |
 | **Silero v6.2** | Adds max-duration splitting and finer control | Same quiet-speech caveat |
-| **Faster-Whisper native** *(Balanced default)* | Fastest — one recognizer call per scene | Coarser timing than a dedicated VAD; no independent speech detector for the run-outcome check |
-| **FireRedVAD** | Tiny multilingual model, cheap on CPU; lowest false-alarm rate of the bundled VADs; installed by default since v1.9.2 | Detection presets upstream-derived; segment cap JAV-tuned |
+| **Faster-Whisper native** *(Balanced — and the only option there)* | Fastest — one recognizer call per scene; pick the Silero build with `--vad-version` | Coarser timing than a dedicated VAD; no independent speech detector for the run-outcome check |
+| **FireRedVAD** *(Fidelity default)* | Tiny multilingual model, cheap on CPU; lowest false-alarm rate of the bundled VADs; installed with WhisperJAV since v1.9.2 | Its ~2 MB model downloads from Hugging Face once — a machine that cannot reach it stops the run and says so; `--speech-segmenter silero-v3.1` needs no download |
 | **None** | The model hears everything | Maximum hallucination exposure on non-speech |
 
 ### ASR engine and model
@@ -409,10 +446,12 @@ Details: [v1.9.2 release notes, "CPU-only users"](docs/release_notes_v1.9.2.md#c
 
 ## Troubleshooting
 
+- **The Windows installer stopped and said the installation failed.** Since v1.9.2 it checks that what WhisperJAV needs to run actually imports, and **stops rather than leaving you a shortcut to a broken install**. It names what failed and writes `INSTALLATION_FAILED_v1.9.2.txt` next to `install_log_v1.9.2.txt` in the installation folder. Run the installer again first — the usual cause is a download that did not finish. If it fails twice, attach both files to an issue.
 - **"FFmpeg not found"** — install FFmpeg and add it to PATH.
 - **Very slow, GPU warning in log** — your PyTorch is CPU-only. Reinstall it with the CUDA index URL shown above.
 - **`model.bin` error in faster mode** — enable Windows Developer Mode (or run once as admin), then delete the cached model folder under `%USERPROFILE%\.cache\huggingface\hub`.
-- Anything else: open a [GitHub issue](https://github.com/meizhong986/WhisperJAV/issues) with your system info and the console log. Logs and reproduction details make fixes much faster.
+- **An empty or very short subtitle file, with the run reporting success.** v1.9.2 fixes one cause of this on Balanced and now reports the outcome per file rather than always claiming success — see [New in v1.9.2](#new-in-v192). If it still happens, that is worth a report.
+- Anything else: open a [GitHub issue](https://github.com/meizhong986/WhisperJAV/issues) with your system info and the console log. `tools/whisperjav_env_report.py` in this repository prints your package versions, GPU, driver and CUDA in one go — run it with the same Python that runs WhisperJAV (Windows users can right-click `whisperjav_env_report.ps1`). Logs and reproduction details make fixes much faster.
 
 ---
 
