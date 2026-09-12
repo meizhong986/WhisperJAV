@@ -37,6 +37,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import stable_whisper
 
 from whisperjav.modules.audio_extraction import AudioExtractor
+from whisperjav.modules.analytics import report as report_audio_analytics
 from whisperjav.modules.speech_enhancement import (
     create_enhancer_direct,
     enhance_scenes,
@@ -676,6 +677,20 @@ class QwenPipeline(BasePipeline):
         scene_detector = SceneDetectorFactory.safe_create_from_legacy_kwargs(**scene_detector_kwargs)
         result = scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)
         scene_paths = result.to_legacy_tuples()
+
+        # Tell the user which scenes look acoustically difficult. vad_threshold is
+        # None because this pipeline segments with WhisperSeg by default, not with
+        # Silero at a threshold -- so the quiet check, and the setting it would
+        # recommend, do not apply here. Reads and prints only; never raises.
+        _analytics = report_audio_analytics(
+            extracted_audio,
+            [(i, s.start_sec, s.end_sec) for i, s in enumerate(result.scenes)],
+            scene_method=result.method,
+            vad_threshold=None,
+        )
+        if _analytics is not None:
+            master_metadata.setdefault("audio_analytics", _analytics.to_dict())
+
         scene_detector.cleanup()
         logger.info(
             "[QwenPipeline PID %s] Phase 2: Detected %d scenes (method=%s)",
