@@ -9,6 +9,7 @@ from datetime import datetime
 
 from whisperjav.pipelines.base_pipeline import BasePipeline
 from whisperjav.modules.audio_extraction import AudioExtractor
+from whisperjav.modules import analytics
 from whisperjav.modules.whisper_pro_asr import WhisperProASR
 from whisperjav.modules.srt_postprocessing import SRTPostProcessor as StandardPostProcessor
 
@@ -247,6 +248,18 @@ class FidelityPipeline(BasePipeline):
                 }
                 master_metadata["scenes_detected"].append(scene_info)
             master_metadata["summary"]["total_scenes_detected"] = len(scene_paths)
+
+            # Tell the user which scenes look likely to lose speech, before they
+            # spend the run finding out. Reads and prints only; never raises.
+            _analytics = analytics.report(
+                extracted_audio,
+                [(i, s.start_sec, s.end_sec)
+                 for i, s in enumerate(detection_result.scenes)],
+                scene_method=self.scene_detector.name,
+                vad_threshold=self.vad_params.get("threshold", 0.40),
+            )
+            if _analytics is not None:
+                master_metadata["audio_analytics"] = _analytics.to_dict()
             self.metadata_manager.update_processing_stage(
                 master_metadata, "scene_detection", "completed",
                 scene_count=len(scene_paths), scenes_dir=str(scenes_dir))
