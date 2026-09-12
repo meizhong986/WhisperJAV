@@ -72,9 +72,9 @@ class FasterWhisperOptions(BaseModel):
         description="Only sample text tokens"
     )
     max_initial_timestamp: Optional[float] = Field(
-        0.0,
+        1.0,
         ge=0.0,
-        description="Max initial timestamp (0 = prevent phantom early timestamps)"
+        description="Earliest timestamp the first subtitle of a window may take, in seconds"
     )
 
     # === Transcriber Options (common_transcriber_options) ===
@@ -245,7 +245,7 @@ class FasterWhisperASR(ASRComponent):
             suppress_tokens=None,
             suppress_blank=True,
             without_timestamps=False,
-            max_initial_timestamp=0.0,
+            max_initial_timestamp=1.0,
             # Transcriber options
             temperature=[0.0],
             compression_ratio_threshold=2.2,
@@ -285,7 +285,12 @@ class FasterWhisperASR(ASRComponent):
             suppress_tokens=None,
             suppress_blank=True,
             without_timestamps=False,
-            max_initial_timestamp=0.0,
+            # v1.9.2: 0.0 -> 1.0, Whisper's own default. At 0.0 a window had exactly one
+            # legal opening timestamp, so with beam search the second beam had no legal
+            # alternative, kept the score CTranslate2 gives a beam at initialisation, and
+            # won. The window decoded to a run of '!' which the compression-ratio check
+            # then discarded, leaving the file with no subtitles at all on some GPUs.
+            max_initial_timestamp=1.0,
             # Transcriber options
             temperature=[0.0],
             compression_ratio_threshold=2.4,
@@ -329,7 +334,7 @@ class FasterWhisperASR(ASRComponent):
             suppress_blank=True,
             suppress_tokens=None,
             without_timestamps=False,
-            max_initial_timestamp=0.0,
+            max_initial_timestamp=1.0,
             # Transcriber options
             temperature=[0.0],                    # v1.9.2 (O4+O6): [0.0, 0.2]→[0.0], no temperature retries, caps worst-case run time
             compression_ratio_threshold=2.2,      # v1.9.2: 2.6→2.2, drops repetitive decoder loops earlier
