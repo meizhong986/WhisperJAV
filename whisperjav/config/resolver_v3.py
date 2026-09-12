@@ -136,9 +136,10 @@ def _get_compute_type_for_device(device: str, provider: str) -> str:
     Select optimal compute_type based on device and provider.
 
     CTranslate2 providers (faster_whisper, kotoba_faster_whisper):
-    - CUDA (non-Pascal): "float16" for best accuracy
     - CUDA + Pascal (sm_6x): "float32" (see Pascal note below)
-    - CUDA + Blackwell (sm_120): "float16" (int8_float16 buggy in CTranslate2)
+    - CUDA + Blackwell (sm_120+): "auto" — CTranslate2 picks, which is int8_float16
+      there; the float16 this used to force is what garbles output on those cards
+    - CUDA, everything else (Turing, Ampere, Ada): "float16"
     - Non-CUDA (CPU, MPS, etc.): "auto" — delegate to CTranslate2
     - See: https://github.com/OpenNMT/CTranslate2/issues/1865
 
@@ -182,20 +183,31 @@ def _get_compute_type_for_device(device: str, provider: str) -> str:
             )
             return "float32"
 
-        # Blackwell workaround (sm_120+): CTranslate2's "auto" incorrectly selects
-        # int8_float16 which fails on Blackwell. Force float16.
-        # See: https://github.com/meizhong986/WhisperJAV/issues/113
+        # Blackwell (sm_120+, RTX 50): "auto" (owner decision, 2026-09-11).
+        #
+        # Until v1.9.2 these cards were forced to float16 to dodge a CTranslate2
+        # crash (issue #113). That reason expired: CTranslate2 disabled int8 for
+        # sm_120 in 4.6.2 and runs it again in the 4.8.1 pinned here. Meanwhile the
+        # forced float16 became the problem -- the reporter of issue #414 measured
+        # it on an RTX 5070 producing garbled windows and almost no subtitles, where
+        # "auto" (int8_float16) gave him clean output. So these cards ask the library.
         if _is_blackwell_gpu():
             logger.info(
-                "Blackwell GPU detected (RTX 50 series). Using float16 compute_type "
-                "due to CTranslate2 int8_float16 compatibility issue."
+                "Blackwell GPU detected (RTX 50 series). Using 'auto' compute_type so "
+                "CTranslate2 selects for this card (see issue #414)."
             )
-            return "float16"
+            return "auto"
 
-        # All other CUDA GPUs (Turing, Ampere, Ada Lovelace): float16 for best
-        # accuracy. "auto" would pick int8_float16 which introduces quantization
-        # artifacts. float16 uses ~1-2GB more VRAM but preserves full precision.
-        # Users with limited VRAM can override with --compute-type int8_float16.
+        # Every other CUDA GPU (Turing, Ampere, Ada): float16.
+        #
+        # "auto" loads int8_float16 on these cards, and it was measured on an RTX 3060
+        # against the human subtitles in test_media/Ground_Truths/ (7 clips, 2 repeats,
+        # large-v2, balanced): accuracy is a wash (CER difference +0.012 in int8's
+        # favour, 95% CI -0.003..+0.027, so not significant), it saves about 1.9 GB of
+        # video memory, and it costs 14-30% throughput on those clips and 32% on JAV
+        # audio. The owner's largest user group gains nothing worth a third of their
+        # speed, so they stay on float16. Users short of video memory can still ask
+        # for int8_float16 with --compute-type.
         return "float16"
     else:
         # PyTorch-based providers can use float16 on GPU/MPS, float32 on CPU
