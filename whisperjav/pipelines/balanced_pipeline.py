@@ -9,6 +9,7 @@ from datetime import datetime
 
 from whisperjav.pipelines.base_pipeline import BasePipeline
 from whisperjav.modules.audio_extraction import AudioExtractor
+from whisperjav.modules import analytics
 from whisperjav.modules.faster_whisper_pro_asr import FasterWhisperProASR
 from whisperjav.modules.srt_postprocessing import SRTPostProcessor as StandardPostProcessor
 
@@ -370,6 +371,18 @@ class BalancedPipeline(BasePipeline):
                     "longest": max((d for _, _, _, d in scene_paths), default=0),
                 }
             )
+
+            # Tell the user which scenes look likely to lose speech, before they
+            # spend the run finding out. Reads and prints only; never raises.
+            _analytics = analytics.report(
+                extracted_audio,
+                [(i, s.start_sec, s.end_sec)
+                 for i, s in enumerate(detection_result.scenes)],
+                scene_method=self.scene_detector.name,
+                vad_threshold=self.vad_params.get("threshold", 0.40),
+            )
+            if _analytics is not None:
+                master_metadata["audio_analytics"] = _analytics.to_dict()
 
             # =================================================================
             # PHASE 1: SPEECH ENHANCEMENT (Exclusive VRAM Block)
