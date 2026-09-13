@@ -554,10 +554,19 @@ class SemanticSegmenter:
         X_times = times[::step]
 
         # 2. Dynamic Clustering
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
-        clusterer = AgglomerativeClustering(n_clusters=None, distance_threshold=self.config.clustering_threshold, linkage='ward')
-        labels = clusterer.fit_predict(X_scaled)
+        # WJAV mod E: AgglomerativeClustering needs at least 2 samples and raises
+        # on one. A clip this short has exactly one possible clustering.
+        if X.shape[0] < 2:
+            self._log(
+                f"    -> Clip is too short to split into scenes ({duration:.1f}s); "
+                f"keeping it as one scene."
+            )
+            labels = np.zeros(X.shape[0], dtype=int)
+        else:
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(X)
+            clusterer = AgglomerativeClustering(n_clusters=None, distance_threshold=self.config.clustering_threshold, linkage='ward')
+            labels = clusterer.fit_predict(X_scaled)
 
         # 3. Raw Boundaries
         boundaries = [0.0]
