@@ -443,6 +443,6 @@ WhisperJAV 在启动时自动检查更新（延迟 3 秒后）。有新版本可
 ### 纯 CPU 模式（无 GPU）
 
 1. 进入 **Advanced** 标签页
-2. 勾选 **"Accept CPU-only mode"**
+2. 勾选 **"Accept CPU-only mode"**（必须：没有可用 GPU 的机器上，不勾选则运行会在启动检查处停下并中止，同时提示您勾选此项）
 3. 使用 **Faster** 模式以获得无 GPU 时的最佳速度
 4. 处理速度会明显变慢，但功能正常

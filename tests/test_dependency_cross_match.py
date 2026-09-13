@@ -229,6 +229,7 @@ class TestInstallationConstraints:
         ("auditok", None, "auditok"),
         ("silero-vad", ">=6.2", "silero_vad"),
         ("ten-vad", None, "ten_vad"),
+        ("fireredvad", ">=0.0.2", "fireredvad"),
         ("psutil", ">=5.9.0", "psutil"),
         ("scikit-learn", ">=1.4.0", "sklearn"),
     ], ids=lambda x: x[0] if isinstance(x, tuple) else str(x))

@@ -1,0 +1,1229 @@
+{
+  "versions": {
+    "sklearn": "1.6.1",
+    "numpy": "1.26.4",
+    "scipy": "1.17.0"
+  },
+  "293sec-S01E04-scene4_extracted.wav": {
+    "duration_s": 293.7,
+    "vectors": 613,
+    "vector_period_s": 0.48,
+    "feature_extraction_s": 3.9,
+    "silence_floor": 0.002578612638171763,
+    "A_unconstrained": [
+      {
+        "threshold": 5,
+        "clusters": 353,
+        "raw_boundaries": 564,
+        "scenes": 6
+      },
+      {
+        "threshold": 10,
+        "clusters": 80,
+        "raw_boundaries": 481,
+        "scenes": 6
+      },
+      {
+        "threshold": 18,
+        "clusters": 17,
+        "raw_boundaries": 352,
+        "scenes": 7
+      },
+      {
+        "threshold": 30,
+        "clusters": 6,
+        "raw_boundaries": 161,
+        "scenes": 7
+      },
+      {
+        "threshold": 50,
+        "clusters": 3,
+        "raw_boundaries": 96,
+        "scenes": 7
+      },
+      {
+        "threshold": 90,
+        "clusters": 1,
+        "raw_boundaries": 0,
+        "scenes": 1
+      },
+      {
+        "threshold": 200,
+        "clusters": 1,
+        "raw_boundaries": 0,
+        "scenes": 1
+      },
+      {
+        "threshold": 500,
+        "clusters": 1,
+        "raw_boundaries": 0,
+        "scenes": 1
+      },
+      {
+        "threshold": 1000,
+        "clusters": 1,
+        "raw_boundaries": 0,
+        "scenes": 1
+      },
+      {
+        "threshold": 3000,
+        "clusters": 1,
+        "raw_boundaries": 0,
+        "scenes": 1
+      }
+    ],
+    "B_temporal_constrained": [
+      {
+        "threshold": 5,
+        "segments": 452,
+        "raw_boundaries": 451,
+        "scenes": 6
+      },
+      {
+        "threshold": 10,
+        "segments": 99,
+        "raw_boundaries": 98,
+        "scenes": 8
+      },
+      {
+        "threshold": 18,
+        "segments": 9,
+        "raw_boundaries": 8,
+        "scenes": 7
+      },
+      {
+        "threshold": 30,
+        "segments": 5,
+        "raw_boundaries": 4,
+        "scenes": 4
+      },
+      {
+        "threshold": 50,
+        "segments": 3,
+        "raw_boundaries": 2,
+        "scenes": 2
+      },
+      {
+        "threshold": 90,
+        "segments": 1,
+        "raw_boundaries": 0,
+        "scenes": 1
+      },
+      {
+        "threshold": 200,
+        "segments": 1,
+        "raw_boundaries": 0,
+        "scenes": 1
+      },
+      {
+        "threshold": 500,
+        "segments": 1,
+        "raw_boundaries": 0,
+        "scenes": 1
+      },
+      {
+        "threshold": 1000,
+        "segments": 1,
+        "raw_boundaries": 0,
+        "scenes": 1
+      },
+      {
+        "threshold": 3000,
+        "segments": 1,
+        "raw_boundaries": 0,
+        "scenes": 1
+      }
+    ],
+    "A_fine": [
+      {
+        "threshold": 5,
+        "scenes": 6
+      },
+      {
+        "threshold": 6,
+        "scenes": 6
+      },
+      {
+        "threshold": 7,
+        "scenes": 6
+      },
+      {
+        "threshold": 8,
+        "scenes": 6
+      },
+      {
+        "threshold": 9,
+        "scenes": 6
+      },
+      {
+        "threshold": 10,
+        "scenes": 6
+      },
+      {
+        "threshold": 11,
+        "scenes": 6
+      },
+      {
+        "threshold": 12,
+        "scenes": 7
+      },
+      {
+        "threshold": 13,
+        "scenes": 7
+      },
+      {
+        "threshold": 14,
+        "scenes": 7
+      },
+      {
+        "threshold": 15,
+        "scenes": 7
+      },
+      {
+        "threshold": 16,
+        "scenes": 7
+      },
+      {
+        "threshold": 17,
+        "scenes": 7
+      },
+      {
+        "threshold": 18,
+        "scenes": 7
+      },
+      {
+        "threshold": 19,
+        "scenes": 7
+      },
+      {
+        "threshold": 20,
+        "scenes": 7
+      },
+      {
+        "threshold": 21,
+        "scenes": 7
+      },
+      {
+        "threshold": 22,
+        "scenes": 7
+      },
+      {
+        "threshold": 23,
+        "scenes": 7
+      },
+      {
+        "threshold": 24,
+        "scenes": 7
+      },
+      {
+        "threshold": 25,
+        "scenes": 8
+      },
+      {
+        "threshold": 26,
+        "scenes": 8
+      },
+      {
+        "threshold": 27,
+        "scenes": 8
+      },
+      {
+        "threshold": 28,
+        "scenes": 7
+      },
+      {
+        "threshold": 29,
+        "scenes": 7
+      },
+      {
+        "threshold": 30,
+        "scenes": 7
+      },
+      {
+        "threshold": 31,
+        "scenes": 7
+      },
+      {
+        "threshold": 32,
+        "scenes": 7
+      },
+      {
+        "threshold": 33,
+        "scenes": 7
+      },
+      {
+        "threshold": 34,
+        "scenes": 7
+      },
+      {
+        "threshold": 35,
+        "scenes": 7
+      },
+      {
+        "threshold": 36,
+        "scenes": 7
+      },
+      {
+        "threshold": 37,
+        "scenes": 7
+      },
+      {
+        "threshold": 38,
+        "scenes": 7
+      },
+      {
+        "threshold": 39,
+        "scenes": 7
+      },
+      {
+        "threshold": 40,
+        "scenes": 7
+      }
+    ],
+    "B_fine": [
+      {
+        "threshold": 5,
+        "scenes": 6
+      },
+      {
+        "threshold": 6,
+        "scenes": 7
+      },
+      {
+        "threshold": 7,
+        "scenes": 7
+      },
+      {
+        "threshold": 8,
+        "scenes": 8
+      },
+      {
+        "threshold": 9,
+        "scenes": 8
+      },
+      {
+        "threshold": 10,
+        "scenes": 8
+      },
+      {
+        "threshold": 11,
+        "scenes": 7
+      },
+      {
+        "threshold": 12,
+        "scenes": 7
+      },
+      {
+        "threshold": 13,
+        "scenes": 7
+      },
+      {
+        "threshold": 14,
+        "scenes": 7
+      },
+      {
+        "threshold": 15,
+        "scenes": 7
+      },
+      {
+        "threshold": 16,
+        "scenes": 7
+      },
+      {
+        "threshold": 17,
+        "scenes": 7
+      },
+      {
+        "threshold": 18,
+        "scenes": 7
+      },
+      {
+        "threshold": 19,
+        "scenes": 7
+      },
+      {
+        "threshold": 20,
+        "scenes": 7
+      },
+      {
+        "threshold": 21,
+        "scenes": 5
+      },
+      {
+        "threshold": 22,
+        "scenes": 5
+      },
+      {
+        "threshold": 23,
+        "scenes": 5
+      },
+      {
+        "threshold": 24,
+        "scenes": 5
+      },
+      {
+        "threshold": 25,
+        "scenes": 4
+      },
+      {
+        "threshold": 26,
+        "scenes": 4
+      },
+      {
+        "threshold": 27,
+        "scenes": 4
+      },
+      {
+        "threshold": 28,
+        "scenes": 4
+      },
+      {
+        "threshold": 29,
+        "scenes": 4
+      },
+      {
+        "threshold": 30,
+        "scenes": 4
+      },
+      {
+        "threshold": 31,
+        "scenes": 4
+      },
+      {
+        "threshold": 32,
+        "scenes": 4
+      },
+      {
+        "threshold": 33,
+        "scenes": 4
+      },
+      {
+        "threshold": 34,
+        "scenes": 4
+      },
+      {
+        "threshold": 35,
+        "scenes": 4
+      },
+      {
+        "threshold": 36,
+        "scenes": 3
+      },
+      {
+        "threshold": 37,
+        "scenes": 3
+      },
+      {
+        "threshold": 38,
+        "scenes": 3
+      },
+      {
+        "threshold": 39,
+        "scenes": 3
+      },
+      {
+        "threshold": 40,
+        "scenes": 3
+      }
+    ],
+    "A_min_duration_sweep_thr18": [
+      {
+        "min_duration": 5,
+        "scenes": 27
+      },
+      {
+        "min_duration": 10,
+        "scenes": 15
+      },
+      {
+        "min_duration": 20,
+        "scenes": 7
+      },
+      {
+        "min_duration": 30,
+        "scenes": 4
+      },
+      {
+        "min_duration": 60,
+        "scenes": 2
+      }
+    ],
+    "A_snap_window_sweep": [
+      {
+        "threshold": 18,
+        "snap_window": 1.0,
+        "scenes": 4
+      },
+      {
+        "threshold": 18,
+        "snap_window": 2.0,
+        "scenes": 5
+      },
+      {
+        "threshold": 18,
+        "snap_window": 5.0,
+        "scenes": 7
+      },
+      {
+        "threshold": 18,
+        "snap_window": 8.0,
+        "scenes": 7
+      },
+      {
+        "threshold": 18,
+        "snap_window": 12.0,
+        "scenes": 8
+      },
+      {
+        "threshold": 50,
+        "snap_window": 1.0,
+        "scenes": 7
+      },
+      {
+        "threshold": 50,
+        "snap_window": 2.0,
+        "scenes": 7
+      },
+      {
+        "threshold": 50,
+        "snap_window": 5.0,
+        "scenes": 7
+      },
+      {
+        "threshold": 50,
+        "snap_window": 8.0,
+        "scenes": 7
+      },
+      {
+        "threshold": 50,
+        "snap_window": 12.0,
+        "scenes": 6
+      }
+    ],
+    "A_label_runs": [
+      {
+        "threshold": 18,
+        "runs": 353,
+        "single_sample_runs": 268,
+        "median_run_samples": 1.0,
+        "max_run_samples": 21
+      },
+      {
+        "threshold": 90,
+        "runs": 1,
+        "single_sample_runs": 0,
+        "median_run_samples": 613.0,
+        "max_run_samples": 613
+      }
+    ],
+    "C_changepoint": [
+      {
+        "window_s": 5,
+        "k_sigma": 1.0,
+        "peaks": 15,
+        "scenes": 8
+      },
+      {
+        "window_s": 5,
+        "k_sigma": 1.5,
+        "peaks": 11,
+        "scenes": 8
+      },
+      {
+        "window_s": 5,
+        "k_sigma": 2.0,
+        "peaks": 8,
+        "scenes": 7
+      },
+      {
+        "window_s": 5,
+        "k_sigma": 3.0,
+        "peaks": 1,
+        "scenes": 1
+      },
+      {
+        "window_s": 10,
+        "k_sigma": 1.0,
+        "peaks": 8,
+        "scenes": 8
+      },
+      {
+        "window_s": 10,
+        "k_sigma": 1.5,
+        "peaks": 6,
+        "scenes": 6
+      },
+      {
+        "window_s": 10,
+        "k_sigma": 2.0,
+        "peaks": 2,
+        "scenes": 1
+      },
+      {
+        "window_s": 10,
+        "k_sigma": 3.0,
+        "peaks": 1,
+        "scenes": 1
+      },
+      {
+        "window_s": 20,
+        "k_sigma": 1.0,
+        "peaks": 4,
+        "scenes": 5
+      },
+      {
+        "window_s": 20,
+        "k_sigma": 1.5,
+        "peaks": 1,
+        "scenes": 2
+      },
+      {
+        "window_s": 20,
+        "k_sigma": 2.0,
+        "peaks": 1,
+        "scenes": 2
+      },
+      {
+        "window_s": 20,
+        "k_sigma": 3.0,
+        "peaks": 0,
+        "scenes": 1
+      },
+      {
+        "window_s": 30,
+        "k_sigma": 1.0,
+        "peaks": 3,
+        "scenes": 4
+      },
+      {
+        "window_s": 30,
+        "k_sigma": 1.5,
+        "peaks": 2,
+        "scenes": 3
+      },
+      {
+        "window_s": 30,
+        "k_sigma": 2.0,
+        "peaks": 1,
+        "scenes": 2
+      },
+      {
+        "window_s": 30,
+        "k_sigma": 3.0,
+        "peaks": 0,
+        "scenes": 1
+      }
+    ]
+  },
+  "3630sec-HODV-22019.wav": {
+    "duration_s": 3900.0,
+    "vectors": 8130,
+    "vector_period_s": 0.48,
+    "feature_extraction_s": 17.3,
+    "silence_floor": 0.0030840797116979957,
+    "A_unconstrained": [
+      {
+        "threshold": 5,
+        "clusters": 4029,
+        "raw_boundaries": 7965,
+        "scenes": 43
+      },
+      {
+        "threshold": 10,
+        "clusters": 885,
+        "raw_boundaries": 7460,
+        "scenes": 43
+      },
+      {
+        "threshold": 18,
+        "clusters": 181,
+        "raw_boundaries": 6734,
+        "scenes": 46
+      },
+      {
+        "threshold": 30,
+        "clusters": 52,
+        "raw_boundaries": 5791,
+        "scenes": 58
+      },
+      {
+        "threshold": 50,
+        "clusters": 14,
+        "raw_boundaries": 4733,
+        "scenes": 60
+      },
+      {
+        "threshold": 90,
+        "clusters": 5,
+        "raw_boundaries": 3187,
+        "scenes": 65
+      },
+      {
+        "threshold": 200,
+        "clusters": 2,
+        "raw_boundaries": 1475,
+        "scenes": 59
+      },
+      {
+        "threshold": 500,
+        "clusters": 1,
+        "raw_boundaries": 0,
+        "scenes": 1
+      },
+      {
+        "threshold": 1000,
+        "clusters": 1,
+        "raw_boundaries": 0,
+        "scenes": 1
+      },
+      {
+        "threshold": 3000,
+        "clusters": 1,
+        "raw_boundaries": 0,
+        "scenes": 1
+      }
+    ],
+    "B_temporal_constrained": [
+      {
+        "threshold": 5,
+        "segments": 5446,
+        "raw_boundaries": 5445,
+        "scenes": 52
+      },
+      {
+        "threshold": 10,
+        "segments": 1237,
+        "raw_boundaries": 1236,
+        "scenes": 82
+      },
+      {
+        "threshold": 18,
+        "segments": 132,
+        "raw_boundaries": 131,
+        "scenes": 65
+      },
+      {
+        "threshold": 30,
+        "segments": 26,
+        "raw_boundaries": 25,
+        "scenes": 25
+      },
+      {
+        "threshold": 50,
+        "segments": 8,
+        "raw_boundaries": 7,
+        "scenes": 8
+      },
+      {
+        "threshold": 90,
+        "segments": 5,
+        "raw_boundaries": 4,
+        "scenes": 5
+      },
+      {
+        "threshold": 200,
+        "segments": 1,
+        "raw_boundaries": 0,
+        "scenes": 1
+      },
+      {
+        "threshold": 500,
+        "segments": 1,
+        "raw_boundaries": 0,
+        "scenes": 1
+      },
+      {
+        "threshold": 1000,
+        "segments": 1,
+        "raw_boundaries": 0,
+        "scenes": 1
+      },
+      {
+        "threshold": 3000,
+        "segments": 1,
+        "raw_boundaries": 0,
+        "scenes": 1
+      }
+    ],
+    "A_fine": [
+      {
+        "threshold": 5,
+        "scenes": 43
+      },
+      {
+        "threshold": 6,
+        "scenes": 43
+      },
+      {
+        "threshold": 7,
+        "scenes": 43
+      },
+      {
+        "threshold": 8,
+        "scenes": 43
+      },
+      {
+        "threshold": 9,
+        "scenes": 43
+      },
+      {
+        "threshold": 10,
+        "scenes": 43
+      },
+      {
+        "threshold": 11,
+        "scenes": 43
+      },
+      {
+        "threshold": 12,
+        "scenes": 43
+      },
+      {
+        "threshold": 13,
+        "scenes": 43
+      },
+      {
+        "threshold": 14,
+        "scenes": 45
+      },
+      {
+        "threshold": 15,
+        "scenes": 46
+      },
+      {
+        "threshold": 16,
+        "scenes": 46
+      },
+      {
+        "threshold": 17,
+        "scenes": 46
+      },
+      {
+        "threshold": 18,
+        "scenes": 46
+      },
+      {
+        "threshold": 19,
+        "scenes": 46
+      },
+      {
+        "threshold": 20,
+        "scenes": 46
+      },
+      {
+        "threshold": 21,
+        "scenes": 46
+      },
+      {
+        "threshold": 22,
+        "scenes": 46
+      },
+      {
+        "threshold": 23,
+        "scenes": 46
+      },
+      {
+        "threshold": 24,
+        "scenes": 50
+      },
+      {
+        "threshold": 25,
+        "scenes": 50
+      },
+      {
+        "threshold": 26,
+        "scenes": 50
+      },
+      {
+        "threshold": 27,
+        "scenes": 50
+      },
+      {
+        "threshold": 28,
+        "scenes": 50
+      },
+      {
+        "threshold": 29,
+        "scenes": 50
+      },
+      {
+        "threshold": 30,
+        "scenes": 58
+      },
+      {
+        "threshold": 31,
+        "scenes": 58
+      },
+      {
+        "threshold": 32,
+        "scenes": 58
+      },
+      {
+        "threshold": 33,
+        "scenes": 58
+      },
+      {
+        "threshold": 34,
+        "scenes": 58
+      },
+      {
+        "threshold": 35,
+        "scenes": 57
+      },
+      {
+        "threshold": 36,
+        "scenes": 57
+      },
+      {
+        "threshold": 37,
+        "scenes": 57
+      },
+      {
+        "threshold": 38,
+        "scenes": 57
+      },
+      {
+        "threshold": 39,
+        "scenes": 57
+      },
+      {
+        "threshold": 40,
+        "scenes": 58
+      }
+    ],
+    "B_fine": [
+      {
+        "threshold": 5,
+        "scenes": 52
+      },
+      {
+        "threshold": 6,
+        "scenes": 60
+      },
+      {
+        "threshold": 7,
+        "scenes": 67
+      },
+      {
+        "threshold": 8,
+        "scenes": 72
+      },
+      {
+        "threshold": 9,
+        "scenes": 77
+      },
+      {
+        "threshold": 10,
+        "scenes": 82
+      },
+      {
+        "threshold": 11,
+        "scenes": 87
+      },
+      {
+        "threshold": 12,
+        "scenes": 92
+      },
+      {
+        "threshold": 13,
+        "scenes": 93
+      },
+      {
+        "threshold": 14,
+        "scenes": 85
+      },
+      {
+        "threshold": 15,
+        "scenes": 83
+      },
+      {
+        "threshold": 16,
+        "scenes": 79
+      },
+      {
+        "threshold": 17,
+        "scenes": 74
+      },
+      {
+        "threshold": 18,
+        "scenes": 65
+      },
+      {
+        "threshold": 19,
+        "scenes": 63
+      },
+      {
+        "threshold": 20,
+        "scenes": 59
+      },
+      {
+        "threshold": 21,
+        "scenes": 54
+      },
+      {
+        "threshold": 22,
+        "scenes": 50
+      },
+      {
+        "threshold": 23,
+        "scenes": 48
+      },
+      {
+        "threshold": 24,
+        "scenes": 44
+      },
+      {
+        "threshold": 25,
+        "scenes": 39
+      },
+      {
+        "threshold": 26,
+        "scenes": 34
+      },
+      {
+        "threshold": 27,
+        "scenes": 32
+      },
+      {
+        "threshold": 28,
+        "scenes": 27
+      },
+      {
+        "threshold": 29,
+        "scenes": 26
+      },
+      {
+        "threshold": 30,
+        "scenes": 25
+      },
+      {
+        "threshold": 31,
+        "scenes": 24
+      },
+      {
+        "threshold": 32,
+        "scenes": 22
+      },
+      {
+        "threshold": 33,
+        "scenes": 22
+      },
+      {
+        "threshold": 34,
+        "scenes": 21
+      },
+      {
+        "threshold": 35,
+        "scenes": 19
+      },
+      {
+        "threshold": 36,
+        "scenes": 17
+      },
+      {
+        "threshold": 37,
+        "scenes": 16
+      },
+      {
+        "threshold": 38,
+        "scenes": 14
+      },
+      {
+        "threshold": 39,
+        "scenes": 14
+      },
+      {
+        "threshold": 40,
+        "scenes": 14
+      }
+    ],
+    "A_min_duration_sweep_thr18": [
+      {
+        "min_duration": 5,
+        "scenes": 354
+      },
+      {
+        "min_duration": 10,
+        "scenes": 130
+      },
+      {
+        "min_duration": 20,
+        "scenes": 46
+      },
+      {
+        "min_duration": 30,
+        "scenes": 22
+      },
+      {
+        "min_duration": 60,
+        "scenes": 12
+      }
+    ],
+    "A_snap_window_sweep": [
+      {
+        "threshold": 18,
+        "snap_window": 1.0,
+        "scenes": 14
+      },
+      {
+        "threshold": 18,
+        "snap_window": 2.0,
+        "scenes": 22
+      },
+      {
+        "threshold": 18,
+        "snap_window": 5.0,
+        "scenes": 46
+      },
+      {
+        "threshold": 18,
+        "snap_window": 8.0,
+        "scenes": 55
+      },
+      {
+        "threshold": 18,
+        "snap_window": 12.0,
+        "scenes": 70
+      },
+      {
+        "threshold": 50,
+        "snap_window": 1.0,
+        "scenes": 28
+      },
+      {
+        "threshold": 50,
+        "snap_window": 2.0,
+        "scenes": 32
+      },
+      {
+        "threshold": 50,
+        "snap_window": 5.0,
+        "scenes": 60
+      },
+      {
+        "threshold": 50,
+        "snap_window": 8.0,
+        "scenes": 64
+      },
+      {
+        "threshold": 50,
+        "snap_window": 12.0,
+        "scenes": 78
+      }
+    ],
+    "A_label_runs": [
+      {
+        "threshold": 18,
+        "runs": 6735,
+        "single_sample_runs": 6060,
+        "median_run_samples": 1.0,
+        "max_run_samples": 21
+      },
+      {
+        "threshold": 90,
+        "runs": 3188,
+        "single_sample_runs": 1801,
+        "median_run_samples": 1.0,
+        "max_run_samples": 54
+      }
+    ],
+    "C_changepoint": [
+      {
+        "window_s": 5,
+        "k_sigma": 1.0,
+        "peaks": 143,
+        "scenes": 77
+      },
+      {
+        "window_s": 5,
+        "k_sigma": 1.5,
+        "peaks": 99,
+        "scenes": 57
+      },
+      {
+        "window_s": 5,
+        "k_sigma": 2.0,
+        "peaks": 68,
+        "scenes": 42
+      },
+      {
+        "window_s": 5,
+        "k_sigma": 3.0,
+        "peaks": 28,
+        "scenes": 23
+      },
+      {
+        "window_s": 10,
+        "k_sigma": 1.0,
+        "peaks": 66,
+        "scenes": 52
+      },
+      {
+        "window_s": 10,
+        "k_sigma": 1.5,
+        "peaks": 50,
+        "scenes": 42
+      },
+      {
+        "window_s": 10,
+        "k_sigma": 2.0,
+        "peaks": 36,
+        "scenes": 32
+      },
+      {
+        "window_s": 10,
+        "k_sigma": 3.0,
+        "peaks": 12,
+        "scenes": 12
+      },
+      {
+        "window_s": 20,
+        "k_sigma": 1.0,
+        "peaks": 37,
+        "scenes": 37
+      },
+      {
+        "window_s": 20,
+        "k_sigma": 1.5,
+        "peaks": 29,
+        "scenes": 29
+      },
+      {
+        "window_s": 20,
+        "k_sigma": 2.0,
+        "peaks": 24,
+        "scenes": 24
+      },
+      {
+        "window_s": 20,
+        "k_sigma": 3.0,
+        "peaks": 7,
+        "scenes": 8
+      },
+      {
+        "window_s": 30,
+        "k_sigma": 1.0,
+        "peaks": 29,
+        "scenes": 30
+      },
+      {
+        "window_s": 30,
+        "k_sigma": 1.5,
+        "peaks": 21,
+        "scenes": 22
+      },
+      {
+        "window_s": 30,
+        "k_sigma": 2.0,
+        "peaks": 14,
+        "scenes": 15
+      },
+      {
+        "window_s": 30,
+        "k_sigma": 3.0,
+        "peaks": 5,
+        "scenes": 6
+      }
+    ]
+  }
+}

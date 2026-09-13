@@ -5,7 +5,6 @@ This module ensures the runtime environment meets all requirements,
 with special focus on CUDA availability and compatibility.
 """
 
-import time
 import sys
 import os
 import io
@@ -100,6 +99,7 @@ class PreflightChecker:
         self._check_ffmpeg()
         self._check_disk_space()
         self._check_dependencies()
+        self._check_downloaded_segmenter_models()
         
         # Display results
         self._display_results()
@@ -138,6 +138,32 @@ class PreflightChecker:
                     device_count = torch.cuda.device_count()
                     device_name = torch.cuda.get_device_name(0)
                     cuda_version = torch.version.cuda
+
+                    # #411: a card this build has no kernels for is not a usable GPU.
+                    from whisperjav.utils.device_detector import cuda_build_supports_device
+                    try:
+                        capability = tuple(torch.cuda.get_device_capability(0))
+                        arch_list = list(torch.cuda.get_arch_list())
+                    except Exception:  # noqa: BLE001 - cannot judge; report availability only
+                        capability, arch_list = None, []
+                    if capability and not cuda_build_supports_device(capability, arch_list):
+                        self.results.append(CheckResult(
+                            name="CUDA Availability",
+                            status=CheckStatus.FAIL,
+                            message="GPU present but not supported by this PyTorch build",
+                            details=[
+                                f"Primary GPU: {device_name} (compute capability "
+                                f"{capability[0]}.{capability[1]})",
+                                f"This build has kernels for: {', '.join(arch_list)}",
+                                "",
+                                "Solutions:",
+                                "1. Install a PyTorch build with kernels for this card",
+                                "   (see https://pytorch.org/get-started/locally/)",
+                                "2. Or use --accept-cpu-mode to run in CPU mode (slower)",
+                            ],
+                            fatal=True
+                        ))
+                        return
 
                     self.results.append(CheckResult(
                         name="CUDA Availability",
@@ -387,7 +413,15 @@ class PreflightChecker:
         ]
 
         optional_deps = {
-            'stable_whisper': "Required only for legacy fast/faster pipelines"
+            'stable_whisper': "Required only for legacy fast/faster pipelines",
+            # v1.9.2: FireRedVAD ships in the [cli] extra. Since 2026-09-12 it is
+            # also the DEFAULT speech segmenter for the fidelity pipeline, so a
+            # plain `--mode fidelity` needs it -- not just an explicit
+            # --speech-segmenter firered-vad.
+            'fireredvad': "FireRedVAD speech segmenter -- the default for --mode "
+                          "fidelity and for a fidelity ensemble pass, and selectable "
+                          "anywhere with --speech-segmenter firered-vad; "
+                          "pip install fireredvad",
         }
         
         missing = []
@@ -428,6 +462,40 @@ class PreflightChecker:
                 fatal=False
             ))
     
+    def _check_downloaded_segmenter_models(self):
+        """Are the speech-segmenter models that are fetched at runtime present?
+
+        FireRedVAD is the fidelity pipeline's speech segmenter since 2026-09-12 and
+        its model is downloaded on first use. A WARN, not a FAIL: a user who only
+        runs Balanced never needs it, and --check has no pipeline to go on.
+        """
+        for backend, (_m, _f, display) in _RUNTIME_DOWNLOADED_SEGMENTERS.items():
+            # download=False: --check reports, it does not change the machine.
+            ok = ensure_segmenter_model_available(
+                backend, download=False, exit_on_fail=False)
+            if ok:
+                self.results.append(CheckResult(
+                    name=f"{display} model",
+                    status=CheckStatus.PASS,
+                    message="Downloaded and ready",
+                ))
+            else:
+                self.results.append(CheckResult(
+                    name=f"{display} model",
+                    status=CheckStatus.WARN,
+                    message="Not downloaded yet",
+                    details=[
+                        f"{display} finds the speech for the fidelity pipeline. Its "
+                        "model is downloaded once from Hugging Face, and it is not "
+                        "on this machine yet. --check does not download it.",
+                        "It is fetched during installation, or at the start of the "
+                        "first fidelity run. To avoid needing the network then, run "
+                        "one fidelity job while online, or use "
+                        "--speech-segmenter silero-v3.1, which needs no download.",
+                    ],
+                    fatal=False,
+                ))
+
     def _display_results(self):
         """Display all check results in a formatted manner."""
         print()
@@ -481,6 +549,100 @@ class PreflightChecker:
                     print()
 
 
+# Speech segmenters whose model is downloaded on first use instead of shipping in
+# the wheel. Name → the callable that fetches it (raising on failure) and the
+# human name used in the message.
+#
+# WHY THIS EXISTS AT START-UP. The fidelity pipeline catches a segmenter failure
+# PER SCENE and carries on (pipelines/fidelity_pipeline.py). A model that cannot be
+# fetched therefore fails every scene, produces an empty subtitle file, and the run
+# summary calls the file "empty" -- which the default --fail-on does not fail on.
+# The user is handed an empty .srt by a run that exited 0. Fetching here turns that
+# into one message before any audio is read. (Owner, 2026-09-12, his option 3.)
+_RUNTIME_DOWNLOADED_SEGMENTERS = {
+    "firered-vad": (
+        "whisperjav.modules.speech_segmentation.backends.firered_vad",
+        "ensure_model_downloaded",
+        "FireRedVAD",
+    ),
+}
+
+
+def ensure_segmenter_model_available(backend, *, model_dir=None,
+                                     download: bool = True,
+                                     exit_on_fail: bool = True) -> bool:
+    """
+    Make sure a speech segmenter's model is on this machine before a run starts.
+
+    Returns True when there is nothing to do (the segmenter ships its model, or is
+    not one we know) or when the fetch succeeded. On failure it prints what the user
+    can do about it and, by default, ends the run with status 1 -- the same status
+    the GPU start-up check uses when it cannot proceed. Pass exit_on_fail=False to
+    get False back instead, which is what --check does.
+
+    ``model_dir`` is the directory the run's segmenter config names, if any, so this
+    check looks in the same place the segmenter will and cannot pass while the run
+    then fails, or the reverse.
+
+    ``download=False`` reports what is already on the machine without fetching
+    anything -- what ``--check`` wants, since a diagnostic must not change the
+    machine it is diagnosing.
+
+    This is a better MESSAGE, earlier; it is not the guarantee. The guarantee is in
+    ``FireRedVadSpeechSegmenter.__init__``, which resolves the model when the
+    segmenter is actually built and so cannot be walked around by a path this check
+    does not predict.
+    """
+    entry = _RUNTIME_DOWNLOADED_SEGMENTERS.get(backend or "")
+    if entry is None:
+        return True
+    module_name, func_name, display = entry
+    try:
+        import importlib
+        getattr(importlib.import_module(module_name), func_name)(
+            model_dir, download=download)
+        return True
+    except Exception as exc:
+        if not exit_on_fail:
+            return False
+        offline = bool(os.environ.get("HF_HUB_OFFLINE"))
+        lines = [
+            f"{display}'s speech-detection model is not on this machine",
+            "",
+            f"This run needs {display} to find the speech in your audio, and its",
+            "model is downloaded once from Hugging Face. That did not work:",
+            "",
+            f"  {((str(exc).splitlines() or ['unknown error'])[0])[:BOX_WIDTH - 8]}",
+            "",
+            "Nothing has been transcribed. Without the model every scene would",
+            "fail and you would be handed an empty subtitle file.",
+            "",
+            "What you can do:",
+            "  - Connect to the internet and run this once. The download is",
+            "    small (about 2 MB) and is kept for every run after it.",
+            "  - Or pick a speech segmenter that needs no download:",
+            "      --speech-segmenter silero-v3.1",
+            "    In the Ensemble tab, set that pass's Speech Segmenter to",
+            "    Silero v3.1.",
+            "  - Or download the model on another machine and point at it:",
+            "      huggingface-cli download FireRedTeam/FireRedVAD \\",
+            "        --local-dir <folder>",
+            "    In China, ModelScope serves the same files:",
+            "      modelscope download --model xukaituo/FireRedVAD \\",
+            "        --local_dir <folder>",
+            "    Then set WHISPERJAV_FIREREDVAD_MODEL_DIR to <folder>.",
+        ]
+        if offline:
+            lines += [
+                "",
+                "Downloads are switched off for this run (HF_HUB_OFFLINE is set,",
+                "which is what --offline does), so nothing can be fetched now.",
+                "The model has to have been downloaded once beforehand.",
+            ]
+        _print_box(lines, Fore.RED)
+        sys.exit(1)
+
+
 def run_preflight_checks(verbose: bool = False, exit_on_fail: bool = True) -> bool:
     """Run pre-flight checks and optionally exit on failure.
     
@@ -499,58 +661,134 @@ def run_preflight_checks(verbose: bool = False, exit_on_fail: bool = True) -> bo
     
     return success
 
-def _wait_for_keypress_with_timeout(timeout_seconds=30):
-    """
-    Cross-platform implementation to wait for any keypress with timeout.
-    Returns True if key was pressed, False if timeout occurred.
-    """
-    if sys.platform == 'win32':
-        # Windows implementation using msvcrt
-        try:
-            import msvcrt
-            start_time = time.time()
-            while (time.time() - start_time) < timeout_seconds:
-                if msvcrt.kbhit():
-                    msvcrt.getch()  # Consume the keypress
-                    return True
-                time.sleep(0.1)
-            return False
-        except ImportError:
-            # Fallback if msvcrt not available
-            time.sleep(timeout_seconds)
-            return False
-    else:
-        # Unix-like systems (Linux, macOS) using select
-        try:
-            import select
-            print("Press any key to continue immediately, or wait for auto-continue...")
-            # Use select to wait for stdin with timeout
-            rlist, _, _ = select.select([sys.stdin], [], [], timeout_seconds)
-            if rlist:
-                sys.stdin.readline()  # Consume the input
-                return True
-            return False
-        except (ImportError, OSError):
-            # Fallback if select not available or stdin not supported
-            time.sleep(timeout_seconds)
-            return False
+# Set once the user has answered "yes" (or passed consent on the command line), so the
+# question is asked once per run: the check runs at import time and again in main(),
+# and spawned worker processes re-run the module level of whisperjav.main.
+CPU_ACCEPTED_ENV = "WHISPERJAV_CPU_ACCEPTED"
 
 
-def enforce_gpu_requirement(accept_cpu_mode=False, timeout_seconds=30):
+def cpu_consent_in_argv(argv) -> bool:
+    """True when the command line already answers "use the CPU": --accept-cpu-mode,
+    or an explicit --device cpu (either spelling)."""
+    argv = list(argv)
+    if "--accept-cpu-mode" in argv or "--device=cpu" in argv:
+        return True
+    for i, tok in enumerate(argv[:-1]):
+        if tok == "--device" and argv[i + 1] == "cpu":
+            return True
+    return False
+
+
+def _stdin_is_interactive() -> bool:
+    """True when a person can answer a question on this console.
+
+    The GUI marks its child processes with WHISPERJAV_NO_CONSOLE=1 because on
+    Windows even the null device reports itself as a terminal, so isatty() alone
+    would leave a GUI worker waiting for an answer nobody can give.
     """
-    Check for GPU (CUDA or MPS) availability with friendly warning and optional bypass.
+    if os.environ.get("WHISPERJAV_NO_CONSOLE") == "1":
+        return False
+    try:
+        return bool(sys.stdin) and sys.stdin.isatty()
+    except Exception:  # noqa: BLE001 - a broken stdin means nobody can answer
+        return False
+
+
+def _ask(prompt: str):
+    """Read one answer. None when there was nobody to answer (end of input on a
+    piped stdin, which Windows reports as a terminal); an interrupt is 'no'."""
+    try:
+        return input(prompt).strip().lower()
+    except EOFError:
+        return None
+    except KeyboardInterrupt:
+        return ""
+
+
+BOX_WIDTH = 72
+CPU_QUESTION = "Continue on the CPU anyway? [y/N] "
+
+
+def _print_box(lines, colour):
+    """Print `lines` inside a double-ruled box so the question cannot be missed
+    (owner, 2026-09-06: "printed out in a very very visible manner")."""
+    inner = BOX_WIDTH - 2
+    print(f"{colour}╔{'═' * inner}╗")
+    print(f"║{' ' * inner}║")
+    for line in lines:
+        print(f"║  {line.ljust(inner - 2)}║")
+    print(f"║{' ' * inner}║")
+    print(f"╚{'═' * inner}╝{Style.RESET_ALL}")
+
+
+def _ask_to_continue_on_cpu(colour) -> bool:
+    """Stop and ask whether to proceed on the CPU or abort. Never decides alone,
+    never continues after a timeout. Returns True only on an explicit yes; a
+    "yes" is remembered for this run and its worker processes. Where nobody can
+    answer (the GUI's child process, a piped run) it aborts and says how to
+    answer in advance. Anything else exits with status 1."""
+    if _stdin_is_interactive():
+        _print_box([
+            "YOUR ANSWER IS NEEDED  -  nothing has been processed yet.",
+            "",
+            "Continue on the CPU anyway?  (much slower than a GPU)",
+            "",
+            "   type  y  then Enter   ->  continue on the CPU",
+            "   Enter, or  n          ->  abort",
+        ], colour)
+        answer = _ask(CPU_QUESTION)
+        if answer in ("y", "yes"):
+            os.environ[CPU_ACCEPTED_ENV] = "1"   # remembered for this run and its workers
+            print(f"\n{Fore.GREEN}✓ Continuing on the CPU (you confirmed).{Style.RESET_ALL}\n")
+            return True
+        if answer is not None:
+            print(f"\n{Fore.RED}Aborted. Nothing was processed.{Style.RESET_ALL}\n")
+            sys.exit(1)
+        print()
+        _print_box([
+            "NO ANSWER RECEIVED  -  input ended before you answered.",
+            "Nothing was processed.",
+            "",
+            "To continue on the CPU, run again with  --accept-cpu-mode",
+            "(in the GUI: tick 'Accept CPU-only mode', then Start again).",
+        ], Fore.RED)
+        print()
+        sys.exit(1)
+    _print_box([
+        "STOPPED  -  no console to ask on.  Nothing was processed.",
+        "",
+        "To continue on the CPU, run again with  --accept-cpu-mode",
+        "(in the GUI: tick 'Accept CPU-only mode', then Start again).",
+    ], Fore.RED)
+    print()
+    sys.exit(1)
+
+
+def enforce_gpu_requirement(accept_cpu_mode=False):
+    """
+    The start-up check every run passes through. A usable GPU (CUDA or MPS)
+    passes silently. Otherwise the run STOPS and ASKS whether to proceed on the
+    CPU or abort (owner, 2026-09-06), both when no GPU is present and when one
+    is present but this PyTorch build has no kernels for it (#411).
 
     Args:
-        accept_cpu_mode: If True, skip the warning entirely (from --accept-cpu flag)
-        timeout_seconds: How long to wait for user acknowledgment (default: 30)
+        accept_cpu_mode: True when the command line already answered
+            (--accept-cpu-mode, --device cpu, or the GUI's "Accept CPU-only
+            mode" box): no question is asked.
 
     Returns:
-        bool: True if GPU is available or user accepted CPU mode, False otherwise
+        bool: True when a GPU is usable or the user chose the CPU; otherwise
+        the process exits with status 1 and nothing has been processed.
     """
     # Skip check entirely if user explicitly accepted CPU mode
     if accept_cpu_mode:
-        print(f"{Fore.YELLOW}ℹ GPU check bypassed via --accept-cpu-mode flag.{Style.RESET_ALL}")
+        if os.environ.get(CPU_ACCEPTED_ENV) != "1":
+            print(f"{Fore.YELLOW}ℹ CPU mode accepted in advance (--accept-cpu-mode, --device cpu, or the "
+                  f"GUI's 'Accept CPU-only mode' box); the GPU check is skipped.{Style.RESET_ALL}")
+        os.environ[CPU_ACCEPTED_ENV] = "1"
         return True
+    if os.environ.get(CPU_ACCEPTED_ENV) == "1":
+        return True   # already answered in this run (or by the parent process)
 
     try:
         import torch
@@ -560,9 +798,31 @@ def enforce_gpu_requirement(accept_cpu_mode=False, timeout_seconds=30):
         if best_device in ('cuda', 'mps'):
             return True
 
-        # No GPU detected - show friendly warning
+        # #411 (owner, 2026-09-06): a GPU is present but this PyTorch build has no
+        # kernels for it. The check stops and ASKS whether to proceed on the CPU or
+        # abort; it never decides by itself and never continues after a timeout.
+        # Where nobody can answer (the GUI's child process, a piped run) it aborts
+        # and says how to answer: --accept-cpu-mode, or the GUI's "Accept CPU-only
+        # mode" box, both handled at the top of this function.
+        from whisperjav.utils import device_detector as _dd
+        if _dd.CUDA_UNUSABLE_REASON:
+            print(f"\n{Fore.RED}{'='*70}{Style.RESET_ALL}")
+            print(f"{Fore.RED}❌ GPU not supported by this PyTorch build{Style.RESET_ALL}")
+            print(f"{Fore.RED}{'='*70}{Style.RESET_ALL}\n")
+            print(f"  {_dd.CUDA_UNUSABLE_REASON}\n")
+            print("Running on this card would end as an empty file reported as success.\n")
+            print(f"{Fore.CYAN}Your options:{Style.RESET_ALL}")
+            print("  - Install a PyTorch build with kernels for this card")
+            print("    (see https://pytorch.org/get-started/locally/), or")
+            print("  - Continue on the CPU instead (much slower; the ChronosJAV pipelines")
+            print("    pick CUDA on their own and may still fail there).")
+            print("\n  Run 'whisperjav --check' for detailed diagnostics\n")
+            return _ask_to_continue_on_cpu(Fore.RED)
+
+        # No GPU at all (no CUDA, no MPS): explain, then the same question
+        # (owner, 2026-09-06: this path asks too; the 30 s auto-continue is gone).
         print(f"\n{Fore.YELLOW}{'='*70}{Style.RESET_ALL}")
-        print(f"{Fore.YELLOW}⚠  GPU Performance Warning{Style.RESET_ALL}")
+        print(f"{Fore.YELLOW}⚠  No GPU found{Style.RESET_ALL}")
         print(f"{Fore.YELLOW}{'='*70}{Style.RESET_ALL}\n")
 
         print("WhisperJAV works best with GPU acceleration.")
@@ -600,22 +860,7 @@ def enforce_gpu_requirement(accept_cpu_mode=False, timeout_seconds=30):
             print("     See https://pytorch.org/get-started/locally/ for ROCm installation")
 
         print("\n  Run 'whisperjav --check' for detailed diagnostics\n")
-
-        print(f"{Fore.YELLOW}You can continue with CPU-only mode, but expect slower performance.{Style.RESET_ALL}\n")
-
-        print(f"{Fore.GREEN}Press any key to continue with CPU mode...{Style.RESET_ALL}")
-        print(f"(Auto-continuing in {timeout_seconds} seconds, or use --accept-cpu-mode to skip this warning)")
-        print(f"{Fore.YELLOW}{'='*70}{Style.RESET_ALL}\n")
-
-        # Wait for keypress or timeout
-        key_pressed = _wait_for_keypress_with_timeout(timeout_seconds)
-
-        if key_pressed:
-            print(f"\n{Fore.GREEN}✓ Continuing with CPU mode (user confirmed)...{Style.RESET_ALL}\n")
-        else:
-            print(f"\n{Fore.GREEN}✓ Auto-continuing with CPU mode after timeout...{Style.RESET_ALL}\n")
-
-        return True
+        return _ask_to_continue_on_cpu(Fore.YELLOW)
 
     except ImportError:
         # PyTorch not installed - this is a critical error

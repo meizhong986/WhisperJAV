@@ -2,7 +2,7 @@
 Null/Passthrough speech segmenter.
 
 Returns the entire audio as a single segment, effectively bypassing
-speech segmentation. Useful when --no-vad or --speech-segmenter none
+speech segmentation. Useful when --speech-segmenter none
 is specified.
 """
 
@@ -25,7 +25,7 @@ class NullSpeechSegmenter:
 
     Used when speech segmentation should be bypassed:
     - --speech-segmenter none
-    - --no-vad flag
+    - --speech-segmenter none
 
     This allows ASR modules to process the full audio without VAD preprocessing.
     """

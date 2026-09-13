@@ -1668,12 +1668,44 @@ Section "Install"
         ${Print} "Local LLM installation: will prompt during post-install"
     ${EndIf}
 
+    # WhisperJAV v{{VERSION}}: make conda-constructor's runner pass on a failed
+    # post-install instead of swallowing it. Without this variable its _nsis.py
+    # catches the non-zero exit, writes a line to stderr and returns normally, so
+    # NSIS never learns the install is broken. This is constructor's own documented
+    # switch: "Pre- and post- install scripts will only throw an error if the
+    # environment variable NSIS_SCRIPTS_RAISE_ERRORS is set."
+    System::Call 'kernel32::SetEnvironmentVariable(t,t)i("NSIS_SCRIPTS_RAISE_ERRORS", "1").r0'
+
     ${If} $Ana_PostInstall_State = ${BST_CHECKED}
         ${Print} "Running post install..."
         push '"$INSTDIR\pythonw.exe" -E -s "$INSTDIR\Lib\_nsis.py" post_install'
         push 'Failed to run post install script'
         push 'WithLog'
         call AbortRetryNSExecWait
+    ${EndIf}
+
+    # WhisperJAV v{{VERSION}}: stop the install when a package WhisperJAV cannot run
+    # without is missing or will not load. Without this the installer reached its
+    # normal finish page and put a shortcut on the desktop that opened onto an error,
+    # which is the failure this release exists to stop reporting as success.
+    #
+    # The marker file is checked rather than the exit code because it survives both
+    # ways the exit code can be lost: the user answering "Ignore" to the retry dialog,
+    # and a silent install, where that dialog answers itself with "Ignore".
+    # post_install.py deletes any older marker when it starts, so this can only be
+    # this run's.
+    ${If} ${FileExists} "$INSTDIR\INSTALLATION_FAILED_v{{VERSION}}.txt"
+        ${Print} "::error:: WhisperJAV cannot run: a core package is missing or will not load."
+        ${Print} "::error:: Details: $INSTDIR\INSTALLATION_FAILED_v{{VERSION}}.txt"
+        ${Print} "::error:: Log: $INSTDIR\install_log_v{{VERSION}}.txt"
+        MessageBox MB_OK|MB_ICONSTOP "WhisperJAV could not finish installing.$\r$\n$\r$\n\
+A package WhisperJAV needs is missing or will not load, so transcription would not work. \
+The installation has been stopped rather than leave you with a shortcut that opens onto an error.$\r$\n$\r$\n\
+What went wrong is written in:$\r$\n$INSTDIR\INSTALLATION_FAILED_v{{VERSION}}.txt$\r$\n$\r$\n\
+Running the installer again usually fixes it, because the usual cause is a download that did not \
+complete. If it happens twice, please attach that file and install_log_v{{VERSION}}.txt to a report at \
+https://github.com/meizhong986/WhisperJAV/issues" /SD IDOK
+        Abort
     ${EndIf}
 
     ; === WhisperJAV v{{VERSION}} Custom Desktop Shortcut Creation ===

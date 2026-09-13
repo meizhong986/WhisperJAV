@@ -25,13 +25,18 @@ class AuditokSceneDetectionOptions(BaseModel):
     # === Core Options ===
     max_duration_s: float = Field(
         29.0,
-        ge=1.0, le=300.0,
+        ge=1.0, le=1200.0,
         description="Maximum scene duration in seconds."
     )
     min_duration_s: float = Field(
         0.2,
         ge=0.1, le=10.0,
-        description="Minimum scene duration in seconds."
+        description=(
+            "Minimum scene duration in seconds. NOTE: on the auditok and silero backends this is a "
+            "DISCARD filter, not a merge floor -- a region shorter than this is dropped together "
+            "with its audio. Keep it small; a scene-length floor is only enforceable on the "
+            "semantic backend, whose min_duration merges short segments into their neighbours."
+        )
     )
     target_sr: int = Field(
         16000,
@@ -174,13 +179,18 @@ class SileroSceneDetectionOptions(BaseModel):
     )
     max_duration_s: float = Field(
         29.0,
-        ge=1.0, le=300.0,
+        ge=1.0, le=1200.0,
         description="Maximum scene duration in seconds."
     )
     min_duration_s: float = Field(
         0.2,
         ge=0.1, le=10.0,
-        description="Minimum scene duration in seconds."
+        description=(
+            "Minimum scene duration in seconds. NOTE: on the auditok and silero backends this is a "
+            "DISCARD filter, not a merge floor -- a region shorter than this is dropped together "
+            "with its audio. Keep it small; a scene-length floor is only enforceable on the "
+            "semantic backend, whose min_duration merges short segments into their neighbours."
+        )
     )
     target_sr: int = Field(
         16000,
@@ -413,5 +423,124 @@ class SileroSceneDetection(FeatureComponent):
             silero_threshold=0.05,
             silero_min_silence_ms=1200,
             silero_speech_pad_ms=150,
+        ),
+    }
+
+
+class SemanticSceneDetectionOptions(BaseModel):
+    """
+    Semantic (texture-clustering) scene detection options.
+
+    IMPORTANT -- FIELD NAMES: the semantic backend reads these keys WITHOUT the
+    ``_s`` suffix (``whisperjav/modules/scene_detection_backends/semantic_backend.py``
+    builds its config from ``min_duration`` / ``max_duration`` / ``snap_window`` /
+    ``clustering_threshold``), and ``SceneDetectorFactory`` passes kwargs through
+    untranslated. A key named ``min_duration_s`` is therefore silently ignored by this
+    backend. That mismatch is why, before v1.9.2, every semantic run fell back to the
+    engine's own hard-coded defaults regardless of the resolved configuration.
+
+    Values below mirror ``config/v4/ecosystems/tools/semantic-scene-detection.yaml``
+    and ``modules/scene_detection_backends/semantic_adapter.py``; nothing here is new.
+    """
+
+    method: str = Field(
+        "semantic",
+        description="Scene detection method identifier."
+    )
+    min_duration: float = Field(
+        20.0,
+        ge=1.0, le=1200.0,
+        description=(
+            "Minimum segment duration in seconds. Unlike the auditok/silero backends, this is a "
+            "real merge floor: shorter segments are merged into a neighbour, so no audio is lost."
+        )
+    )
+    max_duration: float = Field(
+        420.0,
+        ge=10.0, le=1200.0,
+        description=(
+            "Scene ceiling in seconds. It is honoured while pieces are stitched together: the "
+            "engine clusters at 0.5 s granularity and merges upward, declining any merge that "
+            "would exceed this value. Two ways a scene can still end up longer: a single raw "
+            "cluster longer than the ceiling (never observed; the longest seen on three films "
+            "is 18 s), or the final clean-up absorbing a sub-minimum neighbour (at most "
+            "min_duration over). The engine logs a WARNING when either happens."
+        )
+    )
+    snap_window: float = Field(
+        6.0,
+        ge=0.5, le=15.0,
+        description=(
+            "Window in seconds searched either side of a raw boundary when snapping it onto silence. "
+            "v1.9.2 (owner O1): ONE value for every sensitivity -- this field default is the only "
+            "place it is set. Do not re-introduce a per-sensitivity value."
+        )
+    )
+    clustering_threshold: float = Field(
+        22.0,
+        ge=1.0, le=50.0,
+        description=(
+            "Agglomerative clustering distance separating one scene from the next. Lower = more scenes. "
+            "v1.9.2 (owner O1): ONE value for every sensitivity -- this field default is the only "
+            "place it is set. Do not re-introduce a per-sensitivity value."
+        )
+    )
+    sample_rate: int = Field(
+        16000,
+        ge=8000, le=48000,
+        description="Target sample rate for feature extraction."
+    )
+    preserve_original_sr: bool = Field(
+        True,
+        description="Write scene WAVs at the original sample rate."
+    )
+    visualize: bool = Field(
+        False,
+        description="Write a PNG plot of the scene boundaries and their classified types."
+    )
+
+
+@register_feature
+class SemanticSceneDetection(FeatureComponent):
+    """Semantic audio-clustering scene detection (v1.9.2 default)."""
+
+    # === Metadata ===
+    name = "semantic_scene_detection"
+    display_name = "Semantic Audio Clustering"
+    description = (
+        "Texture-based scene splitting using MFCC features and agglomerative clustering, "
+        "with boundaries snapped onto silence and anchored to the following sound onset."
+    )
+    version = "1.0.0"
+    tags = ["feature", "scene_detection", "semantic", "clustering"]
+
+    # === Feature-specific ===
+    feature_type = "scene_detection"
+
+    # === Schema ===
+    Options = SemanticSceneDetectionOptions
+
+    # === Presets ===
+    # Identical to the conservative/balanced/aggressive presets already declared in
+    # semantic-scene-detection.yaml, so the YAML-driven GUI panel and this component
+    # cannot disagree. "balanced" is the spec default (an empty preset in the YAML).
+    #
+    # v1.9.2 (owner O1): snap_window and clustering_threshold are UNIFORM across every
+    # sensitivity -- 6.0 s and 22.0. They are therefore deliberately ABSENT from the
+    # preset constructors below, so the field defaults on SemanticSceneDetectionOptions
+    # are the single place either value is written. Only the scene-length bounds still
+    # vary by sensitivity, and both the balanced and the fidelity pipeline replace both
+    # of them with 28 s / 240 s at every sensitivity, through their own scene_overrides
+    # in LEGACY_PIPELINES. So on those two pipelines the bounds below are never the
+    # values that run; they apply to any other caller of this component.
+    presets = {
+        "conservative": SemanticSceneDetectionOptions(
+            min_duration=30.0,
+            max_duration=420.0,
+        ),
+        "balanced": SemanticSceneDetectionOptions(),
+        "aggressive": SemanticSceneDetectionOptions(
+            min_duration=10.0,
+            max_duration=180.0,
         ),
     }

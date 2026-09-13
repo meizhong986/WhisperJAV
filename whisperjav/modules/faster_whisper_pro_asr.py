@@ -7,6 +7,7 @@ Speech segmentation is handled externally by the Speech Segmenter module.
 This ASR module focuses solely on transcription.
 """
 
+from dataclasses import asdict
 from pathlib import Path
 from typing import Dict, List, Tuple, Union, Optional, Any
 import gc
@@ -25,7 +26,6 @@ from whisperjav.utils.parameter_tracer import NullTracer
 from whisperjav.utils.crash_tracer import get_tracer
 from whisperjav.modules.segment_filters import SegmentFilterConfig, SegmentFilterHelper
 from whisperjav.modules.speech_segmentation import SpeechSegmenterFactory
-from whisperjav.modules.vad_failover import should_force_full_transcribe
 
 
 class FasterWhisperProASR:
@@ -84,13 +84,11 @@ class FasterWhisperProASR:
 
         # Determine speech segmenter backend FIRST (needed for firewall below)
         speech_segmenter_config = params.get("speech_segmenter", {})
-        # v1.8.13: default flipped silero-v3.1 -> whisperseg to align with
-        # LEGACY_PIPELINES["balanced"]["vad"] = "whisperseg" (resolver-level
-        # default). The fallback only fires when speech_segmenter.backend is
-        # not set (e.g., direct module instantiation bypassing the resolver).
-        # v1.8.12 history: aligned with v3.1 to fix prior silent override to
-        # silero-v4.0 — that alignment is preserved by keeping resolver and
-        # fallback in sync.
+        # The backend is always set upstream (main.py / pass_worker) — on
+        # --mode balanced it defaults to "faster-whisper" (built-in VAD).
+        # This fallback only fires on direct module instantiation
+        # that bypasses the resolver. (LEGACY_PIPELINES["balanced"]["vad"] is
+        # the Pydantic VAD *component*, "silero-v3.1", not this selector.)
         segmenter_backend = speech_segmenter_config.get("backend", "whisperseg")
 
         # v1.9.0 T1: "faster-whisper" backend = faster-whisper's BUILT-IN VAD.
@@ -132,22 +130,32 @@ class FasterWhisperProASR:
         else:
             merged_segmenter_config = dict(speech_segmenter_config)
 
-        # Native VAD runs INSIDE faster-whisper (vad_filter=True), so the external
-        # segmenter is the "none" passthrough — transcribe() then routes to the
-        # single-call full-audio path with vad_filter enabled.
-        factory_backend = "none" if self._use_native_vad else segmenter_backend
-        try:
-            self._external_segmenter = SpeechSegmenterFactory.create(
-                factory_backend,
-                config=merged_segmenter_config
-            )
-            if self._use_native_vad:
-                logger.info("Speech Segmenter: faster-whisper native VAD (vad_filter=True, single call/scene)")
-            else:
+        # v1.9.2 (owner in1/ii1): the built-in VAD detects speech INSIDE faster-whisper,
+        # so there is no external segmenter to build, run or inspect. Do not build one.
+        #
+        # This replaces the previous arrangement, in which a passthrough segmenter was
+        # constructed and asked to "segment" the scene; it returned one fabricated
+        # region spanning the whole scene, and a failover heuristic downstream then
+        # misread that fabrication as a detector failure on any scene of 480 s or more.
+        # Short-circuiting here is the same shape qwen, transformers and decoupled
+        # already use (qwen_pipeline.py:807, transformers_pipeline.py:399,
+        # decoupled_pipeline.py:587) -- balanced was the outlier.
+        if self._use_native_vad:
+            self._external_segmenter = None
+            # Owner O4 (2026-09-09): the user-facing name is "Internal FW Silero VAD".
+            # DEBUG, not INFO: the entry point already prints the one line C11 asked
+            # for, naming the version and threshold.
+            logger.debug("Speech detection: Internal FW Silero VAD, one call per scene")
+        else:
+            try:
+                self._external_segmenter = SpeechSegmenterFactory.create(
+                    segmenter_backend,
+                    config=merged_segmenter_config
+                )
                 logger.info(f"Speech Segmenter initialized: {self._external_segmenter.name}")
-        except Exception as e:
-            logger.error(f"Failed to create Speech Segmenter '{segmenter_backend}': {e}")
-            raise ValueError(f"Speech Segmenter not configured - this is an architecture violation: {e}")
+            except Exception as e:
+                logger.error(f"Failed to create Speech Segmenter '{segmenter_backend}': {e}")
+                raise ValueError(f"Speech Segmenter not configured - this is an architecture violation: {e}")
 
         # FIX: Combine all Whisper parameters into a single dictionary
         # The faster-whisper (via stable-ts) expects all parameters in one transcribe() call
@@ -205,6 +213,14 @@ class FasterWhisperProASR:
             logger.info("Translation mode enabled - output will be in English")
         self._logged_param_snapshot = False
         self._vad_parameters = self._build_vad_parameters(vad_params)
+        # v1.9.2 (S6-S8): choose WHICH Silero build the built-in VAD runs. Must happen
+        # before the first transcribe() call, and in whichever process hosts the model
+        # -- this constructor runs in the parent when the recognizer is in-process and
+        # in the spawned worker otherwise (asr_worker_proxy._asr_worker_main), so this
+        # single site covers both.
+        self.vad_version = None
+        if self._use_native_vad:
+            self.vad_version = self._install_vad_version(vad_params)
         self._reset_runtime_statistics()
         # --- END V3 PARAMETER UNPACKING ---
 
@@ -232,6 +248,36 @@ class FasterWhisperProASR:
     def get_filter_statistics(self) -> Dict[str, int]:
         """Return a copy of accumulated filter statistics."""
         return dict(self._filter_statistics)
+
+    def get_last_decode_stats(self) -> List[Dict]:
+        """Full segment dicts from the last transcription, for diagnostics.
+
+        Each entry is a faster-whisper ``Segment`` as a dict, so it carries the
+        decode metadata that discriminates between explanations for #394 --
+        ``temperature`` (a value above the first configured one means fallback
+        fired), ``compression_ratio``, ``avg_logprob`` and ``no_speech_prob``.
+
+        Returns an empty list when nothing was captured; never raises.
+        """
+        out: List[Dict] = []
+        try:
+            for result in getattr(self, "_last_full_results", []) or []:
+                out.extend(result.get("segments") or [])
+        except Exception:  # noqa: BLE001 - diagnostics must not break the run
+            return []
+        return out
+
+    def get_segmenter_name(self) -> str:
+        """Name of the external speech segmenter, or "none" when there is none.
+
+        Returns "none" under faster-whisper's built-in VAD, because v1.9.2 builds
+        no external segmenter there at all -- the recogniser does its own detection
+        and does not report the regions it used. So "none" means "no external
+        detection happened", and ``get_last_vad_segments()`` is empty rather than
+        carrying a fabricated whole-scene region.
+        """
+        seg = getattr(self, "_external_segmenter", None)
+        return getattr(seg, "name", "none") if seg is not None else "none"
 
     def get_last_vad_segments(self) -> List[Dict]:
         """
@@ -342,11 +388,60 @@ class FasterWhisperProASR:
             logger.debug(f"  Combined Whisper Params: {self.whisper_params}")
             logger.debug("----------------------------------------------------")
 
+    def _install_vad_version(self, vad_params: Dict[str, Any]) -> str:
+        """
+        Point the internal FW Silero VAD at the Silero build the user chose.
+
+        ``params["vad"]["version"]`` comes from the FasterWhisperVAD preset (default 4.0,
+        requirement S8) and is overridden by --vad-version, --passN-vad-version or the
+        GUI dropdown.
+
+        Owner decision O3 (2026-09-09): if the chosen build cannot be loaded, fall back to
+        the Silero model faster-whisper ships with, and say so loudly. If THAT cannot be
+        loaded either, stop the run -- do not transcribe with no voice detection at all.
+        """
+        from whisperjav.modules.silero_vad_adapter import install, active_version
+
+        requested = vad_params.get("version")
+        version = install(requested)
+        threshold = (self._vad_parameters or {}).get("threshold")
+        shown = f"{threshold:.2f}" if isinstance(threshold, (int, float)) else "default"
+        if active_version() == version:
+            # DEBUG, not INFO: this constructor runs again on every model refresh (a fresh
+            # worker process every 20 minutes of scene audio by default), so an INFO line
+            # here would repeat. C11 asked for ONE line per run and the entry point prints
+            # it -- main.py for a single-pass run, the pass worker for each ensemble pass.
+            logger.debug("VAD: Silero v%s, threshold %s", version, shown)
+            return version
+
+        # The chosen build did not load. install() has already logged why. Before
+        # continuing on faster-whisper's own model, prove that model actually works --
+        # otherwise the run would reach the first scene and fail there, or worse, run
+        # with no voice detection at all.
+        try:
+            import faster_whisper.vad as fw_vad
+            fw_vad.get_vad_model()
+        except Exception as exc:
+            raise RuntimeError(
+                f"Voice detection is unavailable: Silero v{version} could not be loaded, "
+                f"and neither could the model faster-whisper ships with ({exc}). "
+                "Reinstall WhisperJAV, or reinstall faster-whisper."
+            ) from exc
+
+        logger.warning(
+            "VAD: running the Silero model faster-whisper ships with, NOT the requested "
+            "v%s (threshold %s).", version, shown,
+        )
+        return active_version()
+
     def _build_vad_parameters(self, vad_params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Convert config VAD settings into faster-whisper VadOptions format."""
         if not vad_params:
             return None
 
+        # Whitelist: only real faster-whisper VadOptions fields survive. In
+        # particular 'version' (which Silero build to run, v1.9.2) is OURS and must
+        # never reach VadOptions -- it would raise TypeError there.
         mapping = {
             'threshold': 'threshold',  # faster-whisper VadOptions expects the raw threshold name
             'neg_threshold': 'neg_threshold',  # optional, only present if config defines it
@@ -515,10 +610,33 @@ class FasterWhisperProASR:
             logger.error(f"Failed to read audio file {audio_path}: {e}")
             raise
 
-        # Run speech segmentation through the Speech Segmenter contract
-        vad_segments = self._run_speech_segmentation(audio_data, sample_rate)
-
         audio_duration = len(audio_data) / sample_rate if sample_rate else 0.0
+
+        # ------------------------------------------------------------------ #
+        # Internal VAD: scene in, subtitles out. One call, no detour.
+        #
+        # faster-whisper does the speech detection itself (vad_filter=True), so
+        # there is nothing to segment, nothing to inspect and nothing to fall back
+        # from. Every scene takes this path regardless of length -- the previous
+        # code split at 480 s and produced a false "speech segmentation produced
+        # insufficient coverage" warning above it.
+        # ------------------------------------------------------------------ #
+        if self._use_native_vad:
+            # No external detection happened, so report none. Anything that treats
+            # a fabricated whole-scene region as a speech detection misreads
+            # silence as a malfunction (#324).
+            self._last_vad_segments = []
+            all_segments = self._transcribe_full_audio(audio_data, sample_rate)
+            return {
+                "segments": all_segments,
+                "text": " ".join(seg["text"] for seg in all_segments),
+                "language": self.whisper_params.get('language', 'ja'),
+            }
+
+        # ------------------------------------------------------------------ #
+        # External speech segmenter path.
+        # ------------------------------------------------------------------ #
+        vad_segments = self._run_speech_segmentation(audio_data, sample_rate)
 
         # Store segments for visualization data contract
         # Flatten grouped segments into simple list with start_sec/end_sec
@@ -544,40 +662,23 @@ class FasterWhisperProASR:
             logger.info(f"Speech segmentation complete: {total_segments} segments in {len(vad_segments)} groups")
         logger.debug("=" * 60)
 
-        # Handle "none" backend case - no segments means transcribe full audio
+        # The segmenter's answer is used as given.
+        #
+        # v1.9.2 (owner in1): the "insufficient coverage" failover that used to sit
+        # here is gone. It discarded the detector's answer and transcribed the whole
+        # scene instead whenever the result looked implausible to it -- on a
+        # threshold (480 s) that nobody chose, it being a side effect of an unrelated
+        # constant. A detector that genuinely finds no speech is believed; on this
+        # material that is a normal outcome, not a malfunction (#324).
         if not vad_segments:
-            # Check if this is because segmenter returned empty (no speech) or "none" backend
-            if self._external_segmenter.name == "none":
-                if getattr(self, "_use_native_vad", False):
-                    logger.info("faster-whisper native VAD: single transcribe call per scene (vad_filter=True)")
-                else:
-                    logger.info("Speech segmentation: disabled (none backend) - transcribing full audio directly")
-                all_segments = self._transcribe_full_audio(audio_data, sample_rate)
-            elif should_force_full_transcribe(vad_segments, audio_duration):
-                logger.warning(
-                    "Speech segmentation produced insufficient coverage (segments=%s, duration=%.1fs). "
-                    "Falling back to full-clip transcription.",
-                    0,
-                    audio_duration,
-                )
-                all_segments = self._transcribe_full_audio(audio_data, sample_rate)
-            else:
-                logger.debug(f"No speech detected in {audio_path.name}")
-                return {"segments": [], "text": "", "language": self.whisper_params.get('language', 'ja')}
-        elif should_force_full_transcribe(vad_segments, audio_duration):
-            logger.warning(
-                "Speech segmentation produced insufficient coverage (segments=%s, duration=%.1fs). "
-                "Falling back to full-clip transcription.",
-                sum(len(group or []) for group in (vad_segments or [])),
-                audio_duration,
-            )
-            all_segments = self._transcribe_full_audio(audio_data, sample_rate)
-        else:
-            all_segments = []
-            for i, vad_group in enumerate(vad_segments, 1):
-                logger.debug(f"Processing segment group {i}/{len(vad_segments)}")
-                segments = self._transcribe_vad_group(audio_data, sample_rate, vad_group)
-                all_segments.extend(segments)
+            logger.debug(f"No speech detected in {audio_path.name}")
+            return {"segments": [], "text": "", "language": self.whisper_params.get('language', 'ja')}
+
+        all_segments = []
+        for i, vad_group in enumerate(vad_segments, 1):
+            logger.debug(f"Processing segment group {i}/{len(vad_segments)}")
+            segments = self._transcribe_vad_group(audio_data, sample_rate, vad_group)
+            all_segments.extend(segments)
 
         return {
             "segments": all_segments,
@@ -610,13 +711,16 @@ class FasterWhisperProASR:
             raise
 
     def _transcribe_full_audio(self, audio_data: np.ndarray, sample_rate: int) -> List[Dict]:
-        """
-        Transcribe full audio without speech segmentation.
-        Used when Speech Segmenter backend is set to 'none'.
+        """Transcribe a whole scene in one call.
+
+        This is the primary path for the balanced pipeline: faster-whisper performs
+        the speech detection internally (``vad_filter=True``), so the scene is handed
+        over intact and no external segmentation happens. VAD is NOT bypassed here --
+        it runs inside the recogniser.
         """
         duration = len(audio_data) / sample_rate
         logger.debug("=" * 60)
-        logger.debug("DIAGNOSTIC: Full Audio Transcription (VAD bypassed)")
+        logger.debug("DIAGNOSTIC: Whole-scene transcription (internal FW Silero VAD active)")
         logger.debug(f"  Model: {self.model_name}")
         logger.debug(f"  Audio duration: {duration:.2f}s")
         logger.debug(f"  Audio shape: {audio_data.shape}")
@@ -665,6 +769,7 @@ class FasterWhisperProASR:
 
             # Consume generator with explicit next() for granular crash tracing
             raw_segments = []
+            _full_segments_for_json = []
             seg_idx = 0
             while True:
                 # CRASH TRACER: Before calling next() on generator
@@ -711,12 +816,32 @@ class FasterWhisperProASR:
                     "text": segment.text.strip(),
                     "avg_logprob": segment.avg_logprob
                 })
+
+                # v1.9.2 (owner in1, "restore full telemetry"): capture the decode
+                # metadata for EVERY scene. This used to happen only on the group
+                # path, so the scenes routed here -- the longest ones -- recorded
+                # n_segments 0 and null temperature / avg_logprob / compression_ratio
+                # in the per-scene telemetry even when they produced subtitles. The
+                # instrument built to diagnose long-run failures was blind on
+                # exactly the long scenes.
+                try:
+                    _full_segments_for_json.append(asdict(segment))
+                except Exception:
+                    pass  # Non-fatal: diagnostics must never break a run
+
                 seg_idx += 1
 
             logger.debug(f"Full audio transcription produced {len(raw_segments)} segments")
 
             # CRASH TRACER: Transcription complete
             crash_tracer.trace_transcribe_complete(len(raw_segments))
+
+            if hasattr(self, '_last_full_results'):
+                self._last_full_results.append({
+                    "group_start_sec": 0.0,
+                    "group_end_sec": duration,
+                    "segments": _full_segments_for_json,
+                })
 
             # Apply segment filtering (same logic as VAD path in _transcribe_vad_group)
             filtered_segments = []
@@ -909,7 +1034,6 @@ class FasterWhisperProASR:
                 })
 
                 # Capture full segment for diagnostic JSON (unaltered)
-                from dataclasses import asdict
                 try:
                     _full_segments_for_json.append(asdict(segment))
                 except Exception:

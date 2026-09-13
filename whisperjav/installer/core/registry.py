@@ -382,10 +382,10 @@ PACKAGES: List[Package] = [
     ),
     Package(
         name="numba",
-        version=">=0.60.0",
+        version=">=0.61.0",
         extra=Extra.CLI,
         order=22,
-        reason="JIT compilation for performance - 0.60.0+ required for numpy 2.x binary support",
+        reason="JIT compilation for performance - 0.61.0+ matches pyproject (numpy 2.x binary support)",
     ),
 
     # =========================================================================
@@ -424,13 +424,45 @@ PACKAGES: List[Package] = [
         order=32,
         reason="FFmpeg bindings - PyPI tarball has build issues, use git",
     ),
+    # v1.9.2: faster-whisper and CTranslate2 are pinned exactly, not by range.
+    #
+    # faster-whisper is pinned to a COMMIT on SYSTRAN's master branch, three commits
+    # past the v1.2.1 tag, because those three commits are the ones we want:
+    #   ed9a06c  Adds new VAD parameters (#1386)
+    #   2eeafe0  Update Silero-VAD weights to v6.2 (#1390)
+    #   cf42429  Remove "local_dir_use_symlinks" from download_model() (#1389)
+    # The 1.2.1 release still carries the older Silero v6 weights. Pinning the commit
+    # rather than the branch keeps installs reproducible: the branch moves, this does
+    # not. It is also the exact build the maintainer develops and tests against.
+    #
+    # CT2 4.6.2 reproduces the #125 crash on exit (0xC0000409); 4.8.1 does not.
+    # ctranslate2 is listed first so the pinned version is in place when
+    # faster-whisper is resolved.
+    #
+    # The Windows installer runs them the other way round -- faster-whisper is
+    # installed in Phase 3.5 from git, ctranslate2 in Phase 4 from the generated
+    # requirements file. That is safe only because Phase 3.5 passes --no-deps, so
+    # faster-whisper never resolves ctranslate2 for itself; it needs it at run
+    # time, not at install time.
     Package(
-        name="faster-whisper",
-        version=">=1.1.0",
+        name="ctranslate2",
+        version="==4.8.1",
         extra=Extra.CORE,
         order=33,
         required=True,
-        reason="CTranslate2-based Whisper for 4x faster inference",
+        reason="Inference engine behind faster-whisper. Pinned exactly: 4.6.2 "
+               "reproduces the #125 crash on exit, 4.8.1 does not.",
+    ),
+    Package(
+        name="faster-whisper",
+        extra=Extra.CORE,
+        source=InstallSource.GIT,
+        git_url="git+https://github.com/SYSTRAN/faster-whisper.git@ed9a06cd89a93e47838f564998a6c09b655d7f43",
+        order=34,
+        required=True,
+        import_name="faster_whisper",
+        reason="CTranslate2-based Whisper. Pinned to master@ed9a06c (3 commits past "
+               "v1.2.1) for the Silero v6.2 weights and the new VAD parameters.",
     ),
 
     # =========================================================================
@@ -494,6 +526,13 @@ PACKAGES: List[Package] = [
         order=48,
         import_name="sklearn",  # pip name != import name
         reason="Clustering for semantic scene detection",
+    ),
+    Package(
+        name="fireredvad",
+        version=">=0.0.2",
+        extra=Extra.CLI,
+        order=49,
+        reason="FireRedVAD speech segmenter - ships by default since v1.9.2 (owner CFF6); selected with --speech-segmenter firered-vad",
     ),
 
     # =========================================================================

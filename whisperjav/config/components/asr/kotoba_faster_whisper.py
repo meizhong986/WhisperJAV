@@ -229,7 +229,7 @@ class KotobaFasterWhisperASRComponent(ASRComponent):
             suppress_blank=True,
             without_timestamps=False,
             # Transcriber options
-            temperature=[0.0, 0.3],
+            temperature=[0.0],                  # v1.9.2 (owner O4): [0.0, 0.3] -> [0.0], no temperature retries
             compression_ratio_threshold=2.4,
             logprob_threshold=-1.5,
             no_speech_threshold=0.34,
@@ -260,7 +260,7 @@ class KotobaFasterWhisperASRComponent(ASRComponent):
             suppress_blank=False,
             without_timestamps=False,
             # Transcriber options
-            temperature=[0.0, 0.1, 0.3, 0.5],  # v1.8.10: added 0.3 middle step
+            temperature=[0.0],                  # v1.9.2 (owner O4): 4-step fallback -> [0.0], caps worst-case run time
             compression_ratio_threshold=2.6,  # v1.8.10: 3.0→2.6, tuner-validated
             logprob_threshold=-2.0,
             no_speech_threshold=0.55,  # v1.8.10: 0.2→0.55, wide intake for soft/intimate speech

@@ -92,7 +92,11 @@ class FastPipeline(BasePipeline):
 
 
         # Pass structured config to StableTSASR
-        # NOTE: 'fast' pipeline uses standard whisper backend (turbo_mode=False)
+        # NOTE: 'fast' uses stable-ts with turbo_mode=True, which means the
+        # faster-whisper backend and CTranslate2 underneath -- not plain whisper.
+        # The comment here said the opposite until v1.9.2. It matters: it is the
+        # list of pipelines that stop working if faster-whisper is missing
+        # (balanced, fast, faster, kotoba -- fidelity uses openai-whisper).
         self.asr = StableTSASR(
             model_config=effective_model_cfg,
             params=params,

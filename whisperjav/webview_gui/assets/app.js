@@ -256,6 +256,7 @@ const QwenManager = {
         safe_chunking: true,
         scene_min_duration: 12,
         scene_max_duration: 48,
+        scene_clustering_threshold: 22,  // v1.9.2 CFF2 (semantic detector); O1 made 22 the one product-wide value
         chunk_threshold_ms: 300,
         max_group_duration: 3,
         vad_threshold: 0.25,
@@ -712,8 +713,16 @@ const FormManager = {
             subs_language: document.getElementById('language').value,
             debug: document.getElementById('debugLogging').checked,
             keep_temp: document.getElementById('keepTemp').checked,
+            skip_existing: document.getElementById('skipExisting').checked,
+            fail_on_empty: document.getElementById('failOnEmpty').checked,
+            fail_on_suspect: document.getElementById('failOnSuspect').checked,
+            asr_telemetry: document.getElementById('asrTelemetry').checked,
+            // v1.9.2 (CFF1): minutes of scene audio before the recognizer is reloaded (0 = never)
+            model_refresh_audio_minutes: document.getElementById('modelRefreshAudioMinutes').value,
             temp_dir: document.getElementById('tempDir').value.trim(),
             accept_cpu_mode: document.getElementById('acceptCpuMode').checked,
+            // #415: downloaded Hugging Face models only (--offline)
+            offline_mode: document.getElementById('offlineMode').checked,
             output_format: document.getElementById('outputFormat').value,
         };
 
@@ -1027,24 +1036,32 @@ const ProcessManager = {
                     AppState.isRunning = false;
                     this.updateButtonStates();
 
-                    // Show completion status
+                    // Show completion status, in the CLI's own words: the per-file
+                    // tally from whisperjav_run.json. The exit status is the CLI's
+                    // decision; the GUI repeats it and never re-derives it.
+                    const summary = status.run_summary || null;
+                    const tally = summary ? summary.tally : null;
                     if (status.status === 'completed') {
                         ProgressManager.setProgress(100);
-                        ProgressManager.setStatus('Completed');
+                        ProgressManager.setStatus(tally ? `Finished · ${tally}` : 'Finished');
 
                         // For Ensemble Mode (tab3), translation is handled by CLI --translate flag
                         // For other modes, trigger separate translation subprocess if enabled
                         const isEnsembleMode = AppState.activeTab === 'tab3';
+                        const needsALook = summary && (summary.counts.empty > 0 || summary.counts.suspect > 0);
+                        const body = (tally ? `Files: ${tally}.` : 'The run finished.') +
+                            (needsALook ? ' Some files ended empty or suspect (listed below).' : '');
+                        this.logFileStates(summary);
 
                         if (isEnsembleMode) {
                             // CLI handled everything including translation (if enabled)
-                            ErrorHandler.showSuccess('Process Completed',
+                            ErrorHandler.showSuccess('Finished',
                                 TranslateIntegrationManager.wasEnabledOnStart()
-                                    ? 'Transcription and translation finished successfully'
-                                    : 'Transcription finished successfully');
+                                    ? `${body} Translation was run as part of the ensemble.`
+                                    : body);
                         } else {
                             // Transcription Mode - translation needs separate subprocess (legacy)
-                            ErrorHandler.showSuccess('Process Completed', 'Transcription finished successfully');
+                            ErrorHandler.showSuccess('Finished', body);
 
                             if (TranslateIntegrationManager.wasEnabledOnStart()) {
                                 // Use output_files from API (computed based on mode/language)
@@ -1058,8 +1075,18 @@ const ProcessManager = {
                         }
                     } else if (status.status === 'error') {
                         ProgressManager.reset();
-                        ProgressManager.setStatus(`Error (exit code: ${status.exit_code})`);
-                        ErrorHandler.show('Process Failed', `Process exited with code ${status.exit_code}. Check console for details.`);
+                        this.logFileStates(summary);
+                        if (summary && summary.note) {
+                            ProgressManager.setStatus(`Stopped · ${tally}`);
+                            ErrorHandler.show('Run stopped', `${summary.note} Files: ${tally}. Exit status ${status.exit_code}.`);
+                        } else if (tally) {
+                            ProgressManager.setStatus(`Finished with failures · ${tally}`);
+                            ErrorHandler.show('Finished with failures',
+                                `Files: ${tally}. Exit status ${status.exit_code}; a run fails on: ${(summary.fails_on || ['failed']).join(', ')}. See the RUN SUMMARY in the console.`);
+                        } else {
+                            ProgressManager.setStatus(`Finished with failures (exit status ${status.exit_code})`);
+                            ErrorHandler.show('Finished with failures', `Process exited with status ${status.exit_code} and wrote no run summary. Check the console for details.`);
+                        }
                     } else if (status.status === 'cancelled') {
                         ProgressManager.reset();
                         ProgressManager.setStatus('Cancelled');
@@ -1096,14 +1123,30 @@ const ProcessManager = {
         }
     },
 
+    logFileStates(summary) {
+        // State-aware close: name every file that did not end 'done', in the
+        // CLI's words, and say where the manifest is. 'done' files are counted
+        // in the tally; the RUN SUMMARY table in the console has all of them.
+        if (!summary) return;
+        const files = summary.files || [];
+        for (const f of files) {
+            if (f.state === 'done') continue;
+            const level = f.state === 'failed' ? 'error' : (f.state === 'skipped' ? 'info' : 'warning');
+            ConsoleManager.log(`${f.state}: ${f.name}${f.detail ? ' — ' + f.detail : ''}`, level);
+        }
+        if (summary.manifest_path) {
+            ConsoleManager.log(`Manifest: ${summary.manifest_path}`, 'info');
+        }
+    },
+
     formatStatus(status) {
         // Format status for display
         const statusMap = {
             'idle': 'Idle',
             'running': 'Running...',
-            'completed': 'Completed',
+            'completed': 'Finished',
             'cancelled': 'Cancelled',
-            'error': 'Error'
+            'error': 'Finished with failures'
         };
         return statusMap[status] || status;
     },
@@ -1236,6 +1279,9 @@ const EnsembleManager = {
             sceneDetector: 'semantic',
             speechEnhancer: 'none',
             speechSegmenter: 'whisperseg',  // v1.9.0: WhisperSeg pairs with anime-whisper
+            vadVersion: '4.0',  // v1.9.2: which Silero build the BUILT-IN VAD runs (balanced only).
+                                // Keep in step with defaultVadVersion below and with
+                                // DEFAULT_VAD_VERSION in modules/silero_vad_adapter.py.
             model: 'litagin/anime-whisper',
             customized: false,
             params: null,  // null = use defaults, object = full custom config
@@ -1256,6 +1302,9 @@ const EnsembleManager = {
             sceneDetector: 'semantic',
             speechEnhancer: 'none',
             speechSegmenter: 'ten',  // v1.9.0: TEN VAD on pass 2 for segmentation diversity vs pass 1's WhisperSeg
+            vadVersion: '4.0',  // v1.9.2: which Silero build the BUILT-IN VAD runs (balanced only).
+                                // Keep in step with defaultVadVersion below and with
+                                // DEFAULT_VAD_VERSION in modules/silero_vad_adapter.py.
             model: 'Qwen/Qwen3-ASR-1.7B',
             customized: false,
             params: null,
@@ -1343,7 +1392,12 @@ const EnsembleManager = {
         this.state.pass1.sensitivity = document.getElementById('pass1-sensitivity').value;
         this.state.pass1.sceneDetector = document.getElementById('pass1-scene').value;
         this.state.pass1.speechEnhancer = document.getElementById('pass1-enhancer').value;
-        this.state.pass1.speechSegmenter = document.getElementById('pass1-segmenter').value;
+        const seg1 = document.getElementById('pass1-segmenter');
+        if (seg1.dataset.mode === 'vad-version') {
+            this.state.pass1.vadVersion = seg1.value;
+        } else {
+            this.state.pass1.speechSegmenter = seg1.value;
+        }
         this.state.pass1.model = document.getElementById('pass1-model').value;
 
         // Pass 2 state sync
@@ -1352,7 +1406,12 @@ const EnsembleManager = {
         this.state.pass2.sensitivity = document.getElementById('pass2-sensitivity').value;
         this.state.pass2.sceneDetector = document.getElementById('pass2-scene').value;
         this.state.pass2.speechEnhancer = document.getElementById('pass2-enhancer').value;
-        this.state.pass2.speechSegmenter = document.getElementById('pass2-segmenter').value;
+        const seg2 = document.getElementById('pass2-segmenter');
+        if (seg2.dataset.mode === 'vad-version') {
+            this.state.pass2.vadVersion = seg2.value;
+        } else {
+            this.state.pass2.speechSegmenter = seg2.value;
+        }
         this.state.pass2.model = document.getElementById('pass2-model').value;
 
         this.state.mergeStrategy = document.getElementById('merge-strategy').value;
@@ -1479,7 +1538,13 @@ const EnsembleManager = {
             this.state.pass1.enhanceForVad = e.target.checked;
         });
         document.getElementById('pass1-segmenter').addEventListener('change', (e) => {
-            this.state.pass1.speechSegmenter = e.target.value;
+            // v1.9.2: on a balanced pass this dropdown selects the built-in VAD's
+            // Silero version, not an external segmenter.
+            if (e.target.dataset.mode === 'vad-version') {
+                this.state.pass1.vadVersion = e.target.value;
+            } else {
+                this.state.pass1.speechSegmenter = e.target.value;
+            }
         });
         document.getElementById('pass1-model').addEventListener('change', (e) => {
             this.state.pass1.model = e.target.value;
@@ -1504,7 +1569,13 @@ const EnsembleManager = {
             this.state.pass2.enhanceForVad = e.target.checked;
         });
         document.getElementById('pass2-segmenter').addEventListener('change', (e) => {
-            this.state.pass2.speechSegmenter = e.target.value;
+            // v1.9.2: on a balanced pass this dropdown selects the built-in VAD's
+            // Silero version, not an external segmenter.
+            if (e.target.dataset.mode === 'vad-version') {
+                this.state.pass2.vadVersion = e.target.value;
+            } else {
+                this.state.pass2.speechSegmenter = e.target.value;
+            }
         });
 
         // BYOP: Browse for XXL executable
@@ -1614,6 +1685,11 @@ const EnsembleManager = {
         });
 
         // Initialize UI state based on synced values
+        // v1.9.2: the browser can restore a pass's Pipeline to Balanced across a
+        // reload without firing a change event, so the segmenter dropdown is put in
+        // the right mode here too, not only in handlePipelineChange.
+        this.populateSegmenterOptions('pass1');
+        this.populateSegmenterOptions('pass2');
         this.updatePass2State();
         this.updateBadges();
         this.updateRowGreyingState('pass1');
@@ -1689,8 +1765,71 @@ const EnsembleManager = {
         }
     },
 
+    // v1.9.2 (S7/S8): the Silero builds the balanced pipeline's BUILT-IN VAD can run.
+    // Order and default come from whisperjav/modules/silero_vad_adapter.py.
+    // Labels must match VAD_VERSION_LABELS in whisperjav/modules/silero_vad_adapter.py.
+    vadVersionOptions: [
+        { value: '3.1', label: 'Internal FW Silero VAD 3.1' },
+        { value: '4.0', label: 'Internal FW Silero VAD 4.0 (default)' },
+        { value: '6.2', label: 'Internal FW Silero VAD 6.2 (latest)' },
+    ],
+    defaultVadVersion: '4.0',
+
+    // The external-segmenter option list, captured from index.html the first time a
+    // dropdown is swapped, so the markup stays the single source for that list.
+    _externalSegmenterHTML: {},
+
+    /**
+     * Rebuild a pass's Speech Segmenter dropdown for the pipeline it now runs.
+     *
+     * v1.9.2 (S2/S9/S9.1): the balanced pipeline has NO external speech segmenter.
+     * It runs faster-whisper's built-in VAD, so for a balanced pass this dropdown
+     * becomes the VAD *version* selector -- Silero 3.1, 4.0 (default), 6.2 and
+     * nothing else. Every other pipeline gets the external list back unchanged.
+     * `dataset.mode` tells the change handler, the DOM sync and the availability
+     * check which of the two things the select currently means.
+     */
+    populateSegmenterOptions(passKey) {
+        const select = document.getElementById(`${passKey}-segmenter`);
+        if (!select) return;
+        if (this._externalSegmenterHTML[passKey] === undefined) {
+            this._externalSegmenterHTML[passKey] = select.innerHTML;
+        }
+        const passState = this.state[passKey];
+        const isBalanced = passState.pipeline === 'balanced';
+
+        if (isBalanced) {
+            if (select.dataset.mode !== 'vad-version') {
+                select.innerHTML = this.vadVersionOptions.map(o =>
+                    `<option value="${o.value}">${o.label}</option>`).join('');
+                select.dataset.mode = 'vad-version';
+            }
+            const version = passState.vadVersion || this.defaultVadVersion;
+            passState.vadVersion = version;
+            select.value = version;
+            select.title = 'Which version of the internal FW Silero VAD to use. '
+                + 'Balanced has no external speech segmenter since v1.9.2.';
+            // Keep the backend name consistent for everything that still reads it
+            // (Customize > Segmenter tab, get_pipeline_defaults, saved presets).
+            passState.speechSegmenter = 'faster-whisper';
+        } else if (select.dataset.mode === 'vad-version') {
+            select.innerHTML = this._externalSegmenterHTML[passKey];
+            delete select.dataset.mode;
+            select.title = '';
+            // Availability marking was applied to the options we just replaced.
+            this.updateSegmenterAvailability();
+        }
+    },
+
     // Set scene detector, segmenter, and sensitivity to appropriate defaults for the pipeline type
     applyPipelinePresets(passKey, pipelineType) {
+        // v1.9.2: put the right OPTION LIST in the segmenter dropdown before anything
+        // below assigns a value to it -- balanced gets the Silero VAD versions,
+        // everything else gets the external segmenters back. Ahead of the CrispASR
+        // return below, so switching Balanced -> CrispASR does not leave a greyed-out
+        // dropdown still showing VAD versions.
+        this.populateSegmenterOptions(passKey);
+
         // CrispASR is a self-contained external provider: WhisperJAV's
         // scene/segmenter/sensitivity controls are inert (greyed by
         // updateRowGreyingState), so there is nothing to preset here.
@@ -1700,9 +1839,11 @@ const EnsembleManager = {
         const segmenterSelect = document.getElementById(`${passKey}-segmenter`);
         const sensitivitySelect = document.getElementById(`${passKey}-sensitivity`);
 
-        // v1.8.13: WhisperSeg is the system-wide segmenter default. All branches
-        // below set whisperseg as the per-pipeline preset; users can manually
-        // override via the dropdown (e.g., switch to silero-v3.1 for non-JA audio).
+        // v1.8.13: WhisperSeg is the system-wide segmenter default, and most branches
+        // below set it as the per-pipeline preset. Two do not: a Balanced pass has no
+        // external segmenter at all (v1.9.2), and Fidelity uses FireRedVAD
+        // (2026-09-12). Users can override via the dropdown (e.g. switch to
+        // silero-v3.1 for non-JA audio).
         if (pipelineType === 'anime-whisper') {
             // v1.9.0: pass 1 anime-whisper defaults to aggressive — the tuned
             // WhisperSeg row (wide-net capture). Pass 2 keeps balanced.
@@ -1740,20 +1881,32 @@ const EnsembleManager = {
             // Whisper-based pipeline defaults (balanced, faster, fast, fidelity)
             const pipeline = this.state[passKey].pipeline;
             if (pipeline === 'balanced') {
-                // v1.9.0: balanced defaults to faster-whisper native VAD (fastest;
-                // one transcribe call per scene). Picking an external segmenter
-                // instead auto-applies the best-quality fine-grained grouping
-                // (handled in main.py). Scene detection stays auditok.
-                sceneSelect.value = 'auditok';
-                segmenterSelect.value = 'faster-whisper';
-                this.state[passKey].sceneDetector = 'auditok';
-                this.state[passKey].speechSegmenter = 'faster-whisper';
-            } else if (pipeline === 'fidelity') {
-                // v1.8.13: whisperseg + semantic for fidelity (unchanged)
+                // Balanced defaults to faster-whisper's built-in VAD (fastest; one
+                // transcribe call per scene), the same default as main.py and the
+                // ensemble pass worker. Picking a WhisperJAV segmenter instead
+                // auto-applies the fine-grained grouping (handled in main.py).
+                // v1.9.2: scene detection is SEMANTIC, like every other pipeline and
+                // like DEFAULT_SCENE_DETECTOR on the CLI. This branch used to force
+                // auditok, which silently overrode the new default the moment a user
+                // picked Balanced in the Ensemble tab.
+                // v1.9.2 (S2/S9): balanced offers no external segmenter. The
+                // dropdown becomes the Silero VERSION selector, default 4.0
+                // (S8; 4.0 since 2026-09-12, was 3.1).
                 sceneSelect.value = 'semantic';
-                segmenterSelect.value = 'whisperseg';
                 this.state[passKey].sceneDetector = 'semantic';
-                this.state[passKey].speechSegmenter = 'whisperseg';
+                this.state[passKey].speechSegmenter = 'faster-whisper';
+                this.populateSegmenterOptions(passKey);
+            } else if (pipeline === 'fidelity') {
+                // Owner, 2026-09-12: fidelity's default speech segmenter is
+                // FireRedVAD (was whisperseg since v1.8.13). Same default as
+                // `--mode fidelity` and an --ensemble fidelity pass -- keep in step
+                // with FIDELITY_DEFAULT_SEGMENTER in
+                // whisperjav/config/segmenter_presets.py. The option itself is in
+                // index.html for both passes.
+                sceneSelect.value = 'semantic';
+                segmenterSelect.value = 'firered-vad';
+                this.state[passKey].sceneDetector = 'semantic';
+                this.state[passKey].speechSegmenter = 'firered-vad';
             } else {
                 // faster, fast — runtime has vad=none per LEGACY_PIPELINES, but
                 // dropdown still gets the system-wide default for UI consistency
@@ -1925,7 +2078,12 @@ const EnsembleManager = {
             // Re-enable segmenter (unless pass2 is disabled)
             // Note: Qwen uses segmenter as post-ASR VAD filter
             segmenterSelect.disabled = isPass2Disabled;
-            segmenterSelect.title = passState.isQwen ? `Post-ASR VAD filter for ${passState.isAnimeWhisper ? 'Anime-Whisper' : (passState.isCohere ? 'Cohere-Transcribe' : 'Qwen3-ASR')}` : '';
+            if (segmenterSelect.dataset.mode === 'vad-version') {
+                segmenterSelect.title = 'Which version of the internal FW Silero VAD to use. '
+                    + 'Balanced has no external speech segmenter since v1.9.2.';
+            } else {
+                segmenterSelect.title = passState.isQwen ? `Post-ASR VAD filter for ${passState.isAnimeWhisper ? 'Anime-Whisper' : (passState.isCohere ? 'Cohere-Transcribe' : 'Qwen3-ASR')}` : '';
+            }
         }
 
         // Parameter guide button: visible only for Qwen pipelines
@@ -2240,7 +2398,11 @@ const EnsembleManager = {
             // Get resolved pipeline parameters. v1.9.0: pass the pass's segmenter so
             // the panel reflects the actual balanced VAD defaults (native
             // faster_whisper_vad preset, or Test-D grouping for an external segmenter).
-            const result = await pywebview.api.get_pipeline_defaults(pipeline, sensitivity, passState.speechSegmenter || '');
+            // v1.9.2: also pass the pass's scene detector, so the panel shows that
+            // backend's own scene parameters rather than auditok's names for every pass.
+            const result = await pywebview.api.get_pipeline_defaults(
+                pipeline, sensitivity, passState.speechSegmenter || '', passState.sceneDetector || ''
+            );
 
             if (!result.success) {
                 ErrorHandler.show('Error', 'Failed to load pipeline parameters: ' + result.error);
@@ -2253,7 +2415,13 @@ const EnsembleManager = {
                 decoder: {},
                 engine: {},
                 vad: {},
-                scene: { scene_detection_method: passState.sceneDetector || 'auditok' }
+                // v1.9.2: seed the Scene tab from the RESOLVED scene parameters, not from
+                // the tool YAML's defaults — otherwise saving a customised pass writes the
+                // YAML values back over the pipeline's own (Balanced resolves 28 s / 240 s).
+                scene: {
+                    scene_detection_method: passState.sceneDetector || 'semantic',
+                    ...(result.scene_params || {})
+                }
             };
 
             // Categorize decoder params (from API's decoder section)
@@ -2364,7 +2532,7 @@ const EnsembleManager = {
             await this.generateEnhancerTab('tab-enhancer', enhancerBackend, passState.dspEffects || ['loudnorm']);
 
             // Generate Scene tab (backend-specific parameters)
-            const sceneBackend = passState.sceneDetector || 'auditok';
+            const sceneBackend = passState.sceneDetector || 'semantic';
             await this.generateSceneTab('tab-scene', sceneBackend, currentValues);
 
             // Reset to first tab
@@ -3699,6 +3867,17 @@ const EnsembleManager = {
             currentValues.scene_max_duration ?? maxDef.default,
             maxDef.description
         ));
+
+        // v1.9.2 (CFF2): semantic clustering threshold (scene-change sensitivity)
+        const clusterDef = schemaSection.scene_clustering_threshold;
+        if (clusterDef) {
+            boundsContainer.appendChild(this.createTransformersSlider(
+                'scene_clustering_threshold', clusterDef.label,
+                clusterDef.min, clusterDef.max, clusterDef.step,
+                currentValues.scene_clustering_threshold ?? clusterDef.default,
+                clusterDef.description
+            ));
+        }
 
         boundsDetails.appendChild(boundsContainer);
         container.appendChild(boundsDetails);
@@ -5128,6 +5307,7 @@ const EnsembleManager = {
             sceneDetector: passState.sceneDetector,
             speechEnhancer: passState.speechEnhancer,
             speechSegmenter: passState.speechSegmenter,
+            vadVersion: passState.vadVersion || this.defaultVadVersion,
             model: passState.model,
             customized: true,
             params: params,
@@ -5220,6 +5400,7 @@ const EnsembleManager = {
             if (preset.sceneDetector) passState.sceneDetector = preset.sceneDetector;
             if (preset.speechEnhancer !== undefined) passState.speechEnhancer = preset.speechEnhancer;
             if (preset.speechSegmenter) passState.speechSegmenter = preset.speechSegmenter;
+            if (preset.vadVersion) passState.vadVersion = preset.vadVersion;
             if (preset.model) passState.model = preset.model;
             if (preset.framer) passState.framer = preset.framer;
             if (preset.dspEffects) passState.dspEffects = preset.dspEffects;
@@ -5241,7 +5422,16 @@ const EnsembleManager = {
             setSilent(`${prefix}-sensitivity`, preset.sensitivity);
             setSilent(`${prefix}-scene`, preset.sceneDetector);
             setSilent(`${prefix}-enhancer`, preset.speechEnhancer);
-            setSilent(`${prefix}-segmenter`, preset.speechSegmenter);
+            // v1.9.2: a preset saved before this release can hold an external
+            // segmenter for a balanced pass. That combination no longer exists, so
+            // rebuild the dropdown for the preset's pipeline and show the VAD
+            // version instead of writing a value the list no longer contains.
+            this.populateSegmenterOptions(passKey);
+            if (passState.pipeline === 'balanced') {
+                setSilent(`${prefix}-segmenter`, passState.vadVersion || this.defaultVadVersion);
+            } else {
+                setSilent(`${prefix}-segmenter`, preset.speechSegmenter);
+            }
 
             if (oldType !== newType) {
                 // Pipeline type changed — swap model options first, then set model
@@ -5342,7 +5532,10 @@ const EnsembleManager = {
                 sceneDetector: this.state.pass1.sceneDetector,
                 speechEnhancer: this.state.pass1.speechEnhancer,
                 dspEffects: this.state.pass1.speechEnhancer === 'ffmpeg-dsp' ? this.state.pass1.dspEffects : null,
-                speechSegmenter: disableSegmenter(this.state.pass1) ? null : this.state.pass1.speechSegmenter,
+                // v1.9.2 (S2): a balanced pass sends NO segmenter -- the CLI rejects
+                // --pass1-speech-segmenter there -- and sends the VAD version instead.
+                speechSegmenter: (disableSegmenter(this.state.pass1) || this.state.pass1.pipeline === 'balanced') ? null : this.state.pass1.speechSegmenter,
+                vadVersion: this.state.pass1.pipeline === 'balanced' ? (this.state.pass1.vadVersion || this.defaultVadVersion) : null,
                 model: this.state.pass1.model,
                 customized: this.state.pass1.customized,
                 params: this.state.pass1.customized ? this.state.pass1.params : null,
@@ -5362,7 +5555,10 @@ const EnsembleManager = {
                 sceneDetector: this.state.pass2.sceneDetector,
                 speechEnhancer: this.state.pass2.speechEnhancer,
                 dspEffects: this.state.pass2.speechEnhancer === 'ffmpeg-dsp' ? this.state.pass2.dspEffects : null,
-                speechSegmenter: disableSegmenter(this.state.pass2) ? null : this.state.pass2.speechSegmenter,
+                // v1.9.2 (S2): a balanced pass sends NO segmenter -- the CLI rejects
+                // --pass2-speech-segmenter there -- and sends the VAD version instead.
+                speechSegmenter: (disableSegmenter(this.state.pass2) || this.state.pass2.pipeline === 'balanced') ? null : this.state.pass2.speechSegmenter,
+                vadVersion: this.state.pass2.pipeline === 'balanced' ? (this.state.pass2.vadVersion || this.defaultVadVersion) : null,
                 model: this.state.pass2.model,
                 customized: this.state.pass2.customized,
                 params: this.state.pass2.customized ? this.state.pass2.params : null,
@@ -5389,6 +5585,17 @@ const EnsembleManager = {
             subs_language: document.getElementById('language').value,
             debug: document.getElementById('debugLogging').checked,
             keep_temp: document.getElementById('keepTemp').checked,
+            skip_existing: document.getElementById('skipExisting').checked,
+            fail_on_empty: document.getElementById('failOnEmpty').checked,
+            fail_on_suspect: document.getElementById('failOnSuspect').checked,
+            asr_telemetry: document.getElementById('asrTelemetry').checked,
+            // #415: shared Advanced-options checkbox (Transcription tab), like asrTelemetry
+            offline_mode: document.getElementById('offlineMode').checked,
+            // #411: the start-up check stops on a GPU this build cannot use and, in the GUI,
+            // can only be answered by this shared box (Transcription tab, Advanced options).
+            accept_cpu_mode: document.getElementById('acceptCpuMode').checked,
+            // v1.9.2 (CFF1): shared Advanced-options field (Transcription tab), like source-language
+            model_refresh_audio_minutes: document.getElementById('modelRefreshAudioMinutes').value,
             temp_dir: document.getElementById('tempDir').value.trim(),
             output_format: document.getElementById('outputFormat').value,
         };
@@ -5496,11 +5703,13 @@ const EnsembleManager = {
                     hint: b.install_hint || ''
                 };
             });
-
             // Update both pass1 and pass2 segmenter dropdowns
             ['pass1-segmenter', 'pass2-segmenter'].forEach(selectId => {
                 const select = document.getElementById(selectId);
                 if (!select) return;
+                // v1.9.2: when the dropdown is showing Silero VAD versions it is not
+                // listing segmenter backends, so backend availability does not apply.
+                if (select.dataset.mode === 'vad-version') return;
 
                 Array.from(select.options).forEach(option => {
                     const backend = option.value;
@@ -6903,11 +7112,15 @@ const TranslatorManager = {
     // Provider model options (Ollama models are now driven by OllamaStateManager)
     providerModels: {
         local: ['gemma-9b', 'llama-8b', 'llama-3b', 'auto'],
-        deepseek: ['deepseek-chat', 'deepseek-coder'],
+        // #325: deepseek-chat/-reasoner deprecate 2026-07-24; v4 names per
+        // https://api-docs.deepseek.com/ (flash = non-thinking, pro = thinking)
+        deepseek: ['deepseek-v4-flash', 'deepseek-v4-pro'],
         gemini: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
         claude: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022', 'claude-3-opus-20240229'],
         gpt: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'],
-        openrouter: ['deepseek/deepseek-chat', 'anthropic/claude-3.5-sonnet', 'openai/gpt-4o'],
+        // #325: the routed DeepSeek model was deprecated 2026-07-24 alongside the
+        // direct one; v4-flash is now published on OpenRouter, so both agree again.
+        openrouter: ['deepseek/deepseek-v4-flash', 'deepseek/deepseek-v4-pro', 'anthropic/claude-3.5-sonnet', 'openai/gpt-4o'],
         glm: ['glm-4-flash', 'glm-4', 'glm-4-plus'],
         groq: ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile', 'mixtral-8x7b-32768'],
         custom: []
@@ -7469,11 +7682,15 @@ const TranslationSettingsModal = {
     // Provider model options (Ollama models are now driven by OllamaStateManager)
     providerModels: {
         local: ['gemma-9b', 'llama-8b', 'llama-3b', 'auto'],
-        deepseek: ['deepseek-chat', 'deepseek-coder'],
+        // #325: deepseek-chat/-reasoner deprecate 2026-07-24; v4 names per
+        // https://api-docs.deepseek.com/ (flash = non-thinking, pro = thinking)
+        deepseek: ['deepseek-v4-flash', 'deepseek-v4-pro'],
         gemini: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
         claude: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022', 'claude-3-opus-20240229'],
         gpt: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'],
-        openrouter: ['deepseek/deepseek-chat', 'anthropic/claude-3.5-sonnet', 'openai/gpt-4o'],
+        // #325: the routed DeepSeek model was deprecated 2026-07-24 alongside the
+        // direct one; v4-flash is now published on OpenRouter, so both agree again.
+        openrouter: ['deepseek/deepseek-v4-flash', 'deepseek/deepseek-v4-pro', 'anthropic/claude-3.5-sonnet', 'openai/gpt-4o'],
         glm: ['glm-4-flash', 'glm-4', 'glm-4-plus'],
         groq: ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile', 'mixtral-8x7b-32768'],
         custom: []
@@ -7759,15 +7976,82 @@ const TranslationSettingsModal = {
 // GUI Settings Persistence
 // ============================================================
 const SettingsPersistence = {
-    // Disabled: Tab 1 + Tab 3 always start from HTML defaults.
-    // Backend module (gui_settings.py) retained for future "exit prompt" feature.
-    // Preset CRUD (EnsembleManager) is unaffected.
-    init() {},
-    collectAll() { return {}; },
-    applyToForm() {},
-    async loadFromBackend() {},
-    scheduleSave() {},
-    async _doSave() {},
+    // v1.9.0 (#96/#298): OPT-IN persistence for Tab 1 form fields.
+    FIELDS: {
+        'mode':             { key: 'mode',           prop: 'value' },
+        'sensitivity':      { key: 'sensitivity',    prop: 'value' },
+        'source-language':  { key: 'sourceLanguage', prop: 'value' },
+        'language':         { key: 'subsLanguage',   prop: 'value' },
+        'outputDir':        { key: 'outputDir',      prop: 'value' },
+        'outputFormat':     { key: 'outputFormat',   prop: 'value' },
+        'tempDir':          { key: 'tempDir',        prop: 'value' },
+        'debugLogging':     { key: 'debugLogging',   prop: 'checked' },
+        'keepTemp':         { key: 'keepTemp',       prop: 'checked' },
+        'skipExisting':     { key: 'skipExisting',   prop: 'checked' },
+        'acceptCpuMode':    { key: 'acceptCpuMode',  prop: 'checked' },
+        'offlineMode':      { key: 'offlineMode',    prop: 'checked' },
+        'failOnEmpty':      { key: 'failOnEmpty',    prop: 'checked' },
+        'failOnSuspect':    { key: 'failOnSuspect',  prop: 'checked' },
+        'asrTelemetry':     { key: 'asrTelemetry',   prop: 'checked' },
+        'modelRefreshAudioMinutes': { key: 'modelRefreshAudioMinutes', prop: 'value' },
+    },
+    _saveTimer: null,
+    enabled: false,
+    init() {
+        const toggle = document.getElementById('rememberSettings');
+        if (!toggle) return;
+        toggle.addEventListener('change', () => {
+            this.enabled = toggle.checked;
+            this._doSave();
+        });
+        for (const id of Object.keys(this.FIELDS)) {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('change', () => this.scheduleSave());
+        }
+    },
+    collectAll() {
+        const out = { rememberSettings: this.enabled };
+        if (!this.enabled) return out;
+        for (const [id, spec] of Object.entries(this.FIELDS)) {
+            const el = document.getElementById(id);
+            if (el) out[spec.key] = el[spec.prop];
+        }
+        return out;
+    },
+    applyToForm(settings) {
+        for (const [id, spec] of Object.entries(this.FIELDS)) {
+            if (!(spec.key in settings)) continue;
+            const el = document.getElementById(id);
+            if (!el) continue;
+            el[spec.prop] = settings[spec.key];
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    },
+    async loadFromBackend() {
+        try {
+            const res = await pywebview.api.get_gui_settings();
+            if (!res || !res.success) return;
+            const settings = res.settings || {};
+            const toggle = document.getElementById('rememberSettings');
+            this.enabled = !!settings.rememberSettings;
+            if (toggle) toggle.checked = this.enabled;
+            if (this.enabled) this.applyToForm(settings);
+        } catch (e) {
+            console.warn('Failed to load GUI settings:', e);
+        }
+    },
+    scheduleSave() {
+        if (!this.enabled) return;
+        clearTimeout(this._saveTimer);
+        this._saveTimer = setTimeout(() => this._doSave(), 500);
+    },
+    async _doSave() {
+        try {
+            await pywebview.api.save_gui_settings(this.collectAll());
+        } catch (e) {
+            console.warn('Failed to save GUI settings:', e);
+        }
+    },
     async restorePresets() {},
 };
 
@@ -7797,6 +8081,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     TranslatorManager.init();
     TranslateIntegrationManager.init();
     TranslationSettingsModal.init();
+    SettingsPersistence.init();
 
     // Initial validation
     FormManager.validateForm();
@@ -7850,6 +8135,8 @@ window.addEventListener('pywebviewready', async () => {
 
     // Tab 4 translation settings (unaffected by persistence removal)
     await TranslationSettingsModal.loadSettingsFromBackend();
+
+    await SettingsPersistence.loadFromBackend();
 
     // Restore saved provider selections from localStorage
     const savedEnsemble = localStorage.getItem('whisperjav_ensemble_provider');

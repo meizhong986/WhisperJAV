@@ -7,7 +7,7 @@ with internal VAD support and mandatory scene detection.
 
 Key Features:
 - Scene detection is ALWAYS enabled (method: auditok or silero)
-- Uses faster-whisper's internal VAD (controllable via --no-vad)
+- Uses faster-whisper's internal VAD (always on; --no-vad was removed in v1.9.2)
 - Optimized for Japanese speech recognition
 """
 
@@ -41,10 +41,11 @@ class KotobaFasterWhisperPipeline(BasePipeline):
         - resolved_config["task"]: "transcribe" or "translate"
 
     VAD Coupling:
-        The --no-vad CLI flag modifies resolved_config["params"]["asr"]["vad_filter"]
+        v1.9.2 removed --no-vad; nothing on the CLI now sets
+        resolved_config["params"]["asr"]["vad_filter"]
         in main.py AFTER resolver but BEFORE pipeline initialization. This means:
         1. Resolver sets default vad_filter=True from kotoba component
-        2. main.py may override to False if --no-vad is passed
+        2. (v1.9.2: no CLI flag overrides it any more)
         3. Pipeline receives the already-modified config
 
         This coupling is intentional to allow CLI override of component defaults.

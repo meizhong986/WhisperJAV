@@ -363,6 +363,18 @@
                                         <span>Keep temp files</span>
                                     </label>
                                 </div>
+                                <div class="form-group">
+                                    <label class="checkbox-label" title="Skip files that already have a WhisperJAV subtitle in the output folder">
+                                        <input type="checkbox" id="skipExisting">
+                                        <span>Skip already-subtitled files</span>
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label class="checkbox-label" title="Restore these form settings the next time WhisperJAV starts">
+                                        <input type="checkbox" id="rememberSettings">
+                                        <span>Remember settings</span>
+                                    </label>
+                                </div>
                                 <div class="form-group temp-dir-group inline-field">
                                     <label for="tempDir" class="form-label" style="white-space: nowrap;">Temp dir:</label>
                                     <div class="input-with-button">
@@ -382,10 +394,47 @@
                             <!-- Row 3: Accept CPU mode -->
                             <div class="form-row" id="adv-row-3">
                                 <div class="form-group">
-                                    <label class="checkbox-label" title="Skip GPU performance warning and accept CPU-only mode">
+                                    <label class="checkbox-label" title="The answer to the start-up check: when no usable GPU is found (none present, or the card is not supported by this PyTorch build) a run stops and asks whether to continue on the CPU. The GUI cannot ask, so without this box such a run aborts. Applies to Transcription and Ensemble runs (same as --accept-cpu-mode).">
                                         <input type="checkbox" id="acceptCpuMode">
-                                        <span>Accept CPU-only mode (skip GPU warning)</span>
+                                        <span>Accept CPU-only mode (proceed on the CPU when the GPU is missing or unsupported)</span>
                                     </label>
+                                </div>
+                                <div class="form-group">
+                                    <label class="checkbox-label" title="Use only the Hugging Face models already downloaded and make no requests to huggingface.co (same as --offline). A model that has not been downloaded fails immediately instead of retrying for minutes. Silero via torch.hub, openai-whisper weights, ModelScope enhancers and NeMo configs are not covered.">
+                                        <input type="checkbox" id="offlineMode">
+                                        <span>Offline mode (downloaded Hugging Face models only)</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <!-- Run outcome contract: every file ends as done / empty / suspect / failed / skipped.
+                                 Only 'failed' fails the run by default; these promote the other two. Same as --fail-on. -->
+                            <div class="form-row" id="adv-row-4">
+                                <div class="form-group">
+                                    <label class="checkbox-label" title="A file that produced no subtitles is reported as 'empty' and does not fail the run. Tick to treat it as a failure (same as --fail-on empty).">
+                                        <input type="checkbox" id="failOnEmpty">
+                                        <span>Treat 'empty' files as failures</span>
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label class="checkbox-label" title="A file whose subtitles cover too little of the media, or whose recognizer stopped while speech was still detected, is reported as 'suspect' and does not fail the run. Tick to treat it as a failure (same as --fail-on suspect).">
+                                        <input type="checkbox" id="failOnSuspect">
+                                        <span>Treat 'suspect' files as failures</span>
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label class="checkbox-label" title="Balanced runs keep a per-scene record of the recognizer (timing, decoder retries, confidence, memory) in raw_subs next to the outputs, for diagnosing runs that stop producing subtitles. Untick to skip it (same as --no-asr-telemetry).">
+                                        <input type="checkbox" id="asrTelemetry" checked>
+                                        <span>Keep per-scene ASR telemetry (raw_subs)</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <!-- v1.9.2 (CFF1): Balanced and Fidelity reload the recognizer with a fresh instance
+                                 after this much scene audio, at a scene boundary. 0 = never. Same as
+                                 --model-refresh-audio-minutes. Read by both the Transcription and Ensemble runs. -->
+                            <div class="form-row" id="adv-row-5">
+                                <div class="form-group inline-field">
+                                    <label for="modelRefreshAudioMinutes" class="form-label" style="white-space: nowrap;" title="Balanced and Fidelity unload the recognizer and load a fresh instance after this many minutes of scene audio, at a scene boundary (containment for runs that stop producing subtitles late in a long file). 0 = never. Same as --model-refresh-audio-minutes.">Reload recognizer every (minutes of audio):</label>
+                                    <input type="number" id="modelRefreshAudioMinutes" class="form-input" value="20" min="0" step="1" style="max-width: 6em;">
                                 </div>
                             </div>
                         </div>
@@ -482,8 +531,11 @@
                                         </div>
                                     </div>
                                     <div class="col-segmenter">
+                                        <!-- v1.9.2: the EXTERNAL speech segmenters. When a pass's
+                                             Pipeline is Balanced, app.js (populateSegmenterOptions)
+                                             swaps this list for the built-in VAD's Silero versions:
+                                             balanced offers no external segmenter (S2/S9). -->
                                         <select id="pass1-segmenter" class="form-select compact">
-                                            <option value="faster-whisper" title="faster-whisper's built-in VAD (vad_filter=True). Fastest — one transcribe call per scene. Pick an external segmenter instead to get the best-quality fine-grained grouping.">Faster-Whisper Native VAD (fast)</option>
                                             <option value="silero">Silero v4.0</option>
                                             <option value="silero-v3.1">Silero v3.1</option>
                                             <option value="silero-v6.2">Silero v6.2</option>
@@ -496,7 +548,7 @@
                                             <!-- <option value="whisper-vad-medium">Whisper VAD (medium)</option> -->
                                             <option value="ten">TEN VAD</option>
                                             <option value="whisperseg" selected title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). F1=0.787 on Netflix-GT JAV. For non-Japanese audio, switch to Silero v3.1.">WhisperSeg (JA-ASMR)</option>
-                                            <option value="firered-vad" title="FireRedTeam DFSMN VAD (~0.6M params, 100+ languages). v1.9.0 experimental — early access for feedback; requires 'pip install fireredvad'.">FireRedVAD (experimental)</option>
+                                            <option value="firered-vad" title="FireRedTeam DFSMN VAD (~0.6M params, 100+ languages). Installed with WhisperJAV since v1.9.2.">FireRedVAD</option>
                                             <option value="none">None</option>
                                         </select>
                                     </div>
@@ -647,8 +699,11 @@
                                         </div>
                                     </div>
                                     <div class="col-segmenter">
+                                        <!-- v1.9.2: the EXTERNAL speech segmenters. When a pass's
+                                             Pipeline is Balanced, app.js (populateSegmenterOptions)
+                                             swaps this list for the built-in VAD's Silero versions:
+                                             balanced offers no external segmenter (S2/S9). -->
                                         <select id="pass2-segmenter" class="form-select compact" disabled>
-                                            <option value="faster-whisper" title="faster-whisper's built-in VAD (vad_filter=True). Fastest — one transcribe call per scene.">Faster-Whisper Native VAD (fast)</option>
                                             <option value="silero">Silero v4.0</option>
                                             <option value="silero-v3.1">Silero v3.1</option>
                                             <option value="silero-v6.2">Silero v6.2</option>
@@ -661,7 +716,7 @@
                                             <!-- <option value="whisper-vad-medium">Whisper VAD (medium)</option> -->
                                             <option value="ten" selected title="TEN VAD — pass 2 default for segmentation diversity vs pass 1's WhisperSeg.">TEN VAD (default)</option>
                                             <option value="whisperseg" title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). F1=0.787 on Netflix-GT JAV. For non-Japanese audio, switch to Silero v3.1.">WhisperSeg (JA-ASMR)</option>
-                                            <option value="firered-vad" title="FireRedTeam DFSMN VAD (~0.6M params, 100+ languages). v1.9.0 experimental — early access for feedback; requires 'pip install fireredvad'.">FireRedVAD (experimental)</option>
+                                            <option value="firered-vad" title="FireRedTeam DFSMN VAD (~0.6M params, 100+ languages). Installed with WhisperJAV since v1.9.2.">FireRedVAD</option>
                                             <option value="none">None</option>
                                         </select>
                                     </div>

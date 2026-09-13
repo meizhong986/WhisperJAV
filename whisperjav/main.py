@@ -15,6 +15,16 @@ if (
     relaunch_for_utf8('whisperjav.main')
 
 # ===========================================================================
+# OFFLINE MODE (#415) — huggingface_hub reads HF_HUB_OFFLINE when it is
+# imported, so the flag must act here, before the pipeline imports below pull
+# the hub library in. Raw argv scan: argparse has not run yet.
+# ===========================================================================
+from whisperjav.utils.offline_mode import offline_requested as _offline_requested
+if _offline_requested(_sys.argv[1:]):
+    from whisperjav.utils.offline_mode import enable_offline_mode
+    enable_offline_mode()
+
+# ===========================================================================
 # EARLY WARNING SUPPRESSION - Must be before any library imports
 # ===========================================================================
 # Suppress noisy library warnings that don't affect functionality
@@ -39,8 +49,9 @@ import argparse
 import sys
 from pathlib import Path
 import json
+import time
 import tempfile
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 import io
 import shutil
 import subprocess
@@ -68,6 +79,20 @@ fix_stdout()
 
 from whisperjav.utils.logger import setup_logger, logger
 from whisperjav.utils.device_detector import get_best_device
+from whisperjav.utils.run_outcome import (
+    FAIL_ON_CHOICES,
+    FileOutcome,
+    classify_output,
+    default_manifest_path,
+    exit_status,
+    failed_outcome,
+    log_outcome,
+    mark_translation,
+    parse_fail_on,
+    print_summary,
+    skipped_outcome,
+    write_manifest,
+)
 from whisperjav.modules.media_discovery import MediaDiscovery
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
@@ -75,10 +100,27 @@ from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 from whisperjav.pipelines.kotoba_faster_whisper_pipeline import KotobaFasterWhisperPipeline
 from whisperjav.config.legacy import resolve_legacy_pipeline, resolve_ensemble_config, apply_balanced_vad_defaults
+from whisperjav.utils.model_refresh import DEFAULT_MODEL_REFRESH_AUDIO_MINUTES
+from whisperjav.utils.offline_mode import is_offline
+from whisperjav.modules.silero_vad_adapter import DEFAULT_VAD_VERSION, VAD_VERSIONS
+from whisperjav.config.segmenter_presets import (
+    BALANCED_DEFAULT_SEGMENTER,
+    DEFAULT_SCENE_DETECTOR,
+    FIDELITY_DEFAULT_SEGMENTER,
+    SINGLE_PASS_EXTERNAL_OK,
+    effective_segmenter_for_pass,
+    resolve_segmenter_sensitivity,
+    segmenter_accepts,
+)
 from whisperjav.__version__ import __version__, __version_display__
 
 
-from whisperjav.utils.preflight_check import enforce_gpu_requirement, run_preflight_checks
+from whisperjav.utils.preflight_check import (
+    enforce_gpu_requirement,
+    ensure_segmenter_model_available,
+    run_preflight_checks,
+    cpu_consent_in_argv,
+)
 from whisperjav.utils.progress_aggregator import VerbosityLevel, create_progress_handler
 from whisperjav.utils.async_processor import AsyncPipelineManager, ProcessingStatus
 from whisperjav.utils.parameter_tracer import create_tracer
@@ -98,6 +140,14 @@ LANGUAGE_CODE_MAP = {
     'chinese': 'zh',
     'english': 'en'
 }
+
+
+# Speech-enhancement backends accepted on the CLI.  Kept in step with
+# SpeechEnhancerFactory._BACKEND_REGISTRY by test_cli_enhancer_choices_match_registry;
+# hardcoded rather than imported so `--help` does not pay the factory import cost.
+# Without `choices=`, a typo such as `zipenhance` was accepted and silently
+# downgraded to no enhancement part-way through a multi-hour run (#306).
+SPEECH_ENHANCER_CHOICES = ["none", "ffmpeg-dsp", "zipenhancer", "clearvoice", "bs-roformer"]
 
 
 def build_translation_context(args) -> str:
@@ -121,8 +171,8 @@ def build_translation_context(args) -> str:
 # ensuring the check is never bypassed.
 # Bypass for help/version/check and accept-cpu-mode
 args = sys.argv[1:]
-bypass_flags = ['--check', '--help', '-h', '--version', '-v']
-accept_cpu = '--accept-cpu-mode' in args
+bypass_flags = ['--check', '--check-verbose', '--help', '-h', '--version', '--dump-params']
+accept_cpu = cpu_consent_in_argv(args)   # --accept-cpu-mode, or an explicit --device cpu (#411)
 if not any(flag in args for flag in bypass_flags):
     enforce_gpu_requirement(accept_cpu_mode=accept_cpu)
 # --- END OF CHECK ---
@@ -207,11 +257,17 @@ def parse_arguments():
                                help="JSON string of Qwen3-ASR parameters for pass 1 (when pipeline=qwen)")
     twopass_group.add_argument("--pass1-scene-detector", default=None,
                                choices=["auditok", "silero", "semantic", "none"],
-                               help="Scene detection method for pass 1 (default: auditok)")
+                               help="Scene detection method for pass 1 (default: semantic since v1.9.2)")
     twopass_group.add_argument("--pass1-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none)")
+                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none). Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
+    twopass_group.add_argument("--pass1-vad-version", default=None,
+                               choices=list(VAD_VERSIONS),
+                               help="Silero VAD build for pass 1 when --pass1-pipeline is balanced "
+                                    "(" + " | ".join(VAD_VERSIONS) + ", default " + DEFAULT_VAD_VERSION + "). "
+                                    "Ignored by every other pipeline.")
     twopass_group.add_argument("--pass1-speech-enhancer", default=None,
-                               help="Speech enhancer for pass 1 (e.g., none)")
+                               choices=SPEECH_ENHANCER_CHOICES,
+                               help="Speech enhancer for pass 1 (default: none). An unrecognised name is rejected here rather than silently falling back mid-run (#306).")
     twopass_group.add_argument("--pass1-enhance-for-vad", action="store_true", default=False,
                                help="Dual-track mode for pass 1: enhanced audio for VAD, original for ASR")
     twopass_group.add_argument("--pass1-model", default=None,
@@ -237,11 +293,17 @@ def parse_arguments():
                                help="JSON string of Qwen3-ASR parameters for pass 2 (when pipeline=qwen)")
     twopass_group.add_argument("--pass2-scene-detector", default=None,
                                choices=["auditok", "silero", "semantic", "none"],
-                               help="Scene detection method for pass 2 (default: none)")
+                               help="Scene detection method for pass 2 (default: semantic since v1.9.2)")
     twopass_group.add_argument("--pass2-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none)")
+                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
+    twopass_group.add_argument("--pass2-vad-version", default=None,
+                               choices=list(VAD_VERSIONS),
+                               help="Silero VAD build for pass 2 when --pass2-pipeline is balanced "
+                                    "(" + " | ".join(VAD_VERSIONS) + ", default " + DEFAULT_VAD_VERSION + "). "
+                                    "Ignored by every other pipeline.")
     twopass_group.add_argument("--pass2-speech-enhancer", default=None,
-                               help="Speech enhancer for pass 2 (e.g., none)")
+                               choices=SPEECH_ENHANCER_CHOICES,
+                               help="Speech enhancer for pass 2 (default: none). An unrecognised name is rejected here rather than silently falling back mid-run (#306).")
     twopass_group.add_argument("--pass2-enhance-for-vad", action="store_true", default=False,
                                help="Dual-track mode for pass 2: enhanced audio for VAD, original for ASR")
     twopass_group.add_argument("--pass2-model", default=None,
@@ -284,7 +346,16 @@ def parse_arguments():
     parser.add_argument("--check", action="store_true", help="Run environment checks and exit")
     parser.add_argument("--check-verbose", action="store_true", help="Run verbose environment checks")
     parser.add_argument("--accept-cpu-mode", action="store_true",
-                       help="Accept CPU-only mode without GPU warning (skip GPU performance check)")
+                       help="Answer the start-up check in advance: when no usable GPU is found (none present, "
+                            "or the card is not supported by this PyTorch build) the run stops and asks "
+                            "whether to continue on the CPU; this flag says yes, so nothing is asked")
+    parser.add_argument("--offline", action="store_true",
+                       help="Use only the Hugging Face models already downloaded and make no "
+                            "requests to huggingface.co (sets HF_HUB_OFFLINE=1 for this run and "
+                            "its worker processes). A model that is not in the local cache fails "
+                            "immediately instead of retrying for minutes. Does not cover Silero "
+                            "via torch.hub, openai-whisper weights, ModelScope enhancers or NeMo "
+                            "configs, which have their own download paths.")
 
     # Hardware configuration (device and compute type override)
     hardware_group = parser.add_argument_group("Hardware Configuration")
@@ -340,39 +411,67 @@ def parse_arguments():
     tuning_group.add_argument("--scene-detection-method",
                              type=str,
                              choices=["auditok", "silero", "semantic"],
-                             default=None,  # None = use config default
+                             default=None,  # None = DEFAULT_SCENE_DETECTOR (see help)
                              metavar="METHOD",
                              help=(
                                  "Scene detection method: "
-                                 "auditok (energy-based, default), "
-                                 "silero (VAD-based), or "
-                                 "semantic (texture-based clustering)"
+                                 "semantic (texture-based clustering, DEFAULT since v1.9.2 — "
+                                 "boundaries snap onto silence and are anchored to the following "
+                                 "sound onset, and short scenes are merged rather than dropped), "
+                                 "auditok (energy-based, the pre-v1.9.2 default), or "
+                                 "silero (VAD-based)"
                              ))
-    tuning_group.add_argument("--no-vad", action="store_true",
-                             help="Disable VAD speech segmentation (balanced/fidelity: skip Silero VAD; kotoba: disable faster-whisper VAD)")
+    tuning_group.add_argument("--scene-clustering-threshold",
+                             type=float,
+                             default=None,
+                             metavar="FLOAT",
+                             help=(
+                                 "Semantic scene detector only: the clustering distance that "
+                                 "separates one scene from the next. Lower values tend to give "
+                                 "more, shorter scenes; higher values fewer, longer ones. Default "
+                                 "22, the same on every sensitivity (v1.9.2). Ignored by auditok/silero."
+                             ))
+    tuning_group.add_argument("--vad-version",
+                             type=str,
+                             choices=list(VAD_VERSIONS),
+                             default=None,  # None = the preset default (DEFAULT_VAD_VERSION)
+                             metavar="VERSION",
+                             help=(
+                                 "Which Silero VAD build the balanced pipeline's built-in VAD runs: "
+                                 + " | ".join(VAD_VERSIONS)
+                                 + f" (default {DEFAULT_VAD_VERSION}). All three ONNX models ship "
+                                 "inside WhisperJAV, so nothing is downloaded and nothing needs "
+                                 "the network. Applies to --mode balanced, and to balanced "
+                                 "ensemble passes via --pass1-vad-version / --pass2-vad-version; "
+                                 "other modes use an external speech segmenter and ignore it."
+                             ))
     tuning_group.add_argument("--speech-segmenter",
                              type=str,
                              choices=[
                                  "silero", "silero-v4.0", "silero-v3.1", "silero-v6.2",
                                  "nemo", "nemo-lite",
                                  "whisper-vad", "whisper-vad-tiny", "whisper-vad-base", "whisper-vad-medium",
-                                 "ten", "whisperseg", "firered-vad", "faster-whisper", "none"
+                                 "ten", "whisperseg", "firered-vad", "none"
                              ],
-                             default=None,  # None = use whisperseg (v1.8.13 default for balanced/fidelity)
+                             default=None,  # None = per-mode default (see help text)
                              metavar="BACKEND",
                              help=(
-                                 "Speech segmentation backend: "
-                                 "whisperseg (default for balanced/fidelity since v1.8.13 — "
-                                 "Whisper-encoder VAD trained on JA ASMR, ONNX, F1=0.787 on Netflix-GT JAV), "
+                                 "Speech segmentation backend, for the modes that use an EXTERNAL "
+                                 "segmenter. NOT accepted with --mode balanced since v1.9.2: "
+                                 "balanced runs faster-whisper's built-in VAD, and which Silero "
+                                 "build it runs is chosen with --vad-version. Defaults: --mode fidelity "
+                                 "and a fidelity ensemble pass use firered-vad; --ensemble "
+                                 "and --mode qwen use whisperseg; --mode fast and --mode "
+                                 "faster use silero-v3.1. Choices: "
+                                 "firered-vad (FireRedTeam DFSMN VAD, tiny, CPU), "
+                                 "whisperseg (Whisper-encoder VAD trained on JA ASMR, ONNX, "
+                                 "F1=0.787 on Netflix-GT JAV), "
                                  "silero-v3.1 (recommended for non-Japanese audio), "
                                  "silero/silero-v4.0, silero-v6.2 (pip pkg, max_speech_duration_s + hysteresis), "
                                  "nemo/nemo-lite (fast frame VAD ~0.5GB), "
                                  "whisper-vad (neural VAD using Whisper small model ~500MB), "
                                  "whisper-vad-tiny/base/medium (other model sizes), "
                                  "ten (TEN Framework), "
-                                 "faster-whisper (v1.9.0 balanced default — faster-whisper's "
-                                 "built-in VAD via vad_filter; one transcribe call per scene, "
-                                 "no external per-group overhead), "
                                  "none (disable segmentation)"
                              ))
     tuning_group.add_argument("--initial-prompt",
@@ -411,6 +510,43 @@ def parse_arguments():
                             help="Use async processing (better for GUIs)")
     async_group.add_argument("--max-workers", type=int, default=1,
                             help="Max concurrent workers (default: 1)")
+    async_group.add_argument("--asr-telemetry", type=str, default=None,
+                            metavar="PATH",
+                            help="Where to write the per-scene JSONL record of decode "
+                                 "behaviour (temperature/fallback, logprob, compression "
+                                 "ratio) and memory use that Balanced runs keep for "
+                                 "issue #394. A directory gets one file per media; a "
+                                 "file path is for a single input (later inputs "
+                                 "overwrite it). Default: raw_subs/<name>.asr_telemetry.jsonl "
+                                 "next to the outputs (per pass inside an ensemble). "
+                                 "On by default; see --no-asr-telemetry.")
+    async_group.add_argument("--no-asr-telemetry", action="store_true", default=False,
+                            help="Do not write the per-scene ASR telemetry file.")
+    async_group.add_argument("--model-refresh-audio-minutes", type=float,
+                            default=DEFAULT_MODEL_REFRESH_AUDIO_MINUTES, metavar="MINUTES",
+                            help="Minutes of scene AUDIO handed to the recognizer before it is "
+                                 "unloaded and reloaded as a fresh instance at the next scene "
+                                 "boundary (Balanced and Fidelity). Counted per recognizer "
+                                 "instance: a Balanced batch shares one instance across its files, "
+                                 "while Fidelity and --async-processing load one per file, so the "
+                                 "count restarts with each file there. Containment for the "
+                                 "same-instance degradation reported in #394. Default: 20. Set 0 "
+                                 "to never refresh (Balanced then keeps one in-process instance "
+                                 "as before v1.9.2).")
+    async_group.add_argument("--min-coverage", type=float, default=None,
+                            metavar="RATIO",
+                            help="A file whose subtitles span less than this fraction "
+                                 "of the media is reported as 'suspect' (default: 0.25; "
+                                 "media under 120 s is not assessed). Set 0 to disable "
+                                 "the span check. Reporting only; see --fail-on for the "
+                                 "exit status.")
+    async_group.add_argument("--fail-on", action="append", default=None,
+                            metavar="STATE",
+                            help="Make the run exit non-zero when any file ends in one "
+                                 "of these states: " + ", ".join(FAIL_ON_CHOICES) + ". "
+                                 "Repeatable or comma-separated. By default only a "
+                                 "'failed' file (an error) makes the run exit non-zero; "
+                                 "'empty' and 'suspect' are reported and exit 0.")
     
     # Subtitle signature options
     signature_group = parser.add_argument_group("Subtitle Attribution")
@@ -577,6 +713,11 @@ def parse_arguments():
                            help="Minimum scene duration in seconds (default: 12)")
     qwen_audio_group.add_argument("--qwen-scene-max-duration", type=float, default=None,
                            help="Maximum scene duration in seconds (default: 48)")
+    qwen_audio_group.add_argument("--qwen-scene-clustering-threshold", type=float, default=None,
+                           metavar="FLOAT",
+                           help="Semantic scene detector only: clustering distance separating "
+                                "scenes. Lower values tend to give more, shorter scenes. Default 22 "
+                                "(v1.9.2: the same value every pipeline uses).")
     qwen_audio_group.add_argument("--qwen-enhancer", type=str, default="none",
                            choices=["none", "clearvoice", "bs-roformer", "zipenhancer", "ffmpeg-dsp"],
                            help="Speech enhancement backend (default: none)")
@@ -594,7 +735,7 @@ def parse_arguments():
                                 "silero-v6.2 (force-splits long chunks), "
                                 "ten, silero/silero-v4.0/v3.1, "
                                 "nemo/nemo-lite, whisper-vad, "
-                                "firered-vad (v1.9.0 experimental), none")
+                                "firered-vad, none")
     qwen_audio_group.add_argument("--qwen-max-group-duration", type=float, default=None,
                            help="Max duration (seconds) for VAD segment grouping (pipeline default: 4.0)")
     qwen_audio_group.add_argument("--qwen-chunk-threshold", type=float, default=None,
@@ -693,12 +834,13 @@ def parse_arguments():
                            help=argparse.SUPPRESS)
     qwen_output_group.add_argument("--qwen-drop-nonverbal-lines", dest="qwen_drop_nonverbal_lines",
                            action="store_true", default=True,
-                           help="Drop lone nonverbal single-token subtitle lines "
-                                "(あ。 は。 え。 ん。 つ。 ふ。 ふっ。 切。) in Phase 8 (default: enabled). "
-                                "Applies to all Qwen backends (qwen3 / cohere / anime-whisper).")
+                           help="Drop lone nonverbal subtitle lines "
+                                "(あ。 は。 え。 ん。 つ。 ふ。 ふっ。 切。 and, since v1.9.2, はい。 うん。) "
+                                "in Phase 8 (default: enabled). Only a line that is exactly one of these "
+                                "tokens is dropped. Applies to all Qwen backends (qwen3 / cohere / anime-whisper).")
     qwen_output_group.add_argument("--no-qwen-drop-nonverbal-lines", dest="qwen_drop_nonverbal_lines",
                            action="store_false",
-                           help="Keep nonverbal single-token subtitle lines (disable the Phase-8 filter)")
+                           help="Keep lone nonverbal subtitle lines (disable the Phase-8 filter)")
 
     # Decoupled Pipeline Options (IMPL-001 Phase 2)
     decoupled_group = parser.add_argument_group(
@@ -847,25 +989,32 @@ def _get_xxl_extra_args_from_config() -> str:
         return ''
 
 
-def apply_vtt_conversion(srt_path: str, output_format: str) -> None:
+def apply_vtt_conversion(srt_path: str, output_format: str) -> Optional[str]:
     """Convert SRT to VTT if requested by --output-format, and optionally remove the SRT.
 
     Args:
         srt_path: Path to the SRT file.
         output_format: "srt" (no-op), "vtt" (convert and remove SRT), or "both" (convert, keep SRT).
+
+    Returns:
+        The VTT path when a conversion happened, else None. Callers that
+        record the output file (the run manifest) need it, because with
+        "vtt" the SRT they recorded no longer exists.
     """
     if output_format == "srt" or not srt_path:
-        return
+        return None
     srt = Path(srt_path)
     if not srt.exists():
-        return
+        return None
     try:
         vtt_path = convert_srt_to_vtt(srt)
         if output_format == "vtt":
             srt.unlink()
             logger.info(f"Removed SRT (--output-format vtt): {srt.name}")
+        return str(vtt_path) if vtt_path else None
     except Exception as e:
         logger.warning(f"VTT conversion failed for {srt}: {e}")
+        return None
 
 
 def cleanup_temp_directory(temp_dir: str):
@@ -977,9 +1126,17 @@ def print_subtitle_metrics(totals: Dict[str, int]):
         print(f"  Untracked delta    : {discrepancy}")
 
 
-def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolved_config: Dict):
-    """Process files synchronously with enhanced progress reporting."""
-    
+def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolved_config: Dict,
+                       outcomes: Optional[List[FileOutcome]] = None) -> List[FileOutcome]:
+    """Process files synchronously with enhanced progress reporting.
+
+    ``outcomes`` is the run's shared list, owned by main(): appending to it as
+    each file finishes means an interrupted run still has a record of the
+    files that completed.
+    """
+    if outcomes is None:
+        outcomes = []
+
     # Import unified progress components at function start
     from whisperjav.utils.unified_progress import UnifiedProgressManager, VerbosityLevel as UnifiedVerbosityLevel
     from whisperjav.utils.progress_adapter import ProgressDisplayAdapter
@@ -1102,6 +1259,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         _pipeline_kwargs.setdefault("subs_language", args.subs_language)
         if getattr(args, 'scene_detection_method', None):
             _pipeline_kwargs.setdefault("scene_detector", args.scene_detection_method)
+        if getattr(args, 'scene_clustering_threshold', None) is not None:
+            _pipeline_kwargs.setdefault("scene_clustering_threshold", args.scene_clustering_threshold)
         if getattr(args, 'speech_segmenter', None):
             _pipeline_kwargs.setdefault("speech_segmenter", args.speech_segmenter)
 
@@ -1135,6 +1294,14 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         effective_mode = args.mode
     elif args.mode == "balanced":
         pipeline = BalancedPipeline(**pipeline_args)
+        # #394 per-scene telemetry: on by default, path resolved by the
+        # pipeline (raw_subs next to the outputs) unless --asr-telemetry says
+        # otherwise. The async path carries the same two values in
+        # resolved_config; see BalancedPipeline.__init__.
+        pipeline.asr_telemetry_path = getattr(args, 'asr_telemetry', None)
+        pipeline.asr_telemetry_enabled = not getattr(args, 'no_asr_telemetry', False)
+        # v1.9.2 (CFF1): recogniser refresh budget (minutes of scene audio).
+        pipeline.model_refresh_audio_minutes = getattr(args, 'model_refresh_audio_minutes', DEFAULT_MODEL_REFRESH_AUDIO_MINUTES)
         effective_mode = args.mode
     elif args.mode == "kotoba-faster-whisper":
         # Kotoba Faster-Whisper pipeline with scene detection (always on)
@@ -1288,6 +1455,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         _scene_max = getattr(args, 'qwen_scene_max_duration', None)
         if _scene_max is not None:
             qwen_kwargs["scene_max_duration"] = _scene_max
+        _scene_thr = getattr(args, 'qwen_scene_clustering_threshold', None)
+        if _scene_thr is not None:
+            qwen_kwargs["scene_clustering_threshold"] = _scene_thr
         _max_grp = getattr(args, 'qwen_max_group_duration', None)
         if _max_grp is not None:
             qwen_kwargs["segmenter_max_group_duration"] = _max_grp
@@ -1360,10 +1530,12 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         effective_mode = args.mode
     else:  # fidelity
         pipeline = FidelityPipeline(**pipeline_args)
+        # v1.9.2 (CFF1): recogniser refresh budget (minutes of scene audio).
+        pipeline.model_refresh_audio_minutes = getattr(args, 'model_refresh_audio_minutes', DEFAULT_MODEL_REFRESH_AUDIO_MINUTES)
         effective_mode = args.mode
     
     all_stats, failed_files = [], []
-    
+
     # Calculate expected output lang_code for skip-existing check
     if args.subs_language == 'direct-to-english':
         output_lang_code = 'en'
@@ -1390,6 +1562,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                     logger.info(f"Skipping (output exists): {file_name}")
                     skipped_count += 1
                     all_stats.append({"file": file_path_str, "status": "skipped", "reason": "output_exists"})
+                    outcomes.append(skipped_outcome(file_path_str))
                     continue
 
             # Per-file output directory override for "source" mode
@@ -1400,12 +1573,32 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
 
             progress.set_current_file(file_path_str, i)
 
+            outcome = None  # the outcome recorded for this file, if any
             try:
                 metadata = pipeline.process(media_info)
                 all_stats.append({"file": file_path_str, "status": "success", "metadata": metadata})
                 
                 subtitle_count = metadata.get("summary", {}).get("final_subtitles_refined", 0)
                 output_path = metadata.get("output_files", {}).get("final_srt", "")
+
+                # The per-file verdict (done / empty / suspect), in the shared
+                # vocabulary. The exit status is decided once, in main().
+                outcome = classify_output(
+                    file_path_str,
+                    output_path or None,
+                    media_info.get('duration'),
+                    min_coverage=args.min_coverage,
+                    # Corroboration is only meaningful with a genuine external
+                    # segmenter; pipelines that do not report it leave it at 0.
+                    speech_positive_empty_streak=metadata.get("summary", {}).get(
+                        "speech_positive_empty_streak", 0
+                    ),
+                    processing_time_s=metadata.get("summary", {}).get(
+                        "total_processing_time_seconds"
+                    ),
+                )
+                outcomes.append(outcome)
+                log_outcome(outcome)
                 
                 # Add signatures to the generated subtitle file
                 if output_path and Path(output_path).exists():
@@ -1419,6 +1612,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                     )
 
                 # Translation step (if requested)
+                if args.translate and not output_path:
+                    mark_translation(outcome, "skipped", error="no subtitle output to translate")
                 if args.translate and output_path:
                     try:
                         logger.info("Starting translation...")
@@ -1445,30 +1640,40 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                         if translated_path:
                             metadata.setdefault("output_files", {})["translated_srt"] = str(translated_path)
                             logger.info(f"Translation complete: {translated_path.name}")
+                            mark_translation(outcome, "done", translated_output=str(translated_path))
                         else:
                             logger.error("Translation failed: no output generated")
+                            mark_translation(outcome, "failed", error="no output generated")
 
                     except ConfigurationError as e:
                         logger.error(f"Translation configuration error: {e}")
+                        mark_translation(outcome, "failed", error=f"configuration error: {e}")
                         # Don't re-raise - continue with next file
                     except TranslationError as e:
                         logger.error(f"Translation failed: {e}")
+                        mark_translation(outcome, "failed", error=str(e))
                         # Don't re-raise - continue with next file
                     except FileNotFoundError as e:
                         logger.error(f"Translation failed: {e}")
+                        mark_translation(outcome, "failed", error=str(e))
                         # Don't re-raise - continue with next file
                     except Exception as e:
                         logger.error(f"Translation failed: {e}")
+                        mark_translation(outcome, "failed", error=str(e))
                         # Don't re-raise - continue with next file
 
                 # VTT conversion (if requested via --output-format)
                 output_format = getattr(args, 'output_format', 'srt')
                 if output_format != 'srt':
-                    apply_vtt_conversion(output_path, output_format)
+                    _vtt = apply_vtt_conversion(output_path, output_format)
+                    if _vtt and output_format == 'vtt':
+                        outcome.output = _vtt  # the SRT the manifest named is gone
                     # Also convert translated SRT if present
                     translated_srt = metadata.get("output_files", {}).get("translated_srt", "")
                     if translated_srt:
-                        apply_vtt_conversion(translated_srt, output_format)
+                        _tvtt = apply_vtt_conversion(translated_srt, output_format)
+                        if _tvtt and output_format == 'vtt':
+                            outcome.translated_output = _tvtt
 
                 progress.show_file_complete(file_name, subtitle_count, output_path)
                 
@@ -1479,6 +1684,12 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                 logger.error(f"Failed to process {file_path_str}: {e}", exc_info=True)
                 failed_files.append(file_path_str)
                 all_stats.append({"file": file_path_str, "status": "failed", "error": str(e)})
+                # One outcome per file: if this file was already classified
+                # (the error came from a later step), replace, do not append.
+                if outcome is not None and outcomes and outcomes[-1] is outcome:
+                    outcomes[-1] = failed_outcome(file_path_str, str(e), output=outcome.output)
+                else:
+                    outcomes.append(failed_outcome(file_path_str, str(e)))
                 progress.update_overall(1)
                 
     finally:
@@ -1510,26 +1721,14 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
     ]
     subtitle_totals = aggregate_subtitle_metrics(successful_metadata)
 
-    # Print summary
-    print("\n" + "="*50)
-    print("PROCESSING SUMMARY")
-    print("="*50)
-    print(f"Total files: {len(media_files)}")
-    print(f"Successful: {len(media_files) - len(failed_files) - skipped_count}")
-    if skipped_count > 0:
-        print(f"Skipped (already processed): {skipped_count}")
-    print(f"Failed: {len(failed_files)}")
+    # Timing and filter metrics. The per-file state table and the exit status
+    # are printed once, for every execution path, by _finish_run() in main().
     if subtitle_totals.get("processing_time_seconds"):
         total_time = subtitle_totals["processing_time_seconds"]
-        print(f"Processing time (s): {total_time:.2f}")
+        print(f"\nProcessing time (s): {total_time:.2f}")
         if subtitle_totals.get("files_processed"):
             avg_time = total_time / subtitle_totals["files_processed"]
             print(f"Average per file (s): {avg_time:.2f}")
-    
-    if failed_files:
-        print("\nFailed files:")
-        for file in failed_files:
-            print(f"  - {file}")
 
     print_subtitle_metrics(subtitle_totals)
     
@@ -1544,10 +1743,26 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
     if not args.keep_temp:
         cleanup_temp_directory(args.temp_dir)
 
+    # One outcome per input file, in the shared vocabulary. main() maps the
+    # set of outcomes to the exit status; nothing here may decide it.
+    return outcomes
 
-def process_files_async(media_files: List[Dict], args: argparse.Namespace, resolved_config: Dict):
-    """Process files asynchronously using the new async processor."""
-    
+
+# How long to wait, after a task's future has resolved, for its completion
+# callback to record the final status on the task object. Module-level so a
+# test can shorten it.
+_ASYNC_STATUS_SETTLE_S = 5.0
+
+
+def process_files_async(media_files: List[Dict], args: argparse.Namespace, resolved_config: Dict,
+                        outcomes: Optional[List[FileOutcome]] = None) -> List[FileOutcome]:
+    """Process files asynchronously using the new async processor.
+
+    ``outcomes`` is the run's shared list, owned by main(); see process_files_sync.
+    """
+    if outcomes is None:
+        outcomes = []
+
     # Determine verbosity
     if args.verbosity:
         verbosity = VerbosityLevel(args.verbosity)
@@ -1564,6 +1779,12 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
 
     # Update resolved config with runtime options
     resolved_config['output_dir'] = str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir
+    if output_to_source:
+        # Each file's outputs go beside that file. The async processor builds
+        # one pipeline per task and honours a per-file 'output_dir'; without
+        # this every file in the batch landed beside the first one.
+        for _m in media_files:
+            _m['output_dir'] = str(Path(_m['path']).parent)
     resolved_config['temp_dir'] = args.temp_dir
     resolved_config['keep_temp_files'] = args.keep_temp
     resolved_config['subs_language'] = args.subs_language
@@ -1571,7 +1792,13 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
     
     # Add scene detection method for kotoba pipeline
     resolved_config['scene_method'] = getattr(args, 'scene_detection_method', None) or 'auditok'
-    
+
+    # #394 per-scene telemetry (read by BalancedPipeline.__init__)
+    resolved_config['asr_telemetry'] = getattr(args, 'asr_telemetry', None)
+    resolved_config['asr_telemetry_enabled'] = not getattr(args, 'no_asr_telemetry', False)
+    # v1.9.2 (CFF1): the async path builds one pipeline per file from resolved_config.
+    resolved_config['model_refresh_audio_minutes'] = getattr(args, 'model_refresh_audio_minutes', DEFAULT_MODEL_REFRESH_AUDIO_MINUTES)
+
     # Create async manager
     def progress_callback(message: Dict):
         """Handle progress messages."""
@@ -1618,24 +1845,87 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
         if skipped_files:
             print(f"\nSkipping {len(skipped_files)} files with existing outputs")
 
+    outcomes.extend(skipped_outcome(p) for p in skipped_files)
+
     try:
         # Process files
         print(f"\nProcessing {len(files_to_process)} files asynchronously...")
         task_ids = manager.process_files(files_to_process, args.mode, resolved_config)
-        
-        # Get actual task objects from the processor
+
+        # process_files() submits with wait=False and returns at once. Until
+        # v1.9.2 nothing here waited, so the summary described tasks that had
+        # not run and shutdown() then cancelled them ("Task cancelled before
+        # processing started"). Wait for each task, then for its completion
+        # callback: Future.result() can return a moment before the done
+        # callback has recorded the final status on the task object.
         tasks = []
         for task_id in task_ids:
+            try:
+                manager.processor.wait_for_task(task_id)
+            except Exception as wait_error:  # noqa: BLE001 - the task's own error is recorded on it
+                logger.debug("Waiting for task %s raised %s", task_id, wait_error)
             task = manager.processor.get_task_status(task_id)
+            _terminal = (ProcessingStatus.COMPLETED, ProcessingStatus.FAILED,
+                         ProcessingStatus.CANCELLED)
+            _deadline = time.time() + _ASYNC_STATUS_SETTLE_S
+            while (task is not None and task.status not in _terminal
+                   and time.time() < _deadline):
+                time.sleep(0.05)
+                task = manager.processor.get_task_status(task_id)
+            # The Future is authoritative. If the mirrored status never settled
+            # but the work is done, read the result from the Future rather than
+            # call a finished file failed on a timing accident.
+            _future = getattr(task, 'future', None) if task is not None else None
+            if task is not None and task.status not in _terminal and _future is not None and _future.done():
+                try:
+                    task.result = _future.result()
+                    task.status = ProcessingStatus.COMPLETED
+                except InterruptedError:
+                    task.status = ProcessingStatus.CANCELLED
+                except Exception as task_error:  # noqa: BLE001 - recorded on the task
+                    task.status = ProcessingStatus.FAILED
+                    task.error = task_error
             if task:
                 tasks.append(task)
         
+        # One outcome per task, in the shared vocabulary, measured before the
+        # signature cue is appended (as the sync path does). The state table
+        # and the exit status are produced once, for every path, by _finish_run().
+        _outcome_by_task: Dict[str, FileOutcome] = {}
+        for task in tasks:
+            _path = task.media_info.get('path', 'Unknown File')
+            if task.status == ProcessingStatus.COMPLETED and isinstance(task.result, dict):
+                _summary = task.result.get("summary", {})
+                outcome = classify_output(
+                    _path,
+                    task.result.get("output_files", {}).get("final_srt") or None,
+                    task.media_info.get('duration'),
+                    min_coverage=args.min_coverage,
+                    speech_positive_empty_streak=_summary.get("speech_positive_empty_streak", 0),
+                    processing_time_s=_summary.get("total_processing_time_seconds"),
+                )
+            elif task.status == ProcessingStatus.CANCELLED:
+                outcome = failed_outcome(_path, "cancelled")
+            else:
+                outcome = failed_outcome(
+                    _path,
+                    str(task.error) if task.error
+                    else f"task ended in state '{task.status.value}' with no result",
+                )
+            outcomes.append(outcome)
+            _outcome_by_task[task.task_id] = outcome
+            log_outcome(outcome)
+
         # Add signatures to successfully processed files
         for task in tasks:
             if task.status == ProcessingStatus.COMPLETED and hasattr(task, 'result'):
                 # Try to get the output path from the task result
                 if isinstance(task.result, dict):
                     output_path = task.result.get("output_files", {}).get("final_srt", "")
+                    if args.translate and not (output_path and Path(output_path).exists()):
+                        _oc = _outcome_by_task.get(task.task_id)
+                        if _oc is not None:
+                            mark_translation(_oc, "skipped", error="no subtitle output to translate")
                     if output_path and Path(output_path).exists():
                         add_signatures_to_srt(
                             srt_path=output_path,
@@ -1666,53 +1956,59 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
                                     endpoint=getattr(args, 'translate_endpoint', None)
                                 )
 
+                                _oc = _outcome_by_task.get(task.task_id)
                                 if translated_path:
                                     task.result.setdefault("output_files", {})["translated_srt"] = str(translated_path)
                                     logger.info(f"Translation complete: {translated_path.name}")
+                                    if _oc is not None:
+                                        mark_translation(_oc, "done", translated_output=str(translated_path))
                                 else:
                                     logger.error("Translation failed: no output generated")
+                                    if _oc is not None:
+                                        mark_translation(_oc, "failed", error="no output generated")
 
                             except ConfigurationError as e:
                                 logger.error(f"Translation configuration error: {e}")
+                                _oc = _outcome_by_task.get(task.task_id)
+                                if _oc is not None:
+                                    mark_translation(_oc, "failed", error=f"configuration error: {e}")
                                 # Don't re-raise - continue with next file
                             except TranslationError as e:
                                 logger.error(f"Translation failed: {e}")
+                                _oc = _outcome_by_task.get(task.task_id)
+                                if _oc is not None:
+                                    mark_translation(_oc, "failed", error=str(e))
                                 # Don't re-raise - continue with next file
                             except FileNotFoundError as e:
                                 logger.error(f"Translation failed: {e}")
+                                _oc = _outcome_by_task.get(task.task_id)
+                                if _oc is not None:
+                                    mark_translation(_oc, "failed", error=str(e))
                                 # Don't re-raise - continue with next file
                             except Exception as e:
                                 logger.error(f"Translation failed: {e}")
+                                _oc = _outcome_by_task.get(task.task_id)
+                                if _oc is not None:
+                                    mark_translation(_oc, "failed", error=str(e))
                                 # Don't re-raise - continue with next file
 
                         # VTT conversion (if requested via --output-format)
                         output_format = getattr(args, 'output_format', 'srt')
                         if output_format != 'srt':
-                            apply_vtt_conversion(output_path, output_format)
+                            _vtt = apply_vtt_conversion(output_path, output_format)
+                            _oc = _outcome_by_task.get(task.task_id)
+                            if _vtt and output_format == 'vtt' and _oc is not None:
+                                _oc.output = _vtt
                             translated_srt = task.result.get("output_files", {}).get("translated_srt", "")
                             if translated_srt:
-                                apply_vtt_conversion(translated_srt, output_format)
+                                _tvtt = apply_vtt_conversion(translated_srt, output_format)
+                                if _tvtt and output_format == 'vtt' and _oc is not None:
+                                    _oc.translated_output = _tvtt
 
-        # Summarize results
-        successful = sum(1 for t in tasks if t.status == ProcessingStatus.COMPLETED)
-        failed = sum(1 for t in tasks if t.status == ProcessingStatus.FAILED)
-        cancelled = sum(1 for t in tasks if t.status == ProcessingStatus.CANCELLED)
         subtitle_totals = aggregate_subtitle_metrics([
             t.result for t in tasks
             if t.status == ProcessingStatus.COMPLETED and isinstance(t.result, dict)
         ])
-        
-        print("\n" + "="*50)
-        print("ASYNC PROCESSING SUMMARY")
-        print("="*50)
-        print(f"Total files: {len(media_files)}")
-        print(f"Successful: {successful}")
-        if len(skipped_files) > 0:
-            print(f"Skipped (already processed): {len(skipped_files)}")
-        print(f"Failed: {failed}")
-        if cancelled > 0:
-            print(f"Cancelled: {cancelled}")
-
         print_subtitle_metrics(subtitle_totals)
         
         # Save stats if requested
@@ -1732,9 +2028,123 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
     
     finally:
         manager.shutdown()
-        
+
         if not args.keep_temp:
             cleanup_temp_directory(args.temp_dir)
+
+    return outcomes
+
+
+def _finish_run(outcomes: List[FileOutcome], args: argparse.Namespace,
+                media_files: List[Dict], started_at, note: str = "",
+                force_status: Optional[int] = None) -> int:
+    """The one place that turns per-file outcomes into the exit status.
+
+    Prints the state table, writes the manifest next to the outputs, and
+    returns the exit status. Every execution path (sync, async, ensemble) ends
+    here, including an interrupted or crashed run (``note`` says so and
+    ``force_status`` carries the non-zero status such a run must return);
+    argument validation is the only thing that exits before this.
+    """
+    fail_on = parse_fail_on(getattr(args, 'fail_on', None))
+    status = exit_status(outcomes, fail_on)
+    if force_status is not None:
+        status = max(status, force_status)
+    # Reporting must never change the verdict: a problem printing the table or
+    # writing the manifest is logged, and the status computed above stands.
+    try:
+        manifest_path = write_manifest(
+            outcomes,
+            # From the raw inputs, not the discovered media: the GUI derives
+            # the same path from the same values (see default_manifest_path).
+            default_manifest_path(args.output_dir, [str(p) for p in (getattr(args, 'input', None) or [])]),
+            mode="ensemble" if getattr(args, 'ensemble', False) else args.mode,
+            fail_on=fail_on,
+            status=status,
+            started_at=started_at,
+            version=__version__,
+            note=note,
+        )
+        print_summary(outcomes, fail_on, status, manifest_path, note)
+    except Exception as report_error:  # noqa: BLE001
+        logger.warning("Could not print the run summary: %s", report_error)
+    if status and not note:
+        logger.error(
+            "Run exits with status 1: at least one file is in a failing state "
+            "(%s). See the RUN SUMMARY above.", ", ".join(sorted({"failed"} | set(fail_on)))
+        )
+    return status
+
+
+def validate_balanced_vad_options(args) -> None:
+    """
+    Enforce requirements S2/S9: the balanced pipeline offers no external speech segmenter.
+
+    Balanced runs faster-whisper's built-in VAD, and v1.9.2 replaces the segmenter
+    choice with --vad-version (which Silero build that internal VAD runs). Passing an
+    external segmenter for a balanced pass is now a usage error rather than a silently
+    different pipeline: a script that asks for whisperseg on balanced must be told, not
+    quietly given something else.
+
+    Raises ValueError; main() turns it into exit status 2 before any transcription.
+    """
+    is_ensemble = bool(getattr(args, 'ensemble', False))
+    mode = getattr(args, 'mode', None)
+
+    if not is_ensemble and mode == "balanced" and getattr(args, 'speech_segmenter', None):
+        raise ValueError(
+            "--speech-segmenter is not available with --mode balanced (v1.9.2). "
+            "Balanced uses faster-whisper's built-in VAD; choose which Silero build "
+            "it runs with --vad-version {" + ",".join(VAD_VERSIONS) + "}."
+        )
+
+    for n in ("1", "2"):
+        pipeline = getattr(args, f"pass{n}_pipeline", None)
+        segmenter = getattr(args, f"pass{n}_speech_segmenter", None)
+        if pipeline == "balanced" and segmenter:
+            raise ValueError(
+                f"--pass{n}-speech-segmenter is not available when --pass{n}-pipeline is "
+                f"balanced (v1.9.2). That pass uses faster-whisper's built-in VAD; choose "
+                f"which Silero build it runs with --pass{n}-vad-version "
+                "{" + ",".join(VAD_VERSIONS) + "}."
+            )
+        # The mirror of the rule below: a version for a pass that does not run the
+        # built-in VAD is not a silent no-op either. Same flag family, same answer.
+        if getattr(args, f"pass{n}_vad_version", None) and pipeline not in (None, "balanced"):
+            raise ValueError(
+                f"--pass{n}-vad-version selects the build of the BUILT-IN VAD, which only "
+                f"the balanced pipeline uses; --pass{n}-pipeline is {pipeline}, which runs "
+                f"an external speech segmenter (see --pass{n}-speech-segmenter)."
+            )
+
+    # These two settings belong to an external speech segmenter: they decide how its
+    # detected speech is grouped. Balanced has no external speech segmenter any more, so
+    # they are rejected here rather than accepted and ignored. Owner, 2026-09-09 (O2):
+    # "omitted means omitted" -- a script that still passes them must be told, not
+    # quietly given a run where they did nothing.
+    if not is_ensemble and mode == "balanced":
+        for _flag, _attr in (("--max-group-duration", "max_group_duration"),
+                             ("--chunk-threshold", "chunk_threshold")):
+            if getattr(args, _attr, None) is not None:
+                raise ValueError(
+                    f"{_flag} is not available with --mode balanced (v1.9.2). It groups "
+                    "an external speech segmenter's output, and balanced has no external "
+                    "speech segmenter -- it uses the internal FW Silero VAD "
+                    "(see --vad-version)."
+                )
+
+    if getattr(args, 'vad_version', None) is not None:
+        if is_ensemble:
+            raise ValueError(
+                "--vad-version applies to a single-pass run. For --ensemble use "
+                "--pass1-vad-version / --pass2-vad-version on the balanced passes."
+            )
+        if mode != "balanced":
+            raise ValueError(
+                f"--vad-version selects the build of the BUILT-IN VAD, which only "
+                f"--mode balanced uses; --mode {mode} runs an external speech segmenter "
+                "(see --speech-segmenter)."
+            )
 
 
 def main():
@@ -1744,14 +2154,32 @@ def main():
     patch_hf_hub_downloads()
 
     args = parse_arguments()
-    
+
+    # A mistyped --fail-on or --min-coverage must fail now, not after hours
+    # of transcription. Exit 2 is argparse's own usage-error status.
+    try:
+        parse_fail_on(getattr(args, 'fail_on', None))
+        _mc = getattr(args, 'min_coverage', None)
+        if _mc is not None and not (0.0 <= _mc <= 1.0):
+            raise ValueError(f"--min-coverage: expected a fraction between 0 and 1, got {_mc}")
+        _mr = getattr(args, 'model_refresh_audio_minutes', None)
+        if _mr is not None and _mr < 0:
+            raise ValueError(f"--model-refresh-audio-minutes: expected 0 (never) or a positive number of minutes, got {_mr}")
+        # S2/S9: balanced has no external segmenter any more (v1.9.2).
+        validate_balanced_vad_options(args)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(2)
+
     # Run environment checks if requested
     if args.check or args.check_verbose:
         run_preflight_checks(verbose=args.check_verbose)
         sys.exit(0)
 
-    # Enforce GPU requirement (CUDA/MPS) with optional bypass
-    enforce_gpu_requirement(accept_cpu_mode=args.accept_cpu_mode)
+    # The start-up check (stop and ask when no usable GPU). --dump-params never
+    # transcribes, so it is not asked here either (it is in bypass_flags above).
+    if not args.dump_params:
+        enforce_gpu_requirement(accept_cpu_mode=args.accept_cpu_mode or args.device == "cpu")
 
     # Setup logging
     global logger
@@ -1821,6 +2249,12 @@ def main():
         logger.debug(f"Task derived from --subs-language='{args.subs_language}' -> task='{task}'")
 
     # Log task determination for debugging translation issues
+    if is_offline():
+        logger.info("Offline mode: using downloaded Hugging Face models only; no requests to "
+                    "huggingface.co (HF_HUB_OFFLINE=1). A model that was never downloaded will fail at once.")
+    elif getattr(args, 'offline', False):
+        logger.warning("--offline was parsed but offline mode is not active in this process; "
+                       "the flag must appear on the command line as --offline.")
     logger.info(f"ASR task: {task}" + (" (translating to English)" if task == 'translate' else " (transcribing in source language)"))
     if task == 'translate':
         logger.info("Translation mode: Output subtitles will be in English")
@@ -1914,26 +2348,60 @@ def main():
             logger.debug("CrispASR mode: skipping legacy config resolution (uses --crispasr-* args)")
 
         else:
-            # Legacy mode: use pipeline resolver
+            # Legacy mode: use pipeline resolver.
+            #
+            # v1.9.2: the scene detector is resolved BEFORE the config, because the
+            # resolved parameter NAMES depend on which backend will run (semantic reads
+            # min_duration / max_duration; auditok and silero read the _s spellings).
+            # `--scene-detection-method` keeps default=None so an explicit choice stays
+            # distinguishable from the default, which the clustering-threshold warning
+            # below relies on.
+            _scene_method = getattr(args, 'scene_detection_method', None) or DEFAULT_SCENE_DETECTOR
             resolved_config = resolve_legacy_pipeline(
                 pipeline_name=args.mode,
                 sensitivity=args.sensitivity,
                 task=task,
                 device=args.device,
                 compute_type=args.compute_type,
+                scene_method=_scene_method,
             )
+            if not getattr(args, 'scene_detection_method', None):
+                logger.debug(
+                    "No --scene-detection-method passed; --mode %s uses %s",
+                    args.mode, _scene_method,
+                )
 
-        if args.scene_detection_method:
-            logger.info(f"Using scene detection method: {args.scene_detection_method}")
-            # Inject into resolved_config so pipelines (fidelity, balanced, fast)
-            # pick it up via features["scene_detection"]["method"].
-            # Without this, the factory defaults to auditok. (#269)
-            if resolved_config and "features" in resolved_config:
-                scene_cfg = resolved_config["features"].get("scene_detection")
-                if scene_cfg is None:
-                    scene_cfg = {}
-                    resolved_config["features"]["scene_detection"] = scene_cfg
-                scene_cfg["method"] = args.scene_detection_method
+        # Record the effective method in the resolved config so the pipelines pick it up
+        # via features["scene_detection"]["method"] (#269) — the factory would otherwise
+        # fall back to auditok. Only for pipelines that actually detect scenes: `faster`
+        # declares no scene feature and must not gain one.
+        _effective_scene_method = (
+            getattr(args, 'scene_detection_method', None) or DEFAULT_SCENE_DETECTOR
+        )
+        if resolved_config and resolved_config.get("features", {}).get("scene_detection") is not None:
+            if getattr(args, 'scene_detection_method', None):
+                logger.info(f"Using scene detection method: {args.scene_detection_method}")
+            resolved_config["features"]["scene_detection"]["method"] = _effective_scene_method
+
+        # v1.9.2 (CFF2): semantic clustering threshold. Reaches every legacy
+        # pipeline through features["scene_detection"] -> SceneDetectorFactory
+        # kwargs; the auditok/silero backends accept and ignore the key.
+        _cluster_thr = getattr(args, 'scene_clustering_threshold', None)
+        if _cluster_thr is not None and resolved_config and "features" in resolved_config:
+            scene_cfg = resolved_config["features"].get("scene_detection")
+            if scene_cfg is None:
+                scene_cfg = {}
+                resolved_config["features"]["scene_detection"] = scene_cfg
+            scene_cfg["clustering_threshold"] = float(_cluster_thr)
+            _effective_method = scene_cfg.get("method") or "auditok"
+            if _effective_method != "semantic":
+                logger.warning(
+                    "--scene-clustering-threshold only affects the semantic scene "
+                    "detector; the effective method here is '%s'. Add "
+                    "--scene-detection-method semantic.", _effective_method,
+                )
+            else:
+                logger.info(f"Semantic scene clustering threshold: {_cluster_thr}")
 
     except Exception as e:
         logger.error(f"Failed to resolve configuration: {e}")
@@ -1967,26 +2435,6 @@ def main():
         resolved_config["params"]["decoder"]["language"] = language_code
         logger.debug(f"Language override applied to decoder params: {language_code}")
 
-    # Apply --no-vad override for supported modes
-    if getattr(args, 'no_vad', False) and resolved_config is not None:
-        if "params" not in resolved_config:
-            resolved_config["params"] = {}
-
-        if args.mode == "kotoba-faster-whisper":
-            # Kotoba uses faster-whisper's internal vad_filter
-            if "asr" not in resolved_config["params"]:
-                resolved_config["params"]["asr"] = {}
-            resolved_config["params"]["asr"]["vad_filter"] = False
-            logger.info("Internal VAD disabled via --no-vad flag (kotoba mode)")
-        elif args.mode in ["balanced", "fidelity"]:
-            # Balanced/fidelity use Speech Segmenter - set backend to "none" to disable
-            if "params" not in resolved_config:
-                resolved_config["params"] = {}
-            if "speech_segmenter" not in resolved_config["params"]:
-                resolved_config["params"]["speech_segmenter"] = {}
-            resolved_config["params"]["speech_segmenter"]["backend"] = "none"
-            logger.info("Speech segmentation disabled via --no-vad flag (backend set to 'none')")
-
     # Apply --speech-segmenter (explicit override, or v1.8.13 default).
     #
     # v1.8.13 ships a SCOPED default flip. Whisperseg becomes the default only on
@@ -2013,15 +2461,24 @@ def main():
     speech_segmenter = getattr(args, 'speech_segmenter', None)
     if speech_segmenter is None and resolved_config is not None:
         if getattr(args, 'mode', None) == "balanced":
-            # v1.9.0 T1: balanced defaults to faster-whisper's native VAD
-            # (vad_filter=True, one transcribe call per scene). This is the
-            # throughput fix — it bypasses the external per-group segmenter
-            # whose N-calls-per-scene padding was the 2-3x slowdown. Native
-            # VAD does NOT hit the v1.9.0 non-Silero routing bug because it
-            # uses faster-whisper's internal VAD, not the external grouping
-            # path. Revert with --speech-segmenter silero-v3.1.
-            speech_segmenter = "faster-whisper"
-            logger.debug("No --speech-segmenter passed; --mode balanced uses v1.9.0 default: faster-whisper (native VAD)")
+            # Balanced defaults to faster-whisper's built-in VAD (v1.9.0 throughput
+            # retune: one transcribe(vad_filter=True) call per scene). A v1.9.2
+            # development build defaulted to FireRedVAD; the owner reversed that
+            # (2026-09-05, N3). An explicit --speech-segmenter picks a WhisperJAV
+            # segmenter; firered-vad and ten then honour --sensitivity here.
+            speech_segmenter = BALANCED_DEFAULT_SEGMENTER
+            logger.debug("No --speech-segmenter passed; --mode balanced uses %s (built-in VAD)", speech_segmenter)
+        elif getattr(args, 'mode', None) == "fidelity":
+            # Owner, 2026-09-12: Fidelity's default speech segmenter is FireRedVAD.
+            # It survives the routing guard below via SINGLE_PASS_EXTERNAL_OK, and
+            # its per-sensitivity YAML preset is resolved further down, so the
+            # grouping params reach the segmenter. Same default as an --ensemble
+            # fidelity pass and as the GUI Ensemble tab.
+            speech_segmenter = FIDELITY_DEFAULT_SEGMENTER
+            logger.debug(
+                "No --speech-segmenter passed; --mode fidelity uses %s",
+                speech_segmenter,
+            )
         elif _path_safe_for_whisperseg_default(args):
             speech_segmenter = "whisperseg"
             logger.debug("No --speech-segmenter passed; using v1.8.13 default: whisperseg")
@@ -2034,33 +2491,32 @@ def main():
                 getattr(args, 'mode', None)
             )
 
-    # v1.9.0 fix (code-review): 'faster-whisper' means "use faster-whisper's
-    # NATIVE VAD (vad_filter=True)" and only the balanced pipeline's
-    # FasterWhisperProASR engine can honor it. On any other mode it would
-    # reach an engine that passes it verbatim to SpeechSegmenterFactory,
-    # which has no such backend — aborting the run mid-processing. Downgrade
-    # with a warning instead of crashing.
-    if speech_segmenter == "faster-whisper" and resolved_config is not None \
-            and getattr(args, 'mode', None) != "balanced":
-        _fw_fallback = "whisperseg" if _path_safe_for_whisperseg_default(args) else "silero-v3.1"
-        logger.warning(
-            "Speech segmenter 'faster-whisper' (native VAD) is only available with "
-            "--mode balanced; falling back to '%s' for --mode %s.",
-            _fw_fallback, getattr(args, 'mode', None)
-        )
-        speech_segmenter = _fw_fallback
+    # v1.9.2: 'faster-whisper' (the recognizer's built-in VAD) is no longer a
+    # --speech-segmenter choice. It reaches this variable only as the balanced
+    # default set just above, so the v1.9.0 "wrong mode" downgrade that used to sit
+    # here can no longer fire and was removed rather than left as dead code.
 
-    # Guard: explicit non-Silero choice on a path with the routing bug → downgrade with warning.
+    # Guard: explicit non-Silero choice on a path with the routing bug -> downgrade with warning.
+    #
+    # v1.9.2 removed the firered-vad / ten exemption that used to sit here. It only
+    # ever applied to `--mode balanced`, and balanced no longer accepts
+    # --speech-segmenter at all (validate_balanced_vad_options rejects it at parse
+    # time), so the exemption became unreachable. Fidelity and the other single-pass
+    # modes keep the downgrade unchanged.
     if speech_segmenter is not None and resolved_config is not None:
         if (not _path_safe_for_whisperseg_default(args)
                 and speech_segmenter != "none"
                 and speech_segmenter != "faster-whisper"
+                and speech_segmenter not in SINGLE_PASS_EXTERNAL_OK.get(
+                    getattr(args, 'mode', None), frozenset())
                 and not speech_segmenter.startswith("silero")):
             logger.warning(
-                "Speech segmenter '%s' is not supported in --mode %s due to a known "
-                "v1.9.0 routing bug (catastrophic empty output on JAV moaning content). "
-                "Falling back to silero-v3.1. Use --ensemble for full WhisperSeg / TEN / "
-                "NeMo / whisper-vad support.",
+                "Speech segmenter '%s' is not wired for single-pass --mode %s: that "
+                "path does not resolve the segmenter's sensitivity presets. "
+                "Falling back to silero-v3.1. WhisperSeg / NeMo / whisper-vad / "
+                "ten are fully supported via --ensemble; firered-vad works on "
+                "--mode fidelity, where it is the default; the Silero builds work "
+                "on every single-pass mode.",
                 speech_segmenter, getattr(args, 'mode', None)
             )
             speech_segmenter = "silero-v3.1"
@@ -2071,8 +2527,31 @@ def main():
         if "speech_segmenter" not in resolved_config["params"]:
             resolved_config["params"]["speech_segmenter"] = {}
         resolved_config["params"]["speech_segmenter"]["backend"] = speech_segmenter
-        logger.info(f"Speech segmenter set to: {speech_segmenter}")
+        if speech_segmenter == "faster-whisper":
+            # Balanced has no speech segmenter to announce (owner S2/S9). Saying
+            # "Speech segmenter set to: faster-whisper" contradicts what the user was
+            # just told. The one line naming the VAD and its threshold is printed below.
+            logger.debug("Speech detection: Internal FW Silero VAD")
+        else:
+            logger.info(f"Speech segmenter set to: {speech_segmenter}")
         # Note: Speech Segmenter factory handles "none" backend internally
+
+        # v1.9.2: resolve the backend's per-sensitivity YAML preset on the
+        # single-pass path too (the ensemble path always did, via
+        # pass_worker._apply_gui_overrides). Silero backends keep their Pydantic
+        # VAD component; native/none have nothing to resolve. Runs BEFORE the
+        # Test-D grouping overlay and the explicit CLI overrides, which win.
+        if (speech_segmenter not in ("none", "faster-whisper")
+                and not speech_segmenter.startswith("silero")):
+            _preset = resolve_segmenter_sensitivity(
+                speech_segmenter, getattr(args, 'sensitivity', 'balanced')
+            )
+            for _k, _v in _preset.items():
+                resolved_config["params"]["speech_segmenter"].setdefault(_k, _v)
+            logger.debug(
+                "Speech segmenter '%s': %d sensitivity-preset params resolved (%s)",
+                speech_segmenter, len(_preset), getattr(args, 'sensitivity', 'balanced'),
+            )
 
         # v1.9.0: apply the SHARED balanced VAD defaults — native faster_whisper_vad
         # preset (scale-correct for faster-whisper's bundled Silero), or the Test-D
@@ -2098,6 +2577,15 @@ def main():
             resolved_config["params"]["provider"]["initial_prompt"] = initial_prompt
             logger.info(f"Initial prompt set via CLI: {initial_prompt[:50]}{'...' if len(initial_prompt) > 50 else ''}")
 
+        # v1.9.2 (S6-S8): which Silero build the built-in VAD runs. The
+        # faster_whisper_vad preset already carries a version (default 3.1) via
+        # apply_balanced_vad_defaults above; an explicit --vad-version wins.
+        # FasterWhisperProASR reads params["vad"]["version"] and installs the adapter.
+        vad_version = getattr(args, 'vad_version', None)
+        if vad_version is not None:
+            resolved_config["params"].setdefault("vad", {})["version"] = vad_version
+            logger.debug("VAD version set via CLI: Silero v%s", vad_version)
+
         vad_threshold = getattr(args, 'vad_threshold', None)
         if vad_threshold is not None:
             if not 0.0 <= vad_threshold <= 1.0:
@@ -2122,7 +2610,21 @@ def main():
             if "speech_segmenter" not in resolved_config["params"]:
                 resolved_config["params"]["speech_segmenter"] = {}
             resolved_config["params"]["speech_segmenter"]["speech_pad_ms"] = speech_pad_ms
-            logger.info(f"Speech pad set via CLI: {speech_pad_ms}ms")
+            # Not every segmenter has a speech_pad_ms. The factory drops the ones that
+            # do not at DEBUG level, so confirming it unconditionally told the user a
+            # setting had been applied when it had not. Live since 2026-09-12, when
+            # fidelity's default became firered-vad, which pads with start_pad_ms /
+            # end_pad_ms instead.
+            _seg_backend = (resolved_config["params"].get("speech_segmenter") or {}).get("backend")
+            if segmenter_accepts(_seg_backend, "speech_pad_ms"):
+                logger.info(f"Speech pad set via CLI: {speech_pad_ms}ms")
+            else:
+                logger.warning(
+                    "--speech-pad-ms %dms is ignored: the '%s' speech segmenter has no "
+                    "speech-pad setting. It pads the start and end of each segment "
+                    "separately, and this run keeps the values --sensitivity chose.",
+                    speech_pad_ms, _seg_backend,
+                )
 
         # Group-sizing knobs for external segmenters (silero/nemo/etc). These
         # control the encoder-pass count: each <=30s GROUP is one transcribe()
@@ -2157,6 +2659,21 @@ def main():
                 resolved_config["params"]["decoder"] = {}
             resolved_config["params"]["decoder"]["condition_on_previous_text"] = condition_bool
             logger.info(f"Condition on previous text set via CLI: {condition_bool}")
+
+        # C11 (owner): ONE INFO line naming the VAD that will run, printed once per run.
+        # Here rather than in the recognizer because the recognizer is rebuilt on every
+        # model refresh (a fresh worker process every 20 min of scene audio by default),
+        # which would repeat the line ~6 times on a feature-length film. The recognizer
+        # logs what it actually loaded at DEBUG, and WARNS if that is not this version.
+        # Last, so it reports the values after every override above.
+        if (resolved_config["params"].get("speech_segmenter") or {}).get("backend") == "faster-whisper":
+            _v = resolved_config["params"].get("vad") or {}
+            _thr = _v.get("threshold")
+            logger.info(
+                "VAD: Silero v%s, threshold %s",
+                _v.get("version", DEFAULT_VAD_VERSION),
+                f"{_thr:.2f}" if isinstance(_thr, (int, float)) else "default",
+            )
 
     # Handle --dump-params: dump resolved config to JSON and exit
     if args.dump_params:
@@ -2197,12 +2714,22 @@ def main():
             "subs_language": args.subs_language,
             "language_code": language_code,
             "resolved_config": dump_resolved,
+            "offline_mode": is_offline(),
+            # True only if HF_HUB_OFFLINE was set BEFORE huggingface_hub was imported
+            "hub_constant_offline": bool(
+                "huggingface_hub" in sys.modules
+                and getattr(sys.modules["huggingface_hub"].constants, "HF_HUB_OFFLINE", False)
+            ),
             "cli_args": {
+                "offline": bool(getattr(args, "offline", False)),
                 "model": args.model,
                 "ensemble": args.ensemble,
                 "asr": getattr(args, 'asr', None),
                 "vad": getattr(args, 'vad', None),
                 "speech_segmenter": getattr(args, 'speech_segmenter', None),
+                "scene_clustering_threshold": getattr(args, 'scene_clustering_threshold', None),
+                "qwen_scene_clustering_threshold": getattr(args, 'qwen_scene_clustering_threshold', None),
+                "model_refresh_audio_minutes": getattr(args, 'model_refresh_audio_minutes', None),
                 "transformers_two_pass": getattr(args, 'transformers_two_pass', False),
             }
         }
@@ -2234,6 +2761,7 @@ def main():
                     "sensitivity": args.pass1_sensitivity,
                     "scene_detector": args.pass1_scene_detector,
                     "speech_segmenter": args.pass1_speech_segmenter,
+                    "vad_version": getattr(args, 'pass1_vad_version', None),
                     "speech_enhancer": args.pass1_speech_enhancer,
                     "enhance_for_vad": (
                         getattr(args, 'pass1_enhance_for_vad', False)
@@ -2262,6 +2790,7 @@ def main():
                     "sensitivity": args.pass2_sensitivity,
                     "scene_detector": args.pass2_scene_detector,
                     "speech_segmenter": args.pass2_speech_segmenter,
+                    "vad_version": getattr(args, 'pass2_vad_version', None),
                     "speech_enhancer": args.pass2_speech_enhancer,
                     "enhance_for_vad": (
                         getattr(args, 'pass2_enhance_for_vad', False)
@@ -2316,6 +2845,26 @@ def main():
             logger.error(f"Failed to dump parameters: {e}")
             sys.exit(1)
 
+    # Start-up check: a speech segmenter whose model is downloaded on first use is
+    # fetched HERE, before any audio is read (owner, 2026-09-12). Reaching the
+    # pipeline without it is not a graceful failure -- fidelity catches a segmenter
+    # error per scene and carries on, so the user gets an empty subtitle file from a
+    # run that exits 0. Everything above this point either exits (--check,
+    # --dump-params) or does no work, so nothing is wasted when this stops the run.
+    if args.ensemble:
+        for _n in (1, 2):
+            _pipe = getattr(args, f"pass{_n}_pipeline", None)
+            if not _pipe:
+                continue  # pass 2 is optional
+            ensure_segmenter_model_available(effective_segmenter_for_pass(
+                _pipe, getattr(args, f"pass{_n}_speech_segmenter", None)
+            ))
+    elif resolved_config:
+        _seg_cfg = resolved_config.get("params", {}).get("speech_segmenter") or {}
+        ensure_segmenter_model_available(
+            _seg_cfg.get("backend"), model_dir=_seg_cfg.get("model_dir")
+        )
+
     # Setup temp directory
     if args.temp_dir:
         temp_path = Path(args.temp_dir)
@@ -2336,6 +2885,12 @@ def main():
     logger.info(f"Found {len(media_files)} media file(s) to process:")
     for f in media_files:
         logger.info(f"  - {f['path']}")
+
+    import datetime as _dt
+    _run_started_at = _dt.datetime.now()
+    # The run's outcomes, one per file, shared by every execution path so an
+    # interrupted run still reports the files that finished.
+    outcomes: List[FileOutcome] = []
 
     # Create parameter tracer for ensemble mode (must be created before try block)
     tracer = create_tracer(args.trace_params) if args.ensemble else None
@@ -2424,6 +2979,7 @@ def main():
                 'sensitivity': args.pass1_sensitivity,
                 'scene_detector': args.pass1_scene_detector,
                 'speech_segmenter': args.pass1_speech_segmenter,
+                'vad_version': getattr(args, 'pass1_vad_version', None),
                 'speech_enhancer': args.pass1_speech_enhancer,
                 'enhance_for_vad': getattr(args, 'pass1_enhance_for_vad', False) or getattr(args, 'enhance_for_vad', False),
                 'model': args.pass1_model,
@@ -2440,6 +2996,10 @@ def main():
                 'language': language_code,  # Source language code (e.g., 'en', 'ja')
                 'device': args.device,  # Hardware override (None = auto-detect)
                 'compute_type': args.compute_type,  # Compute type override (None = auto)
+                # #394 per-scene telemetry, applied by the pass worker to
+                # pipelines that record it (Balanced).
+                'asr_telemetry': getattr(args, 'asr_telemetry', None),
+                'asr_telemetry_enabled': not getattr(args, 'no_asr_telemetry', False),
             }
 
             pass2_config = None
@@ -2449,6 +3009,7 @@ def main():
                     'sensitivity': args.pass2_sensitivity,
                     'scene_detector': args.pass2_scene_detector,
                     'speech_segmenter': args.pass2_speech_segmenter,
+                    'vad_version': getattr(args, 'pass2_vad_version', None),
                     'speech_enhancer': args.pass2_speech_enhancer,
                     'enhance_for_vad': getattr(args, 'pass2_enhance_for_vad', False) or getattr(args, 'enhance_for_vad', False),
                     'model': args.pass2_model,
@@ -2465,6 +3026,8 @@ def main():
                     'language': language_code,  # Source language code (e.g., 'en', 'ja')
                     'device': args.device,  # Hardware override (None = auto-detect)
                     'compute_type': args.compute_type,  # Compute type override (None = auto)
+                    'asr_telemetry': getattr(args, 'asr_telemetry', None),
+                    'asr_telemetry_enabled': not getattr(args, 'no_asr_telemetry', False),
                     # BYOP XXL fields (only used when pipeline='xxl')
                     # xxl_exe from CLI flag; extra args from persisted BYOP
                     # preferences in asr_config.json (set via GUI extra args field)
@@ -2485,6 +3048,31 @@ def main():
                 pass1_config, pass2_config, logger=logger
             )
 
+            # --skip-existing (#328): filter out files whose merged output
+            # already exists. Mirrors the sync/async single-pass behavior;
+            # ensemble's final artifact is <basename>.<lang>.merged.whisperjav.srt.
+            _all_media_files = media_files
+            if getattr(args, 'skip_existing', False):
+                _out_lang = 'en' if args.subs_language == 'direct-to-english' else language_code
+                _to_source = str(args.output_dir).lower().strip() == "source"
+                _remaining = []
+                for media_info in media_files:
+                    _src = Path(media_info.get('path', ''))
+                    _base = media_info.get('basename', _src.stem)
+                    _dir = _src.parent if _to_source else Path(args.output_dir)
+                    if (_dir / f"{_base}.{_out_lang}.merged.whisperjav.srt").exists():
+                        logger.info(f"Skipping (merged output exists): {_src.name}")
+                        outcomes.append(skipped_outcome(str(_src), "merged output already exists"))
+                    else:
+                        _remaining.append(media_info)
+                _n_skipped = len(media_files) - len(_remaining)
+                if _n_skipped:
+                    print(f"\nSkipping {_n_skipped} file(s) with existing merged outputs (--skip-existing)")
+                media_files = _remaining
+                if not media_files:
+                    print("All files already have merged outputs - nothing to do.")
+                    sys.exit(_finish_run(outcomes, args, _all_media_files, _run_started_at))
+
             # Create orchestrator
             # "source" sentinel is passed through — orchestrator resolves per-file
             ensemble_output_dir = args.output_dir
@@ -2497,6 +3085,9 @@ def main():
                 parameter_tracer=tracer,
                 log_level=log_level,
                 serial_file_processing=getattr(args, 'ensemble_serial', False),
+                # v1.9.2 (CFF1): rides worker_kwargs into every pass pipeline's
+                # constructor; Balanced/Fidelity honour it, the others ignore it.
+                model_refresh_audio_minutes=getattr(args, 'model_refresh_audio_minutes', DEFAULT_MODEL_REFRESH_AUDIO_MINUTES),
             )
 
             # Process all files with batch processing for optimal VRAM usage
@@ -2508,52 +3099,64 @@ def main():
                 merge_strategy=args.merge_strategy
             )
 
-            # Report individual results
+            # One outcome per result, in the shared vocabulary. A failed
+            # pass is "failed"; pass 2 failing with pass 1 kept is "suspect";
+            # a completed merge is classified by its output like any other file.
             failed_files = []
             degraded_files = []
             successful_count = 0
             total_processing_time = 0.0
+            _duration_by_path = {
+                str(m.get('path')): m.get('duration') for m in media_files
+            }
+            # Keyed by input path, not basename: two inputs in different
+            # folders may share a name, and the manifest must not mix them up.
+            _outcome_by_input: Dict[str, FileOutcome] = {}
 
             for result in results:
                 basename = result.get('input', {}).get('basename', 'unknown')
+                in_path = result.get('input', {}).get('file') or basename
                 status = result.get('status', 'unknown')
+                _summary = result.get('summary', {}) or {}
+                _elapsed = _summary.get('total_processing_time_seconds')
                 if result.get('error') or status == 'failed':
-                    logger.error(f"Failed: {basename} - {result.get('error', 'Unknown error')}")
                     failed_files.append(basename)
-                elif status == 'degraded':
-                    output_path = result.get('summary', {}).get('final_output', 'unknown')
-                    logger.warning(f"Degraded (fallback): {basename} -> {output_path}")
-                    degraded_files.append(basename)
-                    total_processing_time += result.get('summary', {}).get('total_processing_time_seconds', 0.0)
+                    outcome = failed_outcome(
+                        in_path, str(result.get('error') or 'ensemble pass failed'),
+                        processing_time_s=_elapsed,
+                    )
                 else:
-                    output_path = result.get('summary', {}).get('final_output', 'unknown')
-                    logger.info(f"Completed: {output_path}")
-                    successful_count += 1
-                    total_processing_time += result.get('summary', {}).get('total_processing_time_seconds', 0.0)
+                    if status == 'degraded':
+                        degraded_files.append(basename)
+                    else:
+                        successful_count += 1
+                    total_processing_time += _elapsed or 0.0
+                    outcome = classify_output(
+                        in_path,
+                        _summary.get('final_output') or None,
+                        _duration_by_path.get(str(in_path)),
+                        min_coverage=args.min_coverage,
+                        # The pass worker does not carry the per-scene
+                        # speech-positive streak back through the orchestrator,
+                        # so ensemble runs have no corroboration signal yet.
+                        speech_positive_empty_streak=0,
+                        degraded=(status == 'degraded'),
+                        degraded_reason="pass 2 failed; output is pass 1 alone",
+                        processing_time_s=_elapsed,
+                    )
+                    if status == 'degraded' and args.translate:
+                        # Fallback output is deliberately not translated (below).
+                        mark_translation(outcome, "skipped",
+                                         error="pass-1 fallback output is not translated")
+                outcomes.append(outcome)
+                _outcome_by_input[str(in_path)] = outcome
+                log_outcome(outcome)
 
-            # Print ensemble processing summary (matching standard pipeline format)
-            print("\n" + "="*50)
-            print("ENSEMBLE PROCESSING SUMMARY")
-            print("="*50)
-            print(f"Total files: {len(media_files)}")
-            print(f"Completed: {successful_count}")
-            if degraded_files:
-                print(f"Partial (fallback): {len(degraded_files)}")
-            print(f"Failed: {len(failed_files)}")
             if total_processing_time > 0:
-                print(f"Total processing time: {total_processing_time:.2f}s")
+                print(f"\nTotal processing time: {total_processing_time:.2f}s")
                 completed_total = successful_count + len(degraded_files)
                 if completed_total > 0:
                     print(f"Average per file: {total_processing_time / completed_total:.2f}s")
-            if degraded_files:
-                print("\nPartial (pass 2 failed, output is pass 1 fallback):")
-                for f in degraded_files:
-                    print(f"  - {f}")
-            if failed_files:
-                print("\nFailed files:")
-                for f in failed_files:
-                    print(f"  - {f}")
-            print("="*50)
 
             # ============================================================
             # TRANSLATION: Translate only fully successful ensemble outputs.
@@ -2568,6 +3171,7 @@ def main():
 
                 translation_success = 0
                 translation_failed = 0
+                translation_skipped = 0
                 extra_context = build_translation_context(args)
 
                 for result in results:
@@ -2575,11 +3179,14 @@ def main():
                     if result.get('error') or status in ('failed', 'degraded'):
                         continue  # Skip failed and degraded (fallback) files
 
+                    basename = result.get('input', {}).get('basename', 'unknown')
+                    _oc = _outcome_by_input.get(str(result.get('input', {}).get('file') or basename))
+
                     output_path = result.get('summary', {}).get('final_output')
                     if not output_path:
+                        if _oc is not None:
+                            mark_translation(_oc, "skipped", error="no subtitle output to translate")
                         continue
-
-                    basename = result.get('input', {}).get('basename', 'unknown')
 
                     # Pre-validate SRT has enough content for translation
                     try:
@@ -2592,11 +3199,16 @@ def main():
                                 f"only {len(srt_blocks)} subtitle(s) found (minimum: 2)"
                             )
                             print(f"  Skipping {basename}: too few subtitles ({len(srt_blocks)})")
-                            translation_failed += 1
+                            translation_skipped += 1
+                            if _oc is not None:
+                                mark_translation(_oc, "skipped",
+                                                 error=f"too few subtitles ({len(srt_blocks)})")
                             continue
                     except OSError as e:
                         logger.warning(f"Skipping translation for {basename}: cannot read SRT: {e}")
                         translation_failed += 1
+                        if _oc is not None:
+                            mark_translation(_oc, "failed", error=f"cannot read SRT: {e}")
                         continue
 
                     try:
@@ -2622,22 +3234,31 @@ def main():
                             print(f"  -> {translated_path}")
                             result.setdefault('summary', {})['translated_output'] = str(translated_path)
                             translation_success += 1
+                            if _oc is not None:
+                                mark_translation(_oc, "done", translated_output=str(translated_path))
                         else:
                             logger.warning(f"Translation returned no output for {basename}")
                             translation_failed += 1
+                            if _oc is not None:
+                                mark_translation(_oc, "failed", error="no output generated")
 
                     except (TranslationError, ConfigurationError) as e:
                         logger.error(f"Translation failed for {basename}: {e}")
                         translation_failed += 1
+                        if _oc is not None:
+                            mark_translation(_oc, "failed", error=str(e))
                     except Exception as e:
                         logger.error(f"Unexpected translation error for {basename}: {e}")
                         translation_failed += 1
+                        if _oc is not None:
+                            mark_translation(_oc, "failed", error=str(e))
 
                 # Print translation summary
                 print("\n" + "-"*50)
                 print("TRANSLATION SUMMARY")
                 print("-"*50)
                 print(f"Translated: {translation_success}")
+                print(f"Skipped (too few subtitles): {translation_skipped}")
                 print(f"Failed: {translation_failed}")
                 print("="*50)
 
@@ -2661,44 +3282,36 @@ def main():
                 for result in results:
                     if result.get('error') or result.get('status') == 'failed':
                         continue
+                    _oc = _outcome_by_input.get(str(result.get('input', {}).get('file')
+                                                    or result.get('input', {}).get('basename')))
                     srt_path = result.get('summary', {}).get('final_output')
                     if srt_path:
-                        apply_vtt_conversion(srt_path, output_format)
+                        _vtt = apply_vtt_conversion(srt_path, output_format)
+                        if _vtt and output_format == 'vtt' and _oc is not None:
+                            _oc.output = _vtt
                     # Also convert translated SRT if present
                     translated_srt = result.get('summary', {}).get('translated_output', '')
                     if translated_srt:
-                        apply_vtt_conversion(translated_srt, output_format)
+                        _tvtt = apply_vtt_conversion(translated_srt, output_format)
+                        if _tvtt and output_format == 'vtt' and _oc is not None:
+                            _oc.translated_output = _tvtt
 
             # Close parameter tracer for ensemble mode
             if tracer:
                 tracer.close()
 
-            # ============================================================
-            # ENSEMBLE EXIT STATUS: Reflect actual success/failure
-            # ============================================================
-            has_failures = len(failed_files) > 0
-            has_degraded = len(degraded_files) > 0
-            has_translation_failures = (
-                args.translate and successful_count > 0
-                and translation_failed > 0
-            )
-
-            if has_failures or has_degraded or has_translation_failures:
-                parts = []
-                if has_failures:
-                    parts.append(f"{len(failed_files)} transcription(s) failed")
-                if has_degraded:
-                    parts.append(f"{len(degraded_files)} file(s) degraded (pass 2 failed, fell back to pass 1)")
-                if has_translation_failures:
-                    parts.append(f"{translation_failed} translation(s) failed")
-                logger.warning("Ensemble completed with errors: %s", "; ".join(parts))
-                sys.exit(1)
+            # The exit status is decided below by _finish_run(), from the same
+            # per-file outcomes every other path produces. This branch used to
+            # decide it here on its own, and its success path fell through to
+            # a variable the other branches bound -- the v1.9.2 pre-release bug
+            # where every successful ensemble run exited 1.
+            media_files = _all_media_files
 
         # Choose sync or async processing for normal mode
         elif args.async_processing:
-            process_files_async(media_files, args, resolved_config)
+            process_files_async(media_files, args, resolved_config, outcomes)
         else:
-            process_files_sync(media_files, args, resolved_config)
+            process_files_sync(media_files, args, resolved_config, outcomes)
 
         # =============================================================================
         # NUCLEAR EXIT FOR CTRANSLATE2 MODES
@@ -2718,24 +3331,56 @@ def main():
         # - https://github.com/SYSTRAN/faster-whisper/issues/71
         # - https://github.com/OpenNMT/CTranslate2/issues/1782
         # =============================================================================
+        # One place decides the exit status, for every execution path. The
+        # status must survive the nuclear exit below, which until v1.9.2 was
+        # hardcoded to 0.
+        _exit_status = _finish_run(outcomes, args, media_files, _run_started_at)
+
         ctranslate2_modes = {'balanced', 'fast', 'faster'}
         if args.mode in ctranslate2_modes and not args.ensemble:
             logger.debug(f"Using nuclear exit for {args.mode} mode (ctranslate2 crash prevention)")
             import os as _os
-            _os._exit(0)
+            # os._exit skips interpreter shutdown, so nothing flushes stdio for
+            # us. The RUN SUMMARY is the last thing printed; a GUI reading a
+            # pipe must not lose it.
+            for _stream in (sys.stdout, sys.stderr):
+                try:
+                    _stream.flush()
+                except Exception:  # noqa: BLE001
+                    pass
+            _os._exit(_exit_status)
+
+        if _exit_status:
+            sys.exit(_exit_status)
 
     except KeyboardInterrupt:
         logger.warning("\nProcessing interrupted by user")
         if not args.keep_temp:
             logger.debug("Cleaning up temporary files...")
             cleanup_temp_directory(args.temp_dir)
-        sys.exit(1)
+        sys.exit(_finish_interrupted_run(
+            outcomes, args, media_files, _run_started_at,
+            f"Interrupted by user after {len(outcomes)} of {len(media_files)} file(s); "
+            "the table covers the files that finished."))
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}", exc_info=True)
         if not args.keep_temp:
             logger.debug("Cleaning up temporary files...")
             cleanup_temp_directory(args.temp_dir)
-        sys.exit(1)
+        sys.exit(_finish_interrupted_run(
+            outcomes, args, media_files, _run_started_at,
+            f"Run stopped by an unexpected error after {len(outcomes)} of "
+            f"{len(media_files)} file(s): {e}"))
+
+
+def _finish_interrupted_run(outcomes, args, media_files, started_at, note: str) -> int:
+    """Report what finished before an interrupt or crash. Always returns 1;
+    never raises, because this runs inside an exception handler."""
+    try:
+        return _finish_run(outcomes, args, media_files, started_at, note=note, force_status=1)
+    except Exception as finish_error:  # noqa: BLE001
+        logger.debug("Could not write the run summary: %s", finish_error)
+        return 1
 
 
 if __name__ == "__main__":

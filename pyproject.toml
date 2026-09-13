@@ -70,7 +70,17 @@ dependencies = [
     # Whisper backends (core ASR engines)
     "openai-whisper @ git+https://github.com/openai/whisper@main",
     "stable-ts @ git+https://github.com/meizhong986/stable-ts-fix-setup.git@main",
-    "faster-whisper>=1.1.0",
+    # v1.9.2: EXACT pins, not ranges.
+    #
+    # faster-whisper is pinned to a COMMIT, not to the 1.2.1 release. The three
+    # commits after the v1.2.1 tag are the ones we need: #1390 replaces the bundled
+    # Silero weights with v6.2, #1386 adds VAD parameters, #1389 drops a deprecated
+    # download argument. Pinning the commit rather than the branch keeps every
+    # install reproducible -- the branch moves, this does not.
+    #
+    # CTranslate2 4.6.2 reproduces the #125 crash on exit (0xC0000409); 4.8.1 does not.
+    "faster-whisper @ git+https://github.com/SYSTRAN/faster-whisper.git@ed9a06cd89a93e47838f564998a6c09b655d7f43",
+    "ctranslate2==4.8.1",
 
     # Audio/video handling
     "ffmpeg-python @ git+https://github.com/kkroening/ffmpeg-python.git",
@@ -131,6 +141,7 @@ cli = [
     "auditok",
     "silero-vad>=6.2",
     "ten-vad",
+    "fireredvad>=0.0.2",  # v1.9.2: FireRedVAD speech segmenter ships by default
 
     # Performance and utilities
 
@@ -367,6 +378,12 @@ whisperjav = [
     "webview_gui/assets/*.ico",
     "Menu/*.json",
     "data/hallucination_filters/*.json",
+    # v1.9.2: the three selectable Silero VAD builds (~4.7 MB, MIT). Shipped in
+    # the wheel so --vad-version needs no download at install or run time --
+    # required for users behind the Great Firewall.
+    "assets/vad/*.onnx",
+    "assets/vad/*.txt",
+    "assets/vad/*.md",
 ]
 
 # -----------------------------------------------------------------------------
@@ -427,6 +444,7 @@ filterwarnings = [
 ]
 markers = [
     "gated_model: tests that require gated HuggingFace model weights (HF_TOKEN required; skipped in CI)",
+    "slow: tests that shell out to the real CLI (seconds each); deselect with -m 'not slow'",
 ]
 
 # -----------------------------------------------------------------------------

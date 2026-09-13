@@ -109,16 +109,25 @@ class TestSensitivityPresets:
         assert config['params']['asr']['patience'] == 2.0  # Optimized from 2.9 for better speed
 
     def test_presets_differ(self):
-        """Test presets produce different values."""
+        """Test presets produce different values.
+
+        v1.9.2 (owner O4 + O6): the aggressive faster-whisper preset was retuned to cap
+        worst-case run time, which deliberately brought four of its decoding parameters
+        onto the same value as conservative -- beam_size (2), patience (1.0),
+        compression_ratio_threshold (2.2) and temperature ([0.0]). beam_size is therefore
+        no longer a discriminator and this test no longer asserts on it. The axes below
+        are the ones that still separate the two presets.
+        """
         conservative = resolve_config_v3('faster_whisper', 'silero', 'conservative')
         aggressive = resolve_config_v3('faster_whisper', 'silero', 'aggressive')
 
-        # beam_size: conservative=1, aggressive=2
-        assert conservative['params']['asr']['beam_size'] != aggressive['params']['asr']['beam_size']
-        # VAD threshold: conservative=0.35, aggressive=0.05
+        # VAD threshold (external silero component)
         assert conservative['params']['vad']['threshold'] != aggressive['params']['vad']['threshold']
-        # no_speech_threshold: conservative=0.74, aggressive=0.22
+        # no_speech_threshold: aggressive admits quieter audio into the decoder
         assert conservative['params']['asr']['no_speech_threshold'] != aggressive['params']['asr']['no_speech_threshold']
+        # logprob_threshold and repetition_penalty still differ by sensitivity
+        assert conservative['params']['asr']['logprob_threshold'] != aggressive['params']['asr']['logprob_threshold']
+        assert conservative['params']['asr']['repetition_penalty'] != aggressive['params']['asr']['repetition_penalty']
 
 
 class TestOverrides:

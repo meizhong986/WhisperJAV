@@ -90,6 +90,14 @@ class WhisperJAVAPI:
         # Output file tracking - computed when process starts, returned on completion
         self._expected_output_files: List[str] = []
 
+        # Run-outcome contract (v1.9.2): the CLI writes whisperjav_run.json
+        # next to the outputs with one state per file. The GUI reads it when
+        # the process exits and reports the same words; it never re-derives
+        # the exit status.
+        self._run_options: Dict[str, Any] = {}
+        self._process_started_at: float = 0.0
+        self._run_summary: Optional[Dict[str, Any]] = None
+
     # ========================================================================
     # Process Management
     # ========================================================================
@@ -174,6 +182,31 @@ class WhisperJAVAPI:
         if options.get('keep_temp', False):
             args += ["--keep-temp"]
 
+        if options.get('skip_existing', False):
+            args += ["--skip-existing"]
+
+        # Run-outcome contract: same words and same rule as the CLI's --fail-on.
+        _fail_on = [s for s in ("empty", "suspect") if options.get(f"fail_on_{s}", False)]
+        if _fail_on:
+            args += ["--fail-on", ",".join(_fail_on)]
+
+        # Per-scene ASR telemetry is on by default; the checkbox only opts out.
+        if options.get('asr_telemetry', True) is False:
+            args += ["--no-asr-telemetry"]
+
+        # #415: downloaded Hugging Face models only (HF_HUB_OFFLINE=1 in the child and its workers).
+        if options.get('offline_mode', False):
+            args += ["--offline"]
+
+        # #411: the answer to the start-up check's proceed-or-abort question (shared box).
+        if options.get('accept_cpu_mode', False) and "--accept-cpu-mode" not in args:
+            args += ["--accept-cpu-mode"]
+
+        # v1.9.2 (CFF1): recogniser refresh budget in minutes of scene audio (0 = never).
+        _mr = options.get('model_refresh_audio_minutes')
+        if _mr not in (None, ''):
+            args += ["--model-refresh-audio-minutes", str(_mr)]
+
         # Debug logging
         if options.get('debug', False):
             args += ["--debug"]
@@ -195,10 +228,22 @@ class WhisperJAVAPI:
         if options.get('async_processing', False):
             args += ["--async-processing"]
 
-        # Speech segmenter selection (replaces --no-vad)
+        # Speech segmenter selection.
+        # v1.9.2 (S2/S9): the balanced pipeline has no external speech segmenter --
+        # it runs faster-whisper's built-in VAD, and main.py rejects
+        # --speech-segmenter with --mode balanced. The Transcription tab never sends
+        # one (S9.2: it uses the defaults), so this only guards a caller that does.
         speech_segmenter = options.get('speech_segmenter', '').strip()
+        if speech_segmenter and options.get('mode') == 'balanced':
+            print(f"[api] Ignoring speech_segmenter={speech_segmenter!r}: the balanced "
+                  f"pipeline uses the built-in VAD (v1.9.2). Use vad_version instead.")
+            speech_segmenter = ''
         if speech_segmenter:
             args += ["--speech-segmenter", speech_segmenter]
+
+        # No --vad-version is emitted here on purpose: S9.2 says the Transcription tab
+        # "shall just use the default", and it has no VAD control. The version is chosen
+        # per pass in the Ensemble tab (_build_twopass_args).
 
         # Model override
         model_override = options.get('model_override', '').strip()
@@ -283,6 +328,22 @@ class WhisperJAVAPI:
         if options.get('keep_temp', False):
             args += ["--keep-temp"]
 
+        if options.get('skip_existing', False):
+            args += ["--skip-existing"]
+
+        # Run-outcome contract: same words and same rule as the CLI's --fail-on.
+        _fail_on = [s for s in ("empty", "suspect") if options.get(f"fail_on_{s}", False)]
+        if _fail_on:
+            args += ["--fail-on", ",".join(_fail_on)]
+
+        # Per-scene ASR telemetry is on by default; the checkbox only opts out.
+        if options.get('asr_telemetry', True) is False:
+            args += ["--no-asr-telemetry"]
+
+        # #415: downloaded Hugging Face models only (HF_HUB_OFFLINE=1 in the child and its workers).
+        if options.get('offline_mode', False):
+            args += ["--offline"]
+
         if options.get('debug', False):
             args += ["--debug"]
 
@@ -327,6 +388,22 @@ class WhisperJAVAPI:
         crispasr_args = (options.get('crispasr_args') or '').strip()
         if crispasr_args:
             args += ["--crispasr-args", crispasr_args]
+
+        if options.get('skip_existing', False):
+            args += ["--skip-existing"]
+
+        # Run-outcome contract: same words and same rule as the CLI's --fail-on.
+        _fail_on = [s for s in ("empty", "suspect") if options.get(f"fail_on_{s}", False)]
+        if _fail_on:
+            args += ["--fail-on", ",".join(_fail_on)]
+
+        # Per-scene ASR telemetry is on by default; the checkbox only opts out.
+        if options.get('asr_telemetry', True) is False:
+            args += ["--no-asr-telemetry"]
+
+        # #415: downloaded Hugging Face models only (HF_HUB_OFFLINE=1 in the child and its workers).
+        if options.get('offline_mode', False):
+            args += ["--offline"]
 
         # Common arguments
         temp_dir = options.get('temp_dir', '').strip()
@@ -427,6 +504,7 @@ class WhisperJAVAPI:
 
         try:
             # Build arguments
+            self._run_options = dict(options)
             args = self.build_args(options)
 
             # Compute expected output files for post-completion use (e.g., translation)
@@ -438,6 +516,9 @@ class WhisperJAVAPI:
             # Force UTF-8 stdio in the child so logging can print ✓ and JP chars
             env = os.environ.copy()
             env["PYTHONUTF8"] = "1"
+            # The child has no console a person can answer on; the start-up check
+            # must abort and say how to answer instead of waiting for input (#411).
+            env["WHISPERJAV_NO_CONSOLE"] = "1"
             env["PYTHONIOENCODING"] = "utf-8:replace"
 
             # Log command for debugging
@@ -463,6 +544,8 @@ class WhisperJAVAPI:
             # Update status
             self.status = "running"
             self.exit_code = None
+            self._process_started_at = time.time()
+            self._run_summary = None
 
             # Start log streaming thread
             self._stream_thread = threading.Thread(
@@ -576,20 +659,22 @@ class WhisperJAVAPI:
         if self.process is not None and self.process.poll() is not None:
             self.exit_code = self.process.returncode
             self.process = None
+            self._run_summary = self._read_run_summary()
 
             if self.status == "cancelled":
                 pass  # Keep cancelled status
             elif self.exit_code == 0:
                 self.status = "completed"
-                self.log_queue.put("\n[SUCCESS] Process completed successfully.\n")
+                self.log_queue.put(f"\n{self._finish_line()}\n")
             else:
                 self.status = "error"
-                self.log_queue.put(f"\n[ERROR] Process exited with code {self.exit_code}.\n")
+                self.log_queue.put(f"\n{self._finish_line()}\n")
 
         result = {
             "status": self.status,
             "exit_code": self.exit_code,
-            "has_logs": not self.log_queue.empty()
+            "has_logs": not self.log_queue.empty(),
+            "run_summary": self._run_summary if self.status in ("completed", "error") else None,
         }
 
         # Include output files when completed (for post-processing like translation)
@@ -597,6 +682,84 @@ class WhisperJAVAPI:
             result["output_files"] = self._expected_output_files
 
         return result
+
+    # ------------------------------------------------------------------
+    # Run-outcome contract: read what the CLI decided, say it in its words
+    # ------------------------------------------------------------------
+
+    def _read_run_summary(self) -> Optional[Dict[str, Any]]:
+        """Read the manifest the CLI wrote for the run that just exited.
+
+        The manifest path is derived exactly as the CLI derives it, from the
+        same output directory and inputs. A manifest older than this process is
+        a previous run's and is ignored, so a crash before the CLI's finisher
+        never shows stale states. Never raises.
+        """
+        try:
+            import datetime as _dt
+
+            from whisperjav.utils.run_outcome import STATES, default_manifest_path
+
+            opts = self._run_options or {}
+            # The same call, on the same raw inputs and output_dir the CLI was
+            # given, as the CLI itself makes in _finish_run().
+            inputs = [str(p) for p in (opts.get("inputs") or [])]
+            output_dir = opts.get("output_dir") or self.default_output
+            path = default_manifest_path(str(output_dir), inputs)
+            if path is None or not path.exists():
+                return None
+            with open(path, encoding="utf-8") as fh:
+                data = json.load(fh)
+            # This run's manifest, not a previous run's: the CLI stamps its own
+            # start time, on the same clock as ours, after this process began.
+            started = data.get("started_at")
+            if started:
+                if _dt.datetime.fromisoformat(started).timestamp() < self._process_started_at:
+                    return None
+            elif path.stat().st_mtime < self._process_started_at:
+                return None
+            counts = {s: int((data.get("counts") or {}).get(s, 0)) for s in STATES}
+            files = [
+                {
+                    "name": Path(f.get("path", "")).name,
+                    "state": f.get("state"),
+                    "detail": f.get("detail", ""),
+                    "output": f.get("output"),
+                    "translated_output": f.get("translated_output"),
+                }
+                for f in (data.get("files") or [])
+            ]
+            return {
+                "manifest_path": str(path),
+                "exit_status": data.get("exit_status"),
+                "fails_on": data.get("fails_on") or ["failed"],
+                "note": data.get("note"),
+                "counts": counts,
+                "tally": " · ".join(f"{s} {counts[s]}" for s in STATES),
+                "files": files,
+            }
+        except Exception:  # noqa: BLE001 - reporting must not break the GUI
+            return None
+
+    def _finish_line(self) -> str:
+        """The console line that ends a run: what happened, in the CLI's words.
+
+        "Finished" states the one thing the GUI knows for certain, that the
+        process ended; the tally says what happened to each file, and the exit
+        status is the CLI's decision, repeated rather than re-derived.
+        """
+        s = self._run_summary
+        code = self.exit_code
+        if s is None:
+            if code == 0:
+                return f"[FINISHED] exit status {code} (no run summary was written)"
+            return f"[FINISHED WITH FAILURES] exit status {code} (no run summary was written)"
+        if s.get("note"):
+            return f"[STOPPED] {s['note']} — {s['tally']} (exit status {code})"
+        if code == 0:
+            return f"[FINISHED] {s['tally']} (exit status {code})"
+        return (f"[FINISHED WITH FAILURES] {s['tally']} (exit status {code}; "
+                f"a run fails on: {', '.join(s.get('fails_on') or ['failed'])})")
 
     def _stream_output(self):
         """
@@ -1079,6 +1242,76 @@ class WhisperJAVAPI:
         except Exception:
             return {}
 
+    # Widget hints for faster-whisper's built-in VAD. The DEFAULTS are not here --
+    # they come from the FasterWhisperVAD preset for the pass's sensitivity, so this
+    # table and the runtime cannot drift.
+    _NATIVE_VAD_GUI = {
+        "threshold": {
+            "widget": "slider", "min": 0.05, "max": 0.95, "step": 0.05,
+            "data_type": "float", "label": "Speech Threshold", "group": "detection",
+            "description": "Probability above which a 32 ms window counts as speech. "
+                           "Lower catches quieter, breathier speech and more noise.",
+        },
+        "min_speech_duration_ms": {
+            "widget": "spinner", "min": 0, "max": 5000, "step": 10,
+            "data_type": "int", "label": "Min Speech (ms)", "group": "detection",
+            "description": "Speech shorter than this is discarded.",
+        },
+        "min_silence_duration_ms": {
+            "widget": "spinner", "min": 0, "max": 5000, "step": 50,
+            "data_type": "int", "label": "Min Silence (ms)", "group": "detection",
+            "description": "Silence shorter than this does not split a speech chunk.",
+        },
+        "max_speech_duration_s": {
+            "widget": "slider", "min": 1.0, "max": 60.0, "step": 1.0,
+            "data_type": "float", "label": "Max Speech (s)", "group": "grouping",
+            "description": "A speech chunk longer than this is split. A subtitle-length "
+                           "knob: it does not change how fast the recognizer runs.",
+        },
+        "speech_pad_ms": {
+            "widget": "spinner", "min": 0, "max": 2000, "step": 50,
+            "data_type": "int", "label": "Speech Padding (ms)", "group": "grouping",
+            "description": "Padding kept on each side of a detected speech chunk.",
+        },
+    }
+
+    def _native_vad_schema(self, backend: str) -> Dict[str, Any]:
+        """Parameter schema for faster-whisper's built-in VAD (v1.9.2)."""
+        try:
+            from whisperjav.config.components.vad.faster_whisper_vad import FasterWhisperVAD
+            from whisperjav.modules.silero_vad_adapter import (
+                DEFAULT_VAD_VERSION, VAD_VERSION_LABELS,
+            )
+        except Exception as e:  # pragma: no cover - defensive
+            return {"success": False, "error": f"Could not load native VAD schema: {e}"}
+
+        presets = {
+            name: {k: v for k, v in FasterWhisperVAD.get_preset(name).model_dump().items()
+                   if k != "version" and v is not None}
+            for name in ("conservative", "balanced", "aggressive")
+        }
+        defaults = presets["balanced"]
+        parameters = self._convert_gui_hints_to_schema(self._NATIVE_VAD_GUI, defaults)
+        version_list = ", ".join(VAD_VERSION_LABELS)
+        return {
+            "success": True,
+            "backend": backend,
+            "display_name": "Internal FW Silero VAD",
+            "description": (
+                "Faster-Whisper finds the speech itself, in one pass over each scene. "
+                "The Balanced pipeline uses this and nothing else since v1.9.2."
+            ),
+            "info_message": (
+                f"Pick the version in this pass's row above ({version_list}). "
+                f"The default is {DEFAULT_VAD_VERSION}. The settings below apply to "
+                "whichever version you pick."
+            ),
+            "parameters": parameters,
+            "defaults": defaults,
+            "presets": presets,
+            "groups": self._extract_groups(self._NATIVE_VAD_GUI),
+        }
+
     def _convert_gui_hints_to_schema(self, gui_hints: Dict, spec: Dict) -> Dict[str, Any]:
         """Convert YAML gui hints to frontend schema format."""
         schema = {}
@@ -1160,8 +1393,18 @@ class WhisperJAVAPI:
             "nemo-lite": "nemo-speech-segmentation.yaml",
             "silero-v6.2": "silero-v6-speech-segmentation.yaml",
             "whisperseg": "whisperseg-speech-segmentation.yaml",
-            "firered-vad": "firered-vad-speech-segmentation.yaml",  # v1.9.0 experimental
+            "firered-vad": "firered-vad-speech-segmentation.yaml",  # v1.9.0; installed by default since v1.9.2
         }
+
+        # v1.9.2: "faster-whisper" is not an external segmenter and has no tool YAML
+        # -- it is the recognizer's OWN VAD, and its parameters are faster-whisper
+        # VadOptions. The balanced pipeline uses nothing else since v1.9.2, so this
+        # branch is what the Customize > Segmenter tab shows for every balanced pass.
+        # Built from the FasterWhisperVAD Pydantic component, the single source of
+        # truth for those values; before this the tab returned "Unknown segmenter
+        # backend: faster-whisper".
+        if backend == "faster-whisper":
+            return self._native_vad_schema(backend)
 
         # Handle "none" backend
         if backend == "none":
@@ -1629,6 +1872,7 @@ class WhisperJAVAPI:
 
         try:
             # Build ensemble-specific arguments
+            self._run_options = dict(options)
             args = self._build_ensemble_args(options)
 
             # Construct command
@@ -1637,6 +1881,9 @@ class WhisperJAVAPI:
             # Force UTF-8 stdio
             env = os.environ.copy()
             env["PYTHONUTF8"] = "1"
+            # The child has no console a person can answer on; the start-up check
+            # must abort and say how to answer instead of waiting for input (#411).
+            env["WHISPERJAV_NO_CONSOLE"] = "1"
             env["PYTHONIOENCODING"] = "utf-8:replace"
 
             # Log command
@@ -1662,6 +1909,8 @@ class WhisperJAVAPI:
             # Update status
             self.status = "running"
             self.exit_code = None
+            self._process_started_at = time.time()
+            self._run_summary = None
 
             # Start log streaming thread
             self._stream_thread = threading.Thread(
@@ -1743,6 +1992,31 @@ class WhisperJAVAPI:
 
         if options.get('keep_temp', False):
             args += ["--keep-temp"]
+
+        if options.get('skip_existing', False):
+            args += ["--skip-existing"]
+
+        # Run-outcome contract: same words and same rule as the CLI's --fail-on.
+        _fail_on = [s for s in ("empty", "suspect") if options.get(f"fail_on_{s}", False)]
+        if _fail_on:
+            args += ["--fail-on", ",".join(_fail_on)]
+
+        # Per-scene ASR telemetry is on by default; the checkbox only opts out.
+        if options.get('asr_telemetry', True) is False:
+            args += ["--no-asr-telemetry"]
+
+        # #415: downloaded Hugging Face models only (HF_HUB_OFFLINE=1 in the child and its workers).
+        if options.get('offline_mode', False):
+            args += ["--offline"]
+
+        # #411: the answer to the start-up check's proceed-or-abort question (shared box).
+        if options.get('accept_cpu_mode', False) and "--accept-cpu-mode" not in args:
+            args += ["--accept-cpu-mode"]
+
+        # v1.9.2 (CFF1): recogniser refresh budget in minutes of scene audio (0 = never).
+        _mr = options.get('model_refresh_audio_minutes')
+        if _mr not in (None, ''):
+            args += ["--model-refresh-audio-minutes", str(_mr)]
 
         # Verbosity
         verbosity = options.get('verbosity', 'summary')
@@ -2096,6 +2370,14 @@ class WhisperJAVAPI:
                         "min": 20, "max": 300, "step": 5,
                         "default": 48,
                     },
+                    "scene_clustering_threshold": {
+                        "type": "slider",
+                        "label": "Scene Change Threshold",
+                        "description": "Semantic detector only: clustering distance that separates scenes. Lower values tend to give more, shorter scenes (default: 22, the same value every pipeline uses)",
+                        "group": "scene_bounds",
+                        "min": 5, "max": 30, "step": 1,
+                        "default": 22,
+                    },
                     "chunk_threshold_ms": {
                         "type": "slider",
                         "label": "Frame Gap Threshold (ms)",
@@ -2418,13 +2700,19 @@ class WhisperJAVAPI:
     # Two-Pass Ensemble Methods
     # ========================================================================
 
-    def get_pipeline_defaults(self, pipeline: str, sensitivity: str, segmenter: str = None) -> Dict[str, Any]:
+    def get_pipeline_defaults(self, pipeline: str, sensitivity: str, segmenter: str = None,
+                              scene_detector: str = None) -> Dict[str, Any]:
         """
         Get resolved parameters for a pipeline+sensitivity combination.
 
         Args:
             pipeline: Pipeline name ('balanced', 'fast', 'faster', 'fidelity', 'kotoba-faster-whisper', 'transformers')
             sensitivity: Sensitivity level ('conservative', 'balanced', 'aggressive')
+            segmenter: Speech segmenter the pass will use (drives the balanced VAD overlay)
+            scene_detector: Scene backend the pass will use ('semantic', 'auditok',
+                'silero', 'none'). v1.9.2: decides which scene parameter NAMES the panel
+                shows, because the backends read different ones. Empty/None = the shared
+                DEFAULT_SCENE_DETECTOR, the same default the CLI and the pass worker use.
 
         Returns:
             dict with resolved parameters that can be customized
@@ -2457,10 +2745,18 @@ class WhisperJAVAPI:
         try:
             from whisperjav.config.legacy import resolve_legacy_pipeline
 
+            # v1.9.2: resolve with the scene backend the pass will actually use, so the
+            # panel shows that backend's own parameter names and values (semantic reads
+            # min_duration / max_duration; auditok and silero read the _s spellings).
+            # Same default as main.py and pass_worker, from the one shared constant.
+            from whisperjav.config.segmenter_presets import DEFAULT_SCENE_DETECTOR
+            effective_scene_method = (scene_detector or '').strip() or DEFAULT_SCENE_DETECTOR
+
             config = resolve_legacy_pipeline(
                 pipeline_name=pipeline,
                 sensitivity=sensitivity,
-                task='transcribe'
+                task='transcribe',
+                scene_method=effective_scene_method,
             )
 
             # v1.9.0: reflect the runtime balanced VAD defaults in the Customize
@@ -2471,18 +2767,31 @@ class WhisperJAVAPI:
             # panel shows what will actually run.
             if segmenter and 'asr' not in config.get('params', {}):
                 from whisperjav.config.legacy import apply_balanced_vad_defaults
-                config.setdefault('params', {}).setdefault('speech_segmenter', {})['backend'] = segmenter
+                from whisperjav.config.segmenter_presets import resolve_segmenter_sensitivity
+                ss = config.setdefault('params', {}).setdefault('speech_segmenter', {})
+                ss['backend'] = segmenter
+                # v1.9.2: same order as main.py — YAML sensitivity preset for a
+                # non-silero external backend, then the balanced overlay.
+                if segmenter not in ('none', 'faster-whisper') and not segmenter.startswith('silero'):
+                    for _k, _v in resolve_segmenter_sensitivity(segmenter, sensitivity).items():
+                        ss.setdefault(_k, _v)
                 apply_balanced_vad_defaults(
                     config,
                     sensitivity=sensitivity,
                     is_balanced=(pipeline == 'balanced'),
                 )
+                # Mirror the ASR constructor firewall (faster_whisper_pro_asr.py):
+                # for a non-silero external backend the resolver's silero VAD
+                # values are discarded at run time, so show what actually runs —
+                # the segmenter's own effective parameters.
+                if segmenter not in ('none', 'faster-whisper') and not segmenter.startswith('silero'):
+                    config['params']['vad'] = {k: v for k, v in ss.items() if k != 'backend'}
 
-            # Determine scene detection method (default: auditok)
-            scene_detection_method = 'auditok'
-            if 'features' in config and config['features'].get('scene_detection'):
-                # Could be enhanced to read from config if specified
-                pass
+            # The scene method that will actually run. Before v1.9.2 this was hardcoded
+            # to 'auditok' beside an empty `if ... : pass`, so the panel reported auditok
+            # whatever the pass was configured to use.
+            scene_cfg = (config.get('features') or {}).get('scene_detection') or {}
+            scene_detection_method = scene_cfg.get('method') or effective_scene_method
 
             # M11: Detect V3 config by structure, not pipeline name string
             # V3 configs (like kotoba) have 'params.asr', legacy have 'params.decoder'
@@ -2542,7 +2851,13 @@ class WhisperJAVAPI:
                     "vad": config['params']['vad']
                 },
                 "model": config['model'],
-                "scene_detection_method": scene_detection_method
+                "scene_detection_method": scene_detection_method,
+                # v1.9.2: the RESOLVED scene parameters, so the Customize panel seeds the
+                # Scene tab with what will actually run. Without this the tab fell back to
+                # the tool YAML's defaults, and saving a customised pass wrote those back
+                # over the pipeline's own values (Balanced resolves 28 s / 240 s and
+                # Fidelity a 240 s ceiling, while the semantic YAML declares 20 / 420).
+                "scene_params": {k: v for k, v in scene_cfg.items() if k != 'method'}
             }
         except Exception as e:
             return {
@@ -2603,6 +2918,7 @@ class WhisperJAVAPI:
 
         try:
             # Build CLI arguments for two-pass ensemble
+            self._run_options = dict(config)
             args = self._build_twopass_args(config)
 
             # Compute expected output files for post-completion use (e.g., translation)
@@ -2614,6 +2930,9 @@ class WhisperJAVAPI:
             # Force UTF-8 stdio
             env = os.environ.copy()
             env["PYTHONUTF8"] = "1"
+            # The child has no console a person can answer on; the start-up check
+            # must abort and say how to answer instead of waiting for input (#411).
+            env["WHISPERJAV_NO_CONSOLE"] = "1"
             env["PYTHONIOENCODING"] = "utf-8:replace"
 
             # Log command
@@ -2639,6 +2958,8 @@ class WhisperJAVAPI:
             # Update status
             self.status = "running"
             self.exit_code = None
+            self._process_started_at = time.time()
+            self._run_summary = None
 
             # Start log streaming thread
             self._stream_thread = threading.Thread(
@@ -2787,7 +3108,16 @@ class WhisperJAVAPI:
                 # Both Qwen and Legacy use --pass1-speech-segmenter
                 # For Qwen: pass_worker.py translates to qwen_segmenter (post-ASR VAD filter)
                 # For Legacy: used as pre-ASR speech segmentation
-                if segmenter1:  # Pass any value including "none" to disable
+                #
+                # v1.9.2 (S2/S9): a BALANCED pass has no external segmenter -- it runs
+                # faster-whisper's built-in VAD, and main.py rejects
+                # --pass1-speech-segmenter for it. What the user picks in that row is
+                # the Silero VERSION, sent as --pass1-vad-version instead.
+                if pass1.get('pipeline') == 'balanced':
+                    version1 = str(pass1.get('vadVersion') or '').strip()
+                    if version1:
+                        args += ["--pass1-vad-version", version1]
+                elif segmenter1:  # Pass any value including "none" to disable
                     args += ["--pass1-speech-segmenter", segmenter1]
 
             # Pass 1: Speech Enhancer
@@ -2897,7 +3227,16 @@ class WhisperJAVAPI:
                     # Both Qwen and Legacy use --pass2-speech-segmenter
                     # For Qwen: pass_worker.py translates to qwen_segmenter (post-ASR VAD filter)
                     # For Legacy: used as pre-ASR speech segmentation
-                    if segmenter2:  # Pass any value including "none" to disable
+                    #
+                    # v1.9.2 (S2/S9): a BALANCED pass has no external segmenter -- it runs
+                    # faster-whisper's built-in VAD, and main.py rejects
+                    # --pass2-speech-segmenter for it. What the user picks in that row is
+                    # the Silero VERSION, sent as --pass2-vad-version instead.
+                    if pass2.get('pipeline') == 'balanced':
+                        version2 = str(pass2.get('vadVersion') or '').strip()
+                        if version2:
+                            args += ["--pass2-vad-version", version2]
+                    elif segmenter2:  # Pass any value including "none" to disable
                         args += ["--pass2-speech-segmenter", segmenter2]
 
                 # Pass 2: Speech Enhancer
@@ -2970,6 +3309,31 @@ class WhisperJAVAPI:
 
         if config.get('keep_temp', False):
             args += ["--keep-temp"]
+
+        if config.get('skip_existing', False):
+            args += ["--skip-existing"]
+
+        # Run-outcome contract: same words and same rule as the CLI's --fail-on.
+        _fail_on = [s for s in ("empty", "suspect") if config.get(f"fail_on_{s}", False)]
+        if _fail_on:
+            args += ["--fail-on", ",".join(_fail_on)]
+
+        # Per-scene ASR telemetry is on by default; the checkbox only opts out.
+        if config.get('asr_telemetry', True) is False:
+            args += ["--no-asr-telemetry"]
+
+        # #415: downloaded Hugging Face models only (HF_HUB_OFFLINE=1 in the child and its workers).
+        if config.get('offline_mode', False):
+            args += ["--offline"]
+
+        # #411: the answer to the start-up check's proceed-or-abort question (shared box).
+        if config.get('accept_cpu_mode', False):
+            args += ["--accept-cpu-mode"]
+
+        # v1.9.2 (CFF1): recogniser refresh budget in minutes of scene audio (0 = never).
+        _mr = config.get('model_refresh_audio_minutes')
+        if _mr not in (None, ''):
+            args += ["--model-refresh-audio-minutes", str(_mr)]
 
         # Debug logging
         if config.get('debug', False):
@@ -3449,8 +3813,15 @@ class WhisperJAVAPI:
         "debug_logging":             "debugLogging",
         "output_format":             "outputFormat",
         "keep_temp":                 "keepTemp",
+        "skip_existing":             "skipExisting",
+        "remember_settings":         "rememberSettings",
+        "fail_on_empty":             "failOnEmpty",
+        "fail_on_suspect":           "failOnSuspect",
+        "asr_telemetry":             "asrTelemetry",
+        "model_refresh_audio_minutes": "modelRefreshAudioMinutes",
         "temp_dir":                  "tempDir",
         "accept_cpu_mode":           "acceptCpuMode",
+        "offline_mode":              "offlineMode",
         "async_processing":          "asyncProcessing",
         "pass1_pipeline":            "pass1Pipeline",
         "pass1_sensitivity":         "pass1Sensitivity",
@@ -3518,6 +3889,7 @@ class WhisperJAVAPI:
         "scene_detector":    "sceneDetector",
         "speech_enhancer":   "speechEnhancer",
         "speech_segmenter":  "speechSegmenter",
+        "vad_version":       "vadVersion",
         "model":             "model",
         "customized":        "customized",
         "params":            "params",       # nested dict — passed as-is
@@ -3684,8 +4056,17 @@ class WhisperJAVAPI:
 
     # ── Ollama-specific API methods ──────────────────────────────────────
 
+    # Served when config/ollama_models.json cannot be read.  Must mirror that
+    # file's instruct-only curation: v1.8.11 removed Qwen3-family *thinking*
+    # models from the curated list because they emit chain-of-thought into the
+    # SRT and break the format, but this fallback kept leading with
+    # Shisa-v2.1-Qwen3-8B — so any user whose config failed to load was handed
+    # the known-bad recommendation as option one.  #305's reporter was running
+    # exactly that model when they reported English output in a Chinese
+    # translation.  Kept in step by test_v192_small_fixes.py.
     _CURATED_MODELS_FALLBACK = [
-        {"model": "hf.co/mradermacher/shisa-v2.1-qwen3-8b-GGUF:Q8_0", "size": "8.7 GB", "label": "Shisa-v2.1-Qwen3-8B Q8"},
+        {"model": "gemma3:12b", "size": "8.1 GB", "label": "Gemma 3 12B (instruct)"},
+        {"model": "qwen2.5:7b-instruct", "size": "4.7 GB", "label": "Qwen2.5-7B Instruct"},
         {"model": "huihui_ai/qwen2.5-abliterate:7b-instruct-q4_K_M", "size": "4.7 GB", "label": "Qwen2.5-7B-Abliterated Q4"},
         {"model": "dolphin-llama3:8b-256k-v2.9-q4_K_M", "size": "4.8 GB", "label": "Dolphin-Llama3-8B-256K Q4"},
     ]
@@ -3940,6 +4321,9 @@ class WhisperJAVAPI:
             env = os.environ.copy()
             env["PYTHONUNBUFFERED"] = "1"
             env["PYTHONUTF8"] = "1"
+            # The child has no console a person can answer on; the start-up check
+            # must abort and say how to answer instead of waiting for input (#411).
+            env["WHISPERJAV_NO_CONSOLE"] = "1"
             env["PYTHONIOENCODING"] = "utf-8:replace"
 
             self._translate_process = subprocess.Popen(
@@ -4054,12 +4438,12 @@ class WhisperJAVAPI:
                 if self._translate_status != "cancelled":
                     if exit_code == 0:
                         self._translate_status = "completed"
-                        self._translate_log_queue.put("\n[SUCCESS] Translation completed.\n")
+                        self._translate_log_queue.put("\n[FINISHED] Translation completed (exit status 0).\n")
                     else:
                         self._translate_status = "error"
                         if not self._translate_error:
                             self._translate_error = f"Translation process exited with code {exit_code}"
-                        self._translate_log_queue.put(f"\n[ERROR] Exit code: {exit_code}\n")
+                        self._translate_log_queue.put(f"\n[FINISHED WITH FAILURES] Translation exit status {exit_code}.\n")
 
         files_total = getattr(self, '_translate_files_total', 0)
         files_completed = getattr(self, '_translate_files_completed', 0)

@@ -23,21 +23,78 @@ import logging
 from whisperjav.utils.logger import logger
 
 
+# Set when the CUDA device is present but the installed PyTorch build has no
+# kernels for it (#411: GTX 1060, sm_61, cu128 wheel built for sm_75 and up).
+# Read by the start-up gate to say why the GPU is not used.
+CUDA_UNUSABLE_REASON: Optional[str] = None
+
+
+def cuda_build_supports_device(capability: Tuple[int, int], arch_list) -> bool:
+    """Can a PyTorch build compiled for ``arch_list`` run on a card of ``capability``?
+
+    This is NVIDIA's per-entry cubin/PTX rule: an ``sm_XY`` cubin runs on hardware
+    of the same major version with minor >= Y; a ``compute_XY`` PTX is JIT-compiled
+    for any hardware with capability >= X.Y. Architecture-specific suffixes
+    (``sm_90a``, ``sm_100f``) are stripped the way ``torch.cuda._extract_arch_version``
+    does. Recent PyTorch applies the same idea in its start-up warning
+    (``_warn_unsupported_code``) with family exceptions such as 8.7 and 10.1, which
+    this rule does not model and therefore treats as supported; older PyTorch only
+    warned on the list's min/max (``_check_capability``) and on the major version
+    (``_check_cubins``). Where those disagree, this rule errs toward reporting the
+    card as usable. A list with no ``sm``/``compute`` entry cannot be judged and is
+    treated as supported.
+    """
+    major, minor = int(capability[0]), int(capability[1])
+    judged = False
+    for arch in arch_list or []:
+        if not isinstance(arch, str) or "_" not in arch:
+            continue
+        kind, _, num = arch.partition("_")
+        num = num.removesuffix("a").removesuffix("f")
+        if kind not in ("sm", "compute") or not num.isdigit() or len(num) < 2:
+            continue
+        judged = True
+        a_major, a_minor = int(num[:-1]), int(num[-1])
+        if kind == "sm" and a_major == major and a_minor <= minor:
+            return True
+        if kind == "compute" and (a_major, a_minor) <= (major, minor):
+            return True
+    return not judged
+
+
 def _check_cuda_available() -> Tuple[bool, Optional[str]]:
     """
-    Check if CUDA is available and get GPU name.
+    Check if CUDA is available AND usable by this PyTorch build, and get the GPU name.
 
-    Handles CUDA driver version mismatch errors gracefully.
+    Handles CUDA driver version mismatch errors gracefully. A card the build has
+    no kernels for (#411) is reported as not available, with the reason kept in
+    ``CUDA_UNUSABLE_REASON`` for the start-up gate and ``--check``.
 
     Returns:
         (is_available, gpu_name)
     """
+    global CUDA_UNUSABLE_REASON
+    CUDA_UNUSABLE_REASON = None
     try:
         import torch
         if torch.cuda.is_available():
             # get_device_name(0) can throw RuntimeError if driver is incompatible
             try:
                 gpu_name = torch.cuda.get_device_name(0)
+                try:
+                    capability = tuple(torch.cuda.get_device_capability(0))
+                    arch_list = list(torch.cuda.get_arch_list())
+                except Exception as e:  # noqa: BLE001 - cannot judge, keep the old answer
+                    logger.debug(f"CUDA capability check skipped: {e}")
+                    capability, arch_list = None, []
+                if capability and not cuda_build_supports_device(capability, arch_list):
+                    CUDA_UNUSABLE_REASON = (
+                        f"{gpu_name} has compute capability {capability[0]}.{capability[1]}, "
+                        f"but this PyTorch build has kernels only for "
+                        f"{', '.join(arch_list)}. The GPU cannot be used by this build."
+                    )
+                    logger.warning(CUDA_UNUSABLE_REASON)
+                    return False, None
                 return True, gpu_name
             except RuntimeError as e:
                 error_msg = str(e).lower()

@@ -101,6 +101,8 @@
 
 WhisperJAV 没有 GPU 也能工作，只是速度较慢。
 
+找不到可用 GPU 时，启动检查会停下来询问是否改用 CPU 继续；GUI 无法提问，因此下面的选项是必须的（命令行请加 `--accept-cpu-mode` 或 `--device cpu`）。
+
 1. 进入 **Advanced** 标签页
 2. 勾选 **"Accept CPU-only mode"**
 3. 使用 **Faster** 模式以获得无 GPU 时的最佳速度

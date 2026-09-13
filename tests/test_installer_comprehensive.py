@@ -19,6 +19,7 @@ Date: 2026-01-26
 
 import sys
 import os
+import re
 import subprocess
 from pathlib import Path
 from unittest.mock import patch, MagicMock, mock_open
@@ -921,6 +922,17 @@ class TestImportNameMappings:
         # Note: We allow the word 'pysubtrans' in strings/comments, just not as the import
 
 
+def _parse_git_packages_block(content: str) -> set:
+    """Return the package specs listed in the template's git_packages list.
+
+    Only the list itself — a package mentioned in a comment elsewhere in the
+    template is not installed by anything, so it must not count.
+    """
+    block_match = re.search(r"git_packages = \[(.*?)\n    \]", content, re.DOTALL)
+    assert block_match, "git_packages list not found in post_install template"
+    return set(re.findall(r'\(\s*"([^"]+)"\s*,', block_match.group(1)))
+
+
 class TestPostInstallTemplate:
     """Tests for the standalone installer's post_install template."""
 
@@ -939,47 +951,280 @@ class TestPostInstallTemplate:
 
         assert template_path.exists(), "post_install.py.template not found"
 
-        content = template_path.read_text()
+        content = template_path.read_text(encoding="utf-8")
 
         # All git-based packages that MUST be in the template
         required_git_packages = [
             "openai-whisper",
             "stable-ts",
+            # v1.9.2: faster-whisper became a commit pin, which the requirements
+            # generator filters out, so Phase 3.5 is the only place it is installed.
+            "faster-whisper",
             "ffmpeg-python",
             "clearvoice",
         ]
 
-        missing = []
-        for pkg in required_git_packages:
-            if pkg not in content:
-                missing.append(pkg)
+        installed = _parse_git_packages_block(content)
+        installed_names = {spec.split(" @ ")[0].strip() for spec in installed}
 
-        assert not missing, f"Git-based packages missing from post_install template: {missing}"
+        missing = [pkg for pkg in required_git_packages if pkg not in installed_names]
+
+        assert not missing, (
+            f"Git-based packages missing from the post_install template's "
+            f"git_packages list: {missing}. Found: {sorted(installed_names)}"
+        )
 
     def test_phase_35_exists(self):
         """Verify Phase 3.5 (git packages) exists in template."""
         project_root = Path(__file__).parent.parent
         template_path = project_root / "installer" / "templates" / "post_install.py.template"
 
-        content = template_path.read_text()
+        content = template_path.read_text(encoding="utf-8")
 
         assert "Phase 3.5" in content, "Phase 3.5 (git packages) not found in template"
         assert "git_packages" in content, "git_packages list not found in template"
 
+    def test_every_git_dependency_is_installed_by_phase_35(self):
+        """Every git-addressed dependency the installer ships must be in Phase 3.5.
+
+        The requirements generator (build_release.py) drops any dependency whose
+        spec contains "git+" or "@" from requirements_v{VERSION}.txt, so a git
+        dependency that is not listed in Phase 3.5 is never installed at all.
+        That is exactly how faster-whisper went missing from the 1.9.2 installer:
+        it became a commit pin, the generator filtered it, and nothing installed
+        it. This test compares the two lists as sets, both directions, on the
+        exact spec string, so a changed commit pin is caught too.
+        """
+        try:
+            import tomllib
+        except ImportError:  # Python 3.10 without tomli
+            pytest.skip("tomllib not available")
+
+        project_root = Path(__file__).parent.parent
+
+        with open(project_root / "pyproject.toml", "rb") as f:
+            config = tomllib.load(f)
+
+        project = config["project"]
+        optional_deps = project.get("optional-dependencies", {})
+
+        # The extras the Windows installer ships — build_release.py installer_extras
+        installer_extras = [
+            "cli", "gui", "translate", "llm", "enhance",
+            "huggingface", "qwen", "analysis", "compatibility",
+        ]
+
+        expected_specs = set()
+        for dep in project.get("dependencies", []):
+            if " @ git+" in dep:
+                expected_specs.add(dep.strip())
+        for extra in installer_extras:
+            for dep in optional_deps.get(extra, []):
+                if dep.startswith("whisperjav["):
+                    continue
+                if " @ git+" in dep:
+                    expected_specs.add(dep.strip())
+
+        assert expected_specs, "No git dependencies found in pyproject.toml — parser broken?"
+
+        template_path = project_root / "installer" / "templates" / "post_install.py.template"
+        content = template_path.read_text(encoding="utf-8")
+
+        # First string of each ("spec", "display name") tuple
+        template_specs = _parse_git_packages_block(content)
+        assert template_specs, "No package specs parsed out of the git_packages list"
+
+        missing = expected_specs - template_specs
+        extra_in_template = template_specs - expected_specs
+
+        assert not missing, (
+            "These git dependencies are in pyproject.toml but are NOT installed by "
+            "Phase 3.5 of the installer, so the installer would ship without them:\n  "
+            + "\n  ".join(sorted(missing))
+        )
+        assert not extra_in_template, (
+            "Phase 3.5 installs git packages that are not declared in pyproject.toml:\n  "
+            + "\n  ".join(sorted(extra_in_template))
+        )
+
+    def test_failed_core_check_ends_the_install(self):
+        """A failed Phase 6 check must write the failure marker and return 1.
+
+        Before v1.9.2 the install script printed "Installation completed
+        successfully!" and returned 0 even when a core package would not
+        import, so a user whose install was unusable was told it had worked.
+        """
+        project_root = Path(__file__).parent.parent
+        template_path = project_root / "installer" / "templates" / "post_install.py.template"
+        content = template_path.read_text(encoding="utf-8")
+
+        phase_6_pos = content.find('log_section("Phase 6: Post-Install Verification")')
+        assert phase_6_pos != -1, "Phase 6 banner not found in template"
+
+        tail = content[phase_6_pos:]
+        # Stop at the end of main(), before the __main__ block
+        end = tail.find('if __name__ ==')
+        assert end != -1, "__main__ block not found after Phase 6"
+        tail = tail[:end]
+
+        assert "if fails > 0:" in tail, (
+            "Phase 6 does not branch on a failed core check — a broken install "
+            "would still be reported as successful"
+        )
+        assert "create_failure_file(" in tail, (
+            "Phase 6's failure branch does not write the failure marker file"
+        )
+        assert "return 1" in tail, (
+            "Phase 6's failure branch does not return a non-zero exit code"
+        )
+
+        failure_branch = tail[tail.find("if fails > 0:"):]
+        assert failure_branch.find("create_failure_file(") < failure_branch.find("return 1"), (
+            "The failure marker must be written before returning"
+        )
+
     def test_git_packages_after_pytorch(self):
-        """Verify git packages are installed AFTER PyTorch (Phase 3)."""
+        """Verify git packages are installed AFTER PyTorch (Phase 3).
+
+        Match on the log_section() call that opens each phase, not on the bare
+        phase name: the words "Phase 3.5" also appear in a comment about CUDA
+        wheels some 2,000 lines earlier, and matching that made this test
+        compare the wrong positions and fail for the wrong reason.
+        """
         project_root = Path(__file__).parent.parent
         template_path = project_root / "installer" / "templates" / "post_install.py.template"
 
-        content = template_path.read_text()
+        content = template_path.read_text(encoding="utf-8")
 
-        # Find positions
-        phase_3_pos = content.find("Phase 3: PyTorch")
-        phase_35_pos = content.find("Phase 3.5")
-        phase_4_pos = content.find("Phase 4:")
+        # Find positions of the phase banners themselves
+        phase_3_pos = content.find('log_section("Phase 3: PyTorch')
+        phase_35_pos = content.find('log_section("Phase 3.5')
+        phase_4_pos = content.find('log_section("Phase 4:')
+
+        assert phase_3_pos != -1, "Phase 3 banner not found in template"
+        assert phase_35_pos != -1, "Phase 3.5 banner not found in template"
+        assert phase_4_pos != -1, "Phase 4 banner not found in template"
 
         assert phase_3_pos < phase_35_pos < phase_4_pos, \
             "Phase 3.5 must be between Phase 3 (PyTorch) and Phase 4 (requirements)"
+
+
+class TestInstallAbortsOnCoreFailure:
+    """The installer must stop when a package WhisperJAV cannot run without is missing.
+
+    Owner decision, 2026-09-11. Until v1.9.2 the install script's exit code was
+    thrown away by conda-constructor's own runner, the installer reached its
+    normal finish page, and a desktop shortcut was created that opened onto an
+    error. A user was told an unusable install had worked.
+
+    These are text checks on the NSIS template, and that is a real limit: NSIS
+    cannot be compiled or run here, so they prove the instructions are present
+    and in the right order, not that the installer behaves correctly. Only the
+    clean-machine install proves that.
+    """
+
+    @staticmethod
+    def _nsis() -> str:
+        project_root = Path(__file__).parent.parent
+        path = project_root / "installer" / "templates" / "custom_template.nsi.tmpl.template"
+        assert path.exists(), "NSIS template not found"
+        return path.read_text(encoding="utf-8")
+
+    @staticmethod
+    def _post_install() -> str:
+        project_root = Path(__file__).parent.parent
+        path = project_root / "installer" / "templates" / "post_install.py.template"
+        return path.read_text(encoding="utf-8")
+
+    def test_constructor_is_told_to_propagate_a_failed_post_install(self):
+        """conda-constructor swallows the exit code unless this variable is set.
+
+        Its _nsis.py catches the CalledProcessError, writes to stderr and returns
+        normally; only `if os.environ.get("NSIS_SCRIPTS_RAISE_ERRORS")` makes it
+        exit non-zero. Without this line NSIS never learns the install failed.
+        """
+        content = self._nsis()
+
+        # Match the instruction that sets it, not the comment that explains it:
+        # a name mentioned in a comment sets no variable. (The same weakness made
+        # test_git_packages_in_template unable to fail until v1.9.2.)
+        setter = 'SetEnvironmentVariable(t,t)i("NSIS_SCRIPTS_RAISE_ERRORS", "1")'
+        assert setter in content, (
+            "The NSIS script does not SET NSIS_SCRIPTS_RAISE_ERRORS, so a failed "
+            "post-install would be silently discarded by constructor's runner"
+        )
+
+        var_pos = content.find(setter)
+        call_pos = content.find('_nsis.py" post_install')
+        assert call_pos != -1, "post_install invocation not found"
+        assert var_pos < call_pos, (
+            "NSIS_SCRIPTS_RAISE_ERRORS must be set BEFORE post_install runs"
+        )
+
+    def test_the_install_aborts_when_the_failure_marker_exists(self):
+        content = self._nsis()
+
+        marker_check = content.find("INSTALLATION_FAILED_v{{VERSION}}.txt")
+        assert marker_check != -1, (
+            "Nothing checks for the failure marker, so a broken install would still finish"
+        )
+
+        tail = content[marker_check:]
+        abort_pos = tail.find("Abort")
+        assert abort_pos != -1 and abort_pos < 2000, (
+            "The failure-marker branch does not Abort the installation"
+        )
+
+    def test_no_desktop_shortcut_is_created_after_a_failed_install(self):
+        """A shortcut that opens onto an error is worse than no shortcut.
+
+        The abort must come first in the script, so the shortcut block is never
+        reached. This also covers the silent-install case, where the retry
+        dialog answers itself with "Ignore".
+        """
+        content = self._nsis()
+
+        marker_check = content.find('${FileExists} "$INSTDIR\INSTALLATION_FAILED')
+        shortcut = content.find('CreateShortCut "$DESKTOP')
+
+        assert marker_check != -1, "failure-marker check not found in the NSIS template"
+        assert shortcut != -1, "desktop shortcut creation not found in the NSIS template"
+        assert marker_check < shortcut, (
+            "The failure check must come BEFORE the desktop shortcut is created, "
+            "or a broken install still puts a shortcut on the desktop"
+        )
+
+    def test_the_failure_message_tells_the_user_what_to_do(self):
+        """The user is not technical. The dialog has to say what happened, where
+        the details are, and what to try -- re-running fixes the usual cause."""
+        content = self._nsis()
+        marker_check = content.find('${FileExists} "$INSTDIR\INSTALLATION_FAILED')
+        block = content[marker_check:marker_check + 2000]
+
+        assert "MessageBox" in block, "the user is not shown anything"
+        assert "install_log_v{{VERSION}}.txt" in block, "the log file is not named"
+        assert "github.com/meizhong986/WhisperJAV/issues" in block, "no way to report it"
+        assert "again" in block.lower(), "does not tell the user to try again"
+
+    def test_a_stale_marker_from_an_earlier_attempt_is_cleared(self):
+        """Otherwise a marker left by a previous failed attempt in the same folder
+        would abort an install that actually worked."""
+        content = self._post_install()
+
+        main_pos = content.find("def main() -> int:")
+        assert main_pos != -1
+        block = content[main_pos:main_pos + 1200]
+
+        assert "INSTALLATION_FAILED_v{{VERSION}}.txt" in block, (
+            "main() does not clear a stale failure marker before the install runs"
+        )
+        assert "os.remove" in block, "the stale marker is found but not removed"
+
+        first_phase = content.find("Phase 1: Preflight Checks", main_pos)
+        clear_pos = content.find("INSTALLATION_FAILED_v{{VERSION}}.txt", main_pos)
+        assert clear_pos < first_phase, (
+            "the stale marker must be cleared before any phase can write a new one"
+        )
 
 
 class TestKnownIssues:

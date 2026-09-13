@@ -97,7 +97,9 @@ class _CapRule:
     pass2_pipeline: str
     pass2_sensitivity_match: str       # only triggers if pass2 sensitivity equals this
     pass2_sensitivity_replacement: str  # auto-replace with this
-    rationale: str                      # one-line summary for log + tracker
+    rationale: str                      # shown to the USER when the rule fires — keep it true and plain
+    # Maintainer reference only. NOT shown to the user: the investigation memo lives under
+    # docs/plans/, which is gitignored, so it is in no install and no public checkout.
     memo_section: str                   # § reference in V1814_T142_NONDETERMINISM_INVESTIGATION.md
 
 
@@ -109,11 +111,18 @@ CAP_RULES: list[_CapRule] = [
         pass2_sensitivity_match="aggressive",
         pass2_sensitivity_replacement="balanced",
         rationale=(
-            "pass1=fidelity + pass2=balanced + sensitivity=aggressive is empirically "
-            "known to produce intermittent catastrophic ASR truncation in pass 2 "
-            "(~67% rate in early trials). Auto-downgrading sensitivity to 'balanced' "
-            "removes the temperature=0.17 fallback path and the high no_speech_threshold, "
-            "eliminating the catastrophic-empty-scene manifestation."
+            "A Fidelity pass 1 followed by a Balanced pass 2 at aggressive produced "
+            "empty or badly truncated pass-2 subtitles in three trials, two of which "
+            "failed that way. Running pass 2 at balanced instead lowers the no-speech "
+            "threshold from 0.72 to 0.65 and lets the beam search run longer (patience "
+            "1.0 to 1.2; the beam width is 2 either way), which stopped it happening. "
+            "KEPT for v1.9.2 (owner decision, 11 September "
+            "2026) even though half of the original explanation no longer applies: the "
+            "temperature 0.17 retry it also blamed is gone, because every sensitivity "
+            "now decodes once at temperature 0. It stays because the failure it prevents "
+            "was measured, and nothing has yet measured that removing the rule is safe. "
+            "To transcribe at aggressive, run that pass on its own rather than as pass 2 "
+            "after Fidelity."
         ),
         memo_section="§15",
     ),
@@ -186,9 +195,7 @@ def apply_ensemble_safety_caps(
                 f"\n[Conditional sensitivity cap: {rule.name}] "
                 f"Auto-downgrading pass2 sensitivity: "
                 f"'{old_value}' -> '{rule.pass2_sensitivity_replacement}'.\n"
-                f"  Reason: {rule.rationale}\n"
-                f"  See: docs/plans/V1814_T142_NONDETERMINISM_INVESTIGATION.md "
-                f"{rule.memo_section}"
+                f"  Reason: {rule.rationale}"
             )
 
             if logger is not None:

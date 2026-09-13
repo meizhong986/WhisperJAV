@@ -44,7 +44,7 @@ description_long: |
 overrides:
   # Decoding overrides — v1.8.10-hf3: uniform beam_size=2 across sensitivities
   decode.beam_size: 2
-  decode.temperature: 0.17
+  decode.temperature: 0.0        # v1.9.2 (owner O4): 0.17 -> 0.0, temperature 0 everywhere
 
   # Quality thresholds — v1.8.10-hf3: aligned with Pydantic aggressive presets
   quality.no_speech: 0.77

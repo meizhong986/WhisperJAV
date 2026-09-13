@@ -21,6 +21,12 @@ if os.name == 'nt' and not getattr(sys.flags, 'utf8_mode', False):
     from whisperjav.utils.console import relaunch_for_utf8
     relaunch_for_utf8('whisperjav.cli')
 
+# OFFLINE MODE (#415): must precede patch_hf_hub_downloads(), which imports huggingface_hub.
+from whisperjav.utils.offline_mode import offline_requested as _offline_requested
+if _offline_requested(sys.argv[1:]):
+    from whisperjav.utils.offline_mode import enable_offline_mode
+    enable_offline_mode()
+
 # ===========================================================================
 # EARLY SETUP - Must be before any library imports
 # ===========================================================================

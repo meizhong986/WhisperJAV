@@ -327,7 +327,16 @@ pip install "pywebview>=5.0.0" "pythonnet>=3.0" "pywin32>=305"
 
 REM Speech Enhancement
 pip install "modelscope>=1.20" oss2 addict "datasets>=2.14.0,<4.0" simplejson sortedcontainers packaging
-pip install git+https://github.com/meizhong986/ClearerVoice-Studio.git#subdirectory=clearvoice
+
+REM ClearerVoice's own transitive dependencies, installed explicitly because the
+REM next command uses --no-deps (this mirrors what the standalone installer does).
+pip install gdown joblib torchinfo yamlargparse "opencv-python>=4.10.0" "python-speech-features>=0.6" "rotary-embedding-torch>=0.8" "scenedetect>=0.6"
+
+REM --no-deps is required: ClearerVoice declares an unpinned torch, and without it
+REM pip replaces your CUDA build with the CPU wheel from PyPI, silently disabling
+REM GPU acceleration for the whole install (#334).
+pip install --no-deps git+https://github.com/meizhong986/ClearerVoice-Studio.git#subdirectory=clearvoice
+
 pip install bs-roformer-infer "onnxruntime>=1.16.0"
 
 REM Compatibility (pyvideotrans interop)

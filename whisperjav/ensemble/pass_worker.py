@@ -87,56 +87,20 @@ DECODER_PARAMS = {
     "max_initial_timestamp",
 }
 
-# Segmenter params - routed to speech segmentation backends, not passed to Whisper ASR
-# Covers all backends: Silero, TEN, Whisper VAD, and shared grouping params
-SEGMENTER_PARAMS = {
-    # Core VAD (Silero, shared)
-    "threshold",
-    "neg_threshold",           # v1.9.0: WhisperSeg decoupled offset threshold (anime table).
-                               # MUST stay in sync with anime_whisper_vad.SEGMENTER_CONFIG_KEYS —
-                               # keys missing here are silently stripped by resolve_qwen_sensitivity.
-    "speech_start_threshold",  # v1.9.0 "3a": refined display-start threshold (anime table).
-    "force_split_mode",        # v1.9.0: WhisperSeg "dip"|"chop" force-split behavior (anime table).
-    "segmentation_decoder",    # v1.9.0: WhisperSeg "hysteresis"|"offline" decoder (anime table + GUI).
-    "grow_floor",              # v1.9.0 offline decoder: edge-growth floor (anime table + GUI).
-    "gap_merge_ms",            # v1.9.0 offline decoder: dialog-cut gap length (anime table + GUI).
-    "split_smooth_ms",         # v1.9.0 offline decoder: overlong-split smoothing (anime table).
-    "min_speech_duration_ms",
-    "max_speech_duration_s",   # Keep for CLI backward compat (not in GUI)
-    "min_silence_duration_ms",
-    "speech_pad_ms",
-    # Grouping (shared across backends)
-    "chunk_threshold_s",
-    "max_group_duration_s",
-    # TEN-specific
-    "hop_size",
-    "start_pad_ms",
-    "end_pad_ms",
-    # Whisper VAD-specific
-    "cache_results",
-    # FireRedVAD-specific (v1.9.0 experimental)
-    "smooth_window_size",
-    "use_gpu",
-}
-
-# Backend name → YAML tool name mapping for ConfigManager.get_tool_config()
-# Used by resolve_qwen_sensitivity() to resolve sensitivity presets
-_SEGMENTER_TOOL_NAMES = {
-    "silero-v6.2": "silero-v6-speech-segmentation",
-    "silero": "silero-speech-segmentation",
-    "silero-v4.0": "silero-speech-segmentation",
-    "silero-v3.1": "silero-speech-segmentation",
-    "ten": "ten-speech-segmentation",
-    "nemo": "nemo-speech-segmentation",
-    "nemo-lite": "nemo-speech-segmentation",
-    "whisper-vad": "whisper-vad-speech-segmentation",
-    "whisper-vad-tiny": "whisper-vad-speech-segmentation",
-    "whisper-vad-base": "whisper-vad-speech-segmentation",
-    "whisper-vad-small": "whisper-vad-speech-segmentation",
-    "whisper-vad-medium": "whisper-vad-speech-segmentation",
-    "whisperseg": "whisperseg-speech-segmentation",
-    "firered-vad": "firered-vad-speech-segmentation",  # v1.9.0 experimental
-}
+# Segmenter params and the backend→YAML tool-name map live in the light module
+# whisperjav.config.segmenter_presets (v1.9.2) so main.py can resolve presets on the
+# single-pass path without importing every pipeline. Re-exported here under the
+# names this module and its tests have always used.
+from whisperjav.config.segmenter_presets import (  # noqa: E402
+    SEGMENTER_PARAMS,
+    BALANCED_DEFAULT_SEGMENTER,
+    DEFAULT_SCENE_DETECTOR,
+    SEGMENTER_TOOL_NAMES as _SEGMENTER_TOOL_NAMES,
+    resolve_segmenter_sensitivity as resolve_qwen_sensitivity,
+    effective_segmenter_for_pass,
+    segmenter_accepts,
+)
+from whisperjav.modules.silero_vad_adapter import DEFAULT_VAD_VERSION  # noqa: E402
 
 # Provider params - common transcriber options shared by all backends
 PROVIDER_PARAMS_COMMON = {
@@ -455,6 +419,7 @@ def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
         "safe_chunking": "qwen_safe_chunking",
         "scene_min_duration": "qwen_scene_min_duration",
         "scene_max_duration": "qwen_scene_max_duration",
+        "scene_clustering_threshold": "qwen_scene_clustering_threshold",  # v1.9.2 CFF2
         "aligner_backend": "qwen_aligner_backend",
         "timestamp_mode": "qwen_timestamp_mode",
         "assembly_cleaner": "qwen_assembly_cleaner",
@@ -506,60 +471,6 @@ def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
         params["qwen_assembly_cleaner"] = ac != "passthrough"
 
     return params
-
-
-def resolve_qwen_sensitivity(
-    segmenter_backend: str,
-    sensitivity: str,
-    user_overrides: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
-    """
-    Resolve sensitivity preset into segmenter_config for Qwen pipeline.
-
-    Layering: backend YAML spec < sensitivity preset < user overrides.
-    Uses ConfigManager.get_tool_config() which already implements this
-    exact layering.
-
-    Args:
-        segmenter_backend: Speech segmenter backend name (e.g., "silero-v6.2", "ten")
-        sensitivity: Sensitivity level ("aggressive", "balanced", "conservative")
-        user_overrides: Optional user custom params (win over preset)
-
-    Returns:
-        Dict of segmenter config params (filtered to SEGMENTER_PARAMS keys)
-    """
-    # "faster-whisper" = native VAD inside faster-whisper (vad_filter). Like
-    # "none", it has no EXTERNAL segmenter config to resolve by sensitivity, so
-    # return empty (the ASR enables vad_filter itself). Avoids a spurious
-    # "Unknown segmenter backend" warning when balanced runs native VAD in a pass.
-    if segmenter_backend in ("none", "faster-whisper") or not segmenter_backend:
-        return {}
-
-    tool_name = _SEGMENTER_TOOL_NAMES.get(segmenter_backend)
-    if not tool_name:
-        logger.warning(
-            "Unknown segmenter backend '%s' for sensitivity resolution; "
-            "passing user overrides only",
-            segmenter_backend,
-        )
-        return {k: v for k, v in (user_overrides or {}).items() if k in SEGMENTER_PARAMS}
-
-    try:
-        from whisperjav.config.v4 import ConfigManager
-
-        cm = ConfigManager()
-        resolved = cm.get_tool_config(tool_name, sensitivity, user_overrides)
-
-        # Filter to SEGMENTER_PARAMS only — ConfigManager returns full tool config
-        # including metadata keys we don't want to pass to the backend
-        return {k: v for k, v in resolved.items() if k in SEGMENTER_PARAMS}
-    except Exception as e:
-        logger.warning(
-            "ConfigManager failed for '%s' sensitivity '%s': %s. "
-            "Falling back to user overrides only.",
-            tool_name, sensitivity, e,
-        )
-        return {k: v for k, v in (user_overrides or {}).items() if k in SEGMENTER_PARAMS}
 
 
 def _write_dropbox_and_exit(result_file: str, result: Dict[str, Any], tracer, exit_code: int) -> None:
@@ -745,6 +656,13 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
             logger.debug(
                 "[Worker %s] Pass %s: File details - path=%s, basename_len=%d",
                 os.getpid(), pass_number, media_info.get("path"), len(basename)
+            )
+            # #394 per-scene telemetry goes beside this file's pass output,
+            # tagged with the pass number so two Balanced passes do not
+            # overwrite each other. Pipelines that do not record it ignore it.
+            _configure_telemetry(
+                pipeline, pass_config, pass_number,
+                Path(media_info.get('output_dir', payload.output_dir)),
             )
             try:
                 result = pipeline.process({
@@ -1039,6 +957,27 @@ def _run_xxl_pass(
     # Write Drop-Box and Nuclear Exit (same pattern as normal passes)
     final_result = {"results": [r.__dict__ for r in results], "worker_error": None}
     _write_dropbox_and_exit(result_file, final_result, tracer, 0)
+
+
+def _configure_telemetry(pipeline: Any, pass_config: Dict[str, Any],
+                         pass_number: int, file_output_dir: Path) -> None:
+    """Point the pipeline's #394 telemetry at this file's pass output folder.
+
+    The pipeline resolves the final path itself (see
+    ``whisperjav.utils.asr_telemetry.resolve_telemetry_path``): with no user
+    override it is ``<file_output_dir>/raw_subs/<name>.pass<N>.asr_telemetry.jsonl``.
+    The pipeline's own ``output_dir`` cannot be used for this, because in
+    ``--output-dir source`` mode the orchestrator points it at the temp
+    directory and moves only the SRT out afterwards.
+    """
+    enabled = bool(pass_config.get("asr_telemetry_enabled", True))
+    override = pass_config.get("asr_telemetry")
+    setattr(pipeline, "asr_telemetry_enabled", enabled)
+    setattr(pipeline, "asr_telemetry_tag", f"pass{pass_number}")
+    # No override: a directory, so the pipeline names the file; the pass tag
+    # is applied by the pipeline in both cases.
+    setattr(pipeline, "asr_telemetry_path",
+            override if override else str(Path(file_output_dir) / "raw_subs"))
 
 
 def _build_pipeline(
@@ -1347,6 +1286,8 @@ def _build_pipeline(
             qwen_pipeline_params["scene_min_duration"] = qwen_defaults["qwen_scene_min_duration"]
         if "qwen_scene_max_duration" in qwen_defaults:
             qwen_pipeline_params["scene_max_duration"] = qwen_defaults["qwen_scene_max_duration"]
+        if qwen_defaults.get("qwen_scene_clustering_threshold") is not None:
+            qwen_pipeline_params["scene_clustering_threshold"] = qwen_defaults["qwen_scene_clustering_threshold"]
         if "qwen_max_group_duration" in qwen_defaults:
             qwen_pipeline_params["segmenter_max_group_duration"] = qwen_defaults["qwen_max_group_duration"]
         _chunk_thr = qwen_defaults.get("qwen_chunk_threshold")
@@ -1442,6 +1383,20 @@ def _build_pipeline(
             )
             raise
 
+    # v1.9.2: resolve the scene detector BEFORE the config. The resolved parameter NAMES
+    # depend on the backend that will run — semantic reads min_duration / max_duration,
+    # auditok and silero read the _s spellings — so choosing the backend afterwards (as
+    # _apply_gui_overrides does for the "method" key) is too late to fix the names. Same
+    # default as main.py's single-pass path, for the same reason the speech-segmenter
+    # default is mirrored below: the same pipeline+sensitivity must resolve identically
+    # at all three entry points. An explicit --passN-scene-detector still wins.
+    _scene_method = pass_config.get("scene_detector") or DEFAULT_SCENE_DETECTOR
+    if not pass_config.get("scene_detector"):
+        logger.debug(
+            "Pass %s: no scene detector passed; defaulting to %s",
+            pass_number, _scene_method,
+        )
+
     resolved_config = resolve_legacy_pipeline(
         pipeline_name=pipeline_name,
         sensitivity=pass_config.get("sensitivity", "balanced"),
@@ -1449,6 +1404,7 @@ def _build_pipeline(
         overrides=pass_config.get("overrides"),
         device=pass_config.get("device"),  # None = auto-detect
         compute_type=pass_config.get("compute_type"),  # None = auto
+        scene_method=_scene_method,
     )
 
     # Apply source language from pass_config (fixes Issue #104)
@@ -1565,7 +1521,12 @@ def apply_custom_params(
                 # Silero backends read from params["vad"] (legacy path).
                 # Non-Silero backends read from params["speech_segmenter"].
                 seg_backend = params.get("speech_segmenter", {}).get("backend", "silero-v4.0")
-                if seg_backend.startswith("silero"):
+                # v1.9.2: "faster-whisper" is the recognizer's BUILT-IN VAD and its
+                # parameters ARE faster-whisper VadOptions, which FasterWhisperProASR
+                # reads from params["vad"] -- the same place the silero backends use.
+                # Routing them to params["speech_segmenter"] silently dropped every
+                # Customize > Segmenter edit on a balanced pass.
+                if seg_backend.startswith("silero") or seg_backend == "faster-whisper":
                     if "vad" not in params:
                         params["vad"] = {}
                     params["vad"][key] = value
@@ -1597,7 +1558,12 @@ def apply_custom_params(
             elif key in SEGMENTER_PARAMS:
                 # Route segmenter params based on backend type.
                 seg_backend = params.get("speech_segmenter", {}).get("backend", "silero-v4.0")
-                if seg_backend.startswith("silero"):
+                # v1.9.2: "faster-whisper" is the recognizer's BUILT-IN VAD and its
+                # parameters ARE faster-whisper VadOptions, which FasterWhisperProASR
+                # reads from params["vad"] -- the same place the silero backends use.
+                # Routing them to params["speech_segmenter"] silently dropped every
+                # Customize > Segmenter edit on a balanced pass.
+                if seg_backend.startswith("silero") or seg_backend == "faster-whisper":
                     vad_params[key] = value
                     logger.debug("Pass %s: Set vad.%s", pass_number, key)
                 else:
@@ -1689,7 +1655,7 @@ SPEECH_SEGMENTER_MAP = {
     "whisper-vad-medium": "whisper-vad-medium",
     "ten": "ten",
     "silero-v6.2": "silero-v6.2",
-    "firered-vad": "firered-vad",  # v1.9.0 experimental
+    "firered-vad": "firered-vad",  # v1.9.0; installed by default since v1.9.2
     "none": "none",
 }
 
@@ -1751,12 +1717,45 @@ def _apply_gui_overrides(
     # apply_balanced_vad_defaults below keyed off the wrong backend. Default it
     # here so the same mode+sensitivity resolves identically at all three entry
     # points. An explicit --passN-speech-segmenter still wins.
-    if speech_segmenter is None and pass_config.get("pipeline") == "balanced":
-        speech_segmenter = "faster-whisper"
+    if pass_config.get("pipeline") == "balanced":
+        # v1.9.2 (S2/S9): a balanced pass has NO external speech segmenter. It runs
+        # faster-whisper's built-in VAD, and the user's choice is which Silero build
+        # that VAD uses (vad_version, below). main.py rejects an external segmenter
+        # for a balanced pass at parse time; this normalisation is what makes the
+        # behaviour true at the point it derives from, including for a stale saved
+        # preset or a hand-written pass_config that never went through argparse.
+        if speech_segmenter and speech_segmenter != BALANCED_DEFAULT_SEGMENTER:
+            logger.warning(
+                "Pass %s: speech segmenter '%s' is not available on the balanced "
+                "pipeline since v1.9.2 -- using faster-whisper's built-in VAD. "
+                "Select the Silero build with the VAD version option.",
+                pass_number, speech_segmenter,
+            )
+        speech_segmenter = BALANCED_DEFAULT_SEGMENTER
         logger.debug(
-            "Pass %s: balanced pipeline defaults to faster-whisper native VAD (v1.9.0)",
-            pass_number,
+            "Pass %s: balanced pipeline uses %s (built-in VAD)",
+            pass_number, speech_segmenter,
         )
+    elif effective_segmenter_for_pass(pass_config.get("pipeline"), speech_segmenter) \
+            != speech_segmenter:
+        # Owner, 2026-09-12: a fidelity pass defaults to FireRedVAD.
+        # Without this the block below was skipped entirely, resolve_legacy_pipeline
+        # leaves params["speech_segmenter"] unset, and WhisperProASR's own fallback
+        # decided the backend -- so an ensemble fidelity pass and `--mode fidelity`
+        # resolved to different segmenters. Setting it here also means the pass gets
+        # its per-sensitivity preset resolved below, which the fallback path never
+        # did. An explicit --passN-speech-segmenter still wins.
+        #
+        # The rule itself lives in config/segmenter_presets.effective_segmenter_for_pass
+        # so main.py's start-up model check cannot disagree with what runs here.
+        speech_segmenter = effective_segmenter_for_pass(
+            pass_config.get("pipeline"), speech_segmenter
+        )
+        logger.debug(
+            "Pass %s: fidelity pipeline uses %s (no segmenter specified)",
+            pass_number, speech_segmenter,
+        )
+
     if speech_segmenter is not None:  # Allow empty string for default
         segmenter_backend = SPEECH_SEGMENTER_MAP.get(speech_segmenter, speech_segmenter)
 
@@ -1803,6 +1802,22 @@ def _apply_gui_overrides(
         sensitivity=pass_config.get("sensitivity", "balanced"),
         is_balanced=(pass_config.get("pipeline") == "balanced"),
     )
+
+    # v1.9.2 (S6-S8): which Silero build the built-in VAD runs for this pass.
+    # apply_balanced_vad_defaults above already put the preset's version
+    # (DEFAULT_VAD_VERSION, 4.0 since 2026-09-12) into
+    # params["vad"]; an explicit --passN-vad-version / GUI choice wins. Runs after
+    # that call for exactly that reason. FasterWhisperProASR reads it and installs
+    # the adapter inside the process that hosts the model.
+    vad_version = pass_config.get("vad_version")
+    if vad_version and pass_config.get("pipeline") == "balanced":
+        # Balanced ONLY. For any other pipeline params["vad"] is the external Silero
+        # segmenter's parameter block, which is merged into that segmenter's
+        # constructor config (whisper_pro_asr.py) -- and SileroSpeechSegmenter has a
+        # constructor parameter of its own literally called `version`. Writing a
+        # built-in-VAD key into a shared block is how that kind of collision starts.
+        resolved_config.setdefault("params", {}).setdefault("vad", {})["version"] = vad_version
+        logger.debug("Pass %s: Override vad_version = Silero v%s", pass_number, vad_version)
 
     # Override speech enhancer if specified
     speech_enhancer = pass_config.get("speech_enhancer")
@@ -1852,4 +1867,31 @@ def _apply_gui_overrides(
         if "speech_segmenter" not in resolved_config["params"]:
             resolved_config["params"]["speech_segmenter"] = {}
         resolved_config["params"]["speech_segmenter"]["speech_pad_ms"] = speech_pad_ms
-        logger.debug("Pass %s: Override speech_pad_ms = %s", pass_number, speech_pad_ms)
+        # Same check as main.py: the factory silently drops speech_pad_ms for a
+        # backend whose schema has no such key (firered-vad, ten), so a pass that
+        # carries the GUI's "Speech pad" value must say when it will not be used.
+        _seg_backend = (resolved_config["params"].get("speech_segmenter") or {}).get("backend")
+        if segmenter_accepts(_seg_backend, "speech_pad_ms"):
+            logger.debug("Pass %s: Override speech_pad_ms = %s", pass_number, speech_pad_ms)
+        else:
+            logger.warning(
+                "Pass %s: the speech pad of %dms is ignored -- the '%s' speech "
+                "segmenter has no speech-pad setting. It pads the start and end of "
+                "each segment separately, at the values this pass's sensitivity chose.",
+                pass_number, speech_pad_ms, _seg_backend,
+            )
+
+    # C11 (owner): ONE INFO line per pass naming the VAD that will run. Same reason as
+    # main.py -- the recognizer is rebuilt on every model refresh, so the line belongs at
+    # the entry point, not in the recognizer's constructor. Last in this function, so it
+    # reports the values after every override above.
+    if (resolved_config.get("params", {}).get("speech_segmenter") or {}).get("backend") == "faster-whisper":
+        _v = resolved_config.get("params", {}).get("vad") or {}
+        _thr = _v.get("threshold")
+        logger.info(
+            "Pass %s VAD: Silero v%s, threshold %s",
+            pass_number,
+            _v.get("version", DEFAULT_VAD_VERSION),
+            f"{_thr:.2f}" if isinstance(_thr, (int, float)) else "default",
+        )
+

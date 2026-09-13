@@ -80,7 +80,7 @@ presets:
   aggressive:
     # Lower thresholds, capture more detail
     decode.beam_size: 7
-    decode.temperature: 0.1
+    decode.temperature: 0.0      # v1.9.2 (owner O4): 0.1 -> 0.0, temperature 0 everywhere
     quality.no_speech: 0.4
     quality.logprob: -1.5
     chunk.batch_size: 24

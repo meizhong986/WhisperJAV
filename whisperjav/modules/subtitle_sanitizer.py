@@ -244,6 +244,8 @@ class SubtitleSanitizer:
 
         try:
 
+            logger.info(f"Post-processing: reading {input_srt_path.name}")
+
             original_subtitles = list(pysrt.open(str(input_srt_path), encoding='utf-8'))
 
             if not original_subtitles:
@@ -328,11 +330,15 @@ class SubtitleSanitizer:
 
             if self.config.save_original:
 
+                logger.info(f"Post-processing: saving a copy of the original to {paths['original_backup']}")
+
                 shutil.copy2(input_srt_path, paths['original_backup'])
 
             
 
             output_path = paths['original'] if not self.config.preserve_original_file else paths['sanitized']
+
+            logger.info(f"Post-processing: writing {output_path.name}")
 
             self._save_srt(final_subtitles, output_path)
 
@@ -342,7 +348,9 @@ class SubtitleSanitizer:
 
             if self.config.save_artifacts and self.artifact_entries:
 
-                self._save_artifacts_srt(paths['artifacts'])
+                logger.info(f"Post-processing: writing the artifacts file {paths['artifacts'].name}")
+
+                self._save_artifacts_srt(paths['artifacts'], len(final_subtitles))
 
             
 
@@ -350,7 +358,10 @@ class SubtitleSanitizer:
 
             statistics = self._calculate_statistics(len(original_subtitles), len(final_subtitles))
 
-            logger.debug(f"Sanitization complete in {processing_time:.2f}s. Subtitles: {len(original_subtitles)} -> {len(final_subtitles)}")
+            logger.info(
+                f"Post-processing: cleaned {len(original_subtitles)} subtitles down to "
+                f"{len(final_subtitles)} in {processing_time:.2f}s"
+            )
 
             
 
@@ -384,7 +395,16 @@ class SubtitleSanitizer:
 
     def _process_with_validation(self, input_srt_path: Path, start_time: datetime) -> SanitizationResult:
 
-        """Internal process with validation and error handling."""
+        """Internal process with validation and error handling.
+
+        NOT CALLED. Nothing in the project calls this method -- process() above
+        is the only entry point, and it does the same work differently. Left in
+        place rather than deleted because removing it also orphans
+        _process_phase1_refactored, _process_phase2_with_validation,
+        _log_phase1_results and _log_hallucination_database_info, which is a
+        larger change than this release should carry. Deliberately NOT given the
+        progress lines added to process() in v1.9.2: nothing would ever print them.
+        """
 
         if not input_srt_path.exists():
 
@@ -448,7 +468,7 @@ class SubtitleSanitizer:
 
         if self.config.save_artifacts and self.artifact_entries:
 
-            self._save_artifacts_srt(paths['artifacts'])
+            self._save_artifacts_srt(paths['artifacts'], len(final_subtitles))
 
 
 
@@ -1237,9 +1257,15 @@ class SubtitleSanitizer:
 
 
 
-    def _save_artifacts_srt(self, artifacts_path: Path):
+    def _save_artifacts_srt(self, artifacts_path: Path, final_count: Optional[int] = None):
 
-        """Save artifacts as SRT file with detailed information"""
+        """Save artifacts as SRT file with detailed information.
+
+        ``final_count`` is the number of subtitles actually written to the output.
+        It is passed in because the summary must describe the run that happened,
+        not a counter that only one code path maintains -- see
+        ``_create_summary_subtitle``.
+        """
 
         if not self.artifact_entries: return
 
@@ -1249,7 +1275,7 @@ class SubtitleSanitizer:
 
         if self.config.artifact_detail_level in ["full", "summary"]:
 
-            artifacts_subs.append(self._create_summary_subtitle())
+            artifacts_subs.append(self._create_summary_subtitle(final_count))
 
         for entry in sorted(self.artifact_entries, key=lambda e: e.index):
 
@@ -1267,21 +1293,45 @@ class SubtitleSanitizer:
 
 
 
-    def _create_summary_subtitle(self) -> pysrt.SubRipItem:
+    def _create_summary_subtitle(self, final_count: Optional[int] = None) -> pysrt.SubRipItem:
 
-        # Implementation remains the same...
+        """Build the [SANITIZATION SUMMARY] block written into the artifacts file.
 
-        stats = self.phase1_stats
+        Derived from ``self.artifact_entries`` -- the record of what was actually
+        removed -- rather than from ``self.phase1_stats``.
+
+        ``phase1_stats`` is only populated by ``_process_phase1_refactored``. The
+        rule-based workflow that ``process()`` actually runs sets
+        ``original_count`` and nothing else, so the summary reported
+        ``Hallucinations modified/removed: 0`` and ``Final subtitles: 0`` on runs
+        where entries had plainly been removed and subtitles plainly survived.
+
+        That mattered more than a cosmetic miscount: this block is inside the
+        artifacts file users attach to bug reports, so it was actively
+        misinforming diagnosis. Found while investigating #324, where the summary
+        claimed nothing was removed and nothing survived, while the file itself
+        listed two removals and the run produced seven subtitles.
+        """
+
+        hallucinations = sum(1 for e in self.artifact_entries if 'hallucination' in e.category)
+
+        repetitions = sum(1 for e in self.artifact_entries if 'repetition' in e.category)
+
+        if final_count is None:
+
+            final_count = self.phase1_stats.final_count
 
         summary_text = f"""[SANITIZATION SUMMARY]
 
-Original subtitles: {stats.original_count}
+Original subtitles: {self.phase1_stats.original_count}
 
-Hallucinations modified/removed: {stats.hallucinations_removed}
+Hallucinations modified/removed: {hallucinations}
 
-Repetitions modified/removed: {stats.repetitions_cleaned}
+Repetitions modified/removed: {repetitions}
 
-Final subtitles: {stats.final_count}
+Total artifact entries: {len(self.artifact_entries)}
+
+Final subtitles: {final_count}
 
 Config: {self.config.sensitivity_mode}"""
 

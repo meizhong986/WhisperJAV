@@ -13,6 +13,7 @@
    - [Ubuntu / Debian](#ubuntu--debian)
    - [Fedora / RHEL / CentOS Stream](#fedora--rhel--centos-stream)
    - [Arch Linux / Manjaro](#arch-linux--manjaro)
+   - [GUI backend (all distributions)](#gui-backend-all-distributions)
 3. [NVIDIA Driver and CUDA Setup](#nvidia-driver-and-cuda-setup)
 4. [Installation Methods](#installation-methods)
    - [Method 1: Source Installation (Recommended)](#method-1-source-installation-recommended)
@@ -100,10 +101,11 @@ sudo apt-get install -y libc++1 libc++abi1
 sudo apt-get install -y portaudio19-dev
 
 # Optional: For GUI (whisperjav-gui)
-sudo apt-get install -y \
-    libwebkit2gtk-4.0-dev \
-    libgtk-3-dev \
-    gir1.2-webkit2-4.0
+# Ubuntu 24.04+ ships the 4.1 series only; 22.04 and earlier ship 4.0.
+# Install whichever your release provides:
+sudo apt-get install -y libgtk-3-dev
+sudo apt-get install -y libwebkit2gtk-4.1-dev gir1.2-webkit2-4.1 \
+  || sudo apt-get install -y libwebkit2gtk-4.0-dev gir1.2-webkit2-4.0
 ```
 
 **Ubuntu 20.04 (Focal) users:** The default Python is 3.8, which is too old. Install Python 3.10+ from the deadsnakes PPA:
@@ -135,8 +137,9 @@ sudo dnf install -y libsndfile libsndfile-devel
 sudo dnf install -y portaudio-devel
 
 # Optional: For GUI
+# On older Fedora/RHEL releases use webkit2gtk4.0-devel instead.
 sudo dnf install -y \
-    webkit2gtk4.0-devel \
+    webkit2gtk4.1-devel \
     gtk3-devel
 ```
 
@@ -170,6 +173,29 @@ sudo pacman -S --noconfirm portaudio
 # Optional: For GUI
 sudo pacman -S --noconfirm webkit2gtk gtk3
 ```
+
+### GUI backend (all distributions)
+
+The system packages above provide WebKit, but they are **not sufficient on
+their own**. Unlike Windows and macOS - where pywebview declares its backend as
+a normal dependency, so it installs automatically - pywebview ships **no Linux
+backend by default**; GTK and Qt are both opt-in extras. On top of that, apt/dnf
+packages land system-wide, so a virtual environment created without
+`--system-site-packages` cannot see the `gi` (PyGObject) bindings.
+
+Following the distro instructions alone therefore still ends in
+`ModuleNotFoundError: No module named 'gi'` when you launch `whisperjav-gui`
+(#366). Install a backend *into the virtual environment* as well:
+
+```bash
+# Qt backend - simplest, needs no system GTK bindings
+pip install "pywebview[qt]"
+
+# or, to use GTK instead, expose the system bindings to the venv:
+#   python3 -m venv --system-site-packages whisperjav-env
+```
+
+This step is Linux-only. Windows and macOS need nothing extra.
 
 ---
 
@@ -420,7 +446,7 @@ pip install "whisperjav[all] @ git+https://github.com/meizhong986/whisperjav.git
 | Extra | Description | System Deps Required |
 |-------|-------------|---------------------|
 | `cli` | Audio processing, VAD, scene detection | libsndfile |
-| `gui` | PyWebView GUI interface | libwebkit2gtk-4.0-dev, libgtk-3-dev |
+| `gui` | PyWebView GUI interface | libgtk-3-dev + libwebkit2gtk-4.1-dev (4.0 on Ubuntu ≤ 22.04), **plus `pywebview[qt]` inside the venv** |
 | `translate` | AI subtitle translation (cloud APIs) | None |
 | `llm` | Local LLM server (FastAPI) | None |
 | `enhance` | Speech enhancement (ClearVoice, BS-RoFormer) | libsndfile |
@@ -721,12 +747,29 @@ sudo dnf install -y python3-tkinter
 The GUI requires WebKit2GTK. For CLI-only use, this is not needed.
 
 ```bash
-# Ubuntu/Debian
+# Ubuntu 24.04+ (4.1 series — 4.0 is no longer packaged)
+sudo apt-get install -y libwebkit2gtk-4.1-dev
+
+# Ubuntu 22.04 and earlier (4.0 series)
 sudo apt-get install -y libwebkit2gtk-4.0-dev
 
 # Fedora
-sudo dnf install -y webkit2gtk4.0-devel
+sudo dnf install -y webkit2gtk4.1-devel
 ```
+
+**`ModuleNotFoundError: No module named 'gi'`** (#366)
+
+A different problem, despite also being about the GUI. The apt packages above are
+installed system-wide, but pywebview needs a backend *inside* your virtual
+environment. Installing the Qt backend is the quickest fix and avoids the GTK
+bindings entirely:
+
+```bash
+pip install "pywebview[qt]"
+```
+
+Alternatively, recreate the virtual environment with `--system-site-packages` so
+it can see the system PyGObject bindings.
 
 ### Permission Denied
 

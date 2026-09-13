@@ -133,6 +133,7 @@ def load_pipeline_config(yaml_path: str) -> Dict[str, Any]:
         "scene_detector": "scene_detector",
         "scene_min_duration": "scene_min_duration",
         "scene_max_duration": "scene_max_duration",
+        "scene_clustering_threshold": "scene_clustering_threshold",
         "speech_enhancer": "speech_enhancer",
         "speech_enhancer_model": "speech_enhancer_model",
         "speech_segmenter": "speech_segmenter",
@@ -194,6 +195,7 @@ class DecoupledPipeline(BasePipeline):
         safe_chunking: bool = True,
         scene_min_duration: float = 12.0,
         scene_max_duration: float = 48.0,
+        scene_clustering_threshold: Optional[float] = None,  # v1.9.2: semantic only; None = the engine default (22 since O1)
 
         # Speech enhancement (Phase 3)
         speech_enhancer: str = "none",
@@ -259,6 +261,7 @@ class DecoupledPipeline(BasePipeline):
         self.safe_chunking = safe_chunking
         self.scene_min_duration = scene_min_duration
         self.scene_max_duration = scene_max_duration
+        self.scene_clustering_threshold = scene_clustering_threshold
 
         # Speech enhancement config
         self.enhancer_backend = speech_enhancer
@@ -458,6 +461,9 @@ class DecoupledPipeline(BasePipeline):
                 "[DecoupledPipeline PID %s] Phase 2: Safe chunking (min=%.0fs, max=%.0fs)",
                 os.getpid(), self.scene_min_duration, self.scene_max_duration,
             )
+
+        if self.scene_clustering_threshold is not None:
+            scene_detector_kwargs["clustering_threshold"] = float(self.scene_clustering_threshold)
 
         scene_detector = SceneDetectorFactory.safe_create_from_legacy_kwargs(**scene_detector_kwargs)
         result = scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)

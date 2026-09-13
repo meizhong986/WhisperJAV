@@ -26,9 +26,13 @@ C. Silence-clamped per-boundary padding: the fixed ±0.35s ASR pad (which
    per-segment pads clamped to the measured silence extent around each
    boundary (floor 0.05s, cap 0.35s) — padding never deliberately reaches
    into neighbouring speech.
-D. Overlong scenes are LOGGED, not split: max_duration remains a merge
-   ceiling only (docstrings previously claimed splitting that never
-   existed); a warning now reports any final segment exceeding it.
+D. max_duration is honoured during stitching, not by a splitter: the
+   clusterer works at 0.5 s granularity (raw pieces measured at most 18 s
+   on three films) and _smart_merge declines any merge that would exceed
+   the ceiling, so in practice no final scene exceeds it. A raw cluster
+   longer than the ceiling, or _forced_cleanup absorbing a sub-minimum
+   neighbour (at most min_duration over), are the only ways past it; a
+   WARNING reports any final segment exceeding it.
 """
 
 import numpy as np
@@ -157,11 +161,13 @@ class SegmentationConfig:
     Attributes:
         min_duration (float): Minimum duration of a segment in seconds.
                               Segments shorter than this will be merged. Default: 20.0
-        max_duration (float): Merge ceiling in seconds: merges that would
-                              produce a segment longer than this are declined.
-                              NOTE: overlong segments are NOT split — if
-                              clustering yields one, it is kept and a warning
-                              is logged (WJAV mod D). Default: 420.0 (7 mins)
+        max_duration (float): Scene ceiling in seconds, honoured while stitching:
+                              merges that would produce a segment longer than
+                              this are declined (WJAV mod D). No splitter exists;
+                              only a raw cluster longer than the ceiling, or
+                              _forced_cleanup absorbing a sub-minimum neighbour
+                              (at most min_duration over), can exceed it, and a
+                              warning is logged if that happens. Default: 420.0
         snap_window (float):  Window size in seconds for snapping boundaries to silence. Default: 5.0
         sample_rate (int):    Target sample rate for processing. Default: 16000
         chunk_duration (int): Duration of audio chunks for streaming in seconds. Default: 60
@@ -953,9 +959,11 @@ def process_movie_v7(
     segmenter = SemanticSegmenter(config, logger)
     raw_segments = segmenter.segment(features, times, duration, silence_floor=silence_floor)
 
-    # WJAV mod D: max_duration is a merge ceiling, NOT a splitter (no split
-    # exists; _forced_cleanup can even exceed it while absorbing sub-minimum
-    # neighbours). Owner heuristics say overlong scenes are rare — make that
+    # WJAV mod D: max_duration is honoured by _smart_merge, which declines any
+    # merge past it; there is no splitter. Measured on three films the raw
+    # clusters are at most 18 s, so the ceiling holds in practice. The only ways
+    # past it are a raw cluster longer than the ceiling or _forced_cleanup
+    # absorbing a sub-minimum neighbour (at most min_duration over) — make that
     # observable instead of silent so the claim stays measured.
     _overlong = [s for s in raw_segments if (s["end"] - s["start"]) > config.max_duration + 0.5]
     if _overlong:
@@ -963,7 +971,9 @@ def process_movie_v7(
         log(
             f"WARNING: {len(_overlong)} scene(s) exceed max_duration="
             f"{config.max_duration:.0f}s (longest {_worst:.0f}s). max_duration "
-            f"limits merging only — overlong scenes are not split.",
+            f"is applied while stitching; there is no splitter, so this scene was "
+            f"either one raw cluster longer than the ceiling or a sub-minimum "
+            f"neighbour absorbed by the final clean-up.",
             logging.WARNING,
         )
 

@@ -28,7 +28,7 @@ Depends on the mode, GPU tier, and how challenging the audio is. The numbers bel
 
 ### Can I use WhisperJAV without a GPU?
 
-Yes. Go to **Advanced** → check **"Accept CPU-only mode"**. Use **Faster** mode for best CPU speed. It works, just significantly slower.
+Yes. Go to **Advanced** → check **"Accept CPU-only mode"**. This box is required: when no usable GPU is found, the start-up check stops and asks whether to continue on the CPU, and the GUI cannot ask, so without the box the run aborts with a message telling you to tick it. On the command line, pass `--accept-cpu-mode` (or `--device cpu`). Use **Faster** mode for best CPU speed. It works, just significantly slower.
 
 ---
 

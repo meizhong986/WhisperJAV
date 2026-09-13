@@ -37,6 +37,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import stable_whisper
 
 from whisperjav.modules.audio_extraction import AudioExtractor
+from whisperjav.modules.analytics import report as report_audio_analytics
 from whisperjav.modules.speech_enhancement import (
     create_enhancer_direct,
     enhance_scenes,
@@ -98,6 +99,7 @@ class QwenPipeline(BasePipeline):
         qwen_safe_chunking: bool = True,  # Enforce 12-48s scene boundaries for ForcedAligner
         scene_min_duration: Optional[float] = None,  # Override min scene duration (default: 12s)
         scene_max_duration: Optional[float] = None,  # Override max scene duration (default: 48s)
+        scene_clustering_threshold: Optional[float] = None,  # v1.9.2: semantic clustering distance (None = the engine default, 22 since O1)
 
         # Temporal framing for assembly mode (GAP-5)
         qwen_framer: str = "vad-grouped",  # "vad-grouped", "full-scene", "srt-source"
@@ -232,6 +234,7 @@ class QwenPipeline(BasePipeline):
         self.safe_chunking = qwen_safe_chunking
         self.scene_min_override = scene_min_duration  # None = use default (12s)
         self.scene_max_override = scene_max_duration  # None = use default (48s)
+        self.scene_clustering_threshold = scene_clustering_threshold  # None = the engine default (22 since O1)
 
         # Temporal framing for assembly mode (GAP-5)
         self.framer_backend = qwen_framer
@@ -667,9 +670,27 @@ class QwenPipeline(BasePipeline):
                 os.getpid(), min_dur, max_dur,
             )
 
+        # v1.9.2 (CFF2): semantic clustering threshold, independent of safe chunking.
+        if self.scene_clustering_threshold is not None:
+            scene_detector_kwargs["clustering_threshold"] = float(self.scene_clustering_threshold)
+
         scene_detector = SceneDetectorFactory.safe_create_from_legacy_kwargs(**scene_detector_kwargs)
         result = scene_detector.detect_scenes(extracted_audio, scenes_dir, media_basename)
         scene_paths = result.to_legacy_tuples()
+
+        # Tell the user which scenes look acoustically difficult. vad_threshold is
+        # None because this pipeline segments with WhisperSeg by default, not with
+        # Silero at a threshold -- so the quiet check, and the setting it would
+        # recommend, do not apply here. Reads and prints only; never raises.
+        _analytics = report_audio_analytics(
+            extracted_audio,
+            [(i, s.start_sec, s.end_sec) for i, s in enumerate(result.scenes)],
+            scene_method=result.method,
+            vad_threshold=None,
+        )
+        if _analytics is not None:
+            master_metadata.setdefault("audio_analytics", _analytics.to_dict())
+
         scene_detector.cleanup()
         logger.info(
             "[QwenPipeline PID %s] Phase 2: Detected %d scenes (method=%s)",

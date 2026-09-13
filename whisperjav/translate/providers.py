@@ -17,11 +17,14 @@ PROVIDER_CONFIGS = {
     },
     'openrouter': {
         'pysubtrans_name': 'OpenRouter',
-        # v1.8.14 (#325): OpenRouter routes to DeepSeek; OpenRouter typically lags
-        # the upstream model catalog. Keep deepseek-chat as the routed default until
-        # OpenRouter publishes deepseek-v4-flash; users can override via
-        # --model deepseek/deepseek-v4-flash once available.
-        'model': 'deepseek/deepseek-chat',
+        # v1.8.14 (#325): OpenRouter lags the upstream DeepSeek catalog, so
+        # deepseek-chat was kept as the routed default until v4-flash appeared.
+        # v1.9.2: verified present in OpenRouter's public catalog
+        # (GET https://openrouter.ai/api/v1/models lists deepseek/deepseek-v4-flash),
+        # and upstream deprecated deepseek-chat on 2026-07-24, so the wait is over.
+        # Matches the direct-API default. Override with --model if you prefer
+        # another route, e.g. deepseek/deepseek-v4-pro for the thinking model.
+        'model': 'deepseek/deepseek-v4-flash',
         'env_var': 'OPENROUTER_API_KEY',
         'api_base': 'https://openrouter.ai/api/v1'
     },

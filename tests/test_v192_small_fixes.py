@@ -1,0 +1,384 @@
+"""Regression tests for the small verified fixes in v1.9.2.
+
+Each test names the issue it guards. They are grouped here rather than scattered
+because they share nothing but their size — the alternative was five new files of
+one test each.
+"""
+
+import pytest
+
+# ---------------------------------------------------------------------------
+# #340 — Path.resolve() raises WinError 1005 on CloudDrive2 virtual volumes
+# ---------------------------------------------------------------------------
+
+class TestCanonicalPathGuard:
+    """#340: an unresolvable path must not abort discovery before it starts."""
+
+    def test_falls_back_when_resolve_raises_oserror(self, tmp_path, monkeypatch):
+        from pathlib import Path
+
+        from whisperjav.modules import media_discovery
+
+        target = tmp_path / "clip.mp4"
+        target.write_bytes(b"")
+
+        def _boom(self, *args, **kwargs):
+            raise OSError(
+                1005, "The volume does not contain a recognized file system."
+            )
+
+        monkeypatch.setattr(Path, "resolve", _boom)
+
+        result = media_discovery._canonical_path(target)
+
+        assert result.is_absolute()
+        assert result.name == "clip.mp4"
+
+    def test_falls_back_on_valueerror(self, tmp_path, monkeypatch):
+        from pathlib import Path
+
+        from whisperjav.modules import media_discovery
+
+        target = tmp_path / "clip.mp4"
+        target.write_bytes(b"")
+        monkeypatch.setattr(
+            Path, "resolve", lambda self, *a, **k: (_ for _ in ()).throw(ValueError("bad"))
+        )
+
+        assert media_discovery._canonical_path(target).is_absolute()
+
+    def test_normal_path_still_resolves(self, tmp_path):
+        from whisperjav.modules import media_discovery
+
+        target = tmp_path / "clip.mp4"
+        target.write_bytes(b"")
+        assert media_discovery._canonical_path(target) == target.resolve()
+
+    def test_deduplication_still_works_under_fallback(self, tmp_path, monkeypatch):
+        """The fallback must still collapse two spellings of the same file."""
+        from pathlib import Path
+
+        from whisperjav.modules import media_discovery
+
+        target = tmp_path / "clip.mp4"
+        target.write_bytes(b"")
+        monkeypatch.setattr(
+            Path, "resolve", lambda self, *a, **k: (_ for _ in ()).throw(OSError(1005, "x"))
+        )
+
+        a = media_discovery._canonical_path(target)
+        b = media_discovery._canonical_path(Path(str(tmp_path) + "/./clip.mp4"))
+        assert a == b, "abspath fallback should normalise './' segments"
+
+
+# ---------------------------------------------------------------------------
+# #341 — min_batch_size must be less than max_batch_size
+# ---------------------------------------------------------------------------
+
+class TestBatchSizeFloor:
+    """#341: small-context Ollama models produced an unusable batch window.
+
+    PySubtrans defaults ``min_batch_size`` to 10 and raises if it exceeds
+    ``max_batch_size``.  WhisperJAV caps the maximum to fit the context window
+    but never touched the minimum, so any model at <=4096 context produced
+    max=5 and a guaranteed ValueError.
+    """
+
+    @pytest.mark.parametrize("n_ctx", [2048, 4096])
+    def test_small_contexts_produce_a_usable_floor(self, n_ctx):
+        from whisperjav.translate.core import (
+            cap_batch_size_for_context,
+            resolve_batch_window,
+        )
+
+        max_batch = cap_batch_size_for_context(30, n_ctx)
+        min_batch, max_batch = resolve_batch_window(max_batch)
+        assert min_batch < max_batch, (
+            f"n_ctx={n_ctx} still yields min={min_batch} >= max={max_batch}"
+        )
+        assert min_batch >= 1
+
+    @pytest.mark.parametrize("n_ctx", [8192, 16384, 32768])
+    def test_large_contexts_keep_the_default_floor(self, n_ctx):
+        """Where the default floor already fits, it must be left alone."""
+        from whisperjav.translate.core import (
+            PYSUBTRANS_DEFAULT_MIN_BATCH,
+            cap_batch_size_for_context,
+            resolve_batch_window,
+        )
+
+        max_batch = cap_batch_size_for_context(30, n_ctx)
+        min_batch, _ = resolve_batch_window(max_batch)
+        assert min_batch == PYSUBTRANS_DEFAULT_MIN_BATCH
+
+    def test_degenerate_max_is_clamped(self):
+        """A ceiling of 1 leaves no window; the floor must still be valid."""
+        from whisperjav.translate.core import resolve_batch_window
+
+        min_batch, max_batch = resolve_batch_window(1)
+        assert min_batch >= 1
+        assert min_batch <= max_batch
+
+    def test_fallback_mirrors_the_curated_list(self):
+        """The fallback must not drift from config/ollama_models.json."""
+        import json
+        from pathlib import Path
+
+        from whisperjav.webview_gui.api import WhisperJAVAPI
+
+        curated_path = (
+            Path(__file__).resolve().parent.parent
+            / "whisperjav" / "config" / "ollama_models.json"
+        )
+        curated = {m["model"] for m in json.loads(curated_path.read_text(encoding="utf-8"))}
+        fallback = {m["model"] for m in WhisperJAVAPI._CURATED_MODELS_FALLBACK}
+        assert fallback <= curated, (
+            "the Ollama fallback offers models absent from the curated list: "
+            f"{sorted(fallback - curated)}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Curated Ollama fallback must not recommend a thinking model
+# ---------------------------------------------------------------------------
+
+class TestCuratedModelsFallback:
+    """The fallback list is served when ollama_models.json cannot be read.
+
+    It still led with a Qwen3-based model — the class removed from the curated
+    list in v1.8.11 because chain-of-thought leaks into the SRT. #305's reporter
+    was running exactly that model when they reported English output.
+    """
+
+    def test_fallback_contains_no_thinking_models(self):
+        from whisperjav.webview_gui.api import WhisperJAVAPI
+
+        fallback = WhisperJAVAPI._CURATED_MODELS_FALLBACK
+        assert fallback, "fallback list must not be empty"
+
+        banned = ("qwen3", "shisa", "reasoner", "-r1", "deepseek-r")
+        for entry in fallback:
+            model = entry["model"].lower()
+            for token in banned:
+                assert token not in model, (
+                    f"{entry['model']!r} is a reasoning/thinking model; these "
+                    f"emit chain-of-thought into subtitles (v1.8.11 curation)"
+                )
+
+    def test_fallback_entries_are_well_formed(self):
+        from whisperjav.webview_gui.api import WhisperJAVAPI
+
+        for entry in WhisperJAVAPI._CURATED_MODELS_FALLBACK:
+            assert {"model", "size", "label"} <= set(entry)
+
+
+# ---------------------------------------------------------------------------
+# #306 — an unknown speech-enhancer name silently became "none"
+# ---------------------------------------------------------------------------
+
+class TestUnknownEnhancerIsRejectedAtTheBoundary:
+    """#306: `--pass2-speech-enhancer zipenhance` (a typo for `zipenhancer`) was
+    accepted, silently downgraded to no enhancement, and the user spent a
+    multi-hour run believing enhancement was active.
+
+    The fallback in pipeline_helper is correct for a *known* backend whose
+    dependencies are missing, so it is left alone.  An unknown *name* is a user
+    error and belongs at the argument boundary, which is where `--qwen-enhancer`
+    already caught it via `choices=`.
+    """
+
+    @pytest.mark.parametrize("flag", [
+        "--pass1-speech-enhancer",
+        "--pass2-speech-enhancer",
+        "--qwen-enhancer",
+    ])
+    def test_typo_is_rejected_by_argparse(self, flag):
+        import subprocess
+        import sys
+
+        result = subprocess.run(
+            [sys.executable, "-m", "whisperjav.main", "dummy.mp4", flag, "zipenhance"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=180,
+        )
+        assert result.returncode != 0, f"{flag} accepted an unknown backend name"
+        combined = result.stdout + result.stderr
+        assert "invalid choice" in combined
+        assert "zipenhancer" in combined, "the error should name the real backend"
+
+    def test_cli_choices_match_the_backend_registry(self):
+        """The CLI list is hardcoded to keep `--help` cheap; this catches drift."""
+        from whisperjav.main import SPEECH_ENHANCER_CHOICES
+        from whisperjav.modules.speech_enhancement.factory import (
+            SpeechEnhancerFactory,
+        )
+
+        assert sorted(SPEECH_ENHANCER_CHOICES) == sorted(
+            SpeechEnhancerFactory.list_backends()
+        ), (
+            "SPEECH_ENHANCER_CHOICES in main.py has drifted from "
+            "_BACKEND_REGISTRY in speech_enhancement/factory.py"
+        )
+
+    def test_missing_dependency_still_falls_back_quietly(self):
+        """A known backend with absent deps must still degrade, not raise."""
+        from whisperjav.modules.speech_enhancement.factory import (
+            SpeechEnhancerFactory,
+        )
+
+        ok, hint = SpeechEnhancerFactory.is_backend_available("clearvoice")
+        # Whatever the answer on this machine, it must be a usable pair and must
+        # not be reported as an unknown backend.
+        assert isinstance(ok, bool)
+        assert "Unknown backend" not in hint
+
+
+# ---------------------------------------------------------------------------
+# #395 — DeepSeek turns reasoning on by default; it must be switchable off
+# ---------------------------------------------------------------------------
+
+class TestDeepSeekThinkingPatch:
+    """#395: DeepSeek made v4 models reason server-side by default, which is
+    slow, burns rate limit, and can leak reasoning text into the subtitles.
+
+    PySubtrans talks to DeepSeek's chat-completion endpoint directly, so the
+    switch is a plain top-level `thinking` field in the request body rather than
+    the OpenAI SDK's `extra_body` wrapper. Diagnosed by @mcdman on the issue.
+    """
+
+    def test_flash_is_switched_off_but_pro_is_left_alone(self):
+        from whisperjav.translate.core import should_disable_deepseek_thinking
+
+        assert should_disable_deepseek_thinking("deepseek-v4-flash")
+        assert should_disable_deepseek_thinking("deepseek/deepseek-v4-flash")
+        # -pro IS the reasoning model; choosing it is an explicit request for it.
+        assert not should_disable_deepseek_thinking("deepseek-v4-pro")
+        assert not should_disable_deepseek_thinking("deepseek/deepseek-v4-pro")
+
+    def test_non_v4_models_are_untouched(self):
+        """An unrecognised field could be rejected outright by older models."""
+        from whisperjav.translate.core import should_disable_deepseek_thinking
+
+        for model in ("deepseek-chat", "deepseek-reasoner", "gpt-4o", "", None):
+            assert not should_disable_deepseek_thinking(model)
+
+    def test_patch_injects_the_field_into_the_request_body(self):
+        from whisperjav.translate.core import apply_deepseek_thinking_patch
+
+        class FakeClient:
+            def _generate_request_body(self, request, temperature):
+                return {"model": "deepseek-v4-flash", "messages": [], "stream": False}
+
+        class FakeTranslator:
+            client = FakeClient()
+
+        translator = FakeTranslator()
+        assert apply_deepseek_thinking_patch(translator, "deepseek-v4-flash")
+
+        body = translator.client._generate_request_body(object(), 0.5)
+        assert body["thinking"] == {"type": "disabled"}
+        # the original fields must survive
+        assert body["model"] == "deepseek-v4-flash"
+        assert "messages" in body
+
+    def test_patch_is_not_applied_to_pro(self):
+        from whisperjav.translate.core import apply_deepseek_thinking_patch
+
+        class FakeClient:
+            def _generate_request_body(self, request, temperature):
+                return {}
+
+        class FakeTranslator:
+            client = FakeClient()
+
+        translator = FakeTranslator()
+        assert not apply_deepseek_thinking_patch(translator, "deepseek-v4-pro")
+        assert "thinking" not in translator.client._generate_request_body(object(), 0.5)
+
+    def test_missing_client_degrades_instead_of_raising(self):
+        from whisperjav.translate.core import apply_deepseek_thinking_patch
+
+        class NoClient:
+            client = None
+
+        assert not apply_deepseek_thinking_patch(NoClient(), "deepseek-v4-flash")
+
+
+# ---------------------------------------------------------------------------
+# Artifacts summary reported zero while entries had plainly been removed
+# ---------------------------------------------------------------------------
+
+class TestArtifactsSummaryIsAccurate:
+    """The [SANITIZATION SUMMARY] block inside the artifacts file was derived
+    from ``phase1_stats``, which only ``_process_phase1_refactored`` populates.
+    The rule-based workflow that ``process()`` actually runs sets
+    ``original_count`` and nothing else, so the summary claimed nothing had been
+    removed and nothing had survived.
+
+    Found while investigating #324, where it reported 0 removed and 0 final while
+    the same file listed two removals and the run produced seven subtitles. This
+    matters beyond a wrong number: it is the file users attach to bug reports, so
+    it was actively misinforming diagnosis.
+    """
+
+    @staticmethod
+    def _sanitizer_with_entries():
+        """Build the object without __init__ — that would load the hallucination
+        database over the network, which a unit test must not do."""
+        from whisperjav.modules.subtitle_sanitizer import (
+            ArtifactEntry,
+            Phase1Stats,
+            SubtitleSanitizer,
+        )
+
+        def _entry(index, category):
+            return ArtifactEntry(
+                index=index, start_time="00:00:01,000", end_time="00:00:02,000",
+                original_text="x", modified_text=None, reason="test",
+                category=category, confidence=0.9, pattern=None, step="test",
+                additional_info={},
+            )
+
+        s = object.__new__(SubtitleSanitizer)
+        s.artifact_entries = [
+            _entry(1, "hallucination_nonsensical"),
+            _entry(2, "hallucination_nonsensical"),
+            _entry(3, "repetition_ngram"),
+        ]
+        s.phase1_stats = Phase1Stats(original_count=9)
+
+        class _Cfg:
+            sensitivity_mode = "balanced"
+
+        s.config = _Cfg()
+        return s
+
+    def test_summary_counts_what_was_actually_removed(self):
+        s = self._sanitizer_with_entries()
+        text = s._create_summary_subtitle(final_count=7).text
+
+        assert "Original subtitles: 9" in text
+        assert "Hallucinations modified/removed: 2" in text
+        assert "Repetitions modified/removed: 1" in text
+        assert "Final subtitles: 7" in text
+
+    def test_the_324_symptom_does_not_recur(self):
+        """phase1_stats is left at zero by the workflow that actually runs;
+        the summary must not simply echo it."""
+        s = self._sanitizer_with_entries()
+        assert s.phase1_stats.hallucinations_removed == 0
+        assert s.phase1_stats.final_count == 0
+
+        text = s._create_summary_subtitle(final_count=7).text
+        assert "Hallucinations modified/removed: 0" not in text
+        assert "Final subtitles: 0" not in text
+
+    def test_total_entry_count_is_reported(self):
+        s = self._sanitizer_with_entries()
+        assert "Total artifact entries: 3" in s._create_summary_subtitle(7).text
+
+    def test_falls_back_when_no_count_is_supplied(self):
+        """Older callers must not crash."""
+        s = self._sanitizer_with_entries()
+        s.phase1_stats.final_count = 42
+        assert "Final subtitles: 42" in s._create_summary_subtitle().text

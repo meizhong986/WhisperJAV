@@ -3,11 +3,36 @@
 
 from pathlib import Path
 from typing import Dict, Optional, List
+import os
 import subprocess
 import json
 import glob
 
 from whisperjav.utils.logger import logger
+
+
+def _canonical_path(path: Path) -> Path:
+    """Return a canonical form of *path* for de-duplication purposes.
+
+    ``Path.resolve()`` is the natural choice, but it raises on volumes that
+    don't implement the underlying filesystem query — a CloudDrive2-mounted
+    cloud drive raises ``OSError: [WinError 1005]`` ("the volume does not
+    contain a recognized file system") for a file that opens and plays
+    perfectly well (#340).  Since the resolved value is only used as a set key
+    to avoid processing the same file twice, an unresolvable path can fall back
+    to an absolute one: de-duplication stays correct for every ordinary case,
+    and at worst two spellings of the same file on an exotic volume are treated
+    as distinct, which is far better than aborting the run before it starts.
+    """
+    try:
+        return path.resolve()
+    except (OSError, ValueError) as exc:
+        fallback = Path(os.path.abspath(str(path)))
+        logger.debug(
+            "Could not resolve %s (%s); using absolute path %s for de-duplication",
+            path, exc, fallback,
+        )
+        return fallback
 
 
 class MediaDiscovery:
@@ -63,8 +88,8 @@ class MediaDiscovery:
                     # If it's a directory, recursively find all media files in it
                     for item in path.rglob('*'):
                         if item.is_file() and item.suffix.lower() in self.supported_extensions:
-                            # Use resolve() to get canonical path and prevent duplicates
-                            canonical_path = item.resolve()
+                            # Canonical path for de-duplication (guarded: see _canonical_path, #340)
+                            canonical_path = _canonical_path(item)
                             if canonical_path not in processed_paths:
                                 media_info = self._analyze_file(str(item))
                                 if media_info['type'] in ['video', 'audio']:
@@ -74,7 +99,7 @@ class MediaDiscovery:
                 elif path.is_file():
                     # If it's a file, check if it's a supported media file
                     if path.suffix.lower() in self.supported_extensions:
-                        canonical_path = path.resolve()
+                        canonical_path = _canonical_path(path)
                         if canonical_path not in processed_paths:
                             media_info = self._analyze_file(str(path))
                             if media_info['type'] in ['video', 'audio']:

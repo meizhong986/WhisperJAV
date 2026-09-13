@@ -148,8 +148,11 @@ class AnimeWhisperGenerator:
         import time
         start = time.time()
 
-        self._processor = WhisperProcessor.from_pretrained(cfg["model_id"])
-        self._model = WhisperForConditionalGeneration.from_pretrained(
+        # Local cache first, hub only when a file is missing (#415).
+        from whisperjav.utils.offline_mode import load_cached_first
+        self._processor = load_cached_first(WhisperProcessor, cfg["model_id"])
+        self._model = load_cached_first(
+            WhisperForConditionalGeneration,
             cfg["model_id"],
             dtype=dtype,
         ).to(device)

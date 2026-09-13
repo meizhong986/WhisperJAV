@@ -256,13 +256,20 @@ class OpenAIWhisperASR(ASRComponent):
             # Exclusive options
             hallucination_silence_threshold=None,  # v1.8.10-hf1: 2.0→None, disabled
         ),
+        # v1.9.2 aggressive retune (owner O4 + O6, 2026-09-10). His table is scoped to
+        # "balanced and fidelity"; fidelity is this component. Six of his seven rows are
+        # applied below. The seventh, repetition_penalty=1.50, is NOT APPLIED HERE and
+        # cannot be: openai-whisper exposes no such parameter -- neither
+        # whisper.transcribe.transcribe() nor whisper.decoding.DecodingOptions accepts it
+        # (verified against the installed package). It is a CTranslate2 feature and is
+        # applied on the faster_whisper component only.
         "aggressive": OpenAIWhisperOptions(
             # Decoder options
             task="transcribe",
             language="ja",
-            beam_size=3,                          # v1.8.10-hf3: 4→2; v1.8.12: 2→3, engine-split retune
+            beam_size=2,                          # v1.9.2: 3→2, ~95% of the beam-search gain at half the compute
             best_of=2,                            # v1.8.10-hf3: 3→2; v1.8.12: 2→1; v1.8.12.post1: 1→2, mirror faster_whisper aggressive fix
-            patience=1.5,                         # v1.8.10-hf3: 2.5→2.0; v1.8.14: 2.0→1.5, speed/quality tune
+            patience=1.0,                         # v1.9.2: 1.5→1.0, standard beam termination
             length_penalty=None,
             prefix=None,
             suppress_blank=True,
@@ -270,11 +277,11 @@ class OpenAIWhisperASR(ASRComponent):
             without_timestamps=False,
             max_initial_timestamp=0.0,
             # Transcriber options
-            temperature=[0.0, 0.17],              # v1.8.10-hf3: [0.0]→[0.0, 0.17], light fallback for aggressive
-            compression_ratio_threshold=2.6,
-            logprob_threshold=-1.55,              # v1.8.10-hf3: -1.30→-1.00; v1.8.12: -1.00→-1.30; v1.8.14: -1.30→-1.55, gate relaxation (whisper-only)
+            temperature=[0.0],                    # v1.9.2 (O4+O6): [0.0, 0.17]→[0.0], no temperature retries, caps worst-case run time
+            compression_ratio_threshold=2.2,      # v1.9.2: 2.6→2.2, drops repetitive decoder loops earlier
+            logprob_threshold=-1.00,              # v1.9.2: -1.55→-1.00, filters acoustic static while keeping low-confidence speech
             logprob_margin=0.0,
-            no_speech_threshold=0.84,             # v1.8.10-hf3: 0.90→0.77; v1.8.12: 0.77→0.84, engine-split retune
+            no_speech_threshold=0.72,             # v1.9.2: 0.84→0.72, admits quiet/low-SNR audio into the decoder
             drop_nonverbal_vocals=False,
             condition_on_previous_text=False,      # v1.8.10-hf1: True→False, prevents hallucination propagation
             initial_prompt=None,

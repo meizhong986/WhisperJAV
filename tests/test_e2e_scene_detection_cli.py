@@ -247,8 +247,8 @@ class TestAuditokSceneDetection:
         scene_count = count_scenes_in_log(combined_output)
         print(f"Scenes detected: {scene_count}")
 
-    def test_auditok_default_without_explicit_method(self, clean_output_dir):
-        """Test that auditok is used by default when no method specified."""
+    def test_semantic_is_the_default_without_explicit_method(self, clean_output_dir):
+        """The default scene detector is semantic (v1.9.2; auditok before that)."""
         skip_if_no_test_file(TEST_AUDIO_SHORT)
 
         result = run_cli([
@@ -263,10 +263,11 @@ class TestAuditokSceneDetection:
         srt_files = find_srt_files(clean_output_dir)
         assert len(srt_files) >= 1, "No SRT file created"
 
-        # Log verification (informational)
-        combined_output = result.stdout + result.stderr
-        auditok_logged = "auditok" in combined_output.lower() or "story line" in combined_output.lower()
-        print(f"Auditok/story line mentioned in logs: {auditok_logged}")
+        # The default detector must actually be the one that ran.
+        combined_output = (result.stdout + result.stderr).lower()
+        assert "semantic" in combined_output, (
+            "expected the semantic scene detector to run by default; log did not mention it"
+        )
 
     @pytest.mark.slow
     def test_auditok_longer_audio(self, clean_output_dir):
@@ -649,15 +650,21 @@ class TestSceneDetectionParameters:
         srt_files = find_srt_files(clean_output_dir)
         assert len(srt_files) >= 1, "No SRT file created"
 
-    def test_no_vad_option(self, clean_output_dir):
-        """Test --no-vad option with scene detection."""
+    def test_segmentation_disabled(self, clean_output_dir):
+        """Whole scenes to the recognizer, no speech segmentation.
+
+        v1.9.2 removed --no-vad: it only ever set the segmenter backend to "none",
+        which --speech-segmenter none already does. Balanced no longer accepts a
+        segmenter choice at all (it runs the built-in VAD), so this exercises
+        fidelity, the other mode --no-vad used to cover.
+        """
         skip_if_no_test_file(TEST_AUDIO_SHORT)
 
         result = run_cli([
             str(TEST_AUDIO_SHORT),
-            "--mode", "balanced",
+            "--mode", "fidelity",
             "--scene-detection-method", "auditok",
-            "--no-vad",
+            "--speech-segmenter", "none",
             "--output-dir", str(clean_output_dir),
         ], timeout=180)
 
