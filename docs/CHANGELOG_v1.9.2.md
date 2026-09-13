@@ -8,10 +8,279 @@
 > Conventions: one entry per landed change, newest first. "Decision" lines
 > record who decided what, so a later reader can tell policy from mechanism.
 >
-> **SYNC** — pack **r4.0** · 2026-09-12 (section 0.12) | tracker rev **52.2** | change log through **2026-09-12** | `dev_v1.9.2` @ `effed13`; the 2026-09-12 work is in the working tree, **UNCOMMITTED**. Nothing pushed, nothing posted. (GitHub counts measured 2026-09-11 and carried forward.)
-> GitHub 138 open · 12 PRs · 0 labels applied · new #416 #417 #418 #419. Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
+> **SYNC** — pack **r4.5**, and **deliberately left at the v1.9.2 state — owner decision 2026-09-13: "We can open a 1.9.3 owner pack when the right time."** So r4.5 stays the v1.9.2 cycle page; the v1.9.3 standing lives in `docs/plans/V193_STANDING_2026_09_13.md` until he opens the 1.9.3 pack. The one-state rule (A7) is satisfied by his decision, not by an omission. | tracker rev **52.8** | change log through **2026-09-13 (afternoon)** | standing **`docs/plans/V193_STANDING_2026_09_13.md`** rev 1.0 | **v1.9.2 RELEASED** 2026-09-12 19:04 UTC, tag at `63f256e`; `main` = `dev_v1.9.2` = `origin/main` @ `63f256e`; 3 files modified and uncommitted on `main`. Batch 1 POSTED 2026-09-13 (19 threads); batches 2-4 await his word; nothing pushed. (Counts re-pulled **2026-09-13 13:37 UTC**.)
+> GitHub **141 open** · 233 closed · 11 PRs (5 merge clean, 6 conflicting) · 0 of 9 labels applied · newest #424 (unanswered) · **36 owed replies** (13 over 100 days; raw 37 — #320 #337 #99 excluded as resolved on their own threads) · **7 never answered**. Clusters for 1.9.3 planning: **G1 19 / G2 25 / G3 97**. 1.9.2 feedback so far: **#302 improved, #395 improved, #367 cannot test (macOS), #297 NOT improved**. Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
 > (updated in place; never a second page). Rule: a session that changes the pack, this file or the change
 > log brings the other two to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
+
+---
+
+<!-- CL0913PM-BEGIN -->
+## 2026-09-13 (afternoon) — the backlog re-clustered for v1.9.3 planning; first mixed feedback on 1.9.2
+
+**No code changed.** Planning and record-keeping only. Nothing posted, merged, closed, labelled or pushed.
+
+**Deliverable:** `docs/plans/V193_STANDING_2026_09_13.md` (local, gitignored) — the open backlog re-cut
+along the axes the owner asked for, as the input to v1.9.3 planning. Live pull 2026-09-13 13:37 UTC:
+141 open issues, 11 open PRs, population unchanged since the release-evening pull.
+
+**Decision (owner, 2026-09-13):** for preliminary 1.9.3 planning, only issues outside the Balanced /
+faster-whisper / CTranslate2 area are candidates for work. Clustering: precedence **G2 → G1 → G3**;
+**G1 is the whole frozen area** (those three plus VAD / Silero loader / adapters, the speech segmenters
+and scene detection); **G2** is every issue authored by weifu8435 or yangming2027; **G3** is the rest and
+is what 1.9.3 can work on. **Feature Request** = asks for a capability that is not there; **Feature
+Suggestion** = proposes a method or design for behaviour that already exists.
+Result: **G1 19 · G2 25 · G3 97**; 38 feature requests, 8 feature suggestions, 64 bugs, 31 threads and
+questions; 36 threads where the last word is a user's (13 over 100 days, 7 never answered at all).
+
+**Decision (owner, 2026-09-13), one carve-out:** the AgglomerativeClustering crash and the `[839/1]`
+counter reported on #302 are treated as 1.9.3 candidates although scene detection is otherwise inside the
+frozen area — consistent with his public *"I'll look into AgglomerativeClustering"*. Recorded as his
+decision overriding the rule, not as a file that falls outside it.
+
+**Three 1.9.2 replies arrived, and they are mixed — the first negative result is in:**
+- **#302 Kukuindi — improved.** Same EKAI-023 (~2 h 59 min), RTX 5060 Ti, CTranslate2 4.8.1,
+  Balanced/Aggressive/large-v2: the run passed his old collapse point at 01:49:47 and produced **1831 cues
+  reaching 02:58:25**. He is explicit that this does **not** prove the CTranslate2 problem itself is fixed.
+- **#297 teijiIshida — NOT improved.** RTX 5080 / AMD 5900X, fresh 1.9.2 install: *"It got to the
+  extracting audio step. I waited 15+min and it just stuck there."* Screenshot and `log1.txt` attached.
+  **Recorded, not diagnosed** — per the standing direction, no hypothesis without the owner's word.
+- **#367 francetoastVN — cannot test.** He is on Mac/Apple Silicon; the release ships only a Windows
+  `.exe`. Which means the invitation message's "fresh `.exe` install" cannot be followed by any macOS or
+  Linux reporter. Batches 2-4 are unposted, so this is correctable — owner's call.
+
+**Two new defects, neither with an issue of its own yet, both from the #302 run:**
+1. Semantic scene detection is run on an already-cut scene file and dies when that scene is short:
+   `Found array with 1 sample(s) (shape=(1, 36)) … AgglomerativeClustering`.
+   `whisperjav/vendor/semantic_audio_clustering.py:552-560` strides the feature matrix
+   (`step = int(fps * 0.5)`) and calls `fit_predict` with no single-row guard; there is none in the caller
+   or the adapter either. **The user loses the subtitles for that scene, and a complete 3-hour run exits
+   status 1.**
+2. The progress counter reads `[839/1]`. **Producer not identified** — the obvious citation,
+   `utils/progress_aggregator.py:167,169`, sits in `set_file_info()`, which is called from nowhere.
+
+**#367's FireRedVAD question answered (packaging only):** nothing gates FireRedVAD by platform
+(`pyproject.toml:144`, no marker; `installer/core/registry.py:531-536`, no `platforms=`; no platform branch
+on any `firered` reference). Upstream ships a pure-Python wheel and `kaldi-native-fbank` publishes
+`macosx_11_0_arm64` wheels for Python 3.10-3.14, so it should install on Apple Silicon.
+
+**Adversary gate r13** ran over the standing and refuted six of its claims before it was shown: a "verified
+this session" table four of whose rows were not read; #366 wrongly listed as fixed (the corrected guide is
+not the path the reporter used — `README.md:399` and `installer/install_linux.sh` are both still silent on
+GTK); #397 not verifiable from the repository because its fix went through the remote Gist; a file:line
+citation pointing at a function with no callers; unstated exclusions behind the reply-debt arithmetic; and
+four reporters who are deleted `ghost` accounts. All corrected. Detail: tracker rev 52.8.
+
+---
+<!-- CL0913PM-END -->
+
+## 2026-09-13 (batch 1 posted) — the 1.9.2 invitation is on 19 threads
+
+**No code changed.** On the owner's word ("Go ahead with the posting the batch"), the rev 52.6
+message was posted as meizhong986 on the 19 batch-1 threads — #394, #419, #357, #383, #297, #294,
+#322, #411, #333, #326, #367, #324 (English); #416, #343, #99, #401 (Traditional Chinese, English
+under it); #414, #287, #387 (Simplified Chinese, English under it) — one at a time, all successful;
+comment links in tracker rev 52.7. #302 was left as the owner's own post. Batches 2-4 wait for his
+word. From here the work is observation: the feedback register in the tracker.
+
+---
+
+## 2026-09-13 (later) — one generic invitation, fresh `.exe` install recommended (owner C1-C3)
+
+**No code changed.** Owner C1: the message is to be generic and simple — *"v1.9.2 is out. It has
+made fundamental changes to the balanced pipeline. I think most of the issues are solved in this
+version. Please install and give it a try. I recommend to install v 1.9.2 fresh as complete (.exe)
+install. Let me know if things have improved."* C3: a fresh complete install exercises the China
+install path, the FireRedVAD fetch during installation, and the CTranslate2 / faster-whisper pins.
+`docs/plans/V192_FEEDBACK_CAMPAIGN.md` rewritten to one message in three scripts on the rev 52.5
+thread list; the 26 tailored drafts withdrawn (gate r12's fact-checks stay in tracker rev 52.5). The
+feedback register records improved / same / worse per reply and, where a reply shows it, the three
+C3 confirmations. Nothing posted. Adversary gate not run on the owner's own sentence.
+
+---
+
+## 2026-09-13 — the owner's direction: the 1.9.2 VAD stays untouched; invite every reporter to try 1.9.2
+
+**No code changed, and none proposed in the protected area.** The owner, verbatim (tracker rev
+52.5): the v1.9.2 implementation of the VAD, the Silero loader, the adapters and related code is
+not to be touched or speculated about; the aim post-1.9.2 is to observe the community's feedback;
+anyone who had a faster-whisper, CTranslate2 or Balanced-pipeline issue is to be invited to try
+1.9.2. The 2026-09-12 Silero item (T1) and its question are withdrawn; every Balanced/VAD/segmenter
+code item is parked (`docs/plans/V193_PLAN_PROPOSAL.md` §5).
+
+**Deliverable: `docs/plans/V192_FEEDBACK_CAMPAIGN.md`** — the invitee list (47 open threads mention
+Balanced, faster-whisper or CTranslate2; 60 people; cross-checked against the 2026-09-09 pool of 21),
+23 drafts in the owner's register (his own #302 post of 2026-09-12 22:36 UTC is the model), the
+sequence (four batches), and a feedback register (in the tracker from rev 52.5). Each draft: what
+1.9.2 changed on Balanced from his release text, his EKAI-023 result, how to install (pip: no
+`--no-deps`), what to send back, no promise. The rev 51.14 ship-notification drafts are kept with
+one correction (Balanced default Silero build is 4.0, not 3.1).
+
+**1.9.3 reassessed** in his theme order: first the campaign; PRs as before except #375 deferred
+(segmenter code); top issues that are Balanced → invited and observed, no code; the remaining code
+list is outside the protected area (translation #347, `whisperjav-merge`, installer download
+progress, tests updated to shipped values, #372 English path, #381, dead sanitizer code; roadmap
+§3.3 listed but not scheduled — his timing). Nothing posted, merged, closed or pushed.
+
+**Adversary gate r12** (65 tool calls) ran on the campaign drafts and the reassessed proposal;
+every finding re-checked before adoption. Largest: three drafts said RTX 50 cards "get
+`int8_float16`" — the code passes `auto` (`resolver_v3.py:194-199`); every draft framed the owner's
+EKAI-023 pass-2 figure (8.8×, 0 of 89) as a single-pass result — drafts now point at his #302 post;
+#287 (named in the release table for a retest) was missing; #411/#333/#326 were one text for three
+symptoms; two reporters answered in the wrong script; scene bounds and temperature qualified
+(semantic scene detector; aggressive only); a promised measurement removed; `--vad-version` on
+ensemble runs corrected to the per-pass flags. In the proposal: T1 "withdrawn" → "read as
+superseded, his to correct"; C8 parked as his item; the #424 row no longer restates facts inside the
+closed area; "the community feedback is the measurement" reworded. Put to the owner: the CTranslate2
+4.8.1 tension with Kukuindi's #302 A/B; his answer 1 of 2026-09-12; #421 stays his. Not adopted:
+4.7.1 / 3.1 hedges in every draft. Full list: `V192_FEEDBACK_CAMPAIGN.md` §8, tracker rev 52.5.
+
+---
+
+## 2026-09-12 (late) — the owner's answers; the 1.9.3 proposal reassessed by his theme; gate r11
+
+**No code changed.** Three typed answers from the owner after reading the evening pack, quoted in
+tracker rev 52.4. (1) **Silero versions:** single-pass Balanced receives faster-whisper's internal
+VAD as shipped (6.2); the Ensemble path and the Ensemble tab default to 4.0 with 3.1 selectable.
+**1.9.2 as shipped differs** — `DEFAULT_VAD_VERSION = "4.0"` (`modules/silero_vad_adapter.py:80`)
+is global, read by the Balanced preset (`components/vad/faster_whisper_vad.py:47,54`) and by both
+Ensemble passes (`ensemble/pass_worker.py:1798-1811`). **The gate found the mechanism I had wrong:**
+"6.2" in the code selects WhisperJAV's own `assets/vad/silero_vad_v6.2.onnx` (2,327,524 bytes)
+through the adapter that replaces faster-whisper's loader (`silero_vad_adapter.py:191-212,258-288`);
+faster-whisper's own bundled `silero_vad_v6.onnx` (1,249,744 bytes, batched) is reached only as the
+O3 failure fallback (`faster_whisper_pro_asr.py:390-404`). His sentence therefore has two readings
+and only one exists; put to him as a question. Recorded as 1.9.3 item T1, **Medium** (twelve sites,
+listed in the proposal; an explicit ensemble default is needed or the command-line ensemble moves
+too). Added facts: requirements P2H1 verbatim; the 293 s clip has no 6.2 arm; the user note's line
+366 concerns the external `silero-v6.2` segmenter on Fidelity, a different thing, and its line 370
+uses the banned word "detectors". (2) **#394 reply** asks AlanZ-Git to run 1.9.2 on his failing
+file, not the probe; draft rewritten, naming pipeline, sensitivity and scene detector for each
+change. (3) **Theme for 1.9.3, in priority order:** PRs, top issues, closing dormant issues,
+responding to unanswered issues; plus a tally separating issues logged by weifu8435 and
+yangming2027.
+
+**Proposal rewritten in that order** (`docs/plans/V193_PLAN_PROPOSAL.md`). PR triage: all 11 open
+heads fetched and test-merged with `git merge-tree` against `main` @ `63f256e` — #363, #388 (bare
+import verified: `python -S -E -c "import whisperjav"` → 1.9.2), #376, #364 clean and recommended
+for merge or review; #377 clean but stale (aggressive pins 2.6 / [0.0, 0.2] against 1.9.2's 2.2 /
+[0.0]; a `schemas/presets.py` edit to a table nothing reads; registry is 7/6/6; an unguarded
+blocking `tests/config` CI step); #375 (5 conflicting files), #303 (3) rebase requests; #360 = #361
+(same commit, 6 conflicts each) and #362/#365 (the bundle + FireRedVAD + Cohere, 7 each) close.
+Dormancy from the live pull, reproduced by the review: 4 reporter-confirmed, 32 owner-asked-then-
+silent (14 inactivity closes; 7 blocked users kept open with a retest note; 9 feature requests his
+call), 15 user-last > 100 d (incl. #99, whose last comment is an unanswered Gemini request), 27
+user-last recent, 63 live. Tally: weifu8435 12 open / 14 closed / 160 comments; yangming2027 13 /
+11 / 44; one blocked user between them (#416); 116 open by everyone else; the owner has 245
+comments on open issues. Top-issue corrections: #389 was answered by the owner on 2026-08-29; #416's
+version bisect (unusable 1.8.12-1.9.0, works 1.8.11) added; #240 (127.0.0.1 timeout) split from the
+white-screen threads; #408 and #401 out of the end-of-cue group; #413 is a repeat ask, not a third
+merge request; T7 is one retry helper (`post_install.py.template:1178-1195`), not eight sites.
+Reply drafts for #360, #361 (separate), #362/#365, #375, #303, #420 in the tracker. Nothing
+posted, merged, closed or pushed.
+
+**Adversary gate r11** (68 tool calls) ran on the reassessment; every finding re-checked against
+code, git or GitHub before adoption; the full list is in the proposal §10 and tracker rev 52.4.
+Not adopted as stated: #376's reuse of the existing bench modules — recorded as the review's
+reading, not re-read.
+
+---
+
+## 2026-09-12 (evening) — v1.9.2 published; the backlog re-pulled after the release; 1.9.3 proposed
+
+**Release, as measured.** Tag `v1.9.2` at `63f256e`; GitHub release "WhisperJAV 1.9.2 - bug fixes
+and improvements" published 2026-09-12 19:04 UTC as a **stable** release (pre-release unticked),
+one asset `WhisperJAV-1.9.2-Windows-x86_64.exe`. `main`, `dev_v1.9.2` and `origin/main` are the
+same commit. `v1.9.1` stays unpublished. Three files remain modified and uncommitted on `main`
+(`.gitignore` adding `docs/requirements/`; this file's "after the tag" entry; the rewritten
+`docs/release_notes_v1.9.2_for_users.md`) — the owner's to commit or not.
+
+**No code changed in this entry.** It records the post-release state and the proposal for the next
+release, `docs/plans/V193_PLAN_PROPOSAL.md` (gitignored). Nothing posted on GitHub; no issue
+closed or labelled by this session; nothing pushed.
+
+**GitHub, 2026-09-11 pull → 2026-09-12 20:00 UTC.** 141 open (+#421 #422 #423 #424; −#339 −#347,
+both closed by the owner at 16:01 UTC with no closing comment), 233 closed, 11 open PRs (was 12),
+0 of 9 labels applied, 43 threads where a user spoke last (14 over 100 days), 9 never
+answered (#410 #416 #417 #418 #419 #420 #422 #423 #424). Thirteen comments since 2026-09-11 12:00
+UTC, all read. **First reporter confirmation on the shipped build: #395** (loggias06row, 19:26 UTC:
+tested on 1.9.2, DeepSeek speed back to normal) — the #395 ship notification drafted on 09-11 is
+withdrawn. Dataset regenerated from the live pull (`scratchpad/build_dataset.py`,
+`backlog_2026-09-12.json`); the tracker's Quick stats block and the rev 52.3 owed table and index
+are generated from it, not edited.
+
+**Two evidence threads arrived on release day, both for 1.9.3:**
+
+- **#424** (AlanZ-Git, v1.8.14, Balanced, aggressive, Silero segmenter): `0xC0000094` at the same
+  position every rerun — a 160-sample speech group at a 28 s scene boundary handed to CTranslate2
+  unclamped. Code read on `main`: the slice is unchanged at `faster_whisper_pro_asr.py:905-910`;
+  the same missing clamp is on the Fidelity recogniser at `whisper_pro_asr.py:389-393`, where
+  openai-whisper's 30 s padding (`whisper/transcribe.py:139,286`) makes it a silent truncation, not
+  a crash; faster-whisper's own VAD clamps the padded end (`faster_whisper/vad.py:207,214`). The
+  class is built in three places (worker process on the default path, `balanced_pipeline.py:240-256`
+  → `asr_worker_proxy.py:44,89-95`; in-process at `:260` when refresh is 0;
+  `tools/ct2_degradation_probe.py:355`). **Not reached from the Balanced pipeline on 1.9.2**
+  (`main.py:2094-2110`, `webview_gui/api.py:236-240`, `ensemble/pass_worker.py:1721-1736`,
+  `config/segmenter_presets.py:155-156` refuse an external segmenter there); **reached through the
+  probe tool** with `--speech-segmenter` (`:409`, `:212-214`) and on 1.8.x/1.9.0. On 1.9.2 Balanced a
+  native fault would surface as a worker death (`asr_worker_proxy.py:50-58`). Proposal A2: clamp on
+  both paths; the skip threshold is the owner's.
+- **#394** (AlanZ-Git): the reference recovery implementation the owner asked for on 09-04
+  (probe → `del`+`gc`+rebuild → verified replay, no cap), coverage on 334 files (span-only evidence
+  should warn, never fail), and probe results on CT2 4.8.1: bare faster-whisper degrades from
+  chunk 1 at *aggressive*, clean at *balanced*. **His aggressive values (9 s / 30 ms) are the
+  v1.9.0/v1.9.1 preset** (the file does not exist at v1.8.14); `--profile shipped` resolves from the
+  installed package (`tools/ct2_degradation_probe.py:19-21,174-197`). 1.9.2 Balanced aggressive
+  resolves max speech **6.0 s**, min speech 80 ms, beam 2, temperature [0.0], ratio 2.2, Silero 4.0.
+  **On his call-count hypothesis, 6 s moves the variable the way he says is worse** — for every
+  user running Balanced at aggressive on 1.9.2; his hypothesis, our inference, the owner's EKAI-023
+  run at these settings finished clean. Put to the owner as Q2. Three tool defects: the early stop
+  is dead (`:481` binds `n`, `:532` reassigns it — confirmed); the CUDA memory columns read
+  PyTorch's allocator (`:116-117` — source confirmed; the 0.0 is his measurement); the 5 s reference
+  is jumpy (his measurement). Proposal items A3, A4 (one reply), A5 (owner decision).
+
+**Verdict refresh against the published user note** (its "Reports addressed" table names 32
+issues): #414 UNTOUCHED → PARTIAL (float16 no longer forced on RTX 50; not scored); #287
+UNTOUCHED → PARTIAL (possibly resolved by the `max_initial_timestamp` fix; unconfirmed); #263 and
+#305 now marked named rather than inferred; #395 PARTIAL, reporter-confirmed. 141 open: 32 BLOCKED
+/ 38 DEGRADED / 43 ANNOYED / 28 INFO; 8 FIXED, 22 PARTIAL, 10 MITIGATED, 19 CHANGED, 2 WORSE, 80
+UNTOUCHED; 34 of 61 inferred.
+
+**#347 closed while not fixed.** skysstst's v1.9.1 measurement (167/994 English lines; 0/997 with
+his own instruction file) stands; his comment says in its last line it was AI-written, and two of
+its line numbers are off by one (`PySubtrans/Options.py:304`, `TranslationPrompt.py:10`). Verified:
+the bundled `translate/defaults/pornify.txt:51-63` demonstrates the output format with a Japanese →
+English worked example. Found while checking: `translate/settings.py:37` `instructions_files` is
+declared and never read; the GUI has no instruction-file control (the CLI has `--instructions-file`,
+`translate/cli.py:310`); `--tone pornify` hard-sets temperature 1.2 (`cli.py:102-103`). Carried as
+proposal B1. Reopening is the owner's.
+
+**Two questions put to the owner (proposal §2).** Q1: Silero 4.0 is the default on `--mode
+balanced` and the Transcription tab, while requirements S8 says 3.1 and the later instruction
+quoted in this log's 2026-09-12 entry names "balanced pipeline in ensemble and GUI ensemble TAB"
+— applied beyond its scope, or intended everywhere? Q2: the aggressive preset against the #394
+hypothesis, above.
+
+**1.9.3 proposal in one line.** A short follow-up: A1 `failed`/exit 1 when a speech segmenter
+never started (owner-decided, exit-contract change; 1.9.2 already stops on a missing FireRedVAD
+model at start-up, `preflight_check.py:571`); A2 the #424 clamp; A3 the probe-tool fixes; A4 one
+reply asking for the 1.9.2 re-run; A5 a decision on rebuild-and-replay recovery for Balanced; B1 the
+translation-language defect plus a GUI instruction-file control; B2 a standalone merge CLI; B3
+Kaggle #329/#330 (do it or say it moved); B4 an end-of-cue trim experiment measured against the
+Netflix ground truth before any default. Tier C is maintenance (#314, #372 English path, #381,
+Fidelity telemetry, `--speech-pad-ms` on FireRedVAD, the ~34 pre-existing test failures, dead
+sanitizer code, incremental subtitle output from roadmap §9.1). Not 1.9.3: roadmap §9.2 community
+utilities, speech-budget scenes and semantic granularity (2.x), GPU vendors, i18n. Section 4 of
+the proposal lists the five 1.9.2 defaults that shipped unmeasured on a second film.
+
+**Adversary gate r10 ran on this entry, the tracker section and the proposal** (80 tool calls);
+every finding re-checked before adoption. Adopted: the missed #395 comment; the wrong hand-typed
+zero-comment list; three constructor sites and the worker-process fact; the probe-tool route;
+"unreachable" scoped; the kotoba phrase deleted; the Fidelity slice as truncation; the upstream
+clamp; "0.0" labelled his measurement; v1.9.0/v1.9.1 not 1.8.14; Q2; the #347 comment's AI
+authorship and line numbers, plus the two instruction-file defects; A1's `--fail-on` wording and
+omitted mitigation; the owner quote's citation; Q1; roadmap items listed; "detector" and metaphors
+removed; promises stripped from both drafts. Not adopted as stated: extra guard sites counted
+separately; the "any pipeline" category replaced by named pipelines rather than removed.
 
 ---
 
@@ -370,6 +639,31 @@ Two of its findings were **not** acted on, deliberately: `faster_whisper_pro_asr
 hard-codes a `"whisperseg"` fallback, but that is the BALANCED engine, whose default is the built-in
 VAD — fidelity's constant does not belong there; and the `empty` vs `failed` classification is the
 exit-code contract, which is the owner's.
+
+---
+
+## 2026-09-12 (after the tag) — the user release note rewritten in a professional register
+
+Owner: the note was *"way too whimsical ... user centric but professional and right to the
+point"*, with the example *"Fixed performance issues on RTX 5xxx Blackwell cards."*
+
+Rewritten end to end: 647 → 540 lines, 11 sections. Narrative framing, second-person stories
+and rhetorical openings removed; each item now leads with the statement and carries only the
+qualification that prevents a support ticket. **No fact, caveat or credit was dropped** — the
+rewrite was checked against the previous version for each of them.
+
+One correction to the owner's example, made deliberately: the RTX 50 fault was **wrong output**
+(garbled text, almost no subtitles), not a performance problem. Speed runs the other way — the
+alternative setting is 14-30% slower, which is why every other NVIDIA card was left alone. The
+note says "garbled and missing subtitles" so a reader does not go looking in the wrong place.
+
+Verified after the rewrite, not asserted: both sample blocks are byte-identical to the live
+`analytics.render()` and `run_outcome.format_summary()` output; every internal anchor resolves
+to a real heading; 28 people credited, unchanged; all flags present in `--help`.
+
+**Note on branch state:** this edit was made on `main`, after the owner merged, pushed and
+tagged. `dev_v1.9.2` does not have it. Whichever branch he continues on, the two now differ by
+this file.
 
 ---
 
