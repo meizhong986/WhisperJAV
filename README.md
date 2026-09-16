@@ -396,7 +396,9 @@ cd whisperjav
 chmod +x installer/install_linux.sh && ./installer/install_linux.sh
 ```
 
-You need the NVIDIA driver (450+), but not the CUDA Toolkit — PyTorch bundles its own runtime. GUI needs WebKit2GTK. On distros with externally-managed Python (Ubuntu 24.04+), use a venv; the script detects this and tells you what to do.
+You need the NVIDIA driver (450+), but not the CUDA Toolkit — PyTorch bundles its own runtime. On distros with externally-managed Python (Ubuntu 24.04+), use a venv; the script detects this and tells you what to do.
+
+The GUI needs a pywebview backend **inside** your environment — the distro's WebKit2GTK packages install system-wide, where a plain virtual environment cannot see them, which is why the GUI can still stop with `ModuleNotFoundError: No module named 'gi'`. Either `pip install "pywebview[qt]"` (the Qt backend, no system GTK bindings needed), or create the venv with `python3 -m venv --system-site-packages` so it can see the distro's bindings.
 
 Full guide: [docs/en/guides/installation_linux.md](docs/en/guides/installation_linux.md)
 </details>
