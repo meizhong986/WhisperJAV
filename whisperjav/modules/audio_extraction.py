@@ -2,6 +2,7 @@
 """Audio extraction module using FFmpeg."""
 
 import subprocess
+import time
 from typing import Union
 from pathlib import Path
 from typing import Optional, Tuple
@@ -42,7 +43,9 @@ class AudioExtractor:
         # Ensure output directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        logger.debug(f"Extracting audio from {input_file.name}")
+        # INFO, not debug (#429 group): on a long or slow-disk file this stage can run
+        # for minutes with nothing else on screen, so the user needs to see it start.
+        logger.info(f"Extracting audio from {input_file.name}")
 
         # Build FFmpeg command
         cmd = [
@@ -57,17 +60,21 @@ class AudioExtractor:
         ]
 
         try:
-            # Run FFmpeg
+            # Run FFmpeg. No timeout: extraction of a long file on a slow or sleeping
+            # drive legitimately takes many minutes, and killing it would lose the run.
+            started = time.monotonic()
             result = subprocess.run(cmd,
                                   capture_output=True,
                                   text=True,
                                   encoding='utf-8', errors='replace',
                                   check=True)
+            elapsed = time.monotonic() - started
 
             # Get duration
             duration = self._get_audio_duration(output_path)
 
-            logger.debug(f"Audio extracted successfully: {output_path.name} (duration: {duration:.1f}s)")
+            logger.info(f"Audio extracted: {output_path.name} "
+                        f"(duration: {duration:.1f}s, took {elapsed:.1f}s)")
             return output_path, duration
 
         except subprocess.CalledProcessError as e:
