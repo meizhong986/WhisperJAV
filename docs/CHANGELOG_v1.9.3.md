@@ -11,6 +11,38 @@
 
 ---
 
+## 2026-09-16 — phase 4 continued: three more translation targets; the dead Transcription-tab translation bindings removed
+
+**Decisions (owner, 2026-09-16):** on adding languages, *"yes if minimal work"*; on the Transcription tab,
+*"yes the transcription tab needs working translation controls. However it is a bigger job to design GUI and
+it should be parked for [1].10.x release"*; on the dangling element ids, *"please correct"*.
+
+- **Italian, Thai and Korean added** (`3ee80a8`). Requested on #351 (Italian) and #268 (Thai); Korean added
+  alongside. The work was minimal because **there is no allow-list to satisfy**: PySubtrans substitutes
+  `target_language` into the prompt as a free string (`Options.py:301-304`), so a target costs the choice and
+  nothing else — per-language quality is the model's, not WhisperJAV's. `SUPPORTED_TARGETS` goes from six to
+  nine; `main.py`'s choices and both GUI dropdowns follow. Verified: all three exit 0 through the real CLI
+  where they exited 2 before; `tests/test_translate_targets.py` still passes, and it fails if one of the four
+  lists is updated without the others.
+
+- **Five dead translation bindings removed from `app.js`** (`5197fd1`). `translateAfterTranscription`,
+  `translateQuickSettings`, `quickTranslateProvider`, `quickTranslateTarget` and `ensembleTranslateTarget`
+  exist in no asset file, so every binding on them was a silent no-op. The consequential one sat in
+  `isEnabled()`, which therefore always evaluated false on the Transcription tab and Advanced Options —
+  translation could not be switched on from either. It now returns `false` explicitly, so the behaviour is
+  stated rather than reached by accident, and the comments point at the 1.10.x work.
+  **No user-visible change: every removed path was already inert.** Giving those tabs real translation
+  controls is parked for 1.10.x by the owner's decision above.
+  **No reporter exists for this:** 28 threads were searched for anyone describing a missing or unreachable
+  translation control and none matched — the gap was found by reading the code, not from a report.
+
+- **D1, the half that needs no GUI: verified.** The page now sends 17 keys for the Ensemble tab (14 controls
+  + `rememberSettings` + the two preset names). Driving the real `WhisperJAVAPI.save_gui_settings` /
+  `get_gui_settings` through a full save → file → load cycle, **17/17 survive** camelCase → snake_case → disk
+  → back. Run against a sandboxed `APPDATA`; the owner's real
+  `%APPDATA%/WhisperJAV/gui_settings.json` was verified byte-identical before and after (md5 `0ada9602…`).
+  The click-through (set, tick Remember settings, restart, confirm) is still owed and needs the GUI.
+
 ## 2026-09-16 — phase 4: the French target defect fixed; C1 was already resolved on 2026-08-29 and the comparison re-measured that fix; one new defect found and left open
 
 **Decision (owner, 2026-09-16):** "go ahead with step 4."
