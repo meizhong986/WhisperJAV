@@ -2170,6 +2170,13 @@ const EnsembleManager = {
         // Parameter guide button: visible only for Qwen pipelines
         const guideBtn = document.getElementById(`guide-${passKey}`);
         if (guideBtn) guideBtn.style.display = passState.isQwen ? '' : 'none';
+
+        // The two branches above (XXL, CrispASR) refresh the enhancer-dependent
+        // panels before returning; this ordinary path did not, so on a fresh
+        // window Pass 1's DSP panel and both passes' "Enhance for VAD only" row
+        // kept whatever the markup said until something was clicked. This runs at
+        // start-up, on a pipeline change and after a preset is loaded.
+        this.updateDspPanel(passKey);
     },
 
     handleSensitivityChange(passKey, newValue, selectElement) {
@@ -2244,6 +2251,14 @@ const EnsembleManager = {
                 panel.style.display = 'none';
             }
         }
+
+        // "Enhance for VAD only" depends on exactly the same thing this does --
+        // which enhancer the pass has selected -- so it is refreshed here rather
+        // than only from the enhancer dropdown's change handler. Before v1.9.3 it
+        // was refreshed nowhere else, so a pass that already had an enhancer when
+        // the window opened, or that got one from a preset, kept the checkbox
+        // hidden until the user re-picked the enhancer by hand.
+        this.updateEnhanceForVadCheckbox(passId);
     },
 
     // Enhance-for-VAD checkbox visibility

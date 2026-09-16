@@ -3134,7 +3134,14 @@ class WhisperJAVAPI:
                     args += ["--pass1-speech-enhancer", enhancer1]
 
             # Pass 1: Enhance-for-VAD (dual-track: enhanced audio for VAD, original for ASR)
-            # Only effective for Qwen pipeline; pass_worker.py silently ignores for others.
+            # What each pipeline does with it, checked 2026-09-17:
+            #   qwen (and the decoupled pipeline behind it) -- dual-track as described.
+            #   balanced, fidelity -- the flag is read and ACKNOWLEDGED IN THE LOG, but
+            #     the enhanced audio goes to both VAD and ASR; the separation needs ASR
+            #     module changes (see balanced_pipeline.py:177, fidelity_pipeline.py:111).
+            #   fast, faster, transformers, crispasr -- never read: silently ignored.
+            # The GUI shows the checkbox for any pass with an enhancer, so on the
+            # pipelines above it promises more than it delivers. Owner's to decide.
             if pass1.get('enhanceForVad') and enhancer1 and enhancer1 not in ('none', ''):
                 args += ["--pass1-enhance-for-vad"]
 
