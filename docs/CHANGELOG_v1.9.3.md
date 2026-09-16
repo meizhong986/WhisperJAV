@@ -11,6 +11,61 @@
 
 ---
 
+## 2026-09-17 — FFmpeg DSP works from the GUI again, and enhance-for-vad says what it does
+
+**Decision (owner, 2026-09-17):** *"I agree with your recommendation about name-with-effects"*;
+*"it is ok for faster, fast, and transformers and crispASR to ignore that. please document that"*;
+*"please rely on the code as comments and docstrings can be out of date or mistaken"*. He also
+confirmed by clicking that the VAD-only row committed earlier today is visible again.
+
+### Choosing FFmpeg DSP in the GUI no longer stops the run
+
+`--passN-speech-enhancer` takes a detail after a colon again. Everything downstream always
+understood it -- `pass_worker._parse_speech_enhancer` splits the value, the detail travels as the
+enhancer's model, and `FFmpegDSPBackend.__init__` splits a comma-separated model into its effects.
+The #306 fix in 1.9.2 (`7934fac`) put a plain `choices=` list on these two flags to catch typos, and
+that also rejected every value containing a colon -- which is precisely what the GUI builds for
+FFmpeg DSP. **Reproduced before the change:** `--pass1-speech-enhancer ffmpeg-dsp:loudnorm` exited 2
+with `invalid choice`.
+
+`main.speech_enhancer_spec()` replaces the `choices=` list on both flags. It keeps #306's protection
+in argparse's own wording and extends it to the detail, so a mistyped effect is refused at the
+boundary too instead of being dropped mid-run. `FFMPEG_DSP_EFFECTS` is hardcoded beside
+`SPEECH_ENHANCER_CHOICES` so `--help` still pays no import cost; a test catches drift from
+`AVAILABLE_EFFECTS`. `--qwen-enhancer` is untouched -- it has `--qwen-enhancer-model` already.
+
+The expert notebook's eight FFmpeg filter checkboxes are back, per pass, now that the form is
+accepted; they were removed this morning only because it was not.
+
+### What enhance-for-vad actually does, per pipeline
+
+Read from the pipeline sources, not their comments — the `api.py` comment saying "Only effective for
+Qwen pipeline" was wrong in both directions:
+
+| Pipelines | What happens |
+|---|---|
+| qwen, and the decoupled pipeline behind it | The real dual track: cleaned-up audio to the segmenter, original to the recogniser |
+| balanced, fidelity | The flag is read and reported in the log, but the cleaned-up audio goes to **both** |
+| fast, faster, transformers, kotoba-faster-whisper, crispasr | Never read |
+
+The owner accepted the third group on condition it is documented. `ENHANCE_FOR_VAD_IGNORED_BY` in
+`pass_worker.py` names them; the pass worker now logs one line when the flag is set for such a pass,
+so a user who asked for it is told rather than left to infer it from silence; and
+`--passN-enhance-for-vad`'s help states all three behaviours. A test derives the ignore list from
+`inspect.getsource()` of each class in `PIPELINE_CLASSES`, so the documentation cannot drift from
+the code. **Balanced and fidelity enhancing both tracks is unchanged and still open** — separating
+them needs recogniser-side work.
+
+**Verified:** `tests/test_speech_enhancer_spec.py` (new, 30 tests) — accepted and normalised forms,
+every backend and every known effect, the refused forms with #306's wording, no drift, both flags
+through argparse, and that the detail reaches the real filter chain
+(`loudnorm,denoise` → `loudnorm=I=-16:TP=-1.5:LRA=11,afftdn=nf=-25`). `test_v192_small_fixes.py`
+still passes (27), so #306's own tests still hold. The notebook matrix re-ran at 0 failures with the
+two-pass case now emitting `--pass1-speech-enhancer ffmpeg-dsp:loudnorm`. **Not verified:** no ASR
+run was made; the filter chain was built and inspected, not applied to a recording end to end.
+
+---
+
 ## 2026-09-17 — two defects the owner reported: the wasted second read, and the hidden VAD-only control
 
 **Decision (owner, 2026-09-17):** three further requirements for 1.9.3 — the duplicate read in audio
