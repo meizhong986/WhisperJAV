@@ -7432,16 +7432,11 @@ const TranslateIntegrationManager = {
     },
 
     init() {
-        // Bind checkbox handlers for Transcription Mode
-        const transcribeCheckbox = document.getElementById('translateAfterTranscription');
-        const quickSettings = document.getElementById('translateQuickSettings');
-
-        if (transcribeCheckbox && quickSettings) {
-            transcribeCheckbox.addEventListener('change', () => {
-                quickSettings.style.display = transcribeCheckbox.checked ? 'flex' : 'none';
-                this.state.enabled = transcribeCheckbox.checked;
-            });
-        }
+        // v1.9.3: the Transcription Mode enable checkbox used to be bound here, to
+        // 'translateAfterTranscription', with 'translateQuickSettings' as its panel.
+        // Neither id exists in index.html, so this never bound anything. Translation is
+        // available from the Ensemble tab only; giving the Transcription tab its own
+        // controls is a GUI design job parked for the 1.10.x release (owner, 2026-09-16).
 
         // Bind checkbox handlers for Ensemble Mode
         const ensembleCheckbox = document.getElementById('ensembleTranslateAfter');
@@ -7453,35 +7448,21 @@ const TranslateIntegrationManager = {
             });
         }
 
-        // Bind provider/target selects for Transcription Mode
-        const quickProvider = document.getElementById('quickTranslateProvider');
-        const quickTarget = document.getElementById('quickTranslateTarget');
+        // v1.9.3: the Transcription Mode provider/target selects used to be bound here, to
+        // 'quickTranslateProvider' and 'quickTranslateTarget'. Neither id exists in
+        // index.html, so both bindings were silent no-ops and the state they wrote was
+        // never set. Removed rather than left to look wired. See isEnabled() below.
 
-        if (quickProvider) {
-            quickProvider.addEventListener('change', () => {
-                this.state.provider = quickProvider.value;
-            });
-        }
-        if (quickTarget) {
-            quickTarget.addEventListener('change', () => {
-                this.state.target = quickTarget.value;
-            });
-        }
-
-        // Bind provider/target selects for Ensemble Mode
+        // Bind provider/target select for Ensemble Mode
         const ensembleProvider = document.getElementById('ensembleTranslateProvider');
-        const ensembleTarget = document.getElementById('ensembleTranslateTarget');
 
         if (ensembleProvider) {
             ensembleProvider.addEventListener('change', () => {
                 // Sync with transcription mode if needed
             });
         }
-        if (ensembleTarget) {
-            ensembleTarget.addEventListener('change', () => {
-                // Sync with transcription mode if needed
-            });
-        }
+        // ('ensembleTranslateTarget' was bound here with an empty handler; no such id exists
+        //  and the Ensemble target is read from TranslationSettingsModal, so it is gone.)
 
         console.log('TranslateIntegrationManager initialized');
     },
@@ -7521,9 +7502,12 @@ const TranslateIntegrationManager = {
         const tabId = activeTab.dataset.tab;
 
         if (tabId === 'tab1' || tabId === 'tab2') {
-            // Transcription Mode or Advanced Options - use main checkbox
-            const checkbox = document.getElementById('translateAfterTranscription');
-            return checkbox && checkbox.checked;
+            // Translation is not offered on the Transcription tab or Advanced Options.
+            // This used to read a 'translateAfterTranscription' checkbox that does not
+            // exist in index.html, so it already always evaluated false -- this states it
+            // instead of arriving at it by accident. Giving these tabs real translation
+            // controls is parked for the 1.10.x release (owner, 2026-09-16).
+            return false;
         } else if (tabId === 'tab3') {
             // Ensemble Mode
             const checkbox = document.getElementById('ensembleTranslateAfter');
@@ -7559,11 +7543,12 @@ const TranslateIntegrationManager = {
                 customEndpoint: fullSettings.customEndpoint
             };
         } else {
-            // Transcription Mode settings
-            return {
-                provider: document.getElementById('quickTranslateProvider')?.value || 'local',
-                target: document.getElementById('quickTranslateTarget')?.value || 'english'
-            };
+            // Not reachable: isEnabled() returns false on tab1/tab2, so nothing asks for
+            // these settings. Kept as a defensive default rather than reading
+            // 'quickTranslateProvider'/'quickTranslateTarget', two ids that do not exist --
+            // reading them returned these same values while looking as though the user's
+            // choice had been honoured. Parked for 1.10.x with the controls themselves.
+            return { provider: 'local', target: 'english' };
         }
     },
 
