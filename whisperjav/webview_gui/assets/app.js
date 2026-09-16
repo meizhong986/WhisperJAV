@@ -1500,6 +1500,19 @@ const EnsembleManager = {
             this.swapModelOptions('pass2', 'qwen');
         }
 
+        // v1.9.3: filter the legacy passes at startup too. The branches above only cover
+        // the non-legacy families, so a pass left on a legacy pipeline kept index.html's
+        // static option list -- which carries every model, including turbo for Balanced,
+        // the pair the compatibility filtering exists to prevent. Nothing rebuilt it until
+        // the user touched the pipeline dropdown.
+        ['pass1', 'pass2'].forEach(passKey => {
+            const s = this.state[passKey];
+            const isLegacyFamily = !s.isTransformers && !s.isQwen && !s.isCrispasr && !s.isXxl;
+            if (isLegacyFamily) {
+                this.swapModelOptions(passKey, 'legacy');
+            }
+        });
+
         // Pass 2 enable/disable
         document.getElementById('pass2-enabled').addEventListener('change', (e) => {
             this.state.pass2.enabled = e.target.checked;
@@ -5572,8 +5585,14 @@ const EnsembleManager = {
             const setSilent = (id, val) => {
                 const el = document.getElementById(id);
                 if (!el || val === undefined || val === null) return;
+                const before = el.value;
                 el.value = val;
                 if (el.tagName === 'SELECT' && el.value !== String(val)) {
+                    // The assignment already blanked the control -- put back what was
+                    // there. Without this the dropdown is left empty while passState
+                    // still holds the preset's value, collectConfig sends the state, and
+                    // collectAll later writes the blank to the settings file.
+                    el.value = before;
                     ConsoleManager.log(
                         `Preset "${name}": "${val}" is not available for ${passState.pipeline}; ` +
                         `keeping "${el.value || '(none)'}" for ${id}.`, 'warn');
@@ -8224,7 +8243,16 @@ const SettingsPersistence = {
             // model), and the same event reaches scheduleSave, writing '' back to disk so
             // the degradation becomes permanent. This happens for real: a model saved for
             // one pipeline is not offered after the pipeline is restored ahead of it.
-            if (spec.prop === 'value' && el.tagName === 'SELECT' && el.value !== String(wanted)) {
+            // Rejected either because the control does not offer the value, or because the
+            // saved value is blank and blank is not a real option. The second case matters:
+            // a settings file written before this guard existed can hold "", and comparing
+            // el.value !== String("") is '' !== '' -- false -- so the guard would pass the
+            // blank straight through, dispatch it, and put "" back into the run.
+            const blankButNoBlankOption = spec.prop === 'value' && wanted === ''
+                && el.tagName === 'SELECT'
+                && !Array.from(el.options).some(o => o.value === '');
+            if (spec.prop === 'value' && el.tagName === 'SELECT'
+                    && (el.value !== String(wanted) || blankButNoBlankOption)) {
                 // The assignment already blanked the control -- put back what was there.
                 el.value = before;
                 ConsoleManager.log(

@@ -51,6 +51,7 @@ from pathlib import Path
 import json
 import time
 import tempfile
+import glob
 from typing import Dict, List, Any, Optional
 import io
 import shutil
@@ -94,7 +95,11 @@ from whisperjav.utils.run_outcome import (
     write_manifest,
 )
 from whisperjav.modules.media_discovery import MediaDiscovery
-from whisperjav.utils.media_leftovers import looks_like_whisperjav_leftover
+from whisperjav.utils.media_leftovers import (
+    WHISPERJAV_WORK_DIRS,
+    is_whisperjav_temp_file,
+    looks_like_whisperjav_leftover,
+)
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
@@ -1042,18 +1047,34 @@ def cleanup_temp_directory(temp_dir: str):
     else:
         logger.debug(f"Cleaning up temp directory contents: {temp_path}")
         try:
-            subdirs_to_clean = ["scenes", "enhanced_scenes", "scene_srts", "raw_subs"]
-            for subdir in subdirs_to_clean:
+            # WHISPERJAV_WORK_DIRS is the single list of folders WhisperJAV creates. It
+            # used to be duplicated here and had drifted: resampled_scenes and crispasr_out
+            # were created by the pipelines and never cleaned up.
+            for subdir in WHISPERJAV_WORK_DIRS:
                 subdir_path = temp_path / subdir
                 if subdir_path.exists():
                     shutil.rmtree(subdir_path, ignore_errors=True)
                     logger.debug(f"Removed temp subdirectory: {subdir_path}")
-            
+
+            # Delete only files WhisperJAV itself wrote. This loop used to delete EVERY
+            # file at this level, which is safe for the default temp folder but destroys a
+            # user's media when --temp-dir points at a folder of their own -- and pointing
+            # --temp-dir at a media folder is a reasonable thing to do. Leaving an
+            # unrecognised file behind is litter; deleting one is data loss, so anything
+            # not recognised is kept and counted.
+            kept = 0
             for file in temp_path.glob("*"):
-                if file.is_file():
+                if not file.is_file():
+                    continue
+                if is_whisperjav_temp_file(file):
                     file.unlink()
                     logger.debug(f"Removed temp file: {file}")
-                    
+                else:
+                    kept += 1
+                    logger.debug(f"Left alone (not written by WhisperJAV): {file}")
+
+            if kept:
+                logger.debug(f"Left {kept} file(s) in {temp_path} that WhisperJAV did not write")
             logger.info("Temp directory contents cleaned up successfully")
         except Exception as e:
             logger.error(f"Error cleaning up temp directory: {e}")
@@ -2902,11 +2923,21 @@ def main():
         else:
             logger.info(f"  - {f['path']}")
 
-    # One summary line after the listing. The recursion clause is only true when a
-    # directory was actually given: discovery recurses for a directory argument and does
-    # nothing of the sort for named files or a shell glob, so printing it unconditionally
-    # asserted something that had not happened on every single-file run.
-    gave_a_folder = any(Path(a).is_dir() for a in args.input)
+    # One summary line after the listing. The recursion clause is only printed when a
+    # folder was actually walked. Discovery expands each argument with glob(recursive=True)
+    # and then walks any result that is a directory (media_discovery.py), so this is true
+    # both for a folder given directly AND for a pattern the shell left unexpanded that
+    # matched one -- checking only `is_dir()` on the raw argument would have missed the
+    # second case and gone quiet about a search that did happen.
+    def _walked_a_folder(argument: str) -> bool:
+        try:
+            if Path(argument).is_dir():
+                return True
+            return any(Path(hit).is_dir() for hit in glob.glob(argument, recursive=True))
+        except (OSError, ValueError):
+            return False
+
+    gave_a_folder = any(_walked_a_folder(a) for a in args.input)
     summary = f"{len(media_files)} file(s) from {len(source_folders)} folder(s)"
     if gave_a_folder:
         summary += "; folders given as input were searched recursively"
