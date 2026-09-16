@@ -98,6 +98,7 @@ from whisperjav.modules.media_discovery import MediaDiscovery
 from whisperjav.utils.media_leftovers import (
     WHISPERJAV_WORK_DIRS,
     is_whisperjav_temp_file,
+    temp_dir_conflicts,
     looks_like_whisperjav_leftover,
 )
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
@@ -2911,6 +2912,23 @@ def main():
         logger.error(f"No valid media files found in the specified paths: {', '.join(args.input)}")
         sys.exit(1)
     
+    # Refuse a working folder that overlaps the user's videos or their output folder.
+    # The working folder is emptied when a run ends, so sharing it puts their files in the
+    # path of that cleanup. Checked here, after discovery, because only now do we know the
+    # folders the media actually came from -- naming a FILE still reveals its folder.
+    _temp_problems = temp_dir_conflicts(
+        args.temp_dir,
+        media_paths=[f['path'] for f in media_files],
+        output_dir=args.output_dir,
+    )
+    if _temp_problems:
+        logger.error("Cannot use this working folder:")
+        for _problem in _temp_problems:
+            logger.error(f"  - {_problem}")
+        logger.error("Choose a different folder with --temp-dir, or leave it unset to use "
+                     "the system temporary folder.")
+        sys.exit(1)
+
     logger.info(f"Found {len(media_files)} media file(s) to process:")
     leftover_paths = []
     source_folders = set()

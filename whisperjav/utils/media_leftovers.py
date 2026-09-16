@@ -9,6 +9,7 @@ merely to verify something.
 This module's own body uses the standard library only. Importing it still executes
 `whisperjav/utils/__init__.py`, which pulls numpy -- light, and nothing from the ASR stack.
 """
+import os
 from pathlib import Path
 
 # Every folder WhisperJAV creates under its temp directory. A discovered file sitting under
@@ -43,6 +44,67 @@ WHISPERJAV_TEMP_SUFFIXES = WHISPERJAV_AUDIO_SUFFIXES + (
     "_stitched.srt",
     "_master.json",
 )
+
+
+def _same_place(a: Path, b: Path) -> bool:
+    """True if two paths name the same folder, allowing for case and `..` on Windows."""
+    try:
+        return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))
+    except (OSError, ValueError):
+        return False
+
+
+def _contains(parent: Path, child: Path) -> bool:
+    """True if `parent` is `child` or an ancestor of it."""
+    try:
+        p = Path(os.path.normcase(os.path.realpath(parent)))
+        c = Path(os.path.normcase(os.path.realpath(child)))
+    except (OSError, ValueError):
+        return False
+    return p == c or p in c.parents
+
+
+def temp_dir_conflicts(temp_dir, media_paths=(), output_dir=None) -> list:
+    """Reasons the chosen working folder must not be used, in plain words.
+
+    The working folder is emptied at the end of a run. If it is also the folder holding the
+    user's videos, or the folder their subtitles are written to, that cleanup reaches their
+    files. Cleanup now only deletes what WhisperJAV itself wrote, but sharing the folder
+    still invites trouble -- a video named like one of our intermediates would be removed --
+    so the sturdier rule is simply to refuse the overlap.
+
+    Also refuses a working folder that CONTAINS the videos: the hazard is the same, since
+    the per-run subfolders are deleted outright.
+
+    Returns a list of sentences to show the user. Empty means the folder is fine.
+    """
+    problems = []
+    temp = Path(temp_dir)
+
+    if output_dir and str(output_dir).strip().lower() != "source":
+        if _same_place(temp, Path(output_dir)):
+            problems.append(
+                "The working folder is the same as the output folder (%s). Subtitles are "
+                "written there, and the working folder is emptied when the run ends."
+                % temp)
+
+    seen = set()
+    for media in media_paths:
+        folder = Path(media).parent
+        key = os.path.normcase(str(folder))
+        if key in seen:
+            continue
+        seen.add(key)
+        if _same_place(temp, folder):
+            problems.append(
+                "The working folder is the same as the folder holding your videos (%s). "
+                "It is emptied when the run ends." % folder)
+        elif _contains(temp, folder):
+            problems.append(
+                "The working folder (%s) contains your videos (%s). Its sub-folders are "
+                "deleted when the run ends." % (temp, folder))
+
+    return problems
 
 
 def is_whisperjav_temp_file(path: Path) -> bool:
