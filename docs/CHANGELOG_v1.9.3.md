@@ -11,6 +11,179 @@
 
 ---
 
+## 2026-09-16 — phase 5: the expert Colab notebook, and why local translation returned nothing
+
+**Decision (owner, 2026-09-16):** phase 5 goes ahead; `WhisperJAV_colab_edition_expert.ipynb` is
+the notebook to work on; its job is to *"make available the new features and options to the users of
+the notebook … whisperseg, fireredVAD, QwenASR, animewhisper and etc. The only items that cannot be
+made available to the notebook are BYOP externals."* Install pinned to the 1.9.3 tag; Kaggle left as
+it is and marked unmaintained; Python handled per Colab practice.
+
+### The expert notebook now offers what 1.9.2 offers
+
+Before this change the notebook was a v1.8.12 form: five pipelines, four segmenters, four Whisper
+models, no FireRedVAD, no Qwen, no anime-whisper, no `--vad-version`, one translation target and
+five providers. Worse, it emitted `--speech-segmenter whisperseg` together with `--mode balanced`,
+which `validate_balanced_vad_options` has refused since 1.9.2 (exit 2, requirement S2/S9) — so a
+user who pressed run on the defaults got a usage error before any audio was read.
+
+Step 1 now offers, per pass: six pipelines (balanced, fidelity, fast, faster, transformers, qwen),
+the three sensitivities, the Whisper models, the four Kotoba models for transformers, `qwen3` and
+`anime-whisper` for qwen, all ten speech segmenters including `whisperseg` and `firered-vad`, the
+three built-in VAD builds for balanced, four scene detectors, four audio clean-up backends, all
+seven merge strategies, ten translation providers, nine target languages and three tones.
+CrispASR and XXL are not offered: they need an executable the user supplies, which a Colab session
+does not have.
+
+- **Balanced and the speech segmenter.** Balanced runs faster-whisper's built-in VAD and does not
+  accept an external segmenter; the equivalent control is `--vad-version`. The form therefore has
+  two separate controls, and Step 1 *refuses* the combination in the form, naming the two ways out,
+  instead of letting the run fail. `main.py` is unchanged: what the program accepts was not touched.
+- **Step 2 speaks each pipeline's own flags.** qwen gets `--qwen-*`, transformers gets `--hf-*`,
+  the Whisper pipelines get `--model` / `--speech-segmenter` / `--scene-detection-method`, and a
+  two-pass run uses the uniform `--passN-*` family, with an anime-whisper pass carried as
+  `--passN-qwen-params '{"generator_backend": "anime-whisper"}'` (`pass_worker.prepare_qwen_params`,
+  line 434). The command is printed before it runs.
+- **The four ffmpeg filter checkboxes were removed.** `--passN-speech-enhancer` takes a plain name;
+  the `ffmpeg-dsp:amplify` form the old notebook emitted is rejected by argparse. Nothing on the CLI
+  can carry a choice of individual ffmpeg effects, so a control that pretended to was dropped.
+  **Owner's to decide** whether the CLI should gain one.
+- **Python check corrected.** It read `>= (3,14)` while its message said "3.13+ not supported …
+  requires 3.10-3.12". It now reports the supported range 3.10–3.13 truthfully, and only reports:
+  Colab's runtime Python is not ours to change.
+**Verified:** the notebook's own Step 1 and its two command builders were exec'd out of the shipped
+`.ipynb` for 22 settings combinations, and each generated command was handed to
+`whisperjav.main --dump-params` (parses and resolves, runs no ASR). 18 combinations resolved with
+exit 0; the 4 that must not run (balanced + whisperseg, single pass with scene detection off, cloud
+translation with no key, custom provider with no address) were refused by Step 1 itself. 0 failures.
+The run that found the `ffmpeg-dsp:amplify` defect is the same harness. Separately, the translate
+command Step 3 builds was checked the same way for all ten providers and a spread of target
+languages and tones: 11 commands, all accepted by `whisperjav-translate --show-settings`, 0
+failures. Nothing was run on Colab —
+**no claim is made here about a real Colab session.**
+
+### Local translation returned nothing — the installed llama-cpp-python build rejects its own replies
+
+The owner's screenshot: four `SERVER ERROR` attempts, each `500 2 validation errors`, the first
+`'loc': ('response','CreateChatCompletionResponse','choices',0,'message','refusal'), 'msg': 'Field
+required'`, raised inside `llama_cpp/server/app.py` line 376, ending
+`Failed to communicate with server after 3 retries` and `Translation FAILED after 86.9s`.
+The **two** errors are one cause, not two: the route's response model is
+`Union[llama_cpp.ChatCompletion, str]`, so Pydantic reports a failure per union member, and
+`('response','str')` is just the `str` member refusing a dict.
+
+Provider `local` starts llama-cpp-python's own HTTP server as a subprocess
+(`local_backend.py:2196`, reached from `translate/cli.py:718` and `translate/service.py:466`) and
+talks to it over the chat-completions API. That route declares
+`response_model=Union[llama_cpp.ChatCompletion, str]` (`server/app.py:380`) and the non-streaming
+branch returns `run_in_threadpool(llama.create_chat_completion, **kwargs)` (`server/app.py:526`), so
+FastAPI validates the server's *own reply*.
+
+In the JamePeng fork of llama-cpp-python, at the tag Colab installs today
+(`v0.3.49-cu126-linux-20260831`, `llama_cpp/llama_types.py:109-117`):
+
+```
+class ChatCompletionResponseMessage(TypedDict):
+    content: Optional[str]
+    refusal: Optional[str]          # required: no NotRequired
+    role: Literal["assistant"]
+```
+
+while that same tag's `_convert_text_completion_to_chat` builds the message as
+`{"role": ..., "content": ...}` and nothing else. The reply therefore fails its own validation and
+every non-streaming chat completion is an HTTP 500. The key is `Optional[str]`, so supplying `None`
+satisfies it. Upstream `abetlen/llama-cpp-python` does not carry `refusal` on that type (checked at
+tag `v0.3.21` and at `main`), and neither do this project's own pinned 0.3.21 wheels — so the escape
+is the **version**, not the fork.
+
+**Who is affected.** Any install that ends up on a recent fork build. Colab gets there because
+`install_colab.sh` looks for the pinned wheel (`LLAMA_CPP_VERSION=0.3.21`) in
+`mei986/whisperjav-wheels`, whose `cu126` folder holds one file —
+`llama_cpp_python-0.3.21-cp312-cp312-linux_x86_64.whl` — and Colab now runs Python 3.13; with no
+match the script falls through to **the newest JamePeng release**, unpinned. The Windows
+installer (`installer/templates/post_install.py.template`) and `install.py` have their own wheel
+logic and the same fallback, so this is not Colab-only. Every JamePeng release carrying a cp313
+cu126 linux wheel (0.3.46 through 0.3.49) has the defect, so pinning to an older one is not a way
+out. Provider `custom` pointed at a llama-cpp server **the user started themselves** is not covered
+by the fix below — that process is not ours to launch.
+
+**The fix.** `whisperjav/translate/llama_server_shim.py` (new) is started in place of
+`-m llama_cpp.server`. It checks whether the installed build's
+`ChatCompletionResponseMessage.__required_keys__` actually contains `refusal`; **only then** does it
+wrap `Llama.create_chat_completion` to `setdefault("refusal", None)` on each choice's message, then
+hands over to `llama_cpp.server.__main__.main()`. `local_backend.py` launches it **by file path, not
+with `-m`**, so the server subprocess imports `llama_cpp` and nothing of WhisperJAV — the
+translation package and its dependencies are not dragged into that interpreter. Its two stale-server
+scans (`:1785`, `:1802`) also match `llama_server_shim`.
+
+The wrapper is called on the streaming path too — the streaming branch passes
+`llama_cpp.Llama.create_chat_completion` unbound (`server/app.py:506`, invoked at `:207`) — and
+returns the iterator unmodified, which is why streaming is unaffected. Its gate is one key on one
+type: the same fork declares `refusal` required on `ChatCompletionLogprobs` while never setting it
+there either, so a chat request asking for logprobs would fail the same way and the shim would not
+notice. WhisperJAV never asks for logprobs, so nothing user-facing turns on it today.
+
+**What was verified, and what was not.** `tests/test_llama_server_shim.py` (new, 10 tests, all
+passing) covers both arms against the llama-cpp-python in the `WJ` environment (upstream 0.3.23,
+which does **not** have the defect): the repair declines and leaves the method untouched on a clean
+build; with the type made to require `refusal`, it fires, the reply gains `refusal: None`, the reply
+text and an existing refusal value are preserved, a streaming reply passes through, and applying it
+twice is harmless. Two further tests show the shim runs as a script without importing `whisperjav`,
+and that it accepts the server's own options (`--model`, `--n_gpu_layers`, `--n_ctx`, `--host`,
+`--port`) and exits 0 — with `PYTHONIOENCODING=utf-8`, because llama-cpp-python's own help text
+contains an emoji that a cp1252 console cannot print; `-m llama_cpp.server --help` fails identically
+without it, so that is not the shim's doing.
+
+**Not verified:** no build carrying the defect exists on this machine, so the repair has never run
+against one, and nothing at run time reports whether it worked. The diagnosis rests on the fork's
+source at the tag quoted above plus the owner's error text — not on a reproduction. One supporting
+fact: the server readiness probe is `/v1/completions`, not chat (`local_backend.py:1607`), which is
+consistent with a server that reports healthy and only fails 86 seconds later at translate time,
+and inconsistent with VRAM, model or network explanations.
+
+**Proposed, not done (his call).** Add one non-streaming chat request to the readiness check after
+the completions probe. It is the one measurement that separates "this build is broken" from
+everything else, and it would turn a 500 at translate time into a clear message at start-up — but it
+is a new way for a run to stop early, so it is not being added without his word.
+
+### `pip install whisperjav[local-llm]` installed nothing
+
+`_install_server_deps` asked pip for the extra `local-llm`. No such extra exists; the name in
+`pyproject.toml:176` is `llm`. pip warns and exits **0** on an unknown extra, so the function
+reported success while installing no server dependency at all, and a first-time local translation
+could then fail for want of uvicorn or fastapi with no sign of why. Corrected to `whisperjav[llm]`
+in all five places. The Colab path never depended on it: `install_colab.sh` installs the `llm` extra
+directly.
+
+### The Colab installer's pinned wheel could never be found
+
+`install_colab.sh` built the wheel filename with the platform tag
+`manylinux_2_17_x86_64.manylinux2014_x86_64`, while the file in `mei986/whisperjav-wheels` is
+spelled `linux_x86_64`. The pinned source therefore never matched, on any Python, and every install
+took the unpinned fallback. It now tries both spellings. **Checked live:** the old spelling returns
+404 for cp312 and cp313; the new one finds `llama_cpp_python-0.3.21-cp312-cp312-linux_x86_64.whl`.
+On Python 3.13 there is still nothing to find — the dataset has no cp313 wheel — so Colab continues
+to take the fallback until one is built. **His call:** whether to build one
+(`notebook/build_llama_cpp_wheel.ipynb` exists for it, but it clones the JamePeng fork, so it would
+have to check out a tag at or below 0.3.21 or it would ship the same defect on the pinned path).
+
+### The notebooks install a fixed release
+
+`install_colab.sh` now takes `WHISPERJAV_BRANCH="${WHISPERJAV_REF:-main}"`, and the expert notebook
+sets `WHISPERJAV_REF=v1.9.3` and clones `--branch v1.9.3`. Other callers are unaffected.
+**This notebook cannot install until the tag exists** — that happens in phase 7.
+
+### Kaggle
+
+`WhisperJAV_kaggle_parallel_edition.ipynb` is unchanged apart from a banner at the top saying it is
+no longer maintained, that its settings may no longer match what WhisperJAV accepts, that reported
+problems are not being fixed, and pointing at the expert Colab notebook. It still emits
+`--speech-segmenter` with the balanced pipeline and so still fails on its defaults; that is what
+"unmaintained" now tells the reader. `WhisperJAV_colab_edition.ipynb` was already retired and was
+not touched.
+
+---
+
 ## 2026-09-16 — three adversarial reviews, and the data-loss defect they led to
 
 **Decision (owner, 2026-09-16):** *"I would rather all the deficiencies, errors and bugs are
