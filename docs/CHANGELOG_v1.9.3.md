@@ -11,6 +11,54 @@
 
 ---
 
+## 2026-09-16 — D1 and D2 tested in the GUI by the owner: one defect of ours backed out, one pre-existing defect fixed
+
+**D2 — nothing wrong.** Ensemble tab → a Fidelity pass → segmenter FireRedVAD → Customize renders correctly:
+Detection (Speech Threshold 0.3), Processing (Smoothing Window 5 frames), Filters (Min Speech 150 ms,
+Min Silence 150 ms, Max Speech 5 s), Grouping (Group Gap 1 s, Max Group Duration 5), Padding (Start 50 ms,
+End 100 ms). No change made. This closes D2.
+
+**D1 — the 14 two-pass selectors work.** Verified by the owner across a real restart: Fidelity / Aggressive /
+Silero / None / FireRedVAD / Large V2 on pass 1, pass 2 enabled with Transformers / Auditok / Kotoba, and the
+merge strategy all came back. The save → disk → load round trip carries 17 of 17 keys.
+
+- **Backed out — a badge that misreported what would run (`528e64b`; ours, introduced in `19c20d5`).**
+  `SettingsPersistence.restorePresets()` restored the saved `pass1Preset` / `pass2Preset` onto
+  `EnsembleManager`'s state. `updateBadges()` (~`app.js:2256`) derives the green preset badge, the
+  "Edit Parameters" button label and the modal's `[Custom]` title from `presetName` **alone**, while the
+  parameters a preset names live in `passState.params` — which `restorePresets` could not restore. After a
+  restart the GUI therefore announced that preset `MKATEST193` was in force while `params` was `null` and a
+  run would have used **defaults**. It also resurrected a cleared preset: Reset to Defaults nulls
+  `presetName` and refreshes the badge, but does not rewrite the saved settings, so the old name returned at
+  the next restart — the owner's "after I reset to defaults, I still see my saved preset".
+  `restorePresets` is now a documented no-op; the badge tells the truth (after a restart the pass is on
+  defaults). `collectAll` still saves both names, so the Customize-modal half of D1 has the data when it is
+  done. **Restoring the label honestly requires loading the preset through the presets API and applying its
+  values — that is D1 step two and was not attempted.**
+  **Note for a later reader:** the sandboxed round-trip test passed 17/17 and could not have caught this,
+  because the defect was in what the GUI *claimed*, not in what it stored. Only the click-through found it.
+
+- **Fixed — the Customize modal kept the previous pipeline's tab labels (`528e64b`; pre-existing).**
+  The modal has one set of tab buttons shared by every pipeline. `generateTransformersTabs` (`app.js:3326`)
+  and `generateQwenTabs` (`:3670`) rename them in place — Qwen turns Segmenter into "Generation", Quality
+  into "Audio", Enhancer into "Alignment", Scene into "Output", and hides Context — and nothing renamed them
+  back. The legacy path used by fidelity and the other classic pipelines generated its panels but never set
+  the labels. Opening a Fidelity pass's Customize after a Qwen one therefore showed Qwen's labels over
+  Fidelity's content, and **the Segmenter tab appeared to have vanished when it had only been renamed**
+  (the owner's screenshot: correct Fidelity content — Whisper model, Turbo, CUDA — under
+  Model / Audio / Generation / Alignment / Output). The legacy path now restores `index.html`'s own labels
+  and Context's hidden state before filling the panels, as the other two paths already did.
+  Still needs a click-through: open a Transformers pass's Customize, close it, open a Fidelity pass's.
+
+**Owner's observation, recorded, no action:** that the saved settings work per pass rather than per tab. That
+is the design — `pass1_preset` and `pass2_preset` are separate keys — and he confirmed it was an observation,
+not a defect report.
+
+**Decisions (owner, 2026-09-16):** the `.subtrans` target-language fix is **parked for the 1.10.x release**,
+not done in 1.9.3 (the recommendation to fix it was accepted, the timing was not). Working translation
+controls for the Transcription tab go to **2.x**, pending a possible GUI revamp — further out than the
+1.10.x note recorded in the entry below, which this supersedes.
+
 ## 2026-09-16 — phase 4 continued: three more translation targets; the dead Transcription-tab translation bindings removed
 
 **Decisions (owner, 2026-09-16):** on adding languages, *"yes if minimal work"*; on the Transcription tab,
