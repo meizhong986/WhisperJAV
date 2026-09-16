@@ -69,10 +69,18 @@ denying it loaded the ASR stack while loading five heavy modules; an invariant f
 its own commit; "Standard library only" on a module whose import pulls numpy; a claim about
 shell globs that `media_discovery.py` contradicts; and two wrong line citations in this file.
 
-**Still open, and the owner's to decide:** the user-visible strings added this session (the
-media-listing label and summary, the F2/F3 INFO lines, the installer banner, and the two
-console warnings, which print internal pipeline ids such as `balanced` rather than the
-labels the row shows). The GUI changes also still need a click-through.
+**Confirmed in the GUI by the owner, 2026-09-16:** loading a saved preset whose model the
+current pipeline cannot run now keeps a valid model in the row instead of blanking the
+dropdown. That was the defect `5147986` fixed and the one check no static test could make —
+*"I tested the GUI for that testcase and it worked"*. **The GUI work of this session is
+verified.**
+
+**Still open, and the owner's to decide:** the wording of the messages users see that were
+added or changed this session — the note beside a file in the listing, the three English
+post-processing lines and two audio-extraction lines, the Linux installer's closing text,
+the new "cannot use this working folder" error and its exit code, and the two GUI console
+warnings. One of those warnings is wrong as written: it prints the internal pipeline id
+(`balanced`) rather than the label the row shows (`Balanced`).
 
 ## 2026-09-16 — D1 and D2 tested in the GUI by the owner: one defect of ours backed out, one pre-existing defect fixed
 
