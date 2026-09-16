@@ -27,7 +27,7 @@ class TestRejected:
     def test_working_folder_is_the_video_folder(self, media_folder):
         problems = temp_dir_conflicts(media_folder, [media_folder / "SONE-853.mp4"])
         assert problems, "sharing the video folder must be refused"
-        assert "same as the folder holding your videos" in problems[0]
+        assert "same folder your videos are in" in problems[0]
 
     def test_working_folder_is_the_video_folder_named_differently(self, media_folder):
         """`..` and casing must not get round the rule."""
@@ -40,13 +40,13 @@ class TestRejected:
         out.mkdir()
         problems = temp_dir_conflicts(out, [], output_dir=str(out))
         assert problems
-        assert "same as the output folder" in problems[0]
+        assert "same folder your subtitles are saved to" in problems[0]
 
     def test_working_folder_contains_the_videos(self, tmp_path, media_folder):
         """`--temp-dir D:\\` with videos in D:\\MyVideos is the same hazard."""
         problems = temp_dir_conflicts(tmp_path, [media_folder / "SONE-853.mp4"])
         assert problems
-        assert "contains your videos" in problems[0]
+        assert "Your videos are inside it" in problems[0]
 
     def test_the_reported_data_loss_command(self, media_folder):
         """whisperjav --temp-dir D:\\MyVideos D:\\MyVideos is now refused outright."""

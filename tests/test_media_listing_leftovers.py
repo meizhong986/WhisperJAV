@@ -114,7 +114,7 @@ def test_the_listing_code_labels_without_dropping_anything():
     """
     main_src = (Path(__file__).resolve().parents[1]
                 / "whisperjav" / "main.py").read_text(encoding="utf-8")
-    start = main_src.index('logger.info(f"Found {len(media_files)} media file(s) to process:")')
+    start = main_src.index('logger.info(f"Found {len(media_files)} ')
     block = main_src[start:main_src.index("# One summary line after the listing", start)]
 
     # The loop walks every discovered file...

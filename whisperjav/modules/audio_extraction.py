@@ -45,7 +45,7 @@ class AudioExtractor:
 
         # INFO, not debug (#429 group): on a long or slow-disk file this stage can run
         # for minutes with nothing else on screen, so the user needs to see it start.
-        logger.info(f"Extracting audio from {input_file.name}")
+        logger.info(f"Extracting the audio from {input_file.name}...")
 
         # Build FFmpeg command
         cmd = [
@@ -73,8 +73,8 @@ class AudioExtractor:
             # Get duration
             duration = self._get_audio_duration(output_path)
 
-            logger.info(f"Audio extracted: {output_path.name} "
-                        f"(duration: {duration:.1f}s, took {elapsed:.1f}s)")
+            logger.info(f"Audio ready: {duration:.1f} seconds of audio, "
+                        f"extracted in {elapsed:.1f} seconds")
             return output_path, duration
 
         except subprocess.CalledProcessError as e:

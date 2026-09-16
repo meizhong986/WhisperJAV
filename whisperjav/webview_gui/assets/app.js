@@ -1940,6 +1940,14 @@ const EnsembleManager = {
         }
     },
 
+    // v1.9.3: the name of a pipeline as the user sees it in the row ("Balanced"), not the
+    // internal id ("balanced"). Console messages are read by users, so they get the label.
+    pipelineLabel(passKey) {
+        const select = document.getElementById(`${passKey}-pipeline`);
+        const option = select && select.options[select.selectedIndex];
+        return (option && option.textContent.trim()) || this.state[passKey].pipeline;
+    },
+
     // Swap model dropdown options based on pipeline type
     // pipelineType: 'legacy' | 'transformers' | 'qwen' | 'anime-whisper' | 'cohere' | 'crispasr'
     swapModelOptions(passKey, pipelineType) {
@@ -1995,8 +2003,8 @@ const EnsembleManager = {
         // but fall back to the unfiltered list rather than crash.
         if (!models.length) {
             ConsoleManager.log(
-                `Pass ${passKey === 'pass1' ? '1' : '2'}: no model is listed as compatible ` +
-                `with ${this.state[passKey].pipeline}; showing all models.`, 'warn');
+                `Pass ${passKey === 'pass1' ? '1' : '2'}: no model is listed as working ` +
+                `with ${this.pipelineLabel(passKey)}, so all models are being shown.`, 'warn');
             models = this.legacyModels;
             narrowedByPipeline = false;
         }
@@ -2029,8 +2037,9 @@ const EnsembleManager = {
                 && this.legacyModels.some(m => m.value === previous)) {
             const chosenLabel = (models.find(m => m.value === chosen) || {}).label || chosen;
             ConsoleManager.log(
-                `Pass ${passKey === 'pass1' ? '1' : '2'}: "${previousLabel}" cannot run on ` +
-                `${this.state[passKey].pipeline}; using "${chosenLabel}".`, 'warn');
+                `Pass ${passKey === 'pass1' ? '1' : '2'}: ${this.pipelineLabel(passKey)} ` +
+                `cannot use "${previousLabel}", so "${chosenLabel}" has been selected ` +
+                `instead.`, 'warn');
         }
     },
 
@@ -4961,10 +4970,11 @@ const EnsembleManager = {
                     this.state[passKey].model = fullParams.model_name;
                 } else {
                     ConsoleManager.log(
-                        `Pass ${passKey === 'pass1' ? '1' : '2'}: the Customize dialog set ` +
-                        `model "${fullParams.model_name}", which the row does not offer for ` +
-                        `${passState.pipeline}; the row still shows "${modelDropdown.value}". ` +
-                        `The run will use "${fullParams.model_name}".`, 'warn');
+                        `Pass ${passKey === 'pass1' ? '1' : '2'}: the settings window chose ` +
+                        `the model "${fullParams.model_name}", which is not in the list for ` +
+                        `${this.pipelineLabel(passKey)}. The list still shows ` +
+                        `"${modelDropdown.value}", but the run will use ` +
+                        `"${fullParams.model_name}".`, 'warn');
                 }
             }
         }
@@ -5594,8 +5604,9 @@ const EnsembleManager = {
                     // collectAll later writes the blank to the settings file.
                     el.value = before;
                     ConsoleManager.log(
-                        `Preset "${name}": "${val}" is not available for ${passState.pipeline}; ` +
-                        `keeping "${el.value || '(none)'}" for ${id}.`, 'warn');
+                        `Preset "${name}": "${val}" is not available for ` +
+                        `${EnsembleManager.pipelineLabel(passKey)}, so ` +
+                        `"${el.value || 'nothing'}" has been kept instead.`, 'warn');
                 }
             };
             setSilent(`${prefix}-pipeline`, preset.pipeline);
@@ -8256,8 +8267,9 @@ const SettingsPersistence = {
                 // The assignment already blanked the control -- put back what was there.
                 el.value = before;
                 ConsoleManager.log(
-                    `Saved setting "${wanted}" is no longer available for ${id}; ` +
-                    `keeping "${el.value || '(none)'}".`, 'warn');
+                    `A setting saved earlier, "${wanted}", is no longer one of the ` +
+                    `choices, so "${el.value || 'nothing'}" has been kept instead.`,
+                    'warn');
                 continue;
             }
             el.dispatchEvent(new Event('change', { bubbles: true }));

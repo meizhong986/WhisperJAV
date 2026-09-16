@@ -84,9 +84,8 @@ def temp_dir_conflicts(temp_dir, media_paths=(), output_dir=None) -> list:
     if output_dir and str(output_dir).strip().lower() != "source":
         if _same_place(temp, Path(output_dir)):
             problems.append(
-                "The working folder is the same as the output folder (%s). Subtitles are "
-                "written there, and the working folder is emptied when the run ends."
-                % temp)
+                "It is the same folder your subtitles are saved to:\n    %s\n"
+                "  WhisperJAV empties its working folder when a run finishes." % temp)
 
     seen = set()
     for media in media_paths:
@@ -97,12 +96,13 @@ def temp_dir_conflicts(temp_dir, media_paths=(), output_dir=None) -> list:
         seen.add(key)
         if _same_place(temp, folder):
             problems.append(
-                "The working folder is the same as the folder holding your videos (%s). "
-                "It is emptied when the run ends." % folder)
+                "It is the same folder your videos are in:\n    %s\n"
+                "  WhisperJAV empties its working folder when a run finishes." % folder)
         elif _contains(temp, folder):
             problems.append(
-                "The working folder (%s) contains your videos (%s). Its sub-folders are "
-                "deleted when the run ends." % (temp, folder))
+                "Your videos are inside it:\n    working folder: %s\n    your videos:    %s\n"
+                "  WhisperJAV deletes folders inside its working folder when a run finishes."
+                % (temp, folder))
 
     return problems
 

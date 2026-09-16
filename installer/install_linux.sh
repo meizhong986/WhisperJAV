@@ -265,15 +265,21 @@ echo ""
 # the two routes from docs/en/guides/installation_linux.md -- it installs
 # nothing, because which route is right depends on the user's environment.
 # --------------------------------------------------------------------------
-echo -e "${YELLOW}  If the GUI stops with: ModuleNotFoundError: No module named 'gi'${NC}"
+echo -e "${YELLOW}  If the window does not open, and you see this instead:${NC}"
+echo -e "${YELLOW}    ModuleNotFoundError: No module named 'gi'${NC}"
 echo ""
-echo "  pywebview needs a GUI backend inside your environment. Either:"
+echo "  ...then the part that draws the window is missing. Your Linux distribution"
+echo "  may have installed it system-wide, but Python cannot see it from here."
+echo "  Either of these fixes it. The first is simpler:"
+echo ""
 echo -e "    ${GREEN}pip install \"pywebview[qt]\"${NC}"
-echo "      - the Qt backend, needs no system GTK bindings; or"
-echo -e "    ${GREEN}python3 -m venv --system-site-packages whisperjav-env${NC}"
-echo "      - recreate the venv so it can see the distro's WebKit2GTK bindings."
+echo "        Installs everything needed. Nothing else to set up."
 echo ""
-echo "  Full guide: docs/en/guides/installation_linux.md"
+echo -e "    ${GREEN}python3 -m venv --system-site-packages whisperjav-env${NC}"
+echo "        Rebuilds your Python environment so it can see what your"
+echo "        distribution already installed. Use this if you prefer GTK."
+echo ""
+echo "  Step-by-step guide: docs/en/guides/installation_linux.md"
 echo ""
 
 exit 0

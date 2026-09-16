@@ -2922,14 +2922,15 @@ def main():
         output_dir=args.output_dir,
     )
     if _temp_problems:
-        logger.error("Cannot use this working folder:")
+        logger.error("WhisperJAV has not started, because the working folder is not safe to use.")
         for _problem in _temp_problems:
-            logger.error(f"  - {_problem}")
-        logger.error("Choose a different folder with --temp-dir, or leave it unset to use "
-                     "the system temporary folder.")
+            logger.error(f"  {_problem}")
+        logger.error("Pick a different working folder with --temp-dir, or leave it out "
+                     "and WhisperJAV will use your system's temporary folder.")
         sys.exit(1)
 
-    logger.info(f"Found {len(media_files)} media file(s) to process:")
+    logger.info(f"Found {len(media_files)} "
+                f"file{'' if len(media_files) == 1 else 's'} to process:")
     leftover_paths = []
     source_folders = set()
     for f in media_files:
@@ -2937,7 +2938,7 @@ def main():
         source_folders.add(p.parent)
         if looks_like_whisperjav_leftover(p):
             leftover_paths.append(p)
-            logger.info(f"  - {f['path']}    [looks like a file WhisperJAV made earlier]")
+            logger.info(f"  - {f['path']}    [probably left over from an earlier run]")
         else:
             logger.info(f"  - {f['path']}")
 
@@ -2956,16 +2957,20 @@ def main():
             return False
 
     gave_a_folder = any(_walked_a_folder(a) for a in args.input)
-    summary = f"{len(media_files)} file(s) from {len(source_folders)} folder(s)"
+    _n_files = len(media_files)
+    _n_folders = len(source_folders)
+    summary = (f"From {_n_folders} folder{'' if _n_folders == 1 else 's'}")
     if gave_a_folder:
-        summary += "; folders given as input were searched recursively"
+        summary += " (sub-folders were searched too)"
     logger.info(summary + ".")
     if leftover_paths:
-        logger.info(f"{len(leftover_paths)} of these look like files WhisperJAV made on an "
-                    f"earlier run (an _extracted/_enhanced/_resampled .wav, or a file under "
-                    f"one of its working folders). They are still going to be processed -- "
-                    f"leave them out of the input yourself if you did not mean to include "
-                    f"them.")
+        _n = len(leftover_paths)
+        logger.info(
+            f"{_n} of {'them' if _n > 1 else 'these'} look{'' if _n > 1 else 's'} like "
+            f"{'files' if _n > 1 else 'a file'} WhisperJAV left behind on an earlier run. "
+            f"{'They' if _n > 1 else 'It'} will still be processed. If you did not mean to "
+            f"include {'them' if _n > 1 else 'it'}, take {'them' if _n > 1 else 'it'} out "
+            f"of the folder and run again.")
 
     import datetime as _dt
     _run_started_at = _dt.datetime.now()
