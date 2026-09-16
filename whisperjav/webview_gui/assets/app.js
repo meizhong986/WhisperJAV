@@ -1976,6 +1976,18 @@ const EnsembleManager = {
         // Keep the current model if the new pipeline can still run it. Previously this
         // always reset to the first option, which silently discarded a deliberate choice
         // whenever the list was rebuilt.
+        // A compatibility list that shares no value with legacyModels would leave this
+        // empty and throw inside a change handler, half-updating the row. Not reachable
+        // today (the only such entry, kotoba-faster-whisper, is not offered in the row),
+        // but fall back to the unfiltered list rather than crash.
+        if (!models.length) {
+            ConsoleManager.log(
+                `Pass ${passKey === 'pass1' ? '1' : '2'}: no model is listed as compatible ` +
+                `with ${this.state[passKey].pipeline}; showing all models.`, 'warn');
+            models = this.legacyModels;
+            narrowedByPipeline = false;
+        }
+
         const previous = this.state[passKey].model;
         const previousLabel = (this.legacyModels.find(m => m.value === previous) || {}).label || previous;
         const kept = models.some(m => m.value === previous) ? previous : null;
@@ -4400,10 +4412,18 @@ const EnsembleManager = {
         modelSelect.className = 'param-select form-select';
         modelSelect.id = 'model-select';
 
+        // Must contain every value any pipeline's pipelineModelCompatibility list can
+        // name. This table is filtered by that list a few lines below, so a model present
+        // in the compatibility list but missing HERE cannot be shown -- and because
+        // generateModelTab then falls back to allowedModels[0], the dialog would silently
+        // offer large-v2 in its place and applyCustomization would sync that back over the
+        // row. That is exactly what happened to whisper-ja-1.5B-ct2 when it was added to
+        // pipelineModelCompatibility.balanced without being added here.
         const allModelOptions = [
             { value: 'turbo', label: 'Turbo (Fastest)' },
             { value: 'large-v2', label: 'Large-v2 (Balanced)' },
             { value: 'large-v3', label: 'Large-v3 (Latest)' },
+            { value: 'TransWithAI/whisper-ja-1.5B-ct2', label: 'whisper-ja-1.5B (CT2, JA)' },
             { value: 'kotoba-tech/kotoba-whisper-v2.0-faster', label: 'Kotoba-faster-2.0 (Japanese)' },
             { value: 'RoachLin/kotoba-whisper-v2.2-faster', label: 'Kotoba-faster-2.2 (Japanese)' }
         ];
@@ -4911,10 +4931,13 @@ const EnsembleManager = {
         // runs, not just what is shown. Those modals use the param name 'model_id', so
         // they do not reach this branch anyway; their own mismatch is a separate matter.
         //
-        // The row and the modal now draw from the same pipelineModelCompatibility list,
-        // so a value offered by one is offered by the other. The guard is kept for the
-        // case where they ever diverge again: assigning an absent value to a <select> is
-        // silently ignored, which would leave the row and the state disagreeing.
+        // The guard matters. Both sides filter by pipelineModelCompatibility, but the
+        // modal filters a SECOND table (allModelOptions in generateModelTab) that the row
+        // does not, so the two can still diverge if a model is added to one and not the
+        // other. When they diverge the modal shows allowedModels[0] instead, and without
+        // this guard that substitute would be written silently over the user's row choice.
+        // Assigning an absent value to a <select> is ignored, so syncing unconditionally
+        // would also leave the row and the state disagreeing.
         if (fullParams.model_name && !passState.isTransformers && !passState.isQwen) {
             const modelDropdown = document.getElementById(`${passKey}-model`);
             if (modelDropdown) {
@@ -5541,9 +5564,20 @@ const EnsembleManager = {
             passState.presetName = name;
 
             // Update pass row dropdowns silently (no dispatchEvent to avoid confirm dialogs)
+            // v1.9.3: verify the assignment took. Assigning a value a <select> does not
+            // offer sets selectedIndex to -1 and value to '', leaving the control BLANK
+            // while passState still holds the preset's value -- the row and the state then
+            // disagree and collectConfig sends the state. A preset saved on one pipeline
+            // and loaded onto another can carry exactly such a value.
             const setSilent = (id, val) => {
                 const el = document.getElementById(id);
-                if (el && val !== undefined && val !== null) el.value = val;
+                if (!el || val === undefined || val === null) return;
+                el.value = val;
+                if (el.tagName === 'SELECT' && el.value !== String(val)) {
+                    ConsoleManager.log(
+                        `Preset "${name}": "${val}" is not available for ${passState.pipeline}; ` +
+                        `keeping "${el.value || '(none)'}" for ${id}.`, 'warn');
+                }
             };
             setSilent(`${prefix}-pipeline`, preset.pipeline);
             setSilent(`${prefix}-sensitivity`, preset.sensitivity);
@@ -5574,6 +5608,13 @@ const EnsembleManager = {
                 // openCustomize reads passState.customized && passState.params to populate
                 await this.openCustomize(passKey);
             } else {
+                // v1.9.3: rebuild the model list first for a legacy->legacy change. All
+                // four legacy pipelines share the type 'legacy', so oldType === newType
+                // here even when the preset moves the pass from (say) Fidelity to
+                // Balanced, and the row would keep the previous pipeline's model list.
+                if (newType === 'legacy') {
+                    this.swapModelOptions(passKey, newType);
+                }
                 // Same pipeline type — set model and apply params inline
                 setSilent(`${prefix}-model`, preset.model);
 
@@ -8174,7 +8215,23 @@ const SettingsPersistence = {
             if (!(spec.key in settings)) continue;
             const el = document.getElementById(id);
             if (!el) continue;
-            el[spec.prop] = settings[spec.key];
+            const wanted = settings[spec.key];
+            const before = el.value;
+            el[spec.prop] = wanted;
+            // v1.9.3: a saved value the control no longer offers must not be dispatched.
+            // Assigning it to a <select> sets value to '' -- the change handler would then
+            // write '' into EnsembleManager's state (and the run would send an empty
+            // model), and the same event reaches scheduleSave, writing '' back to disk so
+            // the degradation becomes permanent. This happens for real: a model saved for
+            // one pipeline is not offered after the pipeline is restored ahead of it.
+            if (spec.prop === 'value' && el.tagName === 'SELECT' && el.value !== String(wanted)) {
+                // The assignment already blanked the control -- put back what was there.
+                el.value = before;
+                ConsoleManager.log(
+                    `Saved setting "${wanted}" is no longer available for ${id}; ` +
+                    `keeping "${el.value || '(none)'}".`, 'warn');
+                continue;
+            }
             el.dispatchEvent(new Event('change', { bubbles: true }));
         }
     },
