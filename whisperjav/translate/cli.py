@@ -68,20 +68,9 @@ from .configure import configure_command
 import tempfile
 
 
-def generate_output_path(input_path: str, target_lang: str) -> str:
-    """Generate output filename for translated subtitle."""
-    input_path = Path(input_path)
-    stem = input_path.stem
-
-    # If stem has language code, replace it
-    parts = stem.split('.')
-    if len(parts) > 1:
-        # Remove last part if it looks like a language code
-        if parts[-1] in ['japanese', 'english', 'ja', 'en', 'jp']:
-            stem = '.'.join(parts[:-1])
-
-    output_name = f"{stem}.{target_lang}.srt"
-    return str(input_path.parent / output_name)
+# Naming lives in output_naming.py so cli.py and service.py cannot drift apart again,
+# and so it can be tested without running this module's argument parser.
+from .output_naming import generate_output_path  # noqa: E402,F401
 
 
 def build_provider_options(args, settings_model_params: dict, effective_tone: str,

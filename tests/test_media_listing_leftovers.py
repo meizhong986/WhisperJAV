@@ -2,29 +2,41 @@
 """Labelling of WhisperJAV's own leftovers in the discovered-media listing (F4).
 
 Discovery walks folders recursively, so a working folder can yield intermediates from an
-earlier run. Those are LABELLED, never dropped: a user's own file may carry any name and
-sit in any folder, and silently removing one would lose their input.
+earlier run. Those are LABELLED, never dropped from the input list: a user's own file may
+carry any name and sit in any folder, and silently removing one would lose their input.
 
-Imports only whisperjav.main's helper -- no ASR module is touched.
+Imports `whisperjav.utils.media_leftovers`, which is standard library only. It used to
+import `whisperjav.main`, which pulls torch, stable_whisper, transformers, faster_whisper
+and whisper -- CLAUDE.md forbids importing the ASR stack merely to verify something, and
+the old docstring's claim that it did not was simply wrong.
 """
 from pathlib import Path
 
 import pytest
 
-from whisperjav.main import looks_like_whisperjav_leftover as leftover
+from whisperjav.utils.media_leftovers import (
+    WHISPERJAV_AUDIO_SUFFIXES,
+    WHISPERJAV_WORK_DIRS,
+    looks_like_whisperjav_leftover as leftover,
+)
 
 
 class TestLeftoverShapesAreLabelled:
-    def test_extracted_wav(self):
-        assert leftover(Path("/tmp/whisperjav/SONE-853_extracted.wav"))
+    @pytest.mark.parametrize("p", [
+        "/tmp/whisperjav/SONE-853_extracted.wav",
+        "/tmp/whisperjav/SONE-853_enhanced.wav",
+        "/tmp/whisperjav/SONE-853_resampled.wav",
+        "/tmp/whisperjav/SONE-853_EXTRACTED.WAV",          # case-insensitive
+    ])
+    def test_audio_suffixes(self, p):
+        assert leftover(Path(p))
 
-    def test_extracted_wav_is_case_insensitive(self):
-        assert leftover(Path("/tmp/whisperjav/SONE-853_EXTRACTED.WAV"))
+    @pytest.mark.parametrize("folder", WHISPERJAV_WORK_DIRS)
+    def test_every_working_folder_is_known(self, folder):
+        """The helper must know every folder cleanup_temp_directory creates."""
+        assert leftover(Path("/tmp/whisperjav") / folder / "SONE-853_scene_0001.wav")
 
-    def test_file_under_a_scenes_folder(self):
-        assert leftover(Path("/tmp/whisperjav/scenes/SONE-853_scene_0001.wav"))
-
-    def test_file_deeper_under_a_scenes_folder(self):
+    def test_nested_under_a_working_folder(self):
         assert leftover(Path("/tmp/whisperjav/scenes/batch2/x.wav"))
 
 
@@ -41,6 +53,22 @@ class TestOrdinaryInputIsNotLabelled:
         assert not leftover(Path(p))
 
 
+class TestKnownFalsePositives:
+    """Documented, accepted, and harmless because the label never removes anything.
+
+    A user folder genuinely called "scenes" IS flagged. These tests exist so the
+    behaviour is recorded rather than discovered, and so that a future attempt to make
+    the helper stricter has to change a test that says why.
+    """
+
+    @pytest.mark.parametrize("p", [
+        "D:/Media/Scenes/clip.mp4",
+        "D:/Footage/raw_subs/interview.wav",
+    ])
+    def test_user_folder_sharing_our_name_is_flagged(self, p):
+        assert leftover(Path(p)), "documented false positive; label only, never removal"
+
+
 def test_labelling_never_shortens_the_input_list():
     """The guarantee that matters: labelling is not filtering."""
     discovered = [
@@ -54,3 +82,8 @@ def test_labelling_never_shortens_the_input_list():
     assert len(labelled) == 2
     assert kept == discovered
     assert len(kept) == 3, "a labelled file must still be processed"
+
+
+def test_suffix_table_is_not_silently_emptied():
+    assert WHISPERJAV_AUDIO_SUFFIXES, "an empty suffix table would label nothing"
+    assert all(s.endswith(".wav") for s in WHISPERJAV_AUDIO_SUFFIXES)
