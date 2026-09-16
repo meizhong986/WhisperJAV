@@ -2512,6 +2512,32 @@ const EnsembleManager = {
                 ? passState.params.device
                 : 'cuda';
 
+            // v1.9.3: restore this modal's own tab labels before filling the panels.
+            // The modal has ONE set of tab buttons shared by every pipeline, and
+            // generateTransformersTabs() and generateQwenTabs() rename them in place
+            // (e.g. Qwen turns Segmenter into "Generation" and hides Context). Nothing
+            // renamed them back, so opening a legacy pass's Customize after a
+            // Transformers or Qwen one showed the previous pipeline's labels over this
+            // pipeline's content -- the Segmenter tab appeared to have vanished when it
+            // had only been relabelled. These are the labels index.html ships with.
+            const legacyTabLabels = {
+                'model': 'Model',
+                'quality': 'Quality',
+                'segmenter': 'Segmenter',
+                'enhancer': 'Enhancer',
+                'scene': 'Scene',
+                'context': 'Context'
+            };
+            Object.entries(legacyTabLabels).forEach(([tab, label]) => {
+                const tabBtn = document.querySelector(`[data-tab="${tab}"]`);
+                if (tabBtn) {
+                    tabBtn.textContent = label;
+                    // Context is unused by the legacy pipelines and hidden by default;
+                    // the others must be visible again after Qwen hid Context.
+                    tabBtn.style.display = tab === 'context' ? 'none' : '';
+                }
+            });
+
             // Generate Model tab
             this.generateModelTab('tab-model', currentModel, currentDevice, pipeline);
 
@@ -8082,18 +8108,24 @@ const SettingsPersistence = {
             console.warn('Failed to save GUI settings:', e);
         }
     },
-    // v1.9.3 (D1): put the saved preset names back on EnsembleManager's state after the
-    // two-pass selectors have been restored, so each pass's button reads as it did before
-    // the restart. The values themselves come from the selectors, not from the preset
-    // file -- this only restores the label, and never re-applies a preset over them.
-    async restorePresets(settings) {
-        const ens = (typeof EnsembleManager !== 'undefined') ? EnsembleManager.state : null;
-        if (!ens || !settings) return;
-        if (ens.pass1) ens.pass1.presetName = settings.pass1Preset || null;
-        if (ens.pass2) ens.pass2.presetName = settings.pass2Preset || null;
-        if (typeof EnsembleManager.updateBadges === 'function') {
-            try { EnsembleManager.updateBadges(); } catch (e) { /* label only */ }
-        }
+    // v1.9.3 (D1): deliberately does NOT restore the two preset names, though collectAll
+    // still saves them for the work below.
+    //
+    // An earlier version of this set EnsembleManager.state.pass1/2.presetName from the
+    // saved settings. That is wrong on its own: updateBadges() (EnsembleManager, ~line
+    // 2256) derives the green badge, the "Edit Parameters" button and the modal's
+    // [Custom] title from presetName alone, while the parameters a preset names live in
+    // passState.params -- which this cannot restore. The result was a GUI reporting that
+    // preset X was in force when params was null and a run would have used defaults.
+    // It also resurrected a cleared preset: Reset to Defaults nulls presetName but does
+    // not rewrite the saved settings, so the old name came back at the next restart.
+    //
+    // Restoring the label honestly means restoring the values it names -- loading the
+    // preset through the presets API and applying it to passState.params. That is the
+    // Customize-modal half of D1 and is not done here. Until then no label is restored,
+    // so the badge tells the truth: after a restart the pass is on defaults.
+    async restorePresets(_settings) {
+        return;
     },
 };
 
