@@ -1739,7 +1739,11 @@ const EnsembleManager = {
                 this.updateRowGreyingState(passKey);
                 this.updateByopPanel();
                 this.updateCrispasrPanel();
-                if (oldType !== newType) {
+                // v1.9.3: also re-run for a legacy->legacy change. All four legacy
+                // pipelines share the type 'legacy', so the old condition never
+                // refiltered the model list when moving between them (Balanced and
+                // Fidelity run different engines and allow different models).
+                if (oldType !== newType || newType === 'legacy') {
                     this.swapModelOptions(passKey, newType);
                 }
                 this.applyPipelinePresets(passKey, newType);
@@ -1759,7 +1763,8 @@ const EnsembleManager = {
             this.updateRowGreyingState(passKey);
             this.updateByopPanel();
             this.updateCrispasrPanel();
-            if (oldType !== newType) {
+            // v1.9.3: see the note above -- legacy->legacy must refilter too.
+            if (oldType !== newType || newType === 'legacy') {
                 this.swapModelOptions(passKey, newType);
             }
             this.applyPipelinePresets(passKey, newType);
@@ -1927,6 +1932,10 @@ const EnsembleManager = {
     swapModelOptions(passKey, pipelineType) {
         const modelSelect = document.getElementById(`${passKey}-model`);
         let models;
+        // true only when a legacy pipeline's compatibility list actually narrowed the
+        // choice -- switching to another family (qwen, transformers, ...) swaps the list
+        // wholesale and is not a "dropped selection" worth reporting.
+        let narrowedByPipeline = false;
 
         switch (pipelineType) {
             case 'transformers':
@@ -1944,24 +1953,60 @@ const EnsembleManager = {
             case 'crispasr':
                 models = this.crispasrModels;
                 break;
-            default:
-                models = this.legacyModels;
+            default: {
+                // v1.9.3: the row now honours the same per-pipeline compatibility the
+                // Customize modal uses. 'legacy' covers four pipelines on two different
+                // engines, and the unfiltered list offered every model to all of them --
+                // so Balanced could be set to 'turbo' (faster-whisper has none) and
+                // Fidelity to the CT2 model (OpenAI Whisper cannot load it). Nothing
+                // validates the pair downstream: main.py and pass_worker.py have no such
+                // guard, so the row was the only thing that could prevent it.
+                const pipeline = this.state[passKey].pipeline;
+                const allowed = this.pipelineModelCompatibility[pipeline];
+                if (allowed) {
+                    models = this.legacyModels.filter(m => allowed.includes(m.value));
+                    narrowedByPipeline = true;
+                } else {
+                    models = this.legacyModels;
+                }
+                break;
+            }
         }
+
+        // Keep the current model if the new pipeline can still run it. Previously this
+        // always reset to the first option, which silently discarded a deliberate choice
+        // whenever the list was rebuilt.
+        const previous = this.state[passKey].model;
+        const previousLabel = (this.legacyModels.find(m => m.value === previous) || {}).label || previous;
+        const kept = models.some(m => m.value === previous) ? previous : null;
+        const chosen = kept || models[0].value;
 
         // Clear existing options
         modelSelect.innerHTML = '';
 
         // Add new options
-        models.forEach((model, index) => {
+        models.forEach(model => {
             const option = document.createElement('option');
             option.value = model.value;
             option.textContent = model.label;
-            if (index === 0) option.selected = true;
+            if (model.value === chosen) option.selected = true;
             modelSelect.appendChild(option);
         });
 
-        // Update state with first option
-        this.state[passKey].model = models[0].value;
+        modelSelect.value = chosen;
+        this.state[passKey].model = chosen;
+
+        // Say so when a selection was dropped, rather than changing it silently
+        // (owner's decision, 2026-09-16). Only when a real previous choice was lost --
+        // not on the first build, and not when switching to an unrelated pipeline family
+        // whose model list never contained it.
+        if (!kept && previous && narrowedByPipeline
+                && this.legacyModels.some(m => m.value === previous)) {
+            const chosenLabel = (models.find(m => m.value === chosen) || {}).label || chosen;
+            ConsoleManager.log(
+                `Pass ${passKey === 'pass1' ? '1' : '2'}: "${previousLabel}" cannot run on ` +
+                `${this.state[passKey].pipeline}; using "${chosenLabel}".`, 'warn');
+        }
     },
 
     // Update row greying based on pipeline type
@@ -2365,9 +2410,18 @@ const EnsembleManager = {
         vad: { type: 'boolean', default: true }
     },
 
-    // Model compatibility per pipeline (faster-whisper doesn't support turbo)
+    // Model compatibility per pipeline. This is the ONLY place the engine constraint is
+    // written down, and as of v1.9.3 both the Ensemble row and the Customize modal read
+    // it (see swapModelOptions) -- before, only the modal did, so the row offered
+    // combinations that cannot run and nothing validates them downstream.
+    //
+    // balanced / fast / faster run CTranslate2 via faster-whisper, which has no 'turbo'.
+    // fidelity runs OpenAI Whisper, which has turbo but cannot load a CTranslate2
+    // checkpoint. whisper-ja-1.5B-ct2 is CT2, so it is Balanced only by the owner's
+    // decision of 2026-09-16 -- fast/faster share the engine and could run it, but it
+    // ships as Balanced-only and stays that way until he says otherwise.
     pipelineModelCompatibility: {
-        balanced: ['large-v2', 'large-v3'],
+        balanced: ['large-v2', 'large-v3', 'TransWithAI/whisper-ja-1.5B-ct2'],
         faster: ['large-v2', 'large-v3'],
         fast: ['large-v2', 'large-v3'],
         fidelity: ['large-v2', 'large-v3', 'turbo'],
@@ -2504,10 +2558,21 @@ const EnsembleManager = {
             const contextPanel = document.getElementById('tab-context');
             if (contextPanel) contextPanel.innerHTML = '';
 
-            // Get current model settings
-            const currentModel = passState.customized && passState.params.model_name
+            // Get current model settings.
+            // v1.9.3: seed from the row when there is no customized value. `result.model`
+            // is NOT a model name for the standard pipelines -- get_pipeline_defaults
+            // returns the whole model *section* there (a dict; api.py, the standard-
+            // pipeline return), and only the kotoba/V3 branch returns a string. A dict
+            // never matches an entry in allowedModels, so generateModelTab fell back to
+            // allowedModels[0] and the Model tab opened on 'large-v2' for every legacy
+            // pass regardless of what the row said.
+            const rowModel = passState.model;
+            const resultModel = (result.model && typeof result.model === 'object')
+                ? result.model.model_name
+                : result.model;
+            const currentModel = (passState.customized && passState.params && passState.params.model_name)
                 ? passState.params.model_name
-                : result.model || 'large-v2';
+                : (rowModel || resultModel || 'large-v2');
             const currentDevice = passState.customized && passState.params.device
                 ? passState.params.device
                 : 'cuda';
@@ -4832,6 +4897,40 @@ const EnsembleManager = {
             const dropdownId = passKey === 'pass1' ? 'pass1-scene' : 'pass2-scene';
             const dropdown = document.getElementById(dropdownId);
             if (dropdown) dropdown.value = fullParams.scene_detection_method;
+        }
+
+        // v1.9.3: sync model_name to the row, the same bidirectional sync the scene
+        // detector gets above. For the legacy pipelines the MODAL wins at run time --
+        // pass_worker applies the row's --passN-model via _apply_gui_overrides and THEN
+        // the modal's params via apply_custom_params, whose MODEL_PARAMS includes
+        // model_name -- so without this the row displayed a model the run would not use.
+        //
+        // Only for legacy. For Transformers and the Qwen family the ROW wins instead
+        // (pass_worker sets hf_model_id / qwen_model_id from pass_config["model"] after
+        // the modal's params), so copying the modal onto the row there would change what
+        // runs, not just what is shown. Those modals use the param name 'model_id', so
+        // they do not reach this branch anyway; their own mismatch is a separate matter.
+        //
+        // The row and the modal now draw from the same pipelineModelCompatibility list,
+        // so a value offered by one is offered by the other. The guard is kept for the
+        // case where they ever diverge again: assigning an absent value to a <select> is
+        // silently ignored, which would leave the row and the state disagreeing.
+        if (fullParams.model_name && !passState.isTransformers && !passState.isQwen) {
+            const modelDropdown = document.getElementById(`${passKey}-model`);
+            if (modelDropdown) {
+                const offered = Array.from(modelDropdown.options)
+                    .some(o => o.value === fullParams.model_name);
+                if (offered) {
+                    modelDropdown.value = fullParams.model_name;
+                    this.state[passKey].model = fullParams.model_name;
+                } else {
+                    ConsoleManager.log(
+                        `Pass ${passKey === 'pass1' ? '1' : '2'}: the Customize dialog set ` +
+                        `model "${fullParams.model_name}", which the row does not offer for ` +
+                        `${passState.pipeline}; the row still shows "${modelDropdown.value}". ` +
+                        `The run will use "${fullParams.model_name}".`, 'warn');
+                }
+            }
         }
 
         // Sync framer from modal to state (Qwen only)
