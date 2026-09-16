@@ -45,6 +45,13 @@ PIPELINE_CLASSES = {
     "crispasr": CrispASRPipeline,  # Standalone external-provider pipeline (docs/plans/crispasr_v190/08)
 }
 
+# Pipelines whose constructors never read enhance_for_vad. Verified against their
+# source on 2026-09-17, not against their docstrings. Kept in step by
+# tests/test_speech_enhancer_spec.py, which greps the pipeline modules.
+ENHANCE_FOR_VAD_IGNORED_BY = frozenset({
+    "fast", "faster", "transformers", "kotoba-faster-whisper", "crispasr",
+})
+
 DEFAULT_HF_PARAMS = {
     "hf_model_id": "kotoba-tech/kotoba-whisper-bilingual-v1.0",
     "hf_chunk_length": 15,
@@ -995,9 +1002,28 @@ def _build_pipeline(
     if not pipeline_class:
         raise ValueError(f"Unknown pipeline: {pipeline_name}")
 
-    # Pass enhance_for_vad flag to all pipelines via extra_kwargs
+    # Pass enhance_for_vad flag to all pipelines via extra_kwargs.
+    #
+    # What each pipeline then does with it, read from the code on 2026-09-17:
+    #   qwen (and the decoupled pipeline behind it) -- the real dual track: the
+    #     enhanced audio drives the segmenter, the original goes to the recogniser.
+    #   balanced, fidelity -- the flag is read and reported in an INFO line, but
+    #     the enhanced audio goes to BOTH; separating them needs recogniser-side
+    #     changes (balanced_pipeline.py, fidelity_pipeline.py).
+    #   fast, faster, transformers, kotoba-faster-whisper, crispasr -- never read.
+    #     The owner accepted that on 2026-09-17; it is stated here and in --help
+    #     so it is not mistaken for an oversight.
+    #
+    # A user who asked for it and is getting nothing is told so once, rather than
+    # being left to infer it from the absence of any mention.
     if pass_config.get("enhance_for_vad"):
         extra_kwargs = {**extra_kwargs, "enhance_for_vad": True}
+        if pipeline_name in ENHANCE_FOR_VAD_IGNORED_BY:
+            logger.info(
+                "Pass %s: --pass%s-enhance-for-vad has no effect on the %s pipeline, "
+                "which does not run a separate speech segmenter. The audio clean-up "
+                "still runs; it is simply not split between detection and recognition.",
+                pass_number, pass_number, pipeline_name)
 
     pass_temp_dir.mkdir(parents=True, exist_ok=True)
 

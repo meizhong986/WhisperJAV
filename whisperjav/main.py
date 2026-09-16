@@ -156,6 +156,74 @@ LANGUAGE_CODE_MAP = {
 # downgraded to no enhancement part-way through a multi-hour run (#306).
 SPEECH_ENHANCER_CHOICES = ["none", "ffmpeg-dsp", "zipenhancer", "clearvoice", "bs-roformer"]
 
+# The effects FFmpegDSPBackend knows. Hardcoded for the same reason
+# SPEECH_ENHANCER_CHOICES is: --help and argument validation must not pay the cost
+# of importing the backend. tests/test_speech_enhancer_spec.py keeps this in step
+# with AVAILABLE_EFFECTS in speech_enhancement/backends/ffmpeg_dsp.py.
+FFMPEG_DSP_EFFECTS = ["loudnorm", "normalize", "compress", "denoise",
+                      "highpass", "lowpass", "deess", "amplify"]
+
+
+def speech_enhancer_spec(value: str) -> str:
+    """
+    Accept a speech enhancer as "backend" or "backend:detail".
+
+    The detail is the backend's own second argument: a list of effects for
+    ffmpeg-dsp ("ffmpeg-dsp:loudnorm,denoise"), a model name for the others
+    ("clearvoice:MossFormer2_SE_48K"). Everything downstream already understood
+    that form -- pass_worker._parse_speech_enhancer splits it, and
+    FFmpegDSPBackend splits a comma-separated detail into effects -- but the
+    #306 fix in v1.9.2 put a plain choices= list on these flags, which rejected
+    every value containing a colon. The GUI builds exactly that value whenever
+    FFmpeg DSP is picked for a pass, so a two-pass GUI run with FFmpeg DSP
+    stopped with a usage error before reading any audio (owner, 2026-09-17).
+
+    This keeps what #306 asked for -- an unknown name is a user error and is
+    rejected at the boundary, in the same words argparse used -- and extends it
+    to the detail, so a mistyped effect is caught here too rather than being
+    dropped silently by the backend mid-run.
+
+    Returns the value with surrounding whitespace removed, so downstream sees a
+    clean "backend" or "backend:detail".
+    """
+    backend, separator, detail = value.partition(":")
+    backend = backend.strip()
+
+    if backend not in SPEECH_ENHANCER_CHOICES:
+        raise argparse.ArgumentTypeError(
+            "invalid choice: {!r} (choose from {})".format(
+                value, ", ".join(repr(c) for c in SPEECH_ENHANCER_CHOICES)))
+
+    if not separator:
+        return backend
+
+    detail = detail.strip()
+    if backend == "none":
+        raise argparse.ArgumentTypeError(
+            "invalid choice: {!r} ('none' switches enhancement off and takes "
+            "nothing after the colon)".format(value))
+    if not detail:
+        raise argparse.ArgumentTypeError(
+            "invalid choice: {!r} (nothing after the colon; use {!r} on its own, "
+            "or name what follows it)".format(value, backend))
+
+    if backend == "ffmpeg-dsp":
+        effects = [e.strip() for e in detail.split(",")]
+        unknown = [e for e in effects if e not in FFMPEG_DSP_EFFECTS]
+        if unknown:
+            raise argparse.ArgumentTypeError(
+                "invalid choice: {!r} (unknown ffmpeg-dsp effect{}: {}; choose from {})".format(
+                    value,
+                    "" if len(unknown) == 1 else "s",
+                    ", ".join(repr(e) for e in unknown),
+                    ", ".join(repr(e) for e in FFMPEG_DSP_EFFECTS)))
+        return "{}:{}".format(backend, ",".join(effects))
+
+    # clearvoice / zipenhancer / bs-roformer: the detail is a model name. Which
+    # models exist is the backend's business and costs an import to find out, so
+    # it is left to the backend, which already falls back with a warning.
+    return "{}:{}".format(backend, detail)
+
 
 def build_translation_context(args) -> str:
     """Build extra_context string for translation from CLI arguments."""
@@ -273,10 +341,21 @@ def parse_arguments():
                                     "(" + " | ".join(VAD_VERSIONS) + ", default " + DEFAULT_VAD_VERSION + "). "
                                     "Ignored by every other pipeline.")
     twopass_group.add_argument("--pass1-speech-enhancer", default=None,
-                               choices=SPEECH_ENHANCER_CHOICES,
-                               help="Speech enhancer for pass 1 (default: none). An unrecognised name is rejected here rather than silently falling back mid-run (#306).")
+                               type=speech_enhancer_spec,
+                               metavar="BACKEND[:DETAIL]",
+                               help="Speech enhancer for pass 1 (default: none). One of "
+                                    + ", ".join(SPEECH_ENHANCER_CHOICES)
+                                    + ". A detail may follow a colon: for ffmpeg-dsp a comma-separated "
+                                      "list of effects (" + ", ".join(FFMPEG_DSP_EFFECTS) + "), e.g. "
+                                      "ffmpeg-dsp:loudnorm,denoise; for the others a model name, e.g. "
+                                      "clearvoice:MossFormer2_SE_48K. An unrecognised name or effect is "
+                                      "rejected here rather than silently falling back mid-run (#306).")
     twopass_group.add_argument("--pass1-enhance-for-vad", action="store_true", default=False,
-                               help="Dual-track mode for pass 1: enhanced audio for VAD, original for ASR")
+                               help="Dual-track mode for pass 1: the cleaned-up audio drives speech "
+                                    "detection, the original audio goes to the recogniser. Honoured by "
+                                    "qwen. With balanced and fidelity the cleaned-up audio is used for "
+                                    "both, and the run says so. fast, faster, transformers and crispasr "
+                                    "ignore it: they run no separate speech segmenter to feed.")
     twopass_group.add_argument("--pass1-model", default=None,
                                help="Model name for pass 1 (e.g., large-v2, kotoba-whisper-v2.0)")
     twopass_group.add_argument("--pass1-vad-threshold", type=float, default=None,
@@ -309,10 +388,21 @@ def parse_arguments():
                                     "(" + " | ".join(VAD_VERSIONS) + ", default " + DEFAULT_VAD_VERSION + "). "
                                     "Ignored by every other pipeline.")
     twopass_group.add_argument("--pass2-speech-enhancer", default=None,
-                               choices=SPEECH_ENHANCER_CHOICES,
-                               help="Speech enhancer for pass 2 (default: none). An unrecognised name is rejected here rather than silently falling back mid-run (#306).")
+                               type=speech_enhancer_spec,
+                               metavar="BACKEND[:DETAIL]",
+                               help="Speech enhancer for pass 2 (default: none). One of "
+                                    + ", ".join(SPEECH_ENHANCER_CHOICES)
+                                    + ". A detail may follow a colon: for ffmpeg-dsp a comma-separated "
+                                      "list of effects (" + ", ".join(FFMPEG_DSP_EFFECTS) + "), e.g. "
+                                      "ffmpeg-dsp:loudnorm,denoise; for the others a model name, e.g. "
+                                      "clearvoice:MossFormer2_SE_48K. An unrecognised name or effect is "
+                                      "rejected here rather than silently falling back mid-run (#306).")
     twopass_group.add_argument("--pass2-enhance-for-vad", action="store_true", default=False,
-                               help="Dual-track mode for pass 2: enhanced audio for VAD, original for ASR")
+                               help="Dual-track mode for pass 2: the cleaned-up audio drives speech "
+                                    "detection, the original audio goes to the recogniser. Honoured by "
+                                    "qwen. With balanced and fidelity the cleaned-up audio is used for "
+                                    "both, and the run says so. fast, faster, transformers and crispasr "
+                                    "ignore it: they run no separate speech segmenter to feed.")
     twopass_group.add_argument("--pass2-model", default=None,
                                help="Model name for pass 2 (e.g., large-v2, kotoba-whisper-v2.0)")
     twopass_group.add_argument("--pass2-vad-threshold", type=float, default=None,
