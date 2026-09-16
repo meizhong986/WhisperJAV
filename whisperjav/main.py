@@ -2148,6 +2148,25 @@ def validate_balanced_vad_options(args) -> None:
             )
 
 
+def looks_like_whisperjav_leftover(path: Path) -> bool:
+    """True if a discovered file is shaped like one WhisperJAV itself wrote earlier.
+
+    Discovery walks folders recursively, so pointing it at a working folder can pick up
+    WhisperJAV's own intermediates from a previous run. The shapes come from
+    BasePipeline._cleanup_temp_files: `<basename>_extracted.wav` and the per-scene WAVs
+    under a `scenes` folder.
+
+    This only labels a file. Nothing is ever removed from the input list on the strength
+    of it -- a user's own file may legitimately carry any name or sit in any folder.
+    """
+    name = path.name.lower()
+    if name.endswith("_extracted.wav"):
+        return True
+    if any(part.lower() == "scenes" for part in path.parent.parts):
+        return True
+    return False
+
+
 def main():
     """Enhanced main entry point with all V3 improvements."""
     # Apply HuggingFace Hub network resilience patch (#204)
@@ -2884,8 +2903,26 @@ def main():
         sys.exit(1)
     
     logger.info(f"Found {len(media_files)} media file(s) to process:")
+    leftover_paths = []
+    source_folders = set()
     for f in media_files:
-        logger.info(f"  - {f['path']}")
+        p = Path(f['path'])
+        source_folders.add(p.parent)
+        if looks_like_whisperjav_leftover(p):
+            leftover_paths.append(p)
+            logger.info(f"  - {f['path']}    [looks like a file WhisperJAV made earlier]")
+        else:
+            logger.info(f"  - {f['path']}")
+
+    # One summary line after the listing: folders are searched recursively, so a user who
+    # pointed at a parent folder needs to see how wide the search actually went.
+    logger.info(f"{len(media_files)} file(s) from {len(source_folders)} folder(s); "
+                f"folders given as input were searched recursively.")
+    if leftover_paths:
+        logger.info(f"{len(leftover_paths)} of these look like files WhisperJAV made on an "
+                    f"earlier run (named *_extracted.wav, or sitting under a 'scenes' folder). "
+                    f"They are still going to be processed -- leave them out of the input "
+                    f"yourself if you did not mean to include them.")
 
     import datetime as _dt
     _run_started_at = _dt.datetime.now()
