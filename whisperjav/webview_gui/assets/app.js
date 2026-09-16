@@ -8011,6 +8011,23 @@ const SettingsPersistence = {
         'failOnSuspect':    { key: 'failOnSuspect',  prop: 'checked' },
         'asrTelemetry':     { key: 'asrTelemetry',   prop: 'checked' },
         'modelRefreshAudioMinutes': { key: 'modelRefreshAudioMinutes', prop: 'value' },
+        // v1.9.3 (D1/#381): the Ensemble tab's two-pass selectors. The backend has
+        // accepted and returned these keys since 1.9.2 (_GUI_SETTINGS_MAP in api.py);
+        // only the page side was missing, so a restart lost the whole two-pass setup.
+        'pass1-pipeline':   { key: 'pass1Pipeline',       prop: 'value' },
+        'pass1-sensitivity':{ key: 'pass1Sensitivity',    prop: 'value' },
+        'pass1-scene':      { key: 'pass1SceneDetector',  prop: 'value' },
+        'pass1-enhancer':   { key: 'pass1SpeechEnhancer', prop: 'value' },
+        'pass1-segmenter':  { key: 'pass1SpeechSegmenter',prop: 'value' },
+        'pass1-model':      { key: 'pass1Model',          prop: 'value' },
+        'pass2-enabled':    { key: 'pass2Enabled',        prop: 'checked' },
+        'pass2-pipeline':   { key: 'pass2Pipeline',       prop: 'value' },
+        'pass2-sensitivity':{ key: 'pass2Sensitivity',    prop: 'value' },
+        'pass2-scene':      { key: 'pass2SceneDetector',  prop: 'value' },
+        'pass2-enhancer':   { key: 'pass2SpeechEnhancer', prop: 'value' },
+        'pass2-segmenter':  { key: 'pass2SpeechSegmenter',prop: 'value' },
+        'pass2-model':      { key: 'pass2Model',          prop: 'value' },
+        'merge-strategy':   { key: 'mergeStrategy',       prop: 'value' },
     },
     _saveTimer: null,
     enabled: false,
@@ -8033,6 +8050,13 @@ const SettingsPersistence = {
             const el = document.getElementById(id);
             if (el) out[spec.key] = el[spec.prop];
         }
+        // The two preset names are not form controls -- they live in EnsembleManager's
+        // state, set when a preset is loaded and cleared when a field is edited by hand.
+        const ens = (typeof EnsembleManager !== 'undefined') ? EnsembleManager.state : null;
+        if (ens) {
+            out.pass1Preset = ens.pass1?.presetName || '';
+            out.pass2Preset = ens.pass2?.presetName || '';
+        }
         return out;
     },
     applyToForm(settings) {
@@ -8052,7 +8076,11 @@ const SettingsPersistence = {
             const toggle = document.getElementById('rememberSettings');
             this.enabled = !!settings.rememberSettings;
             if (toggle) toggle.checked = this.enabled;
-            if (this.enabled) this.applyToForm(settings);
+            if (this.enabled) {
+                this.applyToForm(settings);
+                // after the selectors are back, restore each pass's preset label
+                await this.restorePresets(settings);
+            }
         } catch (e) {
             console.warn('Failed to load GUI settings:', e);
         }
@@ -8069,7 +8097,19 @@ const SettingsPersistence = {
             console.warn('Failed to save GUI settings:', e);
         }
     },
-    async restorePresets() {},
+    // v1.9.3 (D1): put the saved preset names back on EnsembleManager's state after the
+    // two-pass selectors have been restored, so each pass's button reads as it did before
+    // the restart. The values themselves come from the selectors, not from the preset
+    // file -- this only restores the label, and never re-applies a preset over them.
+    async restorePresets(settings) {
+        const ens = (typeof EnsembleManager !== 'undefined') ? EnsembleManager.state : null;
+        if (!ens || !settings) return;
+        if (ens.pass1) ens.pass1.presetName = settings.pass1Preset || null;
+        if (ens.pass2) ens.pass2.presetName = settings.pass2Preset || null;
+        if (typeof EnsembleManager.updateBadges === 'function') {
+            try { EnsembleManager.updateBadges(); } catch (e) { /* label only */ }
+        }
+    },
 };
 
 // ============================================================
