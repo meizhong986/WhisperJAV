@@ -223,8 +223,8 @@ class SRTPostProcessor:
             # did not return. Constructing the cleaner performs a network fetch,
             # and the moves below can block indefinitely on a network or sleeping
             # drive when output is written next to the source.
-            logger.debug("English post-processing: loading hallucination filter "
-                         "(network fetch, may block)")
+            logger.info("English post-processing: loading hallucination filter "
+                        "(network fetch, may block)")
             cleaner = EnglishSubtitleCleaner(
                 source_file=str(srt_path),
                 target_dir=str(temp_dir),
@@ -238,12 +238,12 @@ class SRTPostProcessor:
             )
             
             # Process
-            logger.debug("English post-processing: cleaning subtitles")
+            logger.info("English post-processing: cleaning subtitles")
             clean_path, log_path = cleaner.clean()
             
             # Move cleaned file to final destination
             final_clean_path = target_dir / final_name
-            logger.debug("English post-processing: writing final SRT to %s", final_clean_path)
+            logger.info("English post-processing: writing final SRT to %s", final_clean_path)
             shutil.move(clean_path, final_clean_path)
             
             # Move log file to raw_subs folder
