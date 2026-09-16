@@ -11,6 +11,76 @@
 
 ---
 
+## 2026-09-17 — two defects the owner reported: the wasted second read, and the hidden VAD-only control
+
+**Decision (owner, 2026-09-17):** three further requirements for 1.9.3 — the duplicate read in audio
+extraction, the missing VAD-only control in the GUI's Ensemble tab, and Demucs (htdemucs) as a
+vocal-isolation backend. He gave the go for the first two, and clarified for the third that
+**htdemucs is to be available for all pipelines**. Whether it installs by default is still open.
+
+### Audio extraction read the file twice; the second read bought a header field
+
+`extract()` ran FFmpeg, then `_get_audio_duration` ran FFmpeg **again** over the whole extracted
+file with `-f null -`, which decodes every sample and throws them away, purely to read the
+`Duration:` line FFmpeg prints before it starts decoding. Every pipeline calls `extract()`, so this
+happened on every file of every run.
+
+Nothing decodes now: ffprobe reads the header and stops; if ffprobe is absent, the extraction run's
+own output is reused, since FFmpeg already printed the duration there; failing both, `0.0`, as
+before. The parser is now a static helper and survives `Duration: N/A`, which the old loop would
+have raised on.
+
+**Measured** on a 90-minute test video (86 MB source, 173 MB extracted WAV, local SSD):
+header read **31 ms**, old full decode **406 ms**, extraction-log fallback **141 ms** — all three
+agreeing to within 0.01 s. 13× faster, 0.37 s per file saved here. The absolute saving is small on a
+fast local disk and larger wherever the audio is slow to read — a network share, a sleeping drive,
+or Google Drive under Colab, where the extracted file actually lives for notebook users.
+`tests/test_audio_extraction_duration.py` (new, 7 tests) covers the real extraction, agreement with
+the old answer, the no-ffprobe fallback, the failure case, and the three parsing shapes.
+
+### The "Enhance for VAD only" control was not removed — it was hidden almost all the time
+
+Both rows are still in the markup, each with its checkbox, both starting at `display: none`. The
+only thing that ever revealed them was `updateEnhanceForVadCheckbox()`, and its only two callers
+were the change handlers of the two enhancer dropdowns. Nothing refreshed it when the window opened,
+when the tab was shown, when a pipeline changed, or after a preset was loaded — so a pass that
+**already** had an enhancer selected kept the checkbox invisible until the user re-picked the
+enhancer by hand.
+
+`updateDspPanel` now ends by refreshing that row — both depend on the same one thing, the pass's
+enhancer — and `updateRowGreyingState` now ends by calling `updateDspPanel`. Its two early-return
+branches already did; the ordinary path, which is what runs at start-up and after a preset load, did
+not. That also fixes the same latent gap for Pass 1's FFmpeg DSP panel.
+
+**Checked:** the two functions were pulled out of the shipped `app.js` and run against a stub DOM
+for eight cases (no enhancer, each of the four enhancers, second pass off, on, and running an
+external tool) — correct in all eight; `node --check` parses the file; the call sites were listed to
+show the refresh is now reached from start-up, a preset load and the pass-2 toggle.
+**Not verified:** whether this is the fault he saw. A GUI change is not verified until he clicks it.
+
+### Two things found while in that code, both his to decide
+
+- **The checkbox promises more than it delivers on most pipelines.** A comment in `api.py` claimed
+  the flag was "Only effective for Qwen pipeline; pass_worker.py silently ignores for others". False
+  in both directions. Checked today: **qwen** and the **decoupled** pipeline do the dual track;
+  **balanced** and **fidelity** read the flag and say so in an INFO line at run time, but send the
+  enhanced audio to **both** VAD and ASR — the separation needs ASR-module changes
+  (`balanced_pipeline.py:177`, `fidelity_pipeline.py:111`); **fast**, **faster**, **transformers**
+  and **crispasr** never read it at all. The GUI offers the checkbox wherever an enhancer is set.
+  The comment now records the truth; what the user is shown is his call.
+- **Choosing FFmpeg DSP in the Ensemble tab stops the run.** `api.py` builds
+  `--passN-speech-enhancer ffmpeg-dsp:<effects>`, and since the #306 fix in 1.9.2 (`7934fac`,
+  2026-08-30) that flag has `choices=SPEECH_ENHANCER_CHOICES`, which does not include the colon
+  form. **Reproduced:** `--pass1-speech-enhancer ffmpeg-dsp:loudnorm` exits 2 with
+  `invalid choice: 'ffmpeg-dsp:loudnorm'` before any audio is read. So a GUI two-pass run with
+  FFmpeg DSP selected fails immediately. The same colon form is why the notebook's four filter
+  checkboxes had to go. **Not fixed** — the repair changes what the program accepts, which is his.
+  The recommendation is to accept `ffmpeg-dsp:<effects>` again, validating the part before the colon
+  against the same list and the effects against the backend's own names, which restores the effect
+  choices and keeps the typo protection #306 asked for.
+
+---
+
 ## 2026-09-16 — phase 5: the expert Colab notebook, and why local translation returned nothing
 
 **Decision (owner, 2026-09-16):** phase 5 goes ahead; `WhisperJAV_colab_edition_expert.ipynb` is
