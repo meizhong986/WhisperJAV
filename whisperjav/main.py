@@ -575,7 +575,8 @@ def parse_arguments():
         # french was missing here while the GUI offered it, so choosing French in the GUI
         # produced "invalid choice: 'french'" and exit 2. tests/test_translate_targets.py
         # pins the two lists together.
-        choices=["english", "indonesian", "portuguese", "spanish", "chinese", "french"],
+        choices=["english", "indonesian", "portuguese", "spanish", "chinese", "french",
+                 "italian", "thai", "korean"],
         default="english",
         help="Target language for translation (default: english)"
     )
