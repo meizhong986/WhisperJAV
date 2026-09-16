@@ -341,7 +341,11 @@ def translate_with_config(
         stem = input_file.stem
         # Remove existing language suffix if present
         parts = stem.split('.')
-        if len(parts) > 1 and parts[-1] in ['japanese', 'english', 'ja', 'en', 'jp', 'chinese', 'indonesian', 'spanish']:
+        # Every supported target, plus the source-language suffixes WhisperJAV writes.
+        # This was a hand-kept list missing portuguese and french, so re-translating
+        # "x.french.srt" produced "x.french.french.srt" instead of replacing the suffix.
+        _language_suffixes = SUPPORTED_TARGETS | {'japanese', 'ja', 'en', 'jp'}
+        if len(parts) > 1 and parts[-1] in _language_suffixes:
             stem = '.'.join(parts[:-1])
         resolved_output_path = input_file.parent / f"{stem}.{target_lang}.srt"
 

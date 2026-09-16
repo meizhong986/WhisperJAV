@@ -570,7 +570,12 @@ def parse_arguments():
     )
     translation_group.add_argument(
         "--translate-target",
-        choices=["english", "indonesian", "portuguese", "spanish", "chinese"],
+        # Must stay in step with SUPPORTED_TARGETS in whisperjav/translate/providers.py,
+        # which is the source of truth and is what the translation layer actually accepts.
+        # french was missing here while the GUI offered it, so choosing French in the GUI
+        # produced "invalid choice: 'french'" and exit 2. tests/test_translate_targets.py
+        # pins the two lists together.
+        choices=["english", "indonesian", "portuguese", "spanish", "chinese", "french"],
         default="english",
         help="Target language for translation (default: english)"
     )
