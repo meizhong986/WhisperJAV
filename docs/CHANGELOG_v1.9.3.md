@@ -6,10 +6,73 @@
 > entry per landed change, newest first; "Decision" lines record who decided what,
 > so a later reader can tell policy from mechanism.
 >
-> **SYNC** — requirements doc `docs/requirements/v1.9.3_vision_mission_highe-leve-features_v1.txt` **v1** (mtime 2026-09-14 14:20, 3,946 bytes, md5 `736f0c97…`) | release plan **`docs/plans/V193_RELEASE_PLAN.md` rev 1.5** (working record; **owner-facing planning moved 2026-09-16 to `docs/plans/V193_MATTERS_MAP.md` rev 2** — the map of matters, his decisions verbatim, the 7 phases; §2.1 and the D1–D43 table are superseded) | tracker rev **53.0** | change log **`docs/CHANGELOG_v1.9.3.md` through 2026-09-16, phases 1–4** (**committed 2026-09-16 on the owner's word**, together with the v1.9.2 log's SYNC edit; the v1.9.2 log is closed at its 2026-09-14 entry) | owner pack: the v1.9.2 pack `73c5c95d` stays at r4.5; **the v1.9.3 pack opens at the Phase 2 scope gate** (owner, 2026-09-14) | branch **`dev_v1.9.3` @ `ed79c1d`** (PRs #388 #363 #376 #364 merged locally 2026-09-16; then phases 2–4: `ac902b4` F1, `7788a2b` F2, `d9afb7e` F3, `58b9f97` F4, `19c20d5` D1, `25863cf` G1, `ed79c1d` C2), `main` @ `e8c1c6e`, `origin/main` @ `63f256e` = tag `v1.9.2`; **nothing pushed — owner decision 2026-09-14: no push until the 1.9.3 release** | GitHub 2026-09-16: **32 comments posted** (25 phase-1 non-G2 + 4 G2 + #366 retest + #305 + #397) and **5 closures** (PRs #365 #362 #361 #360, issue #397); every comment id in `docs/plans/V193_PHASE1_POSTED.log` | **Owner 2026-09-15: F4 (MOSS) dropped from 1.9.3 → next release (perhaps 1.10); step-4 postings APPROVED and POSTED (ten comments + issues #429 #430); replan without MOSS ordered — **scope proposal produced (D2.0) and adversary-gated (25 findings applied); it sits in the release plan §2.1 with 43 numbered decisions for the Phase 2 sitting.** Phase 0 gate (document set, Q5–Q10) still open.**
+> **SYNC** — requirements doc `docs/requirements/v1.9.3_vision_mission_highe-leve-features_v1.txt` **v1** (mtime 2026-09-14 14:20, 3,946 bytes, md5 `736f0c97…`) | release plan **`docs/plans/V193_RELEASE_PLAN.md` rev 1.5** (working record; **owner-facing planning moved 2026-09-16 to `docs/plans/V193_MATTERS_MAP.md` rev 2** — the map of matters, his decisions verbatim, the 7 phases; §2.1 and the D1–D43 table are superseded) | tracker rev **53.0** | change log **`docs/CHANGELOG_v1.9.3.md` through 2026-09-16, phases 1–4** (**committed 2026-09-16 on the owner's word**, together with the v1.9.2 log's SYNC edit; the v1.9.2 log is closed at its 2026-09-14 entry) | owner pack: the v1.9.2 pack `73c5c95d` stays at r4.5; **the v1.9.3 pack opens at the Phase 2 scope gate** (owner, 2026-09-14) | branch **`dev_v1.9.3` @ `5147986`** (PRs #388 #363 #376 #364 merged locally 2026-09-16; then phases 2–4: `ac902b4` F1, `7788a2b` F2, `d9afb7e` F3, `58b9f97` F4, `19c20d5` D1, `25863cf` G1, `ed79c1d` C2, `3ee80a8` languages, `5197fd1`+`528e64b`+`7d5406e` GUI, then the three review-remediation commits `8eb8d00` `6393781` `5147986`), `main` @ `e8c1c6e`, `origin/main` @ `63f256e` = tag `v1.9.2`; **nothing pushed — owner decision 2026-09-14: no push until the 1.9.3 release** | GitHub 2026-09-16: **32 comments posted** (25 phase-1 non-G2 + 4 G2 + #366 retest + #305 + #397) and **5 closures** (PRs #365 #362 #361 #360, issue #397); every comment id in `docs/plans/V193_PHASE1_POSTED.log` | **Owner 2026-09-15: F4 (MOSS) dropped from 1.9.3 → next release (perhaps 1.10); step-4 postings APPROVED and POSTED (ten comments + issues #429 #430); replan without MOSS ordered — **scope proposal produced (D2.0) and adversary-gated (25 findings applied); it sits in the release plan §2.1 with 43 numbered decisions for the Phase 2 sitting.** Phase 0 gate (document set, Q5–Q10) still open.**
 > Rule: a session that changes the release plan, the tracker, this file or the pack brings the others to the same state before it ends (CLAUDE.md rule A7).
 
 ---
+
+## 2026-09-16 — three adversarial reviews, and the data-loss defect they led to
+
+**Decision (owner, 2026-09-16):** *"I would rather all the deficiencies, errors and bugs are
+fixed so we do not leave tech debt to next release."* Three reviews ran: two over the
+session's commits (`c5405b5..7d5406e`, disjoint Python and GUI scopes), then one over the
+remediation those produced. Commits `8eb8d00`, `6393781`, `5147986`.
+
+- **The cleanup deleted files WhisperJAV never wrote (`5147986`).** `cleanup_temp_directory`
+  removed **every** file at the root of the temp directory. Harmless for the default folder
+  under the system temp, which WhisperJAV owns — but `--temp-dir` can point anywhere, and
+  `whisperjav --temp-dir D:\MyVideos D:\MyVideos` destroyed everything in `D:\MyVideos` at
+  the end of the run. It now deletes only the shapes WhisperJAV writes
+  (`_extracted.wav`, `_enhanced.wav`, `_resampled.wav`, `_raw.srt`, `_stitched.srt`,
+  `_master.json`) and keeps anything it does not recognise — litter is preferable to data
+  loss. Demonstrated on a folder holding a video, unrelated media, a text file, a finished
+  subtitle and two intermediates: the intermediates and working folders went, **the other
+  four survived; all four were deleted before**.
+  The behaviour predates this session. It was fixed now because the media-listing text added
+  earlier in the session stood in front of it telling users their files "are still going to
+  be processed".
+- **Six working folders, not four.** `resampled_scenes` and `crispasr_out` were in neither
+  the cleanup list nor the labelling list, so they were never tidied up and never labelled.
+  Both now read `WHISPERJAV_WORK_DIRS` from `whisperjav/utils/media_leftovers.py`.
+- **The preset loader blanked a dropdown instead of restoring it.** `8eb8d00`'s message
+  claimed `setSilent` "restores what was there"; it verified and logged but never restored,
+  so loading a preset whose model the current pipeline cannot run left the Model dropdown
+  empty while the state kept the preset's value — and the next save wrote that blank to the
+  settings file. `applyToForm`'s new guard could not catch the blank coming back either
+  (`'' !== ''` is false). Both fixed.
+- **Legacy passes are now filtered at startup**, so a fresh load on Balanced no longer
+  offers turbo from `index.html`'s static list.
+- **The recursion clause no longer hides a search that happened** — discovery expands each
+  argument with `glob(recursive=True)` and walks any directory it finds, so an unexpanded
+  `"D:/Media/*"` does recurse.
+- **Tests that could not fail, replaced.** Two asserted against hand-built literals or
+  iterated the same tuple the code under test iterates; one had been nested inside another
+  by an earlier edit and never ran. Two new files: `tests/test_temp_cleanup_safety.py`
+  (27 tests, mostly about the user's files surviving) and `tests/test_gui_model_lists.py`
+  (5), which moves the model-list invariant out of a scratchpad file — where nothing would
+  have caught the same mistake at the next model addition — and guards against its own
+  parser silently failing. **92 tests now pass across five files, run individually.**
+
+**What the reviews say about this session's method, recorded because it recurred four times.**
+Work passed its own checks while misreporting what it did: C1 was called a clean negative
+result when it was re-measuring the owner's own fix; D1 shipped a badge announcing a preset
+that was not in force; the first model-sync attempt would have overwritten the user's model
+silently; and `8eb8d00` claimed a restore it had not implemented. Static checks and the
+sandboxed round-trip passed every time. **The checks that actually found these were the
+owner's click-through and adversarial reviews framed around the code rather than around the
+author's claims.** The third review was briefed to read the code first and test the commit
+message against it, and it was the most productive of the three.
+
+**Standing correction for later readers:** a comment, docstring or change-log line in this
+tree is a claim to verify, not evidence. Verified instances this session: a test docstring
+denying it loaded the ASR stack while loading five heavy modules; an invariant falsified by
+its own commit; "Standard library only" on a module whose import pulls numpy; a claim about
+shell globs that `media_discovery.py` contradicts; and two wrong line citations in this file.
+
+**Still open, and the owner's to decide:** the user-visible strings added this session (the
+media-listing label and summary, the F2/F3 INFO lines, the installer banner, and the two
+console warnings, which print internal pipeline ids such as `balanced` rather than the
+labels the row shows). The GUI changes also still need a click-through.
 
 ## 2026-09-16 — D1 and D2 tested in the GUI by the owner: one defect of ours backed out, one pre-existing defect fixed
 
@@ -212,7 +275,7 @@ we proceed with the frozen view and complete step by step." F1–F4 and D1 are m
 
 - **F1 — progress lines read `[839/1]` in a multi-file run (#429).** `ProgressDisplayAdapter.__init__` set
   `self.total_files = 1` and nothing ever updated it; the real count was set on the *manager*
-  (`whisperjav/main.py:1190`), and the adapter is what feeds
+  (`whisperjav/main.py:1196`), and the adapter is what feeds
   `UnifiedProgressManager.start_file_processing`, which prints the line
   (`whisperjav/utils/unified_progress.py:249`). The adapter now takes the count as a constructor argument,
   falling back to the manager's value and then to 1. `create_progress_adapter` passes it through.
@@ -228,7 +291,7 @@ we proceed with the frozen view and complete step by step." F1–F4 and D1 are m
   Verified: a real English-target post-processing run on a three-line SRT prints all three lines at INFO
   (the logger's default level) and produced the cleaned file.
 
-- **F3 — audio extraction was silent and untimed.** `audio_extraction.py:45` is now INFO, and the success
+- **F3 — audio extraction was silent and untimed.** `audio_extraction.py:48` is now INFO, and the success
   line reports how long FFmpeg took. **No timeout was added** (planner + owner): extraction of a long file
   on a slow or sleeping drive legitimately runs for minutes and killing it would lose the run.
   Verified: a real extraction of a synthesised 3-second clip prints
