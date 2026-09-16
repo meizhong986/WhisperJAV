@@ -8,10 +8,30 @@
 > Conventions: one entry per landed change, newest first. "Decision" lines
 > record who decided what, so a later reader can tell policy from mechanism.
 >
-> **SYNC** — pack **r4.5**, and **deliberately left at the v1.9.2 state — owner decision 2026-09-13: "We can open a 1.9.3 owner pack when the right time."** So r4.5 stays the v1.9.2 cycle page; the v1.9.3 standing lives in `docs/plans/V193_STANDING_2026_09_13.md` until he opens the 1.9.3 pack. The one-state rule (A7) is satisfied by his decision, not by an omission. | tracker rev **52.8** — ⚠️ **out of sync: does not yet carry the #302/#297 closures or #425/#426** | change log through **2026-09-14** | standing **`docs/plans/V193_STANDING_2026_09_13.md`** rev 1.0, plus the 2026-09-14 handover in `docs/plans/V193_BRANCHING_RECORD.md` | **v1.9.2 RELEASED** 2026-09-12 19:04 UTC, tag `v1.9.2` still at `63f256e`. **Git changed 2026-09-14:** `main` = `dev_v1.9.3` = `e8c1c6e`, **4 commits ahead of `origin/main` and unpushed**; the 3 formerly-uncommitted files are now committed; the `v1.9.2.post1` hotfix was prepared then abandoned. **All further v1.9.3 work is on `dev_v1.9.3`.** Batch 1 POSTED 2026-09-13 (19 threads); the six ship notifications POSTED; #302/#297 replies POSTED 2026-09-14 — none to be re-posted. Nothing pushed. (Counts re-pulled **2026-09-13 13:37 UTC**.)
-> GitHub **141 open** · 233 closed · 11 PRs (5 merge clean, 6 conflicting) · 0 of 9 labels applied · newest #424 (unanswered) · **36 owed replies** (13 over 100 days; raw 37 — #320 #337 #99 excluded as resolved on their own threads) · **7 never answered**. Clusters for 1.9.3 planning: **G1 19 / G2 25 / G3 97**. 1.9.2 feedback so far: **#302 improved, #395 improved, #367 cannot test (macOS)**; **#297 was recorded NOT improved on 2026-09-13 but the reporter withdrew it on 2026-09-14** — after a PC restart the run completes in minutes, so it is no longer a negative result. Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
-> (updated in place; never a second page). Rule: a session that changes the pack, this file or the change
-> log brings the other two to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
+> **SYNC** — requirements doc `docs/requirements/v1.9.3_vision_mission_highe-leve-features_v1.txt` **v1** (mtime 2026-09-14 14:20, 3,946 bytes, md5 `736f0c97…`) | release plan **`docs/plans/V193_RELEASE_PLAN.md` rev 1.5** (working record; **owner-facing planning moved 2026-09-16 to `docs/plans/V193_MATTERS_MAP.md` rev 2** — the map of matters, his decisions verbatim, the 7 phases; §2.1 and the D1–D43 table are superseded) | tracker rev **53.0** | change log **`docs/CHANGELOG_v1.9.3.md` through 2026-09-16** (a new file, still uncommitted — commit is the owner's call; the v1.9.2 log is closed at its 2026-09-14 entry, its SYNC edit also uncommitted) | owner pack: the v1.9.2 pack `73c5c95d` stays at r4.5; **the v1.9.3 pack opens at the Phase 2 scope gate** (owner, 2026-09-14) | branch **`dev_v1.9.3` @ `c5405b5`** (PRs #388 #363 #376 #364 merged locally 2026-09-16), `main` @ `e8c1c6e`, `origin/main` @ `63f256e` = tag `v1.9.2`; nine commits unpushed — **owner decision 2026-09-14: no push until the 1.9.3 release** | GitHub **148 open** (#431 new 2026-09-15) · 233 closed · 11 PRs; 139 issues labelled 2026-09-16 | **Owner 2026-09-15: F4 (MOSS) dropped from 1.9.3 → next release (perhaps 1.10); step-4 postings APPROVED and POSTED (ten comments + issues #429 #430); replan without MOSS ordered — **scope proposal produced (D2.0) and adversary-gated (25 findings applied); it sits in the release plan §2.1 with 43 numbered decisions for the Phase 2 sitting.** Phase 0 gate (document set, Q5–Q10) still open.**
+> Owner pack (v1.9.2): https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2 (updated in place; never a second page). Rule: a session that changes the release plan, the tracker, this file or the pack brings the others to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
+<!-- V193-POINTER-BEGIN -->
+> **This log is closed at its 2026-09-14 entry.** Everything landing on `dev_v1.9.3` from 2026-09-14 on is recorded in
+> `docs/CHANGELOG_v1.9.3.md`; the clustering guard `e8c1c6e` is cross-referenced there (issue #430). One correction to
+> the 2026-09-14 entry below: the `[839/1]` progress-counter producer, recorded there as not identified, was identified
+> on 2026-09-14 (`whisperjav/utils/progress_adapter.py:21` creates the adapter with `total_files = 1` and nothing updates
+> it) and is now issue #429.
+<!-- V193-POINTER-END -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ---
 
