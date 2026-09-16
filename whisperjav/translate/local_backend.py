@@ -853,7 +853,7 @@ def _are_server_deps_installed() -> bool:
 
 def _install_server_deps() -> bool:
     """
-    Install whisperjav[local-llm] server dependencies.
+    Install whisperjav[llm] server dependencies.
 
     These are platform-agnostic deps (uvicorn, fastapi, etc.) that must be
     installed before llama-cpp-python.
@@ -869,7 +869,7 @@ def _install_server_deps() -> bool:
 
     try:
         result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "whisperjav[local-llm]"],
+            [sys.executable, "-m", "pip", "install", "whisperjav[llm]"],
             capture_output=True,
             text=True,
             encoding='utf-8',
@@ -1031,7 +1031,7 @@ def ensure_llama_cpp_installed() -> bool:
     1. Check if already installed and functional
     2. If functional but CPU-only on CUDA system, offer upgrade to GPU
     3. If broken (DLL issues), diagnose and offer reinstall
-    4. Install server deps first (whisperjav[local-llm]) - platform agnostic
+    4. Install server deps first (whisperjav[llm]) - platform agnostic
     5. Detect CUDA version
     6. Try prebuilt wheel (HuggingFace, then GitHub)
     7. Fall back to source build (with 10s user cancel window)
@@ -1207,7 +1207,7 @@ def ensure_llama_cpp_installed() -> bool:
     print("This is a one-time download (~700MB).\n")
 
     # Step 1: Install server dependencies first (uvicorn, fastapi, etc.)
-    # These are platform-agnostic and declared in setup.py extras_require['local']
+    # These are platform-agnostic and declared as the 'llm' extra in pyproject.toml
     if not _install_server_deps():
         print("WARNING: Could not install server dependencies.")
         print("         Server may not start correctly.\n")
@@ -1364,7 +1364,7 @@ def ensure_llama_cpp_installed() -> bool:
     print("!" * 60)
     print("\nCould not install llama-cpp-python automatically.")
     print("\nManual installation options:")
-    print("  1. pip install whisperjav[local-llm]  # Install server deps")
+    print("  1. pip install whisperjav[llm]  # Install server deps")
     print("  2. python install.py --local-llm-build")
     print("\nAlternatively, use cloud translation providers:")
     print("  whisperjav-translate -i file.srt --provider deepseek")
@@ -1782,7 +1782,8 @@ def _check_existing_llama_servers() -> list:
                 capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=10
             )
             for line in result.stdout.split('\n'):
-                if 'llama_cpp.server' in line or 'llama-cpp-python' in line:
+                if ('llama_cpp.server' in line or 'llama-cpp-python' in line
+                        or 'llama_server_shim' in line):
                     # Extract PID (last number on the line)
                     parts = line.strip().split()
                     if parts:
@@ -1798,7 +1799,8 @@ def _check_existing_llama_servers() -> list:
                 capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=5
             )
             for line in result.stdout.split('\n'):
-                if 'llama_cpp.server' in line or 'llama-cpp-python' in line:
+                if ('llama_cpp.server' in line or 'llama-cpp-python' in line
+                        or 'llama_server_shim' in line):
                     parts = line.split()
                     if len(parts) > 1:
                         try:
@@ -2188,8 +2190,16 @@ def start_local_server(
     # =========================================================================
     # DIAGNOSTIC: Server Command
     # =========================================================================
+    # Started through our own shim rather than llama_cpp.server directly: some
+    # prebuilt CUDA builds reject their own chat replies unless a missing field
+    # is filled in first. See whisperjav/translate/llama_server_shim.py.
+    #
+    # Run by path, not with -m: as a script it imports llama_cpp and nothing of
+    # WhisperJAV, so the server does not depend on the translate package (and its
+    # dependencies) being importable in this interpreter.
+    shim_path = Path(__file__).with_name("llama_server_shim.py")
     cmd = [
-        sys.executable, "-m", "llama_cpp.server",
+        sys.executable, str(shim_path),
         "--model", str(model_path),
         "--host", "127.0.0.1",
         "--port", str(port),
