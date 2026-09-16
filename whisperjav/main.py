@@ -1188,7 +1188,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         # Create unified manager and adapter
         unified_manager = UnifiedProgressManager(verbosity=verbosity)
         unified_manager.total_files = len(media_files)  # Store for reference
-        progress = ProgressDisplayAdapter(unified_manager)
+        progress = ProgressDisplayAdapter(unified_manager, len(media_files))
     
     # Detect "source" sentinel: save SRT next to each input video
     output_to_source = args.output_dir.lower().strip() == "source"
