@@ -84,13 +84,19 @@ def generate_output_path(input_path: str, target_lang: str) -> str:
     return str(input_path.parent / output_name)
 
 
-def build_provider_options(args, settings_model_params: dict, effective_tone: str) -> dict:
+def build_provider_options(args, settings_model_params: dict, effective_tone: str,
+                           settings_tone: str = None) -> dict:
     """Build provider options with correct precedence and tone-aware defaults.
 
     Precedence: CLI > settings > defaults (tone-aware).
     Defaults:
-      - standard: temperature=0.5, top_p=0.9
-      - pornify:  temperature=1.2, top_p=0.9
+      - standard:   temperature=0.5, top_p=0.9
+      - contextual: temperature=0.8, top_p=0.9
+      - pornify:    temperature=1.2, top_p=0.9
+    settings_tone is the tone SAVED IN the settings file (not the effective
+    run tone) — the settings temperature only applies when both match, see
+    step 2 below.
+    Keep in sync with translate/service.py _build_provider_options.
     """
     def _to_float(val):
         try:
@@ -102,15 +108,26 @@ def build_provider_options(args, settings_model_params: dict, effective_tone: st
     if effective_tone == 'pornify':
         temperature = 1.2
         top_p = 0.9
+    elif effective_tone == 'contextual':
+        temperature = 0.8
+        top_p = 0.9
     else:
         temperature = 0.5
         top_p = 0.9
 
-    # 2) Apply settings overrides (if provided and not None)
+    # 2) Apply settings overrides (if provided and not None).
+    #    temperature is TONE-COUPLED: the GUI settings modal persists its
+    #    Temperature field unconditionally (stock 0.5), so a value saved
+    #    alongside tone X must not override tone Y's tuned default —
+    #    otherwise one Save with tone=standard pins 0.5 forever and
+    #    contextual/pornify never see their 0.8/1.2 defaults. Honor the
+    #    settings temperature only when the file was saved for the same
+    #    tone this run uses. top_p has the same default for every tone,
+    #    so it passes through unconditionally.
     if settings_model_params:
         s_temp = settings_model_params.get('temperature', None)
         s_top_p = settings_model_params.get('top_p', None)
-        if s_temp is not None:
+        if s_temp is not None and (settings_tone or 'standard') == effective_tone:
             f = _to_float(s_temp)
             if f is not None:
                 temperature = f
@@ -242,9 +259,11 @@ def main():
     )
     translation_group.add_argument(
         '--tone',
-        choices=['standard', 'pornify'],
+        choices=['standard', 'contextual', 'pornify'],
         default=None,
-        help=f"Translation tone/style (default: {settings.get('tone', 'standard')})"
+        help=f"Translation tone/style: standard (faithful), contextual (explicit only "
+             f"where the original is explicit), pornify (everything explicit) "
+             f"(default: {settings.get('tone', 'standard')})"
     )
 
     # API configuration
@@ -527,9 +546,12 @@ def main():
     # Resolve instruction file
     instruction_file = resolve_instruction_file_or_content(args, merged)
 
-    # Build provider options (tone-aware defaults, settings, then CLI)
+    # Build provider options (tone-aware defaults, settings, then CLI).
+    # settings.get('tone') is the tone the file was SAVED with — the saved
+    # temperature only applies when it matches the effective run tone.
     effective_tone = merged.get('tone') or 'standard'
-    provider_options = build_provider_options(args, merged.get('model_params', {}), effective_tone)
+    provider_options = build_provider_options(args, merged.get('model_params', {}), effective_tone,
+                                              settings_tone=settings.get('tone'))
 
     # Build extra context
     extra_context = build_extra_context(args)
@@ -622,17 +644,23 @@ def main():
             provider_options['num_ctx'] = ollama_n_ctx
 
         # Ollama temperature override for local LLMs.
-        # build_provider_options() always sets temperature (0.5 standard / 1.2
-        # pornify) — these are cloud-provider defaults. Local models need lower
-        # temperature (0.3 best-fit across 10 tested models). Override the
-        # generic default with the Ollama-optimized value, but ONLY when:
+        # build_provider_options() seeds the cloud-provider default for the
+        # standard tone (0.5). Local models prefer lower temperature (0.3
+        # best-fit across 10 tested models). Override that generic default
+        # with the Ollama-optimized value, but ONLY when:
         #   - User did NOT set --temperature on CLI
-        #   - User did NOT set temperature in settings file
-        #   - Tone is NOT pornify (pornify's 1.2 is an intentional user choice)
+        #   - User did NOT set temperature in settings file FOR THIS TONE
+        #     (the settings temperature is tone-coupled, see
+        #     build_provider_options step 2)
+        #   - Tone is standard — pornify's 1.2 and contextual's 0.8 are
+        #     intentional tone-tuned values, not generic defaults
         _user_set_temp_cli = hasattr(args, 'temperature') and args.temperature is not None
-        _user_set_temp_settings = bool(merged.get('model_params', {}).get('temperature'))
+        _user_set_temp_settings = (
+            bool(merged.get('model_params', {}).get('temperature'))
+            and (settings.get('tone') or 'standard') == effective_tone
+        )
         if not _user_set_temp_cli and not _user_set_temp_settings:
-            if effective_tone != 'pornify':
+            if effective_tone not in ('pornify', 'contextual'):
                 provider_options['temperature'] = readiness.get('temperature', 0.3)
 
         provider_config = dict(provider_config)
