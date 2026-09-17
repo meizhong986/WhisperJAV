@@ -201,20 +201,22 @@ class HtDemucsSpeechEnhancer:
         """
         Keep the voice and drop the rest.
 
-        Anything that means the user is not getting what they asked for is
-        raised as SpeechEnhancerUnavailable and stops the run. Only a failure on
-        one piece of audio, with the model already working, returns a failed
-        result so the rest of the file can go on.
+        Every failure here is raised as SpeechEnhancerUnavailable and stops the
+        run: the user chose this clean-up, and carrying on would hand back
+        subtitles made from audio they asked to have cleaned up, from a run that
+        exited 0. Nothing in this backend returns a failed result.
         """
         start_time = time.time()
+
+        # Before the audio, not after: if the model cannot be loaded at all, the
+        # user should be told that rather than made to wait for a read first.
+        self._ensure_initialized()
 
         try:
             audio_data, actual_sr = load_audio_to_array(audio, sample_rate)
         except Exception as e:
             raise SpeechEnhancerUnavailable(
                 "htdemucs: the audio to clean up could not be read ({}).".format(e))
-
-        self._ensure_initialized()
 
         try:
             import torch
@@ -253,7 +255,12 @@ class HtDemucsSpeechEnhancer:
             raise
         except Exception as e:
             message = str(e).lower()
-            if "out of memory" in message or "cuda" in message:
+            # Match what running out of memory actually says. "cuda" on its own
+            # appears in plenty of unrelated faults, and telling someone to free
+            # graphics memory they have not run out of sends them the wrong way.
+            if ("out of memory" in message
+                    or "outofmemory" in message
+                    or "can't allocate memory" in message):
                 raise SpeechEnhancerUnavailable(
                     "htdemucs: the graphics card ran out of memory while "
                     "isolating the voice ({}). Run this enhancer on the "

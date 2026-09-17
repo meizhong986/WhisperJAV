@@ -6,7 +6,7 @@ without extensive code changes. Handles:
 - Dynamic extraction SR: 16kHz when enhancer is "none", 48kHz for real enhancers
 - Enhancing scene audio files (when a real enhancer is configured)
 - Resampling to 16kHz for VAD/ASR (when extracting at 48kHz)
-- Graceful degradation on failure
+- Stopping the run when a clean-up the user chose fails, at any point
 - Resource cleanup
 
 ==============================================================================
@@ -250,6 +250,40 @@ def is_passthrough_backend(backend_name: Optional[str]) -> bool:
     return not backend_name or backend_name == "none"
 
 
+def _scene_at_target_rate(scene_path: Path, destination: Path) -> Path:
+    """
+    Write a 16kHz mono copy of one scene and return its path.
+
+    Everything that leaves this module is paired by position with everything
+    else, and the dual-track path refuses two tracks recorded at different
+    rates, so a scene that skips the resampling step fails the whole file with a
+    message about sample rates rather than about the clean-up that actually
+    failed.
+
+    Returns the original path if the copy cannot be made -- at that point there
+    is nothing better to hand back.
+    """
+    import numpy as np
+
+    try:
+        audio_data, actual_sr = sf.read(str(scene_path), dtype='float32')
+
+        if audio_data.ndim > 1:
+            audio_data = np.mean(audio_data, axis=1)
+
+        if actual_sr != TARGET_SAMPLE_RATE:
+            audio_data = resample_audio(audio_data, actual_sr, TARGET_SAMPLE_RATE)
+
+        sf.write(str(destination), audio_data, TARGET_SAMPLE_RATE)
+        return destination
+    except Exception as e:
+        logger.warning(
+            "Could not resample scene %s to %dHz: %s. Using it as it is.",
+            scene_path.name, TARGET_SAMPLE_RATE, e,
+        )
+        return scene_path
+
+
 def resample_scenes(
     scene_paths: List[Tuple[Path, float, float, float]],
     temp_dir: Path,
@@ -273,33 +307,14 @@ def resample_scenes(
     if not scene_paths:
         return scene_paths
 
-    import numpy as np
-
     resampled_dir = temp_dir / "resampled_scenes"
     resampled_dir.mkdir(exist_ok=True)
 
     resampled_paths = []
     for scene_path, start_sec, end_sec, dur_sec in scene_paths:
-        resampled_path = resampled_dir / f"{scene_path.stem}_resampled.wav"
-        try:
-            audio_data, actual_sr = sf.read(str(scene_path), dtype='float32')
-
-            # Convert stereo to mono if needed
-            if audio_data.ndim > 1:
-                audio_data = np.mean(audio_data, axis=1)
-
-            # Resample to 16kHz if needed
-            if actual_sr != TARGET_SAMPLE_RATE:
-                audio_data = resample_audio(audio_data, actual_sr, TARGET_SAMPLE_RATE)
-
-            sf.write(str(resampled_path), audio_data, TARGET_SAMPLE_RATE)
-            resampled_paths.append((resampled_path, start_sec, end_sec, dur_sec))
-        except Exception as e:
-            logger.warning(
-                "Failed to resample scene %s: %s. Using original.",
-                scene_path.name, e,
-            )
-            resampled_paths.append((scene_path, start_sec, end_sec, dur_sec))
+        resampled_path = _scene_at_target_rate(
+            scene_path, resampled_dir / f"{scene_path.stem}_resampled.wav")
+        resampled_paths.append((resampled_path, start_sec, end_sec, dur_sec))
 
     logger.info("Resampled %d scenes to %dHz (dual-track ASR path)", len(resampled_paths), TARGET_SAMPLE_RATE)
     return resampled_paths
@@ -318,7 +333,7 @@ def enhance_scenes(
     1. Creates an 'enhanced_scenes' directory
     2. For each scene: enhance audio, resample to 16kHz, save
     3. Returns new scene paths pointing to enhanced files
-    4. On failure: logs warning, returns original scene unchanged
+    4. On failure: stops the run by raising SpeechEnhancerUnavailable
 
     Args:
         scene_paths: List of (scene_path, start_sec, end_sec, duration_sec)
@@ -330,9 +345,20 @@ def enhance_scenes(
         List of (enhanced_scene_path, start_sec, end_sec, duration_sec)
         Same structure as input, but paths point to enhanced files
 
+    Raises:
+        SpeechEnhancerUnavailable: if the clean-up fails on any scene.
+
     Note:
-        If enhancement fails for a scene, the original scene is used.
-        This ensures graceful degradation.
+        Owner, 2026-09-17: "yes stop." A scene whose clean-up failed is a scene
+        the user asked to have cleaned up and did not. Using the original
+        instead -- which is what happened until now -- ends in a subtitle file
+        made partly from untouched audio, from a run that exited 0, with only a
+        warning in the log to explain it. That is the silent difference the rest
+        of these rules exist to stop, and it is the same fault whether the
+        clean-up cannot start (a missing package) or fails part-way (weights
+        that cannot be fetched, a card out of memory, a backend that errors).
+        One rule covers both, and it covers every pipeline, because every
+        pipeline enhances its scenes through this function.
     """
     if not scene_paths:
         return scene_paths
@@ -398,12 +424,13 @@ def enhance_scenes(
                     f"{result.processing_time_sec:.2f}s"
                 )
             else:
-                # Enhancement failed - use original
-                logger.warning(
-                    f"Scene {scene_num} enhancement failed: {result.error_message}. "
-                    "Using original."
+                raise SpeechEnhancerUnavailable(
+                    f"{enhancer.display_name} could not clean up part of this "
+                    f"audio (scene {scene_num} of {total_scenes}): "
+                    f"{result.error_message}. The run has stopped rather than "
+                    f"give you subtitles made partly from audio you asked to "
+                    f"have cleaned up. Choose a different clean-up, or none."
                 )
-                enhanced_paths.append((scene_path, start_sec, end_sec, dur_sec))
 
         except SpeechEnhancerUnavailable:
             # The clean-up itself cannot run. Carrying on scene by scene would
@@ -411,10 +438,13 @@ def enhance_scenes(
             # file made from audio the user asked to have cleaned up.
             raise
         except Exception as e:
-            logger.warning(
-                f"Scene {scene_num} enhancement error: {e}. Using original."
-            )
-            enhanced_paths.append((scene_path, start_sec, end_sec, dur_sec))
+            raise SpeechEnhancerUnavailable(
+                f"{enhancer.display_name} failed while cleaning up part of this "
+                f"audio (scene {scene_num} of {total_scenes}): {e}. The run has "
+                f"stopped rather than give you subtitles made partly from audio "
+                f"you asked to have cleaned up. Choose a different clean-up, or "
+                f"none."
+            ) from e
 
         finally:
             # Aggressive memory cleanup for 8GB VRAM GPUs
