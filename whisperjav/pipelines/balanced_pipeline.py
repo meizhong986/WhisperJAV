@@ -175,10 +175,17 @@ class BalancedPipeline(BasePipeline):
         self._enhancer_is_passthrough = is_passthrough_backend(self._enhancer_backend_name)
         self._enhance_for_vad = kwargs.get("enhance_for_vad", False)
         if self._enhance_for_vad and not self._enhancer_is_passthrough:
-            # Dual-track is fully supported in qwen/anime-whisper pipelines.
-            # For balanced/fidelity, enhancement is applied to both VAD and ASR
-            # (the VAD-only separation requires ASR module changes — planned for v1.9).
-            logger.info("Enhance-for-VAD requested — enhancement will be applied to both VAD and ASR in balanced pipeline")
+            # v1.9.3: this should no longer be reachable. Balanced finds the speech
+            # inside faster-whisper's own transcribe() call, on the same audio it
+            # transcribes, so there is no second track to hand the cleaned-up audio
+            # to; the owner's decision of 2026-09-17 is that balanced does not offer
+            # the setting at all. main.validate_balanced_vad_options refuses the flag
+            # for a balanced pass and the GUI hides the box. Kept as a guard, and
+            # honest about what it does if some other caller still sets it.
+            logger.warning(
+                "Enhance-for-VAD was set for a balanced pass, which cannot split the "
+                "two: the cleaned-up audio is used for speech detection AND for "
+                "transcription. Use the fidelity or qwen pipeline for the split.")
 
         # v1.8.5+: Extract at 16kHz when enhancer is "none" (skip enhancement entirely)
         # Extract at 48kHz when a real enhancer is configured (enhancer needs high-SR)

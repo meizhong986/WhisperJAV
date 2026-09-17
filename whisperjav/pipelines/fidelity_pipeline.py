@@ -110,7 +110,8 @@ class FidelityPipeline(BasePipeline):
         self._enhancer_is_passthrough = is_passthrough_backend(self._enhancer_backend_name)
         self._enhance_for_vad = kwargs.get("enhance_for_vad", False)
         if self._enhance_for_vad and not self._enhancer_is_passthrough:
-            logger.info("Enhance-for-VAD requested — enhancement will be applied to both VAD and ASR in fidelity pipeline")
+            logger.info("Enhance-for-VAD: the cleaned-up audio will be used to find "
+                        "the speech, and the original for transcription")
 
         # v1.8.5+: Extract at 16kHz when enhancer is "none" (skip enhancement entirely)
         # Extract at 48kHz when a real enhancer is configured (enhancer needs high-SR)

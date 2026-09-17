@@ -648,6 +648,41 @@ def translate_subtitle(
                 print(f"[TRANSLATE]   Consider: smaller --max-batch-size, different model, or cloud provider",
                       file=sys.stderr)
 
+        def _server_log_hint(verbose: bool = False):
+            """
+            Where this run's server keeps its own log. Which server that is
+            depends on the provider: the "local" provider starts
+            llama-cpp-python on this machine and WhisperJAV prints the path to
+            its log when it starts; "ollama" is Ollama; anything else is a
+            service on the internet with no local log at all.
+            """
+            name = str(provider_config.get('pysubtrans_name', '')).lower()
+
+            if name == 'local':
+                try:
+                    from whisperjav.translate import local_backend
+                    path = getattr(local_backend, '_server_stderr_path', None)
+                except Exception:
+                    path = None
+                if path:
+                    return [f"The local translation server's own log: {path}"]
+                return ["The local translation server writes its own log; its path is "
+                        "printed as [LOCAL-LLM] Server log: when the server starts."]
+
+            if name == 'ollama':
+                if verbose:
+                    return ["For Ollama's own server-side logs (model loading, GGUF errors):",
+                            "  Windows: check the Ollama app log or run 'ollama logs'",
+                            "  Linux/macOS: journalctl -u ollama or OLLAMA_DEBUG=1 ollama serve"]
+                return ["Check Ollama's server logs for details: ollama logs"]
+
+            if name in ('custom server', 'custom'):
+                return ["The server at the address you gave is the one that failed; "
+                        "its logs are wherever you are running it."]
+
+            return ["This is a cloud service, so there is no local log: the error "
+                    "above is what it returned."]
+
         def _diagnostic_error_handler(sender, message=None, **kwargs):
             """Track all translation errors — not just HTTP errors."""
             _batch_stats['errors'] += 1
@@ -679,20 +714,21 @@ def translate_subtitle(
                         print(f"[TRANSLATE]   Request timed out — the model may be too slow. Try a smaller model or smaller batch size.",
                               file=sys.stderr)
                     else:
-                        print(f"[TRANSLATE]   Check Ollama server logs for details: ollama logs",
-                              file=sys.stderr)
-                    # Ollama's internal debug logs (GGUF parsing, tensor loading,
-                    # VRAM allocation) are only available server-side — they don't
-                    # flow through the HTTP API. Guide the user when debug is on.
+                        # Owner, 2026-09-17: this used to tell every provider to
+                        # "check Ollama server logs", including the local one,
+                        # which is llama-cpp-python and has nothing to do with
+                        # Ollama. The advice now matches the server in use.
+                        _where = _server_log_hint()
+                        for _line in _where:
+                            print(f"[TRANSLATE]   {_line}", file=sys.stderr)
+                    # A server's own logs (model loading, GGUF parsing, VRAM
+                    # allocation) never travel over the HTTP API, so the client
+                    # cannot show them. Point at them when debug is on.
                     if debug and _err_num == 1:
                         print(f"[TRANSLATE]   NOTE: WhisperJAV debug shows client-side HTTP traffic only.",
                               file=sys.stderr)
-                        print(f"[TRANSLATE]   For Ollama's own server-side logs (model loading, GGUF errors):",
-                              file=sys.stderr)
-                        print(f"[TRANSLATE]     Windows: check the Ollama app log or run 'ollama logs'",
-                              file=sys.stderr)
-                        print(f"[TRANSLATE]     Linux/macOS: journalctl -u ollama or OLLAMA_DEBUG=1 ollama serve",
-                              file=sys.stderr)
+                        for _line in _server_log_hint(verbose=True):
+                            print(f"[TRANSLATE]     {_line}", file=sys.stderr)
                 elif 'No text returned' in msg_str or 'no text' in msg_str.lower():
                     print(f"\n[TRANSLATE] *** EMPTY RESPONSE (attempt #{_err_num}) ***",
                           file=sys.stderr)

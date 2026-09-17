@@ -1536,6 +1536,77 @@ def _parse_server_stderr(stderr_path: str) -> ServerDiagnostics:
     return diag
 
 
+def _verify_chat_completion(port: int, timeout: int = 60) -> Tuple[bool, Optional[str]]:
+    """
+    Ask the server for one short chat completion -- the shape translation uses.
+
+    Returns (True, None) when the server answers with usable text, or
+    (False, message) with a message written for the person running WhisperJAV.
+
+    This exists because /v1/completions succeeding does not mean
+    /v1/chat/completions will: they are different routes with different response
+    models, and a build can serve the first and fail the second every time.
+    """
+    import json
+    import urllib.error
+    import urllib.request
+
+    url = f"http://localhost:{port}/v1/chat/completions"
+    payload = json.dumps({
+        "messages": [{"role": "user", "content": "Reply with the word OK."}],
+        "max_tokens": 8,
+        "temperature": 0.0,
+        "stream": False,
+    }).encode("utf-8")
+
+    logger.info("Checking that the translation server can answer a chat request...")
+
+    try:
+        request = urllib.request.Request(
+            url, data=payload,
+            headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            body = response.read().decode("utf-8", errors="replace")
+            if response.status != 200:
+                return False, (
+                    f"The local translation server answered a chat request with "
+                    f"HTTP {response.status}. Translation sends only chat requests, "
+                    f"so nothing could be translated.\n"
+                    f"{body[:400]}")
+        data = json.loads(body)
+        choices = data.get("choices") or []
+        if not choices:
+            return False, ("The local translation server answered a chat request "
+                           "with no content at all, so nothing could be translated.")
+        logger.info("The translation server answers chat requests correctly.")
+        return True, None
+
+    except urllib.error.HTTPError as e:
+        detail = ""
+        try:
+            detail = e.read().decode("utf-8", errors="replace")[:400]
+        except Exception:
+            pass
+        hint = ""
+        if "refusal" in detail or "validation error" in detail.lower():
+            # The known defect in some prebuilt CUDA builds.
+            hint = ("\n"
+                    "This build of llama-cpp-python rejects its own chat "
+                    "replies. Reinstalling llama-cpp-python usually fixes it; "
+                    "WhisperJAV already repairs the known form of this fault, so "
+                    "seeing it here means a variant it does not cover.")
+        return False, (
+            f"The local translation server refused a chat request "
+            f"(HTTP {e.code}). Translation sends only chat requests, so nothing "
+            f"could be translated.\n"
+            f"{detail}{hint}")
+
+    except Exception as e:
+        return False, (
+            f"The local translation server could not answer a chat request: {e}. "
+            f"Translation sends only chat requests, so nothing could be translated.")
+
+
 def _wait_for_server(port: int, max_wait: int = 300) -> Tuple[bool, Optional[str], Optional[ServerDiagnostics]]:
     """Wait for server to be ready AND verify inference works.
 
@@ -1695,6 +1766,24 @@ def _wait_for_server(port: int, max_wait: int = 300) -> Tuple[bool, Optional[str
                 except Exception as e:
                     # Phase 3 failed — keep first-inference estimate (already set above)
                     logger.debug(f"Steady-state speed measurement failed, using first-inference estimate: {e}")
+
+                # =====================================================
+                # Phase 4: Verify a CHAT completion, which is what
+                # translation actually sends
+                # =====================================================
+                # Owner, 2026-09-17. Everything above uses /v1/completions.
+                # Translation uses /v1/chat/completions, and a build can serve
+                # one and fail the other: some prebuilt CUDA builds declare a
+                # field on the chat reply that their own code never sets, so
+                # FastAPI rejects the server's own answer and every chat request
+                # comes back as HTTP 500. That showed up as four retries and
+                # "Failed to communicate with server after 3 retries" about 90
+                # seconds into a run, with nothing translated. Asking once here
+                # costs one short request and turns that into an immediate,
+                # explainable stop.
+                chat_ok, chat_error = _verify_chat_completion(port, timeout=60)
+                if not chat_ok:
+                    return False, chat_error, None
 
                 total_time = time.time() - start_time
                 logger.info(f"Server ready and speed measured ({total_time:.1f}s total)")

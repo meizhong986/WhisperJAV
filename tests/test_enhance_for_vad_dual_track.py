@@ -164,3 +164,55 @@ class TestTheFidelityPipelineWiring:
                   / "fidelity_pipeline.py").read_text(encoding="utf-8")
         # Without the setting, the enhanced scenes are what everything uses.
         assert "scene_paths = enhanced_paths" in source
+
+
+class TestBalancedDoesNotOfferIt:
+    """
+    Owner, 2026-09-17: "balanced shall not have the VAD only enhancement."
+    Balanced finds the speech inside faster-whisper's own call, on the audio it
+    transcribes, so there is no second track to hand the cleaned-up audio to.
+    Accepting the flag and enhancing both -- what happened up to v1.9.2 -- is the
+    silent difference the other balanced rules exist to prevent.
+    """
+
+    @pytest.mark.parametrize("n", [1, 2])
+    def test_the_flag_is_refused_on_a_balanced_pass(self, n, tmp_path):
+        import subprocess
+        import sys
+        result = subprocess.run(
+            [sys.executable, "-m", "whisperjav.main", "dummy.mp4",
+             "--dump-params", str(tmp_path / "params.json"), "--ensemble",
+             f"--pass{n}-pipeline", "balanced",
+             f"--pass{n}-speech-enhancer", "clearvoice",
+             f"--pass{n}-enhance-for-vad"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
+        assert result.returncode == 2
+        combined = result.stdout + result.stderr
+        assert f"--pass{n}-enhance-for-vad is not available" in combined
+        assert "fidelity or qwen" in combined
+
+    @pytest.mark.parametrize("pipeline", ["fidelity", "qwen"])
+    def test_it_is_still_accepted_where_it_works(self, pipeline, tmp_path):
+        import subprocess
+        import sys
+        result = subprocess.run(
+            [sys.executable, "-m", "whisperjav.main", "dummy.mp4",
+             "--dump-params", str(tmp_path / "params.json"), "--ensemble",
+             "--pass1-pipeline", pipeline,
+             "--pass1-speech-enhancer", "clearvoice", "--pass1-enhance-for-vad",
+             "--pass2-pipeline", "balanced"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
+        assert result.returncode == 0, (result.stdout + result.stderr)[-500:]
+
+    def test_the_gui_hides_the_box_for_a_balanced_pass(self):
+        from pathlib import Path
+        source = (Path(__file__).resolve().parents[1] / "whisperjav" / "webview_gui"
+                  / "assets" / "app.js").read_text(encoding="utf-8")
+        assert "const isBalanced = this.state[passId]?.pipeline === 'balanced';" in source
+        assert "&& !isXxl && !isBalanced) ? 'block' : 'none';" in source
+
+    def test_the_gui_does_not_send_the_flag_for_a_balanced_pass(self):
+        from pathlib import Path
+        source = (Path(__file__).resolve().parents[1] / "whisperjav" / "webview_gui"
+                  / "api.py").read_text(encoding="utf-8")
+        assert source.count("get('pipeline') != 'balanced'") == 2

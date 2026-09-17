@@ -355,12 +355,12 @@ def parse_arguments():
                                       "rejected here rather than silently falling back mid-run (#306).")
     twopass_group.add_argument("--pass1-enhance-for-vad", action="store_true", default=False,
                                help="Dual-track mode for pass 1: the cleaned-up audio drives speech "
-                                    "detection, the original audio goes to the recogniser. Honoured by "
-                                    "qwen and, since v1.9.3, by fidelity. With balanced the cleaned-up "
-                                    "audio is used for both, and the run says so: its speech detection "
-                                    "happens inside faster-whisper, on the audio it recognises. fast, "
-                                    "faster, transformers and crispasr ignore it: they run no separate "
-                                    "speech segmenter to feed.")
+                                    "detection, the original audio goes to the recogniser. Available "
+                                    "with qwen and fidelity. NOT accepted when --pass1-pipeline is "
+                                    "balanced: balanced finds the speech inside faster-whisper itself, "
+                                    "on the same audio it transcribes, so there is nothing to split. "
+                                    "fast, faster, transformers and crispasr ignore it: they run no "
+                                    "separate speech segmenter to feed.")
     twopass_group.add_argument("--pass1-model", default=None,
                                help="Model name for pass 1 (e.g., large-v2, kotoba-whisper-v2.0)")
     twopass_group.add_argument("--pass1-vad-threshold", type=float, default=None,
@@ -404,12 +404,12 @@ def parse_arguments():
                                       "rejected here rather than silently falling back mid-run (#306).")
     twopass_group.add_argument("--pass2-enhance-for-vad", action="store_true", default=False,
                                help="Dual-track mode for pass 2: the cleaned-up audio drives speech "
-                                    "detection, the original audio goes to the recogniser. Honoured by "
-                                    "qwen and, since v1.9.3, by fidelity. With balanced the cleaned-up "
-                                    "audio is used for both, and the run says so: its speech detection "
-                                    "happens inside faster-whisper, on the audio it recognises. fast, "
-                                    "faster, transformers and crispasr ignore it: they run no separate "
-                                    "speech segmenter to feed.")
+                                    "detection, the original audio goes to the recogniser. Available "
+                                    "with qwen and fidelity. NOT accepted when --pass2-pipeline is "
+                                    "balanced: balanced finds the speech inside faster-whisper itself, "
+                                    "on the same audio it transcribes, so there is nothing to split. "
+                                    "fast, faster, transformers and crispasr ignore it: they run no "
+                                    "separate speech segmenter to feed.")
     twopass_group.add_argument("--pass2-model", default=None,
                                help="Model name for pass 2 (e.g., large-v2, kotoba-whisper-v2.0)")
     twopass_group.add_argument("--pass2-vad-threshold", type=float, default=None,
@@ -2240,6 +2240,21 @@ def validate_balanced_vad_options(args) -> None:
                 f"which Silero build it runs with --pass{n}-vad-version "
                 "{" + ",".join(VAD_VERSIONS) + "}."
             )
+        # Owner, 2026-09-17: "balanced shall not have the VAD only enhancement."
+        # Balanced detects speech inside faster-whisper's own transcribe() call,
+        # on the very audio it recognises, so there is no second track to hand the
+        # cleaned-up audio to. Accepting the flag and quietly enhancing both --
+        # which is what happened up to v1.9.2 -- is the silent-difference the
+        # balanced rules above exist to stop.
+        if pipeline == "balanced" and getattr(args, f"pass{n}_enhance_for_vad", False):
+            raise ValueError(
+                f"--pass{n}-enhance-for-vad is not available when --pass{n}-pipeline "
+                f"is balanced (v1.9.3). Balanced finds the speech inside "
+                f"faster-whisper itself, on the same audio it transcribes, so the "
+                f"clean-up cannot be applied to one and not the other. Use "
+                f"--pass{n}-pipeline fidelity or qwen for that, or drop the flag: "
+                f"the clean-up still runs, it is simply not split.")
+
         # The mirror of the rule below: a version for a pass that does not run the
         # built-in VAD is not a silent no-op either. Same flag family, same answer.
         if getattr(args, f"pass{n}_vad_version", None) and pipeline not in (None, "balanced"):

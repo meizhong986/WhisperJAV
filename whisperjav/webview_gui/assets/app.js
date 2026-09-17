@@ -2268,8 +2268,21 @@ const EnsembleManager = {
         const enhancer = document.getElementById(`${passId}-enhancer`)?.value || 'none';
         const isEnabled = passId === 'pass1' || this.state.pass2.enabled;
         const isXxl = passId === 'pass2' && this.state.pass2.isXxl;
+        // Owner, 2026-09-17: "balanced shall not have the VAD only enhancement."
+        // Balanced detects speech inside faster-whisper's own call, on the audio
+        // it recognises, so there is no second track to feed. Offering the box
+        // there would promise something the pipeline cannot do.
+        const isBalanced = this.state[passId]?.pipeline === 'balanced';
         // Show when a real enhancer is selected (not none) and pass is enabled
-        row.style.display = (enhancer !== 'none' && enhancer !== '' && isEnabled && !isXxl) ? 'block' : 'none';
+        row.style.display = (enhancer !== 'none' && enhancer !== '' && isEnabled
+                             && !isXxl && !isBalanced) ? 'block' : 'none';
+        if (isBalanced && this.state[passId]) {
+            // Clear it too, so a value left over from another pipeline is not
+            // carried into the run by a control the user can no longer see.
+            this.state[passId].enhanceForVad = false;
+            const box = document.getElementById(`${passId}-enhance-for-vad`);
+            if (box) box.checked = false;
+        }
     },
 
     // BYOP Settings Panel Management
