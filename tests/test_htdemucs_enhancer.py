@@ -9,15 +9,15 @@ in the CLI's list of enhancers, in both of the GUI's per-pass dropdowns, and in
 the notebook -- the owner asked on 2026-09-17 for htdemucs to be "available for
 all pipelines".
 
-Second, and more important, that it does NOT fail quietly. Every other enhancer
-here degrades to "no enhancement" with a warning when it cannot run. htdemucs is
-chosen because the audio needs it, so falling back would hand the user subtitles
-made from the untouched audio, from a run that exited 0. The owner's decision was
-"it should fail with good user communication", so the run must stop instead.
+Second, that it follows the agreed error-handling rules (2026-09-17) and has no
+rules of its own: a clean-up that cannot install or cannot start stops the run,
+while a failure on one piece of audio is reported as a failed result and the
+caller decides -- some pieces failing is a shortfall the user is told about,
+every piece failing fails the file.
 
-The demucs package is deliberately not a WhisperJAV dependency, so on a machine
-without it these tests exercise the not-installed path for real; on a machine with
-it, the not-installed path is simulated.
+Third, that the model actually works. demucs is an ordinary WhisperJAV
+dependency, so where it is installed the last class below runs the real model on
+real audio; the not-installed path is then simulated instead.
 
 Run with: pytest tests/test_htdemucs_enhancer.py -v
 """
@@ -237,3 +237,72 @@ class TestTheRunStops:
              "--pass1-speech-enhancer", "htdemucs"],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
         assert result.returncode == 0, (result.stdout + result.stderr)[-600:]
+
+
+class TestTheModelActuallyWorks:
+    """
+    Runs the real model. Skipped where demucs is not installed.
+
+    Until 2026-09-17 nothing here had ever been executed: every behavioural test
+    was skipped on a machine WITH demucs, so the separation itself, the tensor
+    shapes and the stem index were covered nowhere at all.
+    """
+
+    pytestmark = pytest.mark.skipif(
+        not DEMUCS_INSTALLED, reason="demucs is not installed on this machine")
+
+    @staticmethod
+    def _enhancer():
+        from whisperjav.modules.speech_enhancement.factory import SpeechEnhancerFactory
+        return SpeechEnhancerFactory.create("htdemucs", config={})
+
+    @staticmethod
+    def _audio(seconds=1.0, rate=44100):
+        import numpy as np
+        t = np.arange(int(rate * seconds)) / rate
+        tone = 0.3 * np.sin(2 * np.pi * 220 * t)
+        return (tone + 0.02 * np.sin(2 * np.pi * 3000 * t)).astype(np.float32)
+
+    def test_it_separates_and_returns_usable_audio(self):
+        import numpy as np
+
+        enhancer = self._enhancer()
+        try:
+            audio = self._audio()
+            result = enhancer.enhance(audio, 44100)
+
+            assert result.success is True
+            assert result.error_message is None
+            # Same length in and out: the scenes are paired by position with the
+            # untouched track, so a change in length would misplace every line.
+            assert len(result.audio) == len(audio)
+            assert result.audio.dtype == np.float32
+            assert result.audio.ndim == 1, "the rest of WhisperJAV works in mono"
+            assert bool(np.isfinite(result.audio).all()), "NaN or inf would poison the ASR"
+            assert result.sample_rate == 44100
+            assert result.parameters["stem"] == "vocals"
+        finally:
+            enhancer.cleanup()
+
+    def test_input_at_another_rate_is_resampled_not_refused(self):
+        # Scenes arrive at 48kHz from the extractor, not at the model's 44.1kHz.
+        enhancer = self._enhancer()
+        try:
+            result = enhancer.enhance(self._audio(rate=48000), 48000)
+            assert result.success is True
+            assert result.parameters["input_sr"] == 48000
+            assert result.sample_rate == 44100
+        finally:
+            enhancer.cleanup()
+
+    def test_an_unknown_model_is_refused_before_anything_runs(self):
+        from whisperjav.modules.speech_enhancement.base import SpeechEnhancerUnavailable
+        from whisperjav.modules.speech_enhancement.factory import SpeechEnhancerFactory
+
+        with pytest.raises(SpeechEnhancerUnavailable) as caught:
+            SpeechEnhancerFactory.create("htdemucs", config={"model": "not-a-model"})
+        assert "not-a-model" in str(caught.value)
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

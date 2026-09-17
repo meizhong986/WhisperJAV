@@ -548,6 +548,11 @@ class TransformersPipeline(BasePipeline):
         Returns:
             Master metadata dict
         """
+        # Cross-cutting rule of the agreed error-handling table (2026-09-17):
+        # anything that quietly fell short is reported in the run summary rather
+        # than only in the log. Reset per file -- the pipeline object is reused
+        # across the whole run.
+        self.degradations = []
         import os
         start_time = time.time()
 
@@ -662,6 +667,7 @@ class TransformersPipeline(BasePipeline):
                         scene_paths,
                         enhancer,
                         self.temp_dir,
+                        degradations=self.degradations,
                         progress_callback=lambda n, t, name: logger.debug(
                             f"Enhancing scene {n}/{t}: {name}"
                         )

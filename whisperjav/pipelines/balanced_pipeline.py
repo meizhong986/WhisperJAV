@@ -292,6 +292,11 @@ class BalancedPipeline(BasePipeline):
     def process(self, media_info: Dict) -> Dict:
         """Process media file through balanced pipeline with scene detection and VAD-enhanced ASR."""
         start_time = time.time()
+        # Cross-cutting rule of the agreed error-handling table (2026-09-17):
+        # anything that quietly fell short is reported in the run summary rather
+        # than only in the log. Reset per file -- the pipeline object is reused
+        # across the whole run.
+        self.degradations = []
 
         input_file = media_info['path']
         media_basename = media_info['basename']
@@ -433,6 +438,7 @@ class BalancedPipeline(BasePipeline):
                     enhancer,
                     self.temp_dir,
                     progress_callback=enhancement_progress,
+                    degradations=self.degradations,
                 )
                 print()  # Newline after progress
 

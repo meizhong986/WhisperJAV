@@ -325,6 +325,7 @@ def enhance_scenes(
     enhancer: SpeechEnhancer,
     temp_dir: Path,
     progress_callback: Optional[callable] = None,
+    degradations: Optional[List[str]] = None,
 ) -> List[Tuple[Path, float, float, float]]:
     """
     Enhance scene audio files and resample to 16kHz for ASR.
@@ -340,6 +341,9 @@ def enhance_scenes(
         enhancer: Active SpeechEnhancer instance
         temp_dir: Temporary directory (enhanced_scenes will be created here)
         progress_callback: Optional callback(scene_num, total_scenes, scene_name)
+        degradations: Optional list. A plain-language line is appended to it for
+            anything the user should be told about in the run summary -- today,
+            scenes that went through without being cleaned up.
 
     Returns:
         List of (enhanced_scene_path, start_sec, end_sec, duration_sec)
@@ -347,18 +351,24 @@ def enhance_scenes(
 
     Raises:
         SpeechEnhancerUnavailable: if the clean-up cannot run at all -- it is not
-            installed, or it could not start. That is the owner's rule
-            (2026-09-17): a component the user chose that cannot install or
-            start is a failure and the run stops. It is deliberately NOT every
-            error a running clean-up can hit; how those are handled is being
-            settled separately.
+            installed, it could not start, or it failed on EVERY scene. The
+            owner's rule (2026-09-17): a component the user chose that cannot
+            install or start is a failure and the run stops. A clean-up that ran
+            and achieved nothing is the same thing by a different route, so it is
+            treated the same (agreed error-handling table, 2026-09-17).
 
     Note:
-        If enhancement fails for one scene, a 16kHz copy of the original scene is
-        used and the run goes on. It is a copy rather than the scene itself
-        because every path returned here is at 16kHz, and the dual-track path
-        pairs these scenes with originals at that rate and refuses two tracks
-        recorded at different rates.
+        If enhancement fails for SOME scenes, a 16kHz copy of each failed
+        original is used and the run goes on -- only all-fail is fatal (owner,
+        2026-09-17: "only all-fail is fatal, agreed"). The count of scenes that
+        went through unenhanced is returned to the caller through
+        ``degradations`` so it can reach the run summary instead of living in a
+        log line nobody reads.
+
+        The fallback is a copy rather than the scene itself because every path
+        returned here is at 16kHz, and the dual-track path pairs these scenes
+        with originals at that rate and refuses two tracks recorded at different
+        rates.
     """
     if not scene_paths:
         return scene_paths
@@ -369,6 +379,7 @@ def enhance_scenes(
     enhanced_dir.mkdir(exist_ok=True)
 
     enhanced_paths = []
+    failed_scenes = []
     enhancement_start = time.time()
 
     logger.info(
@@ -431,6 +442,7 @@ def enhance_scenes(
                     f"Scene {scene_num} enhancement failed: {result.error_message}. "
                     "Using original."
                 )
+                failed_scenes.append((scene_num, result.error_message))
                 enhanced_paths.append((
                     _scene_at_target_rate(
                         scene_path,
@@ -446,6 +458,7 @@ def enhance_scenes(
             logger.warning(
                 f"Scene {scene_num} enhancement error: {e}. Using original."
             )
+            failed_scenes.append((scene_num, str(e)))
             enhanced_paths.append((
                 _scene_at_target_rate(
                     scene_path,
@@ -492,6 +505,29 @@ def enhance_scenes(
                 logger.debug(f"Scene {scene_num}/{total_scenes}: cleanup exception: {cleanup_err}")
 
     total_time = time.time() - enhancement_start
+
+    if failed_scenes:
+        # Owner, 2026-09-17: "only all-fail is fatal, agreed." A clean-up that
+        # ran and cleaned up nothing is the same as one that could not run, so
+        # it is refused the same way. Anything short of that is a shortfall the
+        # user is told about, not a reason to throw away the transcription.
+        if len(failed_scenes) == total_scenes:
+            first_reason = failed_scenes[0][1]
+            raise SpeechEnhancerUnavailable(
+                f"{enhancer.display_name} failed on every one of the "
+                f"{total_scenes} pieces of this audio, so nothing was cleaned "
+                f"up. The first failure was: {first_reason}. The run has stopped "
+                f"rather than give you subtitles made from audio you asked to "
+                f"have cleaned up. Choose a different clean-up, or none."
+            )
+
+        note = (f"{len(failed_scenes)} of {total_scenes} scenes went through "
+                f"without being cleaned up by {enhancer.display_name} "
+                f"(first: {failed_scenes[0][1]})")
+        logger.warning(note)
+        if degradations is not None:
+            degradations.append(note)
+
     logger.info(f"Enhancement complete: {total_scenes} scenes in {total_time:.1f}s")
 
     return enhanced_paths

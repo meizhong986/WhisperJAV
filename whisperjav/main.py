@@ -1752,10 +1752,20 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
 
                 # The per-file verdict (done / empty / suspect), in the shared
                 # vocabulary. The exit status is decided once, in main().
+                # Cross-cutting rule of the agreed error-handling table
+                # (owner, 2026-09-17): anything that quietly fell short is
+                # named in the RUN SUMMARY, not left in a log line. Today that
+                # is scenes a chosen clean-up could not clean. It travels
+                # through the same degraded/suspect channel a failed pass 2
+                # already uses.
+                _shortfalls = list(getattr(pipeline, 'degradations', None) or [])
+
                 outcome = classify_output(
                     file_path_str,
                     output_path or None,
                     media_info.get('duration'),
+                    degraded=bool(_shortfalls),
+                    degraded_reason="; ".join(_shortfalls),
                     min_coverage=args.min_coverage,
                     # Corroboration is only meaningful with a genuine external
                     # segmenter; pipelines that do not report it leave it at 0.

@@ -11,6 +11,74 @@
 
 ---
 
+## 2026-09-17 — the agreed error-handling rules, and htdemucs finally run
+
+**Owner, 2026-09-17:** *"The D rows, agreed"* and *"only all-fail is fatal, agreed"*, on the table at
+`docs/plans/V193_ERROR_HANDLING_TABLE.md`. That table was written because I had misread his stop rule
+and made every per-scene failure fatal; it is now the agreed reference, and the code follows it.
+
+### The rule, as agreed
+
+A clean-up the user chose that **cannot install or cannot start** stops the run — that was always his
+rule and was already implemented. What is new is the rest of the picture:
+
+- **Some scenes fail, others succeed:** those scenes go through uncleaned, the run continues, and
+  **the user is told how many** — see below.
+- **Every scene fails:** the file fails. A clean-up that ran and cleaned nothing is the same as one
+  that could not run, so it is refused the same way.
+
+`enhance_scenes` carries this for every pipeline at once — balanced, fidelity, qwen, transformers and
+decoupled all enhance through that one function.
+
+### htdemucs no longer has rules of its own
+
+It raised on *everything*, including a failure on one piece of audio, while the other four enhancers
+reported a per-scene failure and let the run continue. One bad scene failed a whole file. It now
+reports a per-piece failure the way they do, and raises only for something that means the clean-up
+cannot be had at all: not installed, weights will not load, a model with no vocal stem.
+
+### A shortfall now reaches the run summary
+
+The rule that makes degrading acceptable rather than silent. A file whose clean-up half-failed is
+reported as **`suspect`**, with the count and the reason, in the RUN SUMMARY — not in a log line
+nobody reads. Anyone who wants no degradation at all already has the switch: **`--fail-on suspect`**
+makes the run exit non-zero.
+
+No vocabulary was invented for this. WhisperJAV already had per-file states
+(`done / empty / suspect / failed / skipped`) and a `degraded` / `degraded_reason` channel built for a
+failed pass 2; the shortfall travels through the same one.
+
+**Where it works and where it does not, stated plainly.** The single-file paths carry it: each
+pipeline collects the notes and `main.py` reads them after `process()`. The **two-pass / ensemble path
+does not yet** — those passes run in a separate process and return a typed result that has no field
+for it, the same boundary that already stops the speech-positive streak getting back (there is a
+comment in `main.py` saying so). Carrying it across means changing that result type, and that is the
+next piece rather than something to rush.
+
+### htdemucs has been run, at last
+
+`demucs` was installed on the owner's machine, so the backend that had **never been executed** was
+finally exercised:
+
+- Directly on audio: the model loaded on CUDA, fetched its 84 MB of weights from Meta's CDN, and
+  returned a vocal stem — same length, float32, all finite.
+- Through the whole pipeline: an 8-second clip through `--ensemble --pass1-pipeline fidelity
+  --pass1-model tiny --pass1-speech-enhancer htdemucs --pass1-enhance-for-vad`. Exit 0, subtitles
+  written, and the temp directory shows both tracks of the VAD-only split at 16 kHz — the cleaned-up
+  one for finding the speech, the untouched one for the recogniser.
+
+**Two of the four things this branch had never proved are now proved.** What remains: the translation
+chat check has still never met a real llama-cpp server, and the GUI changes are still not
+click-confirmed.
+
+### Verified this sitting
+
+`test_enhance_scene_fallback_rate` 14, `test_degradation_reaches_the_summary` 13 (new),
+`test_htdemucs_enhancer` 23, `test_enhance_for_vad_dual_track` 17, `test_speech_enhancer_spec` 30.
+`python -m whisperjav.main --help` exits 0.
+
+---
+
 ## 2026-09-17 — phase 6 opened: the Windows installer (A1), and the mechanism A2 needs
 
 **Owner, 2026-09-17:** *"proceed to 6."*

@@ -19,12 +19,13 @@ One thing still comes from the network the first time:
                        NOTE: not Hugging Face, so --offline, --hf-endpoint and
                        any Hugging Face mirror do not apply to it.
 
-A note on failures, honestly stated. This backend currently raises
-SpeechEnhancerUnavailable for everything that goes wrong, including a failure on
-one piece of audio, while the other four enhancers report a per-scene failure and
-let the run continue. That inconsistency predates the error-handling rules being
-settled with the owner and is NOT a decided design: the agreed table governs, and
-this backend follows it once it exists.
+Failures follow the same rule as every other clean-up (owner's agreed
+error-handling table, 2026-09-17). A failure on one piece of audio is reported as
+a failed result and that piece goes through uncleaned; the caller stops the run
+only if EVERY piece failed. Something that means this clean-up cannot be had at
+all -- it is not installed, the weights will not load, the chosen model has no
+vocal stem -- is raised as SpeechEnhancerUnavailable and stops the run before any
+audio is read.
 
 Model:
     htdemucs -- Hybrid Transformer Demucs, the v4 default. Four stems; we keep
@@ -44,6 +45,7 @@ import numpy as np
 from ..base import (
     EnhancementResult,
     SpeechEnhancerUnavailable,
+    create_failed_result,
     load_audio_to_array,
     resample_audio,
     resolve_torch_device,
@@ -200,10 +202,10 @@ class HtDemucsSpeechEnhancer:
         """
         Keep the voice and drop the rest.
 
-        Every failure here is raised as SpeechEnhancerUnavailable and stops the
-        run: the user chose this clean-up, and carrying on would hand back
-        subtitles made from audio they asked to have cleaned up, from a run that
-        exited 0. Nothing in this backend returns a failed result.
+        A failure on this one piece of audio comes back as a failed result, and
+        the caller decides what it means: some pieces failing is a shortfall the
+        user is told about, every piece failing stops the run. Only something
+        that means the clean-up cannot be had at all is raised from here.
         """
         start_time = time.time()
 
@@ -251,6 +253,9 @@ class HtDemucsSpeechEnhancer:
             )
 
         except SpeechEnhancerUnavailable:
+            # Something that means this clean-up cannot be had at all -- the
+            # model has no vocal stem to give, for instance. That is not a
+            # per-scene problem and does not become one.
             raise
         except Exception as e:
             message = str(e).lower()
@@ -260,12 +265,25 @@ class HtDemucsSpeechEnhancer:
             if ("out of memory" in message
                     or "outofmemory" in message
                     or "can't allocate memory" in message):
-                raise SpeechEnhancerUnavailable(
-                    "htdemucs: the graphics card ran out of memory while "
-                    "isolating the voice ({}). Run this enhancer on the "
-                    "processor instead, or choose a lighter clean-up.".format(e))
-            raise SpeechEnhancerUnavailable(
-                "htdemucs: isolating the voice failed ({}).".format(e))
+                detail = ("the graphics card ran out of memory while isolating "
+                          "the voice ({}). Run this enhancer on the processor "
+                          "instead, or choose a lighter clean-up.".format(e))
+            else:
+                detail = "isolating the voice failed ({}).".format(e)
+
+            # A failure on one piece of audio is reported the way the other four
+            # enhancers report theirs, and the caller decides what it means:
+            # some scenes failing is a shortfall the user is told about, every
+            # scene failing stops the run (owner's agreed error-handling table,
+            # 2026-09-17). Until that table was agreed this backend raised on
+            # everything, which made one bad scene fail a whole file.
+            return create_failed_result(
+                audio=audio_data,
+                sample_rate=actual_sr,
+                method="htdemucs-{}".format(self._model_name),
+                error_message="htdemucs: {}".format(detail),
+                processing_time_sec=time.time() - start_time,
+            )
 
     def _separate_vocals(self, audio: np.ndarray, torch, apply_model) -> np.ndarray:
         """Run the model and return the vocal stem as mono float32."""

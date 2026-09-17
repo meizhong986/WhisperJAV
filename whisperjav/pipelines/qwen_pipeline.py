@@ -594,6 +594,11 @@ class QwenPipeline(BasePipeline):
         Returns:
             Master metadata dictionary with paths, stats, quality metrics.
         """
+        # Cross-cutting rule of the agreed error-handling table (2026-09-17):
+        # anything that quietly fell short is reported in the run summary rather
+        # than only in the log. Reset per file -- the pipeline object is reused
+        # across the whole run.
+        self.degradations = []
         input_file = Path(media_info["path"])
         media_basename = media_info["basename"]
         pipeline_start = time.time()
@@ -769,6 +774,7 @@ class QwenPipeline(BasePipeline):
             enhanced_paths = enhance_scenes(
                 scene_paths, enhancer, self.temp_dir,
                 progress_callback=_enhancement_progress,
+                degradations=self.degradations,
             )
             original_16k_paths = resample_scenes(scene_paths, self.temp_dir)
 
@@ -795,6 +801,7 @@ class QwenPipeline(BasePipeline):
             scene_paths = enhance_scenes(
                 scene_paths, enhancer, self.temp_dir,
                 progress_callback=_enhancement_progress,
+                degradations=self.degradations,
             )
 
             # VRAM Block 1 cleanup — release enhancer before loading ASR
