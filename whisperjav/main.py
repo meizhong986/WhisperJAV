@@ -125,6 +125,7 @@ from whisperjav.__version__ import __version__, __version_display__
 from whisperjav.utils.preflight_check import (
     enforce_gpu_requirement,
     ensure_segmenter_model_available,
+    ensure_speech_enhancer_available,
     run_preflight_checks,
     cpu_consent_in_argv,
 )
@@ -154,7 +155,8 @@ LANGUAGE_CODE_MAP = {
 # hardcoded rather than imported so `--help` does not pay the factory import cost.
 # Without `choices=`, a typo such as `zipenhance` was accepted and silently
 # downgraded to no enhancement part-way through a multi-hour run (#306).
-SPEECH_ENHANCER_CHOICES = ["none", "ffmpeg-dsp", "zipenhancer", "clearvoice", "bs-roformer"]
+SPEECH_ENHANCER_CHOICES = ["none", "ffmpeg-dsp", "zipenhancer", "clearvoice", "bs-roformer",
+                           "htdemucs"]
 
 # The effects FFmpegDSPBackend knows. Hardcoded for the same reason
 # SPEECH_ENHANCER_CHOICES is: --help and argument validation must not pay the cost
@@ -823,8 +825,13 @@ def parse_arguments():
                                 "scenes. Lower values tend to give more, shorter scenes. Default 22 "
                                 "(v1.9.2: the same value every pipeline uses).")
     qwen_audio_group.add_argument("--qwen-enhancer", type=str, default="none",
-                           choices=["none", "clearvoice", "bs-roformer", "zipenhancer", "ffmpeg-dsp"],
-                           help="Speech enhancement backend (default: none)")
+                           choices=SPEECH_ENHANCER_CHOICES,
+                           help="Speech enhancement backend (default: none). htdemucs and "
+                                "bs-roformer isolate the voice from music and effects; "
+                                "zipenhancer and clearvoice reduce noise; ffmpeg-dsp applies "
+                                "level and filter work. htdemucs is not installed with "
+                                "WhisperJAV: choosing it without installing it stops the run "
+                                "with instructions rather than transcribing untouched audio.")
     qwen_audio_group.add_argument("--qwen-enhancer-model", type=str, default=None,
                            help="Speech enhancer model variant (e.g., 'MossFormer2_SE_48K' for clearvoice)")
     qwen_audio_group.add_argument("--enhance-for-vad", action="store_true", default=False,
@@ -2984,6 +2991,17 @@ def main():
         ensure_segmenter_model_available(
             _seg_cfg.get("backend"), model_dir=_seg_cfg.get("model_dir")
         )
+
+    # Same rule for an audio clean-up that must not fail quietly (htdemucs). It is
+    # checked here, before any audio is read, for the same reason: reaching the
+    # pipeline without it would mean subtitles made from the untouched audio the
+    # user asked to have cleaned up, from a run that exits 0.
+    if args.ensemble:
+        for _n in (1, 2):
+            ensure_speech_enhancer_available(
+                getattr(args, f"pass{_n}_speech_enhancer", None))
+    else:
+        ensure_speech_enhancer_available(getattr(args, "qwen_enhancer", None))
 
     # Setup temp directory
     if args.temp_dir:

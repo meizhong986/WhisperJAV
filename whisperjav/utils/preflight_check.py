@@ -643,6 +643,80 @@ def ensure_segmenter_model_available(backend, *, model_dir=None,
         sys.exit(1)
 
 
+
+def ensure_speech_enhancer_available(backend, *, exit_on_fail: bool = True) -> bool:
+    """
+    Make sure an audio clean-up that must not fail quietly can actually run,
+    before any audio is read.
+
+    Most clean-up backends degrade to "no enhancement" with a warning, which is
+    right for one that only helps a little. A backend listed in the factory's
+    FATAL_WHEN_UNAVAILABLE was chosen because the audio needs it -- falling back
+    would hand the user a poor subtitle file from a run that exited 0. Owner,
+    2026-09-17, about htdemucs: "I think it should fail with good user
+    communication."
+
+    This is a better MESSAGE, earlier. The guarantee is in the backend itself and
+    in pipeline_helper, which raise SpeechEnhancerUnavailable however the backend
+    is reached, including by a path this check does not predict.
+
+    Returns True when there is nothing to check or the backend is ready. On
+    failure it prints what the user can do and, by default, ends the run with
+    status 1 -- the same status the other start-up checks use. Pass
+    exit_on_fail=False to get False back instead, which is what --check wants.
+    """
+    if not backend or backend == "none":
+        return True
+
+    # Names may arrive as "backend:detail" from --passN-speech-enhancer.
+    backend = str(backend).split(":", 1)[0].strip()
+
+    try:
+        from whisperjav.modules.speech_enhancement.factory import (
+            FATAL_WHEN_UNAVAILABLE,
+            SpeechEnhancerFactory,
+        )
+    except Exception:
+        return True  # Enhancement is not installed at all; nothing to promise.
+
+    if backend not in FATAL_WHEN_UNAVAILABLE:
+        return True
+
+    available, hint = SpeechEnhancerFactory.is_backend_available(backend)
+    if available:
+        return True
+    if not exit_on_fail:
+        return False
+
+    lines = [
+        f"The {backend} audio clean-up is not installed",
+        "",
+        "This run was asked to isolate the voice from the music and effects",
+        f"with {backend}, and the program that does it is not on this machine.",
+        "",
+        "Nothing has been transcribed. Going ahead without it would hand you",
+        "subtitles made from the untouched audio -- which is the thing you",
+        "asked to have cleaned up -- and the run would look successful.",
+        "",
+        "What you can do:",
+        f"  - Install it, once, with:  {hint}",
+        "    It is a normal install: nothing is compiled, and it brings a",
+        "    model of about 84 MB the first time you run it.",
+        "  - Or pick a clean-up that is already installed:",
+        "      --speech-enhancer is chosen per pass, e.g.",
+        "      --pass1-speech-enhancer bs-roformer  (isolates the voice too)",
+        "      --pass1-speech-enhancer zipenhancer   (reduces noise)",
+        "      --pass1-speech-enhancer ffmpeg-dsp    (levels and filters)",
+        "    In the Ensemble tab, set that pass's Audio Clean-up to one of",
+        "    those instead.",
+        "  - Or leave the clean-up out and transcribe the audio as it is.",
+        "",
+        "Note: the model comes from Meta's own site, not from Hugging Face,",
+        "so a Hugging Face mirror or --offline does not apply to it.",
+    ]
+    _print_box(lines, Fore.RED)
+    sys.exit(1)
+
 def run_preflight_checks(verbose: bool = False, exit_on_fail: bool = True) -> bool:
     """Run pre-flight checks and optionally exit on failure.
     

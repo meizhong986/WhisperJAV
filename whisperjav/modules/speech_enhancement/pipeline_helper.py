@@ -78,8 +78,8 @@ import logging
 import time
 import soundfile as sf
 
-from .factory import SpeechEnhancerFactory
-from .base import SpeechEnhancer, resample_audio
+from .factory import FATAL_WHEN_UNAVAILABLE, SpeechEnhancerFactory
+from .base import SpeechEnhancer, SpeechEnhancerUnavailable, resample_audio
 
 logger = logging.getLogger("whisperjav")
 
@@ -130,6 +130,14 @@ def create_enhancer_from_config(
     if backend != "none":
         available, hint = SpeechEnhancerFactory.is_backend_available(backend)
         if not available:
+            if backend in FATAL_WHEN_UNAVAILABLE:
+                # Chosen because the audio needs it. Handing back the original
+                # audio would produce a poor subtitle file from a run that
+                # exited 0, with only a warning in the log to explain it.
+                raise SpeechEnhancerUnavailable(
+                    f"The '{backend}' audio clean-up was asked for, but it is "
+                    f"not installed on this machine. {hint}"
+                )
             logger.warning(
                 f"Speech enhancer '{backend}' not available: {hint}. "
                 "Falling back to 'none' (passthrough with resampling)."
@@ -141,7 +149,13 @@ def create_enhancer_from_config(
         enhancer = SpeechEnhancerFactory.create(backend, config=enhancer_config)
         logger.info(f"Speech enhancer created: {enhancer.display_name}")
         return enhancer
+    except SpeechEnhancerUnavailable:
+        raise
     except Exception as e:
+        if backend in FATAL_WHEN_UNAVAILABLE:
+            raise SpeechEnhancerUnavailable(
+                f"The '{backend}' audio clean-up could not be started: {e}"
+            )
         logger.warning(f"Failed to create speech enhancer '{backend}': {e}. Falling back to 'none'.")
         # Fallback to none backend - guaranteed to work
         return SpeechEnhancerFactory.create("none", config={})
@@ -174,6 +188,14 @@ def create_enhancer_direct(
     if backend != "none":
         available, hint = SpeechEnhancerFactory.is_backend_available(backend)
         if not available:
+            if backend in FATAL_WHEN_UNAVAILABLE:
+                # Chosen because the audio needs it. Handing back the original
+                # audio would produce a poor subtitle file from a run that
+                # exited 0, with only a warning in the log to explain it.
+                raise SpeechEnhancerUnavailable(
+                    f"The '{backend}' audio clean-up was asked for, but it is "
+                    f"not installed on this machine. {hint}"
+                )
             logger.warning(
                 f"Speech enhancer '{backend}' not available: {hint}. "
                 "Falling back to 'none' (passthrough with resampling)."
@@ -188,7 +210,13 @@ def create_enhancer_direct(
         enhancer = SpeechEnhancerFactory.create(backend, config=params)
         logger.info(f"Speech enhancer created: {enhancer.display_name}")
         return enhancer
+    except SpeechEnhancerUnavailable:
+        raise
     except Exception as e:
+        if backend in FATAL_WHEN_UNAVAILABLE:
+            raise SpeechEnhancerUnavailable(
+                f"The '{backend}' audio clean-up could not be started: {e}"
+            )
         logger.warning(f"Failed to create speech enhancer '{backend}': {e}. Falling back to 'none'.")
         return SpeechEnhancerFactory.create("none", config={})
 
@@ -377,6 +405,11 @@ def enhance_scenes(
                 )
                 enhanced_paths.append((scene_path, start_sec, end_sec, dur_sec))
 
+        except SpeechEnhancerUnavailable:
+            # The clean-up itself cannot run. Carrying on scene by scene would
+            # repeat the same failure for every scene and end with a subtitle
+            # file made from audio the user asked to have cleaned up.
+            raise
         except Exception as e:
             logger.warning(
                 f"Scene {scene_num} enhancement error: {e}. Using original."
@@ -489,6 +522,8 @@ def enhance_single_audio(
             )
             return audio_path
 
+    except SpeechEnhancerUnavailable:
+        raise
     except Exception as e:
         logger.warning(f"Audio enhancement error: {e}. Using original.")
         return audio_path
