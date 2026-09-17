@@ -491,6 +491,9 @@ def translate_with_config(
             server_address = api_base.replace('/v1', '')
             local_provider_config = {
                 'pysubtrans_name': 'Custom Server',
+                # PySubtrans talks to it as a custom server; WhisperJAV
+                # started it and knows where its log is.
+                'whisperjav_provider': 'local',
                 'server_address': server_address,
                 'endpoint': '/v1/chat/completions',
                 'supports_conversation': True,

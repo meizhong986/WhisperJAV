@@ -163,6 +163,7 @@ WHEEL_VERSION = HUGGINGFACE_WHEEL_VERSION
 _server_process: Optional[subprocess.Popen] = None
 _server_port: Optional[int] = None
 _server_stderr_path: Optional[str] = None  # Track stderr temp file for cleanup
+_keep_server_log: bool = False  # Set when something has pointed the user at the log
 
 # Note: atexit handler registered after stop_local_server is defined (see end of module)
 
@@ -1536,9 +1537,10 @@ def _parse_server_stderr(stderr_path: str) -> ServerDiagnostics:
     return diag
 
 
-def _verify_chat_completion(port: int, timeout: int = 60) -> Tuple[bool, Optional[str]]:
+def _verify_chat_completion(port: int, timeout: int = 60,
+                            stream: bool = False) -> Tuple[bool, Optional[str]]:
     """
-    Ask the server for one short chat completion -- the shape translation uses.
+    Ask the server for one short chat completion, in the shape this run will use.
 
     Returns (True, None) when the server answers with usable text, or
     (False, message) with a message written for the person running WhisperJAV.
@@ -1546,6 +1548,14 @@ def _verify_chat_completion(port: int, timeout: int = 60) -> Tuple[bool, Optiona
     This exists because /v1/completions succeeding does not mean
     /v1/chat/completions will: they are different routes with different response
     models, and a build can serve the first and fail the second every time.
+
+    ``stream`` has to match how translation will send its own requests, because
+    those are two more paths that can differ. llama-cpp-python validates a
+    single reply against a response model and sends streamed chunks without
+    validating them -- which is exactly where the known defect lives -- so a
+    build can fail one and serve the other. Asking in the wrong shape would
+    either stop a run that was going to work or pass a run that is about to
+    fail. The translate CLI streams; the GUI and --translate path do not.
     """
     import json
     import urllib.error
@@ -1556,23 +1566,44 @@ def _verify_chat_completion(port: int, timeout: int = 60) -> Tuple[bool, Optiona
         "messages": [{"role": "user", "content": "Reply with the word OK."}],
         "max_tokens": 8,
         "temperature": 0.0,
-        "stream": False,
+        "stream": stream,
     }).encode("utf-8")
 
-    logger.info("Checking that the translation server can answer a chat request...")
+    shape = "streamed" if stream else "single-reply"
+    logger.info(f"Checking that the translation server can answer a {shape} chat request...")
 
     try:
         request = urllib.request.Request(
             url, data=payload,
             headers={"Content-Type": "application/json"}, method="POST")
         with urllib.request.urlopen(request, timeout=timeout) as response:
+            if stream:
+                # Server-sent events: "data: {...}" per chunk, then "data: [DONE]".
+                answered = False
+                for raw_line in response:
+                    line = raw_line.decode("utf-8", errors="replace").strip()
+                    if not line.startswith("data:"):
+                        continue
+                    chunk = line[len("data:"):].strip()
+                    if chunk == "[DONE]":
+                        break
+                    try:
+                        if json.loads(chunk).get("choices"):
+                            answered = True
+                    except ValueError:
+                        continue
+                if not answered:
+                    return False, (
+                        "The local translation server ended a streamed chat request "
+                        "without sending any reply, so nothing could be translated.")
+                logger.info("The translation server answers chat requests correctly.")
+                return True, None
+
             body = response.read().decode("utf-8", errors="replace")
-            if response.status != 200:
-                return False, (
-                    f"The local translation server answered a chat request with "
-                    f"HTTP {response.status}. Translation sends only chat requests, "
-                    f"so nothing could be translated.\n"
-                    f"{body[:400]}")
+
+        if not body.strip():
+            return False, ("The local translation server answered a chat request "
+                           "with an empty body, so nothing could be translated.")
         data = json.loads(body)
         choices = data.get("choices") or []
         if not choices:
@@ -1607,7 +1638,8 @@ def _verify_chat_completion(port: int, timeout: int = 60) -> Tuple[bool, Optiona
             f"Translation sends only chat requests, so nothing could be translated.")
 
 
-def _wait_for_server(port: int, max_wait: int = 300) -> Tuple[bool, Optional[str], Optional[ServerDiagnostics]]:
+def _wait_for_server(port: int, max_wait: int = 300,
+                     chat_stream: bool = False) -> Tuple[bool, Optional[str], Optional[ServerDiagnostics]]:
     """Wait for server to be ready AND verify inference works.
 
     This function performs a two-phase readiness check:
@@ -1781,7 +1813,8 @@ def _wait_for_server(port: int, max_wait: int = 300) -> Tuple[bool, Optional[str
                 # seconds into a run, with nothing translated. Asking once here
                 # costs one short request and turns that into an immediate,
                 # explainable stop.
-                chat_ok, chat_error = _verify_chat_completion(port, timeout=60)
+                chat_ok, chat_error = _verify_chat_completion(
+                    port, timeout=60, stream=chat_stream)
                 if not chat_ok:
                     return False, chat_error, None
 
@@ -2118,7 +2151,8 @@ def _assess_server_viability(
 def start_local_server(
     model: str = "auto",
     n_gpu_layers: int = -1,
-    n_ctx: int = 8192
+    n_ctx: int = 8192,
+    chat_stream: bool = False
 ) -> Tuple[str, int, ServerDiagnostics]:
     """
     Start the local LLM server.
@@ -2127,6 +2161,8 @@ def start_local_server(
         model: Model ID from MODEL_REGISTRY or 'auto'
         n_gpu_layers: GPU layers to offload (-1 = all, 0 = CPU only)
         n_ctx: Context window size
+        chat_stream: True when the caller will ask for streamed chat
+            completions, so the start-up check asks in that same shape
 
     Returns:
         Tuple of (api_base_url, port, diagnostics)
@@ -2135,7 +2171,9 @@ def start_local_server(
         RuntimeError: If server fails to start, llama-cpp-python unavailable,
             CPU doesn't support AVX2, or inference speed is too slow
     """
-    global _server_process, _server_port, _server_stderr_path
+    global _server_process, _server_port, _server_stderr_path, _keep_server_log
+
+    _keep_server_log = False
 
     # Release GPU memory from previous operations (e.g., Whisper transcription)
     # This helps prevent llama-cpp-python initialization failures
@@ -2322,7 +2360,8 @@ def start_local_server(
     # The two-phase check (HTTP ready + inference verification) catches issues like #148
     # where the server starts but fails on first real request due to CUDA issues
     logger.info(f"Waiting for server on port {port} (this may take 1-2 minutes for large models)...")
-    server_ready, readiness_error, diagnostics = _wait_for_server(port)
+    server_ready, readiness_error, diagnostics = _wait_for_server(
+        port, chat_stream=chat_stream)
 
     if not server_ready:
         # Get exit code and stderr if process died
@@ -2477,17 +2516,20 @@ def stop_local_server():
             _server_process = None
             _server_port = None
 
-    # Clean up stderr temp file
+    # Clean up stderr temp file -- unless someone has told the user to read it.
     if _server_stderr_path is not None:
-        try:
-            import os
-            if os.path.exists(_server_stderr_path):
-                os.remove(_server_stderr_path)
-                logger.debug(f"Cleaned up server log: {_server_stderr_path}")
-        except Exception as e:
-            logger.debug(f"Could not remove server log {_server_stderr_path}: {e}")
-        finally:
-            _server_stderr_path = None
+        if _keep_server_log:
+            logger.info(f"The translation server's log has been kept: {_server_stderr_path}")
+        else:
+            try:
+                import os
+                if os.path.exists(_server_stderr_path):
+                    os.remove(_server_stderr_path)
+                    logger.debug(f"Cleaned up server log: {_server_stderr_path}")
+            except Exception as e:
+                logger.debug(f"Could not remove server log {_server_stderr_path}: {e}")
+            finally:
+                _server_stderr_path = None
 
     # Cleanup GPU memory
     gc.collect()
@@ -2497,6 +2539,18 @@ def stop_local_server():
             torch.cuda.empty_cache()
     except Exception:
         pass
+
+
+def keep_server_log() -> None:
+    """
+    Keep this run's server log instead of deleting it when the server stops.
+
+    Called by whatever tells the user where the log is: the path is useless if
+    the file is removed a moment later, which is what stopping the server
+    otherwise does.
+    """
+    global _keep_server_log
+    _keep_server_log = True
 
 
 def is_server_running() -> bool:

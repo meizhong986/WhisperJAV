@@ -81,6 +81,15 @@ PROVIDER_CONFIGS = {
     }
 }
 
+# Every entry carries the name the user types after --translate-provider.
+# 'pysubtrans_name' cannot serve that purpose: it is the name of PySubtrans's
+# client class, and local, ollama, glm, groq and custom all use 'Custom Server'.
+# Code that has to tell the providers apart -- which server failed, whose log to
+# point at -- reads 'whisperjav_provider'.
+for _provider_key, _provider_config in PROVIDER_CONFIGS.items():
+    _provider_config.setdefault('whisperjav_provider', _provider_key)
+
+
 SUPPORTED_SOURCES = {'japanese', 'korean', 'chinese', 'english'}
 # The source of truth for translation targets. main.py's --translate-target choices, the two
 # GUI dropdowns and the output-suffix stripping in service.py all derive from or are pinned to

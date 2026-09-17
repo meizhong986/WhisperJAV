@@ -724,7 +724,11 @@ def main():
                     print(f"[CLI]   Model: {model}", file=sys.stderr)
                     print(f"[CLI]   GPU layers: {n_gpu_layers} (-1=all, 0=CPU)", file=sys.stderr)
                     try:
-                        api_base, server_port, server_diagnostics = start_local_server(model=model, n_gpu_layers=n_gpu_layers)
+                        api_base, server_port, server_diagnostics = start_local_server(
+                            model=model, n_gpu_layers=n_gpu_layers,
+                            # This path translates with stream=True below, so the
+                            # start-up check has to ask in the streamed shape.
+                            chat_stream=True)
                         print(f"[CLI]   Server ready at: {api_base}", file=sys.stderr)
                         if server_diagnostics.inference_speed_tps > 0:
                             print(f"[CLI]   Inference speed: {server_diagnostics.inference_speed_tps:.1f} tokens/sec", file=sys.stderr)
@@ -757,6 +761,9 @@ def main():
                 server_address = api_base.replace('/v1', '')
                 local_provider_config = {
                     'pysubtrans_name': 'Custom Server',
+                    # PySubtrans talks to it as a custom server; WhisperJAV
+                    # started it and knows where its log is.
+                    'whisperjav_provider': 'local',
                     'server_address': server_address,
                     'endpoint': '/v1/chat/completions',
                     'supports_conversation': True,

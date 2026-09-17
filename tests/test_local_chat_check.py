@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Tests for the start-up check that the local translation server can answer a CHAT
-request -- the shape translation actually sends.
+request -- in the shape translation actually sends.
 
 Everything the readiness check did before used /v1/completions. A build can serve
 that and fail /v1/chat/completions every time: they are different routes with
@@ -12,6 +12,13 @@ errors and nothing translated (owner's report, 2026-09-16).
 Owner, 2026-09-17, agreeing to add this: it is the one measurement that separates
 "this build is broken" from everything else, and it turns a long mystery into an
 immediate, explainable stop.
+
+Streaming matters here (added 2026-09-17 after review). llama-cpp-python
+validates a single chat reply against a response model and sends streamed chunks
+without validating them, so a build can fail one and serve the other. The check
+therefore asks in whichever shape the caller will use: the translate CLI streams,
+the GUI and --translate path do not. Asking in the wrong shape would stop a run
+that was going to work, or pass one that is about to fail.
 
 These run against a stub HTTP server, so no model is loaded and nothing is
 downloaded.
@@ -25,7 +32,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 
-from whisperjav.translate.local_backend import _verify_chat_completion
+from whisperjav.translate.local_backend import _verify_chat_completion, _wait_for_server
 
 # The real failure, verbatim in shape: the server rejects its own reply because
 # a required field on the assistant message was never set.
@@ -47,18 +54,72 @@ GOOD_REPLY = {
                  "finish_reason": "stop"}],
 }
 
+GOOD_COMPLETION = {
+    "id": "cmpl-test",
+    "object": "text_completion",
+    "choices": [{"index": 0, "text": "1 2 3", "finish_reason": "stop"}],
+    "usage": {"completion_tokens": 5},
+}
 
-def _serve(behaviour):
-    """Start a one-off HTTP server that answers /v1/chat/completions."""
+STREAM_CHUNK = {
+    "id": "chatcmpl-test",
+    "object": "chat.completion.chunk",
+    "choices": [{"index": 0, "delta": {"content": "OK"}, "finish_reason": None}],
+}
+
+
+def _serve(chat_behaviour, stream_behaviour=None):
+    """
+    Start a one-off HTTP server standing in for llama-cpp-python's.
+
+    ``chat_behaviour`` answers a non-streaming /v1/chat/completions and returns
+    (status, body). ``stream_behaviour`` answers a streaming one and returns
+    (status, list-of-SSE-lines); when it is None the streaming path reuses the
+    non-streaming behaviour, which is what a healthy build does.
+    """
 
     class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            # Phase 1 of the readiness check: is the HTTP server up?
+            payload = json.dumps({"data": [{"id": "stub-model"}]}).encode("utf-8")
+            self._send(200, payload, "application/json")
+
         def do_POST(self):
             length = int(self.headers.get("Content-Length", 0))
-            self.rfile.read(length)
-            status, body = behaviour()
-            payload = json.dumps(body).encode("utf-8")
+            body = self.rfile.read(length)
+            try:
+                request = json.loads(body or b"{}")
+            except ValueError:
+                request = {}
+
+            if self.path.endswith("/completions") and not self.path.endswith("/chat/completions"):
+                # Phases 2 and 3: plain completions, which always work here.
+                self._send(200, json.dumps(GOOD_COMPLETION).encode("utf-8"),
+                           "application/json")
+                return
+
+            if request.get("stream"):
+                # A default-healthy stream, independent of the single-reply
+                # behaviour: on the real server these are two different paths,
+                # and only the single reply is validated against a response
+                # model. A test for a build broken in its stream passes one in.
+                behaviour = stream_behaviour or (
+                    lambda: (200, [f"data: {json.dumps(STREAM_CHUNK)}", "data: [DONE]"]))
+                status, lines = behaviour()
+                if status != 200:
+                    self._send(status, json.dumps(lines).encode("utf-8"),
+                               "application/json")
+                    return
+                payload = ("\n\n".join(lines) + "\n\n").encode("utf-8")
+                self._send(200, payload, "text/event-stream")
+                return
+
+            status, reply = chat_behaviour()
+            self._send(status, json.dumps(reply).encode("utf-8"), "application/json")
+
+        def _send(self, status, payload, content_type):
             self.send_response(status)
-            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(payload)))
             self.end_headers()
             self.wfile.write(payload)
@@ -76,8 +137,8 @@ def _serve(behaviour):
 def server_factory():
     servers = []
 
-    def start(behaviour):
-        server = _serve(behaviour)
+    def start(chat_behaviour, stream_behaviour=None):
+        server = _serve(chat_behaviour, stream_behaviour)
         servers.append(server)
         return server.server_address[1]
 
@@ -91,6 +152,12 @@ class TestAServerThatWorks:
     def test_a_good_chat_reply_passes(self, server_factory):
         port = server_factory(lambda: (200, GOOD_REPLY))
         ok, error = _verify_chat_completion(port, timeout=10)
+        assert ok is True
+        assert error is None
+
+    def test_a_good_streamed_reply_passes(self, server_factory):
+        port = server_factory(lambda: (200, GOOD_REPLY))
+        ok, error = _verify_chat_completion(port, timeout=10, stream=True)
         assert ok is True
         assert error is None
 
@@ -122,6 +189,20 @@ class TestAServerThatDoesNot:
         assert ok is False
         assert "no content" in error
 
+    def test_an_empty_body_is_caught_and_named(self, server_factory):
+        # A 2xx with nothing in it used to come back as a JSON decode error.
+        port = server_factory(lambda: (204, None))
+        ok, error = _verify_chat_completion(port, timeout=10)
+        assert ok is False
+        assert "empty body" in error
+
+    def test_a_stream_that_sends_nothing_is_caught(self, server_factory):
+        port = server_factory(lambda: (200, GOOD_REPLY),
+                              stream_behaviour=lambda: (200, ["data: [DONE]"]))
+        ok, error = _verify_chat_completion(port, timeout=10, stream=True)
+        assert ok is False
+        assert "without sending any reply" in error
+
     def test_a_server_that_is_not_there_is_reported(self):
         # Nothing is listening on this port.
         ok, error = _verify_chat_completion(59999, timeout=2)
@@ -129,14 +210,52 @@ class TestAServerThatDoesNot:
         assert "could not answer a chat request" in error
 
 
+class TestTheShapeAskedForIsTheShapeThatWillBeUsed:
+    """
+    The two chat paths can differ, so checking the wrong one is worse than
+    useless. These are the two builds that made the distinction necessary.
+    """
+
+    def test_a_build_broken_only_when_not_streaming_does_not_stop_a_streaming_run(
+            self, server_factory):
+        port = server_factory(lambda: (500, REFUSAL_ERROR))  # single reply fails
+        assert _verify_chat_completion(port, timeout=10)[0] is False
+        assert _verify_chat_completion(port, timeout=10, stream=True)[0] is True
+
+    def test_a_build_broken_only_when_streaming_is_caught_by_a_streaming_run(
+            self, server_factory):
+        port = server_factory(lambda: (200, GOOD_REPLY),
+                              stream_behaviour=lambda: (500, REFUSAL_ERROR))
+        assert _verify_chat_completion(port, timeout=10)[0] is True
+        assert _verify_chat_completion(port, timeout=10, stream=True)[0] is False
+
+
 class TestItIsWiredIntoTheReadinessCheck:
-    def test_wait_for_server_runs_it_before_reporting_ready(self):
-        from pathlib import Path
-        source = (Path(__file__).resolve().parents[1] / "whisperjav" / "translate"
-                  / "local_backend.py").read_text(encoding="utf-8")
-        wait = source[source.index("def _wait_for_server("):]
-        assert "_verify_chat_completion(port" in wait
-        # And a failure there must stop the server being reported as ready.
-        assert "if not chat_ok:" in wait
-        assert wait.index("_verify_chat_completion(port") < wait.index(
-            "Server ready and speed measured")
+    """
+    Run the readiness check itself, not a search of its source: a stub answers
+    /v1/models and /v1/completions, so only the chat phase decides the outcome.
+    """
+
+    def test_a_server_whose_chat_works_is_reported_ready(self, server_factory):
+        port = server_factory(lambda: (200, GOOD_REPLY))
+        ready, error, diagnostics = _wait_for_server(port, max_wait=20)
+        assert ready is True
+        assert error is None
+        assert diagnostics is not None
+
+    def test_a_server_whose_chat_fails_is_not_reported_ready(self, server_factory):
+        # Everything the old check measured passes; only chat is broken. This is
+        # the Colab case, and before the chat phase existed it was reported ready.
+        port = server_factory(lambda: (500, REFUSAL_ERROR))
+        ready, error, _ = _wait_for_server(port, max_wait=20)
+        assert ready is False
+        assert "rejects its own chat replies" in error
+
+    def test_the_streaming_caller_is_judged_on_the_streaming_path(self, server_factory):
+        port = server_factory(lambda: (500, REFUSAL_ERROR))  # single reply fails
+        assert _wait_for_server(port, max_wait=20, chat_stream=False)[0] is False
+        assert _wait_for_server(port, max_wait=20, chat_stream=True)[0] is True
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
