@@ -3833,10 +3833,22 @@ const EnsembleManager = {
             ];
             modelDefault = 'CohereLabs/cohere-transcribe-03-2026';
         }
+        // v1.9.3 (owner, 2026-09-17): the window shows the model the ROW has, so
+        // there is one answer and it is the one that runs. Before this the window
+        // showed its own value while pass_worker took the row's, so a model chosen
+        // here was displayed as accepted and then quietly discarded.
+        const rowModel = passState && passState.model;
+        if (rowModel && !modelOptions.some(o => o.value === rowModel)) {
+            // The row offers a few models this window's list does not. Show it
+            // rather than silently substituting one of ours, which is how the two
+            // came to disagree in the first place.
+            modelOptions = modelOptions.concat([{ value: rowModel, label: rowModel }]);
+        }
+
         container.appendChild(this.createTransformersDropdown(
             'model_id', modelDef.label,
             modelOptions,
-            currentValues.model_id || modelDefault,
+            rowModel || currentValues.model_id || modelDefault,
             modelDef.description
         ));
 
@@ -4975,11 +4987,14 @@ const EnsembleManager = {
         // the modal's params via apply_custom_params, whose MODEL_PARAMS includes
         // model_name -- so without this the row displayed a model the run would not use.
         //
-        // Only for legacy. For Transformers and the Qwen family the ROW wins instead
-        // (pass_worker sets hf_model_id / qwen_model_id from pass_config["model"] after
-        // the modal's params), so copying the modal onto the row there would change what
-        // runs, not just what is shown. Those modals use the param name 'model_id', so
-        // they do not reach this branch anyway; their own mismatch is a separate matter.
+        // Only for legacy, because those modals use the param name 'model_name'.
+        // The Transformers and Qwen modals use 'model_id' and so never reach this
+        // branch. For them pass_worker sets hf_model_id / qwen_model_id from
+        // pass_config["model"] -- the ROW -- so the row is what runs. The Qwen
+        // family is handled in its own branch below (v1.9.3), which writes the
+        // window's choice onto the row so the two cannot disagree. Transformers
+        // still has the older behaviour: its window shows its own model while the
+        // row is what runs. Same shape, not yet done.
         //
         // The guard matters. Both sides filter by pipelineModelCompatibility, but the
         // modal filters a SECOND table (allModelOptions in generateModelTab) that the row
@@ -5003,6 +5018,32 @@ const EnsembleManager = {
                         `${this.pipelineLabel(passKey)}. The list still shows ` +
                         `"${modelDropdown.value}", but the run will use ` +
                         `"${fullParams.model_name}".`, 'warn');
+                }
+            }
+        }
+
+        // v1.9.3 (owner, 2026-09-17): the Qwen family's window uses the param name
+        // 'model_id', so it never reached the branch above and a model chosen there
+        // was shown as accepted and then discarded -- pass_worker sets qwen_model_id
+        // from the ROW. Now the window writes back to the row, so the row stays the
+        // single answer and the user's choice is the one that runs. Same guard as
+        // above: a value the row does not offer is reported rather than lost, since
+        // assigning an absent value to a <select> does nothing.
+        if (fullParams.model_id && passState.isQwen) {
+            const modelDropdown = document.getElementById(`${passKey}-model`);
+            if (modelDropdown) {
+                const offered = Array.from(modelDropdown.options)
+                    .some(o => o.value === fullParams.model_id);
+                if (offered) {
+                    modelDropdown.value = fullParams.model_id;
+                    this.state[passKey].model = fullParams.model_id;
+                } else {
+                    ConsoleManager.log(
+                        `Pass ${passKey === 'pass1' ? '1' : '2'}: the settings window chose ` +
+                        `the model "${fullParams.model_id}", which is not in the list for ` +
+                        `${this.pipelineLabel(passKey)}, so the list still shows ` +
+                        `"${modelDropdown.value}" and that is what will run. Pick the ` +
+                        `model in the row instead.`, 'warn');
                 }
             }
         }
