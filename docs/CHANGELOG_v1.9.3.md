@@ -1,12 +1,20 @@
 # WhisperJAV v1.9.3 — Development Change Log
 
 > Developer-facing record of what changed on `dev_v1.9.3`, why, and how it was
-> verified. `docs/release_notes_v1.9.3.md` (not yet written) will be the user-facing
-> text derived from this file. Same conventions as `docs/CHANGELOG_v1.9.2.md`: one
+> verified. The user-facing texts derived from this file now exist:
+> `docs/release_notes_v1.9.3_for_users.md` is what goes on the release page, and
+> `docs/release_notes_v1.9.3.md` is the detailed record organised by outcome. Same conventions as `docs/CHANGELOG_v1.9.2.md`: one
 > entry per landed change, newest first; "Decision" lines record who decided what,
 > so a later reader can tell policy from mechanism.
 >
 > **SYNC** — requirements doc `docs/requirements/v1.9.3_vision_mission_highe-leve-features_v1.txt` **v1** (mtime 2026-09-14 14:20, 3,946 bytes, md5 `736f0c97…`) | release plan **`docs/plans/V193_RELEASE_PLAN.md` rev 1.5** (working record; **owner-facing planning moved 2026-09-16 to `docs/plans/V193_MATTERS_MAP.md` rev 2** — the map of matters, his decisions verbatim, the 7 phases; §2.1 and the D1–D43 table are superseded) | tracker rev **53.0** | change log **`docs/CHANGELOG_v1.9.3.md` through 2026-09-16, phases 1–4** (**committed 2026-09-16 on the owner's word**, together with the v1.9.2 log's SYNC edit; the v1.9.2 log is closed at its 2026-09-14 entry) | owner pack: the v1.9.2 pack `73c5c95d` stays at r4.5; **the v1.9.3 pack opens at the Phase 2 scope gate** (owner, 2026-09-14) | branch **`dev_v1.9.3` @ `5147986`** (PRs #388 #363 #376 #364 merged locally 2026-09-16; then phases 2–4: `ac902b4` F1, `7788a2b` F2, `d9afb7e` F3, `58b9f97` F4, `19c20d5` D1, `25863cf` G1, `ed79c1d` C2, `3ee80a8` languages, `5197fd1`+`528e64b`+`7d5406e` GUI, then the three review-remediation commits `8eb8d00` `6393781` `5147986`), `main` @ `e8c1c6e`, `origin/main` @ `63f256e` = tag `v1.9.2`; **nothing pushed — owner decision 2026-09-14: no push until the 1.9.3 release** | GitHub 2026-09-16: **32 comments posted** (25 phase-1 non-G2 + 4 G2 + #366 retest + #305 + #397) and **5 closures** (PRs #365 #362 #361 #360, issue #397); every comment id in `docs/plans/V193_PHASE1_POSTED.log` | **Owner 2026-09-15: F4 (MOSS) dropped from 1.9.3 → next release (perhaps 1.10); step-4 postings APPROVED and POSTED (ten comments + issues #429 #430); replan without MOSS ordered — **scope proposal produced (D2.0) and adversary-gated (25 findings applied); it sits in the release plan §2.1 with 43 numbered decisions for the Phase 2 sitting.** Phase 0 gate (document set, Q5–Q10) still open.**
+> **CLOSED FOR THE RELEASE, 2026-09-17** at `46194c7`. Version bumped to **1.9.3** via
+> `installer/VERSION` (the only hand-edited file; `whisperjav/__version__.py` is generated).
+> Installer built: `WhisperJAV-1.9.3-Windows-x86_64.exe`, 303 MB. Test suite run in full for
+> the first time -- 101 files, 2245 passed, 136 failed, of which **131 predate this branch**
+> (verified file by file against `ef50e86`); the 5 that did not are fixed. Not yet done:
+> the owner's installation of the built .exe, the merge to `main`, the tag and the push.
+>
 > Rule: a session that changes the release plan, the tracker, this file or the pack brings the others to the same state before it ends (CLAUDE.md rule A7).
 
 ---

@@ -60,6 +60,43 @@ Any input FFmpeg can read works: MP4, MKV, AVI, WMV, MP3, WAV, FLAC, and so on. 
 
 ---
 
+## New in v1.9.3
+
+**More bug fixes and overall improvements.** 1.9.3 builds on 1.9.2: where that release was about
+performance and the Balanced pipeline, this one is about fixing bugs and making small improvements
+across the features. Full detail, including every fix and who reported it:
+[**release notes**](docs/release_notes_v1.9.3_for_users.md).
+
+**The one to know about: a major bug in the speech enhancers.** "Enhance for VAD only" did not do
+what its name says — on Fidelity it enhanced *both* tracks, so the recogniser heard the cleaned-up
+audio too, which is the very thing the option exists to avoid. It now genuinely splits them. The
+control was also invisible in the GUI unless you re-picked the enhancer by hand, and FFmpeg DSP could
+not be chosen from the GUI at all.
+
+**The recommended recipe** — more accurate subtitles and more accurate timing, for a little more
+time. Choose a speech enhancer: **htdemucs** (new here, and installed with WhisperJAV), or any of the
+stable enhancers that suits your machine. Then turn on **Enhance for VAD only**. The enhanced vocal
+stem drives the voice detection, so the speech is *segmented* on clean audio, while the recogniser
+transcribes the **original, untouched** audio. Preparing one track and recognising the other is what
+improves the accuracy. The maintainer's own favourite is **Qwen ASR + htdemucs + Enhance-for-VAD-only
++ TEN VAD**:
+
+```
+whisperjav video.mkv --ensemble --pass1-pipeline qwen --pass1-model Qwen/Qwen3-ASR-1.7B \
+  --pass1-speech-enhancer htdemucs --pass1-enhance-for-vad --pass1-speech-segmenter ten
+```
+
+**If you run WhisperJAV from scripts:** `--mode balanced --enhance-for-vad` now exits 2 with an
+explanation instead of being accepted and ignored, and so does a Balanced pass in a two-pass run. See
+[What will break](docs/release_notes_v1.9.3_for_users.md#what-will-break).
+
+Also here: the installer shows what it is doing during the PyTorch download instead of looking
+frozen, and no longer writes settings into your global Git configuration; French translation works
+and Italian, Thai and Korean are added; a failed translation names the right server's log instead of
+telling everyone to check Ollama's.
+
+---
+
 ## New in v1.9.2
 
 Full detail, including every bug fixed and who reported it: [**release notes**](docs/release_notes_v1.9.2_for_users.md).
@@ -448,7 +485,7 @@ Details: [v1.9.2 release notes, "CPU-only users"](docs/release_notes_v1.9.2.md#c
 
 ## Troubleshooting
 
-- **The Windows installer stopped and said the installation failed.** Since v1.9.2 it checks that what WhisperJAV needs to run actually imports, and **stops rather than leaving you a shortcut to a broken install**. It names what failed and writes `INSTALLATION_FAILED_v1.9.2.txt` next to `install_log_v1.9.2.txt` in the installation folder. Run the installer again first — the usual cause is a download that did not finish. If it fails twice, attach both files to an issue.
+- **The Windows installer stopped and said the installation failed.** Since v1.9.2 it checks that what WhisperJAV needs to run actually imports, and **stops rather than leaving you a shortcut to a broken install**. It names what failed and writes `INSTALLATION_FAILED_v<version>.txt` next to `install_log_v<version>.txt` in the installation folder. Run the installer again first — the usual cause is a download that did not finish. If it fails twice, attach both files to an issue.
 - **"FFmpeg not found"** — install FFmpeg and add it to PATH.
 - **Very slow, GPU warning in log** — your PyTorch is CPU-only. Reinstall it with the CUDA index URL shown above.
 - **`model.bin` error in faster mode** — enable Windows Developer Mode (or run once as admin), then delete the cached model folder under `%USERPROFILE%\.cache\huggingface\hub`.
