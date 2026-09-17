@@ -11,6 +11,58 @@
 
 ---
 
+## 2026-09-17 — htdemucs vocal isolation, and the first clean-up that refuses to fail quietly
+
+**Decision (owner, 2026-09-17):** add Demucs v4 for vocal isolation; *"htdemucs for all pipelines to
+be available"*; it *"installs only when picked"*; *"there needs to be good checks in place so if the
+installation fails or unsuccessful, the program is resilient and informs the users with clear
+errors"*; and, asked whether a failure should stop the run or carry on without clean-up,
+*"I think it should fail with good user communication."*
+
+### What arrives, and from where
+
+Two things, neither shipped with WhisperJAV. **The package**, `pip install demucs` — checked on
+PyPI: 4.1.0 is a pure-Python wheel, and the only two dependencies with compiled code (`lameenc`,
+`sphn`) publish prebuilt wheels for Python 3.10–3.14 on Windows x64 and Linux x86_64, so nothing is
+built on the user's machine. **The weights**, 84,141,911 bytes confirmed by request today, fetched
+once from `dl.fbaipublicfiles.com` and cached. That is **Meta's own site, not Hugging Face** — so
+`--offline` and any Hugging Face mirror or endpoint do not cover it. **That matters for phase 6:**
+the China work will not help this download.
+
+### It stops the run instead of handing back untouched audio
+
+The enhancement framework degrades quietly by design — a backend that cannot run is warned about,
+replaced by "none", and the run finishes. Right for a clean-up that only helps a little; wrong for
+one chosen because the audio needs it, where the user would get a poor subtitle file from a run that
+exited 0.
+
+So: a new `SpeechEnhancerUnavailable`; a `FATAL_WHEN_UNAVAILABLE` set in the factory derived from a
+per-backend flag, containing only htdemucs; both creation paths in `pipeline_helper` raising instead
+of falling back for such a backend, and both enhancement loops re-raising instead of swallowing;
+and `ensure_speech_enhancer_available()` checking it **before any audio is read**, in the same shape
+and with the same exit status as the segmenter-model check approved on 2026-09-12. What the user
+sees is a box naming what was asked for, that nothing has been transcribed and why continuing would
+be worse, the one install command, the three clean-ups already present, and the Hugging Face note.
+**Every other backend's behaviour is unchanged**, and a test pins that.
+
+Offered in both `--passN-speech-enhancer` flags, in `--qwen-enhancer` (which now shares one list
+instead of keeping its own copy), in both passes of the GUI's Audio Clean-up dropdown, and in the
+notebook, which installs `demucs` when it is chosen. Deliberately **not** in any extra, with a
+comment saying why: the program, the GUI, the notebook and the failure message all name one command.
+
+**Verified:** 17 new tests; `test_speech_enhancer_spec.py` 30, `test_v192_small_fixes.py` 27,
+`test_audio_extraction_duration.py` 7, `test_llama_server_shim.py` 10; the notebook matrix at 0
+failures; both GUI assets parse; `--help` exits 0. Two real runs on a generated media file with
+demucs absent — one two-pass, one single-pass qwen — stopped with the box and exit 1 **before the
+extraction step**. The start-up check was called with every value an ordinary run passes and let all
+of them through.
+
+**Not verified:** htdemucs has never been run. demucs is not installed here, so no audio has gone
+through the model — separation quality, speed and memory use are unmeasured. The failure paths are
+what has been exercised; the success path has not.
+
+---
+
 ## 2026-09-17 — FFmpeg DSP works from the GUI again, and enhance-for-vad says what it does
 
 **Decision (owner, 2026-09-17):** *"I agree with your recommendation about name-with-effects"*;
