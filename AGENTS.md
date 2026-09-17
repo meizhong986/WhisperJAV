@@ -44,7 +44,8 @@ conda activate WJ
 uv pip install -e . --no-deps
 
 # Tests
-python -m pytest tests/                      # all
+python scripts/run_tests.py                  # all, one file per process
+python scripts/run_tests.py --fast           # all but the slow, model-loading files
 python -m pytest tests/test_config_v4.py     # one file
 
 # Lint / format

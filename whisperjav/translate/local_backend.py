@@ -1811,12 +1811,26 @@ def _wait_for_server(port: int, max_wait: int = 300,
                 # comes back as HTTP 500. That showed up as four retries and
                 # "Failed to communicate with server after 3 retries" about 90
                 # seconds into a run, with nothing translated. Asking once here
-                # costs one short request and turns that into an immediate,
-                # explainable stop.
+                # costs one short request and names the fault straight away.
+                #
+                # It WARNS, it does not stop (owner, 2026-09-17: "soften it to a
+                # warning for this release"). This check has never met a real
+                # llama-cpp server -- only a stub shaped like the fault -- so a
+                # mistake in it would stop runs that were going to work, which is
+                # worse than the problem it reports. The repair for the known
+                # fault is the shim, which is applied when the server starts and
+                # does not depend on this check at all.
                 chat_ok, chat_error = _verify_chat_completion(
                     port, timeout=60, stream=chat_stream)
                 if not chat_ok:
-                    return False, chat_error, None
+                    logger.warning(
+                        "The local translation server answered the start-up chat "
+                        "check badly. Translation may fail; this is the reason it "
+                        "would give:")
+                    for line in str(chat_error).splitlines():
+                        logger.warning("  %s", line)
+                    logger.warning(
+                        "Continuing anyway -- the server is otherwise responding.")
 
                 total_time = time.time() - start_time
                 logger.info(f"Server ready and speed measured ({total_time:.1f}s total)")

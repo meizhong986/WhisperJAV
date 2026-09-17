@@ -11,14 +11,20 @@ errors and nothing translated (owner's report, 2026-09-16).
 
 Owner, 2026-09-17, agreeing to add this: it is the one measurement that separates
 "this build is broken" from everything else, and it turns a long mystery into an
-immediate, explainable stop.
+immediate, explainable message.
+
+It WARNS; it does not stop the run (owner, same day: "soften it to a warning for
+this release"). The check has never met a real llama-cpp server, so a mistake in
+it would stop runs that were going to work -- worse than the fault it reports.
+The repair for the known fault is the shim applied when the server starts, which
+does not depend on this check at all.
 
 Streaming matters here (added 2026-09-17 after review). llama-cpp-python
 validates a single chat reply against a response model and sends streamed chunks
 without validating them, so a build can fail one and serve the other. The check
 therefore asks in whichever shape the caller will use: the translate CLI streams,
-the GUI and --translate path do not. Asking in the wrong shape would stop a run
-that was going to work, or pass one that is about to fail.
+the GUI and --translate path do not. Asking in the wrong shape would report a
+fault that is not there, or miss one that is.
 
 These run against a stub HTTP server, so no model is loaded and nothing is
 downloaded.
@@ -233,7 +239,13 @@ class TestTheShapeAskedForIsTheShapeThatWillBeUsed:
 class TestItIsWiredIntoTheReadinessCheck:
     """
     Run the readiness check itself, not a search of its source: a stub answers
-    /v1/models and /v1/completions, so only the chat phase decides the outcome.
+    /v1/models and /v1/completions, so only the chat phase is in question.
+
+    Owner, 2026-09-17: *"soften it to a warning for this release."* The check has
+    never met a real llama-cpp server, so a mistake in it would stop runs that
+    were going to work -- worse than the fault it reports. It therefore WARNS and
+    the server still comes up. The repair for the known fault is the shim,
+    applied when the server starts, which does not depend on this check.
     """
 
     def test_a_server_whose_chat_works_is_reported_ready(self, server_factory):
@@ -243,18 +255,37 @@ class TestItIsWiredIntoTheReadinessCheck:
         assert error is None
         assert diagnostics is not None
 
-    def test_a_server_whose_chat_fails_is_not_reported_ready(self, server_factory):
-        # Everything the old check measured passes; only chat is broken. This is
-        # the Colab case, and before the chat phase existed it was reported ready.
+    def test_a_server_whose_chat_fails_is_still_reported_ready(self, server_factory):
+        # The Colab case. It is named in the log, and the run goes on.
         port = server_factory(lambda: (500, REFUSAL_ERROR))
         ready, error, _ = _wait_for_server(port, max_wait=20)
-        assert ready is False
-        assert "rejects its own chat replies" in error
+        assert ready is True
+        assert error is None
 
-    def test_the_streaming_caller_is_judged_on_the_streaming_path(self, server_factory):
-        port = server_factory(lambda: (500, REFUSAL_ERROR))  # single reply fails
-        assert _wait_for_server(port, max_wait=20, chat_stream=False)[0] is False
-        assert _wait_for_server(port, max_wait=20, chat_stream=True)[0] is True
+    def test_the_reason_is_put_in_the_log_where_the_user_will_find_it(
+            self, server_factory, caplog):
+        import logging
+
+        port = server_factory(lambda: (500, REFUSAL_ERROR))
+        with caplog.at_level(logging.WARNING, logger="whisperjav"):
+            _wait_for_server(port, max_wait=20)
+
+        warnings = " ".join(r.getMessage() for r in caplog.records
+                            if r.levelno >= logging.WARNING)
+        # The diagnosis must survive the softening -- it is the whole value.
+        assert "rejects its own chat replies" in warnings
+        assert "Continuing anyway" in warnings
+
+    def test_a_healthy_server_produces_no_such_warning(self, server_factory, caplog):
+        import logging
+
+        port = server_factory(lambda: (200, GOOD_REPLY))
+        with caplog.at_level(logging.WARNING, logger="whisperjav"):
+            _wait_for_server(port, max_wait=20)
+
+        warnings = " ".join(r.getMessage() for r in caplog.records
+                            if r.levelno >= logging.WARNING)
+        assert "start-up chat check" not in warnings
 
 
 if __name__ == "__main__":

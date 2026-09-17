@@ -140,8 +140,29 @@ class TestCliFlags:
                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180)
         assert ok.returncode == 0
 
-    def test_version_is_1_9_2(self):
+    def test_the_version_matches_the_single_source(self):
+        """
+        `installer/VERSION` is the only place a version is edited by hand;
+        `whisperjav/__version__.py` is generated from it by
+        `installer/build_release.py`. Pinning a literal here meant the test
+        failed the moment a release was prepared, which is the one time nobody
+        wants a mystery failure. Compare the two instead, so this keeps checking
+        what it was really for: that the generated file is in step with the
+        source.
+        """
+        import configparser
+        from pathlib import Path
+
         from whisperjav.__version__ import __version__, __version_info__
 
-        assert __version__ == "1.9.2"
-        assert __version_info__["patch"] == 2
+        config = configparser.ConfigParser()
+        config.read(Path(__file__).resolve().parents[1] / "installer" / "VERSION",
+                    encoding="utf-8")
+        major = config.getint("version", "major")
+        minor = config.getint("version", "minor")
+        patch = config.getint("version", "patch")
+
+        assert __version__.startswith(f"{major}.{minor}.{patch}")
+        assert __version_info__["major"] == major
+        assert __version_info__["minor"] == minor
+        assert __version_info__["patch"] == patch
