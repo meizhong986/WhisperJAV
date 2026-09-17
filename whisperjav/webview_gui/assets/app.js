@@ -2280,9 +2280,15 @@ const EnsembleManager = {
             // Clear it too, so a value left over from another pipeline is not
             // carried into the run by a control the user can no longer see.
             this.state[passId].enhanceForVad = false;
-            const box = document.getElementById(`${passId}-enhance-for-vad`);
-            if (box) box.checked = false;
         }
+        // The tick box and the stored value are two separate things, and until
+        // now only the balanced rule above ever wrote the box. Anything else
+        // that set the value -- ticking it inside the Customize window, or
+        // loading a preset saved with it on -- left the row showing unticked
+        // while the run still sent the flag: the user saw "off" and got the
+        // dual track. Repainting the row now always shows what will run.
+        const box = document.getElementById(`${passId}-enhance-for-vad`);
+        if (box) box.checked = !!this.state[passId]?.enhanceForVad;
     },
 
     // BYOP Settings Panel Management
