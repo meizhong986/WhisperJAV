@@ -23,6 +23,7 @@ auditok
 av>=13.0.0
 bs-roformer-infer
 colorama
+demucs
 ctranslate2==4.8.1
 datasets>=3.0.0,<=3.6.0
 google-genai>=1.39.0

@@ -66,14 +66,30 @@ class TestItIsOffered:
         assert source.count('"htdemucs"') >= 2, "both passes should offer htdemucs"
         assert "extra_packages.add('demucs')" in source
 
-    def test_it_is_not_installed_with_whisperjav(self):
-        """Owner, 2026-09-17: it arrives only when someone picks it."""
-        pyproject = (REPO / "pyproject.toml").read_text(encoding="utf-8")
-        dependency_lines = [
-            line for line in pyproject.splitlines()
-            if re.match(r'\s*"demucs[",>=<]', line)
-        ]
-        assert dependency_lines == [], f"demucs should not be a declared dependency: {dependency_lines}"
+    def test_it_is_installed_with_whisperjav_like_the_others(self):
+        """
+        Owner, 2026-09-17, replacing his earlier decision: htdemucs is an
+        ordinary dependency, installed with WhisperJAV rather than by hand.
+
+        It belongs in the same extra as the other model-based clean-ups, so that
+        nothing about it is special: whatever installs clearvoice and
+        bs-roformer installs demucs.
+        """
+        import tomllib
+
+        with open(REPO / "pyproject.toml", "rb") as handle:
+            project = tomllib.load(handle)["project"]
+
+        enhance = project["optional-dependencies"]["enhance"]
+        assert "demucs" in enhance
+
+        # The peers it must travel with.
+        assert "bs-roformer-infer" in enhance
+        assert any(spec.startswith("clearvoice") for spec in enhance)
+
+    def test_the_windows_installer_includes_that_extra(self):
+        build = (REPO / "installer" / "build_release.py").read_text(encoding="utf-8")
+        assert '"enhance"' in build, "the installer must build requirements from the enhance extra"
 
 
 class TestItDoesNotFailQuietly:

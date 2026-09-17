@@ -6,27 +6,25 @@ Separates the voice from music and effects, and hands the recogniser the voice
 alone. Useful where a scene has background music or heavy effects over the
 dialogue -- the case BS-RoFormer also serves, with a different model.
 
-Two things are needed the first time and both come from the network:
+The demucs package is an ordinary WhisperJAV dependency (owner's decision,
+2026-09-17, replacing an earlier one): it is installed with everything else, not
+by hand. It adds three packages -- demucs, lameenc and sphn -- does not touch
+torch, and all three publish wheels for every Python WhisperJAV declares
+(3.10-3.13) on Windows, Linux and macOS, so nothing is built from source.
 
-  the demucs package   pip install demucs -- a pure-Python wheel; its two
-                       compiled dependencies (lameenc, sphn) publish prebuilt
-                       wheels for every Python WhisperJAV supports, so nothing
-                       is built from source. NOT installed with WhisperJAV:
-                       the owner's decision, 2026-09-17, is that it arrives
-                       only when someone chooses this backend.
+One thing still comes from the network the first time:
+
   the model weights    about 84 MB, fetched once from Meta's CDN
                        (dl.fbaipublicfiles.com) and cached by torch.hub.
-                       NOTE: not Hugging Face, so --offline and any Hugging
-                       Face mirror or endpoint setting do not apply to it.
+                       NOTE: not Hugging Face, so --offline, --hf-endpoint and
+                       any Hugging Face mirror do not apply to it.
 
-Unlike the other enhancers, a failure here is NOT quietly downgraded to "no
-enhancement" (owner, 2026-09-17: "it should fail with good user
-communication"). Someone who asks for vocal isolation on a noisy source and is
-silently given the noisy source back gets a bad subtitle file and no idea why.
-So this backend reports its problems through SpeechEnhancerUnavailable, which
-the pipeline helper lets through instead of swallowing, and
-whisperjav.utils.preflight_check turns into a plain-language stop before any
-audio is read.
+A note on failures, honestly stated. This backend currently raises
+SpeechEnhancerUnavailable for everything that goes wrong, including a failure on
+one piece of audio, while the other four enhancers report a per-scene failure and
+let the run continue. That inconsistency predates the error-handling rules being
+settled with the owner and is NOT a decided design: the agreed table governs, and
+this backend follows it once it exists.
 
 Model:
     htdemucs -- Hybrid Transformer Demucs, the v4 default. Four stems; we keep
@@ -63,8 +61,9 @@ DEFAULT_MODEL = "htdemucs"
 # name typed by hand is refused with a useful message rather than a stack trace.
 SUPPORTED_MODELS = ["htdemucs", "htdemucs_ft", "htdemucs_6s"]
 
-# What to say when the package is missing. Kept here so the pre-flight check and
-# the backend give the user the same words.
+# What to say if the package is missing. It ships with WhisperJAV, so this means
+# a damaged or partial installation rather than a choice the user has yet to
+# make. Kept here so the pre-flight check and the backend use the same words.
 INSTALL_HINT = "pip install demucs"
 WEIGHTS_MB = 84
 WEIGHTS_HOST = "dl.fbaipublicfiles.com"

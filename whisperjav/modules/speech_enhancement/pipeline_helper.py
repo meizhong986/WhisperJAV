@@ -6,7 +6,7 @@ without extensive code changes. Handles:
 - Dynamic extraction SR: 16kHz when enhancer is "none", 48kHz for real enhancers
 - Enhancing scene audio files (when a real enhancer is configured)
 - Resampling to 16kHz for VAD/ASR (when extracting at 48kHz)
-- Stopping the run when a clean-up the user chose fails, at any point
+- Graceful degradation on failure
 - Resource cleanup
 
 ==============================================================================
@@ -333,7 +333,7 @@ def enhance_scenes(
     1. Creates an 'enhanced_scenes' directory
     2. For each scene: enhance audio, resample to 16kHz, save
     3. Returns new scene paths pointing to enhanced files
-    4. On failure: stops the run by raising SpeechEnhancerUnavailable
+    4. On failure of one scene: logs a warning, uses that scene unenhanced
 
     Args:
         scene_paths: List of (scene_path, start_sec, end_sec, duration_sec)
@@ -346,19 +346,19 @@ def enhance_scenes(
         Same structure as input, but paths point to enhanced files
 
     Raises:
-        SpeechEnhancerUnavailable: if the clean-up fails on any scene.
+        SpeechEnhancerUnavailable: if the clean-up cannot run at all -- it is not
+            installed, or it could not start. That is the owner's rule
+            (2026-09-17): a component the user chose that cannot install or
+            start is a failure and the run stops. It is deliberately NOT every
+            error a running clean-up can hit; how those are handled is being
+            settled separately.
 
     Note:
-        Owner, 2026-09-17: "yes stop." A scene whose clean-up failed is a scene
-        the user asked to have cleaned up and did not. Using the original
-        instead -- which is what happened until now -- ends in a subtitle file
-        made partly from untouched audio, from a run that exited 0, with only a
-        warning in the log to explain it. That is the silent difference the rest
-        of these rules exist to stop, and it is the same fault whether the
-        clean-up cannot start (a missing package) or fails part-way (weights
-        that cannot be fetched, a card out of memory, a backend that errors).
-        One rule covers both, and it covers every pipeline, because every
-        pipeline enhances its scenes through this function.
+        If enhancement fails for one scene, a 16kHz copy of the original scene is
+        used and the run goes on. It is a copy rather than the scene itself
+        because every path returned here is at 16kHz, and the dual-track path
+        pairs these scenes with originals at that rate and refuses two tracks
+        recorded at different rates.
     """
     if not scene_paths:
         return scene_paths
@@ -424,13 +424,18 @@ def enhance_scenes(
                     f"{result.processing_time_sec:.2f}s"
                 )
             else:
-                raise SpeechEnhancerUnavailable(
-                    f"{enhancer.display_name} could not clean up part of this "
-                    f"audio (scene {scene_num} of {total_scenes}): "
-                    f"{result.error_message}. The run has stopped rather than "
-                    f"give you subtitles made partly from audio you asked to "
-                    f"have cleaned up. Choose a different clean-up, or none."
+                # Enhancement failed on this scene - use the original, at the
+                # rate the enhanced scenes come back at, so the lists stay
+                # comparable.
+                logger.warning(
+                    f"Scene {scene_num} enhancement failed: {result.error_message}. "
+                    "Using original."
                 )
+                enhanced_paths.append((
+                    _scene_at_target_rate(
+                        scene_path,
+                        enhanced_dir / f"{scene_path.stem}_original_{TARGET_SAMPLE_RATE}.wav"),
+                    start_sec, end_sec, dur_sec))
 
         except SpeechEnhancerUnavailable:
             # The clean-up itself cannot run. Carrying on scene by scene would
@@ -438,13 +443,14 @@ def enhance_scenes(
             # file made from audio the user asked to have cleaned up.
             raise
         except Exception as e:
-            raise SpeechEnhancerUnavailable(
-                f"{enhancer.display_name} failed while cleaning up part of this "
-                f"audio (scene {scene_num} of {total_scenes}): {e}. The run has "
-                f"stopped rather than give you subtitles made partly from audio "
-                f"you asked to have cleaned up. Choose a different clean-up, or "
-                f"none."
-            ) from e
+            logger.warning(
+                f"Scene {scene_num} enhancement error: {e}. Using original."
+            )
+            enhanced_paths.append((
+                _scene_at_target_rate(
+                    scene_path,
+                    enhanced_dir / f"{scene_path.stem}_original_{TARGET_SAMPLE_RATE}.wav"),
+                start_sec, end_sec, dur_sec))
 
         finally:
             # Aggressive memory cleanup for 8GB VRAM GPUs

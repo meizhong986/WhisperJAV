@@ -73,8 +73,6 @@ _BACKEND_DEPENDENCIES: Dict[str, Dict[str, Any]] = {
         "install_hint": "pip install demucs",
         "always_available": False,
         "description": "htdemucs vocal isolation (Demucs v4)",
-        # Not shipped with WhisperJAV: the owner's decision of 2026-09-17 is that
-        # it is installed only when someone picks it.
         "fatal_when_unavailable": True,
     },
 }

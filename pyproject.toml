@@ -227,13 +227,13 @@ enhance = [
     # BS-RoFormer vocal isolation
     "bs-roformer-infer",
 
-    # NOTE: demucs (htdemucs vocal isolation) is deliberately NOT here.
-    # Owner's decision, 2026-09-17: it is installed only when someone chooses
-    # that backend. There is no whisperjav[demucs] extra either, so that the
-    # program, the GUI, the notebook and the failure message all name the same
-    # single command: pip install demucs. Choosing htdemucs without it stops the
-    # run with instructions (see utils/preflight_check.ensure_speech_enhancer_available)
-    # rather than transcribing the untouched audio.
+    # htdemucs vocal isolation (Demucs v4). Owner's decision, 2026-09-17 (second
+    # decision, replacing the first): an ordinary dependency like any other, not
+    # something the user installs by hand. It adds three packages -- demucs,
+    # lameenc and sphn -- and does not touch torch, and all three have wheels for
+    # every Python WhisperJAV declares (3.10-3.13) on Windows, Linux and macOS,
+    # so nothing has to be built.
+    "demucs",
 
     # ONNX inference
     "onnxruntime>=1.16.0",

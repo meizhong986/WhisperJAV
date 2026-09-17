@@ -857,9 +857,7 @@ def parse_arguments():
                                 + "), for the others a model name. htdemucs and "
                                 "bs-roformer isolate the voice from music and effects; "
                                 "zipenhancer and clearvoice reduce noise; ffmpeg-dsp applies "
-                                "level and filter work. htdemucs is not installed with "
-                                "WhisperJAV: choosing it without installing it stops the run "
-                                "with instructions rather than transcribing untouched audio.")
+                                "level and filter work.")
     qwen_audio_group.add_argument("--qwen-enhancer-model", type=str, default=None,
                            help="Speech enhancer model variant (e.g., 'MossFormer2_SE_48K' for clearvoice)")
     qwen_audio_group.add_argument("--enhance-for-vad", action="store_true", default=False,
