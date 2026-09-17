@@ -306,17 +306,19 @@ Your user configuration in `%APPDATA%\WhisperJAV` is preserved during upgrades.
 If you have PATH enabled (the default), you can upgrade without re-downloading the installer:
 
 ```cmd
-pip install -U "whisperjav[all] @ git+https://github.com/meizhong986/whisperjav.git"
+whisperjav-upgrade
 ```
 
-Keep the `[all]`. It is what installs the optional groups — including `enhance`, which holds the
-speech enhancers. Without it you get the core package only, and an enhancer you pick in the GUI will
-stop the run saying it is not installed.
+**Do not upgrade with a plain `pip install -U whisperjav...`.** On Windows, PyPI serves the
+**CPU-only** build of PyTorch; the CUDA builds are only on `download.pytorch.org`. Any resolution
+that touches PyTorch will therefore replace your GPU build with a CPU one, silently. The same
+command also moves other pinned packages around. `whisperjav-upgrade` passes constraints that
+protect the GPU packages.
 
-> **Upgrading to v1.9.3 with the `whisperjav-upgrade` command:** that command does not install the
-> optional groups, so it will not bring `demucs` (new in v1.9.3, for htdemucs vocal isolation). If
-> you want htdemucs, run `pip install demucs` afterwards, or upgrade with the `.exe` or the pip
-> command above instead.
+> **Upgrading to v1.9.3:** `whisperjav-upgrade` does not install the optional groups, so it will not
+> bring `demucs` (new in v1.9.3, for htdemucs vocal isolation). If you want htdemucs, run
+> `pip install demucs` once afterwards. Choosing htdemucs without it stops the run with a clear
+> message rather than failing quietly.
 
 ### Preserving Configuration
 
@@ -551,7 +553,7 @@ cmd /C START /WAIT WhisperJAV-1.8.9-Windows-x86_64.exe /S /AddToPath=0 /InstallL
 
 ### Q: How do I update to a newer version?
 
-**A:** Download and run the new installer. If you install to the same directory, the installer will detect the previous version and offer to replace it. Your user settings are preserved. Alternatively, if PATH was enabled, run: `pip install -U "whisperjav[all] @ git+https://github.com/meizhong986/whisperjav.git"`
+**A:** Download and run the new installer. If you install to the same directory, the installer will detect the previous version and offer to replace it. Your user settings are preserved. Alternatively, if PATH was enabled, run `whisperjav-upgrade`, which protects your GPU PyTorch while it works. Do not use a plain `pip install -U whisperjav...`: on Windows, PyPI serves the CPU-only build of PyTorch, so it can silently replace your GPU build.
 
 ### Q: What video formats are supported?
 

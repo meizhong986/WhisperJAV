@@ -236,38 +236,59 @@ character anchors read from a file you supply (#393).
 
 ## Installing and upgrading
 
-Which one you want depends on the version you are coming from.
+What to do depends on the version you are coming from. The routes themselves are
+per-platform and are unchanged from 1.9.2.
 
 ### If you are on 1.9.2
 
-**Either works — upgrade, or do a fresh install.** 1.9.3 changes no underlying library, so an
-upgrade is safe.
+**Either works — upgrade, or do a fresh install.** 1.9.3 changes no underlying library: the base
+dependencies are identical to 1.9.2, and the only new package anywhere is `demucs`.
 
-If you upgrade, one thing is worth knowing: **`demucs` is new in 1.9.3**, and it sits in the
-`enhance` group of optional packages. Not every route installs that group:
+**To upgrade, on any platform:**
 
-| How you upgrade | Brings htdemucs? |
-|---|---|
-| Run the new Windows `.exe` over your install | **Yes** |
-| `pip install -U "whisperjav[all] @ git+https://github.com/meizhong986/whisperjav.git"` | **Yes** — keep the `[all]` |
-| `whisperjav-upgrade` | **No** — run `pip install demucs` afterwards |
-| Source install: `git pull` then `uv sync --all-extras` | **Yes** |
+```
+whisperjav-upgrade
+```
 
-Nothing breaks quietly if it is missing: choosing htdemucs stops the run and tells you it is not
-installed. One `pip install demucs` fixes it — two small companions (`lameenc`, `sphn`), and your
-PyTorch is untouched.
+It protects your GPU PyTorch while it works. Rollback is available with `whisperjav-upgrade
+--rollback`.
+
+**One thing to know if you upgrade.** `demucs` is new in 1.9.3 and lives in the `enhance` group of
+optional packages, which `whisperjav-upgrade` does not install. If you want htdemucs vocal
+isolation, run this once afterwards:
+
+```
+pip install demucs
+```
+
+Nothing breaks quietly without it: choosing htdemucs stops the run and tells you it is not
+installed. `demucs` brings two small companions (`lameenc`, `sphn`) and does not touch your PyTorch.
 
 ### If you are on anything older than 1.9.2
 
-**Please do a fresh install.** Download and run the new `.exe`.
+**Please do a fresh install**, using the route for your platform below.
 
-1.9.2 pinned two libraries underneath WhisperJAV to exact builds — Faster-Whisper to one commit, and
-CTranslate2 to 4.8.1 — and an in-place upgrade from an older version can leave your previous versions
-of those in place. A fresh install puts you on the combination this release was actually tested with.
+1.9.2 pinned two libraries underneath WhisperJAV to exact builds — Faster-Whisper to one commit and
+CTranslate2 to 4.8.1 — and an in-place upgrade from an older version can leave your previous
+versions of those behind. A fresh install puts you on the combination this release was tested with.
 
-### Google Colab
+### Fresh install, by platform
 
-No action required. The notebook installs the release itself.
+| Platform | How |
+|---|---|
+| **Windows** (recommended) | Download and run the `.exe` from the [Releases page](https://github.com/meizhong986/WhisperJAV/releases/latest). No Python knowledge needed; it detects your NVIDIA driver and installs the matching CUDA build. |
+| **Windows, from source** | `installer\install_windows.bat` (add `--cpu-only` to force CPU) |
+| **macOS (Apple Silicon)** | `./installer/install_mac.sh` — M-series chips get MPS acceleration; `--mode transformers` performs best there |
+| **Linux** | `./installer/install_linux.sh` — needs the NVIDIA driver (450+), but not the CUDA Toolkit |
+| **Google Colab / Kaggle** | Nothing to install. Use the notebook badges in the README. |
+
+Full per-platform guides are linked from the
+[README's Installation section](https://github.com/meizhong986/WhisperJAV#installation).
+
+> **Do not upgrade with a plain `pip install -U whisperjav...`.** On Windows, PyPI serves the
+> **CPU-only** build of PyTorch — the CUDA builds live on `download.pytorch.org` — so any resolution
+> that touches PyTorch will silently replace your GPU build with a CPU one. The same command also
+> moves other pinned packages around. Use `whisperjav-upgrade`, or the installer for your platform.
 
 ### In every case
 

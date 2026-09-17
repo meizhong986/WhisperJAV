@@ -565,7 +565,12 @@ This re-runs the full installer, which will upgrade packages as needed.
 REM Upgrade WhisperJAV only (no dependency changes)
 pip install -U --no-deps git+https://github.com/meizhong986/whisperjav.git
 
-REM Upgrade with all dependencies (may change PyTorch -- use with caution)
+REM Upgrade with all dependencies -- NOT RECOMMENDED ON A GPU INSTALL
+REM On Windows, PyPI serves the CPU-only build of PyTorch (the CUDA builds are
+REM only on download.pytorch.org), so any resolution that touches PyTorch will
+REM replace your GPU build with a CPU one, silently. It can also move other
+REM pinned packages. Prefer "whisperjav-upgrade", which passes constraints that
+REM protect the GPU packages.
 pip install -U "whisperjav[all] @ git+https://github.com/meizhong986/whisperjav.git"
 ```
 
