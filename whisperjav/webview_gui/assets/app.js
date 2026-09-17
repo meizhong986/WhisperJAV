@@ -5065,6 +5065,12 @@ const EnsembleManager = {
             this.state[passKey].enhanceForVad = efvCheck.checked;
         }
 
+        // Repaint the row so its tick box shows what was just applied. Writing
+        // the state is not enough: the row is only redrawn when something asks
+        // it to, so without this the window said "on", the row said "off", and
+        // the run used the value from the window (owner's GUI test A4).
+        this.updateEnhanceForVadCheckbox(passKey);
+
         const paramCount = Object.keys(fullParams).length;
         const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
         ConsoleManager.log(`Saved ${paramCount} parameters for ${passLabel} (Custom)`, 'info');

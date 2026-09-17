@@ -80,3 +80,36 @@ class TestWhatIsNotDone:
         """
         assert "Transformers" in source
         assert "Same shape, not yet done." in source
+
+
+class TestTheRowShowsWhatWasApplied:
+    """
+    Owner's GUI test A4, 2026-09-17: tick "Use enhanced audio for VAD framing
+    only" inside the Customize window, Apply, and the row's box stayed UNTICKED
+    while the run used the value from the window.
+
+    The repaint function was already correct -- it sets the box from the stored
+    value. Nothing called it after Apply. Apply wrote the state and refreshed
+    only the badges, so the row was never redrawn.
+    """
+
+    def test_apply_repaints_the_row(self, source):
+        start = source.index("applyCustomization")
+        end = source.index("showApplyFeedback();", start)
+        apply_body = source[start:end]
+        assert "this.state[passKey].enhanceForVad = efvCheck.checked" in apply_body
+        assert "this.updateEnhanceForVadCheckbox(passKey)" in apply_body, (
+            "Apply stores the value but never asks the row to redraw")
+
+    def test_the_repaint_sets_the_box_from_the_stored_value(self, source):
+        start = source.index("updateEnhanceForVadCheckbox(passId)")
+        body = source[start:start + 2000]
+        assert "box.checked = !!this.state[passId]?.enhanceForVad" in body, (
+            "the row must show the value that will actually be used")
+
+    def test_balanced_still_clears_it(self, source):
+        # The refusal must survive: balanced offers no VAD-only split, and a
+        # value left from another pipeline must not travel into a run.
+        start = source.index("updateEnhanceForVadCheckbox(passId)")
+        body = source[start:start + 2000]
+        assert "this.state[passId].enhanceForVad = false" in body
