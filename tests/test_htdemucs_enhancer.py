@@ -80,10 +80,25 @@ class TestItDoesNotFailQuietly:
     def test_it_is_marked_fatal(self):
         assert "htdemucs" in FATAL_WHEN_UNAVAILABLE
 
-    def test_the_other_enhancers_are_not(self):
-        """The change must not turn every backend into a hard stop."""
-        for backend in ("ffmpeg-dsp", "zipenhancer", "clearvoice", "bs-roformer", "none"):
+    def test_every_installable_enhancer_is_fatal(self):
+        """
+        Owner, 2026-09-17: "if user selected any but they cannot run then it is
+        a failure and the process shall stop with helpful communication." That
+        is every clean-up the user has to install.
+        """
+        for backend in ("zipenhancer", "clearvoice", "bs-roformer", "htdemucs"):
+            assert backend in FATAL_WHEN_UNAVAILABLE, backend
+
+    def test_the_two_that_cannot_be_missing_are_not(self):
+        """"none" does nothing and "ffmpeg-dsp" uses the FFmpeg we already need."""
+        for backend in ("none", "ffmpeg-dsp"):
             assert backend not in FATAL_WHEN_UNAVAILABLE
+
+    def test_the_fatal_set_matches_what_has_to_be_installed(self):
+        from whisperjav.modules.speech_enhancement.factory import _BACKEND_DEPENDENCIES
+        must_install = {name for name, info in _BACKEND_DEPENDENCIES.items()
+                        if not info["always_available"]}
+        assert set(FATAL_WHEN_UNAVAILABLE) == must_install
 
     @pytest.mark.skipif(DEMUCS_INSTALLED, reason="demucs is installed on this machine")
     def test_creating_it_without_the_package_raises(self):
@@ -99,15 +114,31 @@ class TestItDoesNotFailQuietly:
             pipeline_helper.create_enhancer_from_config(
                 {"params": {"speech_enhancer": {"backend": "htdemucs"}}})
 
-    def test_an_ordinary_missing_enhancer_still_falls_back(self, monkeypatch):
-        """bs-roformer keeps the old behaviour: warn, carry on without it."""
+    @pytest.mark.parametrize("backend", ["zipenhancer", "clearvoice", "bs-roformer"])
+    def test_an_installable_enhancer_that_is_missing_now_stops_the_run(
+            self, backend, monkeypatch):
+        """
+        These used to warn and carry on with the untouched audio. Since
+        2026-09-17 they stop, like htdemucs.
+        """
         real = SpeechEnhancerFactory.is_backend_available
         monkeypatch.setattr(
             SpeechEnhancerFactory, "is_backend_available",
             staticmethod(lambda name: (False, "pip install something")
-                         if name == "bs-roformer" else real(name)))
-        enhancer = pipeline_helper.create_enhancer_direct(backend="bs-roformer")
-        assert enhancer.name == "none"
+                         if name == backend else real(name)))
+        with pytest.raises(SpeechEnhancerUnavailable) as excinfo:
+            pipeline_helper.create_enhancer_direct(backend=backend)
+        assert backend in str(excinfo.value)
+        assert "pip install something" in str(excinfo.value)
+
+    def test_the_two_that_cannot_be_missing_still_never_stop(self):
+        """A clean-up that is always there must not gain a way to fail."""
+        assert pipeline_helper.create_enhancer_direct(backend="none").name == "none"
+        # The FFmpeg backend labels itself "ffmpeg" rather than "ffmpeg-dsp";
+        # what matters here is that it was built and not downgraded to "none".
+        ffmpeg = pipeline_helper.create_enhancer_direct(backend="ffmpeg-dsp")
+        assert ffmpeg.name != "none"
+        assert "FFmpeg" in ffmpeg.display_name
 
 
 class TestTheBackendItself:

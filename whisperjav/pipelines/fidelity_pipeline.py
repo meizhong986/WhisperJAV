@@ -29,6 +29,7 @@ from whisperjav.modules.speech_enhancement import (
     enhance_scenes,
     get_extraction_sample_rate,
     is_passthrough_backend,
+    resample_scenes,
 )
 
 class FidelityPipeline(BasePipeline):
@@ -280,6 +281,11 @@ class FidelityPipeline(BasePipeline):
 
             self.progress.set_current_step("Preparing audio for ASR", 3, 6)
 
+            # Set only when the user asked for "enhance for VAD only" AND there is
+            # a real enhancer to do it: the cleaned-up scenes, used to find the
+            # speech while the recogniser hears the originals.
+            vad_scene_paths = None
+
             if self._enhancer_is_passthrough:
                 # v1.8.5+: Scenes already at 16kHz — skip enhancement entirely
                 logger.info(
@@ -301,13 +307,35 @@ class FidelityPipeline(BasePipeline):
                         print(f"\rEnhancing: [{scene_num}/{total}] {pct:.0f}%", end='', flush=True)
 
                 # B. Process Enhancement (includes 48kHz→16kHz resampling)
-                scene_paths = enhance_scenes(
+                enhanced_paths = enhance_scenes(
                     scene_paths,
                     enhancer,
                     self.temp_dir,
                     progress_callback=enhancement_progress,
                 )
                 print()  # Newline after progress
+
+                if self._enhance_for_vad:
+                    # Dual-track (owner, 2026-09-17): the cleaned-up audio finds
+                    # the speech, the original is what the recogniser hears. The
+                    # originals are resampled to the same rate so the boundaries
+                    # the detector reports land in the right place.
+                    vad_scene_paths = enhanced_paths
+                    scene_paths = resample_scenes(scene_paths, self.temp_dir)
+                    if len(vad_scene_paths) != len(scene_paths):
+                        # The two lists are paired by position below. They are
+                        # built one entry per scene, failures included, so this
+                        # cannot happen today -- but pairing the wrong scenes
+                        # would put every subtitle in the wrong place, so it is
+                        # checked rather than assumed.
+                        raise RuntimeError(
+                            f"Enhance-for-VAD: {len(vad_scene_paths)} cleaned-up "
+                            f"scenes but {len(scene_paths)} original scenes.")
+                    logger.info(
+                        "Enhance-for-VAD: speech is detected in the cleaned-up "
+                        "audio, and the recogniser hears the original")
+                else:
+                    scene_paths = enhanced_paths
 
                 # C. DESTROY Enhancer - This is the "JIT Unload"
                 # We must confirm VRAM is near-zero before loading ASR
@@ -322,6 +350,7 @@ class FidelityPipeline(BasePipeline):
             master_metadata["config"]["speech_enhancement"] = {
                 "enabled": not self._enhancer_is_passthrough,
                 "backend": enhancer_name,
+                "dual_track": vad_scene_paths is not None,
             }
 
             # =================================================================
@@ -411,13 +440,20 @@ class FidelityPipeline(BasePipeline):
                     
                     last_update_time = time.time()
                 
+                # Dual-track: this scene's cleaned-up copy, for detection only.
+                vad_scene_path = vad_scene_paths[idx][0] if vad_scene_paths else None
+
                 try:
                     # Use unified progress manager's external suppression if available
                     if unified_manager:
                         with unified_manager.suppress_external_progress():
-                            asr.transcribe_to_srt(scene_path, scene_srt_path, task=self.asr_task)
+                            asr.transcribe_to_srt(scene_path, scene_srt_path,
+                                                  vad_audio_path=vad_scene_path,
+                                                  task=self.asr_task)
                     else:
-                        asr.transcribe_to_srt(scene_path, scene_srt_path, task=self.asr_task)
+                        asr.transcribe_to_srt(scene_path, scene_srt_path,
+                                              vad_audio_path=vad_scene_path,
+                                              task=self.asr_task)
                     
                     # Process results - simplified to reduce message spam
                     if scene_srt_path.exists() and scene_srt_path.stat().st_size > 0:

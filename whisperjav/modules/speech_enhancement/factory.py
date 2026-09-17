@@ -52,37 +52,46 @@ _BACKEND_DEPENDENCIES: Dict[str, Dict[str, Any]] = {
         "install_hint": "pip install modelscope>=1.20",
         "always_available": False,
         "description": "ZipEnhancer 16kHz (lightweight, SOTA quality)",
+        "fatal_when_unavailable": True,
     },
     "clearvoice": {
         "packages": ["clearvoice"],
         "install_hint": "pip install clearvoice",
         "always_available": False,
         "description": "ClearerVoice speech enhancement (denoising)",
+        "fatal_when_unavailable": True,
     },
     "bs-roformer": {
         "packages": ["bs_roformer"],
         "install_hint": "pip install bs-roformer-infer",
         "always_available": False,
         "description": "BS-RoFormer vocal isolation",
+        "fatal_when_unavailable": True,
     },
     "htdemucs": {
         "packages": ["demucs"],
         "install_hint": "pip install demucs",
         "always_available": False,
         "description": "htdemucs vocal isolation (Demucs v4)",
-        # Not shipped with WhisperJAV and not quietly skipped either: the owner's
-        # decision of 2026-09-17 is that it is installed only when someone picks
-        # it, and that failing to run it stops the run with an explanation rather
-        # than handing back un-enhanced audio. See fatal_when_unavailable below.
+        # Not shipped with WhisperJAV: the owner's decision of 2026-09-17 is that
+        # it is installed only when someone picks it.
         "fatal_when_unavailable": True,
     },
 }
 
 # Backends whose absence must STOP a run instead of falling back to "none".
-# Everything else here improves audio that would still transcribe without it; a
-# backend in this set is one the user chose because their audio needs it, so
-# silently giving them the original audio produces a poor subtitle file from a
-# run that exited 0. Read from _BACKEND_DEPENDENCIES so there is one source.
+#
+# Owner, 2026-09-17: "if user selected any but they cannot run then it is a
+# failure and the process shall stop with helpful communication." Choosing a
+# clean-up is a deliberate act; quietly giving the user the untouched audio
+# hands them a poor subtitle file from a run that exited 0, with only a warning
+# in the log to explain it.
+#
+# This is every backend that has to be installed. "none" and "ffmpeg-dsp" are
+# not in it because they cannot be missing: one does nothing and the other uses
+# the FFmpeg that WhisperJAV already requires.
+#
+# Read from _BACKEND_DEPENDENCIES so there is one source of truth.
 FATAL_WHEN_UNAVAILABLE = frozenset(
     name for name, info in _BACKEND_DEPENDENCIES.items()
     if info.get("fatal_when_unavailable")

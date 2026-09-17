@@ -124,6 +124,7 @@ from whisperjav.__version__ import __version__, __version_display__
 
 from whisperjav.utils.preflight_check import (
     enforce_gpu_requirement,
+    ensure_segmenter_backend_available,
     ensure_segmenter_model_available,
     ensure_speech_enhancer_available,
     run_preflight_checks,
@@ -355,9 +356,11 @@ def parse_arguments():
     twopass_group.add_argument("--pass1-enhance-for-vad", action="store_true", default=False,
                                help="Dual-track mode for pass 1: the cleaned-up audio drives speech "
                                     "detection, the original audio goes to the recogniser. Honoured by "
-                                    "qwen. With balanced and fidelity the cleaned-up audio is used for "
-                                    "both, and the run says so. fast, faster, transformers and crispasr "
-                                    "ignore it: they run no separate speech segmenter to feed.")
+                                    "qwen and, since v1.9.3, by fidelity. With balanced the cleaned-up "
+                                    "audio is used for both, and the run says so: its speech detection "
+                                    "happens inside faster-whisper, on the audio it recognises. fast, "
+                                    "faster, transformers and crispasr ignore it: they run no separate "
+                                    "speech segmenter to feed.")
     twopass_group.add_argument("--pass1-model", default=None,
                                help="Model name for pass 1 (e.g., large-v2, kotoba-whisper-v2.0)")
     twopass_group.add_argument("--pass1-vad-threshold", type=float, default=None,
@@ -402,9 +405,11 @@ def parse_arguments():
     twopass_group.add_argument("--pass2-enhance-for-vad", action="store_true", default=False,
                                help="Dual-track mode for pass 2: the cleaned-up audio drives speech "
                                     "detection, the original audio goes to the recogniser. Honoured by "
-                                    "qwen. With balanced and fidelity the cleaned-up audio is used for "
-                                    "both, and the run says so. fast, faster, transformers and crispasr "
-                                    "ignore it: they run no separate speech segmenter to feed.")
+                                    "qwen and, since v1.9.3, by fidelity. With balanced the cleaned-up "
+                                    "audio is used for both, and the run says so: its speech detection "
+                                    "happens inside faster-whisper, on the audio it recognises. fast, "
+                                    "faster, transformers and crispasr ignore it: they run no separate "
+                                    "speech segmenter to feed.")
     twopass_group.add_argument("--pass2-model", default=None,
                                help="Model name for pass 2 (e.g., large-v2, kotoba-whisper-v2.0)")
     twopass_group.add_argument("--pass2-vad-threshold", type=float, default=None,
@@ -2983,11 +2988,18 @@ def main():
             _pipe = getattr(args, f"pass{_n}_pipeline", None)
             if not _pipe:
                 continue  # pass 2 is optional
-            ensure_segmenter_model_available(effective_segmenter_for_pass(
+            _seg = effective_segmenter_for_pass(
                 _pipe, getattr(args, f"pass{_n}_speech_segmenter", None)
-            ))
+            )
+            # The package first, then the model it downloads: a missing package
+            # is a different problem with a different answer, and saying
+            # "the model could not be fetched" for it would send the user the
+            # wrong way (owner, 2026-09-17).
+            ensure_segmenter_backend_available(_seg)
+            ensure_segmenter_model_available(_seg)
     elif resolved_config:
         _seg_cfg = resolved_config.get("params", {}).get("speech_segmenter") or {}
+        ensure_segmenter_backend_available(_seg_cfg.get("backend"))
         ensure_segmenter_model_available(
             _seg_cfg.get("backend"), model_dir=_seg_cfg.get("model_dir")
         )
@@ -3002,6 +3014,8 @@ def main():
                 getattr(args, f"pass{_n}_speech_enhancer", None))
     else:
         ensure_speech_enhancer_available(getattr(args, "qwen_enhancer", None))
+        if getattr(args, "mode", None) == "qwen":
+            ensure_segmenter_backend_available(getattr(args, "qwen_segmenter", None))
 
     # Setup temp directory
     if args.temp_dir:

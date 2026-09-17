@@ -646,19 +646,20 @@ def ensure_segmenter_model_available(backend, *, model_dir=None,
 
 def ensure_speech_enhancer_available(backend, *, exit_on_fail: bool = True) -> bool:
     """
-    Make sure an audio clean-up that must not fail quietly can actually run,
-    before any audio is read.
+    Make sure a chosen audio clean-up can actually run, before any audio is read.
 
-    Most clean-up backends degrade to "no enhancement" with a warning, which is
-    right for one that only helps a little. A backend listed in the factory's
-    FATAL_WHEN_UNAVAILABLE was chosen because the audio needs it -- falling back
-    would hand the user a poor subtitle file from a run that exited 0. Owner,
-    2026-09-17, about htdemucs: "I think it should fail with good user
-    communication."
+    Owner, 2026-09-17: "if user selected any but they cannot run then it is a
+    failure and the process shall stop with helpful communication." Choosing a
+    clean-up is a deliberate act. Falling back to no clean-up would hand the user
+    subtitles made from the untouched audio, from a run that exited 0, with only
+    a warning in the log to explain it.
 
-    This is a better MESSAGE, earlier. The guarantee is in the backend itself and
-    in pipeline_helper, which raise SpeechEnhancerUnavailable however the backend
-    is reached, including by a path this check does not predict.
+    Applies to every clean-up that has to be installed (the factory's
+    FATAL_WHEN_UNAVAILABLE). "none" and "ffmpeg-dsp" cannot be missing.
+
+    This is a better MESSAGE, earlier. The guarantee is in pipeline_helper, which
+    raises SpeechEnhancerUnavailable however the backend is reached, including by
+    a path this check does not predict.
 
     Returns True when there is nothing to check or the backend is ready. On
     failure it prints what the user can do and, by default, ends the run with
@@ -688,34 +689,125 @@ def ensure_speech_enhancer_available(backend, *, exit_on_fail: bool = True) -> b
     if not exit_on_fail:
         return False
 
+    # Offer the clean-ups this machine can actually run, rather than a fixed list
+    # that may name something else that is also missing.
+    alternatives = []
+    for other in SpeechEnhancerFactory.list_backends():
+        if other in ("none", backend):
+            continue
+        ok, _ = SpeechEnhancerFactory.is_backend_available(other)
+        if ok:
+            alternatives.append(other)
+
     lines = [
-        f"The {backend} audio clean-up is not installed",
+        f"The {backend} audio clean-up cannot run on this machine",
         "",
-        "This run was asked to isolate the voice from the music and effects",
-        f"with {backend}, and the program that does it is not on this machine.",
+        f"This run was asked to clean up the audio with {backend}, and it is",
+        "not installed.",
         "",
         "Nothing has been transcribed. Going ahead without it would hand you",
-        "subtitles made from the untouched audio -- which is the thing you",
-        "asked to have cleaned up -- and the run would look successful.",
+        "subtitles made from the untouched audio -- the thing you asked to",
+        "have cleaned up -- and the run would look successful.",
         "",
         "What you can do:",
-        f"  - Install it, once, with:  {hint}",
-        "    It is a normal install: nothing is compiled, and it brings a",
-        "    model of about 84 MB the first time you run it.",
-        "  - Or pick a clean-up that is already installed:",
-        "      --speech-enhancer is chosen per pass, e.g.",
-        "      --pass1-speech-enhancer bs-roformer  (isolates the voice too)",
-        "      --pass1-speech-enhancer zipenhancer   (reduces noise)",
-        "      --pass1-speech-enhancer ffmpeg-dsp    (levels and filters)",
-        "    In the Ensemble tab, set that pass's Audio Clean-up to one of",
-        "    those instead.",
-        "  - Or leave the clean-up out and transcribe the audio as it is.",
-        "",
-        "Note: the model comes from Meta's own site, not from Hugging Face,",
-        "so a Hugging Face mirror or --offline does not apply to it.",
+        f"  - Install it, once:  {hint}",
     ]
+    if backend == "htdemucs":
+        lines += [
+            "    Nothing is compiled, and it brings a model of about 84 MB the",
+            "    first time you run it.",
+        ]
+    if alternatives:
+        lines += [
+            "  - Or pick a clean-up that is already installed:",
+        ]
+        lines += [f"      {name}" for name in alternatives]
+        lines += [
+            "    On the command line that is --passN-speech-enhancer; in the",
+            "    Ensemble tab it is that pass's Audio Clean-up.",
+        ]
+    lines += [
+        "  - Or leave the clean-up out and transcribe the audio as it is.",
+    ]
+    if backend == "htdemucs":
+        lines += [
+            "",
+            "Note: the model comes from Meta's own site, not from Hugging Face,",
+            "so a Hugging Face mirror or --offline does not apply to it.",
+        ]
     _print_box(lines, Fore.RED)
     sys.exit(1)
+
+
+def ensure_segmenter_backend_available(backend, *, exit_on_fail: bool = True) -> bool:
+    """
+    Make sure a chosen speech segmenter can be built, before any audio is read.
+
+    The same rule as the clean-ups above, for the same reason. A segmenter that
+    cannot be built already stopped the run -- but deep inside the recogniser and
+    with the words "Speech Segmenter not configured - this is an architecture
+    violation", which tells a user nothing. This says it up front, in plain
+    language, and names the segmenters this machine can run.
+
+    ``ensure_segmenter_model_available`` is the sibling of this: that one is
+    about a MODEL that has to be downloaded, this one about a PACKAGE that has to
+    be installed.
+    """
+    if not backend or backend in ("none", "faster-whisper"):
+        return True
+
+    try:
+        from whisperjav.modules.speech_segmentation import SpeechSegmenterFactory
+    except Exception:
+        return True
+
+    try:
+        available, hint = SpeechSegmenterFactory.is_backend_available(backend)
+    except Exception:
+        return True  # Unknown name: argparse already refuses those.
+
+    if available:
+        return True
+    if not exit_on_fail:
+        return False
+
+    alternatives = []
+    try:
+        for other in SpeechSegmenterFactory.list_backends():
+            if other in ("none", backend):
+                continue
+            try:
+                ok, _ = SpeechSegmenterFactory.is_backend_available(other)
+            except Exception:
+                continue
+            if ok:
+                alternatives.append(other)
+    except Exception:
+        pass
+
+    lines = [
+        f"The {backend} speech detector cannot run on this machine",
+        "",
+        f"This run needs {backend} to find the speech in your audio, and it is",
+        "not installed.",
+        "",
+        "Nothing has been transcribed. Without a working speech detector",
+        "every scene would fail and you would get an empty subtitle file.",
+        "",
+        "What you can do:",
+        f"  - Install it, once:  {hint}",
+    ]
+    if alternatives:
+        lines += ["  - Or pick a speech detector that is already installed:"]
+        lines += [f"      {name}" for name in alternatives[:8]]
+        lines += [
+            "    On the command line that is --speech-segmenter (or",
+            "    --passN-speech-segmenter); in the Ensemble tab it is that",
+            "    pass's Speech Segmenter.",
+        ]
+    _print_box(lines, Fore.RED)
+    sys.exit(1)
+
 
 def run_preflight_checks(verbose: bool = False, exit_on_fail: bool = True) -> bool:
     """Run pre-flight checks and optionally exit on failure.

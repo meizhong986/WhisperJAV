@@ -234,7 +234,9 @@ class WhisperProASR:
         logger.debug(f"Final Whisper parameters: {final_params}")
         return final_params
 
-    def transcribe(self, audio_path: Union[str, Path], **kwargs) -> Dict:
+    def transcribe(self, audio_path: Union[str, Path],
+                   vad_audio_path: Optional[Union[str, Path]] = None,
+                   **kwargs) -> Dict:
         """Transcribe audio file with internal VAD processing.
 
         Args:
@@ -271,6 +273,42 @@ class WhisperProASR:
             logger.error(f"Failed to read audio file {audio_path}: {e}")
             raise
 
+        # v1.9.3: dual-track ("enhance for VAD only"). The caller may hand us a
+        # SECOND file -- the cleaned-up version of the same audio -- to find the
+        # speech in, while the recogniser still hears the original. Owner,
+        # 2026-09-17. Without it, both jobs read the one file, as before.
+        vad_audio_data = audio_data
+        if vad_audio_path is not None:
+            try:
+                vad_audio_data, vad_sample_rate = sf.read(str(vad_audio_path), dtype='float32')
+                if vad_audio_data.ndim > 1:
+                    vad_audio_data = np.mean(vad_audio_data, axis=1)
+            except Exception as e:
+                logger.error(f"Failed to read the audio to detect speech in "
+                             f"({vad_audio_path}): {e}")
+                raise
+            if vad_sample_rate != sample_rate:
+                # The two tracks must share a clock or every boundary the
+                # detector reports would land in the wrong place in the audio
+                # the recogniser hears.
+                raise ValueError(
+                    f"Dual-track speech detection needs both tracks at the same "
+                    f"sample rate: the audio is {sample_rate} Hz and the "
+                    f"cleaned-up copy is {vad_sample_rate} Hz.")
+            if len(vad_audio_data) != len(audio_data):
+                # Enhancement can round the length by a sample or two; anything
+                # larger means they are not the same recording.
+                if abs(len(vad_audio_data) - len(audio_data)) > sample_rate // 10:
+                    raise ValueError(
+                        f"Dual-track speech detection needs both tracks to be the "
+                        f"same recording: the audio is {len(audio_data)} samples "
+                        f"and the cleaned-up copy is {len(vad_audio_data)}.")
+                logger.debug("Dual-track lengths differ by %d samples; using the "
+                             "cleaned-up copy for detection as given",
+                             abs(len(vad_audio_data) - len(audio_data)))
+            logger.info("Detecting speech in the cleaned-up audio; the recogniser "
+                        "hears the original")
+
         # v1.9.2 (owner in1): "no segmentation" is honoured up front rather than
         # inferred from a passthrough segmenter's fabricated whole-clip region.
         if self.get_segmenter_name() == "none":
@@ -280,7 +318,7 @@ class WhisperProASR:
             return self._finalise(all_segments)
 
         # Run speech segmentation through the Speech Segmenter contract
-        vad_segments = self._run_speech_segmentation(audio_data, sample_rate)
+        vad_segments = self._run_speech_segmentation(vad_audio_data, sample_rate)
 
         # Store segments for visualization data contract
         self._last_vad_segments = []
@@ -517,12 +555,18 @@ class WhisperProASR:
     def transcribe_to_srt(self, 
                          audio_path: Union[str, Path], 
                          output_srt_path: Union[str, Path],
+                         vad_audio_path: Optional[Union[str, Path]] = None,
                          **kwargs) -> Path:
-        """Transcribes audio and saves the result as an SRT file."""
+        """Transcribes audio and saves the result as an SRT file.
+
+        ``vad_audio_path`` is the cleaned-up copy of the same audio to find the
+        speech in, when the user asked for "enhance for VAD only". The
+        recogniser still hears ``audio_path``.
+        """
         audio_path = Path(audio_path)
         output_srt_path = Path(output_srt_path)
         
-        result = self.transcribe(audio_path, **kwargs)
+        result = self.transcribe(audio_path, vad_audio_path=vad_audio_path, **kwargs)
         
         srt_subs = []
         for idx, segment in enumerate(result.get("segments", []), 1):
