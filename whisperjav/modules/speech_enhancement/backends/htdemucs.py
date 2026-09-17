@@ -129,8 +129,14 @@ class HtDemucsSpeechEnhancer:
                     e, INSTALL_HINT))
 
         device = resolve_torch_device(self._device)
-        logger.info("Loading %s for vocal isolation on %s (first run downloads "
-                    "about %s MB from %s)",
+        # Phrased so it is true either way. It used to say "first run downloads
+        # about 84 MB", which it printed even when the weights were already
+        # cached and nothing was fetched -- a message claiming something that
+        # was not happening (owner's acceptance log, 2026-09-17). The size and
+        # the host still belong here: they are what explains a long pause the
+        # first time.
+        logger.info("Loading %s for vocal isolation on %s (about %s MB, fetched "
+                    "from %s the first time and cached after that)",
                     self._model_name, device, WEIGHTS_MB, WEIGHTS_HOST)
 
         try:

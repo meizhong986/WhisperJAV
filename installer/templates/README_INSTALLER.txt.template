@@ -21,35 +21,54 @@ FIRST RUN NOTE: On your first transcription, AI models will download (~3GB).
 -------------------------------------------------------------------------------
 WHAT'S NEW IN v{{VERSION}}
 -------------------------------------------------------------------------------
-Version {{VERSION}} brings major improvements across 5 key areas:
+{{! MAINTAINER: REWRITE THIS SECTION FOR EVERY RELEASE.
+{{! It is the first thing a user reads after installing, and only the version
+{{! number is substituted -- the words below are not. Up to v1.9.2 this section
+{{! still described the v1.9.0 features as "NEW" under whatever version was
+{{! being built, because nobody rewrote it. Rewrite it or delete it; do not
+{{! leave the previous release's text in place. Lines starting {{! are stripped
+{{! by build_release.py and never reach the user.
+1. CLEANING UP THE AUDIO BEFORE IT IS READ
+   - htdemucs vocal isolation: separates the voice from music and effects.
+     Installed with WhisperJAV, like the other clean-ups.
+   - "Enhance for VAD only": the cleaned-up audio is used to FIND the speech,
+     while the recogniser still hears the original. Available on the fidelity
+     and qwen pipelines.
+   - A clean-up you chose that cannot run now stops the run and says why,
+     instead of quietly transcribing the untouched audio.
 
-1. QWEN3-ASR PIPELINE (NEW)
-   - New Qwen3-based ASR engine with three input modes:
-     Assembly (decoupled text + alignment), Context-Aware, and VAD-Slicing
-   - ForcedAligner for precise word-level timestamps
-   - Generation safety: repetition penalty + dynamic token budgets
+2. INSTALLING
+   - The PyTorch download shows what it is doing. It used to sit silent for
+     minutes and look as though it had frozen.
+   - If the network check fails it now names the addresses it tried and the
+     proxy it used, so you can act on it.
+   - The installer no longer writes settings into your global Git
+     configuration. Earlier versions left eight of them there permanently,
+     including a proxy.
 
-2. ADAPTIVE STEP-DOWN ARCHITECTURE (NEW)
-   - Tier 1/Tier 2 grouping with automatic fallback
-   - Tighter scene/group boundaries for improved accuracy
-   - Proportional timing fallback for alignment failures
+3. TRANSLATION
+   - French now works. Italian, Thai and Korean added.
+   - When a translation server fails, the advice names THAT server's log --
+     not Ollama's, whichever provider you were using.
+   - A local translation server that cannot answer is reported at start-up
+     rather than 90 seconds into a run with nothing produced.
 
-3. PIPELINE ANALYTICS & HEALTH CHECK (NEW)
-   - Real-time health metrics during pipeline execution
-   - Per-group diagnostic detail records
-   - Structured metadata for benchmarking and comparison
+4. WHAT YOU SEE WHILE A RUN IS WORKING
+   - A sensible progress count, a summary line after a long file listing, how
+     long audio extraction took, and the English post-processing steps.
+   - Every run ends with a summary: one line per file, and a manifest.
+   - A file whose clean-up only partly succeeded is reported as "suspect",
+     with the reason, rather than passing silently as done.
 
-4. ALIGNMENT SENTINEL (NEW)
-   - Automatic detection of collapsed/degenerate word timestamps
-   - VAD-guided redistribution (Strategy C) for recovery
-   - Cluster collapse detection via degenerate-ratio check
+5. THE GUI, AND CONTRIBUTIONS
+   - Two-pass settings are saved and restored.
+   - An Auto-scroll toggle on the console (thanks to triatomic).
+   - A "contextual" translation tone (triatomic), an accuracy-regression gate
+     (Mimic-me), and a CI check (AKB0700).
+   - Linux users are told which packages the GUI needs.
 
-5. ENSEMBLE PIPELINE & GUI
-   - Multi-pass processing with configurable pipeline combinations
-   - Improved ensemble defaults and pass configuration in GUI
-   - Streamlined CUDA driver detection (2-tier: cu118/cu128)
-
-For detailed release notes, see RELEASE_NOTES_v{{VERSION}}.md
+For the full release notes, see the v{{VERSION}} release page:
+https://github.com/meizhong986/WhisperJAV/releases
 
 -------------------------------------------------------------------------------
 WHAT THIS INSTALLER DOES
