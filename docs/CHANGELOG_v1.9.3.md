@@ -11,6 +11,58 @@
 
 ---
 
+## 2026-09-17 — one rule for a component that cannot run, and the VAD-only split made real in fidelity
+
+**Decision (owner, 2026-09-17):** *"I think all speech segmenters have to have uniform behaviour: if
+user selected any but they cannot run then it is a failure and the process shall stop with helpful
+communication"*; *"please make the VAD Only Enhancement feature audio separation path to work for
+balanced and fidelity"*; and, on the earlier finding, *"it is ok for faster, fast, and transformers
+and crispASR to ignore that"*, with *"please rely on the code as comments and docstrings can be out
+of date or mistaken."*
+
+### A chosen component that cannot run now stops the run, whichever it is
+
+**Clean-ups** were not uniform: htdemucs stopped, while zipenhancer, clearvoice and bs-roformer
+warned, fell back to "none" and produced subtitles from the untouched audio — a poor file from a run
+that exited 0. Now every clean-up that has to be installed is fatal. `none` and `ffmpeg-dsp` are
+not, because they cannot be missing. The fatal set is **derived** from the dependency table rather
+than listed by hand, and a test asserts the two agree.
+
+**Segmenters** already stopped — but inside the recogniser, saying *"Speech Segmenter not configured
+- this is an architecture violation"*, which tells a user nothing.
+`ensure_segmenter_backend_available()` now checks the chosen segmenter before any audio is read and
+prints the same kind of box. It sits beside `ensure_segmenter_model_available()` — that one is about
+a **model** that must be downloaded, this one about a **package** that must be installed — and runs
+first, because reporting a download failure for a missing package sends the user the wrong way.
+
+Both boxes list the alternatives **actually present on that machine**, computed at the time, rather
+than a fixed list that might name something else that is also missing.
+
+### "Enhance for VAD only" now does what its name says — in fidelity
+
+`WhisperProASR.transcribe()` takes an optional second file: the cleaned-up copy of the same audio,
+used **only** to find the speech, while the recogniser still hears the original. Omitted, both jobs
+read the one file exactly as before. The two tracks must be the same recording at the same rate, or
+it refuses — a clock difference would put every subtitle in the wrong place, and a length difference
+beyond 0.1 s means it is not the same audio. The fidelity pipeline builds both tracks and pairs them
+by position, with a length check, because pairing the wrong scenes would misplace everything.
+
+**Balanced is not done, and not by this route.** Its speech detection happens *inside*
+faster-whisper's own `transcribe(vad_filter=True)` call, on the same buffer it recognises — there is
+no second track to hand it. Splitting them means switching the built-in VAD off and driving
+recognition from an external detector, which is what 1.9.2 deliberately removed (requirement S2/S9),
+and the balanced pipeline is on the owner's frozen list. **Left alone; his decision.**
+
+**Verified:** 11 new tests, which prove the split for real — with a second file given, the array
+handed to the segmenter is the one read from *that* file, not merely that the argument is accepted.
+Plus 22 (3 updated for the new rule), 30, 27, 7, 10 and 33 across the other suites. Both start-up
+checks were called with every value an ordinary run passes and let all of them through, and a real
+fidelity run on a media file reached the extraction step — so no existing configuration is stopped
+by this. **Not verified:** no full transcription has been run with the split active; that needs a
+model and real audio.
+
+---
+
 ## 2026-09-17 — htdemucs vocal isolation, and the first clean-up that refuses to fail quietly
 
 **Decision (owner, 2026-09-17):** add Demucs v4 for vocal isolation; *"htdemucs for all pipelines to
