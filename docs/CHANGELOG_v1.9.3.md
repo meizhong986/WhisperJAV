@@ -11,6 +11,186 @@
 
 ---
 
+## 2026-09-17 — a clean-up that fails while it is running now stops the run too
+
+**Owner, 2026-09-17,** answering the open item the audit left him: *"yes stop."* He also confirmed
+the new refusal of `--mode balanced --enhance-for-vad` (*"confirm"*).
+
+The rule he set earlier that day — a clean-up the user chose that cannot run stops the run — had
+only ever been implemented for a clean-up that cannot *start*: a package that will not import,
+caught by the start-up check, plus htdemucs, which raises on everything. The four other backends
+(clearvoice, bs-roformer, zipenhancer, ffmpeg-dsp) each return a failed result when the weights
+cannot be fetched, the card runs out of memory, FFmpeg exits non-zero or the backend throws — and
+`enhance_scenes` logged a warning, put the untouched scene in the list and carried on. The run ended
+at 0 with a subtitle file made partly from audio the user had asked to have cleaned up.
+
+`enhance_scenes` now raises `SpeechEnhancerUnavailable` on any scene whose clean-up failed, whether
+the backend reported the failure or threw. The message names the clean-up, which scene of how many,
+what went wrong, what it means and the way out. Every pipeline enhances its scenes through that one
+function, so the rule reaches balanced, fidelity, qwen, transformers and decoupled at once, however
+the backend was reached.
+
+**What this changes for users:** a run that used to finish with one or two scenes quietly
+un-enhanced now stops. That is the intent — but it does mean a single transient failure on one scene
+of a long file fails that file. It is worth watching once real backends are exercised; a tolerance
+(stop only when every scene fails) would be a different decision, not a bug fix.
+
+`tests/test_enhancer_failure_stops_run.py` (renamed from the sample-rate test written an hour
+earlier, whose premise this replaces): 8 tests — a backend that reports failure, one that throws,
+what the message must say, and that no path hands back untouched audio. The sample-rate guarantee it
+used to cover is still tested for the scenes that do come back.
+
+---
+
+## 2026-09-17 — the adversary audit of this sitting, and the defects it found
+
+**Owner, 2026-09-17:** *"run the adversary audit. 1b - solve for any issues and bugs with care.
+There are no deadlines, take your time. Make sure nothing gets broken."*
+
+Three adversarial reviews, one per piece of the day's work (speech enhancement, translation
+start-up, GUI/CLI wiring), each framed around the code rather than around the claims made for it.
+Every finding below was re-checked against the code before anything was changed, and every fix has
+a command or a test behind it. The items the reviews raised that are the owner's to decide are
+listed at the end and were **not** implemented.
+
+### The failure advice never reached the provider it was written for
+
+The advice added earlier the same day keyed on `pysubtrans_name`. That field is the name of
+PySubtrans's *client class*, not the provider the user chose: local, ollama, glm, groq and custom
+are all `Custom Server` there, and the local run's config is rebuilt as `Custom Server` before it
+reaches the translator. So the `local` and `ollama` branches could never run. Every local, Ollama,
+GLM, Groq and custom run got the line written for a server the user had named themselves — and
+**Ollama users were worse off than before the change**, because they used to be told `ollama logs`.
+
+Each provider config now carries `whisperjav_provider`, the name the user types after
+`--translate-provider`, and the advice reads that. A cloud provider redirected to a
+`--translate-endpoint` on this machine is no longer called a cloud service either: the address
+decides. The advice function was lifted out of `translate_subtitle` so it can be tested at all —
+`tests/test_translation_server_log_advice.py`, 14 tests, covering every shipped provider.
+
+### The local server's log was deleted before the user could read it
+
+The advice names a file, and `stop_local_server()` removed that file as the run ended. Naming the
+log now marks it to be kept, and the path is logged again when the server stops. An ordinary run
+still cleans up after itself.
+
+### The start-up chat check asked in the wrong shape for the translate CLI
+
+The check sent a non-streaming chat request. `whisperjav-translate --provider local` translates
+with `stream=True`; the GUI and `--translate` path do not. These are two different paths on the
+server — llama-cpp-python validates a single reply against a response model and sends streamed
+chunks without validating them, which is exactly where the known defect lives — so the check could
+have stopped a CLI run that was going to work, and passed a run that was going to fail. It now asks
+in whichever shape the caller will use. A 2xx with an empty body is named instead of surfacing as a
+JSON error.
+
+`tests/test_local_chat_check.py` was rewritten: the wiring test was a search of the source file, and
+is now the readiness check actually running against a stub that answers all three endpoints. 13
+tests, including both "broken only when streaming" and "broken only when not streaming" builds.
+
+### Balanced refused the VAD-only split through one flag and accepted it through another
+
+`--pass1-enhance-for-vad` on a balanced pass was refused, but the pass configuration is built as
+*this pass's flag OR the global `--enhance-for-vad`*, and the refusal only read the pass flag.
+Verified before the fix: `--ensemble --pass1-pipeline balanced --pass1-speech-enhancer clearvoice
+--enhance-for-vad` exited 0 with `enhance_for_vad: true` on a balanced pass — the exact thing the
+owner refused. The refusal now reads the same combination the run will use, and names whichever
+flag the user actually typed.
+
+`--mode balanced --enhance-for-vad` was likewise accepted and ignored; it is now refused in the same
+words. `--pipeline decoupled` is not caught by either rule, because `--mode` still reads `balanced`
+from its default on a decoupled run.
+
+### Single-mode fidelity never received the flag at all
+
+`--mode fidelity --enhance-for-vad` was accepted and did nothing: `pipeline_args` had no
+`enhance_for_vad` key, so `FidelityPipeline` always saw `False`. The split only ever happened
+through `--ensemble` or the GUI. It is now passed. **See the open item below**: single-file mode has
+no way to choose a clean-up in the first place, so this is a gap closed rather than a feature
+reached.
+
+The flag's help text said "Qwen/Decoupled pipelines only", which was already untrue. It now names
+where it applies, where it is refused, and where it is accepted and ignored — the documentation the
+owner's 2026-09-17 decision made a condition of that ignoring.
+
+### One scene's hiccup failed the whole file, with a message about the wrong thing
+
+Scenes are extracted at 48 kHz when an enhancer is configured. `enhance_scenes` resampled what it
+enhanced down to 16 kHz but handed back the untouched 48 kHz file for any scene whose clean-up
+failed. In the VAD-only split that list is paired scene by scene with originals at 16 kHz, and the
+recogniser refuses two tracks at different rates. So a transient failure on one scene failed the
+entire file with "the audio is 16000 Hz and the cleaned-up copy is 48000 Hz" — a message pointing at
+sample rates rather than at the clean-up that actually failed. Every scene returned is now at 16 kHz.
+`tests/test_enhance_scene_fallback_rate.py`, 6 tests.
+
+### `--qwen-enhancer` still rejected the form the other flags accept
+
+The same `choices=` list that broke FFmpeg DSP for the two-pass flags was still on `--qwen-enhancer`,
+so `--mode qwen --qwen-enhancer ffmpeg-dsp:loudnorm` exited 2 with "invalid choice". It now takes the
+same `backend[:detail]` spec, and the detail is separated into the model before it reaches the
+factory, which only knows plain backend names. Not GUI-reachable; it bit CLI and notebook users.
+
+### htdemucs: three corrections, none of them run against the model
+
+- Its docstring promised a failed result for a single-scene failure "so the rest of the file can go
+  on". No path returns one — every failure stops the run, which is what the owner asked for. The
+  words were wrong, not the behaviour.
+- Any error whose text merely contained "cuda" was reported as the graphics card running out of
+  memory, sending users to free memory they had not run out of. It now matches what running out of
+  memory actually says.
+- The model was loaded *after* the audio was read, though the reason to load it early is to stop
+  before spending time on audio. Reordered.
+
+**Still true: no audio has been through htdemucs on this machine.** `demucs` is not installed.
+
+### The duration fallback answered about the wrong file
+
+With no ffprobe on the machine, the duration came from the extraction log — which is the *source
+container's* `Duration:` line, not the extracted stream's, and which gives nothing at all when the
+source prints `Duration: N/A`. The extracted file's own WAV header is now read first, which is still
+a header read and is about the right file. The log stays as the last resort.
+
+### The GUI showed "off" while sending the flag
+
+The "Enhance for VAD only" tick box and the stored value are two separate things, and only the
+balanced rule ever wrote the box. Ticking the option inside the Customize window, or loading a
+preset saved with it on, left the row showing unticked while the run still sent the flag. Repainting
+the row now always shows what will run. **Not click-confirmed — this needs the owner at the GUI.**
+
+### Verified this sitting
+
+`python -m whisperjav.main --help` exits 0. The nine-command sweep over `--enhance-for-vad` and
+`--qwen-enhancer` (refusals exit 2 with the intended message; `--mode fidelity`, `--mode qwen`,
+`--pipeline decoupled`, and ensemble fidelity+qwen all exit 0 and still set the flag). Test files run
+one at a time: `test_translation_server_log_advice` 14, `test_local_chat_check` 13,
+`test_enhance_scene_fallback_rate` 6, `test_llama_server_shim` 10, `test_local_llm_health_check` 33,
+`test_enhance_for_vad_dual_track` 17, `test_speech_enhancer_spec` 30, `test_htdemucs_enhancer` 22,
+`test_audio_extraction_duration` 9, `test_qwen_customize_model` 6. `node --check` on `app.js`.
+
+**A real transcription with the fidelity VAD-only split, which had never been run.** An 8-second
+clip through `--ensemble --pass1-pipeline fidelity --pass1-model tiny --pass1-speech-enhancer
+ffmpeg-dsp --pass1-enhance-for-vad`: exit 0, subtitles written, and the temp directory shows the two
+tracks the split promises — `enhanced_scenes/clip_scene_0000_enhanced.wav` at 16 kHz for finding the
+speech and `resampled_scenes/clip_scene_0000_resampled.wav` at 16 kHz, untouched, for the
+recogniser, both from the 48 kHz original. The log confirms which went where. That retires one of
+the four things this branch had never proved.
+
+### Left for the owner — not implemented
+
+1. ~~**A clean-up that fails at run time still degrades silently.**~~ **ANSWERED the same day:**
+   owner, *"yes stop"* — carried out, see the entry above.
+2. **Single-file mode cannot choose a clean-up at all.** There is no top-level `--speech-enhancer`;
+   only `--pass1/2-speech-enhancer` and `--qwen-enhancer` exist, and the fidelity preset resolves no
+   enhancer. So the VAD-only split in fidelity is reachable only through two-pass/ensemble or the GUI.
+3. **The Transformers Customize window** still discards the model picked in it, the same shape as the
+   Qwen window fixed earlier that day.
+4. **The Customize window's Enhancer tab ticks are collected nowhere**, so DSP effects chosen there
+   change nothing; only the inline row panel reaches the command.
+5. **htdemucs always receives a mono downmix**, so its stereo model runs in its least favourable
+   configuration. Nobody has measured what that costs.
+
+---
+
 ## 2026-09-17 — four of the owner's decisions carried out
 
 **Decisions (owner, 2026-09-17):** *"balanced shall not have the VAD only enhancement"*; *"No
