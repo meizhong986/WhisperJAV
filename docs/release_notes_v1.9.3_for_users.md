@@ -19,6 +19,7 @@ reading about even if you have never used one.
 - [Translation](#translation)
 - [Progress, messages and saved settings](#progress-messages-and-saved-settings)
 - [Every fix, and who reported it](#every-fix-and-who-reported-it)
+- [What people contributed](#what-people-contributed) — the pull requests merged
 - [Upgrading](#upgrading)
 - [Credits](#credits)
 
@@ -215,6 +216,23 @@ and the reported panel behaviour could not be reproduced; nothing was changed.
 
 ---
 
+## What people contributed
+
+Four pull requests were merged into this release. Each was written by someone outside the project and
+is in your copy of 1.9.3.
+
+| What it adds | Who wrote it | Pull request |
+|---|---|---|
+| An **Auto-scroll** toggle in the GUI console header, so the log can follow the run or hold still while you read it | triatomic | #363 |
+| A **"contextual" translation tone** — explicit only where the original is explicit — with temperature defaults matched to each tone | triatomic | #364 |
+| An **accuracy regression gate**: a scorer, baselines and the `whisperjav-accuracy-gate` command, so a change that quietly makes subtitles worse can be caught | Mimic-me | #376 |
+| A **continuous-integration check** that compiles and imports the package on Python 3.12 on every push | AKB0700 | #388 |
+
+Accepted for a later release: **zhiyuchen1101**'s proposal for a role-aware translation layer, with
+character anchors read from a file you supply (#393).
+
+---
+
 ## Upgrading
 
 - **Windows installer:** download and run the new `.exe`. It installs over the existing copy, and
@@ -233,17 +251,11 @@ are. The first run after upgrading may fetch the htdemucs model, if you choose t
 
 ## Credits
 
-**Pull requests merged in this release:**
+**Code contributed:** **triatomic**, **Mimic-me** and **AKB0700** — see
+[What people contributed](#what-people-contributed).
 
-- **AKB0700** — a GitHub Actions check that compiles and imports the package (#388)
-- **triatomic** — the Auto-scroll toggle on the GUI console (#363)
-- **triatomic** — a "contextual" translation tone, explicit only where the original is (#364)
-- **Mimic-me** — an accuracy regression scorer and gate, with the `whisperjav-accuracy-gate`
-  command (#376)
+**Reports and findings that shaped this release:**
 
-**Proposals and findings that shaped this release:**
-
-- **zhiyuchen1101** — the role-aware translation proposal (#393), accepted for a later release
 - **weifu8435** — sustained testing, settings comparisons and detailed reports (#413 and others)
 - **yangming2027**, **sky9639**, **teijiIshida**, **Kukuindi**, **unretired1516**, **thumper100**,
   **zoqapopita93**, **kylesskim-sys**, **jasial2**, **fzfile**, **giulub**, **yedkung69-ctrl**,
