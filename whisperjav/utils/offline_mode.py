@@ -27,6 +27,8 @@ from __future__ import annotations
 import os
 
 OFFLINE_FLAG = "--offline"
+HF_ENDPOINT_FLAG = "--hf-endpoint"
+_HF_ENDPOINT_ENV = "HF_ENDPOINT"
 _HF_OFFLINE_ENV = "HF_HUB_OFFLINE"
 # huggingface_hub also honours TRANSFORMERS_OFFLINE (constants.py: HF_HUB_OFFLINE = _is_true(
 # HF_HUB_OFFLINE or TRANSFORMERS_OFFLINE)); read both so this module agrees with the hub.
@@ -52,6 +54,45 @@ def offline_requested(argv) -> bool:
 def enable_offline_mode() -> None:
     """Switch this process (and every child it spawns) to downloaded models only."""
     os.environ[_HF_OFFLINE_ENV] = "1"
+
+
+def hf_endpoint_requested(argv):
+    """The value of ``--hf-endpoint`` in a raw argument list, or None.
+
+    Accepts ``--hf-endpoint URL`` and ``--hf-endpoint=URL``. Like
+    ``offline_requested``, this runs before argparse, so it also accepts the
+    unambiguous long-option prefixes argparse would accept. No other WhisperJAV
+    option starts with ``--hf``.
+    """
+    tokens = list(argv)
+    for index, tok in enumerate(tokens):
+        name, separator, inline = tok.partition("=")
+        if not name.startswith("--") or len(name) < 5:
+            continue
+        if name != HF_ENDPOINT_FLAG and not HF_ENDPOINT_FLAG.startswith(name):
+            continue
+        if separator:
+            return inline.strip() or None
+        if index + 1 < len(tokens):
+            return tokens[index + 1].strip() or None
+        return None
+    return None
+
+
+def enable_hf_endpoint(endpoint: str) -> None:
+    """Send this process's Hugging Face traffic to ``endpoint``.
+
+    huggingface_hub reads HF_ENDPOINT when it is imported, so this has to run
+    from the raw argv scan in the entry points, before anything pulls the hub
+    library in -- exactly like offline mode. Child processes inherit it with the
+    rest of the environment.
+    """
+    os.environ[_HF_ENDPOINT_ENV] = endpoint.rstrip("/")
+
+
+def hf_endpoint() -> str:
+    """The Hugging Face host in use, however it was set. Empty means the default."""
+    return os.environ.get(_HF_ENDPOINT_ENV, "").strip()
 
 
 def hub_offline() -> bool:

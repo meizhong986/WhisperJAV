@@ -24,6 +24,14 @@ if _offline_requested(_sys.argv[1:]):
     from whisperjav.utils.offline_mode import enable_offline_mode
     enable_offline_mode()
 
+# Same reason, same place: huggingface_hub reads HF_ENDPOINT when it is imported,
+# so --hf-endpoint has to act before the imports below pull the hub library in.
+from whisperjav.utils.offline_mode import hf_endpoint_requested as _hf_endpoint_requested
+_requested_endpoint = _hf_endpoint_requested(_sys.argv[1:])
+if _requested_endpoint:
+    from whisperjav.utils.offline_mode import enable_hf_endpoint
+    enable_hf_endpoint(_requested_endpoint)
+
 # ===========================================================================
 # EARLY WARNING SUPPRESSION - Must be before any library imports
 # ===========================================================================
@@ -108,7 +116,7 @@ from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 from whisperjav.pipelines.kotoba_faster_whisper_pipeline import KotobaFasterWhisperPipeline
 from whisperjav.config.legacy import resolve_legacy_pipeline, resolve_ensemble_config, apply_balanced_vad_defaults
 from whisperjav.utils.model_refresh import DEFAULT_MODEL_REFRESH_AUDIO_MINUTES
-from whisperjav.utils.offline_mode import is_offline
+from whisperjav.utils.offline_mode import is_offline, hf_endpoint
 from whisperjav.modules.silero_vad_adapter import DEFAULT_VAD_VERSION, VAD_VERSIONS
 from whisperjav.config.segmenter_presets import (
     BALANCED_DEFAULT_SEGMENTER,
@@ -453,6 +461,15 @@ def parse_arguments():
                        help="Answer the start-up check in advance: when no usable GPU is found (none present, "
                             "or the card is not supported by this PyTorch build) the run stops and asks "
                             "whether to continue on the CPU; this flag says yes, so nothing is asked")
+    parser.add_argument("--hf-endpoint", type=str, default=None, metavar="URL",
+                        help="Fetch Hugging Face models from this address instead of "
+                             "huggingface.co, for machines that cannot reach it. Takes "
+                             "any mirror you choose, e.g. --hf-endpoint "
+                             "https://example-mirror.invalid (sets HF_ENDPOINT for this "
+                             "run and its workers). Covers what goes through "
+                             "huggingface_hub; Silero via torch.hub, openai-whisper "
+                             "weights and the ModelScope enhancers have their own "
+                             "download paths and are not affected.")
     parser.add_argument("--offline", action="store_true",
                        help="Use only the Hugging Face models already downloaded and make no "
                             "requests to huggingface.co (sets HF_HUB_OFFLINE=1 for this run and "
@@ -2912,6 +2929,13 @@ def main():
             "language_code": language_code,
             "resolved_config": dump_resolved,
             "offline_mode": is_offline(),
+            "hf_endpoint": hf_endpoint(),
+            # True only if HF_ENDPOINT was set BEFORE huggingface_hub was imported,
+            # which is the only way it takes effect.
+            "hub_constant_endpoint": (
+                getattr(sys.modules["huggingface_hub"].constants, "ENDPOINT", "")
+                if "huggingface_hub" in sys.modules else ""
+            ),
             # True only if HF_HUB_OFFLINE was set BEFORE huggingface_hub was imported
             "hub_constant_offline": bool(
                 "huggingface_hub" in sys.modules
