@@ -11,6 +11,67 @@
 
 ---
 
+## 2026-09-17 — four of the owner's decisions carried out
+
+**Decisions (owner, 2026-09-17):** *"balanced shall not have the VAD only enhancement"*; *"No
+external VAD speech segmenter shall be available for balanced"*; *"agree with your recommendation"*
+on a start-up translation check; *"I agree"* on the wrong Ollama advice; *"I agree"* on the Qwen
+Customize window. Also, on a Python 3.13 translation-helper file: **no** — *"my main strategy is
+that I will not fight colab native stack. If python 13 breaks the wheels then the solution pieces
+that require new wheels are no longer supported until new precompiled wheels are found and
+provided."*
+
+### Balanced no longer offers the VAD-only split
+
+Balanced finds the speech inside faster-whisper's own call, on the very audio it transcribes, so
+there is no second track to give the cleaned-up audio to. The flag was being accepted and both
+tracks enhanced — the silent difference the other balanced rules exist to prevent. It is now
+**refused** for a balanced pass, in the same shape and wording as the segmenter refusal beside it;
+the GUI hides the box **and clears the stored value**, so a setting left from another pipeline
+cannot travel into a run through a control the user can no longer see; and the GUI's command builder
+will not send it for a balanced pass either. Still accepted for fidelity and qwen.
+
+The related confirmation needed no change: no external speech segmenter has been available for
+balanced since 1.9.2, and the existing refusal covers it.
+
+### Translation now proves it can chat before the run starts
+
+Everything the local-server readiness check did used `/v1/completions`. Translation sends
+`/v1/chat/completions`, and a build can serve one and fail the other every time — which is exactly
+what happened on Colab: healthy server, then failure 86.9 s later with nothing translated. A new
+phase asks for one short chat completion before the server is reported ready, and a failure there
+stops it coming up with a message written for the user. Where the answer mentions a refusal or a
+validation error it adds that this build rejects its own chat replies and that WhisperJAV already
+repairs the known form, so this is a variant it does not cover.
+
+**One existing test had to change**, and the reason matters: its stub returned a body with no
+`choices` for every request, which was fine while only `/v1/completions` was asked for but no longer
+represents a **working** server. The stub was corrected; the check was not weakened to fit it.
+
+### Each translation provider gets advice that applies to it
+
+Every server error used to end with *"Check Ollama server logs: ollama logs"* — including the local
+provider, which is llama-cpp-python and nothing to do with Ollama. Now: the local provider is
+pointed at the log WhisperJAV itself writes and whose path it prints at start-up; Ollama gets
+Ollama's; a custom server is the user's own; anything else is a cloud service with no local log.
+
+### The Qwen Customize window and the row agree
+
+The window showed its own model while the row was what ran, so a model chosen there was displayed as
+accepted and discarded. It now **shows the row's model** — adding it to the list where the window's
+own list does not carry it, rather than substituting, which is how they came to disagree — and
+**writes a choice back to the row**, guarded so a value the row cannot show is reported rather than
+lost. Transformers has the same shape and is **not** changed; the comment now says so plainly
+instead of calling it "a separate matter".
+
+**Verified:** 6 new tests for the chat check against a stub server (including the exact Colab fault),
+6 new for the balanced refusal and the GUI guards, 6 new reading the Qwen wiring; plus 33, 30, 27,
+22, 17, 10 and 7 across the existing suites, and `node --check` on the GUI script. **Not verified:**
+the chat check has not run against a real local server — there is no model on this machine — and a
+GUI change is not verified until the owner clicks it.
+
+---
+
 ## 2026-09-17 — one rule for a component that cannot run, and the VAD-only split made real in fidelity
 
 **Decision (owner, 2026-09-17):** *"I think all speech segmenters have to have uniform behaviour: if
