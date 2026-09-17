@@ -584,6 +584,10 @@ class FidelityPipeline(BasePipeline):
 
             total_time = time.time() - start_time
             master_metadata["summary"]["total_processing_time_seconds"] = round(total_time, 2)
+            # Carried out with the rest of the summary so every caller sees it
+            # the same way: the plain path, the async path, and a pass running in
+            # its own process (agreed error-handling table, 2026-09-17).
+            master_metadata["summary"]["degradations"] = list(getattr(self, "degradations", None) or [])
             master_metadata["metadata_master"]["updated_at"] = datetime.now().isoformat() + "Z"
             
             self.metadata_manager.save_master_metadata(master_metadata, media_basename)

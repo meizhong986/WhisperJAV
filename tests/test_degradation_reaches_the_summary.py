@@ -117,6 +117,12 @@ class TestEveryPipelineCollectsThem:
             f"{module} calls enhance_scenes {calls} time(s) but passes "
             f"degradations {passed} time(s)")
 
+        # And it must leave them in the metadata it returns. That is the channel
+        # all three consumers read -- the plain path, the async path, and a pass
+        # running in its own process, which has no pipeline object to ask.
+        assert 'master_metadata["summary"]["degradations"]' in source, (
+            f"{module} never puts the shortfalls in the summary it returns")
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

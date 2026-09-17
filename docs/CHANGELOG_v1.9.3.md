@@ -11,6 +11,60 @@
 
 ---
 
+## 2026-09-17 — a shortfall inside a two-pass run now reaches the run summary
+
+**Owner, 2026-09-17:** *"do the ensemble propagation."* This closes the gap left by the previous
+entry: the single-file paths reported a shortfall, the two-pass path did not.
+
+It is the path that matters most, because two-pass is currently the only way to choose an audio
+clean-up from the command line — there is no top-level `--speech-enhancer`.
+
+### One channel instead of two
+
+The first attempt had each pipeline leave its notes on itself, which `main.py` read after
+`process()`. That works only where the caller still holds the pipeline object, and there are three
+callers, not one: the plain path does hold it, the async path builds its outcome from the returned
+metadata, and a pass runs in a **separate process** where the object never existed as far as the
+parent is concerned.
+
+So the notes now travel in the metadata every pipeline already returns —
+`summary["degradations"]` — and all three callers read that one thing. The object attribute stays as
+the place the notes are collected during a run; it is no longer what anyone reads.
+
+### The route, and what carries it
+
+| Hop | What was added |
+|---|---|
+| pipeline → metadata | each of the five pipelines writes `summary["degradations"]` beside the timings it already records |
+| worker → parent | `FileResult` gained a `degradations` field; results cross the process boundary as plain dicts, so it travels with the rest |
+| orchestrator → summary | gathers them per file, labelled `pass 1:` / `pass 2:`, because "2 of 40 scenes" means different things depending on which pass produced the audio being read |
+| summary → the user | `main.py` combines them with the existing "pass 2 failed" reason and the file is reported **`suspect`** with all of it |
+
+A pass that **failed** contributes nothing: its output is not used, so its shortfalls are not the
+user's problem, and the file is already marked degraded for the failure itself.
+
+### Verified
+
+A real two-pass run (`--ensemble --pass1-pipeline fidelity --pass1-speech-enhancer htdemucs
+--pass1-enhance-for-vad`, and again with ffmpeg-dsp): exit 0, `done`, `suspect 0` — the clean path is
+unchanged. With `--debug`, the metadata written by the pipeline **inside the worker process** carries
+`"degradations": []` alongside `total_processing_time_seconds` and `final_subtitles_refined`, so the
+channel is live rather than merely wired.
+
+`tests/test_ensemble_carries_degradations.py` (new, 13 tests) covers each hop with the real code,
+including the orchestrator's actual merge method: a shortfall in pass 1 is labelled and reported,
+two passes are told apart, a failed pass 2 contributes nothing, a result from before this change
+does not crash the gathering, and the combination in `main.py` produces `suspect` while still
+delivering the subtitles. `tests/test_degradation_reaches_the_summary.py` 13, and its guard now also
+checks that every pipeline writes the summary key rather than only passing the list.
+
+**Stated plainly:** what has been exercised live is the empty case — the field is produced, carried
+and read. The non-empty case is covered by tests against the real code at every hop, not by a live
+run, because making one scene of a real clean-up fail on demand is not something that can be
+arranged from outside.
+
+---
+
 ## 2026-09-17 — the agreed error-handling rules, and htdemucs finally run
 
 **Owner, 2026-09-17:** *"The D rows, agreed"* and *"only all-fail is fatal, agreed"*, on the table at

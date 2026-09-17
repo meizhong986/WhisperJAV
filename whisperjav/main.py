@@ -1757,8 +1757,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                 # named in the RUN SUMMARY, not left in a log line. Today that
                 # is scenes a chosen clean-up could not clean. It travels
                 # through the same degraded/suspect channel a failed pass 2
-                # already uses.
-                _shortfalls = list(getattr(pipeline, 'degradations', None) or [])
+                # already uses, and it is read from the metadata the pipeline
+                # returned so that every path reads it the same way.
+                _shortfalls = list(metadata.get("summary", {}).get("degradations") or [])
 
                 outcome = classify_output(
                     file_path_str,
@@ -2075,12 +2076,17 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
             _path = task.media_info.get('path', 'Unknown File')
             if task.status == ProcessingStatus.COMPLETED and isinstance(task.result, dict):
                 _summary = task.result.get("summary", {})
+                _shortfalls = list(_summary.get("degradations") or [])
                 outcome = classify_output(
                     _path,
                     task.result.get("output_files", {}).get("final_srt") or None,
                     task.media_info.get('duration'),
                     min_coverage=args.min_coverage,
                     speech_positive_empty_streak=_summary.get("speech_positive_empty_streak", 0),
+                    # Same rule as the other paths: a shortfall is named in the
+                    # run summary rather than left in the log.
+                    degraded=bool(_shortfalls),
+                    degraded_reason="; ".join(_shortfalls),
                     processing_time_s=_summary.get("total_processing_time_seconds"),
                 )
             elif task.status == ProcessingStatus.CANCELLED:
@@ -3436,6 +3442,16 @@ def main():
                     else:
                         successful_count += 1
                     total_processing_time += _elapsed or 0.0
+                    # Everything the user should be told about this file, in one
+                    # place: a pass 2 that failed, and anything that quietly
+                    # fell short inside a pass that did run. The second kind is
+                    # carried back from the worker processes by the orchestrator
+                    # (agreed error-handling table, 2026-09-17).
+                    _reasons = []
+                    if status == 'degraded':
+                        _reasons.append("pass 2 failed; output is pass 1 alone")
+                    _reasons.extend(_summary.get('degradations') or [])
+
                     outcome = classify_output(
                         in_path,
                         _summary.get('final_output') or None,
@@ -3445,8 +3461,8 @@ def main():
                         # speech-positive streak back through the orchestrator,
                         # so ensemble runs have no corroboration signal yet.
                         speech_positive_empty_streak=0,
-                        degraded=(status == 'degraded'),
-                        degraded_reason="pass 2 failed; output is pass 1 alone",
+                        degraded=bool(_reasons),
+                        degraded_reason="; ".join(_reasons),
                         processing_time_s=_elapsed,
                     )
                     if status == 'degraded' and args.translate:

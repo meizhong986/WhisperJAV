@@ -10,7 +10,7 @@ warnings.filterwarnings("ignore", message=".*chunk_length_s.*is very experimenta
 
 import shutil
 import traceback
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -300,6 +300,12 @@ class FileResult:
     subtitles: int = 0
     processing_time: float = 0.0
     error: Optional[str] = None
+    # Anything that quietly fell short in this pass, in plain language -- today,
+    # scenes a chosen clean-up could not clean. A pass runs in its own process,
+    # so without carrying these back the run summary would never learn of them
+    # and the user would be told nothing (agreed error-handling table,
+    # 2026-09-17, cross-cutting rule 1).
+    degradations: List[str] = field(default_factory=list)
 
 
 def prepare_transformers_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -752,6 +758,10 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                         srt_path=str(pass_output),
                         subtitles=result["summary"].get("final_subtitles_refined", 0),
                         processing_time=result["summary"].get("total_processing_time_seconds", 0.0),
+                        # From the metadata this file's run returned, so the
+                        # worker reads the same channel everything else does.
+                        degradations=list(
+                            result.get("summary", {}).get("degradations") or []),
                     )
                 )
                 logger.debug(

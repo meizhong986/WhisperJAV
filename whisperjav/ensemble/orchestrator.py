@@ -441,10 +441,26 @@ class EnsembleOrchestrator:
 
         passes_completed = 2 if pass2_config and pass2 and pass2.get('status') == 'completed' else 1
         total_time = pass1.get('processing_time', 0.0) + (pass2.get('processing_time', 0.0) if pass2 else 0.0)
+
+        # Anything that quietly fell short, carried back from the worker
+        # processes so the run summary can name it (agreed error-handling table,
+        # 2026-09-17, cross-cutting rule 1). Labelled by pass, because "2 of 40
+        # scenes" means something different depending on which pass produced the
+        # audio the user is reading. Only a pass whose output is actually used
+        # is reported: a pass 2 that failed contributed nothing to complain
+        # about, and the file is already marked degraded for that.
+        degradations: List[str] = []
+        for _pass_number, _pass in ((1, pass1), (2, pass2)):
+            if not _pass or _pass.get('status') != 'completed':
+                continue
+            for _note in _pass.get('degradations') or []:
+                degradations.append(f"pass {_pass_number}: {_note}")
+
         ensemble_metadata['summary'] = {
             'final_output': str(final_output_path) if final_output_path else None,
             'passes_completed': passes_completed,
             'total_processing_time_seconds': total_time,
+            'degradations': degradations,
         }
         ensemble_metadata['output_files'] = {
             'final_srt': str(final_output_path) if final_output_path else None,
