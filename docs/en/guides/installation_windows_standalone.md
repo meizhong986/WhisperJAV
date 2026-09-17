@@ -282,6 +282,15 @@ This file contains detailed information about every step of the installation pro
 
 ## Upgrading from a Previous Version
 
+### Which version are you on?
+
+- **On v1.9.2** — either works. Upgrade, or do a fresh install. v1.9.3 changes no underlying
+  library; the only new package is `demucs`, for htdemucs vocal isolation.
+- **On anything older than v1.9.2** — **do a fresh install.** v1.9.2 pinned Faster-Whisper to an
+  exact commit and CTranslate2 to 4.8.1, and an in-place upgrade from an older version can leave
+  your previous versions of those behind. A fresh install puts you on the combination the release
+  was tested with.
+
 ### Automatic Upgrade Detection
 
 If you install WhisperJAV v1.8.9 to the same directory as a previous version, the installer will:

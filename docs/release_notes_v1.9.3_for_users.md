@@ -20,7 +20,7 @@ reading about even if you have never used one.
 - [Progress, messages and saved settings](#progress-messages-and-saved-settings)
 - [Every fix, and who reported it](#every-fix-and-who-reported-it)
 - [What people contributed](#what-people-contributed) — the pull requests merged
-- [Upgrading](#upgrading)
+- [Installing and upgrading](#installing-and-upgrading) — **on 1.9.2? either way. Older? fresh install**
 - [Credits](#credits)
 
 ---
@@ -54,7 +54,7 @@ In the GUI: the **Ensemble Mode** tab, Pass 1 row — Pipeline **Qwen3-ASR**, Sp
 Notes:
 
 - **htdemucs comes with a fresh install.** If you are **upgrading**, see
-  [Upgrading](#upgrading) — one of the routes does not bring it, and you would get a clear "not
+  [Installing and upgrading](#installing-and-upgrading) — one of the routes does not bring it, and you would get a clear "not
   installed" message when you chose it. Its model is about 84 MB and is fetched once, from Meta's own
   site — not from Hugging Face, so a Hugging Face mirror does not redirect it.
 - **Enhance for VAD only works on the Fidelity and Qwen pipelines.** Balanced refuses it and says
@@ -234,30 +234,45 @@ character anchors read from a file you supply (#393).
 
 ---
 
-## Upgrading
+## Installing and upgrading
 
-**A fresh install brings everything, including htdemucs:**
+Which one you want depends on the version you are coming from.
 
-- **Windows installer:** download and run the new `.exe`. It installs over the existing copy, and
-  you do not have to remove the old one first. **This is the recommended route.**
-- **Google Colab:** no action required — the notebook installs the release itself.
+### If you are on 1.9.2
 
-**If you upgrade an existing install instead, read this.** `demucs` is new in 1.9.3, and it lives in
-the `enhance` group of optional packages. Not every upgrade route installs that group:
+**Either works — upgrade, or do a fresh install.** 1.9.3 changes no underlying library, so an
+upgrade is safe.
 
-| How you upgrade | Does it bring htdemucs? |
+If you upgrade, one thing is worth knowing: **`demucs` is new in 1.9.3**, and it sits in the
+`enhance` group of optional packages. Not every route installs that group:
+
+| How you upgrade | Brings htdemucs? |
 |---|---|
-| The new Windows `.exe` | **Yes** |
-| `pip install -U "whisperjav[all] @ git+https://github.com/meizhong986/whisperjav.git"` | **Yes** |
-| `whisperjav-upgrade` | **No** — add `pip install demucs` afterwards |
-| A source install (`git pull` + `uv sync --all-extras`) | **Yes** |
+| Run the new Windows `.exe` over your install | **Yes** |
+| `pip install -U "whisperjav[all] @ git+https://github.com/meizhong986/whisperjav.git"` | **Yes** — keep the `[all]` |
+| `whisperjav-upgrade` | **No** — run `pip install demucs` afterwards |
+| Source install: `git pull` then `uv sync --all-extras` | **Yes** |
 
-If htdemucs is missing, nothing breaks quietly: choosing it stops the run and tells you it is not
-installed. One `pip install demucs` fixes it. It brings two small companions (`lameenc`, `sphn`) and
-does not change your PyTorch.
+Nothing breaks quietly if it is missing: choosing htdemucs stops the run and tells you it is not
+installed. One `pip install demucs` fixes it — two small companions (`lameenc`, `sphn`), and your
+PyTorch is untouched.
 
-Everything else is unchanged: your settings, your output folders and your models stay where they
-are. The first run after upgrading may fetch the htdemucs model, if you choose that enhancer.
+### If you are on anything older than 1.9.2
+
+**Please do a fresh install.** Download and run the new `.exe`.
+
+1.9.2 pinned two libraries underneath WhisperJAV to exact builds — Faster-Whisper to one commit, and
+CTranslate2 to 4.8.1 — and an in-place upgrade from an older version can leave your previous versions
+of those in place. A fresh install puts you on the combination this release was actually tested with.
+
+### Google Colab
+
+No action required. The notebook installs the release itself.
+
+### In every case
+
+Your settings, your output folders and your models stay where they are. The first run after
+installing may fetch the htdemucs model, if you choose that enhancer.
 
 ---
 
