@@ -135,7 +135,7 @@ settings there permanently, including an `http.proxy` pointing at a proxy that m
 day, and nothing ever offered to undo them. Those settings now apply to the installation only.
 
 **Linux:** the GUI needs a pywebview backend in your environment. The README and the Linux install
-script now say which packages.
+script now say which packages. *(Reported by thumper100, #366.)*
 
 **Models from a mirror:** `--hf-endpoint <url>` sends Hugging Face downloads to an address you
 choose, for machines that cannot reach huggingface.co. It covers what goes through Hugging Face —
@@ -174,8 +174,9 @@ elsewhere.
   *(Reported by unretired1516, #372.)*
 - **A file whose clean-up only partly succeeded is reported as suspect**, with the reason and the
   count, rather than passing silently as done. `--fail-on suspect` makes the run exit non-zero.
-- **Two-pass settings are saved and restored** in the GUI. *(Asked by yangming2027, #381.)*
-  Saving the values inside the Customize window is a separate piece of work, still to come.
+- **Two-pass settings are saved and restored** in the GUI. *(Asked by yangming2027, #381, and
+  sky9639, #96.)* Saving the values inside the Customize window is a separate piece of work, still
+  to come.
 - **The Customize window and the row now agree on which model runs.** Picking a model in the window
   used to display as accepted, and then be discarded.
 
@@ -186,10 +187,11 @@ elsewhere.
 | What was wrong | Who reported it |
 |---|---|
 | Installer stuck at the PyTorch phase with no progress | zoqapopita93 (#314) |
+| `ModuleNotFoundError: No module named 'gi'` on Linux | thumper100 (#366) |
 | Batch transcription appeared to stop early | unretired1516 (#372) |
 | Blank subtitle file after a run reported success | teijiIshida (#297) |
 | Whole-folder runs slow, listing scrolled past | Kukuindi (#302) |
-| Two-pass settings not kept between sessions | yangming2027 (#381) |
+| Two-pass settings not kept between sessions | yangming2027 (#381), sky9639 (#96) |
 | The Colab notebook failed on its own defaults | jasial2 (#407) |
 | Italian translation target | giulub (#351) |
 | Thai translation target | yedkung69-ctrl (#268) |
@@ -215,11 +217,17 @@ and the reported panel behaviour could not be reproduced; nothing was changed.
 
 ## Upgrading
 
-**Windows:** run the new installer. It installs beside your existing setup, and you do not have to
-remove the old one first.
+- **Windows installer:** download and run the new `.exe`. It installs over the existing copy, and
+  you do not have to remove the old one first.
+- **Source install:** `whisperjav-upgrade`.
+- **Google Colab:** no action required — the notebook installs the release itself.
 
 Everything else is unchanged: your settings, your output folders and your models stay where they
 are. The first run after upgrading may fetch the htdemucs model, if you choose that enhancer.
+
+> **If you upgrade manually with pip:** `demucs` is a new dependency in this release, so an upgrade
+> with `--no-deps` will leave htdemucs offered in the GUI with nothing behind it. It brings two
+> small companions (`lameenc`, `sphn`) and does not change your PyTorch.
 
 ---
 
