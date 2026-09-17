@@ -92,10 +92,15 @@ class AudioExtractor:
         front of its log -- a second pass over every byte of audio, on every file,
         in every pipeline. Nothing here decodes any more:
 
-        1. ffprobe reads the header and stops.
-        2. If ffprobe is missing, the extraction run's own log is reused: FFmpeg
-           prints the source's "Duration:" line before it starts work, so it costs
-           nothing to read.
+        1. ffprobe reads the extracted file's header and stops.
+        2. If ffprobe is missing, the extracted file's own WAV header is read,
+           which is also just a header read and is still about the right file.
+        3. Failing both, the extraction run's own log is reused: FFmpeg prints
+           the SOURCE's "Duration:" line before it starts work, so it costs
+           nothing to read -- but it describes the source container, which is not
+           always the same length as the audio stream taken out of it, and a
+           source that prints "Duration: N/A" gives nothing at all. That is why
+           it is the last resort rather than the first.
 
         Args:
             audio_file: The extracted audio file.
@@ -121,10 +126,21 @@ class AudioExtractor:
             except (subprocess.SubprocessError, ValueError) as e:
                 logger.debug(f"ffprobe could not report the duration: {e}")
 
+        try:
+            import soundfile as sf
+
+            info = sf.info(str(audio_file))
+            if info.samplerate > 0 and info.frames > 0:
+                logger.debug("Duration taken from the extracted file's own header")
+                return info.frames / float(info.samplerate)
+        except Exception as e:
+            logger.debug(f"Could not read the extracted file's header: {e}")
+
         if extract_stderr:
             duration = self._parse_ffmpeg_duration(extract_stderr)
             if duration > 0.0:
-                logger.debug("Duration taken from the extraction run's own output")
+                logger.debug("Duration taken from the extraction run's own output "
+                             "(the source's, not the extracted file's)")
                 return duration
 
         logger.debug(f"Could not determine the duration of {audio_file.name}")

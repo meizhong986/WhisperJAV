@@ -61,21 +61,51 @@ class TestDuration:
 
         assert extractor._get_audio_duration(out) == pytest.approx(from_full_decode, abs=0.05)
 
-    def test_the_fallback_reads_the_extraction_log(self, extractor, source_media, tmp_path):
+    def test_without_ffprobe_it_reads_the_extracted_files_own_header(
+            self, extractor, source_media, tmp_path):
         """
-        With no ffprobe on the machine, the duration comes out of the log FFmpeg
-        already produced while extracting -- still without decoding anything.
+        With no ffprobe on the machine, the WAV header of the file just written
+        answers the question -- still a header read, nothing decoded, and still
+        about the extracted file rather than the source container.
         """
         out = tmp_path / "extracted.wav"
         extractor.extract(source_media, out)
-        probe_output = subprocess.run(
-            [extractor.ffmpeg_path, "-i", str(source_media)],
-            capture_output=True, text=True, encoding="utf-8", errors="replace").stderr
 
         with pytest.MonkeyPatch.context() as mp:
             mp.setattr(extractor, "_find_ffprobe", lambda: None)
-            duration = extractor._get_audio_duration(out, probe_output)
+            duration = extractor._get_audio_duration(out)
         assert duration == pytest.approx(TONE_SECONDS, abs=0.2)
+
+    def test_a_source_that_reports_no_duration_does_not_lose_the_answer(
+            self, extractor, source_media, tmp_path):
+        """
+        Found by review, 2026-09-17. The extraction log is the SOURCE's, and a
+        source printing "Duration: N/A" gives nothing -- where the old
+        second-decode of the extracted file would have reported the real length.
+        The extracted file's own header covers that case.
+        """
+        out = tmp_path / "extracted.wav"
+        extractor.extract(source_media, out)
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(extractor, "_find_ffprobe", lambda: None)
+            duration = extractor._get_audio_duration(
+                out, "  Duration: N/A, start: 0.000000, bitrate: N/A")
+        assert duration == pytest.approx(TONE_SECONDS, abs=0.2)
+
+    def test_the_last_resort_is_still_the_extraction_log(self, extractor, tmp_path):
+        """
+        When the extracted file cannot be read at all, the log FFmpeg already
+        produced is better than nothing.
+        """
+        unreadable = tmp_path / "truncated.wav"
+        unreadable.write_bytes(b"not really a wav")
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(extractor, "_find_ffprobe", lambda: None)
+            duration = extractor._get_audio_duration(
+                unreadable, "  Duration: 00:00:05.00, start: 0.000000, bitrate: 256 kb/s")
+        assert duration == pytest.approx(5.0, abs=0.01)
 
     def test_it_returns_zero_when_nothing_can_tell_it(self, extractor, tmp_path):
         """Unreadable file, no log: the same answer as before -- 0.0, not a crash."""
