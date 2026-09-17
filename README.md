@@ -74,7 +74,8 @@ control was also invisible in the GUI unless you re-picked the enhancer by hand,
 not be chosen from the GUI at all.
 
 **The recommended recipe** — more accurate subtitles and more accurate timing, for a little more
-time. Choose a speech enhancer: **htdemucs** (new here, and installed with WhisperJAV), or any of the
+time. Choose a speech enhancer: **htdemucs** (new here; it comes with a fresh install — upgraders,
+see the release notes), or any of the
 stable enhancers that suits your machine. Then turn on **Enhance for VAD only**. The enhanced vocal
 stem drives the voice detection, so the speech is *segmented* on clean audio, while the recogniser
 transcribes the **original, untouched** audio. Preparing one track and recognising the other is what

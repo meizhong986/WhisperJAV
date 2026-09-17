@@ -300,6 +300,15 @@ If you have PATH enabled (the default), you can upgrade without re-downloading t
 pip install -U "whisperjav[all] @ git+https://github.com/meizhong986/whisperjav.git"
 ```
 
+Keep the `[all]`. It is what installs the optional groups — including `enhance`, which holds the
+speech enhancers. Without it you get the core package only, and an enhancer you pick in the GUI will
+stop the run saying it is not installed.
+
+> **Upgrading to v1.9.3 with the `whisperjav-upgrade` command:** that command does not install the
+> optional groups, so it will not bring `demucs` (new in v1.9.3, for htdemucs vocal isolation). If
+> you want htdemucs, run `pip install demucs` afterwards, or upgrade with the `.exe` or the pip
+> command above instead.
+
 ### Preserving Configuration
 
 User settings are stored in:

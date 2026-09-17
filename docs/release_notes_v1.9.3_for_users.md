@@ -53,9 +53,10 @@ In the GUI: the **Ensemble Mode** tab, Pass 1 row — Pipeline **Qwen3-ASR**, Sp
 
 Notes:
 
-- **htdemucs installs with WhisperJAV.** You do not install it separately. Its model is about 84 MB
-  and is fetched once, from Meta's own site — not from Hugging Face, so a Hugging Face mirror does
-  not redirect it.
+- **htdemucs comes with a fresh install.** If you are **upgrading**, see
+  [Upgrading](#upgrading) — one of the routes does not bring it, and you would get a clear "not
+  installed" message when you chose it. Its model is about 84 MB and is fetched once, from Meta's own
+  site — not from Hugging Face, so a Hugging Face mirror does not redirect it.
 - **Enhance for VAD only works on the Fidelity and Qwen pipelines.** Balanced refuses it and says
   so: Balanced finds the speech inside Faster-Whisper itself, on the very audio it transcribes, so
   there is no second track to hand the cleaned-up audio to.
@@ -235,17 +236,28 @@ character anchors read from a file you supply (#393).
 
 ## Upgrading
 
+**A fresh install brings everything, including htdemucs:**
+
 - **Windows installer:** download and run the new `.exe`. It installs over the existing copy, and
-  you do not have to remove the old one first.
-- **Source install:** `whisperjav-upgrade`.
+  you do not have to remove the old one first. **This is the recommended route.**
 - **Google Colab:** no action required — the notebook installs the release itself.
+
+**If you upgrade an existing install instead, read this.** `demucs` is new in 1.9.3, and it lives in
+the `enhance` group of optional packages. Not every upgrade route installs that group:
+
+| How you upgrade | Does it bring htdemucs? |
+|---|---|
+| The new Windows `.exe` | **Yes** |
+| `pip install -U "whisperjav[all] @ git+https://github.com/meizhong986/whisperjav.git"` | **Yes** |
+| `whisperjav-upgrade` | **No** — add `pip install demucs` afterwards |
+| A source install (`git pull` + `uv sync --all-extras`) | **Yes** |
+
+If htdemucs is missing, nothing breaks quietly: choosing it stops the run and tells you it is not
+installed. One `pip install demucs` fixes it. It brings two small companions (`lameenc`, `sphn`) and
+does not change your PyTorch.
 
 Everything else is unchanged: your settings, your output folders and your models stay where they
 are. The first run after upgrading may fetch the htdemucs model, if you choose that enhancer.
-
-> **If you upgrade manually with pip:** `demucs` is a new dependency in this release, so an upgrade
-> with `--no-deps` will leave htdemucs offered in the GUI with nothing behind it. It brings two
-> small companions (`lameenc`, `sphn`) and does not change your PyTorch.
 
 ---
 
