@@ -11,6 +11,65 @@
 
 ---
 
+## 2026-09-17 — phase 6 opened: the Windows installer (A1), and the mechanism A2 needs
+
+**Owner, 2026-09-17:** *"proceed to 6."*
+
+### A1 — the installer looked frozen because it was (#314 and four probable)
+
+Every package install ran through `subprocess.run(capture_output=True)`, so pip's output was held
+until the command finished — and pip prints nothing at all while a single wheel downloads. On the
+PyTorch wheels that is minutes of an unmoving screen with no way to tell a slow download from a dead
+installer.
+
+Installs now stream. Every line goes to the log file; the lines that say what is happening
+(`Collecting`, `Downloading`, `Installing`, errors) go to the screen as they happen; and when pip
+says nothing at all, a heartbeat with the elapsed time arrives every fifteen seconds. Verified
+against real subprocesses, not by reading: a chatty command's lines appear while it runs, a silent
+one still produces heartbeats, and a command that hangs without printing anything is still killed at
+the timeout — the 30-minute limit the old code got from `subprocess.run` had to be rebuilt by hand,
+so it was worth proving it still fires.
+
+**The network check now says what it tried.** It names the addresses it is contacting and the proxy
+it is using, and repeats both when it fails. A user behind a company proxy or in China could not act
+on "network check failed" without knowing what was attempted. Reaching PyPI is still required and
+still fatal; `download.pytorch.org` is reported but not required, because the CPU route takes
+PyTorch from PyPI. A host that answers 403 to a bare GET counts as reachable — `download.pytorch.org`
+does exactly that, and reporting it as unreachable would send every user chasing a fault they do not
+have.
+
+**The installer stopped writing into the user's global git config.** It wrote eight settings there,
+including an `http.proxy` pointing at a proxy that may only exist today, and nothing ever offered to
+undo them — a permanent change to git for everything else that person does on that machine. They now
+go into this install's environment through `GIT_CONFIG_COUNT`, which reaches every git the install
+starts, including the one pip runs for a `git+https` install. Verified: a real git process reads
+every setting and the global config is untouched. On a git older than 2.31, which cannot read them
+that way, they are skipped with a plain line rather than written to disk.
+
+### A2 — `--hf-endpoint`, and nothing else yet
+
+Machines that cannot reach huggingface.co had nothing to set inside WhisperJAV; the only mention of
+a mirror anywhere in the tree was one line of advice printed by the model loader.
+
+`--hf-endpoint URL` sends Hugging Face downloads to an address the user chooses. huggingface_hub
+reads `HF_ENDPOINT` when it is imported, so it is applied from the raw argument scan in both entry
+points, before anything pulls the hub library in — the same place and for the same reason as
+`--offline`. Get that wrong and the flag is accepted and silently does nothing, so `--dump-params`
+now reports both the value asked for and the `ENDPOINT` huggingface_hub actually ended up with,
+beside the two offline fields that already worked this way. Verified in both argument forms.
+`tests/test_hf_endpoint_flag.py`, 12 tests.
+
+**WhisperJAV names no mirror.** The flag takes whatever address the user gives it. Which mirrors to
+recommend, the GUI checkbox, the pip index variable and the China page itself are the owner's
+decisions and are not started.
+
+**For that page when it is written:** `--hf-endpoint` covers what goes through huggingface_hub.
+Silero via torch.hub, the openai-whisper weights and the ModelScope enhancers have their own
+download paths, and htdemucs fetches its model from Meta's own site rather than Hugging Face. None of
+those are redirected by a Hugging Face mirror, and the page has to say so.
+
+---
+
 ## 2026-09-17 — a clean-up that fails while it is running now stops the run too
 
 **Owner, 2026-09-17,** answering the open item the audit left him: *"yes stop."* He also confirmed
