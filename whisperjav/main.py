@@ -829,9 +829,15 @@ def parse_arguments():
                            help="Semantic scene detector only: clustering distance separating "
                                 "scenes. Lower values tend to give more, shorter scenes. Default 22 "
                                 "(v1.9.2: the same value every pipeline uses).")
-    qwen_audio_group.add_argument("--qwen-enhancer", type=str, default="none",
-                           choices=SPEECH_ENHANCER_CHOICES,
-                           help="Speech enhancement backend (default: none). htdemucs and "
+    qwen_audio_group.add_argument("--qwen-enhancer", default="none",
+                           type=speech_enhancer_spec,
+                           metavar="BACKEND[:DETAIL]",
+                           help="Speech enhancement backend (default: none). One of "
+                                + ", ".join(SPEECH_ENHANCER_CHOICES)
+                                + ". A detail may follow a colon: for ffmpeg-dsp a "
+                                  "comma-separated list of effects ("
+                                + ", ".join(FFMPEG_DSP_EFFECTS)
+                                + "), for the others a model name. htdemucs and "
                                 "bs-roformer isolate the voice from music and effects; "
                                 "zipenhancer and clearvoice reduce noise; ffmpeg-dsp applies "
                                 "level and filter work. htdemucs is not installed with "
@@ -840,8 +846,12 @@ def parse_arguments():
     qwen_audio_group.add_argument("--qwen-enhancer-model", type=str, default=None,
                            help="Speech enhancer model variant (e.g., 'MossFormer2_SE_48K' for clearvoice)")
     qwen_audio_group.add_argument("--enhance-for-vad", action="store_true", default=False,
-                           help="Dual-track mode: use enhanced audio for VAD/framing but original audio "
-                                "for ASR transcription (Qwen/Decoupled pipelines only)")
+                           help="Dual-track mode: the cleaned-up audio is used to find the speech "
+                                "and the original audio goes to the recogniser. Applies to the "
+                                "qwen, fidelity and decoupled pipelines. NOT accepted with "
+                                "balanced, which finds the speech inside faster-whisper itself, on "
+                                "the same audio it transcribes. Accepted but ignored by fast, "
+                                "faster, transformers and crispasr.")
     qwen_audio_group.add_argument("--qwen-segmenter", type=str, default="whisperseg",
                            choices=["none", "silero", "silero-v4.0", "silero-v3.1", "silero-v6.2",
                                     "nemo", "nemo-lite", "whisper-vad", "ten", "whisperseg",
@@ -1525,6 +1535,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         _resolved_segmenter_config = resolve_qwen_sensitivity(
             _qwen_segmenter, _qwen_sensitivity, _user_vad_overrides or None
         )
+        _qwen_enhancer_backend, _, _qwen_enhancer_detail = (
+            getattr(args, 'qwen_enhancer', 'none') or 'none').partition(":")
+
         # Build Qwen kwargs — pipeline owns defaults for group duration
         # and step-down params; CLI only forwards explicit user overrides.
         qwen_kwargs = {
@@ -1539,9 +1552,12 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             "qwen_safe_chunking": getattr(args, 'qwen_safe_chunking', True),
             # Scene detection
             "scene_detector": getattr(args, 'qwen_scene', 'none'),
-            # Speech enhancement
-            "speech_enhancer": getattr(args, 'qwen_enhancer', 'none'),
-            "speech_enhancer_model": getattr(args, 'qwen_enhancer_model', None),
+            # Speech enhancement. --qwen-enhancer accepts "backend" or
+            # "backend:detail"; the factory only knows plain backend names, so
+            # the detail is separated here and becomes the model, exactly as
+            # pass_worker._parse_speech_enhancer does for a two-pass run.
+            "speech_enhancer": _qwen_enhancer_backend,
+            "speech_enhancer_model": _qwen_enhancer_detail or getattr(args, 'qwen_enhancer_model', None),
             "enhance_for_vad": getattr(args, 'enhance_for_vad', False),
             # Speech segmentation / VAD
             "speech_segmenter": _qwen_segmenter,
@@ -1661,7 +1677,13 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         )
         effective_mode = args.mode
     else:  # fidelity
-        pipeline = FidelityPipeline(**pipeline_args)
+        pipeline = FidelityPipeline(
+            **pipeline_args,
+            # Fidelity reads this from its kwargs (see FidelityPipeline.__init__).
+            # Without it, --mode fidelity --enhance-for-vad was accepted and did
+            # nothing: the split only ever happened through --ensemble or the GUI.
+            enhance_for_vad=getattr(args, 'enhance_for_vad', False),
+        )
         # v1.9.2 (CFF1): recogniser refresh budget (minutes of scene audio).
         pipeline.model_refresh_audio_minutes = getattr(args, 'model_refresh_audio_minutes', DEFAULT_MODEL_REFRESH_AUDIO_MINUTES)
         effective_mode = args.mode
@@ -2223,11 +2245,28 @@ def validate_balanced_vad_options(args) -> None:
     is_ensemble = bool(getattr(args, 'ensemble', False))
     mode = getattr(args, 'mode', None)
 
-    if not is_ensemble and mode == "balanced" and getattr(args, 'speech_segmenter', None):
+    # --pipeline decoupled overrides --mode, which still reads "balanced" from
+    # its default, so a decoupled run must not be caught by these two.
+    is_balanced_run = (not is_ensemble and mode == "balanced"
+                       and getattr(args, 'pipeline', None) is None)
+
+    if is_balanced_run and getattr(args, 'speech_segmenter', None):
         raise ValueError(
             "--speech-segmenter is not available with --mode balanced (v1.9.2). "
             "Balanced uses faster-whisper's built-in VAD; choose which Silero build "
             "it runs with --vad-version {" + ",".join(VAD_VERSIONS) + "}."
+        )
+
+    # Owner, 2026-09-17: "balanced shall not have the VAD only enhancement."
+    # It was accepted and ignored here, which is the silent difference the rest
+    # of these rules exist to stop.
+    if is_balanced_run and getattr(args, 'enhance_for_vad', False):
+        raise ValueError(
+            "--enhance-for-vad is not available with --mode balanced (v1.9.3). "
+            "Balanced finds the speech inside faster-whisper itself, on the same "
+            "audio it transcribes, so the clean-up cannot be applied to one and "
+            "not the other. Use --mode fidelity or --mode qwen for that, or drop "
+            "the flag."
         )
 
     for n in ("1", "2"):
@@ -2246,14 +2285,25 @@ def validate_balanced_vad_options(args) -> None:
         # cleaned-up audio to. Accepting the flag and quietly enhancing both --
         # which is what happened up to v1.9.2 -- is the silent-difference the
         # balanced rules above exist to stop.
-        if pipeline == "balanced" and getattr(args, f"pass{n}_enhance_for_vad", False):
+        # The pass configuration below is built as "this pass's flag OR the
+        # global --enhance-for-vad", so the refusal has to read the same
+        # combination. Reading only the pass flag let the global form set
+        # enhance_for_vad on a balanced pass -- the exact thing refused here.
+        _pass_efv = getattr(args, f"pass{n}_enhance_for_vad", False)
+        # Only an ensemble run folds the global flag into a pass, and
+        # --pass1-pipeline defaults to balanced, so reading it unconditionally
+        # would refuse --mode fidelity --enhance-for-vad and every other
+        # single-pipeline run that legitimately uses it.
+        _global_efv = is_ensemble and getattr(args, "enhance_for_vad", False)
+        if pipeline == "balanced" and (_pass_efv or _global_efv):
+            _flag = f"--pass{n}-enhance-for-vad" if _pass_efv else "--enhance-for-vad"
             raise ValueError(
-                f"--pass{n}-enhance-for-vad is not available when --pass{n}-pipeline "
+                f"{_flag} is not available when --pass{n}-pipeline "
                 f"is balanced (v1.9.3). Balanced finds the speech inside "
                 f"faster-whisper itself, on the same audio it transcribes, so the "
                 f"clean-up cannot be applied to one and not the other. Use "
-                f"--pass{n}-pipeline fidelity or qwen for that, or drop the flag: "
-                f"the clean-up still runs, it is simply not split.")
+                f"--pass{n}-pipeline fidelity or qwen for that, or drop "
+                f"{_flag}: the clean-up still runs, it is simply not split.")
 
         # The mirror of the rule below: a version for a pass that does not run the
         # built-in VAD is not a silent no-op either. Same flag family, same answer.
