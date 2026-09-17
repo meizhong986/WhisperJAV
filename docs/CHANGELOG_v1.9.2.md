@@ -8,10 +8,83 @@
 > Conventions: one entry per landed change, newest first. "Decision" lines
 > record who decided what, so a later reader can tell policy from mechanism.
 >
-> **SYNC** — pack **r4.5**, and **deliberately left at the v1.9.2 state — owner decision 2026-09-13: "We can open a 1.9.3 owner pack when the right time."** So r4.5 stays the v1.9.2 cycle page; the v1.9.3 standing lives in `docs/plans/V193_STANDING_2026_09_13.md` until he opens the 1.9.3 pack. The one-state rule (A7) is satisfied by his decision, not by an omission. | tracker rev **52.8** | change log through **2026-09-13 (afternoon)** | standing **`docs/plans/V193_STANDING_2026_09_13.md`** rev 1.0 | **v1.9.2 RELEASED** 2026-09-12 19:04 UTC, tag at `63f256e`; `main` = `dev_v1.9.2` = `origin/main` @ `63f256e`; 3 files modified and uncommitted on `main`. Batch 1 POSTED 2026-09-13 (19 threads); batches 2-4 await his word; nothing pushed. (Counts re-pulled **2026-09-13 13:37 UTC**.)
-> GitHub **141 open** · 233 closed · 11 PRs (5 merge clean, 6 conflicting) · 0 of 9 labels applied · newest #424 (unanswered) · **36 owed replies** (13 over 100 days; raw 37 — #320 #337 #99 excluded as resolved on their own threads) · **7 never answered**. Clusters for 1.9.3 planning: **G1 19 / G2 25 / G3 97**. 1.9.2 feedback so far: **#302 improved, #395 improved, #367 cannot test (macOS), #297 NOT improved**. Owner pack: https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2
-> (updated in place; never a second page). Rule: a session that changes the pack, this file or the change
-> log brings the other two to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
+> **SYNC** — requirements doc `docs/requirements/v1.9.3_vision_mission_highe-leve-features_v1.txt` **v1** (mtime 2026-09-14 14:20, 3,946 bytes, md5 `736f0c97…`) | release plan **`docs/plans/V193_RELEASE_PLAN.md` rev 1.5** (working record; **owner-facing planning moved 2026-09-16 to `docs/plans/V193_MATTERS_MAP.md` rev 2** — the map of matters, his decisions verbatim, the 7 phases; §2.1 and the D1–D43 table are superseded) | tracker rev **53.0** | change log **`docs/CHANGELOG_v1.9.3.md` through 2026-09-16** (a new file, still uncommitted — commit is the owner's call; the v1.9.2 log is closed at its 2026-09-14 entry, its SYNC edit also uncommitted) | owner pack: the v1.9.2 pack `73c5c95d` stays at r4.5; **the v1.9.3 pack opens at the Phase 2 scope gate** (owner, 2026-09-14) | branch **`dev_v1.9.3` @ `c5405b5`** (PRs #388 #363 #376 #364 merged locally 2026-09-16), `main` @ `e8c1c6e`, `origin/main` @ `63f256e` = tag `v1.9.2`; nine commits unpushed — **owner decision 2026-09-14: no push until the 1.9.3 release** | GitHub **148 open** (#431 new 2026-09-15) · 233 closed · 11 PRs; 139 issues labelled 2026-09-16 | **Owner 2026-09-15: F4 (MOSS) dropped from 1.9.3 → next release (perhaps 1.10); step-4 postings APPROVED and POSTED (ten comments + issues #429 #430); replan without MOSS ordered — **scope proposal produced (D2.0) and adversary-gated (25 findings applied); it sits in the release plan §2.1 with 43 numbered decisions for the Phase 2 sitting.** Phase 0 gate (document set, Q5–Q10) still open.**
+> Owner pack (v1.9.2): https://claude.ai/code/artifact/73c5c95d-0a92-49d1-b127-fb23c02029c2 (updated in place; never a second page). Rule: a session that changes the release plan, the tracker, this file or the pack brings the others to the same state before it ends (CLAUDE.md, Assessment discipline, rule A7).
+<!-- V193-POINTER-BEGIN -->
+> **This log is closed at its 2026-09-14 entry.** Everything landing on `dev_v1.9.3` from 2026-09-14 on is recorded in
+> `docs/CHANGELOG_v1.9.3.md`; the clustering guard `e8c1c6e` is cross-referenced there (issue #430). One correction to
+> the 2026-09-14 entry below: the `[839/1]` progress-counter producer, recorded there as not identified, was identified
+> on 2026-09-14 (`whisperjav/utils/progress_adapter.py:21` creates the adapter with `total_files = 1` and nothing updates
+> it) and is now issue #429.
+<!-- V193-POINTER-END -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+---
+
+## 2026-09-14 — the three post-release matters closed; no hotfix; v1.9.3 branch opened
+
+**One code change landed.** Two of the three matters raised after v1.9.2 turned out not to be defects,
+confirmed by the reporters themselves. The third is real, fixed, and ships with v1.9.3 rather than as a
+hotfix. Nothing pushed.
+
+**Code — `whisperjav/vendor/semantic_audio_clustering.py` (`WJAV mod E`, commit `e8c1c6e`, 13 insertions /
+4 deletions).** A clip too short to split reached `AgglomerativeClustering`, which needs at least two
+samples, and raised — so that input was recorded failed and the run exited 1. The feature matrix is
+strided at `int(fps*0.5)` = 15 frames and a frame is 512/16000 = 0.032 s, so two strided rows require
+≥16 frames ≈ **0.512 s**; anything shorter left one row. No guard existed at any level: `fit_predict` →
+`segment()` → `process_movie_v7` (`:960`) → `semantic_adapter.py:321`/`:387`, both of which re-raise.
+Fewer than 2 rows now skips clustering, logs one plain INFO line, and uses a single-cluster label array;
+snapping, merging, cleanup and coverage run unchanged. Verified by execution: original path raises;
+single-row clip → 1 segment full coverage; **128 s multi-cluster scene → 4 segments, full coverage**;
+`test_semantic_segmenter_v72.py` 13 passed; `test_scene_clustering_threshold_v192.py` 18 passed; ruff clean.
+
+**Decision (owner, 2026-09-14): no hotfix release.** The guard needs an input under about half a second
+to trigger, and in #302 that only arose because short scene `.wav` files were fed back in as inputs. A
+prepared `v1.9.2.post1` — version bump, annotated tag and merge commit — was stood down and removed;
+branch `dev_v1.9.2.post1` deleted. Nothing had been pushed, so no published history changed. Operations
+and recovery SHAs: `docs/plans/V193_BRANCHING_RECORD.md`.
+
+**#302 — not a defect.** Kukuindi: *"I had made a very big mistake... i clicked the folder button and
+caused it proceeded all files."* `media_discovery.py:88-91` walks a folder input with `rglob('*')` and
+accepts `.wav`; discovery runs once at `main.py:2878-2879` **before** any pipeline work, so all 881 files
+were already on disk — leftovers from his earlier run with Keep Temp on, plus 18 from his own chunking
+script. **A proposed fix was refuted before it was written:** filtering discovered files under `temp_path`
+would have dropped his own `EKAI-023.mp4`, since his temp directory *was* the folder holding the video.
+
+**#297 — not reproducible.** teijiIshida: manual extraction took 7 s, and after a PC restart the run
+*"completes in just a few minutes."* Consistent with the code: `audio_extraction.py` is byte-identical
+from v1.8.9 through v1.9.2, and the two 1.9.2 candidates were closed by reading the code — the Balanced
+worker (`_ensure_asr()`, `balanced_pipeline.py:223+`) cannot run inside `AudioExtractor.extract()`, and
+`speech_enhancement/` is unchanged with the enhancer default `"none"` (`:174`), so extraction ran at
+16 kHz as before.
+
+**Replies POSTED** to #302 (`5656949131`) and #297 (`5656949820`). Do not re-post.
+
+**Git.** `main` is linear at `e8c1c6e` with **4 unpushed commits**; **`dev_v1.9.3` branched from it, and
+all further v1.9.3 work happens there**. Tag `v1.9.2` never moved from `63f256e`.
+
+**Follow-ups recorded, not acted on.** `audio_extraction.py:44` logs at DEBUG and `:60-64` runs FFmpeg
+with `capture_output=True`, no timeout and no progress, so a slow extract and a hang are indistinguishable
+to the user; `_get_audio_duration` (`:77-88`) runs a second full FFmpeg decode of the extracted WAV just to
+read the `Duration:` header. Both predate v1.8.9. Nice-to-have **F1** added to
+`docs/plans/V193_PLAN_PROPOSAL.md`: make the discovered-media tally impossible to miss — noting the listing
+**already exists** at `main.py:2884-2886`, so the request is visibility, not a new listing.
+
+**New and untriaged:** #425 (onset timing accuracy across pipelines), #426 (LM Studio / Unsloth support).
 
 ---
 

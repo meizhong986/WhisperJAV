@@ -548,6 +548,11 @@ class TransformersPipeline(BasePipeline):
         Returns:
             Master metadata dict
         """
+        # Cross-cutting rule of the agreed error-handling table (2026-09-17):
+        # anything that quietly fell short is reported in the run summary rather
+        # than only in the log. Reset per file -- the pipeline object is reused
+        # across the whole run.
+        self.degradations = []
         import os
         start_time = time.time()
 
@@ -662,6 +667,7 @@ class TransformersPipeline(BasePipeline):
                         scene_paths,
                         enhancer,
                         self.temp_dir,
+                        degradations=self.degradations,
                         progress_callback=lambda n, t, name: logger.debug(
                             f"Enhancing scene {n}/{t}: {name}"
                         )
@@ -896,6 +902,10 @@ class TransformersPipeline(BasePipeline):
 
             total_time = time.time() - start_time
             master_metadata["summary"]["total_processing_time_seconds"] = round(total_time, 2)
+            # Carried out with the rest of the summary so every caller sees it
+            # the same way: the plain path, the async path, and a pass running in
+            # its own process (agreed error-handling table, 2026-09-17).
+            master_metadata["summary"]["degradations"] = list(getattr(self, "degradations", None) or [])
             master_metadata["metadata_master"]["updated_at"] = datetime.now().isoformat() + "Z"
 
             self.metadata_manager.save_master_metadata(master_metadata, media_basename)

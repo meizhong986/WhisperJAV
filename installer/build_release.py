@@ -140,6 +140,24 @@ class ReleaseBuilder:
             '{{ARCHITECTURE}}': self.config.get('version', 'architecture'),
         }
 
+    @staticmethod
+    def _strip_template_comments(content):
+        """
+        Drop lines that are notes to whoever maintains the template.
+
+        A template is copied to the user almost verbatim, so there is nowhere in
+        it to leave a note without the user reading it. A line whose first
+        non-blank characters are ``{{!`` is for the maintainer and never ships.
+
+        This exists because the installer README's "WHAT'S NEW" section still
+        described the v1.9.0 features under every later version: there was no
+        way to leave a reminder beside the text that needed rewriting.
+        """
+        return "".join(
+            line for line in content.splitlines(keepends=True)
+            if not line.lstrip().startswith("{{!")
+        )
+
     def _substitute_placeholders(self, content):
         """Replace all placeholders in content."""
         for placeholder, value in self.placeholders.items():
@@ -325,6 +343,7 @@ __version_info__ = {{
 
             # Read template and substitute placeholders
             content = template_path.read_text(encoding='utf-8')
+            content = self._strip_template_comments(content)
             content = self._substitute_placeholders(content)
 
             if self.dry_run:

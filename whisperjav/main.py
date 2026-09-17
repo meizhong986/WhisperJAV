@@ -24,6 +24,14 @@ if _offline_requested(_sys.argv[1:]):
     from whisperjav.utils.offline_mode import enable_offline_mode
     enable_offline_mode()
 
+# Same reason, same place: huggingface_hub reads HF_ENDPOINT when it is imported,
+# so --hf-endpoint has to act before the imports below pull the hub library in.
+from whisperjav.utils.offline_mode import hf_endpoint_requested as _hf_endpoint_requested
+_requested_endpoint = _hf_endpoint_requested(_sys.argv[1:])
+if _requested_endpoint:
+    from whisperjav.utils.offline_mode import enable_hf_endpoint
+    enable_hf_endpoint(_requested_endpoint)
+
 # ===========================================================================
 # EARLY WARNING SUPPRESSION - Must be before any library imports
 # ===========================================================================
@@ -51,6 +59,7 @@ from pathlib import Path
 import json
 import time
 import tempfile
+import glob
 from typing import Dict, List, Any, Optional
 import io
 import shutil
@@ -94,6 +103,12 @@ from whisperjav.utils.run_outcome import (
     write_manifest,
 )
 from whisperjav.modules.media_discovery import MediaDiscovery
+from whisperjav.utils.media_leftovers import (
+    WHISPERJAV_WORK_DIRS,
+    is_whisperjav_temp_file,
+    temp_dir_conflicts,
+    looks_like_whisperjav_leftover,
+)
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
@@ -101,7 +116,7 @@ from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 from whisperjav.pipelines.kotoba_faster_whisper_pipeline import KotobaFasterWhisperPipeline
 from whisperjav.config.legacy import resolve_legacy_pipeline, resolve_ensemble_config, apply_balanced_vad_defaults
 from whisperjav.utils.model_refresh import DEFAULT_MODEL_REFRESH_AUDIO_MINUTES
-from whisperjav.utils.offline_mode import is_offline
+from whisperjav.utils.offline_mode import is_offline, hf_endpoint
 from whisperjav.modules.silero_vad_adapter import DEFAULT_VAD_VERSION, VAD_VERSIONS
 from whisperjav.config.segmenter_presets import (
     BALANCED_DEFAULT_SEGMENTER,
@@ -117,7 +132,9 @@ from whisperjav.__version__ import __version__, __version_display__
 
 from whisperjav.utils.preflight_check import (
     enforce_gpu_requirement,
+    ensure_segmenter_backend_available,
     ensure_segmenter_model_available,
+    ensure_speech_enhancer_available,
     run_preflight_checks,
     cpu_consent_in_argv,
 )
@@ -147,7 +164,76 @@ LANGUAGE_CODE_MAP = {
 # hardcoded rather than imported so `--help` does not pay the factory import cost.
 # Without `choices=`, a typo such as `zipenhance` was accepted and silently
 # downgraded to no enhancement part-way through a multi-hour run (#306).
-SPEECH_ENHANCER_CHOICES = ["none", "ffmpeg-dsp", "zipenhancer", "clearvoice", "bs-roformer"]
+SPEECH_ENHANCER_CHOICES = ["none", "ffmpeg-dsp", "zipenhancer", "clearvoice", "bs-roformer",
+                           "htdemucs"]
+
+# The effects FFmpegDSPBackend knows. Hardcoded for the same reason
+# SPEECH_ENHANCER_CHOICES is: --help and argument validation must not pay the cost
+# of importing the backend. tests/test_speech_enhancer_spec.py keeps this in step
+# with AVAILABLE_EFFECTS in speech_enhancement/backends/ffmpeg_dsp.py.
+FFMPEG_DSP_EFFECTS = ["loudnorm", "normalize", "compress", "denoise",
+                      "highpass", "lowpass", "deess", "amplify"]
+
+
+def speech_enhancer_spec(value: str) -> str:
+    """
+    Accept a speech enhancer as "backend" or "backend:detail".
+
+    The detail is the backend's own second argument: a list of effects for
+    ffmpeg-dsp ("ffmpeg-dsp:loudnorm,denoise"), a model name for the others
+    ("clearvoice:MossFormer2_SE_48K"). Everything downstream already understood
+    that form -- pass_worker._parse_speech_enhancer splits it, and
+    FFmpegDSPBackend splits a comma-separated detail into effects -- but the
+    #306 fix in v1.9.2 put a plain choices= list on these flags, which rejected
+    every value containing a colon. The GUI builds exactly that value whenever
+    FFmpeg DSP is picked for a pass, so a two-pass GUI run with FFmpeg DSP
+    stopped with a usage error before reading any audio (owner, 2026-09-17).
+
+    This keeps what #306 asked for -- an unknown name is a user error and is
+    rejected at the boundary, in the same words argparse used -- and extends it
+    to the detail, so a mistyped effect is caught here too rather than being
+    dropped silently by the backend mid-run.
+
+    Returns the value with surrounding whitespace removed, so downstream sees a
+    clean "backend" or "backend:detail".
+    """
+    backend, separator, detail = value.partition(":")
+    backend = backend.strip()
+
+    if backend not in SPEECH_ENHANCER_CHOICES:
+        raise argparse.ArgumentTypeError(
+            "invalid choice: {!r} (choose from {})".format(
+                value, ", ".join(repr(c) for c in SPEECH_ENHANCER_CHOICES)))
+
+    if not separator:
+        return backend
+
+    detail = detail.strip()
+    if backend == "none":
+        raise argparse.ArgumentTypeError(
+            "invalid choice: {!r} ('none' switches enhancement off and takes "
+            "nothing after the colon)".format(value))
+    if not detail:
+        raise argparse.ArgumentTypeError(
+            "invalid choice: {!r} (nothing after the colon; use {!r} on its own, "
+            "or name what follows it)".format(value, backend))
+
+    if backend == "ffmpeg-dsp":
+        effects = [e.strip() for e in detail.split(",")]
+        unknown = [e for e in effects if e not in FFMPEG_DSP_EFFECTS]
+        if unknown:
+            raise argparse.ArgumentTypeError(
+                "invalid choice: {!r} (unknown ffmpeg-dsp effect{}: {}; choose from {})".format(
+                    value,
+                    "" if len(unknown) == 1 else "s",
+                    ", ".join(repr(e) for e in unknown),
+                    ", ".join(repr(e) for e in FFMPEG_DSP_EFFECTS)))
+        return "{}:{}".format(backend, ",".join(effects))
+
+    # clearvoice / zipenhancer / bs-roformer: the detail is a model name. Which
+    # models exist is the backend's business and costs an import to find out, so
+    # it is left to the backend, which already falls back with a warning.
+    return "{}:{}".format(backend, detail)
 
 
 def build_translation_context(args) -> str:
@@ -266,10 +352,23 @@ def parse_arguments():
                                     "(" + " | ".join(VAD_VERSIONS) + ", default " + DEFAULT_VAD_VERSION + "). "
                                     "Ignored by every other pipeline.")
     twopass_group.add_argument("--pass1-speech-enhancer", default=None,
-                               choices=SPEECH_ENHANCER_CHOICES,
-                               help="Speech enhancer for pass 1 (default: none). An unrecognised name is rejected here rather than silently falling back mid-run (#306).")
+                               type=speech_enhancer_spec,
+                               metavar="BACKEND[:DETAIL]",
+                               help="Speech enhancer for pass 1 (default: none). One of "
+                                    + ", ".join(SPEECH_ENHANCER_CHOICES)
+                                    + ". A detail may follow a colon: for ffmpeg-dsp a comma-separated "
+                                      "list of effects (" + ", ".join(FFMPEG_DSP_EFFECTS) + "), e.g. "
+                                      "ffmpeg-dsp:loudnorm,denoise; for the others a model name, e.g. "
+                                      "clearvoice:MossFormer2_SE_48K. An unrecognised name or effect is "
+                                      "rejected here rather than silently falling back mid-run (#306).")
     twopass_group.add_argument("--pass1-enhance-for-vad", action="store_true", default=False,
-                               help="Dual-track mode for pass 1: enhanced audio for VAD, original for ASR")
+                               help="Dual-track mode for pass 1: the cleaned-up audio drives speech "
+                                    "detection, the original audio goes to the recogniser. Available "
+                                    "with qwen and fidelity. NOT accepted when --pass1-pipeline is "
+                                    "balanced: balanced finds the speech inside faster-whisper itself, "
+                                    "on the same audio it transcribes, so there is nothing to split. "
+                                    "fast, faster, transformers and crispasr ignore it: they run no "
+                                    "separate speech segmenter to feed.")
     twopass_group.add_argument("--pass1-model", default=None,
                                help="Model name for pass 1 (e.g., large-v2, kotoba-whisper-v2.0)")
     twopass_group.add_argument("--pass1-vad-threshold", type=float, default=None,
@@ -302,10 +401,23 @@ def parse_arguments():
                                     "(" + " | ".join(VAD_VERSIONS) + ", default " + DEFAULT_VAD_VERSION + "). "
                                     "Ignored by every other pipeline.")
     twopass_group.add_argument("--pass2-speech-enhancer", default=None,
-                               choices=SPEECH_ENHANCER_CHOICES,
-                               help="Speech enhancer for pass 2 (default: none). An unrecognised name is rejected here rather than silently falling back mid-run (#306).")
+                               type=speech_enhancer_spec,
+                               metavar="BACKEND[:DETAIL]",
+                               help="Speech enhancer for pass 2 (default: none). One of "
+                                    + ", ".join(SPEECH_ENHANCER_CHOICES)
+                                    + ". A detail may follow a colon: for ffmpeg-dsp a comma-separated "
+                                      "list of effects (" + ", ".join(FFMPEG_DSP_EFFECTS) + "), e.g. "
+                                      "ffmpeg-dsp:loudnorm,denoise; for the others a model name, e.g. "
+                                      "clearvoice:MossFormer2_SE_48K. An unrecognised name or effect is "
+                                      "rejected here rather than silently falling back mid-run (#306).")
     twopass_group.add_argument("--pass2-enhance-for-vad", action="store_true", default=False,
-                               help="Dual-track mode for pass 2: enhanced audio for VAD, original for ASR")
+                               help="Dual-track mode for pass 2: the cleaned-up audio drives speech "
+                                    "detection, the original audio goes to the recogniser. Available "
+                                    "with qwen and fidelity. NOT accepted when --pass2-pipeline is "
+                                    "balanced: balanced finds the speech inside faster-whisper itself, "
+                                    "on the same audio it transcribes, so there is nothing to split. "
+                                    "fast, faster, transformers and crispasr ignore it: they run no "
+                                    "separate speech segmenter to feed.")
     twopass_group.add_argument("--pass2-model", default=None,
                                help="Model name for pass 2 (e.g., large-v2, kotoba-whisper-v2.0)")
     twopass_group.add_argument("--pass2-vad-threshold", type=float, default=None,
@@ -349,6 +461,15 @@ def parse_arguments():
                        help="Answer the start-up check in advance: when no usable GPU is found (none present, "
                             "or the card is not supported by this PyTorch build) the run stops and asks "
                             "whether to continue on the CPU; this flag says yes, so nothing is asked")
+    parser.add_argument("--hf-endpoint", type=str, default=None, metavar="URL",
+                        help="Fetch Hugging Face models from this address instead of "
+                             "huggingface.co, for machines that cannot reach it. Takes "
+                             "any mirror you choose, e.g. --hf-endpoint "
+                             "https://example-mirror.invalid (sets HF_ENDPOINT for this "
+                             "run and its workers). Covers what goes through "
+                             "huggingface_hub; Silero via torch.hub, openai-whisper "
+                             "weights and the ModelScope enhancers have their own "
+                             "download paths and are not affected.")
     parser.add_argument("--offline", action="store_true",
                        help="Use only the Hugging Face models already downloaded and make no "
                             "requests to huggingface.co (sets HF_HUB_OFFLINE=1 for this run and "
@@ -570,15 +691,22 @@ def parse_arguments():
     )
     translation_group.add_argument(
         "--translate-target",
-        choices=["english", "indonesian", "portuguese", "spanish", "chinese"],
+        # Must stay in step with SUPPORTED_TARGETS in whisperjav/translate/providers.py,
+        # which is the source of truth and is what the translation layer actually accepts.
+        # french was missing here while the GUI offered it, so choosing French in the GUI
+        # produced "invalid choice: 'french'" and exit 2. tests/test_translate_targets.py
+        # pins the two lists together.
+        choices=["english", "indonesian", "portuguese", "spanish", "chinese", "french",
+                 "italian", "thai", "korean"],
         default="english",
         help="Target language for translation (default: english)"
     )
     translation_group.add_argument(
         "--translate-tone",
-        choices=["standard", "pornify"],
+        choices=["standard", "contextual", "pornify"],
         default="standard",
-        help="Translation style (default: standard)"
+        help="Translation style: standard, contextual (explicit only where the "
+             "original is explicit), pornify (default: standard)"
     )
     translation_group.add_argument(
         "--translate-api-key",
@@ -718,14 +846,27 @@ def parse_arguments():
                            help="Semantic scene detector only: clustering distance separating "
                                 "scenes. Lower values tend to give more, shorter scenes. Default 22 "
                                 "(v1.9.2: the same value every pipeline uses).")
-    qwen_audio_group.add_argument("--qwen-enhancer", type=str, default="none",
-                           choices=["none", "clearvoice", "bs-roformer", "zipenhancer", "ffmpeg-dsp"],
-                           help="Speech enhancement backend (default: none)")
+    qwen_audio_group.add_argument("--qwen-enhancer", default="none",
+                           type=speech_enhancer_spec,
+                           metavar="BACKEND[:DETAIL]",
+                           help="Speech enhancement backend (default: none). One of "
+                                + ", ".join(SPEECH_ENHANCER_CHOICES)
+                                + ". A detail may follow a colon: for ffmpeg-dsp a "
+                                  "comma-separated list of effects ("
+                                + ", ".join(FFMPEG_DSP_EFFECTS)
+                                + "), for the others a model name. htdemucs and "
+                                "bs-roformer isolate the voice from music and effects; "
+                                "zipenhancer and clearvoice reduce noise; ffmpeg-dsp applies "
+                                "level and filter work.")
     qwen_audio_group.add_argument("--qwen-enhancer-model", type=str, default=None,
                            help="Speech enhancer model variant (e.g., 'MossFormer2_SE_48K' for clearvoice)")
     qwen_audio_group.add_argument("--enhance-for-vad", action="store_true", default=False,
-                           help="Dual-track mode: use enhanced audio for VAD/framing but original audio "
-                                "for ASR transcription (Qwen/Decoupled pipelines only)")
+                           help="Dual-track mode: the cleaned-up audio is used to find the speech "
+                                "and the original audio goes to the recogniser. Applies to the "
+                                "qwen, fidelity and decoupled pipelines. NOT accepted with "
+                                "balanced, which finds the speech inside faster-whisper itself, on "
+                                "the same audio it transcribes. Accepted but ignored by fast, "
+                                "faster, transformers and crispasr.")
     qwen_audio_group.add_argument("--qwen-segmenter", type=str, default="whisperseg",
                            choices=["none", "silero", "silero-v4.0", "silero-v3.1", "silero-v6.2",
                                     "nemo", "nemo-lite", "whisper-vad", "ten", "whisperseg",
@@ -1034,18 +1175,34 @@ def cleanup_temp_directory(temp_dir: str):
     else:
         logger.debug(f"Cleaning up temp directory contents: {temp_path}")
         try:
-            subdirs_to_clean = ["scenes", "enhanced_scenes", "scene_srts", "raw_subs"]
-            for subdir in subdirs_to_clean:
+            # WHISPERJAV_WORK_DIRS is the single list of folders WhisperJAV creates. It
+            # used to be duplicated here and had drifted: resampled_scenes and crispasr_out
+            # were created by the pipelines and never cleaned up.
+            for subdir in WHISPERJAV_WORK_DIRS:
                 subdir_path = temp_path / subdir
                 if subdir_path.exists():
                     shutil.rmtree(subdir_path, ignore_errors=True)
                     logger.debug(f"Removed temp subdirectory: {subdir_path}")
-            
+
+            # Delete only files WhisperJAV itself wrote. This loop used to delete EVERY
+            # file at this level, which is safe for the default temp folder but destroys a
+            # user's media when --temp-dir points at a folder of their own -- and pointing
+            # --temp-dir at a media folder is a reasonable thing to do. Leaving an
+            # unrecognised file behind is litter; deleting one is data loss, so anything
+            # not recognised is kept and counted.
+            kept = 0
             for file in temp_path.glob("*"):
-                if file.is_file():
+                if not file.is_file():
+                    continue
+                if is_whisperjav_temp_file(file):
                     file.unlink()
                     logger.debug(f"Removed temp file: {file}")
-                    
+                else:
+                    kept += 1
+                    logger.debug(f"Left alone (not written by WhisperJAV): {file}")
+
+            if kept:
+                logger.debug(f"Left {kept} file(s) in {temp_path} that WhisperJAV did not write")
             logger.info("Temp directory contents cleaned up successfully")
         except Exception as e:
             logger.error(f"Error cleaning up temp directory: {e}")
@@ -1187,7 +1344,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         # Create unified manager and adapter
         unified_manager = UnifiedProgressManager(verbosity=verbosity)
         unified_manager.total_files = len(media_files)  # Store for reference
-        progress = ProgressDisplayAdapter(unified_manager)
+        progress = ProgressDisplayAdapter(unified_manager, len(media_files))
     
     # Detect "source" sentinel: save SRT next to each input video
     output_to_source = args.output_dir.lower().strip() == "source"
@@ -1393,6 +1550,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         _resolved_segmenter_config = resolve_qwen_sensitivity(
             _qwen_segmenter, _qwen_sensitivity, _user_vad_overrides or None
         )
+        _qwen_enhancer_backend, _, _qwen_enhancer_detail = (
+            getattr(args, 'qwen_enhancer', 'none') or 'none').partition(":")
+
         # Build Qwen kwargs — pipeline owns defaults for group duration
         # and step-down params; CLI only forwards explicit user overrides.
         qwen_kwargs = {
@@ -1407,9 +1567,12 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             "qwen_safe_chunking": getattr(args, 'qwen_safe_chunking', True),
             # Scene detection
             "scene_detector": getattr(args, 'qwen_scene', 'none'),
-            # Speech enhancement
-            "speech_enhancer": getattr(args, 'qwen_enhancer', 'none'),
-            "speech_enhancer_model": getattr(args, 'qwen_enhancer_model', None),
+            # Speech enhancement. --qwen-enhancer accepts "backend" or
+            # "backend:detail"; the factory only knows plain backend names, so
+            # the detail is separated here and becomes the model, exactly as
+            # pass_worker._parse_speech_enhancer does for a two-pass run.
+            "speech_enhancer": _qwen_enhancer_backend,
+            "speech_enhancer_model": _qwen_enhancer_detail or getattr(args, 'qwen_enhancer_model', None),
             "enhance_for_vad": getattr(args, 'enhance_for_vad', False),
             # Speech segmentation / VAD
             "speech_segmenter": _qwen_segmenter,
@@ -1529,7 +1692,13 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         )
         effective_mode = args.mode
     else:  # fidelity
-        pipeline = FidelityPipeline(**pipeline_args)
+        pipeline = FidelityPipeline(
+            **pipeline_args,
+            # Fidelity reads this from its kwargs (see FidelityPipeline.__init__).
+            # Without it, --mode fidelity --enhance-for-vad was accepted and did
+            # nothing: the split only ever happened through --ensemble or the GUI.
+            enhance_for_vad=getattr(args, 'enhance_for_vad', False),
+        )
         # v1.9.2 (CFF1): recogniser refresh budget (minutes of scene audio).
         pipeline.model_refresh_audio_minutes = getattr(args, 'model_refresh_audio_minutes', DEFAULT_MODEL_REFRESH_AUDIO_MINUTES)
         effective_mode = args.mode
@@ -1583,10 +1752,21 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
 
                 # The per-file verdict (done / empty / suspect), in the shared
                 # vocabulary. The exit status is decided once, in main().
+                # Cross-cutting rule of the agreed error-handling table
+                # (owner, 2026-09-17): anything that quietly fell short is
+                # named in the RUN SUMMARY, not left in a log line. Today that
+                # is scenes a chosen clean-up could not clean. It travels
+                # through the same degraded/suspect channel a failed pass 2
+                # already uses, and it is read from the metadata the pipeline
+                # returned so that every path reads it the same way.
+                _shortfalls = list(metadata.get("summary", {}).get("degradations") or [])
+
                 outcome = classify_output(
                     file_path_str,
                     output_path or None,
                     media_info.get('duration'),
+                    degraded=bool(_shortfalls),
+                    degraded_reason="; ".join(_shortfalls),
                     min_coverage=args.min_coverage,
                     # Corroboration is only meaningful with a genuine external
                     # segmenter; pipelines that do not report it leave it at 0.
@@ -1896,12 +2076,17 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
             _path = task.media_info.get('path', 'Unknown File')
             if task.status == ProcessingStatus.COMPLETED and isinstance(task.result, dict):
                 _summary = task.result.get("summary", {})
+                _shortfalls = list(_summary.get("degradations") or [])
                 outcome = classify_output(
                     _path,
                     task.result.get("output_files", {}).get("final_srt") or None,
                     task.media_info.get('duration'),
                     min_coverage=args.min_coverage,
                     speech_positive_empty_streak=_summary.get("speech_positive_empty_streak", 0),
+                    # Same rule as the other paths: a shortfall is named in the
+                    # run summary rather than left in the log.
+                    degraded=bool(_shortfalls),
+                    degraded_reason="; ".join(_shortfalls),
                     processing_time_s=_summary.get("total_processing_time_seconds"),
                 )
             elif task.status == ProcessingStatus.CANCELLED:
@@ -2091,11 +2276,28 @@ def validate_balanced_vad_options(args) -> None:
     is_ensemble = bool(getattr(args, 'ensemble', False))
     mode = getattr(args, 'mode', None)
 
-    if not is_ensemble and mode == "balanced" and getattr(args, 'speech_segmenter', None):
+    # --pipeline decoupled overrides --mode, which still reads "balanced" from
+    # its default, so a decoupled run must not be caught by these two.
+    is_balanced_run = (not is_ensemble and mode == "balanced"
+                       and getattr(args, 'pipeline', None) is None)
+
+    if is_balanced_run and getattr(args, 'speech_segmenter', None):
         raise ValueError(
             "--speech-segmenter is not available with --mode balanced (v1.9.2). "
             "Balanced uses faster-whisper's built-in VAD; choose which Silero build "
             "it runs with --vad-version {" + ",".join(VAD_VERSIONS) + "}."
+        )
+
+    # Owner, 2026-09-17: "balanced shall not have the VAD only enhancement."
+    # It was accepted and ignored here, which is the silent difference the rest
+    # of these rules exist to stop.
+    if is_balanced_run and getattr(args, 'enhance_for_vad', False):
+        raise ValueError(
+            "--enhance-for-vad is not available with --mode balanced (v1.9.3). "
+            "Balanced finds the speech inside faster-whisper itself, on the same "
+            "audio it transcribes, so the clean-up cannot be applied to one and "
+            "not the other. Use --mode fidelity or --mode qwen for that, or drop "
+            "the flag."
         )
 
     for n in ("1", "2"):
@@ -2108,6 +2310,32 @@ def validate_balanced_vad_options(args) -> None:
                 f"which Silero build it runs with --pass{n}-vad-version "
                 "{" + ",".join(VAD_VERSIONS) + "}."
             )
+        # Owner, 2026-09-17: "balanced shall not have the VAD only enhancement."
+        # Balanced detects speech inside faster-whisper's own transcribe() call,
+        # on the very audio it recognises, so there is no second track to hand the
+        # cleaned-up audio to. Accepting the flag and quietly enhancing both --
+        # which is what happened up to v1.9.2 -- is the silent-difference the
+        # balanced rules above exist to stop.
+        # The pass configuration below is built as "this pass's flag OR the
+        # global --enhance-for-vad", so the refusal has to read the same
+        # combination. Reading only the pass flag let the global form set
+        # enhance_for_vad on a balanced pass -- the exact thing refused here.
+        _pass_efv = getattr(args, f"pass{n}_enhance_for_vad", False)
+        # Only an ensemble run folds the global flag into a pass, and
+        # --pass1-pipeline defaults to balanced, so reading it unconditionally
+        # would refuse --mode fidelity --enhance-for-vad and every other
+        # single-pipeline run that legitimately uses it.
+        _global_efv = is_ensemble and getattr(args, "enhance_for_vad", False)
+        if pipeline == "balanced" and (_pass_efv or _global_efv):
+            _flag = f"--pass{n}-enhance-for-vad" if _pass_efv else "--enhance-for-vad"
+            raise ValueError(
+                f"{_flag} is not available when --pass{n}-pipeline "
+                f"is balanced (v1.9.3). Balanced finds the speech inside "
+                f"faster-whisper itself, on the same audio it transcribes, so the "
+                f"clean-up cannot be applied to one and not the other. Use "
+                f"--pass{n}-pipeline fidelity or qwen for that, or drop "
+                f"{_flag}: the clean-up still runs, it is simply not split.")
+
         # The mirror of the rule below: a version for a pass that does not run the
         # built-in VAD is not a silent no-op either. Same flag family, same answer.
         if getattr(args, f"pass{n}_vad_version", None) and pipeline not in (None, "balanced"):
@@ -2715,6 +2943,13 @@ def main():
             "language_code": language_code,
             "resolved_config": dump_resolved,
             "offline_mode": is_offline(),
+            "hf_endpoint": hf_endpoint(),
+            # True only if HF_ENDPOINT was set BEFORE huggingface_hub was imported,
+            # which is the only way it takes effect.
+            "hub_constant_endpoint": (
+                getattr(sys.modules["huggingface_hub"].constants, "ENDPOINT", "")
+                if "huggingface_hub" in sys.modules else ""
+            ),
             # True only if HF_HUB_OFFLINE was set BEFORE huggingface_hub was imported
             "hub_constant_offline": bool(
                 "huggingface_hub" in sys.modules
@@ -2856,14 +3091,34 @@ def main():
             _pipe = getattr(args, f"pass{_n}_pipeline", None)
             if not _pipe:
                 continue  # pass 2 is optional
-            ensure_segmenter_model_available(effective_segmenter_for_pass(
+            _seg = effective_segmenter_for_pass(
                 _pipe, getattr(args, f"pass{_n}_speech_segmenter", None)
-            ))
+            )
+            # The package first, then the model it downloads: a missing package
+            # is a different problem with a different answer, and saying
+            # "the model could not be fetched" for it would send the user the
+            # wrong way (owner, 2026-09-17).
+            ensure_segmenter_backend_available(_seg)
+            ensure_segmenter_model_available(_seg)
     elif resolved_config:
         _seg_cfg = resolved_config.get("params", {}).get("speech_segmenter") or {}
+        ensure_segmenter_backend_available(_seg_cfg.get("backend"))
         ensure_segmenter_model_available(
             _seg_cfg.get("backend"), model_dir=_seg_cfg.get("model_dir")
         )
+
+    # Same rule for an audio clean-up that must not fail quietly (htdemucs). It is
+    # checked here, before any audio is read, for the same reason: reaching the
+    # pipeline without it would mean subtitles made from the untouched audio the
+    # user asked to have cleaned up, from a run that exits 0.
+    if args.ensemble:
+        for _n in (1, 2):
+            ensure_speech_enhancer_available(
+                getattr(args, f"pass{_n}_speech_enhancer", None))
+    else:
+        ensure_speech_enhancer_available(getattr(args, "qwen_enhancer", None))
+        if getattr(args, "mode", None) == "qwen":
+            ensure_segmenter_backend_available(getattr(args, "qwen_segmenter", None))
 
     # Setup temp directory
     if args.temp_dir:
@@ -2882,9 +3137,65 @@ def main():
         logger.error(f"No valid media files found in the specified paths: {', '.join(args.input)}")
         sys.exit(1)
     
-    logger.info(f"Found {len(media_files)} media file(s) to process:")
+    # Refuse a working folder that overlaps the user's videos or their output folder.
+    # The working folder is emptied when a run ends, so sharing it puts their files in the
+    # path of that cleanup. Checked here, after discovery, because only now do we know the
+    # folders the media actually came from -- naming a FILE still reveals its folder.
+    _temp_problems = temp_dir_conflicts(
+        args.temp_dir,
+        media_paths=[f['path'] for f in media_files],
+        output_dir=args.output_dir,
+    )
+    if _temp_problems:
+        logger.error("WhisperJAV has not started, because the working folder is not safe to use.")
+        for _problem in _temp_problems:
+            logger.error(f"  {_problem}")
+        logger.error("Pick a different working folder with --temp-dir, or leave it out "
+                     "and WhisperJAV will use your system's temporary folder.")
+        sys.exit(1)
+
+    logger.info(f"Found {len(media_files)} "
+                f"file{'' if len(media_files) == 1 else 's'} to process:")
+    leftover_paths = []
+    source_folders = set()
     for f in media_files:
-        logger.info(f"  - {f['path']}")
+        p = Path(f['path'])
+        source_folders.add(p.parent)
+        if looks_like_whisperjav_leftover(p):
+            leftover_paths.append(p)
+            logger.info(f"  - {f['path']}    [probably left over from an earlier run]")
+        else:
+            logger.info(f"  - {f['path']}")
+
+    # One summary line after the listing. The recursion clause is only printed when a
+    # folder was actually walked. Discovery expands each argument with glob(recursive=True)
+    # and then walks any result that is a directory (media_discovery.py), so this is true
+    # both for a folder given directly AND for a pattern the shell left unexpanded that
+    # matched one -- checking only `is_dir()` on the raw argument would have missed the
+    # second case and gone quiet about a search that did happen.
+    def _walked_a_folder(argument: str) -> bool:
+        try:
+            if Path(argument).is_dir():
+                return True
+            return any(Path(hit).is_dir() for hit in glob.glob(argument, recursive=True))
+        except (OSError, ValueError):
+            return False
+
+    gave_a_folder = any(_walked_a_folder(a) for a in args.input)
+    _n_files = len(media_files)
+    _n_folders = len(source_folders)
+    summary = (f"From {_n_folders} folder{'' if _n_folders == 1 else 's'}")
+    if gave_a_folder:
+        summary += " (sub-folders were searched too)"
+    logger.info(summary + ".")
+    if leftover_paths:
+        _n = len(leftover_paths)
+        logger.info(
+            f"{_n} of {'them' if _n > 1 else 'these'} look{'' if _n > 1 else 's'} like "
+            f"{'files' if _n > 1 else 'a file'} WhisperJAV left behind on an earlier run. "
+            f"{'They' if _n > 1 else 'It'} will still be processed. If you did not mean to "
+            f"include {'them' if _n > 1 else 'it'}, take {'them' if _n > 1 else 'it'} out "
+            f"of the folder and run again.")
 
     import datetime as _dt
     _run_started_at = _dt.datetime.now()
@@ -3131,6 +3442,16 @@ def main():
                     else:
                         successful_count += 1
                     total_processing_time += _elapsed or 0.0
+                    # Everything the user should be told about this file, in one
+                    # place: a pass 2 that failed, and anything that quietly
+                    # fell short inside a pass that did run. The second kind is
+                    # carried back from the worker processes by the orchestrator
+                    # (agreed error-handling table, 2026-09-17).
+                    _reasons = []
+                    if status == 'degraded':
+                        _reasons.append("pass 2 failed; output is pass 1 alone")
+                    _reasons.extend(_summary.get('degradations') or [])
+
                     outcome = classify_output(
                         in_path,
                         _summary.get('final_output') or None,
@@ -3140,8 +3461,8 @@ def main():
                         # speech-positive streak back through the orchestrator,
                         # so ensemble runs have no corroboration signal yet.
                         speech_positive_empty_streak=0,
-                        degraded=(status == 'degraded'),
-                        degraded_reason="pass 2 failed; output is pass 1 alone",
+                        degraded=bool(_reasons),
+                        degraded_reason="; ".join(_reasons),
                         processing_time_s=_elapsed,
                     )
                     if status == 'degraded' and args.translate:

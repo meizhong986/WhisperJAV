@@ -163,6 +163,7 @@ WHEEL_VERSION = HUGGINGFACE_WHEEL_VERSION
 _server_process: Optional[subprocess.Popen] = None
 _server_port: Optional[int] = None
 _server_stderr_path: Optional[str] = None  # Track stderr temp file for cleanup
+_keep_server_log: bool = False  # Set when something has pointed the user at the log
 
 # Note: atexit handler registered after stop_local_server is defined (see end of module)
 
@@ -853,7 +854,7 @@ def _are_server_deps_installed() -> bool:
 
 def _install_server_deps() -> bool:
     """
-    Install whisperjav[local-llm] server dependencies.
+    Install whisperjav[llm] server dependencies.
 
     These are platform-agnostic deps (uvicorn, fastapi, etc.) that must be
     installed before llama-cpp-python.
@@ -869,7 +870,7 @@ def _install_server_deps() -> bool:
 
     try:
         result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "whisperjav[local-llm]"],
+            [sys.executable, "-m", "pip", "install", "whisperjav[llm]"],
             capture_output=True,
             text=True,
             encoding='utf-8',
@@ -1031,7 +1032,7 @@ def ensure_llama_cpp_installed() -> bool:
     1. Check if already installed and functional
     2. If functional but CPU-only on CUDA system, offer upgrade to GPU
     3. If broken (DLL issues), diagnose and offer reinstall
-    4. Install server deps first (whisperjav[local-llm]) - platform agnostic
+    4. Install server deps first (whisperjav[llm]) - platform agnostic
     5. Detect CUDA version
     6. Try prebuilt wheel (HuggingFace, then GitHub)
     7. Fall back to source build (with 10s user cancel window)
@@ -1207,7 +1208,7 @@ def ensure_llama_cpp_installed() -> bool:
     print("This is a one-time download (~700MB).\n")
 
     # Step 1: Install server dependencies first (uvicorn, fastapi, etc.)
-    # These are platform-agnostic and declared in setup.py extras_require['local']
+    # These are platform-agnostic and declared as the 'llm' extra in pyproject.toml
     if not _install_server_deps():
         print("WARNING: Could not install server dependencies.")
         print("         Server may not start correctly.\n")
@@ -1364,7 +1365,7 @@ def ensure_llama_cpp_installed() -> bool:
     print("!" * 60)
     print("\nCould not install llama-cpp-python automatically.")
     print("\nManual installation options:")
-    print("  1. pip install whisperjav[local-llm]  # Install server deps")
+    print("  1. pip install whisperjav[llm]  # Install server deps")
     print("  2. python install.py --local-llm-build")
     print("\nAlternatively, use cloud translation providers:")
     print("  whisperjav-translate -i file.srt --provider deepseek")
@@ -1536,7 +1537,109 @@ def _parse_server_stderr(stderr_path: str) -> ServerDiagnostics:
     return diag
 
 
-def _wait_for_server(port: int, max_wait: int = 300) -> Tuple[bool, Optional[str], Optional[ServerDiagnostics]]:
+def _verify_chat_completion(port: int, timeout: int = 60,
+                            stream: bool = False) -> Tuple[bool, Optional[str]]:
+    """
+    Ask the server for one short chat completion, in the shape this run will use.
+
+    Returns (True, None) when the server answers with usable text, or
+    (False, message) with a message written for the person running WhisperJAV.
+
+    This exists because /v1/completions succeeding does not mean
+    /v1/chat/completions will: they are different routes with different response
+    models, and a build can serve the first and fail the second every time.
+
+    ``stream`` has to match how translation will send its own requests, because
+    those are two more paths that can differ. llama-cpp-python validates a
+    single reply against a response model and sends streamed chunks without
+    validating them -- which is exactly where the known defect lives -- so a
+    build can fail one and serve the other. Asking in the wrong shape would
+    either stop a run that was going to work or pass a run that is about to
+    fail. The translate CLI streams; the GUI and --translate path do not.
+    """
+    import json
+    import urllib.error
+    import urllib.request
+
+    url = f"http://localhost:{port}/v1/chat/completions"
+    payload = json.dumps({
+        "messages": [{"role": "user", "content": "Reply with the word OK."}],
+        "max_tokens": 8,
+        "temperature": 0.0,
+        "stream": stream,
+    }).encode("utf-8")
+
+    shape = "streamed" if stream else "single-reply"
+    logger.info(f"Checking that the translation server can answer a {shape} chat request...")
+
+    try:
+        request = urllib.request.Request(
+            url, data=payload,
+            headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            if stream:
+                # Server-sent events: "data: {...}" per chunk, then "data: [DONE]".
+                answered = False
+                for raw_line in response:
+                    line = raw_line.decode("utf-8", errors="replace").strip()
+                    if not line.startswith("data:"):
+                        continue
+                    chunk = line[len("data:"):].strip()
+                    if chunk == "[DONE]":
+                        break
+                    try:
+                        if json.loads(chunk).get("choices"):
+                            answered = True
+                    except ValueError:
+                        continue
+                if not answered:
+                    return False, (
+                        "The local translation server ended a streamed chat request "
+                        "without sending any reply, so nothing could be translated.")
+                logger.info("The translation server answers chat requests correctly.")
+                return True, None
+
+            body = response.read().decode("utf-8", errors="replace")
+
+        if not body.strip():
+            return False, ("The local translation server answered a chat request "
+                           "with an empty body, so nothing could be translated.")
+        data = json.loads(body)
+        choices = data.get("choices") or []
+        if not choices:
+            return False, ("The local translation server answered a chat request "
+                           "with no content at all, so nothing could be translated.")
+        logger.info("The translation server answers chat requests correctly.")
+        return True, None
+
+    except urllib.error.HTTPError as e:
+        detail = ""
+        try:
+            detail = e.read().decode("utf-8", errors="replace")[:400]
+        except Exception:
+            pass
+        hint = ""
+        if "refusal" in detail or "validation error" in detail.lower():
+            # The known defect in some prebuilt CUDA builds.
+            hint = ("\n"
+                    "This build of llama-cpp-python rejects its own chat "
+                    "replies. Reinstalling llama-cpp-python usually fixes it; "
+                    "WhisperJAV already repairs the known form of this fault, so "
+                    "seeing it here means a variant it does not cover.")
+        return False, (
+            f"The local translation server refused a chat request "
+            f"(HTTP {e.code}). Translation sends only chat requests, so nothing "
+            f"could be translated.\n"
+            f"{detail}{hint}")
+
+    except Exception as e:
+        return False, (
+            f"The local translation server could not answer a chat request: {e}. "
+            f"Translation sends only chat requests, so nothing could be translated.")
+
+
+def _wait_for_server(port: int, max_wait: int = 300,
+                     chat_stream: bool = False) -> Tuple[bool, Optional[str], Optional[ServerDiagnostics]]:
     """Wait for server to be ready AND verify inference works.
 
     This function performs a two-phase readiness check:
@@ -1696,6 +1799,39 @@ def _wait_for_server(port: int, max_wait: int = 300) -> Tuple[bool, Optional[str
                     # Phase 3 failed — keep first-inference estimate (already set above)
                     logger.debug(f"Steady-state speed measurement failed, using first-inference estimate: {e}")
 
+                # =====================================================
+                # Phase 4: Verify a CHAT completion, which is what
+                # translation actually sends
+                # =====================================================
+                # Owner, 2026-09-17. Everything above uses /v1/completions.
+                # Translation uses /v1/chat/completions, and a build can serve
+                # one and fail the other: some prebuilt CUDA builds declare a
+                # field on the chat reply that their own code never sets, so
+                # FastAPI rejects the server's own answer and every chat request
+                # comes back as HTTP 500. That showed up as four retries and
+                # "Failed to communicate with server after 3 retries" about 90
+                # seconds into a run, with nothing translated. Asking once here
+                # costs one short request and names the fault straight away.
+                #
+                # It WARNS, it does not stop (owner, 2026-09-17: "soften it to a
+                # warning for this release"). This check has never met a real
+                # llama-cpp server -- only a stub shaped like the fault -- so a
+                # mistake in it would stop runs that were going to work, which is
+                # worse than the problem it reports. The repair for the known
+                # fault is the shim, which is applied when the server starts and
+                # does not depend on this check at all.
+                chat_ok, chat_error = _verify_chat_completion(
+                    port, timeout=60, stream=chat_stream)
+                if not chat_ok:
+                    logger.warning(
+                        "The local translation server answered the start-up chat "
+                        "check badly. Translation may fail; this is the reason it "
+                        "would give:")
+                    for line in str(chat_error).splitlines():
+                        logger.warning("  %s", line)
+                    logger.warning(
+                        "Continuing anyway -- the server is otherwise responding.")
+
                 total_time = time.time() - start_time
                 logger.info(f"Server ready and speed measured ({total_time:.1f}s total)")
                 return True, None, diagnostics
@@ -1782,7 +1918,8 @@ def _check_existing_llama_servers() -> list:
                 capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=10
             )
             for line in result.stdout.split('\n'):
-                if 'llama_cpp.server' in line or 'llama-cpp-python' in line:
+                if ('llama_cpp.server' in line or 'llama-cpp-python' in line
+                        or 'llama_server_shim' in line):
                     # Extract PID (last number on the line)
                     parts = line.strip().split()
                     if parts:
@@ -1798,7 +1935,8 @@ def _check_existing_llama_servers() -> list:
                 capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=5
             )
             for line in result.stdout.split('\n'):
-                if 'llama_cpp.server' in line or 'llama-cpp-python' in line:
+                if ('llama_cpp.server' in line or 'llama-cpp-python' in line
+                        or 'llama_server_shim' in line):
                     parts = line.split()
                     if len(parts) > 1:
                         try:
@@ -2027,7 +2165,8 @@ def _assess_server_viability(
 def start_local_server(
     model: str = "auto",
     n_gpu_layers: int = -1,
-    n_ctx: int = 8192
+    n_ctx: int = 8192,
+    chat_stream: bool = False
 ) -> Tuple[str, int, ServerDiagnostics]:
     """
     Start the local LLM server.
@@ -2036,6 +2175,8 @@ def start_local_server(
         model: Model ID from MODEL_REGISTRY or 'auto'
         n_gpu_layers: GPU layers to offload (-1 = all, 0 = CPU only)
         n_ctx: Context window size
+        chat_stream: True when the caller will ask for streamed chat
+            completions, so the start-up check asks in that same shape
 
     Returns:
         Tuple of (api_base_url, port, diagnostics)
@@ -2044,7 +2185,9 @@ def start_local_server(
         RuntimeError: If server fails to start, llama-cpp-python unavailable,
             CPU doesn't support AVX2, or inference speed is too slow
     """
-    global _server_process, _server_port, _server_stderr_path
+    global _server_process, _server_port, _server_stderr_path, _keep_server_log
+
+    _keep_server_log = False
 
     # Release GPU memory from previous operations (e.g., Whisper transcription)
     # This helps prevent llama-cpp-python initialization failures
@@ -2188,8 +2331,16 @@ def start_local_server(
     # =========================================================================
     # DIAGNOSTIC: Server Command
     # =========================================================================
+    # Started through our own shim rather than llama_cpp.server directly: some
+    # prebuilt CUDA builds reject their own chat replies unless a missing field
+    # is filled in first. See whisperjav/translate/llama_server_shim.py.
+    #
+    # Run by path, not with -m: as a script it imports llama_cpp and nothing of
+    # WhisperJAV, so the server does not depend on the translate package (and its
+    # dependencies) being importable in this interpreter.
+    shim_path = Path(__file__).with_name("llama_server_shim.py")
     cmd = [
-        sys.executable, "-m", "llama_cpp.server",
+        sys.executable, str(shim_path),
         "--model", str(model_path),
         "--host", "127.0.0.1",
         "--port", str(port),
@@ -2223,7 +2374,8 @@ def start_local_server(
     # The two-phase check (HTTP ready + inference verification) catches issues like #148
     # where the server starts but fails on first real request due to CUDA issues
     logger.info(f"Waiting for server on port {port} (this may take 1-2 minutes for large models)...")
-    server_ready, readiness_error, diagnostics = _wait_for_server(port)
+    server_ready, readiness_error, diagnostics = _wait_for_server(
+        port, chat_stream=chat_stream)
 
     if not server_ready:
         # Get exit code and stderr if process died
@@ -2378,17 +2530,20 @@ def stop_local_server():
             _server_process = None
             _server_port = None
 
-    # Clean up stderr temp file
+    # Clean up stderr temp file -- unless someone has told the user to read it.
     if _server_stderr_path is not None:
-        try:
-            import os
-            if os.path.exists(_server_stderr_path):
-                os.remove(_server_stderr_path)
-                logger.debug(f"Cleaned up server log: {_server_stderr_path}")
-        except Exception as e:
-            logger.debug(f"Could not remove server log {_server_stderr_path}: {e}")
-        finally:
-            _server_stderr_path = None
+        if _keep_server_log:
+            logger.info(f"The translation server's log has been kept: {_server_stderr_path}")
+        else:
+            try:
+                import os
+                if os.path.exists(_server_stderr_path):
+                    os.remove(_server_stderr_path)
+                    logger.debug(f"Cleaned up server log: {_server_stderr_path}")
+            except Exception as e:
+                logger.debug(f"Could not remove server log {_server_stderr_path}: {e}")
+            finally:
+                _server_stderr_path = None
 
     # Cleanup GPU memory
     gc.collect()
@@ -2398,6 +2553,18 @@ def stop_local_server():
             torch.cuda.empty_cache()
     except Exception:
         pass
+
+
+def keep_server_log() -> None:
+    """
+    Keep this run's server log instead of deleting it when the server stops.
+
+    Called by whatever tells the user where the log is: the path is useless if
+    the file is removed a moment later, which is what stopping the server
+    otherwise does.
+    """
+    global _keep_server_log
+    _keep_server_log = True
 
 
 def is_server_running() -> bool:

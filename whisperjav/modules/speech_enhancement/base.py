@@ -20,6 +20,27 @@ import logging
 logger = logging.getLogger("whisperjav")
 
 
+class SpeechEnhancerUnavailable(RuntimeError):
+    """
+    A speech enhancer cannot do what the user asked for, and carrying on would
+    mislead them.
+
+    Most backends here degrade quietly: if they cannot run, the pipeline helper
+    logs a warning, falls back to "none", and the run produces subtitles from
+    un-enhanced audio. That is the right answer for a clean-up that only helps
+    a little. It is the wrong answer for one the user chose because their audio
+    needs it -- they would get a poor subtitle file from a run that exited 0,
+    with nothing but a warning in the log to explain it.
+
+    A backend raises this when its own absence changes the result. The pipeline
+    helper deliberately does NOT catch it, and whisperjav.utils.preflight_check
+    turns it into a plain-language stop before any audio is read.
+
+    Owner's decision, 2026-09-17, about htdemucs: "I think it should fail with
+    good user communication."
+    """
+
+
 @dataclass
 class EnhancementResult:
     """

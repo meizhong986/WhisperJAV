@@ -522,6 +522,9 @@
                                             <optgroup label="BS-RoFormer">
                                                 <option value="bs-roformer:vocals" disabled class="coming-soon">Vocals (Coming Soon)</option>
                                             </optgroup>
+                                            <optgroup label="htdemucs (Demucs v4)">
+                                                <option value="htdemucs" title="Isolates the voice from music and effects. Installed with WhisperJAV; its 84 MB model is fetched once on first use, from Meta's site rather than Hugging Face. If it cannot run, the run stops and says so.">Vocals</option>
+                                            </optgroup>
                                         </select>
                                         <div class="enhance-for-vad-row" id="pass1-enhance-vad-row" style="display: none;">
                                             <label class="checkbox-label compact" title="Enhanced audio drives VAD boundaries; original audio is fed to the ASR model">
@@ -689,6 +692,9 @@
                                             </optgroup>
                                             <optgroup label="BS-RoFormer">
                                                 <option value="bs-roformer:vocals" disabled class="coming-soon">Vocals (Coming Soon)</option>
+                                            </optgroup>
+                                            <optgroup label="htdemucs (Demucs v4)">
+                                                <option value="htdemucs" title="Isolates the voice from music and effects. Installed with WhisperJAV; its 84 MB model is fetched once on first use, from Meta's site rather than Hugging Face. If it cannot run, the run stops and says so.">Vocals</option>
                                             </optgroup>
                                         </select>
                                         <div class="enhance-for-vad-row" id="pass2-enhance-vad-row" style="display: none;">
@@ -1061,13 +1067,17 @@
                                                 <option value="portuguese">Portuguese</option>
                                                 <option value="spanish">Spanish</option>
                                                 <option value="french">French</option>
+                                                <option value="italian">Italian</option>
+                                                <option value="thai">Thai</option>
+                                                <option value="korean">Korean</option>
                                             </select>
                                         </div>
                                         <div class="form-group">
                                             <label for="translatorTone" class="form-label">Tone/Style:</label>
                                             <select id="translatorTone" class="form-select">
                                                 <option value="standard" selected>Standard</option>
-                                                <option value="pornify">Adult/Explicit</option>
+                                                <option value="contextual" title="Explicit language only where the original line is explicit — neutral dialogue stays neutral. Local instructions, not overridden by the online gist.">Adult (contextual)</option>
+                                                <option value="pornify" title="Everything explicit — also sexualizes neutral dialogue by design.">Adult/Explicit</option>
                                             </select>
                                         </div>
                                     </div>
@@ -1164,9 +1174,15 @@
             <section class="section console-section">
                 <div class="section-header">
                     <h2>Console</h2>
-                    <button type="button" class="btn btn-text btn-sm" id="clearConsoleBtn">
-                        Clear
-                    </button>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <label class="checkbox-label" title="Keep the console scrolled to the newest line">
+                            <input type="checkbox" id="consoleAutoScroll" checked>
+                            <span>Auto-scroll</span>
+                        </label>
+                        <button type="button" class="btn btn-text btn-sm" id="clearConsoleBtn">
+                            Clear
+                        </button>
+                    </div>
                 </div>
                 <div class="section-content">
                     <div class="console-output" id="consoleOutput">
@@ -1459,13 +1475,17 @@
                                 <option value="portuguese">Portuguese</option>
                                 <option value="spanish">Spanish</option>
                                 <option value="french">French</option>
+                                <option value="italian">Italian</option>
+                                <option value="thai">Thai</option>
+                                <option value="korean">Korean</option>
                             </select>
                         </div>
                         <div class="form-group">
                             <label for="translationTone" class="form-label">Tone/Style:</label>
                             <select id="translationTone" class="form-select">
                                 <option value="standard" selected>Standard</option>
-                                <option value="pornify">Adult/Explicit</option>
+                                <option value="contextual" title="Explicit language only where the original line is explicit — neutral dialogue stays neutral. Local instructions, not overridden by the online gist.">Adult (contextual)</option>
+                                <option value="pornify" title="Everything explicit — also sexualizes neutral dialogue by design.">Adult/Explicit</option>
                             </select>
                         </div>
                     </div>

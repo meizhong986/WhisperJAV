@@ -258,4 +258,28 @@ echo "  Or from Terminal:"
 echo -e "    ${GREEN}whisperjav-gui${NC}"
 echo ""
 
+# --------------------------------------------------------------------------
+# GUI backend note (#366). The system WebKit packages are not enough on their
+# own: pywebview ships no Linux backend by default, and apt/dnf packages land
+# system-wide where a plain virtual environment cannot see them. This prints
+# the two routes from docs/en/guides/installation_linux.md -- it installs
+# nothing, because which route is right depends on the user's environment.
+# --------------------------------------------------------------------------
+echo -e "${YELLOW}  If the window does not open, and you see this instead:${NC}"
+echo -e "${YELLOW}    ModuleNotFoundError: No module named 'gi'${NC}"
+echo ""
+echo "  ...then the part that draws the window is missing. Your Linux distribution"
+echo "  may have installed it system-wide, but Python cannot see it from here."
+echo "  Either of these fixes it. The first is simpler:"
+echo ""
+echo -e "    ${GREEN}pip install \"pywebview[qt]\"${NC}"
+echo "        Installs everything needed. Nothing else to set up."
+echo ""
+echo -e "    ${GREEN}python3 -m venv --system-site-packages whisperjav-env${NC}"
+echo "        Rebuilds your Python environment so it can see what your"
+echo "        distribution already installed. Use this if you prefer GTK."
+echo ""
+echo "  Step-by-step guide: docs/en/guides/installation_linux.md"
+echo ""
+
 exit 0

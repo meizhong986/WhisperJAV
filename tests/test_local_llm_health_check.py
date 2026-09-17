@@ -317,7 +317,15 @@ class TestHealthCheckIntegration:
         # Mock urllib to simulate successful server response
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.read.return_value = b'{"usage": {"completion_tokens": 15}}'
+        # v1.9.3: readiness now also asks for a CHAT completion, because a build
+        # can serve /v1/completions and fail /v1/chat/completions every time --
+        # which is what happened on Colab. A stub standing in for a WORKING
+        # server therefore has to answer that too, so it carries choices as well
+        # as the usage block this test measures speed from.
+        mock_response.read.return_value = (
+            b'{"usage": {"completion_tokens": 15}, "choices": '
+            b'[{"index": 0, "message": {"role": "assistant", "content": "OK"}}]}'
+        )
         mock_response.__enter__ = MagicMock(return_value=mock_response)
         mock_response.__exit__ = MagicMock(return_value=False)
 

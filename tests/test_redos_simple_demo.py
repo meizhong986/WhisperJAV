@@ -16,7 +16,11 @@ import sys
 import io
 
 # Fix Windows console encoding
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+# Only when run directly: under pytest, sys.stdout is pytest's capture
+# object, and rewrapping its buffer detaches it and kills the session at
+# teardown. That is what stopped `pytest tests/` running at all.
+if "pytest" not in sys.modules:
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 # The dangerous pattern from repetition_cleaner.py line 59
 DANGEROUS_PATTERN = regex.compile(

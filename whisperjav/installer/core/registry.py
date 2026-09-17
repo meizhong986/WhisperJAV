@@ -806,6 +806,12 @@ PACKAGES: List[Package] = [
         reason="BS-RoFormer vocal isolation",
     ),
     Package(
+        name="demucs",
+        extra=Extra.ENHANCE,
+        order=79,
+        reason="htdemucs vocal isolation (Demucs v4)",
+    ),
+    Package(
         name="onnxruntime",
         version=">=1.16.0",
         extra=Extra.ENHANCE,

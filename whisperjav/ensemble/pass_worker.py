@@ -10,7 +10,7 @@ warnings.filterwarnings("ignore", message=".*chunk_length_s.*is very experimenta
 
 import shutil
 import traceback
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -44,6 +44,13 @@ PIPELINE_CLASSES = {
     "qwen": QwenPipeline,  # Dedicated Qwen3-ASR pipeline (ADR-004)
     "crispasr": CrispASRPipeline,  # Standalone external-provider pipeline (docs/plans/crispasr_v190/08)
 }
+
+# Pipelines whose constructors never read enhance_for_vad. Verified against their
+# source on 2026-09-17, not against their docstrings. Kept in step by
+# tests/test_speech_enhancer_spec.py, which greps the pipeline modules.
+ENHANCE_FOR_VAD_IGNORED_BY = frozenset({
+    "fast", "faster", "transformers", "kotoba-faster-whisper", "crispasr",
+})
 
 DEFAULT_HF_PARAMS = {
     "hf_model_id": "kotoba-tech/kotoba-whisper-bilingual-v1.0",
@@ -293,6 +300,12 @@ class FileResult:
     subtitles: int = 0
     processing_time: float = 0.0
     error: Optional[str] = None
+    # Anything that quietly fell short in this pass, in plain language -- today,
+    # scenes a chosen clean-up could not clean. A pass runs in its own process,
+    # so without carrying these back the run summary would never learn of them
+    # and the user would be told nothing (agreed error-handling table,
+    # 2026-09-17, cross-cutting rule 1).
+    degradations: List[str] = field(default_factory=list)
 
 
 def prepare_transformers_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -745,6 +758,10 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                         srt_path=str(pass_output),
                         subtitles=result["summary"].get("final_subtitles_refined", 0),
                         processing_time=result["summary"].get("total_processing_time_seconds", 0.0),
+                        # From the metadata this file's run returned, so the
+                        # worker reads the same channel everything else does.
+                        degradations=list(
+                            result.get("summary", {}).get("degradations") or []),
                     )
                 )
                 logger.debug(
@@ -995,9 +1012,28 @@ def _build_pipeline(
     if not pipeline_class:
         raise ValueError(f"Unknown pipeline: {pipeline_name}")
 
-    # Pass enhance_for_vad flag to all pipelines via extra_kwargs
+    # Pass enhance_for_vad flag to all pipelines via extra_kwargs.
+    #
+    # What each pipeline then does with it, read from the code on 2026-09-17:
+    #   qwen (and the decoupled pipeline behind it) -- the real dual track: the
+    #     enhanced audio drives the segmenter, the original goes to the recogniser.
+    #   balanced, fidelity -- the flag is read and reported in an INFO line, but
+    #     the enhanced audio goes to BOTH; separating them needs recogniser-side
+    #     changes (balanced_pipeline.py, fidelity_pipeline.py).
+    #   fast, faster, transformers, kotoba-faster-whisper, crispasr -- never read.
+    #     The owner accepted that on 2026-09-17; it is stated here and in --help
+    #     so it is not mistaken for an oversight.
+    #
+    # A user who asked for it and is getting nothing is told so once, rather than
+    # being left to infer it from the absence of any mention.
     if pass_config.get("enhance_for_vad"):
         extra_kwargs = {**extra_kwargs, "enhance_for_vad": True}
+        if pipeline_name in ENHANCE_FOR_VAD_IGNORED_BY:
+            logger.info(
+                "Pass %s: --pass%s-enhance-for-vad has no effect on the %s pipeline, "
+                "which does not run a separate speech segmenter. The audio clean-up "
+                "still runs; it is simply not split between detection and recognition.",
+                pass_number, pass_number, pipeline_name)
 
     pass_temp_dir.mkdir(parents=True, exist_ok=True)
 

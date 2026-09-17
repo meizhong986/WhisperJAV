@@ -1,7 +1,26 @@
 """
 Test script to explore ttk.Notebook tab spacing options.
 Tests different approaches to create horizontal gaps between tabs.
+
+NOT an automated test. Each function below opens a Tk window and calls
+mainloop(), so it blocks until a human closes it -- five times over. It is also a
+leftover from the Tkinter GUI, which was replaced by the pywebview GUI in
+`whisperjav/webview_gui/`.
+
+It is kept because it is still a usable way to look at ttk tab styling by hand,
+but it is skipped unless you ask for it:
+
+    WHISPERJAV_MANUAL_GUI=1 python -m pytest tests/test_tab_spacing.py
 """
+import os
+
+import pytest
+
+pytestmark = pytest.mark.skipif(
+    os.environ.get("WHISPERJAV_MANUAL_GUI") != "1",
+    reason="opens Tk windows and waits for a human; set WHISPERJAV_MANUAL_GUI=1 to run",
+)
+
 import tkinter as tk
 from tkinter import ttk
 

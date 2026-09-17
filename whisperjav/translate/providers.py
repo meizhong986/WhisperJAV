@@ -81,5 +81,23 @@ PROVIDER_CONFIGS = {
     }
 }
 
+# Every entry carries the name the user types after --translate-provider.
+# 'pysubtrans_name' cannot serve that purpose: it is the name of PySubtrans's
+# client class, and local, ollama, glm, groq and custom all use 'Custom Server'.
+# Code that has to tell the providers apart -- which server failed, whose log to
+# point at -- reads 'whisperjav_provider'.
+for _provider_key, _provider_config in PROVIDER_CONFIGS.items():
+    _provider_config.setdefault('whisperjav_provider', _provider_key)
+
+
 SUPPORTED_SOURCES = {'japanese', 'korean', 'chinese', 'english'}
-SUPPORTED_TARGETS = {'english', 'chinese', 'indonesian', 'portuguese', 'spanish', 'french'}
+# The source of truth for translation targets. main.py's --translate-target choices, the two
+# GUI dropdowns and the output-suffix stripping in service.py all derive from or are pinned to
+# this set by tests/test_translate_targets.py -- add a language here and add it there too.
+#
+# v1.9.3: italian (#351), thai (#268) and korean added. There is no allow-list to satisfy on
+# the library side: PySubtrans substitutes target_language into the prompt as a free string
+# (Options.py:301-304), so a target costs nothing but the choice itself. Quality per language
+# is the model's, not WhisperJAV's.
+SUPPORTED_TARGETS = {'english', 'chinese', 'indonesian', 'portuguese', 'spanish', 'french',
+                     'italian', 'thai', 'korean'}

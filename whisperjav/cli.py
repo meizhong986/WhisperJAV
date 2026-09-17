@@ -27,6 +27,13 @@ if _offline_requested(sys.argv[1:]):
     from whisperjav.utils.offline_mode import enable_offline_mode
     enable_offline_mode()
 
+# huggingface_hub reads HF_ENDPOINT at import time, so --hf-endpoint acts here too.
+from whisperjav.utils.offline_mode import hf_endpoint_requested as _hf_endpoint_requested
+_requested_endpoint = _hf_endpoint_requested(sys.argv[1:])
+if _requested_endpoint:
+    from whisperjav.utils.offline_mode import enable_hf_endpoint
+    enable_hf_endpoint(_requested_endpoint)
+
 # ===========================================================================
 # EARLY SETUP - Must be before any library imports
 # ===========================================================================

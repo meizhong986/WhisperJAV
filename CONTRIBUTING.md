@@ -69,8 +69,19 @@ python install.py --dev
 
 ### Testing
 
+Run the suite one file per process:
+
 ```bash
-python -m pytest tests/ -v
+python scripts/run_tests.py            # everything
+python scripts/run_tests.py --fast     # skip the files that load real models
+```
+
+Some files shell out to the real CLI and take a minute each, so a single
+`pytest` process is slow and loses every later result if one file crashes. The
+runner gives you a per-file table instead. A single file is still just:
+
+```bash
+python -m pytest tests/test_config_v4.py -v
 ```
 
 ### Pull Request Process

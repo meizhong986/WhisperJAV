@@ -557,18 +557,67 @@ def check_disk_space(min_gb: int = 8) -> bool:
         return True  # Non-fatal, proceed with caution
 
 
+def current_proxy() -> str:
+    """The proxy this process will use, as the environment describes it."""
+    for name in ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"):
+        value = os.environ.get(name, "").strip()
+        if value:
+            return f"{value}  (from {name})"
+    return ""
+
+
 def check_network(timeout: int = 10) -> bool:
-    """Check if network connectivity to PyPI is available"""
-    log("Checking network connectivity to PyPI...")
-    try:
-        import urllib.request
-        urllib.request.urlopen("https://pypi.org", timeout=timeout)
+    """
+    Check that the sites this install downloads from can be reached.
+
+    It says which addresses it is contacting and through which proxy, because a
+    user who cannot reach them -- behind a company proxy, or in China -- cannot
+    act on "network check failed" without knowing what was tried (#314, and the
+    China threads).
+
+    Reaching PyPI is still required: nothing can be installed without it.
+    download.pytorch.org is reported but not required, because the CPU route
+    fetches PyTorch from PyPI instead.
+    """
+    proxy = current_proxy()
+    log("Checking the network. This install downloads from:")
+    log("  PyPI:    https://pypi.org  (required)")
+    log("  PyTorch: https://download.pytorch.org  (needed only for the GPU build)")
+    log(f"  Proxy:   {proxy}" if proxy else "  Proxy:   none set")
+
+    import urllib.error
+    import urllib.request
+
+    def reachable(url):
+        try:
+            urllib.request.urlopen(url, timeout=timeout)
+            return True, ""
+        except urllib.error.HTTPError:
+            # The server answered. download.pytorch.org replies 403 to a bare
+            # GET of its root, and that still proves the address can be reached,
+            # which is the only thing being asked here. Reporting it as
+            # unreachable would send every user looking for a fault they do not
+            # have.
+            return True, ""
+        except Exception as e:
+            return False, str(e)
+
+    torch_ok, torch_error = reachable("https://download.pytorch.org")
+    log(f"  download.pytorch.org: {'reachable' if torch_ok else 'NOT reachable -- ' + torch_error}")
+
+    pypi_ok, pypi_error = reachable("https://pypi.org")
+    if pypi_ok:
+        log("  pypi.org: reachable")
         log("Network check: OK")
         return True
-    except Exception as e:
-        log(f"ERROR: Network check failed: {e}")
-        log("       Internet connection is required for downloading dependencies.")
-        return False
+
+    log(f"ERROR: Network check failed: {pypi_error}")
+    log("       pypi.org could not be reached, and nothing can be installed without it.")
+    log(f"       Address tried: https://pypi.org")
+    log(f"       Proxy in use:  {proxy if proxy else 'none set'}")
+    log("       If you reach the internet through a proxy, set HTTPS_PROXY and")
+    log("       HTTP_PROXY before running this installer.")
+    return False
 
 
 def check_ffmpeg() -> bool:
@@ -933,23 +982,7 @@ def configure_git_for_slow_connections() -> bool:
         ("http.maxRetries", "5"),
     ]
 
-    success = True
-    for key, value in git_configs:
-        try:
-            result = subprocess.run(
-                [git_exe, "config", "--global", key, value],
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-            if result.returncode == 0:
-                log(f"  + {key} = {value}")
-            else:
-                log(f"  x Failed to set {key}: {result.stderr}")
-                success = False
-        except Exception as e:
-            log(f"  x Error setting {key}: {e}")
-            success = False
+    success = apply_git_settings_for_this_install(git_configs)
 
     # Also set environment variables for the current process
     os.environ["GIT_HTTP_CONNECT_TIMEOUT"] = "120"
@@ -1038,6 +1071,61 @@ def detect_and_configure_proxy() -> bool:
     return False
 
 
+def git_supports_environment_config() -> bool:
+    """
+    True when the git we will use honours GIT_CONFIG_COUNT (git 2.31, 2021).
+
+    Worth asking, because on an older git the settings below would be silently
+    ignored -- and they are the ones that make a slow or proxied connection work
+    at all, so failing to apply them quietly would be worse than the problem.
+    """
+    git_exe = shutil.which("git")
+    if not git_exe:
+        bundled = os.path.join(sys.prefix, "Library", "bin", "git.exe")
+        if os.path.exists(bundled):
+            git_exe = bundled
+    if not git_exe:
+        return False
+
+    try:
+        result = subprocess.run([git_exe, "--version"], capture_output=True,
+                                text=True, timeout=10)
+        parts = result.stdout.strip().split()
+        version = parts[2] if len(parts) > 2 else ""
+        major, minor = (int(n) for n in version.split(".")[:2])
+        return (major, minor) >= (2, 31)
+    except Exception:
+        return False
+
+
+def apply_git_settings_for_this_install(settings: list) -> bool:
+    """
+    Apply git settings to this install only, through the environment.
+
+    git reads GIT_CONFIG_COUNT / GIT_CONFIG_KEY_n / GIT_CONFIG_VALUE_n and they
+    reach every git it starts from here, including the one pip runs for a
+    git+https install.
+
+    Until v1.9.3 these were written with "git config --global", which changed
+    git for everything else the user does on that machine, permanently, with
+    nothing offering to undo it -- including an http.proxy pointing at a proxy
+    that may only exist today. An installer has no business doing that.
+    """
+    if not git_supports_environment_config():
+        log("  NOTE: the git on this machine is older than 2.31 and cannot take")
+        log("        these settings from the environment. Skipping them rather")
+        log("        than writing into your global git configuration.")
+        return False
+
+    start = int(os.environ.get("GIT_CONFIG_COUNT", "0") or 0)
+    for offset, (key, value) in enumerate(settings):
+        os.environ[f"GIT_CONFIG_KEY_{start + offset}"] = key
+        os.environ[f"GIT_CONFIG_VALUE_{start + offset}"] = value
+        log(f"  + {key} = {value}  (this install only)")
+    os.environ["GIT_CONFIG_COUNT"] = str(start + len(settings))
+    return True
+
+
 def _configure_git_proxy(proxy_url: str) -> None:
     """Configure bundled git to use the detected proxy."""
     git_exe = shutil.which("git")
@@ -1049,18 +1137,11 @@ def _configure_git_proxy(proxy_url: str) -> None:
     if not git_exe:
         return
 
-    try:
-        subprocess.run(
-            [git_exe, "config", "--global", "http.proxy", proxy_url],
-            capture_output=True, text=True, timeout=10
-        )
-        subprocess.run(
-            [git_exe, "config", "--global", "https.proxy", proxy_url],
-            capture_output=True, text=True, timeout=10
-        )
-        log(f"  Configured git proxy: {proxy_url}")
-    except Exception as e:
-        log(f"  WARNING: Could not configure git proxy: {e}")
+    if apply_git_settings_for_this_install([("http.proxy", proxy_url),
+                                            ("https.proxy", proxy_url)]):
+        log(f"  Using proxy for git: {proxy_url}  (this install only)")
+    else:
+        log(f"  WARNING: could not apply the proxy to git: {proxy_url}")
 
 
 def filter_pip_specific_args(args: list, installer_name: str) -> list:
@@ -1108,6 +1189,115 @@ def filter_pip_specific_args(args: list, installer_name: str) -> list:
         filtered.append(arg)
 
     return filtered
+
+
+# How long the console may stay silent while an install is running. The PyTorch
+# wheels are gigabytes, and pip prints nothing at all while a single wheel
+# downloads. With the output captured until the command finished, #314 saw an
+# unmoving screen for many minutes and reasonably concluded the installer had
+# frozen. Something has to arrive regularly, even when pip says nothing.
+INSTALL_HEARTBEAT_SECONDS = 15
+
+# Lines worth putting on screen as they happen. Everything else goes to the log
+# file, because pip's per-file chatter would bury these.
+_INSTALL_PROGRESS_PREFIXES = (
+    "collecting", "downloading", "installing", "building", "preparing",
+    "prepared", "resolved", "successfully", "uninstalling", "using cached",
+    "error", "warning", "fatal",
+)
+
+
+def _is_install_progress(line: str) -> bool:
+    return line.strip().lower().startswith(_INSTALL_PROGRESS_PREFIXES)
+
+
+def run_streaming(cmd: list, timeout: int) -> tuple:
+    """
+    Run an install command and show what it is doing while it does it.
+
+    Returns (returncode, combined_output). Every line is written to the log
+    file; the console gets the lines that say what is happening, and a heartbeat
+    with the elapsed time whenever nothing has been said for a while -- which is
+    most of a large wheel download.
+
+    stderr is merged into stdout so the order on screen is the order it happened.
+
+    Raises subprocess.TimeoutExpired if the command outlives `timeout`, whether
+    it is producing output or sitting silent.
+    """
+    import queue
+    import threading
+
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        bufsize=1,
+    )
+
+    lines_queue = queue.Queue()
+
+    def _read(stream):
+        try:
+            for line in stream:
+                lines_queue.put(line)
+        except Exception:
+            pass
+        finally:
+            lines_queue.put(None)
+
+    reader = threading.Thread(target=_read, args=(process.stdout,), daemon=True)
+    reader.start()
+
+    started = time.time()
+    last_spoke = started
+    collected = []
+
+    try:
+        while True:
+            elapsed = time.time() - started
+            remaining = timeout - elapsed
+            if remaining <= 0:
+                process.kill()
+                process.wait()
+                raise subprocess.TimeoutExpired(
+                    cmd, timeout, output="\n".join(collected))
+
+            try:
+                line = lines_queue.get(timeout=min(1.0, remaining))
+            except queue.Empty:
+                # Silence. This is the download itself, and the reason #314
+                # thought the installer had died.
+                if time.time() - last_spoke >= INSTALL_HEARTBEAT_SECONDS:
+                    log(f"  ... still working ({int(elapsed)}s elapsed)")
+                    last_spoke = time.time()
+                continue
+
+            if line is None:
+                break
+
+            line = line.rstrip()
+            if not line:
+                continue
+
+            collected.append(line)
+            log_file_only(f"  {line}")
+            if _is_install_progress(line):
+                log(f"  {line}")
+                last_spoke = time.time()
+
+        process.wait(timeout=max(1.0, timeout - (time.time() - started)))
+    finally:
+        try:
+            if process.stdout:
+                process.stdout.close()
+        except Exception:
+            pass
+
+    return process.returncode, "\n".join(collected)
 
 
 def run_pip(args: list, description: str, retries: int = 3,
@@ -1175,24 +1365,11 @@ def run_pip(args: list, description: str, retries: int = 3,
         log(f"[{installer_name}] Attempt {attempt+1}/{retries}: {display_cmd}")
 
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                check=True,
-                encoding='utf-8',
-                timeout=1800  # 30 minute timeout for large downloads
-            )
-            if result.stdout:
-                lines = result.stdout.strip().split('\n')
-                # Write full output to log file for debugging
-                for line in lines:
-                    log_file_only(f"  {line}")
-                # Show last 20 lines on console
-                if len(lines) > 20:
-                    log(f"  ... ({len(lines) - 20} lines written to log file only)")
-                for line in lines[-20:]:
-                    log(f"  {line}")
+            # Streamed rather than captured: see run_streaming. 30 minute limit
+            # for large downloads, as before.
+            returncode, output = run_streaming(cmd, timeout=1800)
+            if returncode != 0:
+                raise subprocess.CalledProcessError(returncode, cmd, output=output)
             log(f"SUCCESS: {description}")
             return True
 
@@ -1357,7 +1534,11 @@ def create_failure_file(error_message: str):
             f.write("Common Solutions:\n")
             f.write("- Out of disk space: Free up 8GB and retry\n")
             f.write("- Permission error: Run installer as administrator, or check antivirus\n")
-            f.write("- Network error: Check internet connection and firewall\n")
+            f.write("- Network error: Check internet connection and firewall.\n")
+            f.write("    The install log names the addresses that were tried and\n")
+            f.write("    the proxy in use. If you reach the internet through a\n")
+            f.write("    proxy, set HTTPS_PROXY and HTTP_PROXY before running\n")
+            f.write("    this installer.\n")
             f.write("- CUDA error: Update NVIDIA drivers or try CPU mode\n")
             f.write("- WebView2 missing: Install from https://go.microsoft.com/fwlink/p/?LinkId=2124703\n\n")
             f.write(f"Full details: {LOG_FILE}\n\n")

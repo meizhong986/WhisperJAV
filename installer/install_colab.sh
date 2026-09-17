@@ -23,7 +23,10 @@
 
 # Configuration
 WHISPERJAV_REPO="https://github.com/meizhong986/WhisperJAV.git"
-WHISPERJAV_BRANCH="main"
+# Which commit-ish of WhisperJAV to install. The notebooks set WHISPERJAV_REF to the
+# release they were published with, so a notebook keeps installing the version it was
+# written for instead of whatever is on main that day. Unset means main.
+WHISPERJAV_BRANCH="${WHISPERJAV_REF:-main}"
 HF_WHEEL_REPO="mei986/whisperjav-wheels"
 LLAMA_CPP_VERSION="0.3.21"
 
@@ -219,18 +222,27 @@ echo ""
 
 LLAMA_INSTALLED=false
 
-# Determine wheel filename for cu126
+# Determine wheel filename for cu126.
+# The wheels in the HuggingFace dataset carry either platform tag depending on how
+# they were built, so both spellings are tried before giving up on that source.
 PY_TAG="cp${PYTHON_MAJOR}${PYTHON_MINOR}"
-WHEEL_NAME="llama_cpp_python-${LLAMA_CPP_VERSION}-${PY_TAG}-${PY_TAG}-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+WHEEL_BASE="llama_cpp_python-${LLAMA_CPP_VERSION}-${PY_TAG}-${PY_TAG}"
+HF_BASE_URL="https://huggingface.co/datasets/${HF_WHEEL_REPO}/resolve/main/llama-cpp-python/cu126"
 
-info "Looking for prebuilt wheel: $WHEEL_NAME"
+WHEEL_NAME=""
+HF_WHEEL_URL=""
+for _plat in "manylinux_2_17_x86_64.manylinux2014_x86_64" "linux_x86_64"; do
+    _candidate="${WHEEL_BASE}-${_plat}.whl"
+    info "Checking HuggingFace for ${_candidate}..."
+    if curl --output /dev/null --silent --head --fail "${HF_BASE_URL}/${_candidate}"; then
+        WHEEL_NAME="$_candidate"
+        HF_WHEEL_URL="${HF_BASE_URL}/${_candidate}"
+        break
+    fi
+done
 
 # --- Attempt 1: HuggingFace (mei986/whisperjav-wheels) ---
-info "Checking HuggingFace for prebuilt cu126 wheel..."
-
-HF_WHEEL_URL="https://huggingface.co/datasets/${HF_WHEEL_REPO}/resolve/main/llama-cpp-python/cu126/${WHEEL_NAME}"
-
-if curl --output /dev/null --silent --head --fail "$HF_WHEEL_URL"; then
+if [[ -n "$HF_WHEEL_URL" ]]; then
     info "Found wheel on HuggingFace, downloading..."
     WHEEL_PATH="/tmp/${WHEEL_NAME}"
 

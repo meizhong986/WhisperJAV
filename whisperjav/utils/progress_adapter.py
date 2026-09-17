@@ -16,9 +16,13 @@ from whisperjav.utils.logger import logger
 class ProgressDisplayAdapter:
     """Adapter to bridge old ProgressDisplay calls to UnifiedProgressManager."""
     
-    def __init__(self, unified_manager: UnifiedProgressManager):
+    def __init__(self, unified_manager: UnifiedProgressManager, total_files: Optional[int] = None):
         self.unified_manager = unified_manager
-        self.total_files = 1
+        # The caller passes the real count. Fall back to whatever the manager was
+        # given, then to 1, so a single-file run still reads [1/1].
+        if total_files is None:
+            total_files = getattr(unified_manager, 'total_files', 1) or 1
+        self.total_files = total_files
         self.current_file_context = None
         self.current_step_context = None
         self.current_task_context = None
@@ -144,9 +148,10 @@ class DummyProgressAdapter:
         yield
 
 
-def create_progress_adapter(unified_manager: Optional[UnifiedProgressManager] = None) -> ProgressDisplayAdapter:
+def create_progress_adapter(unified_manager: Optional[UnifiedProgressManager] = None,
+                            total_files: Optional[int] = None) -> ProgressDisplayAdapter:
     """Factory function to create appropriate progress adapter."""
     if unified_manager:
-        return ProgressDisplayAdapter(unified_manager)
+        return ProgressDisplayAdapter(unified_manager, total_files)
     else:
         return DummyProgressAdapter()

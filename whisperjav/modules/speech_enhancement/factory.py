@@ -8,7 +8,7 @@ Design Decisions (v1.7.3, extended v1.8.x):
 - Default model varies by backend (e.g., 48kHz for ClearVoice, 16kHz for ZipEnhancer)
 - Graceful degradation handled at backend level
 - Consistent with SpeechSegmenterFactory pattern
-- Five backends: none, ffmpeg-dsp, zipenhancer, clearvoice, bs-roformer
+- Six backends: none, ffmpeg-dsp, zipenhancer, clearvoice, bs-roformer, htdemucs
 """
 
 from typing import Dict, Type, Optional, Any, List, Tuple
@@ -27,6 +27,7 @@ _BACKEND_REGISTRY: Dict[str, str] = {
     "zipenhancer": "whisperjav.modules.speech_enhancement.backends.zipenhancer.ZipEnhancerBackend",
     "clearvoice": "whisperjav.modules.speech_enhancement.backends.clearvoice.ClearVoiceSpeechEnhancer",
     "bs-roformer": "whisperjav.modules.speech_enhancement.backends.bs_roformer.BSRoformerSpeechEnhancer",
+    "htdemucs": "whisperjav.modules.speech_enhancement.backends.htdemucs.HtDemucsSpeechEnhancer",
 }
 
 # Cache for loaded backend classes (avoid repeated imports)
@@ -51,20 +52,48 @@ _BACKEND_DEPENDENCIES: Dict[str, Dict[str, Any]] = {
         "install_hint": "pip install modelscope>=1.20",
         "always_available": False,
         "description": "ZipEnhancer 16kHz (lightweight, SOTA quality)",
+        "fatal_when_unavailable": True,
     },
     "clearvoice": {
         "packages": ["clearvoice"],
         "install_hint": "pip install clearvoice",
         "always_available": False,
         "description": "ClearerVoice speech enhancement (denoising)",
+        "fatal_when_unavailable": True,
     },
     "bs-roformer": {
         "packages": ["bs_roformer"],
         "install_hint": "pip install bs-roformer-infer",
         "always_available": False,
         "description": "BS-RoFormer vocal isolation",
+        "fatal_when_unavailable": True,
+    },
+    "htdemucs": {
+        "packages": ["demucs"],
+        "install_hint": "pip install demucs",
+        "always_available": False,
+        "description": "htdemucs vocal isolation (Demucs v4)",
+        "fatal_when_unavailable": True,
     },
 }
+
+# Backends whose absence must STOP a run instead of falling back to "none".
+#
+# Owner, 2026-09-17: "if user selected any but they cannot run then it is a
+# failure and the process shall stop with helpful communication." Choosing a
+# clean-up is a deliberate act; quietly giving the user the untouched audio
+# hands them a poor subtitle file from a run that exited 0, with only a warning
+# in the log to explain it.
+#
+# This is every backend that has to be installed. "none" and "ffmpeg-dsp" are
+# not in it because they cannot be missing: one does nothing and the other uses
+# the FFmpeg that WhisperJAV already requires.
+#
+# Read from _BACKEND_DEPENDENCIES so there is one source of truth.
+FATAL_WHEN_UNAVAILABLE = frozenset(
+    name for name, info in _BACKEND_DEPENDENCIES.items()
+    if info.get("fatal_when_unavailable")
+)
 
 # Default models for each backend
 _DEFAULT_MODELS: Dict[str, str] = {
@@ -72,6 +101,7 @@ _DEFAULT_MODELS: Dict[str, str] = {
     "zipenhancer": "torch",  # torch (GPU) or onnx (CPU/GPU)
     "clearvoice": "MossFormer2_SE_48K",  # 48kHz for best quality
     "bs-roformer": "vocals",
+    "htdemucs": "htdemucs",
 }
 
 

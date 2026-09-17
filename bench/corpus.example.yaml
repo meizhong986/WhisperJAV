@@ -1,0 +1,27 @@
+# Accuracy-gate corpus manifest.
+#
+# Copy to bench/corpus.yaml (gitignored media; GT SRTs are committed) and
+# fill in real clips. Aim for 5-10 clips, 3-5 minutes each, covering the
+# acoustic profiles that historically regress independently:
+#   - clean studio dialogue          (baseline sanity)
+#   - whispered / ASMR               (aggressive-sensitivity territory)
+#   - moaning-heavy, low dialogue    (repetition-pathology trigger; cf. F4/F6)
+#   - dialect (e.g. Kansai-ben)      (tokenizer/lexical errors)
+#   - music / BGM-heavy              (false-alarm pressure)
+#
+# Ground-truth SRTs: human-verified, committed to the repo. Media files:
+# NOT committed - keep them in bench/media/ locally (gitignored).
+schema_version: 1
+clips:
+  - id: clean_dialogue_01
+    media: media/clean_dialogue_01.m4a
+    ground_truth: gt/clean_dialogue_01.srt
+    tags: [clean, dialogue]
+  - id: whisper_asmr_01
+    media: media/whisper_asmr_01.m4a
+    ground_truth: gt/whisper_asmr_01.srt
+    tags: [whisper, asmr]
+  - id: nvv_heavy_01
+    media: media/nvv_heavy_01.m4a
+    ground_truth: gt/nvv_heavy_01.srt
+    tags: [nvv, repetition-risk]

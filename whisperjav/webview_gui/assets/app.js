@@ -807,7 +807,14 @@ const ConsoleManager = {
         line.textContent = message;
         output.appendChild(line);
 
-        // Auto-scroll to bottom (use requestAnimationFrame to ensure DOM updated)
+        this._autoScroll(output);
+    },
+
+    // Scroll to bottom unless the user unchecked the Auto-scroll toggle.
+    // requestAnimationFrame ensures the DOM has been updated first.
+    _autoScroll(output) {
+        const toggle = document.getElementById('consoleAutoScroll');
+        if (toggle && !toggle.checked) return;
         requestAnimationFrame(() => {
             if (output) {
                 output.scrollTop = output.scrollHeight;
@@ -836,12 +843,7 @@ const ConsoleManager = {
             output.appendChild(lineEl);
         });
 
-        // Auto-scroll to bottom (use requestAnimationFrame to ensure DOM updated)
-        requestAnimationFrame(() => {
-            if (output) {
-                output.scrollTop = output.scrollHeight;
-            }
-        });
+        this._autoScroll(output);
     }
 };
 
@@ -1498,6 +1500,19 @@ const EnsembleManager = {
             this.swapModelOptions('pass2', 'qwen');
         }
 
+        // v1.9.3: filter the legacy passes at startup too. The branches above only cover
+        // the non-legacy families, so a pass left on a legacy pipeline kept index.html's
+        // static option list -- which carries every model, including turbo for Balanced,
+        // the pair the compatibility filtering exists to prevent. Nothing rebuilt it until
+        // the user touched the pipeline dropdown.
+        ['pass1', 'pass2'].forEach(passKey => {
+            const s = this.state[passKey];
+            const isLegacyFamily = !s.isTransformers && !s.isQwen && !s.isCrispasr && !s.isXxl;
+            if (isLegacyFamily) {
+                this.swapModelOptions(passKey, 'legacy');
+            }
+        });
+
         // Pass 2 enable/disable
         document.getElementById('pass2-enabled').addEventListener('change', (e) => {
             this.state.pass2.enabled = e.target.checked;
@@ -1737,7 +1752,11 @@ const EnsembleManager = {
                 this.updateRowGreyingState(passKey);
                 this.updateByopPanel();
                 this.updateCrispasrPanel();
-                if (oldType !== newType) {
+                // v1.9.3: also re-run for a legacy->legacy change. All four legacy
+                // pipelines share the type 'legacy', so the old condition never
+                // refiltered the model list when moving between them (Balanced and
+                // Fidelity run different engines and allow different models).
+                if (oldType !== newType || newType === 'legacy') {
                     this.swapModelOptions(passKey, newType);
                 }
                 this.applyPipelinePresets(passKey, newType);
@@ -1757,7 +1776,8 @@ const EnsembleManager = {
             this.updateRowGreyingState(passKey);
             this.updateByopPanel();
             this.updateCrispasrPanel();
-            if (oldType !== newType) {
+            // v1.9.3: see the note above -- legacy->legacy must refilter too.
+            if (oldType !== newType || newType === 'legacy') {
                 this.swapModelOptions(passKey, newType);
             }
             this.applyPipelinePresets(passKey, newType);
@@ -1920,11 +1940,23 @@ const EnsembleManager = {
         }
     },
 
+    // v1.9.3: the name of a pipeline as the user sees it in the row ("Balanced"), not the
+    // internal id ("balanced"). Console messages are read by users, so they get the label.
+    pipelineLabel(passKey) {
+        const select = document.getElementById(`${passKey}-pipeline`);
+        const option = select && select.options[select.selectedIndex];
+        return (option && option.textContent.trim()) || this.state[passKey].pipeline;
+    },
+
     // Swap model dropdown options based on pipeline type
     // pipelineType: 'legacy' | 'transformers' | 'qwen' | 'anime-whisper' | 'cohere' | 'crispasr'
     swapModelOptions(passKey, pipelineType) {
         const modelSelect = document.getElementById(`${passKey}-model`);
         let models;
+        // true only when a legacy pipeline's compatibility list actually narrowed the
+        // choice -- switching to another family (qwen, transformers, ...) swaps the list
+        // wholesale and is not a "dropped selection" worth reporting.
+        let narrowedByPipeline = false;
 
         switch (pipelineType) {
             case 'transformers':
@@ -1942,24 +1974,73 @@ const EnsembleManager = {
             case 'crispasr':
                 models = this.crispasrModels;
                 break;
-            default:
-                models = this.legacyModels;
+            default: {
+                // v1.9.3: the row now honours the same per-pipeline compatibility the
+                // Customize modal uses. 'legacy' covers four pipelines on two different
+                // engines, and the unfiltered list offered every model to all of them --
+                // so Balanced could be set to 'turbo' (faster-whisper has none) and
+                // Fidelity to the CT2 model (OpenAI Whisper cannot load it). Nothing
+                // validates the pair downstream: main.py and pass_worker.py have no such
+                // guard, so the row was the only thing that could prevent it.
+                const pipeline = this.state[passKey].pipeline;
+                const allowed = this.pipelineModelCompatibility[pipeline];
+                if (allowed) {
+                    models = this.legacyModels.filter(m => allowed.includes(m.value));
+                    narrowedByPipeline = true;
+                } else {
+                    models = this.legacyModels;
+                }
+                break;
+            }
         }
+
+        // Keep the current model if the new pipeline can still run it. Previously this
+        // always reset to the first option, which silently discarded a deliberate choice
+        // whenever the list was rebuilt.
+        // A compatibility list that shares no value with legacyModels would leave this
+        // empty and throw inside a change handler, half-updating the row. Not reachable
+        // today (the only such entry, kotoba-faster-whisper, is not offered in the row),
+        // but fall back to the unfiltered list rather than crash.
+        if (!models.length) {
+            ConsoleManager.log(
+                `Pass ${passKey === 'pass1' ? '1' : '2'}: no model is listed as working ` +
+                `with ${this.pipelineLabel(passKey)}, so all models are being shown.`, 'warn');
+            models = this.legacyModels;
+            narrowedByPipeline = false;
+        }
+
+        const previous = this.state[passKey].model;
+        const previousLabel = (this.legacyModels.find(m => m.value === previous) || {}).label || previous;
+        const kept = models.some(m => m.value === previous) ? previous : null;
+        const chosen = kept || models[0].value;
 
         // Clear existing options
         modelSelect.innerHTML = '';
 
         // Add new options
-        models.forEach((model, index) => {
+        models.forEach(model => {
             const option = document.createElement('option');
             option.value = model.value;
             option.textContent = model.label;
-            if (index === 0) option.selected = true;
+            if (model.value === chosen) option.selected = true;
             modelSelect.appendChild(option);
         });
 
-        // Update state with first option
-        this.state[passKey].model = models[0].value;
+        modelSelect.value = chosen;
+        this.state[passKey].model = chosen;
+
+        // Say so when a selection was dropped, rather than changing it silently
+        // (owner's decision, 2026-09-16). Only when a real previous choice was lost --
+        // not on the first build, and not when switching to an unrelated pipeline family
+        // whose model list never contained it.
+        if (!kept && previous && narrowedByPipeline
+                && this.legacyModels.some(m => m.value === previous)) {
+            const chosenLabel = (models.find(m => m.value === chosen) || {}).label || chosen;
+            ConsoleManager.log(
+                `Pass ${passKey === 'pass1' ? '1' : '2'}: ${this.pipelineLabel(passKey)} ` +
+                `cannot use "${previousLabel}", so "${chosenLabel}" has been selected ` +
+                `instead.`, 'warn');
+        }
     },
 
     // Update row greying based on pipeline type
@@ -2089,6 +2170,13 @@ const EnsembleManager = {
         // Parameter guide button: visible only for Qwen pipelines
         const guideBtn = document.getElementById(`guide-${passKey}`);
         if (guideBtn) guideBtn.style.display = passState.isQwen ? '' : 'none';
+
+        // The two branches above (XXL, CrispASR) refresh the enhancer-dependent
+        // panels before returning; this ordinary path did not, so on a fresh
+        // window Pass 1's DSP panel and both passes' "Enhance for VAD only" row
+        // kept whatever the markup said until something was clicked. This runs at
+        // start-up, on a pipeline change and after a preset is loaded.
+        this.updateDspPanel(passKey);
     },
 
     handleSensitivityChange(passKey, newValue, selectElement) {
@@ -2163,6 +2251,14 @@ const EnsembleManager = {
                 panel.style.display = 'none';
             }
         }
+
+        // "Enhance for VAD only" depends on exactly the same thing this does --
+        // which enhancer the pass has selected -- so it is refreshed here rather
+        // than only from the enhancer dropdown's change handler. Before v1.9.3 it
+        // was refreshed nowhere else, so a pass that already had an enhancer when
+        // the window opened, or that got one from a preset, kept the checkbox
+        // hidden until the user re-picked the enhancer by hand.
+        this.updateEnhanceForVadCheckbox(passId);
     },
 
     // Enhance-for-VAD checkbox visibility
@@ -2172,8 +2268,27 @@ const EnsembleManager = {
         const enhancer = document.getElementById(`${passId}-enhancer`)?.value || 'none';
         const isEnabled = passId === 'pass1' || this.state.pass2.enabled;
         const isXxl = passId === 'pass2' && this.state.pass2.isXxl;
+        // Owner, 2026-09-17: "balanced shall not have the VAD only enhancement."
+        // Balanced detects speech inside faster-whisper's own call, on the audio
+        // it recognises, so there is no second track to feed. Offering the box
+        // there would promise something the pipeline cannot do.
+        const isBalanced = this.state[passId]?.pipeline === 'balanced';
         // Show when a real enhancer is selected (not none) and pass is enabled
-        row.style.display = (enhancer !== 'none' && enhancer !== '' && isEnabled && !isXxl) ? 'block' : 'none';
+        row.style.display = (enhancer !== 'none' && enhancer !== '' && isEnabled
+                             && !isXxl && !isBalanced) ? 'block' : 'none';
+        if (isBalanced && this.state[passId]) {
+            // Clear it too, so a value left over from another pipeline is not
+            // carried into the run by a control the user can no longer see.
+            this.state[passId].enhanceForVad = false;
+        }
+        // The tick box and the stored value are two separate things, and until
+        // now only the balanced rule above ever wrote the box. Anything else
+        // that set the value -- ticking it inside the Customize window, or
+        // loading a preset saved with it on -- left the row showing unticked
+        // while the run still sent the flag: the user saw "off" and got the
+        // dual track. Repainting the row now always shows what will run.
+        const box = document.getElementById(`${passId}-enhance-for-vad`);
+        if (box) box.checked = !!this.state[passId]?.enhanceForVad;
     },
 
     // BYOP Settings Panel Management
@@ -2363,9 +2478,18 @@ const EnsembleManager = {
         vad: { type: 'boolean', default: true }
     },
 
-    // Model compatibility per pipeline (faster-whisper doesn't support turbo)
+    // Model compatibility per pipeline. This is the ONLY place the engine constraint is
+    // written down, and as of v1.9.3 both the Ensemble row and the Customize modal read
+    // it (see swapModelOptions) -- before, only the modal did, so the row offered
+    // combinations that cannot run and nothing validates them downstream.
+    //
+    // balanced / fast / faster run CTranslate2 via faster-whisper, which has no 'turbo'.
+    // fidelity runs OpenAI Whisper, which has turbo but cannot load a CTranslate2
+    // checkpoint. whisper-ja-1.5B-ct2 is CT2, so it is Balanced only by the owner's
+    // decision of 2026-09-16 -- fast/faster share the engine and could run it, but it
+    // ships as Balanced-only and stays that way until he says otherwise.
     pipelineModelCompatibility: {
-        balanced: ['large-v2', 'large-v3'],
+        balanced: ['large-v2', 'large-v3', 'TransWithAI/whisper-ja-1.5B-ct2'],
         faster: ['large-v2', 'large-v3'],
         fast: ['large-v2', 'large-v3'],
         fidelity: ['large-v2', 'large-v3', 'turbo'],
@@ -2502,13 +2626,50 @@ const EnsembleManager = {
             const contextPanel = document.getElementById('tab-context');
             if (contextPanel) contextPanel.innerHTML = '';
 
-            // Get current model settings
-            const currentModel = passState.customized && passState.params.model_name
+            // Get current model settings.
+            // v1.9.3: seed from the row when there is no customized value. `result.model`
+            // is NOT a model name for the standard pipelines -- get_pipeline_defaults
+            // returns the whole model *section* there (a dict; api.py, the standard-
+            // pipeline return), and only the kotoba/V3 branch returns a string. A dict
+            // never matches an entry in allowedModels, so generateModelTab fell back to
+            // allowedModels[0] and the Model tab opened on 'large-v2' for every legacy
+            // pass regardless of what the row said.
+            const rowModel = passState.model;
+            const resultModel = (result.model && typeof result.model === 'object')
+                ? result.model.model_name
+                : result.model;
+            const currentModel = (passState.customized && passState.params && passState.params.model_name)
                 ? passState.params.model_name
-                : result.model || 'large-v2';
+                : (rowModel || resultModel || 'large-v2');
             const currentDevice = passState.customized && passState.params.device
                 ? passState.params.device
                 : 'cuda';
+
+            // v1.9.3: restore this modal's own tab labels before filling the panels.
+            // The modal has ONE set of tab buttons shared by every pipeline, and
+            // generateTransformersTabs() and generateQwenTabs() rename them in place
+            // (e.g. Qwen turns Segmenter into "Generation" and hides Context). Nothing
+            // renamed them back, so opening a legacy pass's Customize after a
+            // Transformers or Qwen one showed the previous pipeline's labels over this
+            // pipeline's content -- the Segmenter tab appeared to have vanished when it
+            // had only been relabelled. These are the labels index.html ships with.
+            const legacyTabLabels = {
+                'model': 'Model',
+                'quality': 'Quality',
+                'segmenter': 'Segmenter',
+                'enhancer': 'Enhancer',
+                'scene': 'Scene',
+                'context': 'Context'
+            };
+            Object.entries(legacyTabLabels).forEach(([tab, label]) => {
+                const tabBtn = document.querySelector(`[data-tab="${tab}"]`);
+                if (tabBtn) {
+                    tabBtn.textContent = label;
+                    // Context is unused by the legacy pipelines and hidden by default;
+                    // the others must be visible again after Qwen hid Context.
+                    tabBtn.style.display = tab === 'context' ? 'none' : '';
+                }
+            });
 
             // Generate Model tab
             this.generateModelTab('tab-model', currentModel, currentDevice, pipeline);
@@ -3678,10 +3839,22 @@ const EnsembleManager = {
             ];
             modelDefault = 'CohereLabs/cohere-transcribe-03-2026';
         }
+        // v1.9.3 (owner, 2026-09-17): the window shows the model the ROW has, so
+        // there is one answer and it is the one that runs. Before this the window
+        // showed its own value while pass_worker took the row's, so a model chosen
+        // here was displayed as accepted and then quietly discarded.
+        const rowModel = passState && passState.model;
+        if (rowModel && !modelOptions.some(o => o.value === rowModel)) {
+            // The row offers a few models this window's list does not. Show it
+            // rather than silently substituting one of ours, which is how the two
+            // came to disagree in the first place.
+            modelOptions = modelOptions.concat([{ value: rowModel, label: rowModel }]);
+        }
+
         container.appendChild(this.createTransformersDropdown(
             'model_id', modelDef.label,
             modelOptions,
-            currentValues.model_id || modelDefault,
+            rowModel || currentValues.model_id || modelDefault,
             modelDef.description
         ));
 
@@ -4307,10 +4480,18 @@ const EnsembleManager = {
         modelSelect.className = 'param-select form-select';
         modelSelect.id = 'model-select';
 
+        // Must contain every value any pipeline's pipelineModelCompatibility list can
+        // name. This table is filtered by that list a few lines below, so a model present
+        // in the compatibility list but missing HERE cannot be shown -- and because
+        // generateModelTab then falls back to allowedModels[0], the dialog would silently
+        // offer large-v2 in its place and applyCustomization would sync that back over the
+        // row. That is exactly what happened to whisper-ja-1.5B-ct2 when it was added to
+        // pipelineModelCompatibility.balanced without being added here.
         const allModelOptions = [
             { value: 'turbo', label: 'Turbo (Fastest)' },
             { value: 'large-v2', label: 'Large-v2 (Balanced)' },
             { value: 'large-v3', label: 'Large-v3 (Latest)' },
+            { value: 'TransWithAI/whisper-ja-1.5B-ct2', label: 'whisper-ja-1.5B (CT2, JA)' },
             { value: 'kotoba-tech/kotoba-whisper-v2.0-faster', label: 'Kotoba-faster-2.0 (Japanese)' },
             { value: 'RoachLin/kotoba-whisper-v2.2-faster', label: 'Kotoba-faster-2.2 (Japanese)' }
         ];
@@ -4806,6 +4987,73 @@ const EnsembleManager = {
             if (dropdown) dropdown.value = fullParams.scene_detection_method;
         }
 
+        // v1.9.3: sync model_name to the row, the same bidirectional sync the scene
+        // detector gets above. For the legacy pipelines the MODAL wins at run time --
+        // pass_worker applies the row's --passN-model via _apply_gui_overrides and THEN
+        // the modal's params via apply_custom_params, whose MODEL_PARAMS includes
+        // model_name -- so without this the row displayed a model the run would not use.
+        //
+        // Only for legacy, because those modals use the param name 'model_name'.
+        // The Transformers and Qwen modals use 'model_id' and so never reach this
+        // branch. For them pass_worker sets hf_model_id / qwen_model_id from
+        // pass_config["model"] -- the ROW -- so the row is what runs. The Qwen
+        // family is handled in its own branch below (v1.9.3), which writes the
+        // window's choice onto the row so the two cannot disagree. Transformers
+        // still has the older behaviour: its window shows its own model while the
+        // row is what runs. Same shape, not yet done.
+        //
+        // The guard matters. Both sides filter by pipelineModelCompatibility, but the
+        // modal filters a SECOND table (allModelOptions in generateModelTab) that the row
+        // does not, so the two can still diverge if a model is added to one and not the
+        // other. When they diverge the modal shows allowedModels[0] instead, and without
+        // this guard that substitute would be written silently over the user's row choice.
+        // Assigning an absent value to a <select> is ignored, so syncing unconditionally
+        // would also leave the row and the state disagreeing.
+        if (fullParams.model_name && !passState.isTransformers && !passState.isQwen) {
+            const modelDropdown = document.getElementById(`${passKey}-model`);
+            if (modelDropdown) {
+                const offered = Array.from(modelDropdown.options)
+                    .some(o => o.value === fullParams.model_name);
+                if (offered) {
+                    modelDropdown.value = fullParams.model_name;
+                    this.state[passKey].model = fullParams.model_name;
+                } else {
+                    ConsoleManager.log(
+                        `Pass ${passKey === 'pass1' ? '1' : '2'}: the settings window chose ` +
+                        `the model "${fullParams.model_name}", which is not in the list for ` +
+                        `${this.pipelineLabel(passKey)}. The list still shows ` +
+                        `"${modelDropdown.value}", but the run will use ` +
+                        `"${fullParams.model_name}".`, 'warn');
+                }
+            }
+        }
+
+        // v1.9.3 (owner, 2026-09-17): the Qwen family's window uses the param name
+        // 'model_id', so it never reached the branch above and a model chosen there
+        // was shown as accepted and then discarded -- pass_worker sets qwen_model_id
+        // from the ROW. Now the window writes back to the row, so the row stays the
+        // single answer and the user's choice is the one that runs. Same guard as
+        // above: a value the row does not offer is reported rather than lost, since
+        // assigning an absent value to a <select> does nothing.
+        if (fullParams.model_id && passState.isQwen) {
+            const modelDropdown = document.getElementById(`${passKey}-model`);
+            if (modelDropdown) {
+                const offered = Array.from(modelDropdown.options)
+                    .some(o => o.value === fullParams.model_id);
+                if (offered) {
+                    modelDropdown.value = fullParams.model_id;
+                    this.state[passKey].model = fullParams.model_id;
+                } else {
+                    ConsoleManager.log(
+                        `Pass ${passKey === 'pass1' ? '1' : '2'}: the settings window chose ` +
+                        `the model "${fullParams.model_id}", which is not in the list for ` +
+                        `${this.pipelineLabel(passKey)}, so the list still shows ` +
+                        `"${modelDropdown.value}" and that is what will run. Pick the ` +
+                        `model in the row instead.`, 'warn');
+                }
+            }
+        }
+
         // Sync framer from modal to state (Qwen only)
         if (fullParams.framer && this.state[passKey].isQwen) {
             this.state[passKey].framer = fullParams.framer;
@@ -4816,6 +5064,12 @@ const EnsembleManager = {
         if (efvCheck !== null) {
             this.state[passKey].enhanceForVad = efvCheck.checked;
         }
+
+        // Repaint the row so its tick box shows what was just applied. Writing
+        // the state is not enough: the row is only redrawn when something asks
+        // it to, so without this the window said "on", the row said "off", and
+        // the run used the value from the window (owner's GUI test A4).
+        this.updateEnhanceForVadCheckbox(passKey);
 
         const paramCount = Object.keys(fullParams).length;
         const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
@@ -5414,9 +5668,27 @@ const EnsembleManager = {
             passState.presetName = name;
 
             // Update pass row dropdowns silently (no dispatchEvent to avoid confirm dialogs)
+            // v1.9.3: verify the assignment took. Assigning a value a <select> does not
+            // offer sets selectedIndex to -1 and value to '', leaving the control BLANK
+            // while passState still holds the preset's value -- the row and the state then
+            // disagree and collectConfig sends the state. A preset saved on one pipeline
+            // and loaded onto another can carry exactly such a value.
             const setSilent = (id, val) => {
                 const el = document.getElementById(id);
-                if (el && val !== undefined && val !== null) el.value = val;
+                if (!el || val === undefined || val === null) return;
+                const before = el.value;
+                el.value = val;
+                if (el.tagName === 'SELECT' && el.value !== String(val)) {
+                    // The assignment already blanked the control -- put back what was
+                    // there. Without this the dropdown is left empty while passState
+                    // still holds the preset's value, collectConfig sends the state, and
+                    // collectAll later writes the blank to the settings file.
+                    el.value = before;
+                    ConsoleManager.log(
+                        `Preset "${name}": "${val}" is not available for ` +
+                        `${EnsembleManager.pipelineLabel(passKey)}, so ` +
+                        `"${el.value || 'nothing'}" has been kept instead.`, 'warn');
+                }
             };
             setSilent(`${prefix}-pipeline`, preset.pipeline);
             setSilent(`${prefix}-sensitivity`, preset.sensitivity);
@@ -5447,6 +5719,13 @@ const EnsembleManager = {
                 // openCustomize reads passState.customized && passState.params to populate
                 await this.openCustomize(passKey);
             } else {
+                // v1.9.3: rebuild the model list first for a legacy->legacy change. All
+                // four legacy pipelines share the type 'legacy', so oldType === newType
+                // here even when the preset moves the pass from (say) Fidelity to
+                // Balanced, and the row would keep the previous pipeline's model list.
+                if (newType === 'legacy') {
+                    this.swapModelOptions(passKey, newType);
+                }
                 // Same pipeline type — set model and apply params inline
                 setSilent(`${prefix}-model`, preset.model);
 
@@ -7430,16 +7709,11 @@ const TranslateIntegrationManager = {
     },
 
     init() {
-        // Bind checkbox handlers for Transcription Mode
-        const transcribeCheckbox = document.getElementById('translateAfterTranscription');
-        const quickSettings = document.getElementById('translateQuickSettings');
-
-        if (transcribeCheckbox && quickSettings) {
-            transcribeCheckbox.addEventListener('change', () => {
-                quickSettings.style.display = transcribeCheckbox.checked ? 'flex' : 'none';
-                this.state.enabled = transcribeCheckbox.checked;
-            });
-        }
+        // v1.9.3: the Transcription Mode enable checkbox used to be bound here, to
+        // 'translateAfterTranscription', with 'translateQuickSettings' as its panel.
+        // Neither id exists in index.html, so this never bound anything. Translation is
+        // available from the Ensemble tab only; giving the Transcription tab its own
+        // controls is a GUI design job parked for the 1.10.x release (owner, 2026-09-16).
 
         // Bind checkbox handlers for Ensemble Mode
         const ensembleCheckbox = document.getElementById('ensembleTranslateAfter');
@@ -7451,35 +7725,21 @@ const TranslateIntegrationManager = {
             });
         }
 
-        // Bind provider/target selects for Transcription Mode
-        const quickProvider = document.getElementById('quickTranslateProvider');
-        const quickTarget = document.getElementById('quickTranslateTarget');
+        // v1.9.3: the Transcription Mode provider/target selects used to be bound here, to
+        // 'quickTranslateProvider' and 'quickTranslateTarget'. Neither id exists in
+        // index.html, so both bindings were silent no-ops and the state they wrote was
+        // never set. Removed rather than left to look wired. See isEnabled() below.
 
-        if (quickProvider) {
-            quickProvider.addEventListener('change', () => {
-                this.state.provider = quickProvider.value;
-            });
-        }
-        if (quickTarget) {
-            quickTarget.addEventListener('change', () => {
-                this.state.target = quickTarget.value;
-            });
-        }
-
-        // Bind provider/target selects for Ensemble Mode
+        // Bind provider/target select for Ensemble Mode
         const ensembleProvider = document.getElementById('ensembleTranslateProvider');
-        const ensembleTarget = document.getElementById('ensembleTranslateTarget');
 
         if (ensembleProvider) {
             ensembleProvider.addEventListener('change', () => {
                 // Sync with transcription mode if needed
             });
         }
-        if (ensembleTarget) {
-            ensembleTarget.addEventListener('change', () => {
-                // Sync with transcription mode if needed
-            });
-        }
+        // ('ensembleTranslateTarget' was bound here with an empty handler; no such id exists
+        //  and the Ensemble target is read from TranslationSettingsModal, so it is gone.)
 
         console.log('TranslateIntegrationManager initialized');
     },
@@ -7519,9 +7779,12 @@ const TranslateIntegrationManager = {
         const tabId = activeTab.dataset.tab;
 
         if (tabId === 'tab1' || tabId === 'tab2') {
-            // Transcription Mode or Advanced Options - use main checkbox
-            const checkbox = document.getElementById('translateAfterTranscription');
-            return checkbox && checkbox.checked;
+            // Translation is not offered on the Transcription tab or Advanced Options.
+            // This used to read a 'translateAfterTranscription' checkbox that does not
+            // exist in index.html, so it already always evaluated false -- this states it
+            // instead of arriving at it by accident. Giving these tabs real translation
+            // controls is parked for the 1.10.x release (owner, 2026-09-16).
+            return false;
         } else if (tabId === 'tab3') {
             // Ensemble Mode
             const checkbox = document.getElementById('ensembleTranslateAfter');
@@ -7557,11 +7820,12 @@ const TranslateIntegrationManager = {
                 customEndpoint: fullSettings.customEndpoint
             };
         } else {
-            // Transcription Mode settings
-            return {
-                provider: document.getElementById('quickTranslateProvider')?.value || 'local',
-                target: document.getElementById('quickTranslateTarget')?.value || 'english'
-            };
+            // Not reachable: isEnabled() returns false on tab1/tab2, so nothing asks for
+            // these settings. Kept as a defensive default rather than reading
+            // 'quickTranslateProvider'/'quickTranslateTarget', two ids that do not exist --
+            // reading them returned these same values while looking as though the user's
+            // choice had been honoured. Parked for 1.10.x with the controls themselves.
+            return { provider: 'local', target: 'english' };
         }
     },
 
@@ -7731,6 +7995,21 @@ const TranslationSettingsModal = {
 
         // Test connection button
         document.getElementById('translationTestConnection')?.addEventListener('click', () => this.testConnection());
+
+        // Tone change reflects the tone's default temperature in the modal's
+        // Temperature field. That field is always forwarded to the backend,
+        // so without this the tone-aware defaults in translate/service.py
+        // (_build_provider_options) never applied — the stale field value
+        // silently won. User edits after the tone switch still stick.
+        // Keep this map in sync with _build_provider_options.
+        const toneTemperatureDefaults = { standard: 0.5, contextual: 0.8, pornify: 1.2 };
+        document.getElementById('translationTone')?.addEventListener('change', (e) => {
+            const temp = toneTemperatureDefaults[e.target.value];
+            const tempInput = document.getElementById('translationTemperature');
+            if (temp !== undefined && tempInput) {
+                tempInput.value = temp;
+            }
+        });
 
         // Provider change handler for inline dropdown — route through ProviderUIManager
         document.getElementById('ensembleTranslateProvider')?.addEventListener('change', (e) => {
@@ -7994,6 +8273,23 @@ const SettingsPersistence = {
         'failOnSuspect':    { key: 'failOnSuspect',  prop: 'checked' },
         'asrTelemetry':     { key: 'asrTelemetry',   prop: 'checked' },
         'modelRefreshAudioMinutes': { key: 'modelRefreshAudioMinutes', prop: 'value' },
+        // v1.9.3 (D1/#381): the Ensemble tab's two-pass selectors. The backend has
+        // accepted and returned these keys since 1.9.2 (_GUI_SETTINGS_MAP in api.py);
+        // only the page side was missing, so a restart lost the whole two-pass setup.
+        'pass1-pipeline':   { key: 'pass1Pipeline',       prop: 'value' },
+        'pass1-sensitivity':{ key: 'pass1Sensitivity',    prop: 'value' },
+        'pass1-scene':      { key: 'pass1SceneDetector',  prop: 'value' },
+        'pass1-enhancer':   { key: 'pass1SpeechEnhancer', prop: 'value' },
+        'pass1-segmenter':  { key: 'pass1SpeechSegmenter',prop: 'value' },
+        'pass1-model':      { key: 'pass1Model',          prop: 'value' },
+        'pass2-enabled':    { key: 'pass2Enabled',        prop: 'checked' },
+        'pass2-pipeline':   { key: 'pass2Pipeline',       prop: 'value' },
+        'pass2-sensitivity':{ key: 'pass2Sensitivity',    prop: 'value' },
+        'pass2-scene':      { key: 'pass2SceneDetector',  prop: 'value' },
+        'pass2-enhancer':   { key: 'pass2SpeechEnhancer', prop: 'value' },
+        'pass2-segmenter':  { key: 'pass2SpeechSegmenter',prop: 'value' },
+        'pass2-model':      { key: 'pass2Model',          prop: 'value' },
+        'merge-strategy':   { key: 'mergeStrategy',       prop: 'value' },
     },
     _saveTimer: null,
     enabled: false,
@@ -8016,6 +8312,13 @@ const SettingsPersistence = {
             const el = document.getElementById(id);
             if (el) out[spec.key] = el[spec.prop];
         }
+        // The two preset names are not form controls -- they live in EnsembleManager's
+        // state, set when a preset is loaded and cleared when a field is edited by hand.
+        const ens = (typeof EnsembleManager !== 'undefined') ? EnsembleManager.state : null;
+        if (ens) {
+            out.pass1Preset = ens.pass1?.presetName || '';
+            out.pass2Preset = ens.pass2?.presetName || '';
+        }
         return out;
     },
     applyToForm(settings) {
@@ -8023,7 +8326,33 @@ const SettingsPersistence = {
             if (!(spec.key in settings)) continue;
             const el = document.getElementById(id);
             if (!el) continue;
-            el[spec.prop] = settings[spec.key];
+            const wanted = settings[spec.key];
+            const before = el.value;
+            el[spec.prop] = wanted;
+            // v1.9.3: a saved value the control no longer offers must not be dispatched.
+            // Assigning it to a <select> sets value to '' -- the change handler would then
+            // write '' into EnsembleManager's state (and the run would send an empty
+            // model), and the same event reaches scheduleSave, writing '' back to disk so
+            // the degradation becomes permanent. This happens for real: a model saved for
+            // one pipeline is not offered after the pipeline is restored ahead of it.
+            // Rejected either because the control does not offer the value, or because the
+            // saved value is blank and blank is not a real option. The second case matters:
+            // a settings file written before this guard existed can hold "", and comparing
+            // el.value !== String("") is '' !== '' -- false -- so the guard would pass the
+            // blank straight through, dispatch it, and put "" back into the run.
+            const blankButNoBlankOption = spec.prop === 'value' && wanted === ''
+                && el.tagName === 'SELECT'
+                && !Array.from(el.options).some(o => o.value === '');
+            if (spec.prop === 'value' && el.tagName === 'SELECT'
+                    && (el.value !== String(wanted) || blankButNoBlankOption)) {
+                // The assignment already blanked the control -- put back what was there.
+                el.value = before;
+                ConsoleManager.log(
+                    `A setting saved earlier, "${wanted}", is no longer one of the ` +
+                    `choices, so "${el.value || 'nothing'}" has been kept instead.`,
+                    'warn');
+                continue;
+            }
             el.dispatchEvent(new Event('change', { bubbles: true }));
         }
     },
@@ -8035,7 +8364,11 @@ const SettingsPersistence = {
             const toggle = document.getElementById('rememberSettings');
             this.enabled = !!settings.rememberSettings;
             if (toggle) toggle.checked = this.enabled;
-            if (this.enabled) this.applyToForm(settings);
+            if (this.enabled) {
+                this.applyToForm(settings);
+                // after the selectors are back, restore each pass's preset label
+                await this.restorePresets(settings);
+            }
         } catch (e) {
             console.warn('Failed to load GUI settings:', e);
         }
@@ -8052,7 +8385,25 @@ const SettingsPersistence = {
             console.warn('Failed to save GUI settings:', e);
         }
     },
-    async restorePresets() {},
+    // v1.9.3 (D1): deliberately does NOT restore the two preset names, though collectAll
+    // still saves them for the work below.
+    //
+    // An earlier version of this set EnsembleManager.state.pass1/2.presetName from the
+    // saved settings. That is wrong on its own: updateBadges() (EnsembleManager, ~line
+    // 2256) derives the green badge, the "Edit Parameters" button and the modal's
+    // [Custom] title from presetName alone, while the parameters a preset names live in
+    // passState.params -- which this cannot restore. The result was a GUI reporting that
+    // preset X was in force when params was null and a run would have used defaults.
+    // It also resurrected a cleared preset: Reset to Defaults nulls presetName but does
+    // not rewrite the saved settings, so the old name came back at the next restart.
+    //
+    // Restoring the label honestly means restoring the values it names -- loading the
+    // preset through the presets API and applying it to passState.params. That is the
+    // Customize-modal half of D1 and is not done here. Until then no label is restored,
+    // so the badge tells the truth: after a restart the pass is on defaults.
+    async restorePresets(_settings) {
+        return;
+    },
 };
 
 // ============================================================

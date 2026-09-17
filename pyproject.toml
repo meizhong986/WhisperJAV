@@ -227,6 +227,14 @@ enhance = [
     # BS-RoFormer vocal isolation
     "bs-roformer-infer",
 
+    # htdemucs vocal isolation (Demucs v4). Owner's decision, 2026-09-17 (second
+    # decision, replacing the first): an ordinary dependency like any other, not
+    # something the user installs by hand. It adds three packages -- demucs,
+    # lameenc and sphn -- and does not touch torch, and all three have wheels for
+    # every Python WhisperJAV declares (3.10-3.13) on Windows, Linux and macOS,
+    # so nothing has to be built.
+    "demucs",
+
     # ONNX inference
     "onnxruntime>=1.16.0",
 
@@ -339,6 +347,7 @@ whisperjav-gui = "whisperjav.webview_gui.main:main"
 whisperjav-translate = "whisperjav.translate.cli:main"
 whisperjav-upgrade = "whisperjav.upgrade:main"
 whisperjav-bench = "whisperjav.bench.cli:main"
+whisperjav-accuracy-gate = "whisperjav.bench.regression_cli:main"
 
 # -----------------------------------------------------------------------------
 # Project URLs

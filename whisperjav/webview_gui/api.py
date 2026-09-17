@@ -3134,8 +3134,19 @@ class WhisperJAVAPI:
                     args += ["--pass1-speech-enhancer", enhancer1]
 
             # Pass 1: Enhance-for-VAD (dual-track: enhanced audio for VAD, original for ASR)
-            # Only effective for Qwen pipeline; pass_worker.py silently ignores for others.
-            if pass1.get('enhanceForVad') and enhancer1 and enhancer1 not in ('none', ''):
+            # What each pipeline does with it, checked 2026-09-17:
+            #   qwen (and the decoupled pipeline behind it) -- dual-track as described.
+            #   fidelity -- dual-track since v1.9.3: the enhanced scenes go to the
+            #     external segmenter, the originals (resampled) to the recogniser.
+            #   balanced -- the flag is read and ACKNOWLEDGED IN THE LOG, but the
+            #     enhanced audio goes to both. Its speech detection is inside
+            #     faster-whisper's own transcribe(vad_filter=True) call, on the same
+            #     buffer it recognises, so there is no second track to feed without
+            #     changing what the balanced pipeline is. Owner's to decide.
+            #   fast, faster, transformers, crispasr -- never read: silently ignored,
+            #     which the owner accepted on 2026-09-17; documented in --help.
+            if (pass1.get('enhanceForVad') and enhancer1 and enhancer1 not in ('none', '')
+                    and pass1.get('pipeline') != 'balanced'):
                 args += ["--pass1-enhance-for-vad"]
 
             # Pass 1: Model
@@ -3253,7 +3264,11 @@ class WhisperJAVAPI:
                         args += ["--pass2-speech-enhancer", enhancer2]
 
                 # Pass 2: Enhance-for-VAD (dual-track: enhanced audio for VAD, original for ASR)
-                if pass2.get('enhanceForVad') and enhancer2 and enhancer2 not in ('none', ''):
+                # The program refuses this flag on a balanced pass (v1.9.3), so a
+                # stale value from another pipeline must not be sent: the run would
+                # stop with a usage error the user could not act on.
+                if (pass2.get('enhanceForVad') and enhancer2 and enhancer2 not in ('none', '')
+                        and pass2.get('pipeline') != 'balanced'):
                     args += ["--pass2-enhance-for-vad"]
 
                 # Pass 2: Model

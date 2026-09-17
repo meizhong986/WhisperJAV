@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from .providers import PROVIDER_CONFIGS, SUPPORTED_TARGETS
+from .output_naming import strip_language_suffix
 from .settings import load_settings, DEFAULT_SETTINGS
 from .instructions import get_instruction_content
 from .core import translate_subtitle, _normalize_api_base, _api_base_to_custom_server, cap_batch_size_for_context, compute_max_output_tokens
@@ -128,7 +129,8 @@ def _build_provider_options(
     tone: str = "standard",
     temperature: Optional[float] = None,
     top_p: Optional[float] = None,
-    settings_model_params: Optional[dict] = None
+    settings_model_params: Optional[dict] = None,
+    settings_tone: Optional[str] = None
 ) -> dict:
     """
     Build provider options with tone-aware defaults.
@@ -140,6 +142,11 @@ def _build_provider_options(
         temperature: Explicit temperature override
         top_p: Explicit top_p override
         settings_model_params: Model params from settings file
+        settings_tone: Tone the settings file was SAVED with — the settings
+            temperature is tone-coupled and only applies when it matches
+            the effective run tone (the GUI modal persists its Temperature
+            field unconditionally, so a stock 0.5 saved under tone=standard
+            must not pin contextual/pornify to 0.5 forever)
 
     Returns:
         Dict of provider options
@@ -148,6 +155,12 @@ def _build_provider_options(
     if tone == 'pornify':
         default_temperature = 1.2
         default_top_p = 0.9
+    elif tone == 'contextual':
+        # Adult-when-source-is-adult: warmer than standard for natural porn
+        # phrasing in explicit lines, but cool enough not to freelance on
+        # neutral dialogue (the failure mode pornify@1.2 is prone to).
+        default_temperature = 0.8
+        default_top_p = 0.9
     else:
         default_temperature = 0.5
         default_top_p = 0.9
@@ -155,9 +168,11 @@ def _build_provider_options(
     result_temp = default_temperature
     result_top_p = default_top_p
 
-    # Apply settings overrides
+    # Apply settings overrides (temperature only when the settings file was
+    # saved for the same tone this run uses — see settings_tone docstring)
     if settings_model_params:
-        if settings_model_params.get('temperature') is not None:
+        if (settings_model_params.get('temperature') is not None
+                and (settings_tone or 'standard') == tone):
             try:
                 result_temp = float(settings_model_params['temperature'])
             except (ValueError, TypeError):
@@ -316,7 +331,8 @@ def translate_with_config(
         tone=tone,
         temperature=temperature,
         top_p=top_p,
-        settings_model_params=settings.get('model_params')
+        settings_model_params=settings.get('model_params'),
+        settings_tone=settings.get('tone')
     )
 
     # Generate output path if not specified
@@ -324,10 +340,11 @@ def translate_with_config(
         resolved_output_path = Path(output_path)
     else:
         stem = input_file.stem
-        # Remove existing language suffix if present
-        parts = stem.split('.')
-        if len(parts) > 1 and parts[-1] in ['japanese', 'english', 'ja', 'en', 'jp', 'chinese', 'indonesian', 'spanish']:
-            stem = '.'.join(parts[:-1])
+        # Remove existing language suffix if present.
+        # Shared with translate/cli.py via output_naming, so the two naming paths cannot
+        # drift apart again. Both were hand-kept lists before: this one was missing
+        # portuguese and french, cli.py's knew only japanese/english/ja/en/jp.
+        stem = strip_language_suffix(stem)
         resolved_output_path = input_file.parent / f"{stem}.{target_lang}.srt"
 
     # Log configuration
@@ -386,7 +403,16 @@ def translate_with_config(
             if ollama_max_tokens is not None:
                 max_tokens = ollama_max_tokens
 
-            if temperature is None and readiness.get('temperature'):
+            # Curated Ollama temperature replaces only the generic standard-
+            # tone default — contextual's 0.8 and pornify's 1.2 are
+            # intentional tone-tuned values (mirror of cli.py's guard).
+            _settings_temp_applies = (
+                bool((settings.get('model_params') or {}).get('temperature'))
+                and (settings.get('tone') or 'standard') == tone
+            )
+            if (temperature is None and not _settings_temp_applies
+                    and tone not in ('pornify', 'contextual')
+                    and readiness.get('temperature')):
                 provider_options['temperature'] = readiness['temperature']
             provider_options['num_ctx'] = n_ctx
 
@@ -465,6 +491,9 @@ def translate_with_config(
             server_address = api_base.replace('/v1', '')
             local_provider_config = {
                 'pysubtrans_name': 'Custom Server',
+                # PySubtrans talks to it as a custom server; WhisperJAV
+                # started it and knows where its log is.
+                'whisperjav_provider': 'local',
                 'server_address': server_address,
                 'endpoint': '/v1/chat/completions',
                 'supports_conversation': True,
