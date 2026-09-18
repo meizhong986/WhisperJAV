@@ -96,7 +96,8 @@ class TestBalancedPipeline:
         """Test balanced has silero VAD."""
         config = resolve_legacy_pipeline("balanced")
 
-        assert config['workflow']['vad'] == 'silero'
+        # v1.8.12: pipeline definition pins the versioned component
+        assert config['workflow']['vad'] == 'silero-v3.1'
         assert config['params']['vad'] != {}
 
     def test_has_scene_detection(self):
@@ -178,7 +179,7 @@ class TestHelperFunctions:
 
         assert info['name'] == 'balanced'
         assert info['asr'] == 'faster_whisper'
-        assert info['vad'] == 'silero'
+        assert info['vad'] == 'silero-v3.1'  # v1.8.12
         assert 'description' in info
 
 

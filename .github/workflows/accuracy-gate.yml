@@ -1,0 +1,91 @@
+# Accuracy-gate CI: CPU-only checks that run on every PR.
+#
+# What runs here:
+#   - config-resolution test suite (catches routing/preset plumbing bugs
+#     like the v1.9.0 segmenter firewall issue and YAML/Pydantic drift)
+#   - accuracy-gate scorer unit tests (synthetic regression signatures)
+#
+# What does NOT run here: actual ASR on the GT corpus (needs a GPU).
+# Before releases, run the corpus locally and gate with:
+#   python -m whisperjav.bench.regression_cli gate \
+#       --manifest bench/corpus.yaml --hyp-dir out/candidate \
+#       --baseline bench/baselines/<pipeline>.json \
+#       --thresholds bench/thresholds.yaml
+# If candidate outputs are uploaded as workflow artifacts, the same command
+# gates them here unchanged.
+name: accuracy-gate
+
+on:
+  pull_request:
+    paths:
+      - "whisperjav/config/**"
+      - "whisperjav/bench/**"
+      - "whisperjav/modules/**"
+      - "whisperjav/pipelines/**"
+      - "whisperjav/ensemble/**"
+      - "whisperjav/main.py"
+      - "tests/**"
+      - ".github/workflows/accuracy-gate.yml"
+  push:
+    branches: [main]
+
+jobs:
+  scorer-and-config-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install minimal test dependencies
+        run: pip install pydantic pyyaml pysrt numpy pytest
+
+      - name: Accuracy-gate scorer tests
+        # Ships in the accuracy-gate PR; guard until merged
+        run: |
+          if [ -d tests/bench ]; then python -m pytest tests/bench -q; else echo "tests/bench not present - skipping"; fi
+
+      - name: Segmenter routing tests
+        # Ships in the unified-routing PR; guard until merged
+        run: |
+          if [ -f tests/config/test_segmenter_routing.py ]; then python -m pytest tests/config/test_segmenter_routing.py -q; else echo "not present - skipping"; fi
+
+      # Greened in v1.9.0 (26 stale expectations retuned to current intended
+      # values, with provenance comments). BLOCKING: a failure here means a
+      # resolved config value changed without a matching test/release-note
+      # update.
+      - name: Config resolution suite
+        run: python -m pytest tests/config -q
+
+      - name: Gate smoke test (synthetic corpus)
+        if: ${{ hashFiles('whisperjav/bench/regression_cli.py') != '' }}
+        run: |
+          python - <<'PY'
+          import json, subprocess, sys
+          from pathlib import Path
+
+          def ts(sec):
+              ms = int(round(sec * 1000))
+              return f"{ms//3600000:02d}:{ms%3600000//60000:02d}:{ms%60000//1000:02d},{ms%1000:03d}"
+
+          gt = [(0.0, 2.0, "A"), (3.0, 5.0, "B"), (6.0, 8.5, "C"), (10.0, 12.0, "D")]
+          def srt(entries):
+              return "\n".join(f"{i+1}\n{ts(a)} --> {ts(b)}\n{t}\n" for i, (a, b, t) in enumerate(entries))
+
+          root = Path("gate_smoke"); (root / "gt").mkdir(parents=True); (root / "good").mkdir(); (root / "bad").mkdir()
+          (root / "gt" / "c.srt").write_text(srt(gt))
+          (root / "good" / "c.srt").write_text(srt(gt))
+          (root / "bad" / "c.srt").write_text(srt(gt[:1]))
+          (root / "corpus.yaml").write_text("schema_version: 1\nclips:\n  - id: c\n    media: m\n    ground_truth: gt/c.srt\n")
+
+          def run(*args):
+              return subprocess.run([sys.executable, "-m", "whisperjav.bench.regression_cli", *args]).returncode
+
+          assert run("baseline", "--manifest", str(root/"corpus.yaml"), "--hyp-dir", str(root/"good"), "-o", str(root/"base.json")) == 0
+          assert run("gate", "--manifest", str(root/"corpus.yaml"), "--hyp-dir", str(root/"good"), "--baseline", str(root/"base.json")) == 0, "good run must pass"
+          assert run("gate", "--manifest", str(root/"corpus.yaml"), "--hyp-dir", str(root/"bad"), "--baseline", str(root/"base.json")) == 1, "collapsed run must fail"
+          print("gate smoke OK")
+          PY
