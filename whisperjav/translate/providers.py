@@ -11,7 +11,7 @@ PROVIDER_CONFIGS = {
         # 'deepseek-v4-pro' (thinking, was deepseek-reasoner).
         # Source: https://api-docs.deepseek.com/zh-cn/
         # Users wanting the thinking model can override via: --model deepseek-v4-pro
-        'model': 'deepseek-v4-flash',
+        'model': 'deepseek-flash',
         'env_var': 'DEEPSEEK_API_KEY',
         'api_base': 'https://api.deepseek.com'
     },
