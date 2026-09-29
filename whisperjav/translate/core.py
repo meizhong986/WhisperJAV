@@ -3,8 +3,87 @@ Core translation logic - PySubtrans wrapper.
 """
 
 import os
+import re
 import sys
 from pathlib import Path
+
+# PySubtrans extracts only the last occurrence of each context tag. Some local
+# models repeat these tags after every cue, leaving earlier copies in the SRT.
+_CONTEXT_TAG_PAIR = re.compile(
+    r"<(?P<tag>summary|scene|synopsis)>"
+    r"(?P<value>(?:(?!\n[ \t]*#\d+\b)[\s\S])*?)"
+    r"</(?P=tag)>",
+    re.IGNORECASE,
+)
+
+
+def strip_translation_context_tags(text: str) -> tuple[str, dict[str, str], int]:
+    """Remove complete context tags and retain the last value of each kind."""
+    context = {}
+    count = 0
+
+    def remove(match):
+        nonlocal count
+        count += 1
+        context[match.group("tag").lower()] = match.group("value").strip()
+        return ""
+
+    return _CONTEXT_TAG_PAIR.sub(remove, text), context, count
+
+
+def apply_translation_context_filter(translator) -> bool:
+    """Clean provider responses before PySubtrans parses them into subtitle lines."""
+    client = getattr(translator, "client", None)
+    if client is None or not hasattr(client, "RequestTranslation"):
+        return False
+
+    original = client.RequestTranslation
+
+    def filtered_request(*args, **kwargs):
+        translation = original(*args, **kwargs)
+        content = getattr(translation, "content", None)
+        if not isinstance(content, dict) or not isinstance(content.get("text"), str):
+            return translation
+
+        cleaned_text, context, count = strip_translation_context_tags(content["text"])
+        if not count:
+            return translation
+
+        # Rebuild through PySubtrans's own Translation class so its other
+        # metadata parsers still run. Restore the extracted context afterwards.
+        cleaned = translation.__class__({**content, "text": cleaned_text})
+        cleaned.content.update(context)
+        if count > len(context):
+            print(f"[TRANSLATE] Removed {count - len(context)} repeated context tags", file=sys.stderr)
+        return cleaned
+
+    client.RequestTranslation = filtered_request
+    return True
+
+
+def clean_resumed_translation_tags(project) -> int:
+    """Remove tags already saved in a .subtrans project before resume skips them."""
+    changed = 0
+    changed_originals = False
+    subtitles = getattr(project, "subtitles", None)
+    for scene in getattr(subtitles, "scenes", ()) or ():
+        for batch in getattr(scene, "batches", ()) or ():
+            for line in getattr(batch, "translated", ()) or ():
+                if line.text:
+                    cleaned, _, count = strip_translation_context_tags(line.text)
+                    if count:
+                        line.text = cleaned.strip()
+                        changed += 1
+            for line in getattr(batch, "originals", ()) or ():
+                if line.translation:
+                    cleaned, _, count = strip_translation_context_tags(line.translation)
+                    if count:
+                        line.translation = cleaned.strip()
+                        changed_originals = True
+
+    if changed or changed_originals:
+        project.needs_writing = True
+    return changed
 
 
 def cap_batch_size_for_context(max_batch_size: int, n_ctx: int) -> int:
@@ -73,13 +152,12 @@ def should_disable_deepseek_thinking(model: str) -> bool:
 
     Only ``-flash`` is switched off. ``-pro`` *is* the reasoning model, so a user
     who selects it has asked for reasoning and we leave their choice alone. Models
-    outside the v4 family are untouched, since an unrecognised field could be
-    rejected outright.
+    outside the v4 family are untouched, except the current ``deepseek-flash``.
     """
     if not model:
         return False
     m = model.lower()
-    return 'deepseek-v4' in m and 'pro' not in m
+    return m == 'deepseek-flash' or ('deepseek-v4' in m and 'pro' not in m)
 
 
 def apply_deepseek_thinking_patch(translator, model: str, debug: bool = False) -> bool:
@@ -554,6 +632,14 @@ def translate_subtitle(
         print(f"[TRANSLATE] Loading subtitle project...", file=sys.stderr)
         project = init_project(options, filepath=str(input_path), persistent=True)
 
+        if provider_config.get('whisperjav_provider') == 'ollama':
+            cleaned_resumed = clean_resumed_translation_tags(project)
+            if cleaned_resumed:
+                print(
+                    f"[TRANSLATE] Cleaned context tags from {cleaned_resumed} saved subtitle lines",
+                    file=sys.stderr,
+                )
+
         # Set output path immediately so ALL intermediate saves (SaveProject
         # after each batch) go to the user's desired location.  Without this,
         # PySubtrans defaults to writing in the input directory — either as
@@ -644,6 +730,10 @@ def translate_subtitle(
         # Enable resume mode to skip already-translated batches when resuming
         # This is critical for interrupted translations - without it, the translator
         # will re-translate everything from the beginning even if a .subtrans file exists
+        if provider_config.get('whisperjav_provider') == 'ollama':
+            if not apply_translation_context_filter(translator):
+                print("[TRANSLATE]   WARNING: Could not install context tag filter", file=sys.stderr)
+
         translator.resume = True
         print(f"[TRANSLATE]   Resume mode: enabled (will skip already-translated batches)", file=sys.stderr)
 

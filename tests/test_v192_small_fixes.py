@@ -249,6 +249,7 @@ class TestDeepSeekThinkingPatch:
     def test_flash_is_switched_off_but_pro_is_left_alone(self):
         from whisperjav.translate.core import should_disable_deepseek_thinking
 
+        assert should_disable_deepseek_thinking("deepseek-flash")
         assert should_disable_deepseek_thinking("deepseek-v4-flash")
         assert should_disable_deepseek_thinking("deepseek/deepseek-v4-flash")
         # -pro IS the reasoning model; choosing it is an explicit request for it.
@@ -267,18 +268,18 @@ class TestDeepSeekThinkingPatch:
 
         class FakeClient:
             def _generate_request_body(self, request, temperature):
-                return {"model": "deepseek-v4-flash", "messages": [], "stream": False}
+                return {"model": "deepseek-flash", "messages": [], "stream": False}
 
         class FakeTranslator:
             client = FakeClient()
 
         translator = FakeTranslator()
-        assert apply_deepseek_thinking_patch(translator, "deepseek-v4-flash")
+        assert apply_deepseek_thinking_patch(translator, "deepseek-flash")
 
         body = translator.client._generate_request_body(object(), 0.5)
         assert body["thinking"] == {"type": "disabled"}
         # the original fields must survive
-        assert body["model"] == "deepseek-v4-flash"
+        assert body["model"] == "deepseek-flash"
         assert "messages" in body
 
     def test_patch_is_not_applied_to_pro(self):
