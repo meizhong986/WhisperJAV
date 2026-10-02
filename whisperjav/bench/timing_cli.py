@@ -1,5 +1,5 @@
 """
-CLI for subtitle timing against reference subtitles (1.9.4 requirement T1).
+CLI for subtitle timing against reference (ground-truth) subtitles.
 
 Pairs every reference SRT in --ref-dir with the one WhisperJAV SRT in each run
 folder whose name starts with the clip id. The clip id is the reference file
