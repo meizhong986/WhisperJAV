@@ -1,7 +1,7 @@
 """
 Subtitle timing against a reference: how early or late lines start and end.
 
-Built for the 1.9.4 ChronosJAV timing requirement (T1). Each reference line is
+Each reference (ground-truth) line is
 matched to a WhisperJAV line with the existing matcher (time overlap + text
 similarity). For every matched pair:
 
