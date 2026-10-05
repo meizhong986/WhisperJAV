@@ -240,6 +240,26 @@ const TransformersManager = {
 // Qwen3-ASR Manager (v1.8.4+)
 // ============================================================
 const QwenManager = {
+    // v1.9.4: the Customize-dialog values that depend on the pass's model,
+    // sensitivity and speech segmenter. Python (get_qwen_schema) resolves them as
+    // the run will; a key missing from the schema is a control this segmenter
+    // does not have, and is removed so it is neither shown nor sent.
+    SEGMENTER_KEYS: ['chunk_threshold_ms', 'max_group_duration', 'vad_threshold',
+                     'vad_start_pad', 'vad_end_pad', 'vad_decoder', 'vad_grow_floor',
+                     'vad_gap_merge_ms', 'max_speech_duration'],
+
+    applySegmenterDefaults(values, schema) {
+        const aud = (schema && schema.audio) || {};
+        for (const key of this.SEGMENTER_KEYS) {
+            if (aud[key] && aud[key].default !== undefined) {
+                values[key] = aud[key].default;
+            } else {
+                delete values[key];
+            }
+        }
+        return values;
+    },
+
     params: null,
     customized: false,
 
@@ -3686,13 +3706,14 @@ const EnsembleManager = {
         const passState = this.state[passKey];
 
         try {
-            // Get Qwen parameter schema from API. Pass sensitivity + backend so
-            // anime-whisper receives its per-sensitivity WhisperSeg VAD defaults
-            // (single source of truth in Python); qwen3 / cohere are unaffected.
+            // Get Qwen parameter schema from API. Pass sensitivity, backend AND the
+            // pass's speech segmenter: Python resolves the values the run will use
+            // (v1.9.4, config/chronosjav_vad.py), so Apply sends back what runs.
             const qwenBackend = passState.isAnimeWhisper ? 'anime-whisper'
                 : (passState.isCohere ? 'cohere' : 'qwen3');
             const result = await pywebview.api.get_qwen_schema(
-                passState.sensitivity || 'balanced', qwenBackend);
+                passState.sensitivity || 'balanced', qwenBackend,
+                passState.speechSegmenter || 'whisperseg');
 
             if (!result.success) {
                 ErrorHandler.show('Error', 'Failed to load Qwen3-ASR parameters: ' + (result.error || 'Unknown error'));
@@ -3716,10 +3737,15 @@ const EnsembleManager = {
                 ? { ...passState.params }
                 : { ...QwenManager.defaults };
 
-            // Override defaults for anime-whisper when not customized. The 5
-            // WhisperSeg VAD fields are read from the sensitivity-aware schema
-            // (Python is the single source of truth), so the dialog shows exactly
-            // what will run at this pass's selected sensitivity.
+            // v1.9.4: when not customized, every segmenter-dependent value comes from
+            // the schema, which Python resolved for this pass's model, sensitivity and
+            // segmenter (what the run will use). A control the segmenter does not have
+            // is absent from the schema and is dropped here, so Apply never sends it.
+            if (!passState.customized) {
+                QwenManager.applySegmenterDefaults(currentValues, result.schema);
+            }
+
+            // Override defaults for anime-whisper when not customized.
             if (passState.isAnimeWhisper && !passState.customized) {
                 currentValues.model_id = 'litagin/anime-whisper';
                 currentValues.repetition_penalty = 1.0;
@@ -3727,17 +3753,6 @@ const EnsembleManager = {
                 currentValues.timestamp_mode = 'vad_only';
                 currentValues.assembly_cleaner = 'passthrough';
                 currentValues.stepdown = false;
-                const aud = result.schema.audio;
-                currentValues.chunk_threshold_ms = aud.chunk_threshold_ms.default;
-                currentValues.max_group_duration = aud.max_group_duration.default;
-                currentValues.vad_threshold = aud.vad_threshold.default;
-                currentValues.vad_start_pad = aud.vad_start_pad.default;
-                currentValues.vad_end_pad = aud.vad_end_pad.default;
-                // v1.9.0 offline-decoder levers (sensitivity-aware via Python table)
-                currentValues.vad_decoder = aud.vad_decoder.default;
-                currentValues.vad_grow_floor = aud.vad_grow_floor.default;
-                currentValues.vad_gap_merge_ms = aud.vad_gap_merge_ms.default;
-                currentValues.max_speech_duration = aud.max_speech_duration.default;
             }
 
             // Override defaults for cohere when not customized (v1.8.14 D2/D3/D7).
@@ -4093,12 +4108,14 @@ const EnsembleManager = {
         vadContainer.className = 'details-content';
 
         const thrDef = schemaSection.vad_threshold;
-        vadContainer.appendChild(this.createTransformersSlider(
-            'vad_threshold', thrDef.label,
-            thrDef.min, thrDef.max, thrDef.step,
-            currentValues.vad_threshold ?? thrDef.default,
-            thrDef.description
-        ));
+        if (thrDef) {  // absent when the pass has no speech segmenter (None)
+            vadContainer.appendChild(this.createTransformersSlider(
+                'vad_threshold', thrDef.label,
+                thrDef.min, thrDef.max, thrDef.step,
+                currentValues.vad_threshold ?? thrDef.default,
+                thrDef.description
+            ));
+        }
 
         const startPadDef = schemaSection.vad_start_pad;
         if (startPadDef) {
@@ -5388,6 +5405,12 @@ const EnsembleManager = {
         // Reset Qwen controls using QwenManager defaults
         const passState = this.state[passKey];
         const defaults = { ...(QwenManager.defaults || {}) };
+        // v1.9.4: the segmenter-dependent values come from the schema the dialog
+        // was opened with (resolved in Python for this pass), not from the fixed
+        // list above, which was wrong for anime-whisper and for non-WhisperSeg passes.
+        if (this._qwenSchema) {
+            QwenManager.applySegmenterDefaults(defaults, this._qwenSchema);
+        }
         if (passState.isAnimeWhisper) {
             defaults.model_id = 'litagin/anime-whisper';
             defaults.repetition_penalty = 1.0;
@@ -5395,8 +5418,6 @@ const EnsembleManager = {
             defaults.timestamp_mode = 'vad_only';
             defaults.assembly_cleaner = 'passthrough';
             defaults.stepdown = false;
-            defaults.chunk_threshold_ms = 300;
-            defaults.max_group_duration = 3;
         } else if (passState.isCohere) {
             // Cohere defaults — mirror the openCustomize override (D2/D3/D7).
             defaults.model_id = 'CohereLabs/cohere-transcribe-03-2026';
