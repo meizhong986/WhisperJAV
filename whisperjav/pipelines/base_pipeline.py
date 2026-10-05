@@ -25,6 +25,9 @@ class BasePipeline(ABC):
         self.keep_temp_files = keep_temp_files
         self.save_metadata_json = save_metadata_json  # Preserve metadata JSON files (enabled by --debug)
         self.metadata_manager = MetadataManager(self.temp_dir, self.output_dir)
+        # 1.9.4 (REQ1): whether this pipeline puts a damaged-audio reason into its
+        # run summary. An ensemble's pass 2 sets it False: pass 1 already did.
+        self.audio_integrity_in_summary = True
         
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.temp_dir.mkdir(parents=True, exist_ok=True)
