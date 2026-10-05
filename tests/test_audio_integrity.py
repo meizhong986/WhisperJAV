@@ -1,7 +1,7 @@
 """Tests for the audio integrity check (1.9.4, REQ1): the pure checks only.
 
 The packet lists are made up, in the shapes measured on real files:
-AAC packets of 1024 samples at 48 kHz (0.02133 s), and the IPZZ-912 damage --
+AAC packets of 1024 samples at 48 kHz (0.02133 s), and the film A of docs/measurements/v1.9.4 damage --
 a packet that states a 2.027 s length while holding one packet of sound, so
 the gap is hidden inside the packet and the next packet starts exactly where
 the stated length ends.
@@ -188,8 +188,8 @@ def test_fail_on_suspect_stops_a_damaged_file(monkeypatch):
 def test_console_wording():
     rep = _damaged_report()
     assert console_message(IntegrityReport(seconds=3.6), "a.mp4") == "Audio check: no problems found (3.6 s)."
-    msg = console_message(rep, "IPZZ-912.mp4")
-    assert msg.startswith("Audio check: the audio track of IPZZ-912.mp4 has 1 gap(s), 2.0 s in all (2.0 s at 0:11:40)")
+    msg = console_message(rep, "film A of docs/measurements/v1.9.4.mp4")
+    assert msg.startswith("Audio check: the audio track of film A of docs/measurements/v1.9.4.mp4 has 1 gap(s), 2.0 s in all (2.0 s at 0:11:40)")
     assert msg.endswith("WhisperJAV filled the gaps with silence, so subtitle times stay in step with the video; "
                         "any speech inside the gaps is missing from the file. Transcription continues.")
     assert console_message(rep, "x.mp4", stopping=True).endswith(
