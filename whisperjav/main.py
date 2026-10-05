@@ -917,7 +917,7 @@ def parse_arguments():
                                 "anime-whisper 100 / 50 / 30 by sensitivity)")
     qwen_audio_group.add_argument("--qwen-max-speech-duration", type=float, default=None,
                            help="Force-split any single speech segment longer than this (seconds). "
-                                "Default with the WhisperSeg segmenter: 4 for Qwen3-ASR and 3 for "
+                                "Default with the WhisperSeg segmenter: 4 for Qwen3-ASR and "
                                 "anime-whisper, at every sensitivity; with other segmenters, the "
                                 "segmenter's own sensitivity preset. The binding cap on subtitle "
                                 "length — lower = shorter, more granular subtitles.")
