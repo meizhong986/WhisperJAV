@@ -4136,7 +4136,8 @@ const EnsembleManager = {
 
             const decSelect = document.createElement('select');
             decSelect.className = 'param-select';
-            const currentDec = currentValues.vad_decoder || decDef.default || 'offline';
+            // Fallback = WhisperSeg's own default (hysteresis); the schema normally supplies it.
+            const currentDec = currentValues.vad_decoder || decDef.default || 'hysteresis';
             decDef.options.forEach(opt => {
                 const option = document.createElement('option');
                 option.value = opt.value;
