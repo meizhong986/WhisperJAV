@@ -15,11 +15,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from whisperjav.modules.audio_integrity import AudioIntegrityStop
-from whisperjav.config.qwen3_whisperseg_vad import apply_qwen3_segmenter_defaults
-from whisperjav.config.anime_whisper_vad import (
-    anime_whisperseg_defaults,
-    apply_anime_segmenter_defaults,
-)
+from whisperjav.config.chronosjav_vad import apply_chronosjav_segmenter_defaults
+from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
 from whisperjav.config.legacy import resolve_legacy_pipeline, apply_balanced_vad_defaults
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
@@ -1223,22 +1220,15 @@ def _build_pipeline(
         # (pass 2 = qwen + TEN) the flat 0.25 silently replaced TEN's tuned
         # 0.42/0.32/0.22 gradient and made the sensitivity selector inert.
         segmenter_backend = qwen_defaults.get("qwen_segmenter", "whisperseg")
-        if segmenter_backend == "whisperseg":
-            if _aw_gen == "anime-whisper":
-                # v1.9.0: inject ALL table-pinned segmenter_config defaults
-                # (threshold, neg_threshold, min_silence_duration_ms,
-                # max_speech_duration_s) so they reach the Phase-4 segmenter AND
-                # the vad-grouped framer. setdefault semantics: GUI custom params /
-                # sliders / CLI collected above always win. Single source of the
-                # lift: anime_whisper_vad.apply_anime_segmenter_defaults (2026-07-30
-                # fix — the previous per-key copies here silently dropped
-                # neg_threshold, shipping it as dead config).
-                apply_anime_segmenter_defaults(user_segmenter_overrides, qwen_sensitivity)
-            elif _aw_gen == "qwen3":
-                # Single source: config/qwen3_whisperseg_vad.py (threshold 0.25,
-                # longest segment 4.0 s at every sensitivity since v1.9.4).
-                # setdefault semantics: GUI / CLI values collected above win.
-                apply_qwen3_segmenter_defaults(user_segmenter_overrides)
+        # One decision for every entry point (config/chronosjav_vad.py): for
+        # WhisperSeg only, inject ALL anime-table segmenter_config defaults
+        # (threshold, neg_threshold, min_silence_duration_ms, max_speech_duration_s,
+        # decoder, grow floor ...) or the Qwen3-ASR values (threshold 0.25, longest
+        # segment 4.0 s since v1.9.4), so they reach the Phase-4 segmenter AND the
+        # vad-grouped framer. setdefault semantics: GUI custom params / sliders /
+        # CLI collected above always win.
+        apply_chronosjav_segmenter_defaults(
+            user_segmenter_overrides, _aw_gen, segmenter_backend, qwen_sensitivity)
         # NOTE: --passN-speech-pad-ms (pass_config["speech_pad_ms"]) is applied to the
         # pipeline padding scalars below, not to segmenter_config (see v1.9.0 note above).
         segmenter_config = resolve_qwen_sensitivity(
