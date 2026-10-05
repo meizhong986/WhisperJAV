@@ -376,7 +376,7 @@ class TestAnimeWhisperSegDefaults:
 
     # (sensitivity, chunk_threshold_s, max_group_duration_s, threshold, start_pad_ms, end_pad_ms)
     # aggressive retuned 2026-07-13 (cross-clip VAD sweep): threshold 0.25->0.15,
-    # end_pad 0->30 + max_speech pinned to 4.0 (see test_aggressive_max_speech_pinned).
+    # end_pad 0->30. Longest segment and grow floor: see the v1.9.4 tests below.
     EXPECTED = [
         ("conservative", 0.3,  3.0, 0.35, 100, 100),
         ("balanced",     0.25, 2.5, 0.30, 50,  50),
@@ -393,13 +393,22 @@ class TestAnimeWhisperSegDefaults:
         assert d["start_pad_ms"] == sp
         assert d["end_pad_ms"] == ep
 
-    def test_aggressive_max_speech_pinned(self):
-        """max_speech is pinned to 4.0 for aggressive ONLY; other rows omit it
-        (they inherit the WhisperSeg YAML: balanced 5 / conservative 6)."""
+    def test_max_speech_is_3s_at_every_sensitivity(self):
+        """v1.9.4 (owner, 2026-10-05): the longest segment is 3.0 s at every
+        sensitivity (was: aggressive 4.0, the others inherited the WhisperSeg
+        YAML's 6 / 5). It is a line-length policy, not a sensitivity setting."""
         from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
-        assert anime_whisperseg_defaults("aggressive")["max_speech_duration_s"] == 4.0
-        assert "max_speech_duration_s" not in anime_whisperseg_defaults("balanced")
-        assert "max_speech_duration_s" not in anime_whisperseg_defaults("conservative")
+        for sens in ("conservative", "balanced", "aggressive"):
+            assert anime_whisperseg_defaults(sens)["max_speech_duration_s"] == 3.0
+
+    def test_aggressive_grow_floor(self):
+        """v1.9.4: the offline decoder's grow floor is 0.15 (was 0.05). Only the
+        aggressive row runs the offline decoder, so only it pins grow_floor."""
+        from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
+        assert anime_whisperseg_defaults("aggressive")["grow_floor"] == 0.15
+        assert anime_whisperseg_defaults("aggressive")["segmentation_decoder"] == "offline"
+        assert "grow_floor" not in anime_whisperseg_defaults("balanced")
+        assert "grow_floor" not in anime_whisperseg_defaults("conservative")
 
     def test_unknown_sensitivity_falls_back_to_balanced(self):
         """Owner rule: any unknown/None sensitivity uses the BALANCED row."""
