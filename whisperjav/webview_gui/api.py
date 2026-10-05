@@ -2213,42 +2213,71 @@ class WhisperJAVAPI:
             }
         }
 
+    # Segmenters whose backend does not enforce a longest-segment cap (Silero
+    # v3.1/v4.0 ignore max_speech_duration_s, config/components/vad/silero.py),
+    # and the dialog levers only WhisperSeg has.
+    _NO_MAX_SPEECH_SEGMENTERS = ("silero", "silero-v3.1", "silero-v4.0", "none")
+    _WHISPERSEG_ONLY_LEVERS = ("vad_decoder", "vad_grow_floor", "vad_gap_merge_ms")
+
     def get_qwen_schema(self, sensitivity: str = "balanced",
-                        generator_backend: str = "qwen3") -> Dict[str, Any]:
+                        generator_backend: str = "qwen3",
+                        segmenter: str = "whisperseg") -> Dict[str, Any]:
         """
         Get parameter schema for the Qwen / ChronosJAV customize modal.
 
-        For the **anime-whisper** backend, the WhisperSeg VAD fields (Frame
-        Gap, Max Group, VAD Threshold, Start/End Pad, and the v1.9.0 offline-
-        decoder levers: Decoder, Grow Floor, Gap Cut, Max Speech Duration) are
-        defaulted from the owner's per-sensitivity table (single source of
-        truth) so the Customize dialog shows exactly what will run at the
-        pass's selected sensitivity.
-        Balanced is the fallback for an unknown sensitivity. qwen3 / cohere are
-        unaffected (they keep the static schema defaults).
+        v1.9.4: the dialog shows what the pass will run, for its model,
+        sensitivity AND speech segmenter, because Apply sends every shown value
+        back as the user's choice; a wrong default would silently change the run.
+        - Segmenter values (VAD Threshold, Max Speech Duration, and for
+          WhisperSeg the Decoder / Grow Floor / Gap Cut) are resolved through
+          config/chronosjav_vad.py, the same decision main.py and the ensemble
+          worker make: ChronosJAV values for WhisperSeg, otherwise that
+          segmenter's own sensitivity preset (e.g. TEN on the default pass 2).
+        - Controls a segmenter does not have are left out of the schema, so they
+          are neither shown nor sent: the three WhisperSeg-only levers for other
+          segmenters; Max Speech Duration for Silero v3.1/v4.0 and None; the VAD
+          Threshold for None.
+        - anime-whisper's pipeline values (Frame Gap, Max Group, Start/End Pad)
+          come from its per-sensitivity table, as in a run.
+        Balanced is the fallback for an unknown sensitivity.
         """
         result = self._get_qwen_schema_base()
-        # (the base schema's Max Speech Duration default is the Qwen3-ASR value,
-        # config/qwen3_whisperseg_vad.py; anime-whisper replaces it below.)
-        if generator_backend == "anime-whisper" and result.get("success"):
+        if not result.get("success"):
+            return result
+        audio = result["schema"]["audio"]
+        if generator_backend == "anime-whisper":
             from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
             aw = anime_whisperseg_defaults(sensitivity)
-            audio = result["schema"]["audio"]
             audio["chunk_threshold_ms"]["default"] = int(round(aw["chunk_threshold_s"] * 1000))
             audio["max_group_duration"]["default"] = aw["max_group_duration_s"]
-            audio["vad_threshold"]["default"] = aw["threshold"]
             audio["vad_start_pad"]["default"] = int(aw["start_pad_ms"])
             audio["vad_end_pad"]["default"] = int(aw["end_pad_ms"])
-            # v1.9.0 offline-decoder levers — table-driven where the row pins
-            # them (aggressive); other sensitivities keep the schema defaults.
-            if "segmentation_decoder" in aw:
-                audio["vad_decoder"]["default"] = aw["segmentation_decoder"]
-            if "grow_floor" in aw:
-                audio["vad_grow_floor"]["default"] = aw["grow_floor"]
-            if "gap_merge_ms" in aw:
-                audio["vad_gap_merge_ms"]["default"] = int(aw["gap_merge_ms"])
-            if "max_speech_duration_s" in aw:
-                audio["max_speech_duration"]["default"] = aw["max_speech_duration_s"]
+
+        segmenter = (segmenter or "whisperseg").strip().lower()
+        if segmenter == "none":
+            for key in ("vad_threshold", "max_speech_duration") + self._WHISPERSEG_ONLY_LEVERS:
+                audio.pop(key, None)
+            return result
+
+        from whisperjav.config.chronosjav_vad import resolve_chronosjav_segmenter_config
+        cfg = resolve_chronosjav_segmenter_config(generator_backend, segmenter, sensitivity)
+        if cfg.get("threshold") is not None:
+            audio["vad_threshold"]["default"] = float(cfg["threshold"])
+        if segmenter == "whisperseg":
+            if cfg.get("segmentation_decoder"):
+                audio["vad_decoder"]["default"] = cfg["segmentation_decoder"]
+            if cfg.get("grow_floor") is not None:
+                audio["vad_grow_floor"]["default"] = float(cfg["grow_floor"])
+            if cfg.get("gap_merge_ms") is not None:
+                audio["vad_gap_merge_ms"]["default"] = int(cfg["gap_merge_ms"])
+        else:
+            for key in self._WHISPERSEG_ONLY_LEVERS:
+                audio.pop(key, None)
+        max_speech = cfg.get("max_speech_duration_s")
+        if segmenter in self._NO_MAX_SPEECH_SEGMENTERS or max_speech is None:
+            audio.pop("max_speech_duration", None)
+        else:
+            audio["max_speech_duration"]["default"] = float(max_speech)
         return result
 
     def _get_qwen_schema_base(self) -> Dict[str, Any]:
