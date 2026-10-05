@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from whisperjav.modules.audio_integrity import AudioIntegrityStop
+from whisperjav.config.qwen3_whisperseg_vad import apply_qwen3_segmenter_defaults
 from whisperjav.config.anime_whisper_vad import (
     anime_whisperseg_defaults,
     apply_anime_segmenter_defaults,
@@ -1233,8 +1234,11 @@ def _build_pipeline(
                 # fix — the previous per-key copies here silently dropped
                 # neg_threshold, shipping it as dead config).
                 apply_anime_segmenter_defaults(user_segmenter_overrides, qwen_sensitivity)
-            elif _aw_gen == "qwen3" and "threshold" not in user_segmenter_overrides:
-                user_segmenter_overrides["threshold"] = 0.25
+            elif _aw_gen == "qwen3":
+                # Single source: config/qwen3_whisperseg_vad.py (threshold 0.25,
+                # longest segment 4.0 s at every sensitivity since v1.9.4).
+                # setdefault semantics: GUI / CLI values collected above win.
+                apply_qwen3_segmenter_defaults(user_segmenter_overrides)
         # NOTE: --passN-speech-pad-ms (pass_config["speech_pad_ms"]) is applied to the
         # pipeline padding scalars below, not to segmenter_config (see v1.9.0 note above).
         segmenter_config = resolve_qwen_sensitivity(
