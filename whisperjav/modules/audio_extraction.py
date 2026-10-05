@@ -67,7 +67,7 @@ class AudioExtractor:
             # 1.9.4: put silence where the audio track has a hole, as a video
             # player does. Without it FFmpeg joins the sound on either side of a
             # hole and every later subtitle comes out early by the hole's length
-            # (IPZZ-912: five 2-second holes, up to 10 s early). Same single
+            # (film A of docs/measurements/v1.9.4: five 2-second holes, up to 10 s early). Same single
             # FFmpeg pass, no extra time measured.
             # async=1 only fills holes and drops overlaps of 0.1 s or more
             # (aresample's min_hard_comp); smaller timing jitter is left alone.
