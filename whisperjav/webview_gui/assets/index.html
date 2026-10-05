@@ -416,7 +416,7 @@
                                     </label>
                                 </div>
                                 <div class="form-group">
-                                    <label class="checkbox-label" title="A file whose subtitles cover too little of the media, or whose recognizer stopped while speech was still detected, is reported as 'suspect' and does not fail the run. Tick to treat it as a failure (same as --fail-on suspect).">
+                                    <label class="checkbox-label" title="A file whose subtitles cover too little of the media, whose recognizer stopped while speech was still detected, or whose audio track looks damaged is reported as 'suspect' and does not fail the run. Tick to treat it as a failure (same as --fail-on suspect); a file with damaged audio is then stopped before transcription.">
                                         <input type="checkbox" id="failOnSuspect">
                                         <span>Treat 'suspect' files as failures</span>
                                     </label>
