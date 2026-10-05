@@ -1502,10 +1502,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         # Dedicated Qwen3-ASR pipeline (ADR-004)
         from whisperjav.pipelines.qwen_pipeline import QwenPipeline
         from whisperjav.ensemble.pass_worker import resolve_qwen_sensitivity, SEGMENTER_PARAMS
-        from whisperjav.config.anime_whisper_vad import (
-            anime_whisperseg_defaults,
-            apply_anime_segmenter_defaults,
-        )
+        from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
         initial_output_dir = str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir
         # Resolve sensitivity preset into segmenter_config
         _qwen_sensitivity = getattr(args, 'qwen_sensitivity', 'balanced')
@@ -1543,14 +1540,12 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         # FireRedVAD rode above THEIR per-sensitivity YAML presets in
         # resolve_qwen_sensitivity, silently replacing e.g. TEN's tuned
         # 0.42/0.32/0.22 gradient and making the sensitivity selector inert.
-        if _qwen_segmenter == "whisperseg":
-            if _gen_backend_early == "anime-whisper":
-                apply_anime_segmenter_defaults(_user_vad_overrides, _qwen_sensitivity)
-            elif _gen_backend_early == "qwen3":
-                # Single source: config/qwen3_whisperseg_vad.py (threshold 0.25,
-                # longest segment 4.0 s at every sensitivity since v1.9.4).
-                from whisperjav.config.qwen3_whisperseg_vad import apply_qwen3_segmenter_defaults
-                apply_qwen3_segmenter_defaults(_user_vad_overrides)
+        # One decision for every entry point (config/chronosjav_vad.py): anime
+        # table / Qwen3-ASR values (threshold 0.25, longest segment 4.0 s since
+        # v1.9.4), WhisperSeg only, user values kept.
+        from whisperjav.config.chronosjav_vad import apply_chronosjav_segmenter_defaults
+        apply_chronosjav_segmenter_defaults(
+            _user_vad_overrides, _gen_backend_early, _qwen_segmenter, _qwen_sensitivity)
         # v1.9.0: VAD padding routed to pipeline scalars (segmenter_start/end_pad_ms)
         # below, NOT into segmenter_config — the pipeline injects start/end pad at
         # clobber time, so a speech_pad_ms in segmenter_config would be overwritten.
