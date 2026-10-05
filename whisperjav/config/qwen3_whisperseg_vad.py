@@ -24,12 +24,15 @@ shorter window (worse text) depends on the ASR model, not on the sensitivity.
                                   aggressive) from the YAML presets
 
 Evidence for 4.0 s (1.9.4 timing work, 2026-10-05; 7 Netflix drama clips, 305
-ground-truth lines, Qwen3-ASR balanced; docs/plans/MEASUREMENTS_v194_REQ1_REQ2.md
-section 2.3): 5 s -> 4 s raised lines ending within 0.5 s of the ground truth from
-50 to 79, cut the median end error from 1.06 to 0.68 s and the start error from
-0.33 to 0.31 s, with character error rate 0.390 -> 0.394. Limits of 3 s and below
-gained more timing but raised it to 0.43. Measured at the balanced sensitivity
-only; conservative and aggressive follow the uniform policy above. Only the
+ground-truth lines, Qwen3-ASR balanced; docs/measurements/v1.9.4/MEASUREMENTS_v194_REQ1_REQ2.md
+section 2.3): 5 s -> 4 s. On the 156 ground-truth lines both runs matched, the
+median end error fell from 1.06 to 0.68 s and the median start error from 0.33 to
+0.31 s (13 lines the 5 s run matched were not matched at 4 s). Counting each run on
+its own, lines ending within 0.5 s of the ground truth rose from 50 to 79 (matched
+lines 169 -> 186). Character error rate 0.390 -> 0.394. Limits of 3 s and below
+gained more timing but raised it to about 0.43. Measured at the balanced
+sensitivity only, on drama scenes, not JAV audio; conservative (was 6 s) and
+aggressive (already 4 s) follow the uniform policy above, unmeasured. Only the
 single-segment ceiling changed: the group cap (3.0 s) and group gap (0.3 s) are
 pipeline constructor values and stay as they were.
 
