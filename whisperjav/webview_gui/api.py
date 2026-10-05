@@ -23,6 +23,7 @@ from whisperjav.utils.process_manager import (
     terminate_process_tree,
     PSUTIL_AVAILABLE,
 )
+from whisperjav.config.qwen3_whisperseg_vad import QWEN3_WHISPERSEG_DEFAULTS
 
 
 # Determine REPO_ROOT for module resolution
@@ -2227,6 +2228,8 @@ class WhisperJAVAPI:
         unaffected (they keep the static schema defaults).
         """
         result = self._get_qwen_schema_base()
+        # (the base schema's Max Speech Duration default is the Qwen3-ASR value,
+        # config/qwen3_whisperseg_vad.py; anime-whisper replaces it below.)
         if generator_backend == "anime-whisper" and result.get("success"):
             from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
             aw = anime_whisperseg_defaults(sensitivity)
@@ -2256,6 +2259,14 @@ class WhisperJAVAPI:
         alignment, output. Anime-whisper per-sensitivity overrides are applied
         by the public get_qwen_schema() wrapper.
         """
+        # The decoder a WhisperSeg run uses when nothing sets one (hysteresis),
+        # read from the segmenter factory so the dialog and the run cannot drift.
+        # Only anime-whisper aggressive pins "offline"; get_qwen_schema() applies
+        # that row. Before v1.9.4 this default was "offline" for every model and
+        # sensitivity, so Apply in Customize silently switched Qwen3-ASR and
+        # anime-whisper conservative/balanced from hysteresis to offline.
+        from whisperjav.modules.speech_segmentation.factory import _PARAM_SCHEMAS
+        whisperseg_decoder = _PARAM_SCHEMAS["whisperseg"]["segmentation_decoder"][1]
         return {
             "success": True,
             "schema": {
@@ -2422,10 +2433,10 @@ class WhisperJAVAPI:
                         "description": "How speech probabilities become segments. Offline (two-level): seeds at VAD Threshold, edges grow to the Grow Floor, dialogs cut at pauses >= Gap Cut. Hysteresis: vendor streaming state machine (ChickenRice lineage).",
                         "group": "vad_settings",
                         "options": [
-                            {"value": "offline", "label": "Offline two-level (default)"},
+                            {"value": "offline", "label": "Offline two-level"},
                             {"value": "hysteresis", "label": "Hysteresis (ChickenRice)"},
                         ],
-                        "default": "offline",
+                        "default": whisperseg_decoder,
                     },
                     "vad_grow_floor": {
                         "type": "slider",
@@ -2449,7 +2460,9 @@ class WhisperJAVAPI:
                         "description": "Single-segment ceiling. Segments longer than this are split at the quietest point (offline decoder) or per the force-split mode (hysteresis).",
                         "group": "vad_settings",
                         "min": 2.0, "max": 10.0, "step": 0.5,
-                        "default": 4.0,
+                        # Qwen3-ASR default (single source); anime-whisper rows
+                        # override it from config/anime_whisper_vad.py.
+                        "default": QWEN3_WHISPERSEG_DEFAULTS["max_speech_duration_s"],
                     },
                 },
                 # ── Tab 3: Generation ─────────────────────────────────
