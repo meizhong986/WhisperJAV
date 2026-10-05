@@ -267,7 +267,7 @@
     <div class="param-desc">
       Controls how readily the speech segmenter detects voice. What it changes depends on the model.
       Values below are for the default segmenter, WhisperSeg; other segmenters use their own presets.
-      At every sensitivity, the longest segment is 4 s for Qwen3-ASR and 3 s for anime-whisper.
+      At every sensitivity, the longest segment is 4 s for both Qwen3-ASR and anime-whisper.
     </div>
     <div class="param-desc" style="margin-top: 10px;">
       <table>
@@ -419,17 +419,17 @@
         </tr>
         <tr>
           <td><strong>anime-whisper</strong>, conservative</td>
-          <td>3 s</td>
+          <td>4 s</td>
           <td>0.3 s / 3 s</td>
         </tr>
         <tr>
           <td><strong>anime-whisper</strong>, balanced</td>
-          <td>3 s</td>
+          <td>4 s</td>
           <td>0.25 s / 2.5 s</td>
         </tr>
         <tr>
           <td><strong>anime-whisper</strong>, aggressive</td>
-          <td>3 s</td>
+          <td>4 s</td>
           <td>0.2 s / 2 s</td>
         </tr>
       </table>
@@ -700,7 +700,7 @@
     <div class="param-desc">
       With VAD Grouped framing, a frame is not extended with another segment if that would make it longer
       than this. It limits joining only: a single segment can be longer, up to Max Speech Duration
-      (4 s for Qwen3-ASR, 3 s for anime-whisper).
+      (4 s for Qwen3-ASR and anime-whisper).
     </div>
     <div class="param-when">
       <strong>When to change:</strong> Lower it for shorter lines with less context for the ASR model;
