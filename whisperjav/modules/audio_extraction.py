@@ -9,6 +9,7 @@ from typing import Optional, Tuple
 
 import shutil
 from whisperjav.utils.logger import logger
+from whisperjav.modules.audio_integrity import IntegrityProbe, console_message, stop_requested
 
 class AudioExtractor:
     """Extract audio from media files using FFmpeg."""
@@ -17,11 +18,16 @@ class AudioExtractor:
                  sample_rate: int = 16000,
                  channels: str = "mono",
                  audio_codec: str = "pcm_s16le",
-                 ffmpeg_path: Optional[str] = None):
+                 ffmpeg_path: Optional[str] = None,
+                 check_integrity: bool = True):
         self.sample_rate = sample_rate
         self.channels = channels
         self.audio_codec = audio_codec
         self.ffmpeg_path = ffmpeg_path or self._find_ffmpeg()
+        # 1.9.4 (REQ1): the audio check runs with every extraction. Its report
+        # for the last extracted file is kept here for the pipeline to act on.
+        self.check_integrity = check_integrity
+        self.last_integrity = None
 
     def _find_ffmpeg(self) -> str:
         """Find FFmpeg executable in system PATH."""
@@ -48,8 +54,12 @@ class AudioExtractor:
         logger.info(f"Extracting the audio from {input_file.name}...")
 
         # Build FFmpeg command
+        # "-loglevel level+info" tags each FFmpeg line with its level, so the
+        # audio check can count real decoder errors ("[error]") without
+        # guessing from the wording; the "Duration:" line read below is kept.
         cmd = [
             self.ffmpeg_path,
+            "-loglevel", "level+info",
             "-i", str(input_file),
             "-vn",  # No video
             "-acodec", self.audio_codec,
@@ -63,6 +73,9 @@ class AudioExtractor:
             # Run FFmpeg. No timeout: extraction of a long file on a slow or sleeping
             # drive legitimately takes many minutes, and killing it would lose the run.
             started = time.monotonic()
+            self.last_integrity = None
+            probe = (IntegrityProbe(self._find_ffprobe(), input_file)
+                     if self.check_integrity else None)
             result = subprocess.run(cmd,
                                   capture_output=True,
                                   text=True,
@@ -77,6 +90,15 @@ class AudioExtractor:
 
             logger.info(f"Audio ready: {duration:.1f} seconds of audio, "
                         f"extracted in {elapsed:.1f} seconds")
+
+            if probe is not None:
+                report = probe.finish(duration, result.stderr)
+                self.last_integrity = report
+                message = console_message(report, input_file.name, stopping=stop_requested())
+                if report.suspect:
+                    logger.warning(message)
+                else:
+                    logger.info(message)
             return output_path, duration
 
         except subprocess.CalledProcessError as e:
