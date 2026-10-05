@@ -911,9 +911,10 @@ def parse_arguments():
                            help="VAD padding after speech offset, ms (pipeline default: 200; end-of-speech is most critical)")
     qwen_audio_group.add_argument("--qwen-max-speech-duration", type=float, default=None,
                            help="Force-split any single speech segment longer than this (seconds). "
-                                "Overrides the sensitivity preset (conservative 6 / balanced 5 / "
-                                "aggressive 4). The binding cap on subtitle length — lower = shorter, "
-                                "more granular subtitles.")
+                                "Default with the WhisperSeg segmenter: 4 for Qwen3-ASR and 3 for "
+                                "anime-whisper, at every sensitivity; with other segmenters, the "
+                                "segmenter's own sensitivity preset. The binding cap on subtitle "
+                                "length — lower = shorter, more granular subtitles.")
 
     # ── Qwen3-ASR: Generation ─────────────────────────────────────────────
     qwen_gen_group = parser.add_argument_group("Qwen3-ASR: Generation")
@@ -1546,7 +1547,10 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             if _gen_backend_early == "anime-whisper":
                 apply_anime_segmenter_defaults(_user_vad_overrides, _qwen_sensitivity)
             elif _gen_backend_early == "qwen3":
-                _user_vad_overrides.setdefault("threshold", 0.25)
+                # Single source: config/qwen3_whisperseg_vad.py (threshold 0.25,
+                # longest segment 4.0 s at every sensitivity since v1.9.4).
+                from whisperjav.config.qwen3_whisperseg_vad import apply_qwen3_segmenter_defaults
+                apply_qwen3_segmenter_defaults(_user_vad_overrides)
         # v1.9.0: VAD padding routed to pipeline scalars (segmenter_start/end_pad_ms)
         # below, NOT into segmenter_config — the pipeline injects start/end pad at
         # clobber time, so a speech_pad_ms in segmenter_config would be overwritten.
