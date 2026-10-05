@@ -126,7 +126,7 @@ warning once per pass.
 - **Clips:** 7 Netflix scenes ("The Naked Director", S01E03–S02E05) in `test_media/Ground_Truths/Netflix`, with
   Japanese ground-truth subtitles: 305 lines in all. These are TV-drama scenes, not JAV.
 - **Runs:** the command the GUI Ensemble tab builds for a pass-1-only run, default timestamp mode (no aligner),
-  semantic scene detection, WhisperSeg speech segmenter (`scripts/measure/run_chronosjav_reference_runs.py`):
+  semantic scene detection, WhisperSeg speech segmenter (`measure-scripts/measure/run_chronosjav_reference_runs.py`):
   - **Qwen3-ASR:** `Qwen/Qwen3-ASR-1.7B`, sensitivity balanced (hysteresis decoder, onset 0.25, end level 0.10,
     longest segment 5 s, pads 100/100 ms, group gap 0.3 s, group cap 3.0 s).
   - **anime-whisper:** `litagin/anime-whisper`, sensitivity aggressive = the GUI Ensemble default (offline decoder,
@@ -223,7 +223,7 @@ measures, pooled over the 7 clips. CER = (substituted + missing + extra characte
 after normalisation (sound notes in brackets removed, NFKC, letters and digits only). Netflix text is not
 word-for-word, so CER compares runs; it is not an absolute accuracy. "End level None" = WhisperSeg's derived end
 level (threshold − 0.15). "End error med" here counts each run's own matched lines; §2.3 compares runs on the lines
-both matched. Produced by `scripts/cer_trace.py`.
+both matched. Produced by `measure-scripts/cer_trace.py`.
 
 | Run | Model | Sensitivity | Longest segment (s) | Decoder | Grow floor | Gap merge (ms) | End level | End pad (ms) | Group cap / gap (s) | Lines | Matched | Ends ≤ 0.5 s | End error med (s) | CER | Substituted | Missing | Extra | Our chars |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -250,7 +250,7 @@ both matched. Produced by `scripts/cer_trace.py`.
 
 The rows `a_cons_*` and `a_bal_*` are the confirming runs for anime-whisper conservative and balanced (hysteresis
 decoder; 1.9.3 value passed explicitly vs the 1.9.4 default). On the ground-truth lines both runs matched
-(`scripts/compare_pairs.py`):
+(`measure-scripts/compare_pairs.py`):
 
 | Base -> candidate | Common lines | Lost | Start median (s) | End median (s) | End mean (s) |
 |---|---|---|---|---|---|
@@ -289,18 +289,18 @@ conservative and balanced).
 - "Of 36 undamaged files (MP4, MKV, AVI, TS) none was reported."
 - Timing figures: the 1.9.4 defaults chosen from them are in §5; nothing is released yet.
 
-## 4. How to repeat (`scripts/` = docs/measurements/v1.9.4/scripts; others are in the repository)
+## 4. How to repeat (`measure-scripts/` = docs/measurements/v1.9.4/scripts; others are in the repository)
 | What | Command / script | Data |
 |---|---|---|
-| Source-audio probe with timings | `scripts/measure/probe_source_audio_faults.py <film> --work <dir> --ffmpeg-dir <bin>` | — |
-| Offset of extracted audio vs film time | `scripts/offset_check.py`, `fix_test.py <film> <dir> t1 t2 …` | — |
-| Late-starting audio | `scripts/offset_start_test.py` | — |
-| Check on real files / sweep | `scripts/integrity_real.py <work> <files…>` | sweep outputs: `scripts/sweep_out.txt`, `sweep2_out.txt` |
-| Packet-list cost after / alongside extraction | `scripts/scan_cost.py <film> after|parallel <dir>` | — |
-| REQ2 baseline (2 runs each) | `scripts/measure/run_chronosjav_reference_runs.py --python <WJ python> --media-dir test_media/Ground_Truths/Netflix --out <measure folder>/req2_baseline --runs 2 --pairs qwen3_whisperseg anime_whisperseg --record` | `<measure folder>\req2_baseline` |
-| REQ2 settings | `scripts/run_levers.py <measure folder>/req2_levers [names]` (each run's exact command is in its `command.json`) | `<measure folder>\req2_levers` |
-| Scoring | `python -m whisperjav.bench.timing_cli --ref-dir test_media/Ground_Truths/Netflix --base <run>`; `scripts/measure/score_reference_runs.py`; `scripts/score_levers.py`, `late_ends.py` | — |
-The scripts in `scripts/` were written for one machine. Repository paths are found from the script's own location and ffmpeg / ffprobe / python are taken from PATH; the media library, the working folder and the measurement output folder are placeholders (`<media library>`, `<work folder>`, `<measure folder>`) to fill in before re-running. Films are labelled A, B, …; the label-to-title key is kept off the repository.
+| Source-audio probe with timings | `measure-scripts/measure/probe_source_audio_faults.py <film> --work <dir> --ffmpeg-dir <bin>` | — |
+| Offset of extracted audio vs film time | `measure-scripts/offset_check.py`, `fix_test.py <film> <dir> t1 t2 …` | — |
+| Late-starting audio | `measure-scripts/offset_start_test.py` | — |
+| Check on real files / sweep | `measure-scripts/integrity_real.py <work> <files…>` | sweep outputs: `measure-scripts/sweep_out.txt`, `sweep2_out.txt` |
+| Packet-list cost after / alongside extraction | `measure-scripts/scan_cost.py <film> after|parallel <dir>` | — |
+| REQ2 baseline (2 runs each) | `measure-scripts/measure/run_chronosjav_reference_runs.py --python <WJ python> --media-dir test_media/Ground_Truths/Netflix --out <measure folder>/req2_baseline --runs 2 --pairs qwen3_whisperseg anime_whisperseg --record` | `<measure folder>\req2_baseline` |
+| REQ2 settings | `measure-scripts/run_levers.py <measure folder>/req2_levers [names]` (each run's exact command is in its `command.json`) | `<measure folder>\req2_levers` |
+| Scoring | `python -m whisperjav.bench.timing_cli --ref-dir test_media/Ground_Truths/Netflix --base <run>`; `measure-scripts/measure/score_reference_runs.py`; `measure-scripts/score_levers.py`, `late_ends.py` | — |
+The scripts in `measure-scripts/` were written for one machine. Repository paths are found from the script's own location and ffmpeg / ffprobe / python are taken from PATH; the media library, the working folder and the measurement output folder are placeholders (`<media library>`, `<work folder>`, `<measure folder>`) to fill in before re-running. Films are labelled A, B, …; the label-to-title key is kept off the repository.
 
 ## 5. Open for the owner
 1. ~~The extraction fix~~ — adopted 2026-10-05 (§1.1b).
