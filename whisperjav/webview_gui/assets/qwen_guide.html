@@ -263,44 +263,43 @@
 
   <div class="param">
     <span class="param-name">Sensitivity Preset</span>
-    <span class="param-default">Balanced</span>
+    <span class="param-default">Balanced (GUI Ensemble pass 1, anime-whisper: Aggressive)</span>
     <div class="param-desc">
-      Controls how the speech segmenter (VAD) detects speech vs. silence. The preset
-      automatically adjusts detection thresholds, padding, and duration filters for the
-      selected segmenter backend. This is the single most impactful setting for capturing
-      or ignoring quiet speech.
+      Controls how readily the speech segmenter detects voice. What it changes depends on the model.
+      Values below are for the default segmenter, WhisperSeg; other segmenters use their own presets.
+      At every sensitivity, the longest segment is 4 s for Qwen3-ASR and 3 s for anime-whisper.
     </div>
     <div class="param-desc" style="margin-top: 10px;">
       <table>
         <tr>
-          <th>Preset</th>
-          <th>Behaviour</th>
-          <th>Best for</th>
+          <th></th>
+          <th>Conservative</th>
+          <th>Balanced</th>
+          <th>Aggressive</th>
         </tr>
         <tr>
-          <td><strong>Aggressive</strong></td>
-          <td>Low threshold (0.2), tight padding (150ms), keeps very short utterances (50ms+).
-              Detects speech early &mdash; less padding needed since boundaries are already accurate.
-              Captures soft whispers, faint moaning, trailing particles.</td>
-          <td>Noisy audio, soft speech, whispered dialogue, maximum subtitle coverage</td>
+          <td><strong>Qwen3-ASR</strong></td>
+          <td>Threshold 0.25. Keeps speech of 150 ms or more; a pause of 200 ms ends a segment.</td>
+          <td>Threshold 0.25. Keeps speech of 100 ms or more; a pause of 100 ms ends a segment.</td>
+          <td>Threshold 0.25. Keeps speech of 80 ms or more; a pause of 80 ms ends a segment.</td>
         </tr>
         <tr>
-          <td><strong>Balanced</strong></td>
-          <td>Default thresholds (0.35), moderate padding (250ms), 100ms min speech.
-              Good tradeoff between capturing speech and avoiding false positives.</td>
-          <td>Most JAV content, general use</td>
-        </tr>
-        <tr>
-          <td><strong>Conservative</strong></td>
-          <td>High threshold (0.5), compensating padding (350ms), 150ms min speech.
-              Detects speech later &mdash; extra padding recovers the clipped edges.
-              Only captures clear, confident speech.</td>
-          <td>Clean studio audio, or when you want fewer subtitles (skip background chatter)</td>
+          <td><strong>anime-whisper</strong></td>
+          <td>Threshold 0.35. Speech of 150 ms or more; pauses of 200 ms end a segment.
+              Pads 100 / 100 ms. Frames: gap 300 ms, up to 3 s.</td>
+          <td>Threshold 0.30. Speech of 100 ms or more; pauses of 100 ms end a segment.
+              Pads 50 / 50 ms. Frames: gap 250 ms, up to 2.5 s.</td>
+          <td>Threshold 0.15 with the Offline two-level decoder: edges grow while the probability
+              stays at 0.15 or more, pauses of 350 ms or more cut, and the line's start is placed where
+              the probability first reaches 0.30. Speech of 80 ms or more. Pads 0 / 30 ms.
+              Frames: gap 200 ms, up to 2 s.</td>
         </tr>
       </table>
+      Qwen3-ASR's pads (100 / 100 ms) and frames (gap 300 ms, up to 3 s) are the same at every
+      sensitivity.
     </div>
     <div class="param-when">
-      <strong>When to change:</strong> Start with Balanced. Switch to Aggressive if subtitles are
+      <strong>When to change:</strong> Start with the default. Switch to Aggressive if subtitles are
       missing quiet dialogue. Switch to Conservative if you see too many spurious subtitle lines
       triggered by music or background noise.
     </div>
@@ -611,7 +610,7 @@
     </div>
     <div class="param-desc" style="margin-top: 8px; padding-left: 12px;">
       <strong>VAD Grouped</strong> &mdash; Groups VAD speech segments into frames up to Max Group Duration
-      (default 6s). Each frame contains only detected speech regions with natural pause boundaries.
+      (default 3 s; anime-whisper 3 / 2.5 / 2 s by sensitivity). Each frame contains only detected speech regions with natural pause boundaries.
       Best accuracy for most content.<br>
       <strong>Full Scene</strong> &mdash; Sends the entire scene (12&ndash;48s) as a single frame. The model
       gets maximum audio context but may struggle with precise timing on long scenes. Can produce
@@ -676,35 +675,39 @@
 
   <div class="param">
     <span class="param-name">Frame Gap Threshold</span>
-    <span class="param-default">1.0s</span>
+    <span class="param-default">300 ms (anime-whisper: 300 / 250 / 200 ms by sensitivity)</span>
     <div class="param-desc">
-      When using VAD Grouped framing, this sets the maximum silence gap (in seconds) allowed within a
-      single frame. If a silence gap between two speech segments exceeds this threshold, a new frame starts.
-      Lower values produce more, smaller frames with tighter sentence boundaries. Higher values produce
-      fewer, larger frames with more context per frame.
+      With VAD Grouped framing, two speech segments are joined into one frame (one subtitle line) when
+      the gap between them is at most this value and the frame stays within Max Group Duration. The gap
+      is measured after padding, so the real silence that still joins two segments is this value plus
+      the end pad and the start pad (Qwen3-ASR: 300 + 100 + 100 = 500 ms). Lower values split more;
+      higher values join more and give the ASR model more context per frame.
     </div>
     <div class="param-when">
-      <strong>When to change:</strong> Decrease to 0.3-0.5s for rapid dialogue with clear pauses between
-      sentences. Increase to 2-3s for monologue or content with long pauses within the same thought. The
-      default of 1.0s works well for most conversational content.
+      <strong>When to change:</strong> Lower it if one line holds speech that should be two lines and
+      there is a clear pause between them. Raise it if lines are split at short pauses inside a sentence.
+      Most joined lines come from one long segment, not from joining; for those, lower Max Speech
+      Duration instead.
     </div>
     <div class="param-cli">
-      <strong>CLI:</strong> <code>--qwen-chunk-threshold 0.5</code>
+      <strong>CLI:</strong> <code>--qwen-chunk-threshold 0.3</code> (seconds)
     </div>
   </div>
 
   <div class="param">
     <span class="param-name">Max Group Duration</span>
-    <span class="param-default">6s</span>
+    <span class="param-default">3 s (anime-whisper: 3 / 2.5 / 2 s by sensitivity)</span>
     <div class="param-desc">
-      When using VAD Grouped framing, this sets the maximum duration of each group. VAD speech
-      segments within a scene are grouped together until they hit this limit, then a new group
-      starts. Shorter groups mean more precise text generation and alignment but add processing
-      overhead.
+      With VAD Grouped framing, a frame is not extended with another segment if that would make it longer
+      than this. It limits joining only: a single segment can be longer, up to Max Speech Duration
+      (4 s for Qwen3-ASR, 3 s for anime-whisper).
     </div>
     <div class="param-when">
-      <strong>When to change:</strong> Increase to 10-15s if you get sentence fragments or words
-      split across subtitle lines. Decrease to 3-4s for very rapid dialogue where precision matters.
+      <strong>When to change:</strong> Lower it for shorter lines with less context for the ASR model;
+      raise it to let more short segments share one line.
+    </div>
+    <div class="param-cli">
+      <strong>CLI:</strong> <code>--qwen-max-group-duration 3</code>
     </div>
   </div>
 
@@ -712,7 +715,7 @@
 
   <div class="param">
     <span class="param-name">VAD Threshold</span>
-    <span class="param-default">0.35</span>
+    <span class="param-default">0.25 (anime-whisper: 0.35 / 0.30 / 0.15 by sensitivity)</span>
     <div class="param-desc">
       Speech detection probability threshold for the VAD model. A frame of audio is classified as
       speech when the model's confidence exceeds this value. Lower values detect quieter or more
@@ -731,8 +734,8 @@
     </div>
     <div class="param-when">
       <strong>When to change:</strong> If the sensitivity preset is close but not quite right for your
-      content, use this slider to fine-tune. For example, use &ldquo;aggressive&rdquo; sensitivity but
-      raise the threshold from 0.2 to 0.25 to reduce a few false positives.
+      content, use this slider to fine-tune. For example, use anime-whisper at aggressive sensitivity
+      but raise the threshold from 0.15 to 0.20 to reduce a few false positives.
     </div>
     <div class="cli-note">
       <strong>CLI:</strong> <code>--qwen-vad-threshold 0.25</code>
@@ -740,37 +743,33 @@
   </div>
 
   <div class="param">
-    <span class="param-name">VAD Padding (ms)</span>
-    <span class="param-default">250ms</span>
+    <span class="param-name">VAD Start Pad / VAD End Pad (ms)</span>
+    <span class="param-default">100 / 100 ms (anime-whisper: 100 / 100, 50 / 50, 0 / 30 ms by sensitivity)</span>
     <div class="param-desc">
-      Milliseconds of audio added before and after each detected speech segment. Padding ensures the
-      ASR model sees the full onset and release of speech, preventing clipped words. This slider
-      <strong>overrides</strong> the value set by the sensitivity preset.
-    </div>
-    <div class="param-desc" style="margin-top: 8px; padding-left: 12px;">
-      <strong>50&ndash;150ms</strong> &mdash; Tight padding. Use with aggressive sensitivity (which
-      already detects speech early) to avoid excessive silence in frames.<br>
-      <strong>200&ndash;300ms</strong> &mdash; Standard range. Good default for balanced sensitivity.<br>
-      <strong>350&ndash;600ms</strong> &mdash; Wide padding. Use with conservative sensitivity (which
-      detects speech late) to capture soft onsets and trailing particles.
+      Milliseconds of audio added before (start pad) and after (end pad) each detected speech segment.
+      The pads give the ASR model the onset and release of speech, so words are not clipped. In the
+      default timestamp mode the subtitle line starts and ends at the padded edges, so larger pads also
+      make lines start earlier and end later. These sliders <strong>override</strong> the values set by
+      the sensitivity preset.
     </div>
     <div class="param-when">
-      <strong>When to change:</strong> If words are getting clipped at the start or end of subtitle
-      lines, increase padding. If subtitle timestamps feel too loose with excessive silence, decrease
-      padding.
+      <strong>When to change:</strong> If words are clipped at the start or end of lines, increase the
+      matching pad. If lines start too early or linger after the speech, decrease it.
     </div>
     <div class="cli-note">
-      <strong>CLI:</strong> <code>--qwen-vad-padding 300</code>
+      <strong>CLI:</strong> <code>--qwen-vad-start-pad 100 --qwen-vad-end-pad 100</code>
+      (<code>--qwen-vad-padding</code> sets both)
     </div>
   </div>
 
   <div class="param">
     <span class="param-name">Sensitivity + VAD Sliders</span>
     <div class="param-desc">
-      The sensitivity dropdown sets a complete preset of VAD parameters. The VAD Threshold and
-      VAD Padding sliders <strong>override only the specific values you change</strong>, leaving
-      other preset parameters (like <code>neg_threshold</code>, <code>min_speech_duration_ms</code>)
-      intact. If you don't touch the sliders, the sensitivity preset applies fully.
+      The sensitivity dropdown sets a complete preset of VAD parameters. The VAD sliders (threshold,
+      start and end pads, decoder, grow floor, gap cut, Max Speech Duration)
+      <strong>override only the specific values you change</strong>, leaving other preset parameters
+      (like <code>min_speech_duration_ms</code>) intact. If you don't touch the sliders, the sensitivity
+      preset applies fully.
     </div>
   </div>
 </div>
