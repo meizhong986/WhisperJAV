@@ -247,6 +247,8 @@ both matched. Produced by `measure-scripts/cer_trace.py`.
 | a_cons_new3 | anime-whisper | conservative | 3.0 | hysteresis | - | - | None | 100 | 3.0 / 0.3 | 236 | 193 | 97 | 0.50 | 0.413 | 0.140 | 0.257 | 0.016 | 2366 |
 | a_bal_old5 | anime-whisper | balanced | 5.0 | hysteresis | - | - | None | 50 | 2.5 / 0.25 | 177 | 154 | 51 | 1.13 | 0.400 | 0.175 | 0.208 | 0.017 | 2518 |
 | a_bal_new3 | anime-whisper | balanced | 3.0 | hysteresis | - | - | None | 50 | 2.5 / 0.25 | 233 | 190 | 95 | 0.50 | 0.422 | 0.146 | 0.263 | 0.013 | 2339 |
+| a_cons_4 | anime-whisper | conservative | 4.0 | hysteresis | - | - | None | 100 | 3.0 / 0.3 | 201 | 168 | 74 | 0.60 | 0.399 | 0.161 | 0.219 | 0.019 | 2492 |
+| a_bal_4 | anime-whisper | balanced | 4.0 | hysteresis | - | - | None | 50 | 2.5 / 0.25 | 200 | 170 | 74 | 0.61 | 0.402 | 0.165 | 0.217 | 0.020 | 2500 |
 
 The rows `a_cons_*` and `a_bal_*` are the confirming runs for anime-whisper conservative and balanced (hysteresis
 decoder; 1.9.3 value passed explicitly vs the 1.9.4 default). On the ground-truth lines both runs matched
@@ -256,6 +258,8 @@ decoder; 1.9.3 value passed explicitly vs the 1.9.4 default). On the ground-trut
 |---|---|---|---|---|---|
 | a_cons_old6 -> a_cons_new3 | 135 | 7 | 0.225 -> 0.178 | 1.030 -> 0.495 | +1.361 -> +0.079 |
 | a_bal_old5 -> a_bal_new3 | 147 | 7 | 0.282 -> 0.219 | 1.094 -> 0.507 | +1.065 -> +0.091 |
+| a_cons_old6 -> a_cons_4 | 135 | 7 | 0.225 -> 0.195 | 1.131 -> 0.663 | +1.390 -> +0.609 |
+| a_bal_old5 -> a_bal_4 | 143 | 11 | 0.300 -> 0.252 | 1.052 -> 0.576 | +1.069 -> +0.586 |
 
 **What the trace shows**
 - A shorter longest segment always moves text from "substituted" to "missing": fewer wrong characters, more text not
@@ -266,6 +270,12 @@ decoder; 1.9.3 value passed explicitly vs the 1.9.4 default). On the ground-trut
   (0.400 → 0.422). The +10 % figures belong to Qwen3-ASR at 3 s and below (0.428–0.435), which were not adopted.
 - For the same rows, timing: lines ending within 0.5 s of the ground truth roughly double (46 → 97, 51 → 95) and the
   median end error halves (about 1.1 → 0.5 s).
+
+- The middle value, 4 s, for anime-whisper conservative and balanced (owner's request, same day): text as
+  in 1.9.3 (CER 0.397 → 0.399 and 0.400 → 0.402; characters written +1.6 % and −0.7 %), timing about two thirds of
+  the 3 s gain (ends within 0.5 s 46 → 74 and 51 → 74; median end error about 1.1 → 0.6 s). Aggressive at 4 s with
+  grow floor 0.15 (`a_floor015`): CER 0.392, characters −0.8 %, ends within 0.5 s 75 → 82. Qwen3-ASR at 4 s: CER
+  +1 %. So 4 s is, for every measured model and sensitivity, the step with no material text cost.
 
 **Where each value lives (to tune or revert)**
 | Model, sensitivity | Longest segment now (1.9.3) | Where | Other measured lever |
@@ -279,6 +289,122 @@ Removing a row's `max_speech_duration_s` returns it to the WhisperSeg YAML prese
 and Cohere also use; change the YAML only with that in mind. All values reach every entry point through
 `whisperjav/config/chronosjav_vad.py`. Not measured: values between the tested ones (e.g. 4 s for anime-whisper
 conservative and balanced).
+
+### 2.7 Patterns in the errors (owner's questions, 2026-10-05; `measure-scripts/error_patterns.py`)
+
+Six runs: Qwen3-ASR 5 s / 4 s, anime-whisper aggressive 4 s / 3 s + grow floor 0.15, anime-whisper balanced
+5 s / 3 s. Method: each clip's whole ground-truth text is aligned with our text character by character; every
+missing character is traced to its ground-truth line, its place in the line, and an estimated time (in proportion
+to the line's span). Patterns, not exact counts: the ground truth is not word-for-word.
+
+- **Missing text is mostly whole lines.** 59–69 % of missing characters are in ground-truth lines we did not match
+  at all. Going shorter adds loss both ways (anime aggressive 4 → 3 s: +91 missing, 57 in whole lines, 34 inside
+  matched lines; anime balanced 5 → 3 s: +169, 72 and 97).
+- **What goes missing.** The most frequent single gaps are interjections and short replies (う, あ, っ, ん, はい,
+  うん, ああ, あっ) and particles (は, を, も, の) — about one tenth of the missing characters; part of that is the
+  deliberate はい / うん / あ line filter. The rest is ordinary speech.
+- **Start or end of a line.** Missing characters are slightly over-represented in the first quarter of a line
+  (25–28 % against 23.6 % of all characters; more so at shorter limits), and for Qwen3-ASR also the last quarter
+  (27–28 %). They do not cluster at our line edges: within 0.3 s of an edge, 15–20 % of missing characters
+  against 13–22 % of all characters. Shorter windows make the models drop speech inside the window; the cut
+  points do not slice words.
+- **Timing by line length.** Short ground-truth lines (1–2 s) have the worst ends (median 0.9–1.6 s at 1.9.3
+  values: our line runs into the next one), and gain most from a shorter limit (2–3 s lines: 0.66–0.97 →
+  0.27–0.45 s at 3 s). Long ones (3–5 s) have the worst starts (about 0.5 s) because we split them; for anime
+  aggressive 3 s makes these starts worse (0.48 → 0.95 s). Lines cut by the length limit end far worse at 1.9.3
+  values (Qwen3-ASR 1.54 vs 0.78 s; anime balanced 1.68 vs 0.66 s); at shorter limits the gap mostly closes.
+- **End error vs text errors.** Per-line Spearman correlation between end error and missing or wrong characters:
+  −0.03 to +0.14 in all six runs — essentially none. For anime-whisper, lines ending more than 0.5 s late carry
+  somewhat more missing text (0.12–0.17 vs 0.09–0.13 per character). Timing and text loss are largely separate.
+
+### 2.8 Line and character accounting (owner's questions W1–W5, 2026-10-05; `measure-scripts/line_accounting.py`)
+
+Base: all 305 ground-truth lines and 3,115 characters. Each clip's whole text is aligned character by character;
+every ground-truth character is exactly one of correct / wrong / missing. A **missing line** has none of its
+characters in our text. "Produced lines" are all other ground-truth lines; their characters are split into correct /
+wrong / missing. Positions: first quarter, middle half, last quarter of the line (expected 24 % / 52 % / 24 %).
+
+| Run | Our lines | Missing lines | Chars in missing lines | Produced lines: correct | wrong | missing | Extra chars | Missing in first / last quarter | Wrong in first / last quarter | Expected first / last |
+|---|---|---|---|---|---|---|---|---|---|---|
+| a_cons_old6 | 169 | 15.4% | 8.0% | 66.7% | 17.7% | 15.6% | 34 | 30% / 25% | 28% / 20% | 24% / 24% |
+| a_cons_4 | 201 | 17.4% | 9.0% | 68.2% | 17.6% | 14.2% | 60 | 28% / 26% | 29% / 20% | 24% / 24% |
+| a_cons_new3 | 236 | 18.0% | 10.5% | 67.4% | 15.7% | 16.9% | 51 | 30% / 25% | 29% / 20% | 24% / 24% |
+| a_bal_old5 | 177 | 14.8% | 6.4% | 65.9% | 18.7% | 15.4% | 52 | 29% / 25% | 27% / 22% | 24% / 24% |
+| a_bal_4 | 200 | 17.7% | 9.0% | 67.8% | 18.2% | 14.0% | 61 | 28% / 24% | 29% / 23% | 24% / 24% |
+| a_bal_new3 | 233 | 18.7% | 10.9% | 66.4% | 16.4% | 17.2% | 42 | 32% / 24% | 28% / 22% | 24% / 24% |
+| anime_whisperseg | 227 | 14.8% | 7.0% | 67.7% | 17.0% | 15.2% | 67 | 29% / 22% | 29% / 22% | 24% / 24% |
+| a_floor015 | 221 | 15.4% | 7.2% | 67.7% | 16.6% | 15.7% | 64 | 29% / 24% | 29% / 21% | 24% / 24% |
+| a_maxseg3_floor015 | 258 | 17.7% | 9.0% | 68.2% | 15.2% | 16.6% | 41 | 31% / 24% | 30% / 20% | 24% / 24% |
+| qwen3_whisperseg | 220 | 11.1% | 5.1% | 67.3% | 24.0% | 8.7% | 89 | 27% / 33% | 26% / 22% | 24% / 24% |
+| q_maxseg4 | 245 | 13.1% | 6.5% | 69.2% | 20.7% | 10.0% | 128 | 29% / 30% | 26% / 21% | 24% / 24% |
+| q_maxseg3 | 307 | 10.2% | 4.0% | 63.5% | 26.1% | 10.4% | 138 | 28% / 30% | 26% / 22% | 24% / 24% |
+
+- 5–6 s keeps the most text (fewest missing lines, about 15 %) but packs it into long lines that span two ground-
+  truth lines (late ends). 3 s misses more whole lines (18–19 %) and more characters inside produced lines (about
+  17 %), leaning to line starts. 4 s misses about as many whole lines as 3 s but writes the most complete lines
+  (anime-whisper: missing 14 %, correct 68 %); its total error rate equals 1.9.3's. Qwen3-ASR at 3 s misses fewer
+  lines but gets more characters wrong (26 %): it guesses where anime-whisper drops.
+- Inside produced lines, missing and wrong characters lean to the first quarter (28–32 % and 26–30 %); the line's
+  very first character is wrong about twice as often as an average character.
+
+### 2.9 Why line starts go wrong (character-accuracy step 1; `measure-scripts/onset_analysis.py`)
+
+Runs at the option-B values (anime-whisper conservative / balanced / aggressive at 4 s, Qwen3-ASR at 4 s). Each
+matched pair is aligned on its own; the audio window the model received is rebuilt from the recording.
+- The effect is real and it is "wrong", not "missing": first character wrong 24–33 % against about 14 % for all
+  characters; first-character missing about average. Line ends are fine (last character wrong 8–11 %).
+- About a third of first-character substitutions are spellings of names (お→美, ケ→賢, み→ミ, ニ→二). Others look
+  like a lost first sound: 君→ミ (ki-mi → mi), 黒→ロ (ku-ro → ro), 俺→レ (o-re → re), 弁→ン (be-n → n).
+- Lines that start at a forced split: first character wrong or missing 47–54 %, against 28–39 % after a pause.
+- Window start minus ground-truth start: more than 0.3 s late → first character wrong or missing 83–91 % (24–33
+  lines per run); 0–0.3 s early → 16–32 % (best); more than 0.3 s early → 39–42 %.
+- Of the late-window lines, 55–65 % start at a forced split; in 6–11 per run the opening is at the end of our
+  previous line (the split moved it); in 16–21 per run (about one matched line in ten) it is not found: not heard.
+- Ends: a window ending more than 0.3 s before the ground-truth end loses the last character 56–72 % (16–21 lines).
+- Step 2 (owner's go, same day) tests start pads, added silence and the forced-split rule (`run_step2.py`,
+  `experiment_hooks/`).
+
+### 2.10 Character-accuracy step 2: start pads, added silence, split rule (`measure-scripts/run_step2.py`, `score_step2.py`)
+
+Each experiment against its option-B baseline (same 7 clips). Pads are set through the normal settings; added
+silence and the split rule through `measure-scripts/experiment_hooks/` (an experiment-only module; no product code
+changed). Every run's recording confirms the intended settings. "Late lines" = matched lines whose audio window
+starts more than 0.3 s after the ground-truth line. Start / end = medians on the lines both runs matched.
+
+| Model | Run | CER | Characters written | Missing lines | First char wrong | Late lines | Ends within 0.5 s | Start (s) | End (s) |
+|---|---|---|---|---|---|---|---|---|---|
+| anime aggressive | baseline (pad 0 / 30 ms) | 0.392 | 2,501 | 15.4 % | 31.5 % | 29 | 82 | 0.175 | 0.596 |
+| | start pad 100 ms | 0.390 | 2,518 | 15.1 % | 31.9 % | 28 | 82 | 0.178 | 0.596 |
+| | start pad 200 ms | 0.391 | 2,514 | 14.8 % | 31.9 % | 29 | 82 | 0.176 | 0.596 |
+| | start pad 300 ms | 0.388 | 2,521 | 14.4 % | 32.3 % | 29 | 81 | 0.176 | 0.596 |
+| | 200 ms silence before | 0.387 | 2,472 | 15.7 % | 28.3 % | 29 | 82 | 0.172 | 0.579 |
+| | 200 ms silence before and after | identical to "before" (Whisper pads its input to 30 s with silence anyway) | | | | | | | |
+| Qwen3-ASR | baseline (pad 100 / 100 ms) | 0.394 | 2,747 | 13.1 % | 24.2 % | 33 | 79 | 0.291 | 0.695 |
+| | start pad 0 ms | 0.394 | 2,742 | 10.8 % | 25.5 % | 34 | 79 | 0.286 | 0.695 |
+| | start pad 200 ms | 0.387 | 2,724 | 12.1 % | 25.1 % | 33 | 81 | 0.314 (was 0.300) | 0.695 |
+| | start pad 300 ms | 0.389 | 2,763 | 11.1 % | 25.7 % | 33 | 80 | 0.384 (was 0.311) | 0.695 |
+| | 200 ms silence before | 0.409 | 2,848 | 11.5 % | 23.0 % | 32 | 79 | 0.286 | 0.677 |
+| | 200 ms silence before and after | 0.401 | 2,822 | 11.1 % | 25.5 % | 33 | 79 | 0.290 | 0.680 |
+| | split: dip search from 30 %, any dip | 0.418 | 2,790 | 11.8 % | 21.8 % | 30 | 102 | 0.303 (was 0.290) | 0.477 (was 0.655) |
+| anime balanced | baseline (4 s) | 0.402 | 2,500 | 17.7 % | 32.9 % | 26 | 74 | 0.232 | 0.614 |
+| | split: dip search from 30 %, any dip | 0.405 | 2,513 | 17.4 % | 32.1 % | 27 | 101 | 0.238 | 0.450 |
+
+**What it shows**
+- Start pads: small text gains (CER −0.5 to −1.8 % relative; fewer missing lines), but the late lines do not move
+  (28–34 per run in every variant). They mostly start at a forced split, with no gap before them, so a start pad
+  cannot reach back into the previous segment. For Qwen3-ASR a 300 ms start pad also makes starts later on screen
+  (0.311 → 0.384 s), because today the pad is part of the displayed time.
+- Added silence: anime-whisper gains a little (CER −1.3 %, first character wrong 31.5 → 28.3 %, fewer extra
+  characters); silence after the window changes nothing. Qwen3-ASR gets worse (CER +3.8 %; more text written, more
+  of it wrong).
+- Split rule: for anime-whisper balanced it gives most of the 3 s timing gain (ends within 0.5 s 74 → 101, end
+  error 0.61 → 0.45 s) at almost no text cost (CER +0.7 %, characters +0.5 %) — where 3 s cost +5.5 %. For
+  Qwen3-ASR the same rule gains timing (79 → 102) but costs text (CER +6 %): shorter windows again.
+- Not fixed by any of these: the 16–21 lines per run whose opening is never heard. A window that may reach back
+  into the previous segment for the model only (Clar3: the model's window separate from the displayed time) is the
+  remaining candidate; it needs a code change.
+- Effects of 1–2 % relative are measured on 7 clips; runs are repeatable (identical on repeat), but small
+  differences may not hold on other material.
 
 ---
 
