@@ -881,9 +881,11 @@ def parse_arguments():
                                 "nemo/nemo-lite, whisper-vad, "
                                 "firered-vad, none")
     qwen_audio_group.add_argument("--qwen-max-group-duration", type=float, default=None,
-                           help="Max duration (seconds) for VAD segment grouping (pipeline default: 4.0)")
+                           help="Max duration (seconds) for VAD segment grouping (default: 3.0 for Qwen3-ASR; "
+                                "anime-whisper 3.0 / 2.5 / 2.0 by sensitivity)")
     qwen_audio_group.add_argument("--qwen-chunk-threshold", type=float, default=None,
-                           help="Silence gap (seconds) above which segments are NOT grouped (pipeline default: 0.4 / 400ms)")
+                           help="Silence gap (seconds) above which segments are NOT grouped (default: 0.3 for Qwen3-ASR; "
+                                "anime-whisper 0.3 / 0.25 / 0.2 by sensitivity)")
     qwen_audio_group.add_argument("--qwen-input-mode", type=str, default="assembly",
                            choices=["assembly", "context_aware", "vad_slicing"],
                            help="Audio input strategy: 'assembly' (default). "
@@ -897,18 +899,22 @@ def parse_arguments():
     qwen_audio_group.add_argument("--qwen-sensitivity", type=str, default="balanced",
                            choices=["conservative", "balanced", "aggressive"],
                            help="Sensitivity preset for Qwen segmenter config: "
-                                "aggressive (low threshold, max capture), "
+                                "aggressive (keeps shorter speech and pauses, max capture), "
                                 "balanced (default), "
-                                "conservative (high threshold, fewer false positives)")
+                                "conservative (fewer false positives). With WhisperSeg, "
+                                "Qwen3-ASR keeps threshold 0.25 at every sensitivity; "
+                                "anime-whisper uses 0.35 / 0.30 / 0.15.")
     qwen_audio_group.add_argument("--qwen-vad-threshold", type=float, default=None,
                            help="VAD speech detection threshold (overrides sensitivity preset)")
     qwen_audio_group.add_argument("--qwen-vad-padding", type=int, default=None,
                            help="Legacy symmetric VAD padding in ms (applies to both start and end). "
                                 "Prefer --qwen-vad-start-pad / --qwen-vad-end-pad.")
     qwen_audio_group.add_argument("--qwen-vad-start-pad", type=int, default=None,
-                           help="VAD padding before speech onset, ms (pipeline default: 100)")
+                           help="VAD padding before speech onset, ms (default: 100 for Qwen3-ASR; "
+                                "anime-whisper 100 / 50 / 0 by sensitivity)")
     qwen_audio_group.add_argument("--qwen-vad-end-pad", type=int, default=None,
-                           help="VAD padding after speech offset, ms (pipeline default: 200; end-of-speech is most critical)")
+                           help="VAD padding after speech offset, ms (default: 100 for Qwen3-ASR; "
+                                "anime-whisper 100 / 50 / 30 by sensitivity)")
     qwen_audio_group.add_argument("--qwen-max-speech-duration", type=float, default=None,
                            help="Force-split any single speech segment longer than this (seconds). "
                                 "Default with the WhisperSeg segmenter: 4 for Qwen3-ASR and 3 for "
