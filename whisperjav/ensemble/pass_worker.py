@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from whisperjav.modules.audio_integrity import AudioIntegrityStop
 from whisperjav.config.anime_whisper_vad import (
     anime_whisperseg_defaults,
     apply_anime_segmenter_defaults,
@@ -638,6 +639,10 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
             pass_temp_dir=pass_temp_dir,
             tracer=tracer,
         )
+        # 1.9.4 (REQ1): both passes read the same file; only pass 1 names a
+        # damaged audio track in the run summary (the stop switch acts in both).
+        if pass_number != 1:
+            pipeline.audio_integrity_in_summary = False
     except Exception:  # pragma: no cover - fatal config issues propagated
         logger.exception("[Worker %s] Failed to initialize pipeline", os.getpid())
         if not payload.keep_temp_files and pass_temp_dir.exists():
@@ -770,6 +775,10 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                     result["summary"].get("final_subtitles_refined", 0),
                     result["summary"].get("total_processing_time_seconds", 0.0)
                 )
+            except AudioIntegrityStop as stop:
+                # --fail-on suspect: a requested stop, not a crash.
+                logger.error("[Worker %s] Pass %s: %s: %s", os.getpid(), pass_number, basename, stop)
+                results.append(FileResult(basename=basename, status="failed", error=str(stop)))
             except Exception:
                 logger.exception(
                     "[Worker %s] Pass %s failed for %s", os.getpid(), pass_number, basename
