@@ -4,7 +4,7 @@ Many inputs are web downloads. Some carry damage a video player hides but
 transcription does not: a stretch of the audio track that holds no sound
 while the video plays on. Until 1.9.4 our extraction joined the audio on
 either side of such a hole, so every subtitle after it came out early by the
-hole's length (IPZZ-912: five 2-second holes, subtitles up to 10 s early by
+hole's length (film A of docs/measurements/v1.9.4: five 2-second holes, subtitles up to 10 s early by
 the last hour). Since 1.9.4 the extraction fills each hole with silence
 (``audio_extraction.py``), so the times stay right; the sound in the hole is
 still missing from the file, which is why the file is still reported.
@@ -19,7 +19,7 @@ What is checked, and what each check costs:
      and how long do the audio and video tracks say they are.
   2. The audio packet list (ffprobe, no decoding): holes between packets, holes
      hidden inside a packet whose stated length is far longer than the others
-     (the IPZZ-912 form, which the plain "gap between packets" rule misses),
+     (the film A of docs/measurements/v1.9.4 form, which the plain "gap between packets" rule misses),
      and timestamps that run backwards. Measured: 2.5-5 s on a 2-hour film when
      it runs after the extraction, as the file is then already read from disk.
   3. The extracted audio's length against the audio track's own timeline.
