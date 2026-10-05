@@ -196,3 +196,47 @@ def test_console_wording():
         "This file is stopped before transcription (--fail-on suspect).")
     unchecked = IntegrityReport(checked=False, facts={"not_checked": "ffprobe not found"})
     assert console_message(unchecked, "x.mp4") == "Audio check: not run (ffprobe not found)."
+
+
+# ---------------------------------------------------------------------------
+# Extraction command: an FFmpeg that rejects "-loglevel level+info"
+# ---------------------------------------------------------------------------
+
+def test_extraction_retries_without_loglevel_on_an_old_ffmpeg(monkeypatch):
+    import subprocess
+    from whisperjav.modules.audio_extraction import AudioExtractor
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(list(cmd))
+        if "-loglevel" in cmd:
+            raise subprocess.CalledProcessError(1, cmd, stderr='Invalid loglevel "level+info". Possible levels ...')
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    AudioExtractor._run_ffmpeg(["ffmpeg", "-loglevel", "level+info", "-i", "in.mp4", "out.wav"])
+    assert calls == [["ffmpeg", "-loglevel", "level+info", "-i", "in.mp4", "out.wav"],
+                     ["ffmpeg", "-i", "in.mp4", "out.wav"]]
+
+
+def test_extraction_does_not_retry_other_ffmpeg_errors(monkeypatch):
+    import subprocess
+    from whisperjav.modules.audio_extraction import AudioExtractor
+
+    def fake_run(cmd, **kwargs):
+        raise subprocess.CalledProcessError(1, cmd, stderr="in.mp4: Invalid data found when processing input")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    with pytest.raises(subprocess.CalledProcessError):
+        AudioExtractor._run_ffmpeg(["ffmpeg", "-loglevel", "level+info", "-i", "in.mp4", "out.wav"])
+
+
+def test_extraction_fills_holes_without_first_pts():
+    """first_pts=0 must not come back: with a mid-file sample-rate change FFmpeg rebuilds
+    the filter and a rebuilt first_pts=0 inserts silence as long as the time already
+    played (adversary review 2026-10-05)."""
+    import inspect
+    from whisperjav.modules import audio_extraction
+    src = inspect.getsource(audio_extraction.AudioExtractor.extract)
+    assert '"-af", "aresample=async=1",' in src
+    assert 'aresample=async=1:first_pts' not in src
