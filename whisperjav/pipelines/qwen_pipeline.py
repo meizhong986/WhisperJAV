@@ -37,6 +37,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import stable_whisper
 
 from whisperjav.modules.audio_extraction import AudioExtractor
+from whisperjav.modules.audio_integrity import apply_to_run as apply_audio_integrity
 from whisperjav.modules.analytics import report as report_audio_analytics
 from whisperjav.modules.speech_enhancement import (
     create_enhancer_direct,
@@ -630,6 +631,10 @@ class QwenPipeline(BasePipeline):
 
         audio_path = self.temp_dir / f"{media_basename}_extracted.wav"
         extracted_audio, duration = self.audio_extractor.extract(input_file, audio_path)
+        # 1.9.4 (REQ1): a damaged audio track makes this file 'suspect', or
+        # stops it here with --fail-on suspect.
+        apply_audio_integrity(self.audio_extractor.last_integrity, self.degradations,
+                              in_summary=self.audio_integrity_in_summary)
 
         master_metadata["duration_seconds"] = duration
         master_metadata["stages"]["extraction"] = {
