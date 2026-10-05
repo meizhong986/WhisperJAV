@@ -62,6 +62,13 @@ class AudioExtractor:
             "-loglevel", "level+info",
             "-i", str(input_file),
             "-vn",  # No video
+            # 1.9.4: put silence where the audio track has a hole, as a video
+            # player does, and start the audio at the film's time zero. Without
+            # it FFmpeg joins the sound on either side of a hole and every later
+            # subtitle comes out early by the hole's length (IPZZ-912: five
+            # 2-second holes, up to 10 s early). Same single FFmpeg pass, no
+            # extra time measured; output identical on films without holes.
+            "-af", "aresample=async=1:first_pts=0",
             "-acodec", self.audio_codec,
             "-ar", str(self.sample_rate),
             "-ac", "1" if self.channels == "mono" else "2",
