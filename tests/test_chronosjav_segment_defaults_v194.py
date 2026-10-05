@@ -5,7 +5,7 @@ With the WhisperSeg speech segmenter, the longest single segment (the WhisperSeg
 sensitivity, per ASR model:
 
     Qwen3-ASR      4.0 s   (was 6 / 5 / 4 s from the WhisperSeg YAML presets)
-    anime-whisper  3.0 s   (was 6 / 5 / 4 s), and grow floor 0.15 on aggressive
+    anime-whisper  4.0 s   (was 6 / 5 / 4 s; option B), and grow floor 0.15 on aggressive
                            (the only row that runs the offline decoder; was 0.05)
 
 Group cap and group gap are unchanged. Evidence and limits:
@@ -35,9 +35,9 @@ REPO = Path(__file__).resolve().parents[1]
 
 # (sensitivity, longest segment, group cap, group gap, decoder, grow floor)
 ANIME = [
-    ("conservative", 3.0, 3.0, 0.3, None, None),
-    ("balanced", 3.0, 2.5, 0.25, None, None),
-    ("aggressive", 3.0, 2.0, 0.2, "offline", 0.15),
+    ("conservative", 4.0, 3.0, 0.3, None, None),
+    ("balanced", 4.0, 2.5, 0.25, None, None),
+    ("aggressive", 4.0, 2.0, 0.2, "offline", 0.15),
 ]
 
 
