@@ -103,6 +103,7 @@ from whisperjav.utils.run_outcome import (
     write_manifest,
 )
 from whisperjav.modules.media_discovery import MediaDiscovery
+from whisperjav.modules.audio_integrity import AudioIntegrityStop
 from whisperjav.utils.media_leftovers import (
     WHISPERJAV_WORK_DIRS,
     is_whisperjav_temp_file,
@@ -667,7 +668,9 @@ def parse_arguments():
                                  "of these states: " + ", ".join(FAIL_ON_CHOICES) + ". "
                                  "Repeatable or comma-separated. By default only a "
                                  "'failed' file (an error) makes the run exit non-zero; "
-                                 "'empty' and 'suspect' are reported and exit 0.")
+                                 "'empty' and 'suspect' are reported and exit 0. With 'suspect', "
+                                 "a file whose audio check finds the audio track damaged is stopped "
+                                 "before transcription.")
     
     # Subtitle signature options
     signature_group = parser.add_argument_group("Subtitle Attribution")
@@ -1861,7 +1864,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                 
             except Exception as e:
                 progress.show_message(f"Failed: {file_name} - {str(e)}", "error", 3.0)
-                logger.error(f"Failed to process {file_path_str}: {e}", exc_info=True)
+                # A stop asked for by --fail-on suspect (damaged audio) is not a crash: no traceback.
+                logger.error(f"Failed to process {file_path_str}: {e}",
+                             exc_info=not isinstance(e, AudioIntegrityStop))
                 failed_files.append(file_path_str)
                 all_stats.append({"file": file_path_str, "status": "failed", "error": str(e)})
                 # One outcome per file: if this file was already classified
@@ -2398,6 +2403,15 @@ def main():
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         sys.exit(2)
+
+    # --fail-on suspect also stops a file whose audio track is damaged before
+    # transcription (owner, 2026-10-05: one switch for "suspect"). Damaged audio
+    # is known before the work starts, so the failure is declared then. The
+    # setting reaches every run path through the environment, the ensemble's
+    # worker processes included (they inherit it at start).
+    if "suspect" in parse_fail_on(getattr(args, 'fail_on', None)):
+        from whisperjav.modules.audio_integrity import STOP_ENV
+        os.environ[STOP_ENV] = "1"
 
     # Run environment checks if requested
     if args.check or args.check_verbose:
@@ -3432,8 +3446,15 @@ def main():
                 _elapsed = _summary.get('total_processing_time_seconds')
                 if result.get('error') or status == 'failed':
                     failed_files.append(basename)
+                    _why = result.get('error')
+                    # A file stopped for damaged audio (--fail-on suspect) names
+                    # that reason, not the generic text. Other pass-1 errors are
+                    # full tracebacks and stay out of the summary row.
+                    _p1_error = str((result.get('pass1') or {}).get('error') or '')
+                    if not _why and _p1_error.startswith("stopped before transcription"):
+                        _why = _p1_error
                     outcome = failed_outcome(
-                        in_path, str(result.get('error') or 'ensemble pass failed'),
+                        in_path, str(_why or 'ensemble pass failed'),
                         processing_time_s=_elapsed,
                     )
                 else:
