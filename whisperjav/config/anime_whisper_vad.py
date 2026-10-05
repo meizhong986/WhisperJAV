@@ -44,11 +44,19 @@ ANIME_WHISPER_WHISPERSEG_DEFAULTS: Dict[str, Dict[str, Any]] = {
     # detection-sensitivity setting; before, conservative and balanced inherited
     # 6 / 5 s from the WhisperSeg YAML presets and aggressive pinned 4.0. Measured
     # on aggressive (7 Netflix drama clips, 305 ground-truth lines;
-    # docs/plans/MEASUREMENTS_v194_REQ1_REQ2.md section 2.3): 4.0 -> 3.0 together
-    # with grow_floor 0.05 -> 0.15 raised lines ending within 0.5 s of the ground
-    # truth from 75 to 112 and cut the median end error from 0.71 to 0.36 s, at an
-    # unchanged character error rate (0.392). Conservative and balanced follow the
-    # uniform policy (not measured separately). Group cap and group gap unchanged.
+    # docs/measurements/v1.9.4/MEASUREMENTS_v194_REQ1_REQ2.md section 2.3; drama
+    # scenes, not JAV audio): 4.0 -> 3.0 together with grow_floor 0.05 -> 0.15. On the
+    # 178 ground-truth lines both runs matched, the median end error fell from 0.71
+    # to 0.36 s (start 0.18 -> 0.20 s; 10 lines lost); counting each run on its own,
+    # lines ending within 0.5 s rose from 75 to 112. Character error rate 0.392 for
+    # the combined change (3 s alone: 0.399). Measured at aggressive only, which runs
+    # the offline decoder. Conservative and balanced run the hysteresis decoder;
+    # confirming runs (same clips, section 2.6): 6 -> 3 s and 5 -> 3 s roughly double
+    # the lines ending within 0.5 s (46 -> 97, 51 -> 95) and halve the median end error
+    # (about 1.1 -> 0.5 s), at a text cost: character error rate 0.397 -> 0.413 and
+    # 0.400 -> 0.422 (+4 % and +5.5 % relative), more text missing. To revert a row,
+    # set its max_speech_duration_s back (6.0 / 5.0) or remove the key (then the
+    # WhisperSeg YAML preset applies). Group cap and group gap unchanged.
     "conservative": {
         "chunk_threshold_s": 0.3,
         "max_group_duration_s": 3.0,
