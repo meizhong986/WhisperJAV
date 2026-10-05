@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[4]
-PY = "python"
+PY = sys.executable  # the Python running this script (the WhisperJAV environment)
 CLIPS = sorted(str(p) for p in (REPO / "test_media" / "Ground_Truths" / "Netflix").glob("*.mkv"))
 RECORDER = REPO / "scripts" / "measure" / "segmenter_recorder"
 ANIME = {"framer": "vad-grouped", "generator_backend": "anime-whisper", "timestamp_mode": "vad_only",
@@ -21,6 +21,9 @@ RUNS = {
     "a_cons_new3": ("conservative", {}),
     "a_bal_old5": ("balanced", {"max_speech_duration": 5.0}),
     "a_bal_new3": ("balanced", {}),
+    # owner, 2026-10-05: try the middle value, 4 s, for the two hysteresis rows
+    "a_cons_4": ("conservative", {"max_speech_duration": 4.0}),
+    "a_bal_4": ("balanced", {"max_speech_duration": 4.0}),
 }
 
 out_root = Path(sys.argv[1])
