@@ -190,7 +190,8 @@ def test_console_wording():
     assert console_message(IntegrityReport(seconds=3.6), "a.mp4") == "Audio check: no problems found (3.6 s)."
     msg = console_message(rep, "IPZZ-912.mp4")
     assert msg.startswith("Audio check: the audio track of IPZZ-912.mp4 has 1 gap(s), 2.0 s in all (2.0 s at 0:11:40)")
-    assert msg.endswith("Subtitle times after the first gap may be early. Transcription continues.")
+    assert msg.endswith("WhisperJAV filled the gaps with silence, so subtitle times stay in step with the video; "
+                        "any speech inside the gaps is missing from the file. Transcription continues.")
     assert console_message(rep, "x.mp4", stopping=True).endswith(
         "This file is stopped before transcription (--fail-on suspect).")
     unchecked = IntegrityReport(checked=False, facts={"not_checked": "ffprobe not found"})
