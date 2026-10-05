@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[4]
-PY = "python"
+PY = sys.executable  # the Python running this script (the WhisperJAV environment)
 E2E = Path(r"<work folder>\e2e")
 GAP = str(E2E / "film_A_gap_clip.mp4")
 CLEAN = str(E2E / "film_A_clean_clip.mp4")
