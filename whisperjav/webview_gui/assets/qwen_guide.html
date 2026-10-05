@@ -398,30 +398,73 @@
 
   <div class="param">
     <span class="param-name">Segmenter Backend</span>
-    <span class="param-default">Silero v6.2</span>
+    <span class="param-default">WhisperSeg (Qwen3-ASR on pass 2: TEN VAD)</span>
     <div class="param-desc">
-      Within each scene, the segmenter runs Voice Activity Detection (VAD) to find exactly where
-      speech occurs. Detected speech regions are grouped into frames (max 6s each) and sent to the
-      ASR model. The sensitivity preset above controls this backend's parameters.
+      Within each scene, the segmenter finds where people's voices are. Each stretch of voice is a
+      <em>segment</em>. Segments that follow each other closely are joined into one <em>frame</em>,
+      which goes to the ASR model and becomes one subtitle line. The Sensitivity setting above controls
+      how readily the segmenter detects voice.
+    </div>
+    <div class="param-desc" style="margin-top: 10px;">
+      How long a line can get with WhisperSeg (the same at every sensitivity for the longest segment):
+      <table>
+        <tr>
+          <th></th>
+          <th>Longest segment</th>
+          <th>Frame Gap Threshold / Max Group Duration</th>
+        </tr>
+        <tr>
+          <td><strong>Qwen3-ASR</strong>, every sensitivity</td>
+          <td>4 s</td>
+          <td>0.3 s / 3 s</td>
+        </tr>
+        <tr>
+          <td><strong>anime-whisper</strong>, conservative</td>
+          <td>3 s</td>
+          <td>0.3 s / 3 s</td>
+        </tr>
+        <tr>
+          <td><strong>anime-whisper</strong>, balanced</td>
+          <td>3 s</td>
+          <td>0.25 s / 2.5 s</td>
+        </tr>
+        <tr>
+          <td><strong>anime-whisper</strong>, aggressive</td>
+          <td>3 s</td>
+          <td>0.2 s / 2 s</td>
+        </tr>
+      </table>
+      A stretch of voice longer than the longest segment is split, at a quiet point inside it where
+      the segmenter finds one. Change it under Customize &rarr; <em>Max Speech Duration</em>. With
+      other segmenters these values come from that segmenter's own sensitivity preset.
     </div>
     <div class="param-desc" style="margin-top: 8px; padding-left: 12px;">
-      <strong>Silero v6.2</strong> &mdash; Recommended. Force-splits long speech at internal silences
-      (<code>max_speech_duration_s</code>), hysteresis via <code>neg_threshold</code> for stable
-      segmentation in noisy audio. Handles fast Japanese dialogue well.<br>
-      <strong>TEN VAD</strong> &mdash; Previous default. Lightweight energy-based VAD. Fast but can
-      miss pauses in rapid dialogue with background audio.<br>
-      <strong>Silero v4.0 / v3.1</strong> &mdash; Older Silero versions without force-split or hysteresis.
-      Use only if v6.2 causes issues.<br>
-      <strong>Whisper VAD</strong> &mdash; Uses a Whisper model internally for VAD. Accurate but slow
-      and VRAM-heavy. Variants: tiny, small, medium.<br>
-      <strong>NeMo Lite</strong> &mdash; NVIDIA NeMo-based VAD. Requires <code>nemo_toolkit</code>
-      (not included in default install).<br>
-      <strong>None</strong> &mdash; Skip segmentation. Entire scene goes to ASR as one chunk.
-      Only use with Full Scene framing.
+      <strong>WhisperSeg</strong> &mdash; Default for Qwen3-ASR and anime-whisper. A Whisper-based
+      model trained on about 500 hours of Japanese ASMR recordings; good at soft and whispered speech.
+      Its <em>VAD Decoder</em> (Customize) is Offline two-level for anime-whisper at aggressive
+      sensitivity, and Hysteresis everywhere else.<br>
+      <strong>TEN VAD</strong> &mdash; Default for Qwen3-ASR on pass 2, so that the two passes split
+      the speech differently. A lightweight neural model.<br>
+      <strong>FireRedVAD</strong> &mdash; A tiny multilingual model (about 0.6 million parameters)
+      that runs on the CPU. Installed with WhisperJAV since v1.9.2.<br>
+      <strong>Silero v6.2</strong> &mdash; Splits long speech by itself and has a separate
+      end-of-speech level (<code>neg_threshold</code>).<br>
+      <strong>Silero v4.0 / v3.1</strong> &mdash; Older Silero versions. They do not split long
+      speech themselves.<br>
+      <strong>None</strong> &mdash; No speech segmentation. Use it only together with Full Scene
+      framing.<br>
+      Command line only: <strong>NeMo Lite</strong> (needs <code>nemo_toolkit</code>, which the
+      installer does not include) and <strong>Whisper VAD</strong>.
     </div>
     <div class="param-when">
-      <strong>When to change:</strong> Leave on Silero v6.2 for most content. Try TEN if Silero
-      produces too many tiny segments. Use None only with Full Scene framing for short scenes.
+      <strong>When to change:</strong> Keep WhisperSeg for Japanese audio. If lines run too long, or
+      hold two people's sentences, lower Max Speech Duration in Customize; if sentences are cut in
+      half, raise it. Try TEN VAD or FireRedVAD if WhisperSeg misses speech or finds speech that is
+      not there in your audio.
+    </div>
+    <div class="cli-note">
+      <strong>CLI:</strong> <code>--qwen-segmenter whisperseg|ten|firered-vad|silero-v6.2|silero|silero-v3.1|none</code>,
+      <code>--qwen-max-speech-duration 3.5</code>
     </div>
   </div>
 </div>
