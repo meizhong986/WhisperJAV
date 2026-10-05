@@ -69,7 +69,7 @@ class IntegrityFinding:
 class IntegrityReport:
     findings: List[IntegrityFinding] = field(default_factory=list)
     facts: dict = field(default_factory=dict)  # the measured values, for logs and the manifest
-    seconds: float = 0.0                       # time the checks took
+    seconds: float = 0.0                       # time the check added after the extraction
     checked: bool = True                       # False when ffprobe was missing or failed
 
     @property
@@ -296,6 +296,9 @@ class IntegrityProbe:
             self._error = str(exc) or type(exc).__name__
 
     def finish(self, extracted_s: Optional[float], extraction_stderr: str = "") -> IntegrityReport:
+        # The reading ran alongside the extraction; what the user waits for is
+        # only what is left of it now, plus the assessment.
+        self._started = time.monotonic()
         if self._thread is not None:
             self._thread.join()
         report = IntegrityReport()
