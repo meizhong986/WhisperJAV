@@ -3,10 +3,11 @@ speech segmenter and the framer were actually built with. Usage: python entrypoi
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[4]
-PY = "python"
+PY = sys.executable  # the Python running this script (the WhisperJAV environment)
 S = Path(r"<work folder>")
 CLIP = str(S / "e2e" / "film_A_clean_clip.mp4")
 OUT = S / "entrypoints"
