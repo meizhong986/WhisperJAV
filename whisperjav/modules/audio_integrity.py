@@ -2,9 +2,12 @@
 
 Many inputs are web downloads. Some carry damage a video player hides but
 transcription does not: a stretch of the audio track that holds no sound
-while the video plays on. Our extraction joins the audio on either side of
-such a hole, so every subtitle after it comes out early by the hole's length
-(IPZZ-912: five 2-second holes, subtitles up to 10 s early by the last hour).
+while the video plays on. Until 1.9.4 our extraction joined the audio on
+either side of such a hole, so every subtitle after it came out early by the
+hole's length (IPZZ-912: five 2-second holes, subtitles up to 10 s early by
+the last hour). Since 1.9.4 the extraction fills each hole with silence
+(``audio_extraction.py``), so the times stay right; the sound in the hole is
+still missing from the file, which is why the file is still reported.
 
 This module only detects and describes. It never repairs, never stops a run
 and never decides an outcome; the caller decides what to do with the report.
@@ -354,7 +357,8 @@ def console_message(report: IntegrityReport, media_name: str, stopping: bool = F
                hole.detail.replace(" in the audio track", "", 1)
         if others:
             text += "; " + "; ".join(others)
-        text += ". Subtitle times after the first gap may be early."
+        text += (". WhisperJAV filled the gaps with silence, so subtitle times stay in step with the video; "
+                 "any speech inside the gaps is missing from the file.")
     else:
         text = f"Audio check: {media_name}: " + "; ".join(others) + "."
     if stopping:
