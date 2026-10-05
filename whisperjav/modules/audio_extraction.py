@@ -57,18 +57,27 @@ class AudioExtractor:
         # "-loglevel level+info" tags each FFmpeg line with its level, so the
         # audio check can count real decoder errors ("[error]") without
         # guessing from the wording; the "Duration:" line read below is kept.
+        # An FFmpeg too old to know the "level" flag rejects it; the command is
+        # then run once more without it (see _run_ffmpeg).
         cmd = [
             self.ffmpeg_path,
             "-loglevel", "level+info",
             "-i", str(input_file),
             "-vn",  # No video
             # 1.9.4: put silence where the audio track has a hole, as a video
-            # player does, and start the audio at the film's time zero. Without
-            # it FFmpeg joins the sound on either side of a hole and every later
-            # subtitle comes out early by the hole's length (IPZZ-912: five
-            # 2-second holes, up to 10 s early). Same single FFmpeg pass, no
-            # extra time measured; output identical on films without holes.
-            "-af", "aresample=async=1:first_pts=0",
+            # player does. Without it FFmpeg joins the sound on either side of a
+            # hole and every later subtitle comes out early by the hole's length
+            # (IPZZ-912: five 2-second holes, up to 10 s early). Same single
+            # FFmpeg pass, no extra time measured.
+            # async=1 only fills holes and drops overlaps of 0.1 s or more
+            # (aresample's min_hard_comp); smaller timing jitter is left alone.
+            # NOT "first_pts=0": FFmpeg rebuilds the filter when the audio's
+            # sample rate or channel layout changes partway through a file, and a
+            # rebuilt filter with first_pts=0 inserts silence as long as the time
+            # already played (adversary review 2026-10-05: a 20 s test file became
+            # 30 s). Audio that starts after the video therefore keeps its 1.9.3
+            # behaviour (not shifted); aligning it is a separate change.
+            "-af", "aresample=async=1",
             "-acodec", self.audio_codec,
             "-ar", str(self.sample_rate),
             "-ac", "1" if self.channels == "mono" else "2",
@@ -83,11 +92,7 @@ class AudioExtractor:
             self.last_integrity = None
             probe = (IntegrityProbe(self._find_ffprobe(), input_file)
                      if self.check_integrity else None)
-            result = subprocess.run(cmd,
-                                  capture_output=True,
-                                  text=True,
-                                  encoding='utf-8', errors='replace',
-                                  check=True)
+            result = self._run_ffmpeg(cmd)
             elapsed = time.monotonic() - started
 
             # Get duration. Never by decoding the extracted file again: ffprobe
@@ -111,6 +116,23 @@ class AudioExtractor:
         except subprocess.CalledProcessError as e:
             logger.error(f"FFmpeg error: {e.stderr}")
             raise RuntimeError(f"Failed to extract audio: {e.stderr}")
+
+    @staticmethod
+    def _run_ffmpeg(cmd):
+        """Run the extraction. If this FFmpeg rejects "-loglevel level+info"
+        (builds older than the "level" flag), run it once more without it: the
+        extraction is unchanged, only the audio check's decoder-error count is
+        then unavailable (untagged lines count as none)."""
+        try:
+            return subprocess.run(cmd, capture_output=True, text=True,
+                                  encoding='utf-8', errors='replace', check=True)
+        except subprocess.CalledProcessError as e:
+            if "Invalid loglevel" not in (e.stderr or "") or "-loglevel" not in cmd:
+                raise
+            i = cmd.index("-loglevel")
+            logger.debug("This FFmpeg does not accept '-loglevel level+info'; extracting without it")
+            return subprocess.run(cmd[:i] + cmd[i + 2:], capture_output=True, text=True,
+                                  encoding='utf-8', errors='replace', check=True)
 
     def _get_audio_duration(self, audio_file: Path, extract_stderr: Optional[str] = None) -> float:
         """Get duration of audio file in seconds.
