@@ -33,6 +33,8 @@ def norm(t):
 def settings(run):
     f = run / "framing.jsonl"
     cmd = json.loads((run / "command.json").read_text(encoding="utf-8")) if (run / "command.json").exists() else []
+    if isinstance(cmd, dict):          # run_step2.py stores {"cmd": [...], "env": {...}}
+        cmd = cmd.get("cmd", [])
     model = "anime-whisper" if any("anime-whisper" in c for c in cmd) else "Qwen3-ASR"
     sens = cmd[cmd.index("--pass1-sensitivity") + 1] if "--pass1-sensitivity" in cmd else "?"
     if f.exists():
