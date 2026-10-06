@@ -385,11 +385,8 @@ whisperjav video.mp4
 # Use transformers mode for MPS GPU acceleration (RECOMMENDED on Mac)
 whisperjav video.mp4 --mode transformers
 
-# With sensitivity control
-whisperjav video.mp4 --mode transformers --sensitivity aggressive
-
-# Specify model size (adjust based on available RAM)
-whisperjav video.mp4 --mode transformers --model large-v2
+# Specify the model (adjust based on available RAM)
+whisperjav video.mp4 --mode transformers --hf-model-id openai/whisper-large-v2
 
 # With translation
 whisperjav video.mp4 --mode transformers --translate
@@ -401,13 +398,10 @@ For Apple Silicon Macs, the recommended configuration is:
 
 ```bash
 # 16 GB RAM Mac
-whisperjav video.mp4 --mode transformers --model medium
+whisperjav video.mp4 --mode transformers --hf-model-id openai/whisper-medium
 
 # 32 GB+ RAM Mac
-whisperjav video.mp4 --mode transformers --model large-v2
-
-# Maximum quality (32 GB+ RAM)
-whisperjav video.mp4 --mode transformers --model large-v2 --sensitivity aggressive
+whisperjav video.mp4 --mode transformers --hf-model-id openai/whisper-large-v2
 ```
 
 ---
@@ -437,7 +431,7 @@ whisperjav video.mp4 --mode faster
 The `balanced` mode provides the full preprocessing pipeline (scene detection + VAD) but runs ASR on CPU via faster-whisper. The `transformers` mode runs ASR on MPS GPU. For maximum accuracy with GPU acceleration:
 
 ```bash
-whisperjav video.mp4 --mode transformers --sensitivity aggressive
+whisperjav video.mp4 --mode transformers --hf-model-id openai/whisper-large-v2
 ```
 
 ### For Qwen Pipeline: `--mode qwen`
@@ -695,7 +689,7 @@ pip install soundfile
 **Solutions:**
 1. Use a smaller model:
    ```bash
-   whisperjav video.mp4 --mode transformers --model medium
+   whisperjav video.mp4 --mode transformers --hf-model-id openai/whisper-medium
    ```
 2. Enable MPS memory fallback:
    ```bash
