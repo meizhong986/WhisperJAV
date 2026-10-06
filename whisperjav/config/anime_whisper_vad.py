@@ -56,6 +56,16 @@ ANIME_WHISPER_WHISPERSEG_DEFAULTS: Dict[str, Dict[str, Any]] = {
     # at conservative and balanced). Accuracy of the text comes first (owner).
     # To revert a row, set its max_speech_duration_s back (6.0 / 5.0) or remove the
     # key (then the WhisperSeg YAML preset applies). Group cap and group gap unchanged.
+    #
+    # v1.9.4 (owner, 2026-10-06): conservative and balanced, which run the
+    # hysteresis decoder, split an overlong segment at the lowest point of the last
+    # 70 % (dip_search_from 0.3) and always take it (dip_accept_any), instead of
+    # searching the last 40 % and otherwise cutting exactly at the limit, often
+    # inside a word. Measured on balanced (section 2.10): lines ending within 0.5 s
+    # 74 -> 101, median end error 0.61 -> 0.45 s, character error rate 0.402 ->
+    # 0.405, characters written +0.5 %. Aggressive runs the offline decoder, which
+    # already cuts at minima of the smoothed curve; Qwen3-ASR keeps the defaults
+    # (the same rule cost it +6 % character error rate). To revert, remove the two keys.
     "conservative": {
         "chunk_threshold_s": 0.3,
         "max_group_duration_s": 3.0,
@@ -63,6 +73,8 @@ ANIME_WHISPER_WHISPERSEG_DEFAULTS: Dict[str, Dict[str, Any]] = {
         "start_pad_ms": 100,
         "end_pad_ms": 100,
         "max_speech_duration_s": 4.0,
+        "dip_search_from": 0.3,
+        "dip_accept_any": True,
     },
     "balanced": {
         "chunk_threshold_s": 0.25,
@@ -71,6 +83,8 @@ ANIME_WHISPER_WHISPERSEG_DEFAULTS: Dict[str, Dict[str, Any]] = {
         "start_pad_ms": 50,
         "end_pad_ms": 50,
         "max_speech_duration_s": 4.0,
+        "dip_search_from": 0.3,
+        "dip_accept_any": True,
     },
     "aggressive": {
         # v1.9.0 tuning (2026-07-13): cross-clip VAD sweep over 4 Naked-Director
@@ -146,6 +160,8 @@ SEGMENTER_CONFIG_KEYS = (
     "split_smooth_ms",
     "min_silence_duration_ms",
     "max_speech_duration_s",
+    "dip_search_from",
+    "dip_accept_any",
 )
 
 
