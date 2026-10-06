@@ -29,6 +29,38 @@ from whisperjav.utils.crash_tracer import get_tracer
 from whisperjav.modules.segment_filters import SegmentFilterConfig, SegmentFilterHelper
 from whisperjav.modules.speech_segmentation import SpeechSegmenterFactory
 
+# #424, owner 2026-10-02: "Both: source + guard"; the shortest speech piece that may reach
+# the recogniser is 0.1 s, and anything shorter joins the piece next to it.
+MIN_GROUP_SEC = 0.1
+
+
+def join_short_groups(groups: List[List[Dict]], min_sec: float = MIN_GROUP_SEC) -> List[List[Dict]]:
+    """Join every speech group shorter than ``min_sec`` to its nearer neighbour (#424).
+
+    A group is a list of segment dicts with start_sec / end_sec. The short group's
+    segments are added to the neighbour with the smaller gap, so its audio is still
+    transcribed, inside the neighbour. A lone short group (no neighbour) is returned
+    as it is; the guard in _transcribe_vad_group handles it.
+    """
+    result = [list(g) for g in groups if g]
+    i = 0
+    while len(result) > 1 and i < len(result):
+        g = result[i]
+        if g[-1]["end_sec"] - g[0]["start_sec"] >= min_sec:
+            i += 1
+            continue
+        gap_prev = g[0]["start_sec"] - result[i - 1][-1]["end_sec"] if i > 0 else None
+        gap_next = result[i + 1][0]["start_sec"] - g[-1]["end_sec"] if i + 1 < len(result) else None
+        if gap_next is None or (gap_prev is not None and gap_prev <= gap_next):
+            result[i - 1].extend(g)
+            del result[i]
+            i -= 1          # the grown neighbour is checked again
+        else:
+            result[i + 1][0:0] = g
+            del result[i]
+        logger.debug(f"Joined a speech group under {min_sec} s to its neighbour (#424)")
+    return result
+
 
 class FasterWhisperProASR:
     """Faster-Whisper ASR (direct API) using Speech Segmenter for speech detection."""
@@ -638,7 +670,7 @@ class FasterWhisperProASR:
         # ------------------------------------------------------------------ #
         # External speech segmenter path.
         # ------------------------------------------------------------------ #
-        vad_segments = self._run_speech_segmentation(audio_data, sample_rate)
+        vad_segments = join_short_groups(self._run_speech_segmentation(audio_data, sample_rate))
 
         # Store segments for visualization data contract
         # Flatten grouped segments into simple list with start_sec/end_sec
@@ -912,11 +944,11 @@ class FasterWhisperProASR:
         end_sample = min(int(end_sec * sample_rate), len(audio_data))
         group_audio = audio_data[start_sample:end_sample]
 
-        # #424 (reporter's fix, AlanZ-Git): groups under 0.1 s are scene-boundary pad artifacts
-        # with no transcribable speech (real groups are at least ~0.6 s). CTranslate2 divides by
-        # zero below one feature frame (400 samples at 16 kHz) and Windows kills the process
-        # (0xC0000094), so skip them.
-        if len(group_audio) < int(0.1 * sample_rate):
+        # #424 guard (reporter's fix, AlanZ-Git). join_short_groups has already joined short
+        # groups to a neighbour; what can still arrive here under 0.1 s is a scene's only group,
+        # or one cut short by the clamp above. CTranslate2 divides by zero below one feature
+        # frame (400 samples at 16 kHz) and Windows kills the process (0xC0000094), so skip it.
+        if len(group_audio) < int(MIN_GROUP_SEC * sample_rate):
             logger.debug(
                 f"Skipping a {len(group_audio)}-sample group at {start_sec:.2f}-{end_sec:.2f}s "
                 f"(under 0.1 s; #424)"
