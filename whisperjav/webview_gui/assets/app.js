@@ -4256,6 +4256,17 @@ const EnsembleManager = {
             tokensDef.description
         ));
 
+        // v1.9.4: anime-whisper only (the schema carries it only for that backend)
+        const lsDef = schemaSection.leading_silence_ms;
+        if (lsDef) {
+            container.appendChild(this.createTransformersSlider(
+                'leading_silence_ms', lsDef.label,
+                lsDef.min, lsDef.max, lsDef.step,
+                currentValues.leading_silence_ms ?? lsDef.default,
+                lsDef.description
+            ));
+        }
+
         // Generation Safety (collapsed <details>)
         const safetyDetails = document.createElement('details');
         safetyDetails.className = 'param-group-details';
@@ -5410,6 +5421,8 @@ const EnsembleManager = {
         // list above, which was wrong for anime-whisper and for non-WhisperSeg passes.
         if (this._qwenSchema) {
             QwenManager.applySegmenterDefaults(defaults, this._qwenSchema);
+            const ls = this._qwenSchema.generation && this._qwenSchema.generation.leading_silence_ms;
+            if (ls) defaults.leading_silence_ms = ls.default;   // v1.9.4 anime-whisper lead-in
         }
         if (passState.isAnimeWhisper) {
             defaults.model_id = 'litagin/anime-whisper';
