@@ -162,6 +162,34 @@ def target_language_name(target_lang: str) -> str:
     return name[:1].upper() + name[1:] if name else "the target language"
 
 
+def write_shared_text(path, text: str) -> str:
+    """Write a temp file that other runs may be reading, and return the path to use.
+
+    Two translations of the same tone at the same moment share these files (review
+    finding, 2026-10-06). Rewriting one while another run reads it could hand that
+    run an empty file; on Windows a file another run has open cannot be replaced at
+    all. So: a file that already holds this text is left alone (the usual case:
+    same tone, same bundled text); otherwise the text goes to a private temp file
+    that is swapped in, and if the swap is refused the private file is used instead.
+    """
+    import tempfile
+    path = Path(path)
+    try:
+        if path.read_text(encoding="utf-8") == text:
+            return str(path)
+    except OSError:
+        pass
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=path.stem + "_", suffix=path.suffix, dir=str(path.parent))
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(text)
+    try:
+        os.replace(tmp, path)
+        return str(path)
+    except OSError:
+        return tmp          # the shared file is in use; this run reads its own copy
+
+
 def fill_target_language(instruction_file, target_lang: str) -> str:
     """Write the target language into an instruction file that asks for it ({LANG}).
 
@@ -182,13 +210,14 @@ def fill_target_language(instruction_file, target_lang: str) -> str:
     name = target_language_name(target_lang)
     out_dir = Path(tempfile.gettempdir()) / "whisperjav_translate"
     out_dir.mkdir(parents=True, exist_ok=True)
-    out = out_dir / f"{path.stem}_{name.lower().replace(' ', '_')}.txt"
+    import hashlib
+    digest = hashlib.sha1(text.encode("utf-8")).hexdigest()[:8]   # different texts never share a copy
+    out = out_dir / f"{path.stem}_{name.lower().replace(' ', '_')}_{digest}.txt"
     # The rule sentence is written as its meaning, not filled literally
     # ("unless Chinese is English" reads oddly): kept for other targets, dropped for English.
     rule = "Do not answer in English unless {LANG} is English."
     text = text.replace(" " + rule, "" if name.lower() == "english" else " Do not answer in English.")
-    out.write_text(text.replace("{LANG}", name), encoding="utf-8")
-    return str(out)
+    return write_shared_text(out, text.replace("{LANG}", name))
 
 
 def resolve_batch_window(max_batch_size: int) -> tuple:
