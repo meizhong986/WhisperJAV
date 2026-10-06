@@ -84,7 +84,7 @@ Workarounds for users who explicitly want aggressive Pass 2 sensitivity:
 - Use **Balanced** as Pass 1 instead of Fidelity (no cap fires; aggressive Pass 2 is stable in this combination).
 - Use **Fast** or **Faster** as Pass 1 (no cap fires).
 
-A deeper architectural fix is planned for v1.9.0+ pending investigation. The cap is a documented workaround, not a root-cause fix.
+A root-cause fix is still being investigated; no release date is set. The cap is a documented workaround, not a root-cause fix.
 
 ---
 
@@ -181,7 +181,7 @@ The bundled Qwen3-ASR fork is incompatible with `transformers` 5.x (the decorato
    ```
    Replace `<env-pip>` with the exact pip path for your install (e.g. `Scripts\pip.exe` for the Windows standalone installer, or your venv pip for source installs).
 
-2. Or wait for v1.9.0, which will ship a Qwen3-ASR fork patched for transformers 5.x. Tracking: <https://github.com/QwenLM/Qwen3-ASR/issues/138>.
+2. Or wait for a WhisperJAV release that supports transformers 5.x. None is scheduled yet, so option 1 is the fix for now. Tracking: <https://github.com/QwenLM/Qwen3-ASR/issues/138>.
 
 ### "CUDA not available" but I have an NVIDIA GPU
 
