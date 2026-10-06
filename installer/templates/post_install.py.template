@@ -496,6 +496,19 @@ def select_torch_install_plan(driver_info: DriverInfo) -> TorchInstallPlan:
     )
 
 
+def torch_imports_in_fresh_process() -> Tuple[bool, str]:
+    """Import torch and torchaudio in a new interpreter (#438). Returns (ok, last error line)."""
+    try:
+        r = subprocess.run([sys.executable, "-c", "import torch, torchaudio"],
+                           capture_output=True, text=True, timeout=600)
+    except Exception as exc:
+        return False, str(exc)
+    if r.returncode == 0:
+        return True, ""
+    lines = [l for l in (r.stderr or r.stdout or "").strip().splitlines() if l.strip()]
+    return False, lines[-1] if lines else f"exit code {r.returncode}"
+
+
 def install_pytorch_and_torchaudio(plan: TorchInstallPlan) -> bool:
     installer_label = "uv" if USE_UV else "pip"
     log(f"Installing via {installer_label}: {' '.join(plan.pip_args)}")
@@ -849,6 +862,24 @@ def install_pytorch(driver_info: Optional[DriverInfo] = None) -> Optional[str]:
 
     if not install_pytorch_and_torchaudio(plan):
         return "PyTorch package installation failed (pip/uv error)"
+
+    # #438: uv can "install" PyTorch in seconds from a damaged download cache and
+    # report success, and PyTorch then fails to import. Check in a fresh process
+    # (a failed import here would stay cached in this one); if it fails, download
+    # it once more past the cache. The reporter's fix was clearing %LOCALAPPDATA%\uv\cache.
+    imports_ok, import_error = torch_imports_in_fresh_process()
+    if not imports_ok and USE_UV:
+        log(f"PyTorch was installed but does not import: {import_error}")
+        log("The uv download cache may be damaged. Downloading PyTorch again without the cache...")
+        if not run_pip(plan.pip_args + ["--reinstall", "--no-cache"],
+                       plan.description + " (fresh download)", use_constraints=False):
+            return "PyTorch did not import and the fresh download failed (uv error)"
+        imports_ok, import_error = torch_imports_in_fresh_process()
+    if not imports_ok:
+        log(f"FATAL: PyTorch was installed but does not import: {import_error}")
+        if USE_UV:
+            log(r"       Delete the folder %LOCALAPPDATA%\uv\cache and run the installer again.")
+        return f"PyTorch installed but does not import: {import_error}"
 
     try:
         import torch
