@@ -60,6 +60,42 @@ Any input FFmpeg can read works: MP4, MKV, AVI, WMV, MP3, WAV, FLAC, and so on. 
 
 ---
 
+## New in v1.9.4
+
+**Bug fixes, hardening, and better subtitle timing for ChronosJAV.** On 1.9.3, upgrade with one
+command — `whisperjav-upgrade --wheel-only` — because 1.9.4 changes no library underneath
+WhisperJAV. Full detail, including every change and who reported it:
+[**release notes**](docs/release_notes_v1.9.4_for_users.md).
+
+**Subtitles stay in time in films with holes in their audio.** Some downloaded films have hidden holes in their audio
+track. In those files every subtitle after the first hole came out early — by up to 10 seconds in
+the films we measured. WhisperJAV now fills the holes with silence while extracting the audio, so
+subtitle times stay in step with the video. Every file is checked as it is extracted. A damaged file
+is still transcribed, and the run summary lists it as `suspect`, with the reason. To stop such files
+instead, use `--fail-on suspect`, or tick **Treat 'suspect' files as failures** in the GUI.
+
+**An attempt to improve ChronosJAV timing** (#433, #421, #417, #437, #427). For Qwen3-ASR and
+anime-whisper, the longest piece of speech sent to the model is now 4 seconds at every sensitivity,
+and anime-whisper has new settings for where long pieces are cut. On seven drama scenes with
+reference subtitles, the typical gap between a line's end and the reference end shrank by 36 % for
+Qwen3-ASR, by 57–61 % for anime-whisper at conservative and balanced, and by 14 % at aggressive. The
+text error changed by between 1.5 % better and 1 % worse. These are drama scenes, not JAV, and lines
+still end somewhat late — please tell us how it does on your films. anime-whisper now also hears
+200 ms of silence before each piece of audio: **Silence Before Each Window (ms)**, or
+`--qwen-leading-silence` (`0` turns it off).
+
+**If you run WhisperJAV from scripts:** `--fail-on suspect` now also stops files with damaged audio;
+a ForcedAligner that cannot be loaded now leaves the file `suspect` and exits 0 instead of failing the
+job; a custom translation server now keeps its own temperature unless you pass `--temperature`. See
+[What will break](docs/release_notes_v1.9.4_for_users.md#what-will-break).
+
+Also here: Gemini's default model is now `gemini-3.6-flash`; translation choices are remembered
+between launches; the command line finds the bundled FFmpeg on Windows; on Balanced and Faster, a
+speech piece of a few milliseconds at the edge of a scene, which could crash the run, is now joined to
+its neighbour; and the Windows installer downloads PyTorch again if it does not load after install.
+
+---
+
 ## New in v1.9.3
 
 **More bug fixes and overall improvements.** 1.9.3 builds on 1.9.2: where that release was about
