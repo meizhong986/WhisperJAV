@@ -387,6 +387,10 @@ def translate_subtitle(
         # Qwen3-family thinking model flag: consumed later by the response
         # parsing patch (after provider init). Remove from provider_options
         # so it doesn't get passed to PySubtrans as an unknown option.
+        # Work on a copy: the translate CLI passes ONE provider_options dict for every
+        # file of a run, and the pops below would strip the flags from file 2 onward
+        # (found by review, 2026-10-06; it affected _thinking_model too).
+        provider_options = dict(provider_options) if provider_options else provider_options
         _is_thinking_model = provider_options.pop('_thinking_model', False) if provider_options else False
         # #444: provider 'custom' with no --temperature leaves the temperature to the server.
         _server_temperature = provider_options.pop('_server_temperature', False) if provider_options else False
