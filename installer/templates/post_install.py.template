@@ -497,9 +497,10 @@ def select_torch_install_plan(driver_info: DriverInfo) -> TorchInstallPlan:
 
 
 def torch_imports_in_fresh_process() -> Tuple[bool, str]:
-    """Import torch and torchaudio in a new interpreter (#438). Returns (ok, last error line)."""
+    """Import torch in a new interpreter (#438). Returns (ok, last error line).
+    torch only: the check after it lets a torchaudio import failure pass, and this must not be stricter."""
     try:
-        r = subprocess.run([sys.executable, "-c", "import torch, torchaudio"],
+        r = subprocess.run([sys.executable, "-c", "import torch"],
                            capture_output=True, text=True, timeout=600)
     except Exception as exc:
         return False, str(exc)
