@@ -2246,7 +2246,18 @@ class WhisperJAVAPI:
             return result
         audio = result["schema"]["audio"]
         if generator_backend == "anime-whisper":
-            from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
+            from whisperjav.config.anime_whisper_vad import (
+                ANIME_WHISPER_LEADING_SILENCE_MS, anime_whisperseg_defaults)
+            # v1.9.4 (owner, 2026-10-06): the lead-in silence and its off switch (0).
+            result["schema"]["generation"]["leading_silence_ms"] = {
+                "type": "slider",
+                "label": "Silence Before Each Window (ms)",
+                "description": "Silence placed before every audio window sent to anime-whisper. It helped "
+                               "the first words of a line come out right. Where each window starts and ends does not change. "
+                               "0 turns it off.",
+                "min": 0, "max": 500, "step": 50,
+                "default": ANIME_WHISPER_LEADING_SILENCE_MS,
+            }
             aw = anime_whisperseg_defaults(sensitivity)
             audio["chunk_threshold_ms"]["default"] = int(round(aw["chunk_threshold_s"] * 1000))
             audio["max_group_duration"]["default"] = aw["max_group_duration_s"]
