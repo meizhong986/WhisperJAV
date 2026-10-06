@@ -38,6 +38,13 @@ from typing import Any, Dict
 # ---------------------------------------------------------------------------
 # Per-sensitivity defaults. Keys are the resolved runtime parameter names.
 # ---------------------------------------------------------------------------
+# v1.9.4 (owner, 2026-10-06): silence placed before every audio window sent to
+# anime-whisper by the ChronosJAV pipeline (0 = off). Measured on the reference clips:
+# character error rate 0.392 -> 0.387 on aggressive; timing unchanged. Users can turn it
+# off: --qwen-leading-silence 0, ensemble qwen-params "leading_silence_ms", GUI Customize
+# "Silence Before Each Window (ms)". docs/measurements/v1.9.4, sections 2.10-2.11.
+ANIME_WHISPER_LEADING_SILENCE_MS = 200
+
 ANIME_WHISPER_WHISPERSEG_DEFAULTS: Dict[str, Dict[str, Any]] = {
     # v1.9.4 (owner, 2026-10-05, option B): max_speech_duration_s is 4.0 at EVERY
     # sensitivity, the same as Qwen3-ASR. The longest segment is a subtitle
