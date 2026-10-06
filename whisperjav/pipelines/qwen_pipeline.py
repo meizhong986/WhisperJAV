@@ -496,6 +496,11 @@ class QwenPipeline(BasePipeline):
                 dtype=cfg["dtype"],
                 no_repeat_ngram_size=cfg.get("no_repeat_ngram_size", 0),
                 max_new_tokens=aw_max_tokens,
+                # v1.9.4 (owner, 2026-10-06): 200 ms of silence before every window
+                # (anime-whisper only; it lowered the character error rate on the
+                # reference clips, Qwen3-ASR got worse). Window edges and so the
+                # subtitle start/end do not move; see the generator's docstring.
+                leading_silence_ms=200,
             )
         elif self.generator_backend == "cohere":
             # Cohere Transcribe-03-2026 — gated HF repo, AutoModel + trust_remote_code.
