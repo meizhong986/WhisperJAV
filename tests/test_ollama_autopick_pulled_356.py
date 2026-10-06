@@ -68,3 +68,25 @@ def test_an_explicit_model_is_never_swapped():
 def test_recommended_model_already_pulled_is_used():
     m = _Mgr(pulled={"gemma3:12b", "qwen2.5:7b"}, vram=12)
     assert m.ensure_ready(model=None, auto_pull=False, interactive=False)["model"] == "gemma3:12b"
+
+
+def test_with_auto_pull_the_vram_pick_is_still_downloaded():
+    """Review finding: the GUI always passes --yes; there the better model was downloaded before and still is."""
+    m = _Mgr(pulled={"qwen2.5:3b"}, vram=16)
+    with pytest.raises(om.ModelNotAvailableError):      # the stand-in download fails
+        m.ensure_ready(model=None, auto_pull=True, interactive=False)
+    assert m.pulls == ["qwen2.5:14b"]
+
+
+def test_the_interactive_prompt_is_still_offered():
+    m = _Mgr(pulled={"qwen2.5:7b"}, vram=12)
+    import builtins
+    asked = []
+    orig = builtins.input
+    builtins.input = lambda prompt="": asked.append(prompt) or "n"
+    try:
+        with pytest.raises(om.ModelNotAvailableError, match="gemma3:12b"):
+            m.ensure_ready(model=None, auto_pull=False, interactive=True)
+    finally:
+        builtins.input = orig
+    assert asked and "gemma3:12b" in asked[0]
