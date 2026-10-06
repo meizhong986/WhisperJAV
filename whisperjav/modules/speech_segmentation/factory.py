@@ -163,6 +163,8 @@ _PARAM_SCHEMAS = {
         "grow_floor":              (float, 0.05, False),   # v1.9.0 offline: edge-growth floor (capture-vs-cut dial)
         "gap_merge_ms":            (int,   350,  False),   # v1.9.0 offline: gaps >= this become cuts; shorter merge
         "split_smooth_ms":         (int,   120,  False),   # v1.9.0 offline: smoothing window for overlong-split minima
+        "dip_search_from":         (float, 0.6,  False),   # v1.9.4 hysteresis "dip" split: search start (fraction)
+        "dip_accept_any":          (bool,  False, False),  # v1.9.4 hysteresis "dip" split: cut at the lowest point always
         "min_speech_duration_ms":  (int,   100,  False),
         "min_silence_duration_ms": (int,   100,  False),
         "speech_pad_ms":           (int,   300,  False),  # Symmetric fallback for start/end pad
