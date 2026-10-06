@@ -55,6 +55,7 @@ class AnimeWhisperGenerator:
         dtype: str = "auto",
         no_repeat_ngram_size: int = 0,
         max_new_tokens: int = 444,
+        leading_silence_ms: int = 0,
     ):
         """
         Store configuration for deferred model construction.
@@ -71,6 +72,17 @@ class AnimeWhisperGenerator:
                 generation_config defaults to 4096, which exceeds 448.
                 litagin's demo uses 64 for 15s clips; 444 is appropriate
                 for our 6-48s framed audio.
+            leading_silence_ms: silence placed before every audio window.
+                0 here (off); the ChronosJAV (qwen) pipeline passes 200 (v1.9.4,
+                owner 2026-10-06), so other users of this class (the decoupled
+                pipeline) are unchanged. Measured (7 Netflix drama clips;
+                docs/measurements/v1.9.4, section 2.10): 200 ms lowered the
+                character error rate 0.392 -> 0.387 and the share of lines whose
+                first character is wrong 31.5 -> 28.3 %, with no change in
+                timing (subtitle times come from the speech segmenter, not the
+                model). Silence after the window changes nothing (Whisper pads
+                its input to 30 s with silence anyway). Qwen3-ASR got worse with
+                the same lead-in (+3.8 %), so it is anime-whisper only. 0 = off.
         """
         self._config = {
             "model_id": model_id,
@@ -78,6 +90,7 @@ class AnimeWhisperGenerator:
             "dtype": dtype,
             "no_repeat_ngram_size": no_repeat_ngram_size,
             "max_new_tokens": max_new_tokens,
+            "leading_silence_ms": max(0, int(leading_silence_ms)),
         }
         self._processor = None
         self._model = None
@@ -231,6 +244,14 @@ class AnimeWhisperGenerator:
                 loaded = loaded.mean(axis=1)
             return loaded.astype(np.float32)
 
+    def with_leading_silence(self, audio: np.ndarray) -> np.ndarray:
+        """Prepend the configured silence (16 kHz float32) to one window."""
+        ms = self._config.get("leading_silence_ms", 0)
+        if not ms:
+            return audio
+        lead = np.zeros(int(16000 * ms / 1000), dtype=np.float32)
+        return np.concatenate([lead, audio.astype(np.float32, copy=False)])
+
     # ------------------------------------------------------------------
     # Generation
     # ------------------------------------------------------------------
@@ -272,7 +293,7 @@ class AnimeWhisperGenerator:
         cfg = self._config
 
         # Load and preprocess audio (has its own fallback logic)
-        audio = self._load_audio(audio_path)
+        audio = self.with_leading_silence(self._load_audio(audio_path))
 
         # Extract features via WhisperProcessor and cast to model dtype
         # (processor outputs float32; model may be float16 on CUDA)
