@@ -905,9 +905,21 @@ class FasterWhisperProASR:
 
         start_sec = vad_group[0]["start_sec"]
         end_sec = vad_group[-1]["end_sec"]
-        start_sample = int(start_sec * sample_rate)
-        end_sample = int(end_sec * sample_rate)
+        start_sample = max(0, int(start_sec * sample_rate))
+        # Clamp to the audio length: the speech pad can push end_sec past the clip (#424).
+        end_sample = min(int(end_sec * sample_rate), len(audio_data))
         group_audio = audio_data[start_sample:end_sample]
+
+        # #424 (reporter's fix, AlanZ-Git): groups under 0.1 s are scene-boundary pad artifacts
+        # with no transcribable speech (real groups are at least ~0.6 s). CTranslate2 divides by
+        # zero below one feature frame (400 samples at 16 kHz) and Windows kills the process
+        # (0xC0000094), so skip them.
+        if len(group_audio) < int(0.1 * sample_rate):
+            logger.debug(
+                f"Skipping a {len(group_audio)}-sample group at {start_sec:.2f}-{end_sec:.2f}s "
+                f"(under 0.1 s; #424)"
+            )
+            return []
 
         # Get cleaned parameters from tuner
         whisper_params = self._prepare_whisper_params()
