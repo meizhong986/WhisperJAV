@@ -3802,6 +3802,48 @@ class WhisperJAVAPI:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    # #435: the choices on the Ensemble translation row and the AI SRT Translate tab.
+    # They lived only in browser storage, which private_mode (main.py, #236/#240)
+    # clears at every launch, so they were forgotten. Kept in the translate settings
+    # file under "gui_tab_state", a key the translate command line does not read.
+    # Per-film fields (title, names, plot) and the AI SRT Translate API key are not kept.
+    _TRANSLATION_TAB_FIELDS = {
+        "ensemble": ("provider", "model", "modelOverride"),
+        "srt": ("provider", "model", "customModel", "sourceLang", "targetLang", "tone",
+                "customEndpoint", "maxBatchSize", "maxRetries", "rateLimit", "sceneThreshold"),
+    }
+
+    def get_translation_tab_state(self) -> Dict[str, Any]:
+        """Saved translation choices per tab: {success, state: {ensemble: {...}, srt: {...}}}."""
+        try:
+            from whisperjav.translate.settings import load_settings
+            saved = load_settings().get("gui_tab_state") or {}
+            state = {}
+            for tab, fields in self._TRANSLATION_TAB_FIELDS.items():
+                values = saved.get(tab) if isinstance(saved.get(tab), dict) else {}
+                state[tab] = {k: str(values[k]) for k in fields if values.get(k) not in (None, "")}
+            return {"success": True, "state": state}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def save_translation_tab_state(self, tab: str, values: Dict[str, Any]) -> Dict[str, Any]:
+        """Replace the saved choices of one tab ('ensemble' or 'srt'); unknown keys are ignored."""
+        try:
+            fields = self._TRANSLATION_TAB_FIELDS.get(tab)
+            if fields is None:
+                return {"success": False, "error": f"unknown tab: {tab}"}
+            from whisperjav.translate.settings import load_settings, save_settings
+            existing = load_settings()
+            tabs = existing.get("gui_tab_state") if isinstance(existing.get("gui_tab_state"), dict) else {}
+            tabs[tab] = {k: str(values[k]) for k in fields
+                         if isinstance(values, dict) and values.get(k) not in (None, "")}
+            existing["gui_tab_state"] = tabs
+            if not save_settings(existing):
+                return {"success": False, "error": "could not write the translate settings file"}
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def save_translation_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
         """
         Save translation settings from GUI (camelCase) to file (snake_case).
