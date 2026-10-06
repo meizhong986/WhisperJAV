@@ -50,6 +50,10 @@ RUNS = {
     # f_aa2 repeats f_aa on the final code (must equal aa_lead200 byte for byte).
     "f_ac2": ("ac", {}, {}),
     "f_aa2": ("aa", {}, {}),
+    # off switch (owner, 2026-10-06): 0 must reproduce the pre-lead-in output (req2_levers/a_floor015);
+    # the default must still reproduce aa_lead200
+    "f_aa_off": ("aa", {"leading_silence_ms": 0}, {}),
+    "f_aa3": ("aa", {}, {}),
 }
 
 out_root = Path(sys.argv[1])
