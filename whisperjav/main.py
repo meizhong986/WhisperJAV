@@ -2769,13 +2769,12 @@ def main():
                 and speech_segmenter not in SINGLE_PASS_EXTERNAL_OK.get(
                     getattr(args, 'mode', None), frozenset())
                 and not speech_segmenter.startswith("silero")):
+            # Wording approved by the owner, 2026-10-06 (WP-004 follow-up).
             logger.warning(
-                "Speech segmenter '%s' is not wired for single-pass --mode %s: that "
-                "path does not resolve the segmenter's sensitivity presets. "
-                "Falling back to silero-v3.1. WhisperSeg / NeMo / whisper-vad / "
-                "ten are fully supported via --ensemble; firered-vad works on "
-                "--mode fidelity, where it is the default; the Silero builds work "
-                "on every single-pass mode.",
+                "Speech segmenter '%s' is not available on single-pass --mode %s; "
+                "using silero-v3.1 instead. On --mode fidelity use firered-vad (the "
+                "default), ten, whisperseg, whisper-vad or a Silero build; every "
+                "segmenter works with --ensemble.",
                 speech_segmenter, getattr(args, 'mode', None)
             )
             speech_segmenter = "silero-v3.1"
