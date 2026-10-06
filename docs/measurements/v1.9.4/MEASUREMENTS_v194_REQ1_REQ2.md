@@ -281,9 +281,9 @@ decoder; 1.9.3 value passed explicitly vs the 1.9.4 default). On the ground-trut
 | Model, sensitivity | Longest segment now (1.9.3) | Where | Other measured lever |
 |---|---|---|---|
 | Qwen3-ASR, all | 4.0 s (6 / 5 / 4 s) | `whisperjav/config/qwen3_whisperseg_vad.py`, `QWEN3_WHISPERSEG_DEFAULTS["max_speech_duration_s"]` | — |
-| anime-whisper conservative | 3.0 s (6 s) | `whisperjav/config/anime_whisper_vad.py`, row "conservative", `max_speech_duration_s` | — |
-| anime-whisper balanced | 3.0 s (5 s) | same file, row "balanced" | — |
-| anime-whisper aggressive | 3.0 s (4 s) | same file, row "aggressive" | `grow_floor` 0.15 (0.05) |
+| anime-whisper conservative | 4.0 s (6 s) | `whisperjav/config/anime_whisper_vad.py`, row "conservative", `max_speech_duration_s` | split rule `dip_search_from` 0.3, `dip_accept_any` (from 2026-10-06, §2.10–2.11) |
+| anime-whisper balanced | 4.0 s (5 s) | same file, row "balanced" | the same split rule |
+| anime-whisper aggressive | 4.0 s (4 s) | same file, row "aggressive" | `grow_floor` 0.15 (0.05) |
 Removing a row's `max_speech_duration_s` returns it to the WhisperSeg YAML preset
 (`whisperjav/config/v4/ecosystems/tools/whisperseg-speech-segmentation.yaml`: 6 / 5 / 4 s), which other pipelines
 and Cohere also use; change the YAML only with that in mind. All values reach every entry point through
@@ -406,6 +406,57 @@ starts more than 0.3 s after the ground-truth line. Start / end = medians on the
 - Effects of 1–2 % relative are measured on 7 clips; runs are repeatable (identical on repeat), but small
   differences may not hold on other material.
 
+### 2.11 Reach-back window; the two changes adopted on 2026-10-06; verification on the product code
+
+**Reach-back (owner's Clar3, tested 2026-10-06; `experiment_hooks/`, `WJ_EXP_REACHBACK_MS`).** Each window started
+300 ms earlier for the ASR model only (it may reach into the previous window); the original start became the
+window's display start, so subtitle times did not move (start median 0.176 → 0.176 s, 0.290 → 0.282 s). Result:
+| Model | CER | Missing lines | In produced lines: wrong / missing | Extra characters | First char wrong |
+|---|---|---|---|---|---|
+| anime aggressive: baseline → reach-back | 0.392 → 0.400 | 15.4 → 15.1 % | 16.6 → 18.6 % / 15.7 → 13.5 % | 64 → 71 | 31.5 → 32.6 % |
+| Qwen3-ASR: baseline → reach-back | 0.394 → 0.427 | 13.1 → 10.2 % | 20.7 → 23.3 % / 10.0 → 10.1 % | 128 → 197 | 24.2 → 25.8 % |
+More audio recovers some missing text, but the model also transcribes the end of the previous line again (more
+wrong and extra characters). Not adopted. (For these two runs the recorder logged the windows before the hook moved
+them, so their "late lines" counts in `onset_analysis.py` describe the original windows.)
+
+**Adopted (owner, 2026-10-06: "agreed with all 3"):**
+- anime-whisper: 200 ms of silence before every window (`leading_silence_ms`, passed by the qwen/ChronosJAV pipeline
+  only; the generator's own default is 0, so the decoupled pipeline is unchanged).
+- WhisperSeg hysteresis forced split: two new settings, `dip_search_from` (default 0.6) and `dip_accept_any`
+  (default False), i.e. unchanged unless set; the anime-whisper table sets 0.3 and True for conservative and
+  balanced. Aggressive (offline decoder) and Qwen3-ASR keep the old rule.
+
+**Verification on the product code (no experiment settings), each against its option-B baseline:**
+| Run | CER | Characters written | Missing lines | Ends within 0.5 s | End / start median (common lines) |
+|---|---|---|---|---|---|
+| anime conservative: split + lead-in (`f_ac`, `f_ac2`, identical) | 0.399 → 0.399 | 2,492 → 2,532 (+1.6 %) | 17.4 → 19.0 % | 74 → 101 | 0.553 → 0.383 s / 0.195 → 0.225 s |
+| anime balanced: split + lead-in (`f_ab`) | 0.402 → 0.394 | 2,500 → 2,532 (+1.3 %) | 17.7 → 18.7 % | 74 → 103 | 0.583 → 0.442 s / 0.225 → 0.236 s |
+| anime aggressive: lead-in (`f_aa`, `f_aa2`) | 0.392 → 0.387 | 2,501 → 2,472 (−1.2 %) | 15.4 → 15.7 % | 82 → 82 | unchanged |
+| Qwen3-ASR (`f_q`) | byte-for-byte identical to the baseline (7 of 7 files) | | | | |
+- `f_aa` and `f_aa2` are byte-for-byte identical to the experiment run `aa_lead200`: the product lead-in is the
+  experiment's lead-in.
+- `f_ac` was suspected of running without the lead-in (it started 11 s before the lead-in was moved from the
+  generator default to the pipeline); `f_ac2` on the final code is byte-for-byte identical to it, so both ran with
+  it (the worker loads both files at start). The split rule alone was measured on balanced only (`ab_dip30`).
+- The conservative and balanced rows are the first measurements of the combined change (adversary review: they are
+  new evidence, not checks of an earlier experiment).
+- The 14 entry-point runs (recorder) show `dip_search_from` 0.3 / `dip_accept_any` True for anime conservative and
+  balanced on the command line and in the ensemble, and 0.6 / False for every Qwen3-ASR run and for anime aggressive.
+
+**Adversary review of these two changes (2026-10-06, one `assessment-adversary`, read-only) and what was done:**
+- Code correct; Qwen3-ASR and other segmenters unchanged; the GUI dialog neither sends nor drops the new settings.
+- "Subtitle times unaffected" was too strong: window edges do not move, but inside a window the text is split into
+  sentences with times proportional to text length, so different text moves those inner split points. Wording
+  corrected here.
+- The lead-in reached `--pipeline decoupled --generator anime-whisper` through the class default: fixed (default 0,
+  ChronosJAV passes 200).
+- There is no user switch to turn the lead-in off (owner's decision; not added).
+- The owner's words for these decisions were not in his words file: added (`docs/plans/OWNER_WORDS_SPRINT_20260927.md`).
+- Stale "3 s" lines in this record: corrected. Latent: the segmenter factory turns any string into `True` for a
+  boolean setting (`bool("false")`); no current path sends a string.
+- Unmeasured risk noted by the reviewer: very short windows become mostly silence for the model, where Whisper models
+  can invent text; JAV has many short sounds. Drama clips only.
+
 ---
 
 ## 3. Numbers for release notes or replies (drafts of facts; wording and use are the owner's decision)
@@ -431,8 +482,9 @@ The scripts in `measure-scripts/` were written for one machine. Repository paths
 ## 5. Open for the owner
 1. ~~The extraction fix~~ — adopted 2026-10-05 (§1.1b).
 2. ~~REQ2 defaults~~ — DECIDED 2026-10-05 (owner) and committed (77d2078 … a943545): with WhisperSeg, longest
-   segment Qwen3-ASR 4.0 s and anime-whisper 3.0 s at every sensitivity; anime-whisper aggressive grow floor
-   0.15; group cap and group gap unchanged (grouping joined only 4–6 pairs per run, so it was not the cause of
+   segment Qwen3-ASR 4.0 s and anime-whisper 3.0 s at every sensitivity, then changed the same day to option B
+   (anime-whisper 4.0 s, commits e2a30af … fd384d4) after the confirming runs showed 3 s writes 3.5–7 % less text;
+   anime-whisper aggressive grow floor 0.15; group cap and group gap unchanged (grouping joined only 4–6 pairs per run, so it was not the cause of
    joined sentences). Verified on all 14 entry-point runs with the segmenter recorder (CLI and ensemble, both
    models, three sensitivities, plus a user value of 5.5 s that wins). Same day: the GUI Customize dialog's
    decoder default fixed (it showed "offline" where hysteresis runs), and the qwen_guide.html segmenter entry
