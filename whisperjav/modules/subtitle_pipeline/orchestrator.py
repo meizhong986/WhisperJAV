@@ -200,6 +200,18 @@ class DecoupledSubtitlePipeline:
                 scene_durations, scene_speech_regions,
                 vad_audio_paths=vad_audio_paths,
             )
+            # The aligner loaded for pass 1 but not for the retry (#436 fallback):
+            # the retry ran without alignment, which is not an improvement. Keep
+            # the pass-1 results (already recovered) and say what happened.
+            if self.alignment_unavailable:
+                self.alignment_unavailable = self.alignment_unavailable.replace(
+                    "ForcedAligner could not be loaded",
+                    "ForcedAligner could not be reloaded for the step-down retry", 1,
+                ).replace(
+                    "subtitle times come from the speech segments instead; the text is kept",
+                    f"{len(collapsed_indices)} collapsed scene(s) keep their first-pass timing", 1,
+                )
+                return results
             # Replace Pass 1 results for retried scenes with Pass 2 results
             for idx, retry_result in zip(collapsed_indices, retry_results):
                 _pass1_diag = results[idx][1]
