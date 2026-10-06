@@ -2394,6 +2394,11 @@ def validate_balanced_vad_options(args) -> None:
 
 def main():
     """Enhanced main entry point with all V3 improvements."""
+    # Installed copies keep FFmpeg in <install>\Library\bin, on PATH only in an activated environment; the GUI adds
+    # it at start-up, the CLI did not ("FFmpeg not found", #436). Windows only; no-op when already present.
+    from whisperjav.utils.conda_path import ensure_conda_dirs_on_path
+    ensure_conda_dirs_on_path()
+
     # Apply HuggingFace Hub network resilience patch (#204)
     from whisperjav.utils.model_loader import patch_hf_hub_downloads
     patch_hf_hub_downloads()
