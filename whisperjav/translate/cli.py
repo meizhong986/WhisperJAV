@@ -195,10 +195,9 @@ def resolve_instruction_file_or_content(args, merged: dict) -> Optional[str]:
         temp_dir.mkdir(exist_ok=True)
         temp_file = temp_dir / f'instructions_{tone}.txt'
 
-        with open(temp_file, 'w', encoding='utf-8') as f:
-            f.write(instruction_content)
-
-        return str(temp_file)
+        # Another run of the same tone may be reading this file right now.
+        from .core import write_shared_text
+        return write_shared_text(temp_file, instruction_content)
 
     return None
 
