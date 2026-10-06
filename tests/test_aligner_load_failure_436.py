@@ -69,3 +69,33 @@ def test_both_pipelines_report_it():
     for name in ("qwen_pipeline.py", "decoupled_pipeline.py"):
         src = (root / name).read_text(encoding="utf-8")
         assert "self.degradations.append(self._subtitle_pipeline.alignment_unavailable)" in src, name
+
+
+def test_aligner_failing_only_for_the_step_down_retry_keeps_the_first_pass(tmp_path):
+    """Review finding: pass 1 aligned (scene collapsed), the retry could not reload the aligner. The retry's
+    aligner-free result must not replace pass 1 as an 'improvement'."""
+    from whisperjav.modules.subtitle_pipeline.types import StepDownConfig
+
+    class _Framer:
+        def reframe(self, *a, **k):
+            pass
+
+    orch = DecoupledSubtitlePipeline(
+        framer=_Framer(), generator=object(), cleaner=object(), aligner=object(),
+        hardening_config=HardeningConfig(timestamp_mode=TimestampMode.ALIGNER_WITH_VAD_FALLBACK),
+        stepdown_config=StepDownConfig(enabled=True),
+    )
+    pass1 = [("pass1-result", {"sentinel_status": "COLLAPSED"})]
+
+    def _retry(*a, **k):
+        orch.alignment_unavailable = ("ForcedAligner could not be loaded (RuntimeError: CUDA out of memory); "
+                                      "subtitle times come from the speech segments instead; the text is kept")
+        return [("retry-result", {"sentinel_status": "N/A"})]
+
+    orch._run_pass = lambda *a, **k: pass1
+    orch._run_stepdown_pass = _retry
+    results = orch.process_scenes([tmp_path / "s.wav"], [10.0])
+    assert results[0][0] == "pass1-result"
+    assert orch.alignment_unavailable == ("ForcedAligner could not be reloaded for the step-down retry "
+                                          "(RuntimeError: CUDA out of memory); 1 collapsed scene(s) keep their "
+                                          "first-pass timing")
