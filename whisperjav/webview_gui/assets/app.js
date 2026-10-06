@@ -8531,13 +8531,24 @@ window.addEventListener('pywebviewready', async () => {
 
     await SettingsPersistence.loadFromBackend();
 
-    // Restore saved provider selections from localStorage
-    const savedEnsemble = localStorage.getItem('whisperjav_ensemble_provider');
+    // Restore the translation choices of both tabs (#435). They come from the
+    // translate settings file; browser storage is cleared at every launch
+    // (private_mode, main.py), so it is only a fallback for the provider.
+    let tabState = {};
+    try {
+        const r = await pywebview.api.get_translation_tab_state();
+        if (r && r.success) tabState = r.state || {};
+    } catch (e) {
+        console.warn('Could not load translation tab state:', e);
+    }
+    const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+
+    const savedEnsemble = (tabState.ensemble || {}).provider || lsGet('whisperjav_ensemble_provider');
     if (savedEnsemble) {
         const dd = document.getElementById('ensembleTranslateProvider');
         if (dd) {
             dd.value = savedEnsemble;
-            ProviderUIManager.onProviderChange(savedEnsemble, 'ensemble');
+            await ProviderUIManager.onProviderChange(savedEnsemble, 'ensemble');
             TranslationSettingsModal.updateModelOptions(savedEnsemble);
             // Show/hide Ollama URL field in settings modal
             document.querySelectorAll('.ollama-settings-row').forEach(el => {
@@ -8545,13 +8556,79 @@ window.addEventListener('pywebviewready', async () => {
             });
         }
     }
-    const savedSrt = localStorage.getItem('whisperjav_srt_provider');
+    const savedSrt = (tabState.srt || {}).provider || lsGet('whisperjav_srt_provider');
     if (savedSrt) {
         const dd = document.getElementById('translatorProvider');
         if (dd) {
             dd.value = savedSrt;
-            ProviderUIManager.onProviderChange(savedSrt, 'srt');
+            await ProviderUIManager.onProviderChange(savedSrt, 'srt');
             TranslatorManager.updateApiKeyStatus(savedSrt);
         }
     }
+    TranslationTabState.apply(tabState);
+    TranslationTabState.bind();
 });
+
+// #435: remember the translation choices of the Ensemble row and the AI SRT Translate
+// tab between launches (saved through the backend; see api.save_translation_tab_state).
+const TranslationTabState = {
+    FIELDS: {
+        ensemble: {
+            provider: 'ensembleTranslateProvider', model: 'ensembleTranslateModel',
+            modelOverride: 'ensembleTranslateModelOverride',
+        },
+        srt: {
+            provider: 'translatorProvider', model: 'translatorModel', customModel: 'translatorCustomModel',
+            sourceLang: 'translatorSourceLang', targetLang: 'translatorTargetLang', tone: 'translatorTone',
+            customEndpoint: 'translatorCustomEndpoint', maxBatchSize: 'translatorMaxBatchSize',
+            maxRetries: 'translatorMaxRetries', rateLimit: 'translatorRateLimit',
+            sceneThreshold: 'translatorSceneThreshold',
+        },
+    },
+    _timers: {},
+
+    // Fill everything but the provider (already restored, with its model list).
+    // A saved value a drop-down no longer offers is skipped, not forced in.
+    apply(state) {
+        for (const [tab, fields] of Object.entries(this.FIELDS)) {
+            const saved = (state || {})[tab] || {};
+            for (const [key, id] of Object.entries(fields)) {
+                if (key === 'provider' || saved[key] === undefined) continue;
+                const el = document.getElementById(id);
+                if (!el) continue;
+                if (el.tagName === 'SELECT' && !Array.from(el.options).some(o => o.value === saved[key])) continue;
+                el.value = saved[key];
+            }
+        }
+    },
+
+    collect(tab) {
+        const values = {};
+        for (const [key, id] of Object.entries(this.FIELDS[tab])) {
+            const el = document.getElementById(id);
+            if (el && el.value !== undefined && el.value !== '') values[key] = String(el.value).trim();
+        }
+        return values;
+    },
+
+    save(tab) {
+        clearTimeout(this._timers[tab]);
+        this._timers[tab] = setTimeout(async () => {
+            try {
+                if (window.pywebview?.api?.save_translation_tab_state) {
+                    await pywebview.api.save_translation_tab_state(tab, this.collect(tab));
+                }
+            } catch (e) {
+                console.warn('Could not save translation tab state:', e);
+            }
+        }, 400);
+    },
+
+    bind() {
+        for (const [tab, fields] of Object.entries(this.FIELDS)) {
+            for (const id of Object.values(fields)) {
+                document.getElementById(id)?.addEventListener('change', () => this.save(tab));
+            }
+        }
+    },
+};
