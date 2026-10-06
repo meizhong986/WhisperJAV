@@ -157,6 +157,8 @@ class AnimeWhisperGenerator:
         logger.info("  Model:  %s", cfg["model_id"])
         logger.info("  Device: %s", device)
         logger.info("  Dtype:  %s", dtype)
+        logger.debug("[AnimeWhisperGenerator] Silence before each window: %d ms",
+                     self._config.get("leading_silence_ms", 0))
 
         import time
         start = time.time()
