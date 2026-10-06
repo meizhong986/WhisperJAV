@@ -594,8 +594,10 @@ class OllamaManager:
             print(f"[OLLAMA] Auto-selected model: {model} ({rec.quality}, {rec.download_size})",
                   file=sys.stderr)
             # #356: the pick went by VRAM only, so a model never pulled was chosen and the
-            # translation failed while a usable model sat on disk. Prefer one already pulled.
-            if not self.check_model(model):
+            # translation failed while a usable model sat on disk. Prefer one already pulled --
+            # only when the run can neither download (auto_pull; the GUI always passes --yes)
+            # nor ask (interactive CLI prompt); those keep offering the VRAM pick, as before.
+            if not auto_pull and not interactive and not self.check_model(model):
                 fallback = self._best_pulled_known_model(OLLAMA_MODEL_CONFIGS[model]['min_vram_gb'])
                 if fallback:
                     print(f"[OLLAMA] {model} is not downloaded; using {fallback}, which is already "
