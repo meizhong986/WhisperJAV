@@ -541,6 +541,11 @@ def main():
     effective_tone = merged.get('tone') or 'standard'
     provider_options = build_provider_options(args, merged.get('model_params', {}), effective_tone,
                                               settings_tone=settings.get('tone'))
+    # #444 (owner, 2026-10-06): a custom server keeps its own temperature unless
+    # --temperature is given; the tone default is not sent (core.apply_server_temperature_patch).
+    if provider_name == 'custom' and getattr(args, 'temperature', None) is None:
+        provider_options.pop('temperature', None)
+        provider_options['_server_temperature'] = True
 
     # Build extra context
     extra_context = build_extra_context(args)
