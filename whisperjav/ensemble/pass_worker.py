@@ -452,6 +452,7 @@ def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
         "vad_grow_floor": "qwen_vad_grow_floor",   # v1.9.0 offline decoder: edge-growth floor
         "vad_gap_merge_ms": "qwen_vad_gap_merge_ms",  # v1.9.0 offline decoder: dialog-cut gap (ms)
         "max_speech_duration": "qwen_max_speech_duration",  # v1.9.0: single-segment ceiling (s)
+        "leading_silence_ms": "qwen_leading_silence_ms",  # v1.9.4: anime-whisper lead-in silence (0 = off)
     }
 
     # Track which qwen_* keys were explicitly set by user
@@ -1351,6 +1352,9 @@ def _build_pipeline(
             qwen_pipeline_params["stepdown_initial_group"] = qwen_defaults["qwen_stepdown_initial_group"]
         if "qwen_stepdown_fallback_group" in qwen_defaults:
             qwen_pipeline_params["stepdown_fallback_group"] = qwen_defaults["qwen_stepdown_fallback_group"]
+        if qwen_defaults.get("qwen_leading_silence_ms") is not None:
+            # v1.9.4: anime-whisper lead-in silence from the GUI dialog / qwen-params (0 = off)
+            qwen_pipeline_params["anime_leading_silence_ms"] = max(0, int(qwen_defaults["qwen_leading_silence_ms"]))
         logger.debug(
             "[Worker %s] Pass %s: Creating QwenPipeline with model_id=%s, scene=%s, segmenter=%s",
             os.getpid(), pass_number,
