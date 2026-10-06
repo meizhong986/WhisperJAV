@@ -5923,8 +5923,10 @@ const EnsembleManager = {
             config.translate_tone = translateSettings.tone || 'standard';
             // Use model override if provided, otherwise use selected model
             config.translate_model = translateSettings.modelOverride || translateSettings.model || null;
-            // Local/custom providers don't require API key (custom: optional via --translate-api-key)
-            config.translate_api_key = (translateSettings.provider === 'local' || translateSettings.provider === 'custom') ? null : (translateSettings.apiKey || null);
+            // The local provider takes no API key. A custom endpoint may need one (#420: a
+            // local proxy answered 401 "Missing API key" because the key was dropped here,
+            // while the AI SRT Translate tab sends it), so it is sent when entered.
+            config.translate_api_key = (translateSettings.provider === 'local') ? null : (translateSettings.apiKey || null);
             config.translate_title = translateSettings.movieTitle || null;
             config.translate_actress = translateSettings.actress || null;
             config.translate_plot = translateSettings.plot || null;
@@ -8223,7 +8225,12 @@ const TranslationSettingsModal = {
                 else statusEl.textContent = 'Custom (No API)';
                 statusEl.className = 'api-status connected';
             }
-            const label = provider === 'ollama' ? 'Ollama' : provider === 'local' ? 'Local LLM' : 'Custom endpoint';
+            if (provider === 'custom') {
+                // #420: it said "no API key required", but a custom endpoint may need one.
+                ConsoleManager.log('Custom endpoint selected - not tested here; the API key is sent if you entered one', 'info');
+                return;
+            }
+            const label = provider === 'ollama' ? 'Ollama' : 'Local LLM';
             ConsoleManager.log(`${label} provider selected - no API key required`, 'info');
             return;
         }
