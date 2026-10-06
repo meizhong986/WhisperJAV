@@ -244,7 +244,10 @@ class TestBalancedDefault:
         2026-09-12, which stopped `--mode fast --speech-segmenter firered-vad` over a
         model fast never loads. fast/faster run stable_ts with no segmenter at all."""
         from whisperjav.config.segmenter_presets import SINGLE_PASS_EXTERNAL_OK
-        assert SINGLE_PASS_EXTERNAL_OK == {"fidelity": frozenset({"firered-vad"})}
+        # 1.9.4 (WP-004, owner 2026-10-04): fidelity also keeps ten, whisperseg and
+        # whisper-vad; nemo is still not listed. Still fidelity only.
+        assert SINGLE_PASS_EXTERNAL_OK == {
+            "fidelity": frozenset({"firered-vad", "ten", "whisperseg", "whisper-vad"})}
 
     def test_check_reports_without_downloading(self, monkeypatch):
         """A diagnostic must not change the machine it is diagnosing."""
@@ -387,9 +390,20 @@ class TestBalancedCliDefaults:
         assert p1["sensitivity"] == "aggressive"
 
     def test_fidelity_still_downgrades_an_unwired_segmenter(self, tmp_path):
-        dump, log = _dump(tmp_path, "--mode", "fidelity", "--speech-segmenter", "whisperseg")
+        # 1.9.4 (WP-004): whisperseg, ten and whisper-vad are now kept on
+        # single-pass fidelity; nemo is the one left unwired (owner, 2026-10-04).
+        dump, log = _dump(tmp_path, "--mode", "fidelity", "--speech-segmenter", "nemo")
         assert _segmenter(dump)["backend"] == "silero-v3.1"
         assert "Falling back to silero-v3.1" in log
+
+    def test_fidelity_keeps_whisperseg_with_its_sensitivity_preset(self, tmp_path):
+        """WP-004 / #323: it used to be swapped for silero-v3.1 with a warning."""
+        dump, log = _dump(tmp_path, "--mode", "fidelity", "--sensitivity", "conservative",
+                          "--speech-segmenter", "whisperseg")
+        seg = _segmenter(dump)
+        assert seg["backend"] == "whisperseg"
+        assert seg["max_group_duration_s"] == 7 and seg["chunk_threshold_s"] == 1.0
+        assert "Falling back to silero-v3.1" not in log
 
     def test_cli_overrides_still_win_on_a_mode_that_takes_a_segmenter(self, tmp_path):
         dump, _ = _dump(tmp_path, "--mode", "fidelity", "--speech-segmenter", "silero-v3.1",
