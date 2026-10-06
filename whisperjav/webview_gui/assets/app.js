@@ -8056,6 +8056,7 @@ const TranslationSettingsModal = {
             document.querySelectorAll('.ollama-settings-row').forEach(el => {
                 el.style.display = (e.target.value === 'ollama') ? 'block' : 'none';
             });
+            this.updateTemperatureHint(e.target.value);
         });
 
         // No default provider initialization — dropdown starts blank
@@ -8155,7 +8156,15 @@ const TranslationSettingsModal = {
         }
     },
 
+    // #444: for the custom provider the temperature is left to the server, so the
+    // Temperature field is labelled as not sent.
+    updateTemperatureHint(provider) {
+        const hint = document.getElementById('translationTemperatureHint');
+        if (hint) hint.style.display = (provider === 'custom') ? 'block' : 'none';
+    },
+
     populateForm() {
+        this.updateTemperatureHint(document.getElementById('ensembleTranslateProvider')?.value || '');
         document.getElementById('translationApiKey').value = this.settings.apiKey;
         document.getElementById('translationTargetLang').value = this.settings.targetLang;
         document.getElementById('translationTone').value = this.settings.tone;
