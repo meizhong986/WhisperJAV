@@ -126,7 +126,9 @@ INSTRUCTIONS_FALLBACK = textwrap.dedent("""\
 def load_instructions() -> str:
     """Load the actual instruction file if available, otherwise use fallback."""
     if INSTRUCTIONS_STANDARD.exists():
-        return INSTRUCTIONS_STANDARD.read_text(encoding="utf-8")
+        # 1.9.4 (WP-001): the shipped file carries {LANG}; WhisperJAV fills it before use.
+        from whisperjav.translate.core import fill_target_language
+        return Path(fill_target_language(INSTRUCTIONS_STANDARD, "english")).read_text(encoding="utf-8")
     return INSTRUCTIONS_FALLBACK
 
 
