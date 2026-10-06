@@ -572,7 +572,7 @@ def main():
             file=sys.stderr,
         )
         print(
-            "  The local LLM server (llama-cpp-python) will be removed in v1.9.0.\n",
+            "  The local LLM server (llama-cpp-python) will be removed in a later release.\n",
             file=sys.stderr,
         )
         n_gpu_layers = getattr(args, 'translate_gpu_layers', -1)
