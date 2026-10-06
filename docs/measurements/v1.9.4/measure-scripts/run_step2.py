@@ -20,6 +20,7 @@ CONFIG = {
     "aa": ("aggressive", "litagin/anime-whisper", ANIME),
     "ab": ("balanced", "litagin/anime-whisper", ANIME),
     "q": ("balanced", "Qwen/Qwen3-ASR-1.7B", {"framer": "vad-grouped"}),
+    "ac": ("conservative", "litagin/anime-whisper", ANIME),
 }
 # name -> (config, extra qwen-params, experiment environment)
 RUNS = {
@@ -35,6 +36,20 @@ RUNS = {
     "q_leadtail200": ("q", {}, {"WJ_EXP_LEADIN_MS": "200", "WJ_EXP_TAIL_MS": "200"}),
     "q_dip30": ("q", {}, {"WJ_EXP_DIP_FROM": "0.3", "WJ_EXP_DIP_ACCEPT_ALL": "1"}),
     "ab_dip30": ("ab", {}, {"WJ_EXP_DIP_FROM": "0.3", "WJ_EXP_DIP_ACCEPT_ALL": "1"}),
+    # owner, 2026-10-06: the model's window reaches 300 ms back; the subtitle keeps its time
+    "aa_reach300": ("aa", {}, {"WJ_EXP_REACHBACK_MS": "300"}),
+    "q_reach300": ("q", {}, {"WJ_EXP_REACHBACK_MS": "300"}),
+    # product verification after the 2026-10-06 changes (anime silence 200 ms; split rule for anime
+    # conservative/balanced): no experiment variables, product defaults only
+    "f_aa": ("aa", {}, {}),
+    "f_ab": ("ab", {}, {}),
+    "f_ac": ("ac", {}, {}),
+    "f_q": ("q", {}, {}),
+    # f_ac started 11 s before the lead-in was moved from the generator default to the qwen pipeline and
+    # mixed the two file versions: it ran WITHOUT the lead-in (split rule only). Re-run on the final code;
+    # f_aa2 repeats f_aa on the final code (must equal aa_lead200 byte for byte).
+    "f_ac2": ("ac", {}, {}),
+    "f_aa2": ("aa", {}, {}),
 }
 
 out_root = Path(sys.argv[1])
