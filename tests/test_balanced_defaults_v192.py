@@ -394,7 +394,7 @@ class TestBalancedCliDefaults:
         # single-pass fidelity; nemo is the one left unwired (owner, 2026-10-04).
         dump, log = _dump(tmp_path, "--mode", "fidelity", "--speech-segmenter", "nemo")
         assert _segmenter(dump)["backend"] == "silero-v3.1"
-        assert "Falling back to silero-v3.1" in log
+        assert "using silero-v3.1 instead" in log
 
     def test_fidelity_keeps_whisperseg_with_its_sensitivity_preset(self, tmp_path):
         """WP-004 / #323: it used to be swapped for silero-v3.1 with a warning."""
@@ -403,7 +403,7 @@ class TestBalancedCliDefaults:
         seg = _segmenter(dump)
         assert seg["backend"] == "whisperseg"
         assert seg["max_group_duration_s"] == 7 and seg["chunk_threshold_s"] == 1.0
-        assert "Falling back to silero-v3.1" not in log
+        assert "using silero-v3.1 instead" not in log
 
     def test_cli_overrides_still_win_on_a_mode_that_takes_a_segmenter(self, tmp_path):
         dump, _ = _dump(tmp_path, "--mode", "fidelity", "--speech-segmenter", "silero-v3.1",
@@ -417,7 +417,7 @@ class TestBalancedCliDefaults:
         dump, log = _dump(tmp_path, "--mode", "fidelity")
         assert _segmenter(dump)["backend"] == "firered-vad"
         # It must NOT be sent back to silero by the routing guard...
-        assert "Falling back to silero-v3.1" not in log
+        assert "using silero-v3.1 instead" not in log
         # ...and it must arrive with its grouping params, which is the whole
         # reason the guard exists. A backend that reached the segmenter without
         # these ran on its own defaults and produced the repetition pathology.
