@@ -992,6 +992,10 @@ def parse_arguments():
     qwen_output_group.add_argument("--no-qwen-drop-nonverbal-lines", dest="qwen_drop_nonverbal_lines",
                            action="store_false",
                            help="Keep lone nonverbal subtitle lines (disable the Phase-8 filter)")
+    qwen_output_group.add_argument("--qwen-leading-silence", type=int, default=None, metavar="MS",
+                           help="Silence in milliseconds placed before every audio window sent to "
+                                "anime-whisper (default: 200; 0 turns it off). Where each window starts "
+                                "and ends does not change. Qwen3-ASR does not use it.")
 
     # Decoupled Pipeline Options (IMPL-001 Phase 2)
     decoupled_group = parser.add_argument_group(
@@ -1589,6 +1593,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             "stepdown_enabled": getattr(args, 'qwen_stepdown', True),
             # v1.9.0: Phase-8 nonverbal single-token line filter (default on)
             "drop_nonverbal_lines": getattr(args, 'qwen_drop_nonverbal_lines', True),
+            # v1.9.4: anime-whisper lead-in silence; None keeps the pipeline default (200 ms)
+            **({"anime_leading_silence_ms": args.qwen_leading_silence}
+               if getattr(args, 'qwen_leading_silence', None) is not None else {}),
             # Generator backend selection (v1.8.6+)
             "generator_backend": getattr(args, 'qwen_generator', 'qwen3'),
             # Qwen ASR
