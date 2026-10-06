@@ -9,6 +9,10 @@ usual, then applies, from environment variables:
                      longest segment (the product uses 0.6, i.e. only the last 40 %)
   WJ_EXP_DIP_ACCEPT_ALL=1  accept the lowest point found even if it is not below 0.85 x the window's mean (the
                      product then cuts exactly at the limit)
+  WJ_EXP_REACHBACK_MS  each vad-grouped window starts this much earlier for the ASR model (it may reach into the
+                     previous window; clipped at the scene start). The original start is recorded as the window's
+                     "speech start", which the orchestrator uses as the displayed start (vad_only mode), so the
+                     subtitle keeps its time. A window that already has a speech start keeps it.
 Silence is added to in-memory windows only (the pipeline's default "pathless" mode). The default timestamp mode
 takes subtitle times from the frames, not from the model, so added silence does not move times.
 """
@@ -31,6 +35,7 @@ LEADIN = int(os.environ.get("WJ_EXP_LEADIN_MS", "0") or 0)
 TAIL = int(os.environ.get("WJ_EXP_TAIL_MS", "0") or 0)
 DIP_FROM = os.environ.get("WJ_EXP_DIP_FROM")
 DIP_ALL = os.environ.get("WJ_EXP_DIP_ACCEPT_ALL") == "1"
+REACHBACK = int(os.environ.get("WJ_EXP_REACHBACK_MS", "0") or 0)
 SR = 16000
 
 
@@ -77,6 +82,21 @@ def _hook_qwen3(mod):
 
 def _hook_split(mod):
     cls = mod.WhisperSegSpeechSegmenter
+    if "dip_search_from" in inspect.signature(cls.__init__).parameters:
+        # Since 2026-10-06 the product has these as settings (dip_search_from / dip_accept_any): set them.
+        orig_init = cls.__init__
+
+        def __init__(self, *a, **k):
+            if DIP_FROM:
+                k["dip_search_from"] = float(DIP_FROM)
+            if DIP_ALL:
+                k["dip_accept_any"] = True
+            orig_init(self, *a, **k)
+
+        cls.__init__ = __init__
+        _note({"kind": "experiment", "hook": "whisperseg dip split (settings)", "dip_from": DIP_FROM,
+               "accept_all": DIP_ALL})
+        return
     src = inspect.getsource(mod)
     a = src.index("    def _probs_to_segments(")
     b = src.index("    def _pad_and_convert(")
@@ -94,7 +114,33 @@ def _hook_split(mod):
     _note({"kind": "experiment", "hook": "whisperseg dip split", "dip_from": DIP_FROM, "accept_all": DIP_ALL})
 
 
+def _hook_reachback(mod):
+    cls = mod.VadGroupedFramer
+    orig = cls.frame
+    r = REACHBACK / 1000.0
+
+    def frame(self, *a, **k):
+        res = orig(self, *a, **k)
+        frames = list(res.frames)
+        starts = list(res.metadata.get("speech_starts") or [None] * len(frames))
+        moved = 0
+        for i, f in enumerate(frames):
+            new_start = max(0.0, f.start - r)
+            if new_start < f.start:
+                if i < len(starts) and starts[i] is None:
+                    starts[i] = f.start
+                f.start = new_start
+                moved += 1
+        res.metadata["speech_starts"] = starts
+        _note({"kind": "experiment", "hook": "reachback", "ms": REACHBACK, "frames": len(frames), "moved": moved})
+        return res
+
+    cls.frame = frame
+
+
 _TARGETS = {}
+if REACHBACK:
+    _TARGETS["whisperjav.modules.subtitle_pipeline.framers.vad_grouped"] = _hook_reachback
 if LEADIN or TAIL:
     _TARGETS["whisperjav.modules.subtitle_pipeline.generators.anime_whisper"] = _hook_anime
     _TARGETS["whisperjav.modules.subtitle_pipeline.generators.qwen3"] = _hook_qwen3
