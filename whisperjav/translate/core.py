@@ -156,6 +156,41 @@ def apply_server_temperature_patch(translator, debug: bool = False) -> bool:
     return True
 
 
+def target_language_name(target_lang: str) -> str:
+    """'chinese' -> 'Chinese'; the name the instructions and the prompt use."""
+    name = (target_lang or "").strip()
+    return name[:1].upper() + name[1:] if name else "the target language"
+
+
+def fill_target_language(instruction_file, target_lang: str) -> str:
+    """Write the target language into an instruction file that asks for it ({LANG}).
+
+    WP-001 / #347 (owner, 2026-10-06): the instructions never named the target
+    language and their example answered in English, so local models drifted into
+    English. Tags inside the instructions are not filled in on this path, so
+    WhisperJAV fills {LANG} itself and passes a filled copy. A file without {LANG}
+    (a user's own) is passed unchanged.
+    """
+    import tempfile
+    path = Path(instruction_file)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return str(instruction_file)
+    if "{LANG}" not in text:
+        return str(instruction_file)
+    name = target_language_name(target_lang)
+    out_dir = Path(tempfile.gettempdir()) / "whisperjav_translate"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"{path.stem}_{name.lower().replace(' ', '_')}.txt"
+    # The rule sentence is written as its meaning, not filled literally
+    # ("unless Chinese is English" reads oddly): kept for other targets, dropped for English.
+    rule = "Do not answer in English unless {LANG} is English."
+    text = text.replace(" " + rule, "" if name.lower() == "english" else " Do not answer in English.")
+    out.write_text(text.replace("{LANG}", name), encoding="utf-8")
+    return str(out)
+
+
 def resolve_batch_window(max_batch_size: int) -> tuple:
     """Return a (min_batch_size, max_batch_size) pair PySubtrans will accept.
 
@@ -379,7 +414,8 @@ def translate_subtitle(
             print(f"[TRANSLATE]   API base: {provider_config['api_base']}", file=sys.stderr)
 
         # Build prompt
-        prompt = f"Translate these subtitles from {source_lang} into {target_lang}."
+        prompt = (f"Translate these subtitles from {target_language_name(source_lang)} "
+                  f"into {target_language_name(target_lang)}.")
         if extra_context:
             prompt += "\n" + extra_context
             print(f"[TRANSLATE]   Extra context: {extra_context[:200]}", file=sys.stderr)
@@ -432,6 +468,7 @@ def translate_subtitle(
         # does not exist in current PySubtrans — instructions were silently
         # dropped for ALL providers.
         if instruction_file:
+            instruction_file = fill_target_language(instruction_file, target_lang)  # WP-001
             opt_kwargs['instruction_file'] = str(instruction_file)
 
         if 'api_base' in provider_config:
