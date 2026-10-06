@@ -458,7 +458,7 @@ def translate_with_config(
         elif provider == 'local' and not endpoint:
             import warnings
             warnings.warn(
-                "provider='local' is deprecated as of v1.8.10 and will be removed in v1.9.0. "
+                "provider='local' is deprecated as of v1.8.10 and will be removed in a later release. "
                 "Use provider='ollama' instead.",
                 DeprecationWarning,
                 stacklevel=2,
