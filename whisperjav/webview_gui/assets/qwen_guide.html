@@ -810,6 +810,20 @@
     </div>
   </div>
 
+  <div class="param">
+    <span class="param-name">Silence Before Each Window (ms)</span>
+    <span class="param-default">200 ms (anime-whisper only)</span>
+    <div class="param-desc">
+      Silence placed before every audio window sent to anime-whisper. On the reference clips it helped
+      the first words of a line come out right. Where each window starts and ends does not change.
+      Qwen3-ASR does not use it (silence made its text slightly worse), so the control is shown only for anime-whisper.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Set to 0 to turn it off, for example to compare with 1.9.3 output.
+      On the command line: <code>--qwen-leading-silence 0</code>.
+    </div>
+  </div>
+
   <p class="group-header">Generation Safety</p>
 
   <div class="param">
