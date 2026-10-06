@@ -946,6 +946,10 @@ class QwenPipeline(BasePipeline):
             vad_audio_paths=orch_vad_paths,
         )
 
+        # A failed aligner load no longer ends the job (#436); say so in the summary.
+        if getattr(self._subtitle_pipeline, "alignment_unavailable", None):
+            self.degradations.append(self._subtitle_pipeline.alignment_unavailable)
+
         # Convert to Phase 6 format: (WhisperResult, scene_idx)
         for idx, (result, _diag) in enumerate(orch_results):
             scene_results.append((result, idx))
