@@ -30,3 +30,12 @@ def test_both_paths_flag_only_custom_without_an_explicit_temperature():
     src = inspect.getsource(core.translate_subtitle)
     assert "_server_temperature = provider_options.pop('_server_temperature', False)" in src
     assert "apply_server_temperature_patch(translator, debug=debug)" in src
+
+
+def test_flags_are_popped_from_a_copy_so_every_file_of_a_run_keeps_them():
+    """Review finding: the translate CLI passes ONE provider_options dict for all files of a run; popping the flags
+    from it made files 2..N send temperature 0.0 (and lost _thinking_model)."""
+    src = inspect.getsource(core.translate_subtitle)
+    copy_at = src.index("provider_options = dict(provider_options) if provider_options else provider_options")
+    assert copy_at < src.index("provider_options.pop('_thinking_model'")
+    assert copy_at < src.index("provider_options.pop('_server_temperature'")
