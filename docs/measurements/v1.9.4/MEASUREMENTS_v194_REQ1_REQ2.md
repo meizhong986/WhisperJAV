@@ -457,6 +457,21 @@ them, so their "late lines" counts in `onset_analysis.py` describe the original 
 - Unmeasured risk noted by the reviewer: very short windows become mostly silence for the model, where Whisper models
   can invent text; JAV has many short sounds. Drama clips only.
 
+### 2.12 1.9.3 defaults against the final 1.9.4 code (scored 2026-10-06 for the release notes; no new runs)
+The release-note figures. Existing runs only, re-scored: the 1.9.3 baselines (`req2_baseline/*/run1`;
+`req2_confirm/a_cons_old6`, `a_bal_old5`, which pass the 1.9.3 values explicitly) against the product-verification runs
+on the final code (`step2/f_q`, `f_ac2`, `f_ab`, `f_aa`; §2.11). Commands, from the repository root:
+`python measure-scripts/cer_trace.py <runs…>` and `python measure-scripts/compare_pairs.py <base> <candidate> …`.
+
+| Model, sensitivity | End median, common lines (s) | Change | Ends ≤ 0.5 s | Matched | Start median, common (s) | Lost | End mean (s) | CER | CER change (relative) |
+|---|---|---|---|---|---|---|---|---|---|
+| Qwen3-ASR balanced | 1.057 → 0.677 | −36 % | 50 → 79 | 169 → 186 | 0.328 → 0.311 | 13 | +1.073 → +0.652 | 0.390 → 0.394 | +1.0 % (worse) |
+| anime-whisper conservative | 1.131 → 0.482 | −57 % | 46 → 101 | 142 → 183 | 0.222 → 0.225 | 9 | +1.377 → +0.413 | 0.397 → 0.399 | +0.5 % |
+| anime-whisper balanced | 1.112 → 0.435 | −61 % | 51 → 103 | 154 → 187 | 0.289 → 0.253 | 8 | +1.112 → +0.389 | 0.400 → 0.394 | −1.5 % (better) |
+| anime-whisper aggressive | 0.690 → 0.596 | −14 % | 75 → 82 | 188 → 184 | 0.178 → 0.172 | 8 | +0.569 → +0.554 | 0.392 → 0.387 | −1.3 % (better) |
+"Common" = the ground-truth lines both runs matched (133–180 per row); "Lost" = lines 1.9.3 matched and 1.9.4 did not.
+Same limits as §2.5: seven drama scenes, not JAV; Qwen3-ASR measured at balanced only.
+
 ---
 
 ## 3. Numbers for release notes or replies (drafts of facts; wording and use are the owner's decision)
