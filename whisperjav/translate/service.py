@@ -334,6 +334,11 @@ def translate_with_config(
         settings_model_params=settings.get('model_params'),
         settings_tone=settings.get('tone')
     )
+    # #444 (owner, 2026-10-06): a custom server keeps its own temperature unless one is
+    # given explicitly; the tone default is not sent (core.apply_server_temperature_patch).
+    if provider == 'custom' and temperature is None:
+        provider_options.pop('temperature', None)
+        provider_options['_server_temperature'] = True
 
     # Generate output path if not specified
     if output_path:
