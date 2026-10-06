@@ -31,6 +31,8 @@ SEGMENTER_PARAMS = {
     "grow_floor",              # v1.9.0 offline decoder: edge-growth floor (anime table + GUI).
     "gap_merge_ms",            # v1.9.0 offline decoder: dialog-cut gap length (anime table + GUI).
     "split_smooth_ms",         # v1.9.0 offline decoder: overlong-split smoothing (anime table).
+    "dip_search_from",         # v1.9.4 hysteresis "dip" split: where the search starts (anime table).
+    "dip_accept_any",          # v1.9.4 hysteresis "dip" split: cut at the lowest point always (anime table).
     "min_speech_duration_ms",
     "max_speech_duration_s",   # Keep for CLI backward compat (not in GUI)
     "min_silence_duration_ms",
