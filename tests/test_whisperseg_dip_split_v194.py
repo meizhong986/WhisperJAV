@@ -71,7 +71,7 @@ def test_anime_whisper_leading_silence():
     from whisperjav.modules.subtitle_pipeline.generators.anime_whisper import AnimeWhisperGenerator
     assert AnimeWhisperGenerator()._config["leading_silence_ms"] == 0          # off unless asked for
     src = (Path(__file__).resolve().parents[1] / "whisperjav/pipelines/qwen_pipeline.py").read_text(encoding="utf-8")
-    assert "leading_silence_ms=200," in src                                       # ChronosJAV asks for 200 ms
+    assert "leading_silence_ms=self.anime_leading_silence_ms," in src            # ChronosJAV passes its setting (200 by default)
     gen = AnimeWhisperGenerator(leading_silence_ms=200)
     out = gen.with_leading_silence(np.ones(1600, dtype=np.float32))
     assert len(out) == 1600 + 3200 and not out[:3200].any() and out[3200:].all() and out.dtype == np.float32
