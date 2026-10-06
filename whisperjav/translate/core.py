@@ -122,6 +122,40 @@ def apply_deepseek_thinking_patch(translator, model: str, debug: bool = False) -
     return True
 
 
+def apply_server_temperature_patch(translator, debug: bool = False) -> bool:
+    """Leave the temperature to a custom server: drop it from the request body (#444).
+
+    WhisperJAV sent its tone's temperature (standard 0.5, contextual 0.8, pornify
+    1.2) with every request, and PySubtrans' CustomClient always sends one (0.0
+    when none is set), so a server's own temperature never applied. Owner,
+    2026-10-06: custom servers keep theirs. Used only for provider 'custom' when
+    the user gave no --temperature. Same instance-level wrap as the DeepSeek patch.
+
+    Returns True if the patch was applied.
+    """
+    client = getattr(translator, 'client', None)
+    if client is None or not hasattr(client, '_generate_request_body'):
+        print("[TRANSLATE]   WARNING: could not leave the temperature to the custom server - "
+              "translator.client._generate_request_body not found", file=sys.stderr)
+        return False
+
+    original = client._generate_request_body
+
+    def _patched(request, temperature, _orig=original):
+        body = _orig(request, temperature)
+        try:
+            body.pop('temperature', None)
+        except AttributeError:
+            return body
+        if debug:
+            print("[TRANSLATE]   [server-temperature] temperature left out of the request", file=sys.stderr)
+        return body
+
+    client._generate_request_body = _patched
+    print("[TRANSLATE]   Temperature: set by the custom server (not sent)", file=sys.stderr)
+    return True
+
+
 def resolve_batch_window(max_batch_size: int) -> tuple:
     """Return a (min_batch_size, max_batch_size) pair PySubtrans will accept.
 
@@ -354,6 +388,10 @@ def translate_subtitle(
         # parsing patch (after provider init). Remove from provider_options
         # so it doesn't get passed to PySubtrans as an unknown option.
         _is_thinking_model = provider_options.pop('_thinking_model', False) if provider_options else False
+        # #444: provider 'custom' with no --temperature leaves the temperature to the server.
+        _server_temperature = provider_options.pop('_server_temperature', False) if provider_options else False
+        if _server_temperature:
+            provider_options.pop('temperature', None)
         if _is_thinking_model:
             print(f"[TRANSLATE]   Thinking model: YES (will patch response parsing)",
                   file=sys.stderr)
@@ -605,6 +643,10 @@ def translate_subtitle(
         # rate-limit hungry, and can leak reasoning text into the subtitles.
         if provider_config.get('pysubtrans_name') == 'DeepSeek':
             apply_deepseek_thinking_patch(translator, model, debug=debug)
+
+        # Custom server keeps its own temperature (#444)
+        if _server_temperature:
+            apply_server_temperature_patch(translator, debug=debug)
 
         # =====================================================================
         # Qwen3 thinking model workaround: patch response parsing
