@@ -30,7 +30,9 @@ PROVIDER_CONFIGS = {
     },
     'gemini': {
         'pysubtrans_name': 'Gemini',
-        'model': 'gemini-2.0-flash',
+        # WP-002 (#291, #346): gemini-2.0-flash is shut down; Google's deprecations page (read 2026-10-06)
+        # names gemini-3.6-flash as its replacement.
+        'model': 'gemini-3.6-flash',
         'env_var': 'GEMINI_API_KEY'
     },
     'claude': {
