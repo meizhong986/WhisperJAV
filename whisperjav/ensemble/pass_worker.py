@@ -14,10 +14,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from whisperjav.config.anime_whisper_vad import (
-    anime_whisperseg_defaults,
-    apply_anime_segmenter_defaults,
-)
+from whisperjav.modules.audio_integrity import AudioIntegrityStop
+from whisperjav.config.chronosjav_vad import apply_chronosjav_segmenter_defaults
+from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
 from whisperjav.config.legacy import resolve_legacy_pipeline, apply_balanced_vad_defaults
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
@@ -453,6 +452,7 @@ def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
         "vad_grow_floor": "qwen_vad_grow_floor",   # v1.9.0 offline decoder: edge-growth floor
         "vad_gap_merge_ms": "qwen_vad_gap_merge_ms",  # v1.9.0 offline decoder: dialog-cut gap (ms)
         "max_speech_duration": "qwen_max_speech_duration",  # v1.9.0: single-segment ceiling (s)
+        "leading_silence_ms": "qwen_leading_silence_ms",  # v1.9.4: anime-whisper lead-in silence (0 = off)
     }
 
     # Track which qwen_* keys were explicitly set by user
@@ -638,6 +638,10 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
             pass_temp_dir=pass_temp_dir,
             tracer=tracer,
         )
+        # 1.9.4 (REQ1): both passes read the same file; only pass 1 names a
+        # damaged audio track in the run summary (the stop switch acts in both).
+        if pass_number != 1:
+            pipeline.audio_integrity_in_summary = False
     except Exception:  # pragma: no cover - fatal config issues propagated
         logger.exception("[Worker %s] Failed to initialize pipeline", os.getpid())
         if not payload.keep_temp_files and pass_temp_dir.exists():
@@ -770,6 +774,10 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                     result["summary"].get("final_subtitles_refined", 0),
                     result["summary"].get("total_processing_time_seconds", 0.0)
                 )
+            except AudioIntegrityStop as stop:
+                # --fail-on suspect: a requested stop, not a crash.
+                logger.error("[Worker %s] Pass %s: %s: %s", os.getpid(), pass_number, basename, stop)
+                results.append(FileResult(basename=basename, status="failed", error=str(stop)))
             except Exception:
                 logger.exception(
                     "[Worker %s] Pass %s failed for %s", os.getpid(), pass_number, basename
@@ -1213,19 +1221,15 @@ def _build_pipeline(
         # (pass 2 = qwen + TEN) the flat 0.25 silently replaced TEN's tuned
         # 0.42/0.32/0.22 gradient and made the sensitivity selector inert.
         segmenter_backend = qwen_defaults.get("qwen_segmenter", "whisperseg")
-        if segmenter_backend == "whisperseg":
-            if _aw_gen == "anime-whisper":
-                # v1.9.0: inject ALL table-pinned segmenter_config defaults
-                # (threshold, neg_threshold, min_silence_duration_ms,
-                # max_speech_duration_s) so they reach the Phase-4 segmenter AND
-                # the vad-grouped framer. setdefault semantics: GUI custom params /
-                # sliders / CLI collected above always win. Single source of the
-                # lift: anime_whisper_vad.apply_anime_segmenter_defaults (2026-07-30
-                # fix — the previous per-key copies here silently dropped
-                # neg_threshold, shipping it as dead config).
-                apply_anime_segmenter_defaults(user_segmenter_overrides, qwen_sensitivity)
-            elif _aw_gen == "qwen3" and "threshold" not in user_segmenter_overrides:
-                user_segmenter_overrides["threshold"] = 0.25
+        # One decision for every entry point (config/chronosjav_vad.py): for
+        # WhisperSeg only, inject ALL anime-table segmenter_config defaults
+        # (threshold, neg_threshold, min_silence_duration_ms, max_speech_duration_s,
+        # decoder, grow floor ...) or the Qwen3-ASR values (threshold 0.25, longest
+        # segment 4.0 s since v1.9.4), so they reach the Phase-4 segmenter AND the
+        # vad-grouped framer. setdefault semantics: GUI custom params / sliders /
+        # CLI collected above always win.
+        apply_chronosjav_segmenter_defaults(
+            user_segmenter_overrides, _aw_gen, segmenter_backend, qwen_sensitivity)
         # NOTE: --passN-speech-pad-ms (pass_config["speech_pad_ms"]) is applied to the
         # pipeline padding scalars below, not to segmenter_config (see v1.9.0 note above).
         segmenter_config = resolve_qwen_sensitivity(
@@ -1348,6 +1352,9 @@ def _build_pipeline(
             qwen_pipeline_params["stepdown_initial_group"] = qwen_defaults["qwen_stepdown_initial_group"]
         if "qwen_stepdown_fallback_group" in qwen_defaults:
             qwen_pipeline_params["stepdown_fallback_group"] = qwen_defaults["qwen_stepdown_fallback_group"]
+        if qwen_defaults.get("qwen_leading_silence_ms") is not None:
+            # v1.9.4: anime-whisper lead-in silence from the GUI dialog / qwen-params (0 = off)
+            qwen_pipeline_params["anime_leading_silence_ms"] = max(0, int(qwen_defaults["qwen_leading_silence_ms"]))
         logger.debug(
             "[Worker %s] Pass %s: Creating QwenPipeline with model_id=%s, scene=%s, segmenter=%s",
             os.getpid(), pass_number,

@@ -240,6 +240,26 @@ const TransformersManager = {
 // Qwen3-ASR Manager (v1.8.4+)
 // ============================================================
 const QwenManager = {
+    // v1.9.4: the Customize-dialog values that depend on the pass's model,
+    // sensitivity and speech segmenter. Python (get_qwen_schema) resolves them as
+    // the run will; a key missing from the schema is a control this segmenter
+    // does not have, and is removed so it is neither shown nor sent.
+    SEGMENTER_KEYS: ['chunk_threshold_ms', 'max_group_duration', 'vad_threshold',
+                     'vad_start_pad', 'vad_end_pad', 'vad_decoder', 'vad_grow_floor',
+                     'vad_gap_merge_ms', 'max_speech_duration'],
+
+    applySegmenterDefaults(values, schema) {
+        const aud = (schema && schema.audio) || {};
+        for (const key of this.SEGMENTER_KEYS) {
+            if (aud[key] && aud[key].default !== undefined) {
+                values[key] = aud[key].default;
+            } else {
+                delete values[key];
+            }
+        }
+        return values;
+    },
+
     params: null,
     customized: false,
 
@@ -3686,13 +3706,14 @@ const EnsembleManager = {
         const passState = this.state[passKey];
 
         try {
-            // Get Qwen parameter schema from API. Pass sensitivity + backend so
-            // anime-whisper receives its per-sensitivity WhisperSeg VAD defaults
-            // (single source of truth in Python); qwen3 / cohere are unaffected.
+            // Get Qwen parameter schema from API. Pass sensitivity, backend AND the
+            // pass's speech segmenter: Python resolves the values the run will use
+            // (v1.9.4, config/chronosjav_vad.py), so Apply sends back what runs.
             const qwenBackend = passState.isAnimeWhisper ? 'anime-whisper'
                 : (passState.isCohere ? 'cohere' : 'qwen3');
             const result = await pywebview.api.get_qwen_schema(
-                passState.sensitivity || 'balanced', qwenBackend);
+                passState.sensitivity || 'balanced', qwenBackend,
+                passState.speechSegmenter || 'whisperseg');
 
             if (!result.success) {
                 ErrorHandler.show('Error', 'Failed to load Qwen3-ASR parameters: ' + (result.error || 'Unknown error'));
@@ -3716,10 +3737,15 @@ const EnsembleManager = {
                 ? { ...passState.params }
                 : { ...QwenManager.defaults };
 
-            // Override defaults for anime-whisper when not customized. The 5
-            // WhisperSeg VAD fields are read from the sensitivity-aware schema
-            // (Python is the single source of truth), so the dialog shows exactly
-            // what will run at this pass's selected sensitivity.
+            // v1.9.4: when not customized, every segmenter-dependent value comes from
+            // the schema, which Python resolved for this pass's model, sensitivity and
+            // segmenter (what the run will use). A control the segmenter does not have
+            // is absent from the schema and is dropped here, so Apply never sends it.
+            if (!passState.customized) {
+                QwenManager.applySegmenterDefaults(currentValues, result.schema);
+            }
+
+            // Override defaults for anime-whisper when not customized.
             if (passState.isAnimeWhisper && !passState.customized) {
                 currentValues.model_id = 'litagin/anime-whisper';
                 currentValues.repetition_penalty = 1.0;
@@ -3727,17 +3753,6 @@ const EnsembleManager = {
                 currentValues.timestamp_mode = 'vad_only';
                 currentValues.assembly_cleaner = 'passthrough';
                 currentValues.stepdown = false;
-                const aud = result.schema.audio;
-                currentValues.chunk_threshold_ms = aud.chunk_threshold_ms.default;
-                currentValues.max_group_duration = aud.max_group_duration.default;
-                currentValues.vad_threshold = aud.vad_threshold.default;
-                currentValues.vad_start_pad = aud.vad_start_pad.default;
-                currentValues.vad_end_pad = aud.vad_end_pad.default;
-                // v1.9.0 offline-decoder levers (sensitivity-aware via Python table)
-                currentValues.vad_decoder = aud.vad_decoder.default;
-                currentValues.vad_grow_floor = aud.vad_grow_floor.default;
-                currentValues.vad_gap_merge_ms = aud.vad_gap_merge_ms.default;
-                currentValues.max_speech_duration = aud.max_speech_duration.default;
             }
 
             // Override defaults for cohere when not customized (v1.8.14 D2/D3/D7).
@@ -4093,12 +4108,14 @@ const EnsembleManager = {
         vadContainer.className = 'details-content';
 
         const thrDef = schemaSection.vad_threshold;
-        vadContainer.appendChild(this.createTransformersSlider(
-            'vad_threshold', thrDef.label,
-            thrDef.min, thrDef.max, thrDef.step,
-            currentValues.vad_threshold ?? thrDef.default,
-            thrDef.description
-        ));
+        if (thrDef) {  // absent when the pass has no speech segmenter (None)
+            vadContainer.appendChild(this.createTransformersSlider(
+                'vad_threshold', thrDef.label,
+                thrDef.min, thrDef.max, thrDef.step,
+                currentValues.vad_threshold ?? thrDef.default,
+                thrDef.description
+            ));
+        }
 
         const startPadDef = schemaSection.vad_start_pad;
         if (startPadDef) {
@@ -4136,7 +4153,8 @@ const EnsembleManager = {
 
             const decSelect = document.createElement('select');
             decSelect.className = 'param-select';
-            const currentDec = currentValues.vad_decoder || decDef.default || 'offline';
+            // Fallback = WhisperSeg's own default (hysteresis); the schema normally supplies it.
+            const currentDec = currentValues.vad_decoder || decDef.default || 'hysteresis';
             decDef.options.forEach(opt => {
                 const option = document.createElement('option');
                 option.value = opt.value;
@@ -4237,6 +4255,17 @@ const EnsembleManager = {
             currentValues.max_new_tokens ?? tokensDef.default,
             tokensDef.description
         ));
+
+        // v1.9.4: anime-whisper only (the schema carries it only for that backend)
+        const lsDef = schemaSection.leading_silence_ms;
+        if (lsDef) {
+            container.appendChild(this.createTransformersSlider(
+                'leading_silence_ms', lsDef.label,
+                lsDef.min, lsDef.max, lsDef.step,
+                currentValues.leading_silence_ms ?? lsDef.default,
+                lsDef.description
+            ));
+        }
 
         // Generation Safety (collapsed <details>)
         const safetyDetails = document.createElement('details');
@@ -5387,6 +5416,14 @@ const EnsembleManager = {
         // Reset Qwen controls using QwenManager defaults
         const passState = this.state[passKey];
         const defaults = { ...(QwenManager.defaults || {}) };
+        // v1.9.4: the segmenter-dependent values come from the schema the dialog
+        // was opened with (resolved in Python for this pass), not from the fixed
+        // list above, which was wrong for anime-whisper and for non-WhisperSeg passes.
+        if (this._qwenSchema) {
+            QwenManager.applySegmenterDefaults(defaults, this._qwenSchema);
+            const ls = this._qwenSchema.generation && this._qwenSchema.generation.leading_silence_ms;
+            if (ls) defaults.leading_silence_ms = ls.default;   // v1.9.4 anime-whisper lead-in
+        }
         if (passState.isAnimeWhisper) {
             defaults.model_id = 'litagin/anime-whisper';
             defaults.repetition_penalty = 1.0;
@@ -5394,8 +5431,6 @@ const EnsembleManager = {
             defaults.timestamp_mode = 'vad_only';
             defaults.assembly_cleaner = 'passthrough';
             defaults.stepdown = false;
-            defaults.chunk_threshold_ms = 300;
-            defaults.max_group_duration = 3;
         } else if (passState.isCohere) {
             // Cohere defaults — mirror the openCustomize override (D2/D3/D7).
             defaults.model_id = 'CohereLabs/cohere-transcribe-03-2026';
@@ -5888,8 +5923,10 @@ const EnsembleManager = {
             config.translate_tone = translateSettings.tone || 'standard';
             // Use model override if provided, otherwise use selected model
             config.translate_model = translateSettings.modelOverride || translateSettings.model || null;
-            // Local/custom providers don't require API key (custom: optional via --translate-api-key)
-            config.translate_api_key = (translateSettings.provider === 'local' || translateSettings.provider === 'custom') ? null : (translateSettings.apiKey || null);
+            // The local provider takes no API key. A custom endpoint may need one (#420: a
+            // local proxy answered 401 "Missing API key" because the key was dropped here,
+            // while the AI SRT Translate tab sends it), so it is sent when entered.
+            config.translate_api_key = (translateSettings.provider === 'local') ? null : (translateSettings.apiKey || null);
             config.translate_title = translateSettings.movieTitle || null;
             config.translate_actress = translateSettings.actress || null;
             config.translate_plot = translateSettings.plot || null;
@@ -7394,7 +7431,7 @@ const TranslatorManager = {
         // #325: deepseek-chat/-reasoner deprecate 2026-07-24; v4 names per
         // https://api-docs.deepseek.com/ (flash = non-thinking, pro = thinking)
         deepseek: ['deepseek-v4-flash', 'deepseek-v4-pro'],
-        gemini: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
+        gemini: ['gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite'],  // WP-002: 2.0 / 1.5 are retired
         claude: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022', 'claude-3-opus-20240229'],
         gpt: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'],
         // #325: the routed DeepSeek model was deprecated 2026-07-24 alongside the
@@ -7949,7 +7986,7 @@ const TranslationSettingsModal = {
         // #325: deepseek-chat/-reasoner deprecate 2026-07-24; v4 names per
         // https://api-docs.deepseek.com/ (flash = non-thinking, pro = thinking)
         deepseek: ['deepseek-v4-flash', 'deepseek-v4-pro'],
-        gemini: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
+        gemini: ['gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite'],  // WP-002: 2.0 / 1.5 are retired
         claude: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022', 'claude-3-opus-20240229'],
         gpt: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'],
         // #325: the routed DeepSeek model was deprecated 2026-07-24 alongside the
@@ -8019,6 +8056,7 @@ const TranslationSettingsModal = {
             document.querySelectorAll('.ollama-settings-row').forEach(el => {
                 el.style.display = (e.target.value === 'ollama') ? 'block' : 'none';
             });
+            this.updateTemperatureHint(e.target.value);
         });
 
         // No default provider initialization — dropdown starts blank
@@ -8118,7 +8156,15 @@ const TranslationSettingsModal = {
         }
     },
 
+    // #444: for the custom provider the temperature is left to the server, so the
+    // Temperature field is labelled as not sent.
+    updateTemperatureHint(provider) {
+        const hint = document.getElementById('translationTemperatureHint');
+        if (hint) hint.style.display = (provider === 'custom') ? 'block' : 'none';
+    },
+
     populateForm() {
+        this.updateTemperatureHint(document.getElementById('ensembleTranslateProvider')?.value || '');
         document.getElementById('translationApiKey').value = this.settings.apiKey;
         document.getElementById('translationTargetLang').value = this.settings.targetLang;
         document.getElementById('translationTone').value = this.settings.tone;
@@ -8188,7 +8234,12 @@ const TranslationSettingsModal = {
                 else statusEl.textContent = 'Custom (No API)';
                 statusEl.className = 'api-status connected';
             }
-            const label = provider === 'ollama' ? 'Ollama' : provider === 'local' ? 'Local LLM' : 'Custom endpoint';
+            if (provider === 'custom') {
+                // #420: it said "no API key required", but a custom endpoint may need one.
+                ConsoleManager.log('Custom endpoint selected - not tested here; the API key is sent if you entered one', 'info');
+                return;
+            }
+            const label = provider === 'ollama' ? 'Ollama' : 'Local LLM';
             ConsoleManager.log(`${label} provider selected - no API key required`, 'info');
             return;
         }
@@ -8489,13 +8540,24 @@ window.addEventListener('pywebviewready', async () => {
 
     await SettingsPersistence.loadFromBackend();
 
-    // Restore saved provider selections from localStorage
-    const savedEnsemble = localStorage.getItem('whisperjav_ensemble_provider');
+    // Restore the translation choices of both tabs (#435). They come from the
+    // translate settings file; browser storage is cleared at every launch
+    // (private_mode, main.py), so it is only a fallback for the provider.
+    let tabState = {};
+    try {
+        const r = await pywebview.api.get_translation_tab_state();
+        if (r && r.success) tabState = r.state || {};
+    } catch (e) {
+        console.warn('Could not load translation tab state:', e);
+    }
+    const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+
+    const savedEnsemble = (tabState.ensemble || {}).provider || lsGet('whisperjav_ensemble_provider');
     if (savedEnsemble) {
         const dd = document.getElementById('ensembleTranslateProvider');
         if (dd) {
             dd.value = savedEnsemble;
-            ProviderUIManager.onProviderChange(savedEnsemble, 'ensemble');
+            await ProviderUIManager.onProviderChange(savedEnsemble, 'ensemble');
             TranslationSettingsModal.updateModelOptions(savedEnsemble);
             // Show/hide Ollama URL field in settings modal
             document.querySelectorAll('.ollama-settings-row').forEach(el => {
@@ -8503,13 +8565,79 @@ window.addEventListener('pywebviewready', async () => {
             });
         }
     }
-    const savedSrt = localStorage.getItem('whisperjav_srt_provider');
+    const savedSrt = (tabState.srt || {}).provider || lsGet('whisperjav_srt_provider');
     if (savedSrt) {
         const dd = document.getElementById('translatorProvider');
         if (dd) {
             dd.value = savedSrt;
-            ProviderUIManager.onProviderChange(savedSrt, 'srt');
+            await ProviderUIManager.onProviderChange(savedSrt, 'srt');
             TranslatorManager.updateApiKeyStatus(savedSrt);
         }
     }
+    TranslationTabState.apply(tabState);
+    TranslationTabState.bind();
 });
+
+// #435: remember the translation choices of the Ensemble row and the AI SRT Translate
+// tab between launches (saved through the backend; see api.save_translation_tab_state).
+const TranslationTabState = {
+    FIELDS: {
+        ensemble: {
+            provider: 'ensembleTranslateProvider', model: 'ensembleTranslateModel',
+            modelOverride: 'ensembleTranslateModelOverride',
+        },
+        srt: {
+            provider: 'translatorProvider', model: 'translatorModel', customModel: 'translatorCustomModel',
+            sourceLang: 'translatorSourceLang', targetLang: 'translatorTargetLang', tone: 'translatorTone',
+            customEndpoint: 'translatorCustomEndpoint', maxBatchSize: 'translatorMaxBatchSize',
+            maxRetries: 'translatorMaxRetries', rateLimit: 'translatorRateLimit',
+            sceneThreshold: 'translatorSceneThreshold',
+        },
+    },
+    _timers: {},
+
+    // Fill everything but the provider (already restored, with its model list).
+    // A saved value a drop-down no longer offers is skipped, not forced in.
+    apply(state) {
+        for (const [tab, fields] of Object.entries(this.FIELDS)) {
+            const saved = (state || {})[tab] || {};
+            for (const [key, id] of Object.entries(fields)) {
+                if (key === 'provider' || saved[key] === undefined) continue;
+                const el = document.getElementById(id);
+                if (!el) continue;
+                if (el.tagName === 'SELECT' && !Array.from(el.options).some(o => o.value === saved[key])) continue;
+                el.value = saved[key];
+            }
+        }
+    },
+
+    collect(tab) {
+        const values = {};
+        for (const [key, id] of Object.entries(this.FIELDS[tab])) {
+            const el = document.getElementById(id);
+            if (el && el.value !== undefined && el.value !== '') values[key] = String(el.value).trim();
+        }
+        return values;
+    },
+
+    save(tab) {
+        clearTimeout(this._timers[tab]);
+        this._timers[tab] = setTimeout(async () => {
+            try {
+                if (window.pywebview?.api?.save_translation_tab_state) {
+                    await pywebview.api.save_translation_tab_state(tab, this.collect(tab));
+                }
+            } catch (e) {
+                console.warn('Could not save translation tab state:', e);
+            }
+        }, 400);
+    },
+
+    bind() {
+        for (const [tab, fields] of Object.entries(this.FIELDS)) {
+            for (const id of Object.values(fields)) {
+                document.getElementById(id)?.addEventListener('change', () => this.save(tab));
+            }
+        }
+    },
+};

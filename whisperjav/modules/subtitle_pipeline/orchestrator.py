@@ -114,6 +114,10 @@ class DecoupledSubtitlePipeline:
             "recovery_strategies": {"vad_guided": 0, "proportional": 0},
         }
 
+        # Set when the aligner could not be loaded for the current file and the
+        # times came from the aligner-free path instead (#436). Reset per file.
+        self.alignment_unavailable: Optional[str] = None
+
         # Temp files for cleanup
         self._temp_files: list[Path] = []
 
@@ -150,6 +154,8 @@ class DecoupledSubtitlePipeline:
             raise ValueError(f"scene_audio_paths ({n_scenes}) and scene_durations ({len(scene_durations)}) must match")
         if vad_audio_paths is not None and len(vad_audio_paths) != n_scenes:
             raise ValueError(f"vad_audio_paths ({len(vad_audio_paths)}) and scene_audio_paths ({n_scenes}) must match")
+
+        self.alignment_unavailable = None
 
         logger.info(
             "[DecoupledPipeline] Processing %d scenes (aligner=%s, step-down=%s%s)",
@@ -194,6 +200,18 @@ class DecoupledSubtitlePipeline:
                 scene_durations, scene_speech_regions,
                 vad_audio_paths=vad_audio_paths,
             )
+            # The aligner loaded for pass 1 but not for the retry (#436 fallback):
+            # the retry ran without alignment, which is not an improvement. Keep
+            # the pass-1 results (already recovered) and say what happened.
+            if self.alignment_unavailable:
+                self.alignment_unavailable = self.alignment_unavailable.replace(
+                    "ForcedAligner could not be loaded",
+                    "ForcedAligner could not be reloaded for the step-down retry", 1,
+                ).replace(
+                    "subtitle times come from the speech segments instead; the text is kept",
+                    f"{len(collapsed_indices)} collapsed scene(s) keep their first-pass timing", 1,
+                )
+                return results
             # Replace Pass 1 results for retried scenes with Pass 2 results
             for idx, retry_result in zip(collapsed_indices, retry_results):
                 _pass1_diag = results[idx][1]
@@ -642,7 +660,25 @@ class DecoupledSubtitlePipeline:
         step57_start = _time.monotonic()
         scene_alignments: list[list[list[dict[str, Any]]]] = []
 
-        self.aligner.load()
+        # The aligner loads only now, after all text is generated. A failed load
+        # (first use with an interrupted model download, out of memory) used to
+        # end the job and throw that text away (#436). Keep the text and take the
+        # aligner-free path (Branch B: times from the speech segments).
+        try:
+            self.aligner.load()
+        except Exception as load_err:
+            first_line = (str(load_err).strip().splitlines() or [""])[0][:200]
+            self.alignment_unavailable = (
+                f"ForcedAligner could not be loaded ({type(load_err).__name__}: {first_line}); "
+                f"subtitle times come from the speech segments instead; the text is kept"
+            )
+            logger.warning("[DecoupledPipeline] %s", self.alignment_unavailable, exc_info=True)
+            try:
+                self.aligner.unload()
+            except Exception:
+                pass
+            self._safe_cuda_cleanup()
+            return None
         try:
             for scene_idx in range(n_scenes):
                 frames = scene_frames[scene_idx]

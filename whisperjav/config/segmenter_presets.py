@@ -31,6 +31,8 @@ SEGMENTER_PARAMS = {
     "grow_floor",              # v1.9.0 offline decoder: edge-growth floor (anime table + GUI).
     "gap_merge_ms",            # v1.9.0 offline decoder: dialog-cut gap length (anime table + GUI).
     "split_smooth_ms",         # v1.9.0 offline decoder: overlong-split smoothing (anime table).
+    "dip_search_from",         # v1.9.4 hysteresis "dip" split: where the search starts (anime table).
+    "dip_accept_any",          # v1.9.4 hysteresis "dip" split: cut at the lowest point always (anime table).
     "min_speech_duration_ms",
     "max_speech_duration_s",   # Keep for CLI backward compat (not in GUI)
     "min_silence_duration_ms",
@@ -112,7 +114,16 @@ FIDELITY_DEFAULT_SEGMENTER = "firered-vad"
 # they were verified on: keyed by --mode, because `fast` and `faster` run
 # stable_ts with no speech segmenter at all (config/legacy.py: "vad": "none"), so
 # exempting them buys nothing and costs a run stopped over a model they never load.
-SINGLE_PASS_EXTERNAL_OK = {"fidelity": frozenset({"firered-vad"})}
+#
+# 1.9.4 (WP-004, #323; owner decision 2026-10-04: "leave nemo, but you can leave
+# whisper-vad be as valid"): single-pass Fidelity also keeps ten and whisperseg
+# (their tool YAMLs meet the rule above: chunk_threshold_s 1.0, max group 7/6/5 s
+# by sensitivity) and whisper-vad. whisper-vad runs with its YAML as it is --
+# chunk_threshold_s 2.5, max_group_duration_s 29.0, no sensitivity presets -- the
+# same values two-pass Fidelity already uses. That knowingly departs from the rule
+# above, by his decision. nemo is not listed: it still goes to silero-v3.1 with
+# the warning, unchanged.
+SINGLE_PASS_EXTERNAL_OK = {"fidelity": frozenset({"firered-vad", "ten", "whisperseg", "whisper-vad"})}
 
 # The default SCENE detector for every scene-detecting legacy pipeline (v1.9.2).
 #

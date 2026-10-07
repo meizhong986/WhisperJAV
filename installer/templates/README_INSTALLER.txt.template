@@ -28,44 +28,47 @@ WHAT'S NEW IN v{{VERSION}}
 {{! being built, because nobody rewrote it. Rewrite it or delete it; do not
 {{! leave the previous release's text in place. Lines starting {{! are stripped
 {{! by build_release.py and never reach the user.
-1. CLEANING UP THE AUDIO BEFORE IT IS READ
-   - htdemucs vocal isolation: separates the voice from music and effects.
-     Installed with WhisperJAV, like the other clean-ups.
-   - "Enhance for VAD only": the cleaned-up audio is used to FIND the speech,
-     while the recogniser still hears the original. Available on the fidelity
-     and qwen pipelines.
-   - A clean-up you chose that cannot run now stops the run and says why,
-     instead of quietly transcribing the untouched audio.
+1. SUBTITLES STAY IN TIME IN FILMS WITH DAMAGED AUDIO
+   - Some downloaded films have hidden holes in their audio track. In those
+     files every subtitle after the first hole came out early -- by up to 10
+     seconds in the films we measured.
+   - WhisperJAV now fills the holes with silence while extracting the audio,
+     so subtitle times stay in step with the video.
+   - Every file is checked. A damaged file is still transcribed, and the run
+     summary lists it as "suspect", with the reason. To stop such files
+     instead, tick "Treat 'suspect' files as failures" on the Transcription
+     Adv. Options tab.
 
-2. INSTALLING
-   - The PyTorch download shows what it is doing. It used to sit silent for
-     minutes and look as though it had frozen.
-   - If the network check fails it now names the addresses it tried and the
-     proxy it used, so you can act on it.
-   - The installer no longer writes settings into your global Git
-     configuration. Earlier versions left eight of them there permanently,
-     including a proxy.
+2. CHRONOSJAV TIMING (Qwen3-ASR and anime-whisper)
+   - An attempt to make lines end closer to the speech. The longest piece
+     of speech sent to the model is now 4 seconds at every sensitivity. On
+     seven drama scenes, the typical late end shrank by 14 to 61 %, with the
+     text about the same. Not yet measured on JAV.
+   - anime-whisper hears 200 ms of silence before each piece of audio. The
+     new "Silence Before Each Window (ms)" setting changes it; 0 turns it off.
+   - The Customize Parameters window shows the values the run will use.
 
 3. TRANSLATION
-   - French now works. Italian, Thai and Korean added.
-   - When a translation server fails, the advice names THAT server's log --
-     not Ollama's, whichever provider you were using.
-   - A local translation server that cannot answer is reported at start-up
-     rather than 90 seconds into a run with nothing produced.
+   - Gemini's default model is now gemini-3.6-flash. Google has shut down
+     the old default, gemini-2.0-flash.
+   - Your translation choices are remembered between launches.
+   - Two-pass translation to a custom server now sends your API key.
+   - A custom server keeps its own temperature unless you set one.
 
-4. WHAT YOU SEE WHILE A RUN IS WORKING
-   - A sensible progress count, a summary line after a long file listing, how
-     long audio extraction took, and the English post-processing steps.
-   - Every run ends with a summary: one line per file, and a manifest.
-   - A file whose clean-up only partly succeeded is reported as "suspect",
-     with the reason, rather than passing silently as done.
+4. OTHER FIXES
+   - On Balanced and Faster, a speech piece of a few milliseconds at the
+     edge of a scene, which could crash the run, is now joined to its
+     neighbour.
+   - If the ForcedAligner cannot be loaded, the transcribed text is kept
+     and the file is marked "suspect", instead of the job failing.
+   - The command line finds the bundled FFmpeg without activating the
+     environment first.
+   - Single-pass Fidelity now uses the TEN, WhisperSeg or whisper-vad speech
+     segmenter you choose.
 
-5. THE GUI, AND CONTRIBUTIONS
-   - Two-pass settings are saved and restored.
-   - An Auto-scroll toggle on the console (thanks to triatomic).
-   - A "contextual" translation tone (triatomic), an accuracy-regression gate
-     (Mimic-me), and a CI check (AKB0700).
-   - Linux users are told which packages the GUI needs.
+5. INSTALLING
+   - If PyTorch does not load after it is installed (a damaged download
+     cache), the installer downloads it once more, past the cache.
 
 For the full release notes, see the v{{VERSION}} release page:
 https://github.com/meizhong986/WhisperJAV/releases

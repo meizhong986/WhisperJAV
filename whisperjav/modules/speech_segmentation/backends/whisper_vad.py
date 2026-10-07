@@ -252,6 +252,8 @@ class WhisperVadSpeechSegmenter:
 
         try:
             from faster_whisper import WhisperModel
+            from whisperjav.utils.pyav_compat import ensure_av_open_compat
+            ensure_av_open_compat()  # PyAV 19 dropped an argument faster-whisper passes
         except ImportError:
             raise ImportError(
                 "faster-whisper is required for WhisperVAD.\n"

@@ -416,7 +416,7 @@
                                     </label>
                                 </div>
                                 <div class="form-group">
-                                    <label class="checkbox-label" title="A file whose subtitles cover too little of the media, or whose recognizer stopped while speech was still detected, is reported as 'suspect' and does not fail the run. Tick to treat it as a failure (same as --fail-on suspect).">
+                                    <label class="checkbox-label" title="A file whose subtitles cover too little of the media, whose recognizer stopped while speech was still detected, or whose audio track looks damaged is reported as 'suspect' and does not fail the run. Tick to treat it as a failure (same as --fail-on suspect); a file with damaged audio is then stopped before transcription.">
                                         <input type="checkbox" id="failOnSuspect">
                                         <span>Treat 'suspect' files as failures</span>
                                     </label>
@@ -479,7 +479,7 @@
                                             <optgroup label="ChronosJAV">
                                                 <option value="qwen">Qwen3-ASR</option>
                                                 <option value="anime-whisper" selected>Anime-Whisper</option>
-                                                <option value="cohere" disabled>Cohere-Transcribe (preview — coming in v1.9.0)</option>
+                                                <option value="cohere" disabled>Cohere-Transcribe (not available yet)</option>
                                             </optgroup>
                                             <optgroup label="External (CrispASR)">
                                                 <option value="crispasr">CrispASR</option>
@@ -647,7 +647,7 @@
                                             <optgroup label="ChronosJAV">
                                                 <option value="qwen" selected>Qwen3-ASR</option>
                                                 <option value="anime-whisper">Anime-Whisper</option>
-                                                <option value="cohere" disabled>Cohere-Transcribe (preview — coming in v1.9.0)</option>
+                                                <option value="cohere" disabled>Cohere-Transcribe (not available yet)</option>
                                             </optgroup>
                                             <optgroup label="External (BYOP)">
                                                 <option value="xxl">XXL Faster Whisper</option>
@@ -1542,6 +1542,8 @@
                             <div class="form-group">
                                 <label for="translationTemperature" class="form-label">Temperature:</label>
                                 <input type="number" id="translationTemperature" class="form-input" value="0.5" min="0" max="2" step="0.1">
+                                <!-- #444 (owner, 2026-10-06): a custom server keeps its own temperature -->
+                                <div id="translationTemperatureHint" style="display:none; font-size:11px; font-style:italic; color:var(--text-tertiary); margin-top:2px">Custom provider: set by your server (not sent)</div>
                             </div>
                             <div class="form-group">
                                 <label for="translationTopP" class="form-label">Top P:</label>

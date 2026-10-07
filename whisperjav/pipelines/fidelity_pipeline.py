@@ -9,6 +9,7 @@ from datetime import datetime
 
 from whisperjav.pipelines.base_pipeline import BasePipeline
 from whisperjav.modules.audio_extraction import AudioExtractor
+from whisperjav.modules.audio_integrity import AudioIntegrityStop, apply_to_run as apply_audio_integrity
 from whisperjav.modules import analytics
 from whisperjav.modules.whisper_pro_asr import WhisperProASR
 from whisperjav.modules.srt_postprocessing import SRTPostProcessor as StandardPostProcessor
@@ -229,6 +230,10 @@ class FidelityPipeline(BasePipeline):
             
             audio_path = self.temp_dir / f"{media_basename}_extracted.wav"
             extracted_audio, duration = self.audio_extractor.extract(input_file, audio_path)
+            # 1.9.4 (REQ1): a damaged audio track makes this file 'suspect', or
+            # stops it here with --fail-on suspect.
+            apply_audio_integrity(self.audio_extractor.last_integrity, self.degradations,
+                                  in_summary=self.audio_integrity_in_summary)
             master_metadata["input_info"]["processed_audio_file"] = str(extracted_audio)
             master_metadata["input_info"]["audio_duration_seconds"] = duration
             self.metadata_manager.update_processing_stage(
@@ -608,7 +613,8 @@ class FidelityPipeline(BasePipeline):
             
         except Exception as e:
             self.progress.show_message(f"Pipeline error: {str(e)}", "error", 0)
-            logger.error(f"Pipeline error: {e}", exc_info=True)
+            # A stop asked for by --fail-on suspect is not a crash: no traceback.
+            logger.error(f"Pipeline error: {e}", exc_info=not isinstance(e, AudioIntegrityStop))
             self.metadata_manager.update_processing_stage(
                 master_metadata, "error", "failed", error_message=str(e))
             self.metadata_manager.save_master_metadata(master_metadata, media_basename)

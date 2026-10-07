@@ -521,6 +521,17 @@ class OllamaManager:
             temperature=cfg['temperature'],
         )
 
+    def _best_pulled_known_model(self, max_min_vram_gb: float) -> Optional[str]:
+        """The largest model from OLLAMA_MODEL_CONFIGS that is already pulled and needs no
+        more VRAM than the auto-pick did (#356). None when none of them is pulled."""
+        try:
+            pulled = {m.get('name') or m.get('model') for m in self.list_models()}
+        except Exception:
+            return None
+        fitting = [name for name, cfg in OLLAMA_MODEL_CONFIGS.items()
+                   if cfg['min_vram_gb'] <= max_min_vram_gb and name in pulled]
+        return max(fitting, key=lambda n: OLLAMA_MODEL_CONFIGS[n]['min_vram_gb'], default=None)
+
     # ── Orchestration ─────────────────────────────────────────────────
 
     def ensure_ready(
@@ -582,6 +593,16 @@ class OllamaManager:
             model = rec.name
             print(f"[OLLAMA] Auto-selected model: {model} ({rec.quality}, {rec.download_size})",
                   file=sys.stderr)
+            # #356: the pick went by VRAM only, so a model never pulled was chosen and the
+            # translation failed while a usable model sat on disk. Prefer one already pulled --
+            # only when the run can neither download (auto_pull; the GUI always passes --yes)
+            # nor ask (interactive CLI prompt); those keep offering the VRAM pick, as before.
+            if not auto_pull and not interactive and not self.check_model(model):
+                fallback = self._best_pulled_known_model(OLLAMA_MODEL_CONFIGS[model]['min_vram_gb'])
+                if fallback:
+                    print(f"[OLLAMA] {model} is not downloaded; using {fallback}, which is already "
+                          f"downloaded. To use {model}, run: ollama pull {model}", file=sys.stderr)
+                    model = fallback
 
         # Step 3: Normalize model name (add :latest if no tag)
         if ':' not in model:

@@ -244,7 +244,9 @@ def _load_audio(path: Path):
         pass
 
     from faster_whisper.audio import decode_audio
+    from whisperjav.utils.pyav_compat import ensure_av_open_compat
 
+    ensure_av_open_compat()  # PyAV 19 dropped an argument faster-whisper passes
     return decode_audio(str(path), sampling_rate=SAMPLE_RATE)
 
 

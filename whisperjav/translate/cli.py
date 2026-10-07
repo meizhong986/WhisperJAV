@@ -195,10 +195,9 @@ def resolve_instruction_file_or_content(args, merged: dict) -> Optional[str]:
         temp_dir.mkdir(exist_ok=True)
         temp_file = temp_dir / f'instructions_{tone}.txt'
 
-        with open(temp_file, 'w', encoding='utf-8') as f:
-            f.write(instruction_content)
-
-        return str(temp_file)
+        # Another run of the same tone may be reading this file right now.
+        from .core import write_shared_text
+        return write_shared_text(temp_file, instruction_content)
 
     return None
 
@@ -541,6 +540,11 @@ def main():
     effective_tone = merged.get('tone') or 'standard'
     provider_options = build_provider_options(args, merged.get('model_params', {}), effective_tone,
                                               settings_tone=settings.get('tone'))
+    # #444 (owner, 2026-10-06): a custom server keeps its own temperature unless
+    # --temperature is given; the tone default is not sent (core.apply_server_temperature_patch).
+    if provider_name == 'custom' and getattr(args, 'temperature', None) is None:
+        provider_options.pop('temperature', None)
+        provider_options['_server_temperature'] = True
 
     # Build extra context
     extra_context = build_extra_context(args)
@@ -572,7 +576,7 @@ def main():
             file=sys.stderr,
         )
         print(
-            "  The local LLM server (llama-cpp-python) will be removed in v1.9.0.\n",
+            "  The local LLM server (llama-cpp-python) will be removed in a later release.\n",
             file=sys.stderr,
         )
         n_gpu_layers = getattr(args, 'translate_gpu_layers', -1)

@@ -122,6 +122,104 @@ def apply_deepseek_thinking_patch(translator, model: str, debug: bool = False) -
     return True
 
 
+def apply_server_temperature_patch(translator, debug: bool = False) -> bool:
+    """Leave the temperature to a custom server: drop it from the request body (#444).
+
+    WhisperJAV sent its tone's temperature (standard 0.5, contextual 0.8, pornify
+    1.2) with every request, and PySubtrans' CustomClient always sends one (0.0
+    when none is set), so a server's own temperature never applied. Owner,
+    2026-10-06: custom servers keep theirs. Used only for provider 'custom' when
+    the user gave no --temperature. Same instance-level wrap as the DeepSeek patch.
+
+    Returns True if the patch was applied.
+    """
+    client = getattr(translator, 'client', None)
+    if client is None or not hasattr(client, '_generate_request_body'):
+        print("[TRANSLATE]   WARNING: could not leave the temperature to the custom server - "
+              "translator.client._generate_request_body not found", file=sys.stderr)
+        return False
+
+    original = client._generate_request_body
+
+    def _patched(request, temperature, _orig=original):
+        body = _orig(request, temperature)
+        try:
+            body.pop('temperature', None)
+        except AttributeError:
+            return body
+        if debug:
+            print("[TRANSLATE]   [server-temperature] temperature left out of the request", file=sys.stderr)
+        return body
+
+    client._generate_request_body = _patched
+    print("[TRANSLATE]   Temperature: set by the custom server (not sent)", file=sys.stderr)
+    return True
+
+
+def target_language_name(target_lang: str) -> str:
+    """'chinese' -> 'Chinese'; the name the instructions and the prompt use."""
+    name = (target_lang or "").strip()
+    return name[:1].upper() + name[1:] if name else "the target language"
+
+
+def write_shared_text(path, text: str) -> str:
+    """Write a temp file that other runs may be reading, and return the path to use.
+
+    Two translations of the same tone at the same moment share these files (review
+    finding, 2026-10-06). Rewriting one while another run reads it could hand that
+    run an empty file; on Windows a file another run has open cannot be replaced at
+    all. So: a file that already holds this text is left alone (the usual case:
+    same tone, same bundled text); otherwise the text goes to a private temp file
+    that is swapped in, and if the swap is refused the private file is used instead.
+    """
+    import tempfile
+    path = Path(path)
+    try:
+        if path.read_text(encoding="utf-8") == text:
+            return str(path)
+    except OSError:
+        pass
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=path.stem + "_", suffix=path.suffix, dir=str(path.parent))
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(text)
+    try:
+        os.replace(tmp, path)
+        return str(path)
+    except OSError:
+        return tmp          # the shared file is in use; this run reads its own copy
+
+
+def fill_target_language(instruction_file, target_lang: str) -> str:
+    """Write the target language into an instruction file that asks for it ({LANG}).
+
+    WP-001 / #347 (owner, 2026-10-06): the instructions never named the target
+    language and their example answered in English, so local models drifted into
+    English. Tags inside the instructions are not filled in on this path, so
+    WhisperJAV fills {LANG} itself and passes a filled copy. A file without {LANG}
+    (a user's own) is passed unchanged.
+    """
+    import tempfile
+    path = Path(instruction_file)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return str(instruction_file)
+    if "{LANG}" not in text:
+        return str(instruction_file)
+    name = target_language_name(target_lang)
+    out_dir = Path(tempfile.gettempdir()) / "whisperjav_translate"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    import hashlib
+    digest = hashlib.sha1(text.encode("utf-8")).hexdigest()[:8]   # different texts never share a copy
+    out = out_dir / f"{path.stem}_{name.lower().replace(' ', '_')}_{digest}.txt"
+    # The rule sentence is written as its meaning, not filled literally
+    # ("unless Chinese is English" reads oddly): kept for other targets, dropped for English.
+    rule = "Do not answer in English unless {LANG} is English."
+    text = text.replace(" " + rule, "" if name.lower() == "english" else " Do not answer in English.")
+    return write_shared_text(out, text.replace("{LANG}", name))
+
+
 def resolve_batch_window(max_batch_size: int) -> tuple:
     """Return a (min_batch_size, max_batch_size) pair PySubtrans will accept.
 
@@ -345,7 +443,8 @@ def translate_subtitle(
             print(f"[TRANSLATE]   API base: {provider_config['api_base']}", file=sys.stderr)
 
         # Build prompt
-        prompt = f"Translate these subtitles from {source_lang} into {target_lang}."
+        prompt = (f"Translate these subtitles from {target_language_name(source_lang)} "
+                  f"into {target_language_name(target_lang)}.")
         if extra_context:
             prompt += "\n" + extra_context
             print(f"[TRANSLATE]   Extra context: {extra_context[:200]}", file=sys.stderr)
@@ -353,7 +452,15 @@ def translate_subtitle(
         # Qwen3-family thinking model flag: consumed later by the response
         # parsing patch (after provider init). Remove from provider_options
         # so it doesn't get passed to PySubtrans as an unknown option.
+        # Work on a copy: the translate CLI passes ONE provider_options dict for every
+        # file of a run, and the pops below would strip the flags from file 2 onward
+        # (found by review, 2026-10-06; it affected _thinking_model too).
+        provider_options = dict(provider_options) if provider_options else provider_options
         _is_thinking_model = provider_options.pop('_thinking_model', False) if provider_options else False
+        # #444: provider 'custom' with no --temperature leaves the temperature to the server.
+        _server_temperature = provider_options.pop('_server_temperature', False) if provider_options else False
+        if _server_temperature:
+            provider_options.pop('temperature', None)
         if _is_thinking_model:
             print(f"[TRANSLATE]   Thinking model: YES (will patch response parsing)",
                   file=sys.stderr)
@@ -390,6 +497,7 @@ def translate_subtitle(
         # does not exist in current PySubtrans — instructions were silently
         # dropped for ALL providers.
         if instruction_file:
+            instruction_file = fill_target_language(instruction_file, target_lang)  # WP-001
             opt_kwargs['instruction_file'] = str(instruction_file)
 
         if 'api_base' in provider_config:
@@ -605,6 +713,10 @@ def translate_subtitle(
         # rate-limit hungry, and can leak reasoning text into the subtitles.
         if provider_config.get('pysubtrans_name') == 'DeepSeek':
             apply_deepseek_thinking_patch(translator, model, debug=debug)
+
+        # Custom server keeps its own temperature (#444)
+        if _server_temperature:
+            apply_server_temperature_patch(translator, debug=debug)
 
         # =====================================================================
         # Qwen3 thinking model workaround: patch response parsing

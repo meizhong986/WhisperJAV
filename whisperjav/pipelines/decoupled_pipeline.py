@@ -673,6 +673,10 @@ class DecoupledPipeline(BasePipeline):
             vad_audio_paths=orch_vad_paths,
         )
 
+        # A failed aligner load no longer ends the job (#436); say so in the summary.
+        if getattr(self._subtitle_pipeline, "alignment_unavailable", None):
+            self.degradations.append(self._subtitle_pipeline.alignment_unavailable)
+
         # Convert to Phase 6 format: (WhisperResult, scene_idx)
         scene_results: List[Tuple[Optional[stable_whisper.WhisperResult], int]] = []
         for idx, (asr_result, _diag) in enumerate(orch_results):

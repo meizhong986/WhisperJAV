@@ -56,7 +56,9 @@ def main():
         print(f"Current version: {sys.version}")
         sys.exit(1)
 
-    # Check for FFmpeg in PATH (required dependency)
+    # Check for FFmpeg in PATH (required dependency); an installed copy keeps it in <install>\Library\bin (#436)
+    from whisperjav.utils.conda_path import ensure_conda_dirs_on_path
+    ensure_conda_dirs_on_path()
     if shutil.which("ffmpeg") is None:
         print("Error: FFmpeg is not installed or not in PATH")
         print()

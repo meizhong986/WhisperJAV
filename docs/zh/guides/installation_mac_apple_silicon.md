@@ -385,11 +385,8 @@ whisperjav video.mp4
 # 使用 transformers 模式启用 MPS GPU 加速（Mac 上推荐）
 whisperjav video.mp4 --mode transformers
 
-# 调整灵敏度
-whisperjav video.mp4 --mode transformers --sensitivity aggressive
-
-# 指定模型大小（根据可用内存调整）
-whisperjav video.mp4 --mode transformers --model large-v2
+# 指定模型（根据可用内存调整）
+whisperjav video.mp4 --mode transformers --hf-model-id openai/whisper-large-v2
 
 # 带翻译
 whisperjav video.mp4 --mode transformers --translate
@@ -401,13 +398,10 @@ whisperjav video.mp4 --mode transformers --translate
 
 ```bash
 # 16 GB 内存 Mac
-whisperjav video.mp4 --mode transformers --model medium
+whisperjav video.mp4 --mode transformers --hf-model-id openai/whisper-medium
 
 # 32 GB+ 内存 Mac
-whisperjav video.mp4 --mode transformers --model large-v2
-
-# 最高质量（32 GB+ 内存）
-whisperjav video.mp4 --mode transformers --model large-v2 --sensitivity aggressive
+whisperjav video.mp4 --mode transformers --hf-model-id openai/whisper-large-v2
 ```
 
 ---
@@ -437,7 +431,7 @@ whisperjav video.mp4 --mode faster
 `balanced` 模式提供完整的预处理管线（场景检测 + 语音活动检测），但语音识别通过 faster-whisper 在 CPU 上运行。`transformers` 模式的语音识别在 MPS GPU 上运行。要获得带 GPU 加速的最高精度：
 
 ```bash
-whisperjav video.mp4 --mode transformers --sensitivity aggressive
+whisperjav video.mp4 --mode transformers --hf-model-id openai/whisper-large-v2
 ```
 
 ### Qwen 处理管线：`--mode qwen`
@@ -695,7 +689,7 @@ pip install soundfile
 **解决方案：**
 1. 使用较小的模型：
    ```bash
-   whisperjav video.mp4 --mode transformers --model medium
+   whisperjav video.mp4 --mode transformers --hf-model-id openai/whisper-medium
    ```
 2. 启用 MPS 内存回退：
    ```bash

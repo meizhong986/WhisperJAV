@@ -84,7 +84,7 @@ Workarounds for users who explicitly want aggressive Pass 2 sensitivity:
 - Use **Balanced** as Pass 1 instead of Fidelity (no cap fires; aggressive Pass 2 is stable in this combination).
 - Use **Fast** or **Faster** as Pass 1 (no cap fires).
 
-A deeper architectural fix is planned for v1.9.0+ pending investigation. The cap is a documented workaround, not a root-cause fix.
+A root-cause fix is still being investigated; no release date is set. The cap is a documented workaround, not a root-cause fix.
 
 ---
 
@@ -181,7 +181,7 @@ The bundled Qwen3-ASR fork is incompatible with `transformers` 5.x (the decorato
    ```
    Replace `<env-pip>` with the exact pip path for your install (e.g. `Scripts\pip.exe` for the Windows standalone installer, or your venv pip for source installs).
 
-2. Or wait for v1.9.0, which will ship a Qwen3-ASR fork patched for transformers 5.x. Tracking: <https://github.com/QwenLM/Qwen3-ASR/issues/138>.
+2. Or wait for a WhisperJAV release that supports transformers 5.x. None is scheduled yet, so option 1 is the fix for now. Tracking: <https://github.com/QwenLM/Qwen3-ASR/issues/138>.
 
 ### "CUDA not available" but I have an NVIDIA GPU
 
@@ -266,17 +266,17 @@ Tips:- Avoid running other GPU-heavy applications simultaneously (Chrome, games,
 
 ---
 
-## Cohere-Transcribe (preview — deferred to v1.9.0)
+## Cohere-Transcribe (not available yet)
 
-> **Status update (v1.8.14):** The Cohere-Transcribe preview is **deferred to v1.9.0** and the dropdown entry is greyed out. The model requires `transformers ≥ 5.4.0`, but the Qwen3-ASR fork that ships with WhisperJAV breaks on transformers 5.x (`@check_model_inputs()` decorator API change). v1.9.0 will land a coordinated transformers upgrade together with the Qwen3-ASR fork patch and the Cohere ship.
+> **Status:** Cohere-Transcribe is not available in WhisperJAV yet. It needs transformers 5.x, which WhisperJAV does not support yet. No release date is set. The dropdown entry is greyed out.
 
 > **Migration note for users who already upgraded transformers:** If you ran a recent `pip install transformers --upgrade` (or otherwise pulled transformers 5.x into your WhisperJAV env), Qwen3-ASR will fail to load. Restore stability with `pip install "transformers>=4.40.0,<5.0"` and then verify Qwen3-ASR loads via `python -c "from qwen_asr import Qwen3ASRModel; print('OK')"`.
 
-The setup notes below remain valid for v1.9.0 resumption — preserved for forward reference.
+The setup notes below are for when it becomes available.
 
-### Using Cohere-Transcribe (preview, opt-in) — v1.9.0
+### For when it becomes available: setup
 
-Cohere Transcribe-03-2026 will be available in v1.9.0 as a third generator under the **ChronosJAV** dropdown, alongside Qwen3-ASR and Anime-Whisper. The model is gated on HuggingFace, so a one-time setup is required. Anime-Whisper remains the default JA-tuned generator; Cohere is opt-in.
+Cohere Transcribe-03-2026 is planned as a third generator under the **ChronosJAV** dropdown, alongside Qwen3-ASR and Anime-Whisper. The model is gated on HuggingFace, so a one-time setup is required. Anime-Whisper remains the default JA-tuned generator; Cohere is opt-in.
 
 **Setup (one-time)**
 

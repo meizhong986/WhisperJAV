@@ -23,6 +23,7 @@ from whisperjav.utils.process_manager import (
     terminate_process_tree,
     PSUTIL_AVAILABLE,
 )
+from whisperjav.config.qwen3_whisperseg_vad import QWEN3_WHISPERSEG_DEFAULTS
 
 
 # Determine REPO_ROOT for module resolution
@@ -2212,40 +2213,82 @@ class WhisperJAVAPI:
             }
         }
 
+    # Segmenters whose backend does not enforce a longest-segment cap (Silero
+    # v3.1/v4.0 ignore max_speech_duration_s, config/components/vad/silero.py),
+    # and the dialog levers only WhisperSeg has.
+    _NO_MAX_SPEECH_SEGMENTERS = ("silero", "silero-v3.1", "silero-v4.0", "none")
+    _WHISPERSEG_ONLY_LEVERS = ("vad_decoder", "vad_grow_floor", "vad_gap_merge_ms")
+
     def get_qwen_schema(self, sensitivity: str = "balanced",
-                        generator_backend: str = "qwen3") -> Dict[str, Any]:
+                        generator_backend: str = "qwen3",
+                        segmenter: str = "whisperseg") -> Dict[str, Any]:
         """
         Get parameter schema for the Qwen / ChronosJAV customize modal.
 
-        For the **anime-whisper** backend, the WhisperSeg VAD fields (Frame
-        Gap, Max Group, VAD Threshold, Start/End Pad, and the v1.9.0 offline-
-        decoder levers: Decoder, Grow Floor, Gap Cut, Max Speech Duration) are
-        defaulted from the owner's per-sensitivity table (single source of
-        truth) so the Customize dialog shows exactly what will run at the
-        pass's selected sensitivity.
-        Balanced is the fallback for an unknown sensitivity. qwen3 / cohere are
-        unaffected (they keep the static schema defaults).
+        v1.9.4: the dialog shows what the pass will run, for its model,
+        sensitivity AND speech segmenter, because Apply sends every shown value
+        back as the user's choice; a wrong default would silently change the run.
+        - Segmenter values (VAD Threshold, Max Speech Duration, and for
+          WhisperSeg the Decoder / Grow Floor / Gap Cut) are resolved through
+          config/chronosjav_vad.py, the same decision main.py and the ensemble
+          worker make: ChronosJAV values for WhisperSeg, otherwise that
+          segmenter's own sensitivity preset (e.g. TEN on the default pass 2).
+        - Controls a segmenter does not have are left out of the schema, so they
+          are neither shown nor sent: the three WhisperSeg-only levers for other
+          segmenters; Max Speech Duration for Silero v3.1/v4.0 and None; the VAD
+          Threshold for None.
+        - anime-whisper's pipeline values (Frame Gap, Max Group, Start/End Pad)
+          come from its per-sensitivity table, as in a run.
+        Balanced is the fallback for an unknown sensitivity.
         """
         result = self._get_qwen_schema_base()
-        if generator_backend == "anime-whisper" and result.get("success"):
-            from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
+        if not result.get("success"):
+            return result
+        audio = result["schema"]["audio"]
+        if generator_backend == "anime-whisper":
+            from whisperjav.config.anime_whisper_vad import (
+                ANIME_WHISPER_LEADING_SILENCE_MS, anime_whisperseg_defaults)
+            # v1.9.4 (owner, 2026-10-06): the lead-in silence and its off switch (0).
+            result["schema"]["generation"]["leading_silence_ms"] = {
+                "type": "slider",
+                "label": "Silence Before Each Window (ms)",
+                "description": "Silence placed before every audio window sent to anime-whisper. It helped "
+                               "the first words of a line come out right. Where each window starts and ends does not change. "
+                               "0 turns it off.",
+                "min": 0, "max": 500, "step": 50,
+                "default": ANIME_WHISPER_LEADING_SILENCE_MS,
+            }
             aw = anime_whisperseg_defaults(sensitivity)
-            audio = result["schema"]["audio"]
             audio["chunk_threshold_ms"]["default"] = int(round(aw["chunk_threshold_s"] * 1000))
             audio["max_group_duration"]["default"] = aw["max_group_duration_s"]
-            audio["vad_threshold"]["default"] = aw["threshold"]
             audio["vad_start_pad"]["default"] = int(aw["start_pad_ms"])
             audio["vad_end_pad"]["default"] = int(aw["end_pad_ms"])
-            # v1.9.0 offline-decoder levers — table-driven where the row pins
-            # them (aggressive); other sensitivities keep the schema defaults.
-            if "segmentation_decoder" in aw:
-                audio["vad_decoder"]["default"] = aw["segmentation_decoder"]
-            if "grow_floor" in aw:
-                audio["vad_grow_floor"]["default"] = aw["grow_floor"]
-            if "gap_merge_ms" in aw:
-                audio["vad_gap_merge_ms"]["default"] = int(aw["gap_merge_ms"])
-            if "max_speech_duration_s" in aw:
-                audio["max_speech_duration"]["default"] = aw["max_speech_duration_s"]
+
+        segmenter = (segmenter or "whisperseg").strip().lower()
+        if segmenter == "none":
+            for key in ("vad_threshold", "max_speech_duration") + self._WHISPERSEG_ONLY_LEVERS:
+                audio.pop(key, None)
+            return result
+
+        from whisperjav.config.chronosjav_vad import resolve_chronosjav_segmenter_config
+        cfg = resolve_chronosjav_segmenter_config(generator_backend, segmenter, sensitivity)
+        if cfg.get("threshold") is not None:
+            audio["vad_threshold"]["default"] = float(cfg["threshold"])
+        if segmenter == "whisperseg":
+            if cfg.get("segmentation_decoder"):
+                audio["vad_decoder"]["default"] = cfg["segmentation_decoder"]
+            if cfg.get("grow_floor") is not None:
+                audio["vad_grow_floor"]["default"] = float(cfg["grow_floor"])
+            if cfg.get("gap_merge_ms") is not None:
+                audio["vad_gap_merge_ms"]["default"] = int(cfg["gap_merge_ms"])
+        else:
+            for key in self._WHISPERSEG_ONLY_LEVERS:
+                audio.pop(key, None)
+        max_speech = cfg.get("max_speech_duration_s")
+        if segmenter in self._NO_MAX_SPEECH_SEGMENTERS or max_speech is None:
+            audio.pop("max_speech_duration", None)
+        else:
+            audio["max_speech_duration"]["default"] = float(max_speech)
         return result
 
     def _get_qwen_schema_base(self) -> Dict[str, Any]:
@@ -2256,6 +2299,14 @@ class WhisperJAVAPI:
         alignment, output. Anime-whisper per-sensitivity overrides are applied
         by the public get_qwen_schema() wrapper.
         """
+        # The decoder a WhisperSeg run uses when nothing sets one (hysteresis),
+        # read from the segmenter factory so the dialog and the run cannot drift.
+        # Only anime-whisper aggressive pins "offline"; get_qwen_schema() applies
+        # that row. Before v1.9.4 this default was "offline" for every model and
+        # sensitivity, so Apply in Customize silently switched Qwen3-ASR and
+        # anime-whisper conservative/balanced from hysteresis to offline.
+        from whisperjav.modules.speech_segmentation.factory import _PARAM_SCHEMAS
+        whisperseg_decoder = _PARAM_SCHEMAS["whisperseg"]["segmentation_decoder"][1]
         return {
             "success": True,
             "schema": {
@@ -2422,10 +2473,10 @@ class WhisperJAVAPI:
                         "description": "How speech probabilities become segments. Offline (two-level): seeds at VAD Threshold, edges grow to the Grow Floor, dialogs cut at pauses >= Gap Cut. Hysteresis: vendor streaming state machine (ChickenRice lineage).",
                         "group": "vad_settings",
                         "options": [
-                            {"value": "offline", "label": "Offline two-level (default)"},
+                            {"value": "offline", "label": "Offline two-level"},
                             {"value": "hysteresis", "label": "Hysteresis (ChickenRice)"},
                         ],
-                        "default": "offline",
+                        "default": whisperseg_decoder,
                     },
                     "vad_grow_floor": {
                         "type": "slider",
@@ -2449,7 +2500,9 @@ class WhisperJAVAPI:
                         "description": "Single-segment ceiling. Segments longer than this are split at the quietest point (offline decoder) or per the force-split mode (hysteresis).",
                         "group": "vad_settings",
                         "min": 2.0, "max": 10.0, "step": 0.5,
-                        "default": 4.0,
+                        # Qwen3-ASR default (single source); anime-whisper rows
+                        # override it from config/anime_whisper_vad.py.
+                        "default": QWEN3_WHISPERSEG_DEFAULTS["max_speech_duration_s"],
                     },
                 },
                 # ── Tab 3: Generation ─────────────────────────────────
@@ -3746,6 +3799,48 @@ class WhisperJAVAPI:
                 'provider': backend.get('provider', ''),
             }
             return {"success": True, "settings": gui_settings}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    # #435: the choices on the Ensemble translation row and the AI SRT Translate tab.
+    # They lived only in browser storage, which private_mode (main.py, #236/#240)
+    # clears at every launch, so they were forgotten. Kept in the translate settings
+    # file under "gui_tab_state", a key the translate command line does not read.
+    # Per-film fields (title, names, plot) and the AI SRT Translate API key are not kept.
+    _TRANSLATION_TAB_FIELDS = {
+        "ensemble": ("provider", "model", "modelOverride"),
+        "srt": ("provider", "model", "customModel", "sourceLang", "targetLang", "tone",
+                "customEndpoint", "maxBatchSize", "maxRetries", "rateLimit", "sceneThreshold"),
+    }
+
+    def get_translation_tab_state(self) -> Dict[str, Any]:
+        """Saved translation choices per tab: {success, state: {ensemble: {...}, srt: {...}}}."""
+        try:
+            from whisperjav.translate.settings import load_settings
+            saved = load_settings().get("gui_tab_state") or {}
+            state = {}
+            for tab, fields in self._TRANSLATION_TAB_FIELDS.items():
+                values = saved.get(tab) if isinstance(saved.get(tab), dict) else {}
+                state[tab] = {k: str(values[k]) for k in fields if values.get(k) not in (None, "")}
+            return {"success": True, "state": state}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def save_translation_tab_state(self, tab: str, values: Dict[str, Any]) -> Dict[str, Any]:
+        """Replace the saved choices of one tab ('ensemble' or 'srt'); unknown keys are ignored."""
+        try:
+            fields = self._TRANSLATION_TAB_FIELDS.get(tab)
+            if fields is None:
+                return {"success": False, "error": f"unknown tab: {tab}"}
+            from whisperjav.translate.settings import load_settings, save_settings
+            existing = load_settings()
+            tabs = existing.get("gui_tab_state") if isinstance(existing.get("gui_tab_state"), dict) else {}
+            tabs[tab] = {k: str(values[k]) for k in fields
+                         if isinstance(values, dict) and values.get(k) not in (None, "")}
+            existing["gui_tab_state"] = tabs
+            if not save_settings(existing):
+                return {"success": False, "error": "could not write the translate settings file"}
+            return {"success": True}
         except Exception as e:
             return {"success": False, "error": str(e)}
 

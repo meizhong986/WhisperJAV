@@ -379,7 +379,6 @@ whisperjav = [
     "config/v4/**/*.yaml",
     "config/v4/**/*.md",
     "config/components/**/*.py",
-    "instructions/*.txt",
     "translate/defaults/*.txt",
     "webview_gui/assets/*.html",
     "webview_gui/assets/*.css",

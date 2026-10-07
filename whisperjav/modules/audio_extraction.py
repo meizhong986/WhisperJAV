@@ -9,6 +9,7 @@ from typing import Optional, Tuple
 
 import shutil
 from whisperjav.utils.logger import logger
+from whisperjav.modules.audio_integrity import IntegrityProbe, console_message, stop_requested
 
 class AudioExtractor:
     """Extract audio from media files using FFmpeg."""
@@ -17,11 +18,16 @@ class AudioExtractor:
                  sample_rate: int = 16000,
                  channels: str = "mono",
                  audio_codec: str = "pcm_s16le",
-                 ffmpeg_path: Optional[str] = None):
+                 ffmpeg_path: Optional[str] = None,
+                 check_integrity: bool = True):
         self.sample_rate = sample_rate
         self.channels = channels
         self.audio_codec = audio_codec
         self.ffmpeg_path = ffmpeg_path or self._find_ffmpeg()
+        # 1.9.4 (REQ1): the audio check runs with every extraction. Its report
+        # for the last extracted file is kept here for the pipeline to act on.
+        self.check_integrity = check_integrity
+        self.last_integrity = None
 
     def _find_ffmpeg(self) -> str:
         """Find FFmpeg executable in system PATH."""
@@ -48,10 +54,30 @@ class AudioExtractor:
         logger.info(f"Extracting the audio from {input_file.name}...")
 
         # Build FFmpeg command
+        # "-loglevel level+info" tags each FFmpeg line with its level, so the
+        # audio check can count real decoder errors ("[error]") without
+        # guessing from the wording; the "Duration:" line read below is kept.
+        # An FFmpeg too old to know the "level" flag rejects it; the command is
+        # then run once more without it (see _run_ffmpeg).
         cmd = [
             self.ffmpeg_path,
+            "-loglevel", "level+info",
             "-i", str(input_file),
             "-vn",  # No video
+            # 1.9.4: put silence where the audio track has a hole, as a video
+            # player does. Without it FFmpeg joins the sound on either side of a
+            # hole and every later subtitle comes out early by the hole's length
+            # (film A of docs/measurements/v1.9.4: five 2-second holes, up to 10 s early). Same single
+            # FFmpeg pass, no extra time measured.
+            # async=1 only fills holes and drops overlaps of 0.1 s or more
+            # (aresample's min_hard_comp); smaller timing jitter is left alone.
+            # NOT "first_pts=0": FFmpeg rebuilds the filter when the audio's
+            # sample rate or channel layout changes partway through a file, and a
+            # rebuilt filter with first_pts=0 inserts silence as long as the time
+            # already played (adversary review 2026-10-05: a 20 s test file became
+            # 30 s). Audio that starts after the video therefore keeps its 1.9.3
+            # behaviour (not shifted); aligning it is a separate change.
+            "-af", "aresample=async=1",
             "-acodec", self.audio_codec,
             "-ar", str(self.sample_rate),
             "-ac", "1" if self.channels == "mono" else "2",
@@ -63,11 +89,10 @@ class AudioExtractor:
             # Run FFmpeg. No timeout: extraction of a long file on a slow or sleeping
             # drive legitimately takes many minutes, and killing it would lose the run.
             started = time.monotonic()
-            result = subprocess.run(cmd,
-                                  capture_output=True,
-                                  text=True,
-                                  encoding='utf-8', errors='replace',
-                                  check=True)
+            self.last_integrity = None
+            probe = (IntegrityProbe(self._find_ffprobe(), input_file)
+                     if self.check_integrity else None)
+            result = self._run_ffmpeg(cmd)
             elapsed = time.monotonic() - started
 
             # Get duration. Never by decoding the extracted file again: ffprobe
@@ -77,11 +102,37 @@ class AudioExtractor:
 
             logger.info(f"Audio ready: {duration:.1f} seconds of audio, "
                         f"extracted in {elapsed:.1f} seconds")
+
+            if probe is not None:
+                report = probe.finish(duration, result.stderr)
+                self.last_integrity = report
+                message = console_message(report, input_file.name, stopping=stop_requested())
+                if report.suspect:
+                    logger.warning(message)
+                else:
+                    logger.info(message)
             return output_path, duration
 
         except subprocess.CalledProcessError as e:
             logger.error(f"FFmpeg error: {e.stderr}")
             raise RuntimeError(f"Failed to extract audio: {e.stderr}")
+
+    @staticmethod
+    def _run_ffmpeg(cmd):
+        """Run the extraction. If this FFmpeg rejects "-loglevel level+info"
+        (builds older than the "level" flag), run it once more without it: the
+        extraction is unchanged, only the audio check's decoder-error count is
+        then unavailable (untagged lines count as none)."""
+        try:
+            return subprocess.run(cmd, capture_output=True, text=True,
+                                  encoding='utf-8', errors='replace', check=True)
+        except subprocess.CalledProcessError as e:
+            if "Invalid loglevel" not in (e.stderr or "") or "-loglevel" not in cmd:
+                raise
+            i = cmd.index("-loglevel")
+            logger.debug("This FFmpeg does not accept '-loglevel level+info'; extracting without it")
+            return subprocess.run(cmd[:i] + cmd[i + 2:], capture_output=True, text=True,
+                                  encoding='utf-8', errors='replace', check=True)
 
     def _get_audio_duration(self, audio_file: Path, extract_stderr: Optional[str] = None) -> float:
         """Get duration of audio file in seconds.

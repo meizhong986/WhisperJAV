@@ -21,6 +21,8 @@ import srt
 import torch
 from faster_whisper import WhisperModel
 
+from whisperjav.utils.pyav_compat import ensure_av_open_compat
+ensure_av_open_compat()  # PyAV 19 dropped an argument faster-whisper passes
 from whisperjav.utils.logger import logger
 from whisperjav.utils.device_detector import get_best_device
 

@@ -11,8 +11,9 @@ padding defaults used by the **anime-whisper** ASR backend inside the qwen
     - whisperjav/webview_gui/api.py         (Customize-parameters dialog display)
 
 Scope note: this table is anime-whisper ONLY. qwen3 and cohere keep their own
-defaults (qwen3: flat 0.3/3.0/0.25/100/100 via ctor + threshold injection;
-cohere: 1.0/6.0/300). See the __init__ generator-backend branch in
+defaults (qwen3: group gap 0.3 s / group cap 3.0 s / pads 100/100 ms via the
+pipeline ctor, threshold 0.25 and longest segment 4.0 s via
+config/qwen3_whisperseg_vad.py; cohere: 1.0/6.0/300). See the __init__ generator-backend branch in
 qwen_pipeline.py and the anime/cohere branches in main.py / pass_worker.py.
 
 Mapping to GUI labels / pipeline scalars:
@@ -37,13 +38,50 @@ from typing import Any, Dict
 # ---------------------------------------------------------------------------
 # Per-sensitivity defaults. Keys are the resolved runtime parameter names.
 # ---------------------------------------------------------------------------
+# v1.9.4 (owner, 2026-10-06): silence placed before every audio window sent to
+# anime-whisper by the ChronosJAV pipeline (0 = off). Measured on the reference clips:
+# character error rate 0.392 -> 0.387 on aggressive; timing unchanged. Users can turn it
+# off: --qwen-leading-silence 0, ensemble qwen-params "leading_silence_ms", GUI Customize
+# "Silence Before Each Window (ms)". docs/measurements/v1.9.4, sections 2.10-2.11.
+ANIME_WHISPER_LEADING_SILENCE_MS = 200
+
 ANIME_WHISPER_WHISPERSEG_DEFAULTS: Dict[str, Dict[str, Any]] = {
+    # v1.9.4 (owner, 2026-10-05, option B): max_speech_duration_s is 4.0 at EVERY
+    # sensitivity, the same as Qwen3-ASR. The longest segment is a subtitle
+    # line-length policy, not a detection-sensitivity setting; before, conservative
+    # and balanced inherited 6 / 5 s from the WhisperSeg YAML presets and aggressive
+    # pinned 4.0. Aggressive also takes grow_floor 0.15 (was 0.05).
+    # Measured (7 Netflix drama clips, 305 ground-truth lines; drama scenes, not JAV
+    # audio; docs/measurements/v1.9.4/MEASUREMENTS_v194_REQ1_REQ2.md sections 2.6-2.8):
+    #   conservative 6 -> 4 s: lines ending within 0.5 s 46 -> 74, median end error
+    #     1.14 -> 0.60 s, character error rate 0.397 -> 0.399, characters +1.6 %;
+    #   balanced 5 -> 4 s: 51 -> 74, 1.13 -> 0.61 s, 0.400 -> 0.402, characters -0.7 %;
+    #   aggressive 4 s with grow floor 0.05 -> 0.15: 75 -> 82, 0.71 -> 0.60 s,
+    #     0.392 -> 0.392, characters -0.8 %.
+    # 3 s was measured and NOT adopted: about one more third of the timing gain, but
+    # 3.5-7 % fewer characters written (character error rate +4 % and +5.5 % relative
+    # at conservative and balanced). Accuracy of the text comes first (owner).
+    # To revert a row, set its max_speech_duration_s back (6.0 / 5.0) or remove the
+    # key (then the WhisperSeg YAML preset applies). Group cap and group gap unchanged.
+    #
+    # v1.9.4 (owner, 2026-10-06): conservative and balanced, which run the
+    # hysteresis decoder, split an overlong segment at the lowest point of the last
+    # 70 % (dip_search_from 0.3) and always take it (dip_accept_any), instead of
+    # searching the last 40 % and otherwise cutting exactly at the limit, often
+    # inside a word. Measured on balanced (section 2.10): lines ending within 0.5 s
+    # 74 -> 101, median end error 0.61 -> 0.45 s, character error rate 0.402 ->
+    # 0.405, characters written +0.5 %. Aggressive runs the offline decoder, which
+    # already cuts at minima of the smoothed curve; Qwen3-ASR keeps the defaults
+    # (the same rule cost it +6 % character error rate). To revert, remove the two keys.
     "conservative": {
         "chunk_threshold_s": 0.3,
         "max_group_duration_s": 3.0,
         "threshold": 0.35,
         "start_pad_ms": 100,
         "end_pad_ms": 100,
+        "max_speech_duration_s": 4.0,
+        "dip_search_from": 0.3,
+        "dip_accept_any": True,
     },
     "balanced": {
         "chunk_threshold_s": 0.25,
@@ -51,13 +89,17 @@ ANIME_WHISPER_WHISPERSEG_DEFAULTS: Dict[str, Dict[str, Any]] = {
         "threshold": 0.30,
         "start_pad_ms": 50,
         "end_pad_ms": 50,
+        "max_speech_duration_s": 4.0,
+        "dip_search_from": 0.3,
+        "dip_accept_any": True,
     },
     "aggressive": {
         # v1.9.0 tuning (2026-07-13): cross-clip VAD sweep over 4 Naked-Director
         # benchmarks showed lowering threshold 0.25->0.15 + a 30ms end-pad lifts
         # dialogue recall (time_recall 0.83->0.88 mean) at flat CER on every clip,
-        # without lengthening subs. max_speech adjusted to 3.5 (typical JAV dialogue
-        # ~2.7s; 4.0 was too long). See tools/vad_hypothesis_suite + reference_benchmarks/.
+        # without lengthening subs. (This note once said max_speech was adjusted to
+        # 3.5; the value that shipped and ran was 4.0. v1.9.4 keeps 4.0, see above.)
+        # See tools/vad_hypothesis_suite + reference_benchmarks/.
         #
         # neg_threshold decoupled from threshold (2026-07-28): the upstream formula
         # max(threshold-0.15, 0.01) collapses to 0.01 at threshold=0.15, disabling
@@ -66,7 +108,8 @@ ANIME_WHISPER_WHISPERSEG_DEFAULTS: Dict[str, Dict[str, Any]] = {
         #
         # 2026-07-31 DEFAULT: "offline" two-level decoder (owner-approved).
         # Segments SEED at prob >= threshold (0.15), edges GROW while prob >=
-        # grow_floor (0.05 — keeps quiet speech attached to confident speech),
+        # grow_floor (0.15 since v1.9.4, was 0.05 — keeps quiet speech attached
+        # to confident speech; 0.15 trims late tails, see the v1.9.4 note above),
         # gaps >= gap_merge_ms (350) become real dialog cuts, and overlong
         # segments split at smoothed-probability minima instead of a blind
         # chop. "3a" speech_start_threshold=0.30 still refines display starts
@@ -85,7 +128,7 @@ ANIME_WHISPER_WHISPERSEG_DEFAULTS: Dict[str, Dict[str, Any]] = {
         "max_group_duration_s": 2.0,
         "threshold": 0.15,
         "segmentation_decoder": "offline",
-        "grow_floor": 0.05,
+        "grow_floor": 0.15,
         "gap_merge_ms": 350,
         "split_smooth_ms": 120,
         "speech_start_threshold": 0.30,
@@ -124,6 +167,8 @@ SEGMENTER_CONFIG_KEYS = (
     "split_smooth_ms",
     "min_silence_duration_ms",
     "max_speech_duration_s",
+    "dip_search_from",
+    "dip_accept_any",
 )
 
 

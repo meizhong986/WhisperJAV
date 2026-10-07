@@ -87,6 +87,8 @@ class WhisperSegSpeechSegmenter:
         grow_floor: float = 0.05,
         gap_merge_ms: int = 350,
         split_smooth_ms: int = 120,
+        dip_search_from: float = 0.6,
+        dip_accept_any: bool = False,
         min_speech_duration_ms: int = 100,
         min_silence_duration_ms: int = 100,
         speech_pad_ms: int = 300,
@@ -132,6 +134,19 @@ class WhisperSegSpeechSegmenter:
                 segment at a real onset — empirically stronger content
                 capture on wide-net presets (threshold 0.15), at the cost of
                 near-uniform segment lengths in continuous speech.
+            dip_search_from: ("dip" split) where the search for the lowest-
+                probability frame starts, as a fraction of max_speech_duration_s.
+                0.6 (default) searches the last 40 %; v1.9.4 anime-whisper
+                conservative/balanced use 0.3 (search the last 70 %).
+            dip_accept_any: ("dip" split) cut at the lowest point found even
+                when it is not below 0.85 x the window's mean. False (default)
+                cuts exactly at the limit in that case, often inside a word.
+                v1.9.4 anime-whisper conservative/balanced use True.
+                Measured (7 Netflix drama clips; docs/measurements/v1.9.4,
+                section 2.10): anime-whisper balanced 0.3 + True: lines ending
+                within 0.5 s of the ground truth 74 -> 101, character error rate
+                0.402 -> 0.405. Qwen3-ASR: timing gain but error rate +6 %, so
+                Qwen3-ASR keeps the defaults.
             segmentation_decoder: Which decoder converts the probability
                 stream into segments.
                 "hysteresis" (default): the vendor-lineage streaming state
@@ -200,6 +215,8 @@ class WhisperSegSpeechSegmenter:
         self.grow_floor = min(max(0.0, float(grow_floor)), self.threshold)
         self.gap_merge_ms = max(0, int(gap_merge_ms))
         self.split_smooth_ms = max(20, int(split_smooth_ms))
+        self.dip_search_from = min(max(0.0, float(dip_search_from)), 0.95)
+        self.dip_accept_any = bool(dip_accept_any)
         self.min_speech_duration_ms = int(min_speech_duration_ms)
         self.min_silence_duration_ms = int(min_silence_duration_ms)
         self.speech_pad_ms = int(speech_pad_ms)
@@ -606,12 +623,12 @@ class WhisperSegSpeechSegmenter:
             if triggered and "start" in current and self.force_split_mode == "dip":
                 duration = i - current["start"]
                 if duration > max_speech_frames:
-                    window_start = int(max_speech_frames * 0.6)
+                    window_start = int(max_speech_frames * self.dip_search_from)
                     window_probs = current_probs[window_start:max_speech_frames]
                     if window_probs:
                         min_prob = float(np.min(window_probs))
                         mean_prob = float(np.mean(window_probs))
-                        if min_prob < mean_prob * 0.85:
+                        if self.dip_accept_any or min_prob < mean_prob * 0.85:
                             best_offset = window_start + int(np.argmin(window_probs))
                         else:
                             best_offset = max_speech_frames
@@ -1029,6 +1046,8 @@ class WhisperSegSpeechSegmenter:
             "grow_floor": self.grow_floor,
             "gap_merge_ms": self.gap_merge_ms,
             "split_smooth_ms": self.split_smooth_ms,
+            "dip_search_from": self.dip_search_from,
+            "dip_accept_any": self.dip_accept_any,
             "min_speech_duration_ms": self.min_speech_duration_ms,
             "min_silence_duration_ms": self.min_silence_duration_ms,
             "speech_pad_ms": self.speech_pad_ms,

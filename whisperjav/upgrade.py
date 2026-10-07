@@ -589,6 +589,50 @@ def cleanup_old_snapshots(install_dir: Path, keep: int = 3) -> int:
 # Compatibility Check Functions
 # =============================================================================
 
+def _kill_process_tree(pid: int) -> None:
+    """Kill a process and everything it started (pip's git fetch, build steps)."""
+    if sys.platform == "win32":
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True, timeout=30)
+        return
+    try:
+        from whisperjav.utils.process_manager import terminate_process_tree
+        terminate_process_tree(pid, timeout=5.0)
+    except Exception:
+        try:
+            os.kill(pid, 9)
+        except OSError:
+            pass
+
+
+def _run_bounded(cmd: List[str], timeout: float) -> subprocess.CompletedProcess:
+    """Run a command and give up after `timeout` seconds, for real.
+
+    subprocess.run(capture_output=True, timeout=...) can wait far past its
+    timeout on Windows: after killing the child it waits for the output pipes,
+    which a grandchild (pip's git fetch or a build step) keeps open. Reproduced
+    2026-10-06: a 2 s timeout returned after 20 s, i.e. when the grandchild
+    ended; with pip that can be never (#436: "whisperjav-upgrade hangs in the
+    compatibility check"). Here output goes to temporary files and on timeout
+    the whole process tree is killed; TimeoutExpired is raised as before.
+    """
+    import tempfile
+    with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+        proc = subprocess.Popen(cmd, stdout=out, stderr=err)
+        try:
+            returncode = proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            _kill_process_tree(proc.pid)
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                pass
+            raise
+        out.seek(0)
+        err.seek(0)
+        decode = lambda b: b.decode("utf-8", errors="replace")
+        return subprocess.CompletedProcess(cmd, returncode, decode(out.read()), decode(err.read()))
+
+
 def check_upgrade_compatibility(install_dir: Path, extras: str = "all") -> Tuple[bool, List[str]]:
     """
     Check if upgrade would cause dependency conflicts.
@@ -617,14 +661,13 @@ def check_upgrade_compatibility(install_dir: Path, extras: str = "all") -> Tuple
     # Use pip's dry-run to check for conflicts (PEP 508 syntax, not #egg=)
     print("      Checking dependency compatibility...")
     try:
-        result = subprocess.run(
+        # Bounded for real (#436): see _run_bounded.
+        result = _run_bounded(
             [
                 str(pip_exe), 'install', '--dry-run', '--ignore-installed',
                 f"{install_spec} @ {GITHUB_REPO}"
             ],
-            capture_output=True,
-            text=True,
-            timeout=300
+            timeout=300,
         )
 
         if result.returncode != 0:

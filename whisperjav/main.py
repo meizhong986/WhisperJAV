@@ -103,6 +103,7 @@ from whisperjav.utils.run_outcome import (
     write_manifest,
 )
 from whisperjav.modules.media_discovery import MediaDiscovery
+from whisperjav.modules.audio_integrity import AudioIntegrityStop
 from whisperjav.utils.media_leftovers import (
     WHISPERJAV_WORK_DIRS,
     is_whisperjav_temp_file,
@@ -667,7 +668,9 @@ def parse_arguments():
                                  "of these states: " + ", ".join(FAIL_ON_CHOICES) + ". "
                                  "Repeatable or comma-separated. By default only a "
                                  "'failed' file (an error) makes the run exit non-zero; "
-                                 "'empty' and 'suspect' are reported and exit 0.")
+                                 "'empty' and 'suspect' are reported and exit 0. With 'suspect', "
+                                 "a file whose audio check finds the audio track damaged is stopped "
+                                 "before transcription.")
     
     # Subtitle signature options
     signature_group = parser.add_argument_group("Subtitle Attribution")
@@ -878,9 +881,11 @@ def parse_arguments():
                                 "nemo/nemo-lite, whisper-vad, "
                                 "firered-vad, none")
     qwen_audio_group.add_argument("--qwen-max-group-duration", type=float, default=None,
-                           help="Max duration (seconds) for VAD segment grouping (pipeline default: 4.0)")
+                           help="Max duration (seconds) for VAD segment grouping (default: 3.0 for Qwen3-ASR; "
+                                "anime-whisper 3.0 / 2.5 / 2.0 by sensitivity)")
     qwen_audio_group.add_argument("--qwen-chunk-threshold", type=float, default=None,
-                           help="Silence gap (seconds) above which segments are NOT grouped (pipeline default: 0.4 / 400ms)")
+                           help="Silence gap (seconds) above which segments are NOT grouped (default: 0.3 for Qwen3-ASR; "
+                                "anime-whisper 0.3 / 0.25 / 0.2 by sensitivity)")
     qwen_audio_group.add_argument("--qwen-input-mode", type=str, default="assembly",
                            choices=["assembly", "context_aware", "vad_slicing"],
                            help="Audio input strategy: 'assembly' (default). "
@@ -894,23 +899,28 @@ def parse_arguments():
     qwen_audio_group.add_argument("--qwen-sensitivity", type=str, default="balanced",
                            choices=["conservative", "balanced", "aggressive"],
                            help="Sensitivity preset for Qwen segmenter config: "
-                                "aggressive (low threshold, max capture), "
+                                "aggressive (keeps shorter speech and pauses, max capture), "
                                 "balanced (default), "
-                                "conservative (high threshold, fewer false positives)")
+                                "conservative (fewer false positives). With WhisperSeg, "
+                                "Qwen3-ASR keeps threshold 0.25 at every sensitivity; "
+                                "anime-whisper uses 0.35 / 0.30 / 0.15.")
     qwen_audio_group.add_argument("--qwen-vad-threshold", type=float, default=None,
                            help="VAD speech detection threshold (overrides sensitivity preset)")
     qwen_audio_group.add_argument("--qwen-vad-padding", type=int, default=None,
                            help="Legacy symmetric VAD padding in ms (applies to both start and end). "
                                 "Prefer --qwen-vad-start-pad / --qwen-vad-end-pad.")
     qwen_audio_group.add_argument("--qwen-vad-start-pad", type=int, default=None,
-                           help="VAD padding before speech onset, ms (pipeline default: 100)")
+                           help="VAD padding before speech onset, ms (default: 100 for Qwen3-ASR; "
+                                "anime-whisper 100 / 50 / 0 by sensitivity)")
     qwen_audio_group.add_argument("--qwen-vad-end-pad", type=int, default=None,
-                           help="VAD padding after speech offset, ms (pipeline default: 200; end-of-speech is most critical)")
+                           help="VAD padding after speech offset, ms (default: 100 for Qwen3-ASR; "
+                                "anime-whisper 100 / 50 / 30 by sensitivity)")
     qwen_audio_group.add_argument("--qwen-max-speech-duration", type=float, default=None,
                            help="Force-split any single speech segment longer than this (seconds). "
-                                "Overrides the sensitivity preset (conservative 6 / balanced 5 / "
-                                "aggressive 4). The binding cap on subtitle length — lower = shorter, "
-                                "more granular subtitles.")
+                                "Default with the WhisperSeg segmenter: 4 for Qwen3-ASR and "
+                                "anime-whisper, at every sensitivity; with other segmenters, the "
+                                "segmenter's own sensitivity preset. The binding cap on subtitle "
+                                "length — lower = shorter, more granular subtitles.")
 
     # ── Qwen3-ASR: Generation ─────────────────────────────────────────────
     qwen_gen_group = parser.add_argument_group("Qwen3-ASR: Generation")
@@ -982,6 +992,10 @@ def parse_arguments():
     qwen_output_group.add_argument("--no-qwen-drop-nonverbal-lines", dest="qwen_drop_nonverbal_lines",
                            action="store_false",
                            help="Keep lone nonverbal subtitle lines (disable the Phase-8 filter)")
+    qwen_output_group.add_argument("--qwen-leading-silence", type=int, default=None, metavar="MS",
+                           help="Silence in milliseconds placed before every audio window sent to "
+                                "anime-whisper (default: 200; 0 turns it off). Where each window starts "
+                                "and ends does not change. Qwen3-ASR does not use it.")
 
     # Decoupled Pipeline Options (IMPL-001 Phase 2)
     decoupled_group = parser.add_argument_group(
@@ -1498,10 +1512,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         # Dedicated Qwen3-ASR pipeline (ADR-004)
         from whisperjav.pipelines.qwen_pipeline import QwenPipeline
         from whisperjav.ensemble.pass_worker import resolve_qwen_sensitivity, SEGMENTER_PARAMS
-        from whisperjav.config.anime_whisper_vad import (
-            anime_whisperseg_defaults,
-            apply_anime_segmenter_defaults,
-        )
+        from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
         initial_output_dir = str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir
         # Resolve sensitivity preset into segmenter_config
         _qwen_sensitivity = getattr(args, 'qwen_sensitivity', 'balanced')
@@ -1539,11 +1550,12 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         # FireRedVAD rode above THEIR per-sensitivity YAML presets in
         # resolve_qwen_sensitivity, silently replacing e.g. TEN's tuned
         # 0.42/0.32/0.22 gradient and making the sensitivity selector inert.
-        if _qwen_segmenter == "whisperseg":
-            if _gen_backend_early == "anime-whisper":
-                apply_anime_segmenter_defaults(_user_vad_overrides, _qwen_sensitivity)
-            elif _gen_backend_early == "qwen3":
-                _user_vad_overrides.setdefault("threshold", 0.25)
+        # One decision for every entry point (config/chronosjav_vad.py): anime
+        # table / Qwen3-ASR values (threshold 0.25, longest segment 4.0 s since
+        # v1.9.4), WhisperSeg only, user values kept.
+        from whisperjav.config.chronosjav_vad import apply_chronosjav_segmenter_defaults
+        apply_chronosjav_segmenter_defaults(
+            _user_vad_overrides, _gen_backend_early, _qwen_segmenter, _qwen_sensitivity)
         # v1.9.0: VAD padding routed to pipeline scalars (segmenter_start/end_pad_ms)
         # below, NOT into segmenter_config — the pipeline injects start/end pad at
         # clobber time, so a speech_pad_ms in segmenter_config would be overwritten.
@@ -1581,6 +1593,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             "stepdown_enabled": getattr(args, 'qwen_stepdown', True),
             # v1.9.0: Phase-8 nonverbal single-token line filter (default on)
             "drop_nonverbal_lines": getattr(args, 'qwen_drop_nonverbal_lines', True),
+            # v1.9.4: anime-whisper lead-in silence; None keeps the pipeline default (200 ms)
+            **({"anime_leading_silence_ms": args.qwen_leading_silence}
+               if getattr(args, 'qwen_leading_silence', None) is not None else {}),
             # Generator backend selection (v1.8.6+)
             "generator_backend": getattr(args, 'qwen_generator', 'qwen3'),
             # Qwen ASR
@@ -1861,7 +1876,9 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                 
             except Exception as e:
                 progress.show_message(f"Failed: {file_name} - {str(e)}", "error", 3.0)
-                logger.error(f"Failed to process {file_path_str}: {e}", exc_info=True)
+                # A stop asked for by --fail-on suspect (damaged audio) is not a crash: no traceback.
+                logger.error(f"Failed to process {file_path_str}: {e}",
+                             exc_info=not isinstance(e, AudioIntegrityStop))
                 failed_files.append(file_path_str)
                 all_stats.append({"file": file_path_str, "status": "failed", "error": str(e)})
                 # One outcome per file: if this file was already classified
@@ -2377,6 +2394,11 @@ def validate_balanced_vad_options(args) -> None:
 
 def main():
     """Enhanced main entry point with all V3 improvements."""
+    # Installed copies keep FFmpeg in <install>\Library\bin, on PATH only in an activated environment; the GUI adds
+    # it at start-up, the CLI did not ("FFmpeg not found", #436). Windows only; no-op when already present.
+    from whisperjav.utils.conda_path import ensure_conda_dirs_on_path
+    ensure_conda_dirs_on_path()
+
     # Apply HuggingFace Hub network resilience patch (#204)
     from whisperjav.utils.model_loader import patch_hf_hub_downloads
     patch_hf_hub_downloads()
@@ -2398,6 +2420,15 @@ def main():
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         sys.exit(2)
+
+    # --fail-on suspect also stops a file whose audio track is damaged before
+    # transcription (owner, 2026-10-05: one switch for "suspect"). Damaged audio
+    # is known before the work starts, so the failure is declared then. The
+    # setting reaches every run path through the environment, the ensemble's
+    # worker processes included (they inherit it at start).
+    if "suspect" in parse_fail_on(getattr(args, 'fail_on', None)):
+        from whisperjav.modules.audio_integrity import STOP_ENV
+        os.environ[STOP_ENV] = "1"
 
     # Run environment checks if requested
     if args.check or args.check_verbose:
@@ -2738,13 +2769,12 @@ def main():
                 and speech_segmenter not in SINGLE_PASS_EXTERNAL_OK.get(
                     getattr(args, 'mode', None), frozenset())
                 and not speech_segmenter.startswith("silero")):
+            # Wording approved by the owner, 2026-10-06 (WP-004 follow-up).
             logger.warning(
-                "Speech segmenter '%s' is not wired for single-pass --mode %s: that "
-                "path does not resolve the segmenter's sensitivity presets. "
-                "Falling back to silero-v3.1. WhisperSeg / NeMo / whisper-vad / "
-                "ten are fully supported via --ensemble; firered-vad works on "
-                "--mode fidelity, where it is the default; the Silero builds work "
-                "on every single-pass mode.",
+                "Speech segmenter '%s' is not available on single-pass --mode %s; "
+                "using silero-v3.1 instead. On --mode fidelity use firered-vad (the "
+                "default), ten, whisperseg, whisper-vad or a Silero build; every "
+                "segmenter works with --ensemble.",
                 speech_segmenter, getattr(args, 'mode', None)
             )
             speech_segmenter = "silero-v3.1"
@@ -3432,8 +3462,15 @@ def main():
                 _elapsed = _summary.get('total_processing_time_seconds')
                 if result.get('error') or status == 'failed':
                     failed_files.append(basename)
+                    _why = result.get('error')
+                    # A file stopped for damaged audio (--fail-on suspect) names
+                    # that reason, not the generic text. Other pass-1 errors are
+                    # full tracebacks and stay out of the summary row.
+                    _p1_error = str((result.get('pass1') or {}).get('error') or '')
+                    if not _why and _p1_error.startswith("stopped before transcription"):
+                        _why = _p1_error
                     outcome = failed_outcome(
-                        in_path, str(result.get('error') or 'ensemble pass failed'),
+                        in_path, str(_why or 'ensemble pass failed'),
                         processing_time_s=_elapsed,
                     )
                 else:

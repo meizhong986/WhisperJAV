@@ -119,10 +119,9 @@ def _resolve_instruction_file(tone: str = "standard", refresh: bool = False) -> 
     temp_dir.mkdir(exist_ok=True)
     temp_file = temp_dir / f'instructions_{tone}.txt'
 
-    with open(temp_file, 'w', encoding='utf-8') as f:
-        f.write(instruction_content)
-
-    return str(temp_file)
+    # Another run of the same tone may be reading this file right now.
+    from .core import write_shared_text
+    return write_shared_text(temp_file, instruction_content)
 
 
 def _build_provider_options(
@@ -334,6 +333,11 @@ def translate_with_config(
         settings_model_params=settings.get('model_params'),
         settings_tone=settings.get('tone')
     )
+    # #444 (owner, 2026-10-06): a custom server keeps its own temperature unless one is
+    # given explicitly; the tone default is not sent (core.apply_server_temperature_patch).
+    if provider == 'custom' and temperature is None:
+        provider_options.pop('temperature', None)
+        provider_options['_server_temperature'] = True
 
     # Generate output path if not specified
     if output_path:
@@ -458,7 +462,7 @@ def translate_with_config(
         elif provider == 'local' and not endpoint:
             import warnings
             warnings.warn(
-                "provider='local' is deprecated as of v1.8.10 and will be removed in v1.9.0. "
+                "provider='local' is deprecated as of v1.8.10 and will be removed in a later release. "
                 "Use provider='ollama' instead.",
                 DeprecationWarning,
                 stacklevel=2,
