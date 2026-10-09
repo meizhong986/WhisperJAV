@@ -2232,7 +2232,8 @@ class WhisperJAVAPI:
           WhisperSeg the Decoder / Grow Floor / Gap Cut) are resolved through
           config/chronosjav_vad.py, the same decision main.py and the ensemble
           worker make: ChronosJAV values for WhisperSeg, otherwise that
-          segmenter's own sensitivity preset (e.g. TEN on the default pass 2).
+          segmenter's own sensitivity preset (e.g. TEN on the default pass 2),
+          except the longest segment of TEN and FireRedVAD (4 s, 2026-10-08).
         - Controls a segmenter does not have are left out of the schema, so they
           are neither shown nor sent: the three WhisperSeg-only levers for other
           segmenters; Max Speech Duration for Silero v3.1/v4.0 and None; the VAD
