@@ -20,6 +20,10 @@ One exception (owner, 2026-10-08): with TEN and FireRedVAD the longest segment
 is 4 s at every sensitivity for Qwen3-ASR and anime-whisper, as with WhisperSeg
 (their presets say 6/5/4 s and 7/6/5 s). Only that value; the rest of their
 presets stays theirs. Other pipelines using TEN or FireRedVAD are not touched.
+
+The end pad of Qwen3-ASR with WhisperSeg is 0 ms at every sensitivity (owner,
+2026-10-09; it is a pipeline value, not part of the segmenter config):
+chronosjav_end_pad_default().
 """
 
 from typing import Any, Dict, Optional
@@ -33,6 +37,20 @@ CHRONOSJAV_GENERATORS = ("qwen3", "anime-whisper")
 
 # Longest segment for TEN and FireRedVAD in ChronosJAV, every sensitivity (owner, 2026-10-08).
 LONGEST_SEGMENT_S = {"ten": 4.0, "firered-vad": 4.0}
+
+# End pad for Qwen3-ASR with WhisperSeg, every sensitivity (owner, 2026-10-09; the pipeline's
+# own default, 100 ms, stays for the other segmenters). anime-whisper takes its pads from
+# config/anime_whisper_vad.py.
+QWEN3_WHISPERSEG_END_PAD_MS = 0
+
+
+def chronosjav_end_pad_default(generator: str, segmenter: str) -> Optional[int]:
+    """The end pad (ms) a Qwen3-ASR pass uses when the user set none, or None
+    for the pipeline's own default. Read by main.py, the ensemble worker and
+    the Customize dialog."""
+    if generator == "qwen3" and (segmenter or "whisperseg").strip().lower() == "whisperseg":
+        return QWEN3_WHISPERSEG_END_PAD_MS
+    return None
 
 
 def apply_chronosjav_segmenter_defaults(
