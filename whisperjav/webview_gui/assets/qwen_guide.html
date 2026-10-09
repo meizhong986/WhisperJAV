@@ -682,7 +682,7 @@
       With VAD Grouped framing, two speech segments are joined into one frame (one subtitle line) when
       the gap between them is at most this value and the frame stays within Max Group Duration. The gap
       is measured after padding, so the real silence that still joins two segments is this value plus
-      the end pad and the start pad (Qwen3-ASR: 300 + 100 + 100 = 500 ms). Lower values split more;
+      the end pad and the start pad (Qwen3-ASR with WhisperSeg: 300 + 0 + 100 = 400 ms). Lower values split more;
       higher values join more and give the ASR model more context per frame.
     </div>
     <div class="param-when">
@@ -746,7 +746,7 @@
 
   <div class="param">
     <span class="param-name">VAD Start Pad / VAD End Pad (ms)</span>
-    <span class="param-default">100 / 100 ms (anime-whisper: 100 / 100, 50 / 50, 0 / 30 ms by sensitivity)</span>
+    <span class="param-default">100 / 100 ms (Qwen3-ASR with WhisperSeg: 100 / 0 ms; anime-whisper: 100 / 100, 50 / 50, 0 / 30 ms by sensitivity)</span>
     <div class="param-desc">
       Milliseconds of audio added before (start pad) and after (end pad) each detected speech segment.
       The pads give the ASR model the onset and release of speech, so words are not clipped. In the
@@ -814,11 +814,12 @@
 
   <div class="param">
     <span class="param-name">Silence Before Each Window (ms)</span>
-    <span class="param-default">200 ms (anime-whisper only)</span>
+    <span class="param-default">200 ms (anime-whisper only; 0 ms with the Silero segmenters)</span>
     <div class="param-desc">
       Silence placed before every audio window sent to anime-whisper. On the reference clips it helped
       the first words of a line come out right. Where each window starts and ends does not change.
       Qwen3-ASR does not use it (silence made its text slightly worse), so the control is shown only for anime-whisper.
+      With the Silero segmenters it is off by default.
     </div>
     <div class="param-when">
       <strong>When to change:</strong> Set to 0 to turn it off, for example to compare with 1.9.3 output.
