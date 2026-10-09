@@ -2239,7 +2239,9 @@ class WhisperJAVAPI:
           segmenters; Max Speech Duration for Silero v3.1/v4.0 and None; the VAD
           Threshold for None.
         - anime-whisper's pipeline values (Frame Gap, Max Group, Start/End Pad)
-          come from its per-sensitivity table, as in a run.
+          come from its per-sensitivity table, as in a run; its Silence Before
+          Each Window is 0 with Silero (2026-10-09). Qwen3-ASR with WhisperSeg
+          shows End Pad 0 (2026-10-09).
         Balanced is the fallback for an unknown sensitivity.
         """
         result = self._get_qwen_schema_base()
@@ -2248,8 +2250,9 @@ class WhisperJAVAPI:
         audio = result["schema"]["audio"]
         if generator_backend == "anime-whisper":
             from whisperjav.config.anime_whisper_vad import (
-                ANIME_WHISPER_LEADING_SILENCE_MS, anime_whisperseg_defaults)
-            # v1.9.4 (owner, 2026-10-06): the lead-in silence and its off switch (0).
+                anime_leading_silence_default, anime_whisperseg_defaults)
+            # v1.9.4 (owner, 2026-10-06): the lead-in silence and its off switch (0);
+            # 0 by default with Silero (owner, 2026-10-09), as a run uses it.
             result["schema"]["generation"]["leading_silence_ms"] = {
                 "type": "slider",
                 "label": "Silence Before Each Window (ms)",
@@ -2257,13 +2260,19 @@ class WhisperJAVAPI:
                                "the first words of a line come out right. Where each window starts and ends does not change. "
                                "0 turns it off.",
                 "min": 0, "max": 500, "step": 50,
-                "default": ANIME_WHISPER_LEADING_SILENCE_MS,
+                "default": anime_leading_silence_default(segmenter),
             }
             aw = anime_whisperseg_defaults(sensitivity)
             audio["chunk_threshold_ms"]["default"] = int(round(aw["chunk_threshold_s"] * 1000))
             audio["max_group_duration"]["default"] = aw["max_group_duration_s"]
             audio["vad_start_pad"]["default"] = int(aw["start_pad_ms"])
             audio["vad_end_pad"]["default"] = int(aw["end_pad_ms"])
+
+        # Qwen3-ASR + WhisperSeg: end pad 0 ms (owner, 2026-10-09), as a run uses it.
+        from whisperjav.config.chronosjav_vad import chronosjav_end_pad_default
+        _end_pad_default = chronosjav_end_pad_default(generator_backend, segmenter)
+        if _end_pad_default is not None:
+            audio["vad_end_pad"]["default"] = _end_pad_default
 
         segmenter = (segmenter or "whisperseg").strip().lower()
         if segmenter == "none":
@@ -2463,7 +2472,7 @@ class WhisperJAVAPI:
                     "vad_end_pad": {
                         "type": "slider",
                         "label": "VAD End Pad (ms)",
-                        "description": "Padding added after each speech segment (ms). Capturing end-of-speech is critical for JAV ASR accuracy. JAV default: 100ms.",
+                        "description": "Padding added after each speech segment (ms). The default depends on the model, the sensitivity and the speech segmenter.",
                         "group": "vad_settings",
                         "min": 0, "max": 800, "step": 50,
                         "default": 100,
