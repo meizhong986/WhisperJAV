@@ -79,11 +79,12 @@ anime-whisper, the longest piece of speech sent to the model is now 4 seconds at
 with the WhisperSeg, TEN and FireRedVAD speech segmenters, and anime-whisper has new settings for
 where long pieces are cut. TEN now cuts long speech at the quietest point and never past the limit.
 On seven drama scenes with reference subtitles, measured with WhisperSeg, the typical gap between a
-line's end and the reference end shrank by 10 to 19 % (Qwen3-ASR measured at balanced only). The
-text error changed by between 1.5 % better and 1 % worse. These are drama scenes, not JAV, and lines
-still end somewhat late — please tell us how it does on your films. anime-whisper now also hears
-200 ms of silence before each piece of audio: **Silence Before Each Window (ms)**, or
-`--qwen-leading-silence` (`0` turns it off).
+line's end and the reference end shrank by 10 to 24 % (Qwen3-ASR measured at balanced only). The
+text error changed by between 1.5 % better and 0.5 % worse. These are drama scenes, not JAV, and lines
+still end somewhat late — please tell us how it does on your films. Qwen3-ASR with WhisperSeg no
+longer adds 100 ms of padding after each piece of speech. anime-whisper now also hears 200 ms of
+silence before each piece of audio, except with the Silero speech segmenters, where it is off:
+**Silence Before Each Window (ms)**, or `--qwen-leading-silence` (`0` turns it off).
 
 **If you run WhisperJAV from scripts:** `--fail-on suspect` now also stops files with damaged audio;
 a ForcedAligner that cannot be loaded now leaves the file `suspect` and exits 0 instead of failing the
