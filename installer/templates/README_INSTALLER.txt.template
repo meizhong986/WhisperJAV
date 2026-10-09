@@ -41,9 +41,11 @@ WHAT'S NEW IN v{{VERSION}}
 
 2. CHRONOSJAV TIMING (Qwen3-ASR and anime-whisper)
    - An attempt to make lines end closer to the speech. The longest piece
-     of speech sent to the model is now 4 seconds at every sensitivity. On
-     seven drama scenes, the typical late end shrank by 14 to 61 %, with the
-     text about the same. Not yet measured on JAV.
+     of speech sent to the model is now 4 seconds at every sensitivity, with
+     the WhisperSeg, TEN and FireRedVAD speech segmenters. On seven drama
+     scenes, measured with WhisperSeg, the typical late end shrank by 10 to
+     19 %, with the text about the same. Not yet measured on JAV.
+   - TEN now cuts long speech at the quietest point, never past the limit.
    - anime-whisper hears 200 ms of silence before each piece of audio. The
      new "Silence Before Each Window (ms)" setting changes it; 0 turns it off.
    - The Customize Parameters window shows the values the run will use.
