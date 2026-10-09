@@ -8,6 +8,10 @@ sensitivity, per ASR model:
     anime-whisper  4.0 s   (was 6 / 5 / 4 s; option B), and grow floor 0.15 on aggressive
                            (the only row that runs the offline decoder; was 0.05)
 
+With TEN and FireRedVAD (owner, 2026-10-08) the longest segment is also 4.0 s at every
+sensitivity for both models (their presets: 6 / 5 / 4 s and 7 / 6 / 5 s); the rest of their
+presets is unchanged, and other pipelines keep the presets.
+
 Group cap and group gap are unchanged. Evidence and limits:
 docs/measurements/v1.9.4/MEASUREMENTS_v194_REQ1_REQ2.md section 2.
 
@@ -81,12 +85,39 @@ def test_a_users_own_value_still_wins(generator):
     assert cfg["threshold"] == 0.4
 
 
-@pytest.mark.parametrize("segmenter", ["ten", "silero-v6.2", "firered-vad"])
+@pytest.mark.parametrize("segmenter", ["silero-v6.2", "silero", "whisper-vad"])
 @pytest.mark.parametrize("generator", ["qwen3", "anime-whisper"])
 def test_other_segmenters_keep_their_own_presets(generator, segmenter):
-    # The gate itself: no ChronosJAV value is injected unless the segmenter is WhisperSeg.
+    # The gate itself: no ChronosJAV value is injected for these segmenters.
     assert apply_chronosjav_segmenter_defaults({}, generator, segmenter, "balanced") == {}
     assert _resolve(generator, "balanced", segmenter) == resolve_segmenter_sensitivity(segmenter, "balanced", None)
+
+
+# TEN and FireRedVAD (owner, 2026-10-08): longest segment 4 s at every sensitivity, nothing else changed.
+@pytest.mark.parametrize("sens", SENSITIVITIES)
+@pytest.mark.parametrize("segmenter", ["ten", "firered-vad"])
+@pytest.mark.parametrize("generator", ["qwen3", "anime-whisper"])
+def test_ten_and_firered_longest_segment_is_4s(generator, segmenter, sens):
+    assert apply_chronosjav_segmenter_defaults({}, generator, segmenter, sens) == {"max_speech_duration_s": 4.0}
+    cfg = _resolve(generator, sens, segmenter)
+    preset = resolve_segmenter_sensitivity(segmenter, sens, None)
+    assert cfg["max_speech_duration_s"] == 4.0
+    assert {k: v for k, v in cfg.items() if k != "max_speech_duration_s"} == \
+           {k: v for k, v in preset.items() if k != "max_speech_duration_s"}
+
+
+@pytest.mark.parametrize("segmenter", ["ten", "firered-vad"])
+def test_ten_and_firered_presets_untouched_elsewhere(segmenter):
+    # Other pipelines read the presets directly; Cohere is not a ChronosJAV model here.
+    for sens, expected in zip(SENSITIVITIES, (6, 5, 4) if segmenter == "ten" else (7, 6, 5)):
+        assert resolve_segmenter_sensitivity(segmenter, sens, None)["max_speech_duration_s"] == expected
+        assert _resolve("cohere", sens, segmenter)["max_speech_duration_s"] == expected
+
+
+@pytest.mark.parametrize("segmenter", ["ten", "firered-vad"])
+def test_ten_and_firered_users_own_value_still_wins(segmenter):
+    assert _resolve("qwen3", "conservative", segmenter, user={"max_speech_duration_s": 6.5})[
+        "max_speech_duration_s"] == 6.5
 
 
 def test_cohere_keeps_the_yaml_steps():
@@ -133,7 +164,7 @@ def test_dialog_for_ten_shows_tens_own_values_and_no_whisperseg_levers(sens):
     audio = _dialog(sens, "qwen3", "ten")
     runs = resolve_segmenter_sensitivity("ten", sens, None)
     assert audio["vad_threshold"]["default"] == runs["threshold"]
-    assert audio["max_speech_duration"]["default"] == runs["max_speech_duration_s"]
+    assert audio["max_speech_duration"]["default"] == 4.0          # ChronosJAV longest segment (2026-10-08)
     for lever in ("vad_decoder", "vad_grow_floor", "vad_gap_merge_ms"):
         assert lever not in audio
 
