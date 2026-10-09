@@ -37,7 +37,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import stable_whisper
 
 from whisperjav.modules.audio_extraction import AudioExtractor
-from whisperjav.config.anime_whisper_vad import ANIME_WHISPER_LEADING_SILENCE_MS
+from whisperjav.config.anime_whisper_vad import anime_leading_silence_default
 from whisperjav.modules.audio_integrity import apply_to_run as apply_audio_integrity
 from whisperjav.modules.analytics import report as report_audio_analytics
 from whisperjav.modules.speech_enhancement import (
@@ -163,7 +163,7 @@ class QwenPipeline(BasePipeline):
         # sensitive VAD/decoding captures. Whole-line exact match — safe. CLI:
         # --qwen-drop-nonverbal-lines / --no-qwen-drop-nonverbal-lines.
         drop_nonverbal_lines: bool = True,
-        anime_leading_silence_ms: int = ANIME_WHISPER_LEADING_SILENCE_MS,
+        anime_leading_silence_ms: Optional[int] = None,  # None: 200 ms, 0 with Silero
 
         # v1.9.0: Phase-8 scene-overlap timestamp resolver. Semantic scene
         # detection extracts scenes with a ±0.35s buffer (~0.7s overlap between
@@ -298,7 +298,10 @@ class QwenPipeline(BasePipeline):
 
         # v1.9.0: Phase-8 nonverbal single-token line filter toggle.
         self.drop_nonverbal_lines = drop_nonverbal_lines
-        # v1.9.4: silence before every anime-whisper window (0 = off); see config/anime_whisper_vad.py
+        # v1.9.4: silence before every anime-whisper window (0 = off); see config/anime_whisper_vad.py.
+        # Not set by the user: 200 ms, or 0 with Silero (owner, 2026-10-09).
+        if anime_leading_silence_ms is None:
+            anime_leading_silence_ms = anime_leading_silence_default(speech_segmenter)
         self.anime_leading_silence_ms = max(0, int(anime_leading_silence_ms or 0))
 
         # v1.9.0: Phase-8 scene-overlap timestamp resolver toggle.
@@ -502,8 +505,9 @@ class QwenPipeline(BasePipeline):
                 max_new_tokens=aw_max_tokens,
                 # v1.9.4 (owner, 2026-10-06): silence before every window, 200 ms by
                 # default (anime-whisper only; it lowered the character error rate on
-                # the reference clips, Qwen3-ASR got worse). Window edges and so the
-                # subtitle start/end do not move. 0 turns it off (CLI, ensemble, GUI).
+                # the reference clips, Qwen3-ASR got worse); 0 with Silero (owner,
+                # 2026-10-09). Window edges and so the subtitle start/end do not move.
+                # 0 turns it off (CLI, ensemble, GUI).
                 leading_silence_ms=self.anime_leading_silence_ms,
             )
         elif self.generator_backend == "cohere":
