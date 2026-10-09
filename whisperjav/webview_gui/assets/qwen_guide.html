@@ -267,7 +267,8 @@
     <div class="param-desc">
       Controls how readily the speech segmenter detects voice. What it changes depends on the model.
       Values below are for the default segmenter, WhisperSeg; other segmenters use their own presets.
-      At every sensitivity, the longest segment is 4 s for both Qwen3-ASR and anime-whisper.
+      At every sensitivity, the longest segment is 4 s for both Qwen3-ASR and anime-whisper, with WhisperSeg,
+      TEN and FireRedVAD.
     </div>
     <div class="param-desc" style="margin-top: 10px;">
       <table>
@@ -435,7 +436,8 @@
       </table>
       A stretch of voice longer than the longest segment is split, at a quiet point inside it where
       the segmenter finds one. Change it under Customize &rarr; <em>Max Speech Duration</em>. With
-      other segmenters these values come from that segmenter's own sensitivity preset.
+      TEN and FireRedVAD the longest segment is also 4 s; with other segmenters it comes from that
+      segmenter's own sensitivity preset.
     </div>
     <div class="param-desc" style="margin-top: 8px; padding-left: 12px;">
       <strong>WhisperSeg</strong> &mdash; Default for Qwen3-ASR and anime-whisper. A Whisper-based
