@@ -12,6 +12,9 @@ With TEN and FireRedVAD (owner, 2026-10-08) the longest segment is also 4.0 s at
 sensitivity for both models (their presets: 6 / 5 / 4 s and 7 / 6 / 5 s); the rest of their
 presets is unchanged, and other pipelines keep the presets.
 
+With WhisperSeg, Qwen3-ASR's end pad is 0 ms at every sensitivity (owner, 2026-10-09; was the
+pipeline's 100 ms, which other segmenters keep).
+
 Group cap and group gap are unchanged. Evidence and limits:
 docs/measurements/v1.9.4/MEASUREMENTS_v194_REQ1_REQ2.md section 2.
 
@@ -29,6 +32,7 @@ import pytest
 from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
 from whisperjav.config.chronosjav_vad import (
     apply_chronosjav_segmenter_defaults,
+    chronosjav_end_pad_default,
     resolve_chronosjav_segmenter_config,
 )
 from whisperjav.config.qwen3_whisperseg_vad import QWEN3_WHISPERSEG_DEFAULTS
@@ -191,3 +195,38 @@ def test_dialog_js_takes_segmenter_values_from_the_schema():
     assert "passState.speechSegmenter || 'whisperseg')" in js          # the segmenter is sent
     assert js.count("QwenManager.applySegmenterDefaults(") == 2         # open and Reset
     assert "defaults.chunk_threshold_ms = 300;" not in js               # no fixed anime values in Reset
+
+
+# ---- end pad: Qwen3-ASR with WhisperSeg 0 ms (owner, 2026-10-09) ----------------------------------
+
+@pytest.mark.parametrize("generator,segmenter,expected", [
+    ("qwen3", "whisperseg", 0), ("qwen3", None, 0), ("qwen3", " WhisperSeg ", 0),
+    ("qwen3", "ten", None), ("qwen3", "firered-vad", None), ("qwen3", "silero-v6.2", None), ("qwen3", "none", None),
+    ("anime-whisper", "whisperseg", None), ("cohere", "whisperseg", None)])
+def test_end_pad_default(generator, segmenter, expected):
+    assert chronosjav_end_pad_default(generator, segmenter) == expected
+
+
+@pytest.mark.parametrize("sens", SENSITIVITIES)
+def test_dialog_end_pad_is_the_run_value(sens):
+    assert _dialog(sens, "qwen3")["vad_end_pad"]["default"] == 0
+    assert _dialog(sens, "qwen3", "ten")["vad_end_pad"]["default"] == 100
+    assert _dialog(sens, "anime-whisper")["vad_end_pad"]["default"] == anime_whisperseg_defaults(sens)["end_pad_ms"]
+
+
+def test_both_entry_points_apply_the_end_pad_default_unless_the_user_set_one():
+    main = (REPO / "whisperjav/main.py").read_text(encoding="utf-8")
+    assert "chronosjav_end_pad_default(_gen_backend, _qwen_segmenter)" in main
+    i = main.index("chronosjav_end_pad_default(_gen_backend, _qwen_segmenter)")
+    block = main[i:i + 400]
+    assert "_vad_end_pad is None and _vad_pad_legacy is None" in block   # args, so abbreviations count
+    assert 'qwen_kwargs["segmenter_end_pad_ms"] = _end_pad_default' in block
+    # it comes after the user's pad flags are read, and the flags gate it
+    assert main.index("_vad_end_pad = getattr(args, 'qwen_vad_end_pad', None)") < i
+    worker = (REPO / "whisperjav/ensemble/pass_worker.py").read_text(encoding="utf-8")
+    j = worker.index('chronosjav_end_pad_default(_gen_backend, qwen_pipeline_params["speech_segmenter"])')
+    block = worker[j:j + 300]
+    assert '"vad_padding" not in _user_qwen and "vad_end_pad" not in _user_qwen' in block
+    # the user's GUI / qwen-params / speech_pad_ms values are applied after it, so they win
+    assert worker.index('_end_pad = qwen_defaults.get("qwen_vad_end_pad")') > j
+    assert worker.index('_legacy_pad = pass_config.get("speech_pad_ms")') > j
