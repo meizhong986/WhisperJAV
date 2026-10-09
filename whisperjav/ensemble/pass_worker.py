@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from whisperjav.modules.audio_integrity import AudioIntegrityStop
-from whisperjav.config.chronosjav_vad import apply_chronosjav_segmenter_defaults
+from whisperjav.config.chronosjav_vad import apply_chronosjav_segmenter_defaults, chronosjav_end_pad_default
 from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
 from whisperjav.config.legacy import resolve_legacy_pipeline, apply_balanced_vad_defaults
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
@@ -1299,6 +1299,13 @@ def _build_pipeline(
                 qwen_pipeline_params["segmenter_start_pad_ms"] = int(_aw_vad["start_pad_ms"])
             if "vad_padding" not in _user_qwen and "vad_end_pad" not in _user_qwen:
                 qwen_pipeline_params["segmenter_end_pad_ms"] = int(_aw_vad["end_pad_ms"])
+        elif _gen_backend == "qwen3":
+            # Qwen3-ASR + WhisperSeg: end pad 0 ms at every sensitivity (owner, 2026-10-09);
+            # config/chronosjav_vad.py. GUI sliders / qwen-params / speech_pad_ms (below) win.
+            _user_qwen = pass_config.get("qwen_params") or {}
+            _end_pad_default = chronosjav_end_pad_default(_gen_backend, qwen_pipeline_params["speech_segmenter"])
+            if _end_pad_default is not None and "vad_padding" not in _user_qwen and "vad_end_pad" not in _user_qwen:
+                qwen_pipeline_params["segmenter_end_pad_ms"] = _end_pad_default
         elif _gen_backend == "cohere":
             # Cohere Transcribe defaults (D7: Qwen3 ForcedAligner ON by default).
             # User can disable aligner via Customize Parameters; the customize
