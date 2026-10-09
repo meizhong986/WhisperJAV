@@ -1,6 +1,6 @@
 # WhisperJAV 1.9.4
 
-**Bug fixes, hardening, and better subtitle timing for ChronosJAV.**
+**Bug fixes, hardening, and a step toward better subtitle timing for ChronosJAV.**
 
 1.9.4 builds on 1.9.3. It changes no library underneath WhisperJAV, so **on 1.9.3 you can upgrade
 with one command** — see [Installing and upgrading](#installing-and-upgrading).
@@ -12,7 +12,7 @@ Two changes are larger than the rest:
   the films we measured. WhisperJAV now fills the holes with silence, so the times stay right, and it
   tells you the file was damaged.
 - **An attempt to make ChronosJAV lines end closer to the speech**, for both Qwen3-ASR and
-  anime-whisper. On drama scenes, the typical late end shrank by 14 to 61 %, with the text about the
+  anime-whisper. On drama scenes, the typical late end shrank by 10 to 19 %, with the text about the
   same.
 
 ---
@@ -77,15 +77,19 @@ the speech segmenter, not from the words. In 1.9.3 most lines ended late, often 
 start of the next line. The main cause was a limit on how long one piece of speech could be. In
 long stretches of talk, a line ended where that limit fell, not where the speaker paused.
 
-**What 1.9.4 changes** (with the WhisperSeg speech segmenter, the default):
+**What 1.9.4 changes:**
 
-- **The longest segment is 4 seconds** for both models at every sensitivity. In 1.9.3 it was 6, 5
-  and 4 seconds for conservative, balanced and aggressive.
-- **anime-whisper, aggressive:** a slightly stricter rule for extending a segment, so fewer segments
-  run on into the next line.
-- **anime-whisper, conservative and balanced:** a segment that reaches the limit is now cut where
-  the speech is weakest within its last 70 %. 1.9.3 looked only in the last 40 %, and when it found
-  no clear dip there it cut exactly at the limit, often inside a word.
+- **The longest segment is 4 seconds** for both models at every sensitivity, with the WhisperSeg,
+  TEN and FireRedVAD speech segmenters. In 1.9.3 it was 6, 5 and 4 seconds for conservative,
+  balanced and aggressive (7, 6 and 5 with FireRedVAD).
+- **TEN cuts long speech at the quietest point, and never past the limit.** 1.9.3 cut at the first
+  small dip after 80 % of the limit, sometimes inside a word, and some pieces ran up to 2 seconds
+  over it. This applies wherever TEN is used.
+- **anime-whisper with WhisperSeg, aggressive:** a slightly stricter rule for extending a segment,
+  so fewer segments run on into the next line.
+- **anime-whisper with WhisperSeg, conservative and balanced:** a segment that reaches the limit is
+  now cut where the speech is weakest within its last 70 %. 1.9.3 looked only in the last 40 %, and
+  when it found no clear dip there it cut exactly at the limit, often inside a word.
 - **anime-whisper hears 200 ms of silence before each piece of audio.** Where each piece starts and
   ends does not change. A new setting controls it: **Silence Before Each Window (ms)**, in the
   *Customize Parameters* window of an anime-whisper pass (0 to 500), or `--qwen-leading-silence MS`
@@ -99,20 +103,18 @@ VAD only (#437), and the wider question of how to get better timing (#417, #427)
 attempt to improve this with the settings WhisperJAV already has. It is a step, not a solution.
 
 We measured it on seven TV-drama scenes with reference subtitles (305 lines), comparing the 1.9.3
-defaults with 1.9.4's. "How late a line ends" is the typical (median) gap between our line's end and
-the reference line's end, on the lines both versions matched. "Text error" is the share of
-characters wrong, missing or extra (lower is better).
+defaults with 1.9.4's, with WhisperSeg. "How far off a line's end is" is the typical (median) gap
+between our line's end and the reference line's end, measured where our line ends a reference line
+in both versions. "Text error" is the share of characters wrong, missing or extra (lower is better).
 
-| Model and sensitivity | How late a line ends | Lines ending within 0.5 s (of 305) | Text error |
+| Model and sensitivity | How far off a line's end is | Ends within 0.5 s (share of those measured) | Text error |
 |---|---|---|---|
-| Qwen3-ASR, balanced | 1.06 s → 0.68 s (36 % less) | 50 → 79 | 0.390 → 0.394 (1 % worse) |
-| anime-whisper, conservative | 1.13 s → 0.48 s (57 % less) | 46 → 101 | 0.397 → 0.399 (about the same) |
-| anime-whisper, balanced | 1.11 s → 0.44 s (61 % less) | 51 → 103 | 0.400 → 0.394 (1.5 % better) |
-| anime-whisper, aggressive | 0.69 s → 0.60 s (14 % less) | 75 → 82 | 0.392 → 0.387 (1.3 % better) |
+| Qwen3-ASR, balanced | 0.47 s → 0.39 s (17 % less) | 53 % → 61 % | 0.390 → 0.394 (1 % worse) |
+| anime-whisper, conservative | 0.35 s → 0.32 s (10 % less) | 61 % → 68 % | 0.397 → 0.399 (about the same) |
+| anime-whisper, balanced | 0.44 s → 0.36 s (19 % less) | 57 % → 66 % | 0.400 → 0.394 (1.5 % better) |
+| anime-whisper, aggressive | 0.43 s → 0.37 s (14 % less) | 54 % → 58 % | 0.392 → 0.387 (1.3 % better) |
 
-Where a line starts barely moved: within 0.04 s either way. Each model also matched 8 to 13
-reference lines that 1.9.3 had matched and 1.9.4 did not; three of the four matched more lines
-overall.
+Where a line starts barely moved: within 0.04 s either way.
 
 Shorter limits — 3 seconds and below — moved the line ends even closer, but they cost text: the
 model wrote less, or wrote it wrong. 4 seconds was the shortest limit that kept the text about the
@@ -120,7 +122,9 @@ same.
 
 **Limits — please read these before expecting a big change.** These are drama scenes, not JAV;
 scenes full of moans and action sound were not measured, so we do not yet know how much of this
-carries over to your films. Qwen3-ASR was measured at balanced only. Lines still end late on
+carries over to your films. Qwen3-ASR was measured at balanced only. TEN and FireRedVAD at 4 seconds
+were checked at conservative only: lines no longer run to 6 or 7 seconds, line ends did not move,
+and about 1 to 2 % less of the text was right. Lines still end late on
 average — less late than before. About one line in ten still loses its opening words, because the
 model never hears them; 1.9.4 does not change this. A new aligner (#440) or a different pairing of
 speech detector and model (#418) is not part of this release. If you try 1.9.4 on the films where
