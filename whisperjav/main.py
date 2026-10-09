@@ -913,8 +913,9 @@ def parse_arguments():
                            help="VAD padding before speech onset, ms (default: 100 for Qwen3-ASR; "
                                 "anime-whisper 100 / 50 / 0 by sensitivity)")
     qwen_audio_group.add_argument("--qwen-vad-end-pad", type=int, default=None,
-                           help="VAD padding after speech offset, ms (default: 100 for Qwen3-ASR; "
-                                "anime-whisper 100 / 50 / 30 by sensitivity)")
+                           help="VAD padding after speech offset, ms (default for Qwen3-ASR: 0 with "
+                                "WhisperSeg, 100 with other segmenters; anime-whisper 100 / 50 / 30 "
+                                "by sensitivity)")
     qwen_audio_group.add_argument("--qwen-max-speech-duration", type=float, default=None,
                            help="Force-split any single speech segment longer than this (seconds). "
                                 "Default with the WhisperSeg, TEN and FireRedVAD segmenters: 4 for "
@@ -994,8 +995,9 @@ def parse_arguments():
                            help="Keep lone nonverbal subtitle lines (disable the Phase-8 filter)")
     qwen_output_group.add_argument("--qwen-leading-silence", type=int, default=None, metavar="MS",
                            help="Silence in milliseconds placed before every audio window sent to "
-                                "anime-whisper (default: 200; 0 turns it off). Where each window starts "
-                                "and ends does not change. Qwen3-ASR does not use it.")
+                                "anime-whisper (default: 200, but 0 with the Silero segmenters; 0 turns "
+                                "it off). Where each window starts and ends does not change. Qwen3-ASR "
+                                "does not use it.")
 
     # Decoupled Pipeline Options (IMPL-001 Phase 2)
     decoupled_group = parser.add_argument_group(
@@ -1594,7 +1596,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             "stepdown_enabled": getattr(args, 'qwen_stepdown', True),
             # v1.9.0: Phase-8 nonverbal single-token line filter (default on)
             "drop_nonverbal_lines": getattr(args, 'qwen_drop_nonverbal_lines', True),
-            # v1.9.4: anime-whisper lead-in silence; None keeps the pipeline default (200 ms)
+            # v1.9.4: anime-whisper lead-in silence; None keeps the pipeline default (200 ms, 0 with Silero)
             **({"anime_leading_silence_ms": args.qwen_leading_silence}
                if getattr(args, 'qwen_leading_silence', None) is not None else {}),
             # Generator backend selection (v1.8.6+)
@@ -1686,6 +1688,14 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                 qwen_kwargs["segmenter_start_pad_ms"] = int(_aw_vad["start_pad_ms"])
             if not any(a.startswith(('--qwen-vad-end-pad', '--qwen-vad-padding')) for a in sys.argv):
                 qwen_kwargs["segmenter_end_pad_ms"] = int(_aw_vad["end_pad_ms"])
+        else:
+            # Qwen3-ASR + WhisperSeg: end pad 0 ms at every sensitivity (owner, 2026-10-09);
+            # config/chronosjav_vad.py. The explicit pad flags (applied above) win; read from
+            # args, not sys.argv, so an abbreviated flag (--qwen-vad-end 50) also counts.
+            from whisperjav.config.chronosjav_vad import chronosjav_end_pad_default
+            _end_pad_default = chronosjav_end_pad_default(_gen_backend, _qwen_segmenter)
+            if (_end_pad_default is not None and _vad_end_pad is None and _vad_pad_legacy is None):
+                qwen_kwargs["segmenter_end_pad_ms"] = _end_pad_default
 
         pipeline = QwenPipeline(**qwen_kwargs)
         effective_mode = args.mode
