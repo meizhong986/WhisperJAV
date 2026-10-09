@@ -44,10 +44,13 @@ WHAT'S NEW IN v{{VERSION}}
      of speech sent to the model is now 4 seconds at every sensitivity, with
      the WhisperSeg, TEN and FireRedVAD speech segmenters. On seven drama
      scenes, measured with WhisperSeg, the typical late end shrank by 10 to
-     19 %, with the text about the same. Not yet measured on JAV.
+     24 %, with the text about the same. Not yet measured on JAV.
    - TEN now cuts long speech at the quietest point, never past the limit.
-   - anime-whisper hears 200 ms of silence before each piece of audio. The
-     new "Silence Before Each Window (ms)" setting changes it; 0 turns it off.
+   - Qwen3-ASR with WhisperSeg: no padding after each piece of speech (it
+     was 100 ms).
+   - anime-whisper hears 200 ms of silence before each piece of audio,
+     except with the Silero speech segmenters, where it is off. The new
+     "Silence Before Each Window (ms)" setting changes it; 0 turns it off.
    - The Customize Parameters window shows the values the run will use.
 
 3. TRANSLATION
