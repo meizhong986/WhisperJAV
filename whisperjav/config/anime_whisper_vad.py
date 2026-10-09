@@ -45,6 +45,16 @@ from typing import Any, Dict
 # "Silence Before Each Window (ms)". docs/measurements/v1.9.4, sections 2.10-2.11.
 ANIME_WHISPER_LEADING_SILENCE_MS = 200
 
+
+def anime_leading_silence_default(segmenter: str) -> int:
+    """The lead-in silence a run uses when the user set none: 0 with Silero
+    (owner, 2026-10-09: with it off, anime-whisper + Silero gives the 1.9.3
+    output, the "not worse" requirement; measured at aggressive), otherwise
+    ANIME_WHISPER_LEADING_SILENCE_MS. Read by the pipeline and the GUI dialog."""
+    if (segmenter or "").strip().lower().startswith("silero"):
+        return 0
+    return ANIME_WHISPER_LEADING_SILENCE_MS
+
 ANIME_WHISPER_WHISPERSEG_DEFAULTS: Dict[str, Dict[str, Any]] = {
     # v1.9.4 (owner, 2026-10-05, option B): max_speech_duration_s is 4.0 at EVERY
     # sensitivity, the same as Qwen3-ASR. The longest segment is a subtitle
