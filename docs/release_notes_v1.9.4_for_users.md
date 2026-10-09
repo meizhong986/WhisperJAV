@@ -12,7 +12,7 @@ Two changes are larger than the rest:
   the films we measured. WhisperJAV now fills the holes with silence, so the times stay right, and it
   tells you the file was damaged.
 - **An attempt to make ChronosJAV lines end closer to the speech**, for both Qwen3-ASR and
-  anime-whisper. On drama scenes, the typical late end shrank by 10 to 19 %, with the text about the
+  anime-whisper. On drama scenes, the typical late end shrank by 10 to 24 %, with the text about the
   same.
 
 ---
@@ -90,7 +90,10 @@ long stretches of talk, a line ended where that limit fell, not where the speake
 - **anime-whisper with WhisperSeg, conservative and balanced:** a segment that reaches the limit is
   now cut where the speech is weakest within its last 70 %. 1.9.3 looked only in the last 40 %, and
   when it found no clear dip there it cut exactly at the limit, often inside a word.
-- **anime-whisper hears 200 ms of silence before each piece of audio.** Where each piece starts and
+- **Qwen3-ASR with WhisperSeg: no padding after each piece of speech** (it was 100 ms). Lines end a
+  little closer to the speech; the text stayed the same.
+- **anime-whisper hears 200 ms of silence before each piece of audio**, except with the Silero speech
+  segmenters, where it is off. Where each piece starts and
   ends does not change. A new setting controls it: **Silence Before Each Window (ms)**, in the
   *Customize Parameters* window of an anime-whisper pass (0 to 500), or `--qwen-leading-silence MS`
   on the command line (anime-whisper only, despite the flag's name). `0` turns it off.
@@ -109,12 +112,12 @@ in both versions. "Text error" is the share of characters wrong, missing or extr
 
 | Model and sensitivity | How far off a line's end is | Ends within 0.5 s (share of those measured) | Text error |
 |---|---|---|---|
-| Qwen3-ASR, balanced | 0.47 s → 0.39 s (17 % less) | 53 % → 61 % | 0.390 → 0.394 (1 % worse) |
+| Qwen3-ASR, balanced | 0.47 s → 0.36 s (24 % less) | 53 % → 60 % | 0.390 → 0.391 (about the same) |
 | anime-whisper, conservative | 0.35 s → 0.32 s (10 % less) | 61 % → 68 % | 0.397 → 0.399 (about the same) |
 | anime-whisper, balanced | 0.44 s → 0.36 s (19 % less) | 57 % → 66 % | 0.400 → 0.394 (1.5 % better) |
 | anime-whisper, aggressive | 0.43 s → 0.37 s (14 % less) | 54 % → 58 % | 0.392 → 0.387 (1.3 % better) |
 
-Where a line starts barely moved: within 0.04 s either way.
+Where a line starts barely moved: within 0.05 s either way.
 
 Shorter limits — 3 seconds and below — moved the line ends even closer, but they cost text: the
 model wrote less, or wrote it wrong. 4 seconds was the shortest limit that kept the text about the
@@ -242,7 +245,7 @@ than 0.1 s is now joined to its neighbour (see [Other fixes](#other-fixes)).
 | What was reported | What 1.9.4 does | Who reported it |
 |---|---|---|
 | Subtitles drift early in some downloaded films | Fills audio holes with silence; checks every file; reports damaged files | found in the maintainer's testing |
-| ChronosJAV timing not accurate; lines end late | An attempt: 4-second longest segment; anime-whisper split settings and 200 ms of silence before each piece | Timi2028 (#433, #421), weifu8435 (#417, #437, #427) |
+| ChronosJAV timing not accurate; lines end late | An attempt: 4-second longest segment; anime-whisper split settings and 200 ms of silence before each piece (not with Silero) | Timi2028 (#433, #421), weifu8435 (#417, #437, #427) |
 | Edge-of-scene crash on Balanced and Faster | Joins very short speech pieces; skips any still too short | AlanZ-Git (#424) |
 | FFmpeg not found from the command line; aligner failure loses the work; `whisperjav-upgrade` hangs; ChronosJAV guide out of date | See [Other fixes](#other-fixes) and [What will break](#what-will-break) | Angelholl (#436) |
 | Custom model in two-pass translation fails | Sends the API key to the custom server | ArenaSora (#420) |
