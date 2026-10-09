@@ -76,9 +76,10 @@ instead, use `--fail-on suspect`, or tick **Treat 'suspect' files as failures** 
 
 **An attempt to improve ChronosJAV timing** (#433, #421, #417, #437, #427). For Qwen3-ASR and
 anime-whisper, the longest piece of speech sent to the model is now 4 seconds at every sensitivity,
-and anime-whisper has new settings for where long pieces are cut. On seven drama scenes with
-reference subtitles, the typical gap between a line's end and the reference end shrank by 36 % for
-Qwen3-ASR, by 57–61 % for anime-whisper at conservative and balanced, and by 14 % at aggressive. The
+with the WhisperSeg, TEN and FireRedVAD speech segmenters, and anime-whisper has new settings for
+where long pieces are cut. TEN now cuts long speech at the quietest point and never past the limit.
+On seven drama scenes with reference subtitles, measured with WhisperSeg, the typical gap between a
+line's end and the reference end shrank by 10 to 19 % (Qwen3-ASR measured at balanced only). The
 text error changed by between 1.5 % better and 1 % worse. These are drama scenes, not JAV, and lines
 still end somewhat late — please tell us how it does on your films. anime-whisper now also hears
 200 ms of silence before each piece of audio: **Silence Before Each Window (ms)**, or
