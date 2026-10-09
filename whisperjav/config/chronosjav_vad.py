@@ -15,6 +15,11 @@ apply ONLY when the segmenter is WhisperSeg. With any other segmenter (TEN,
 Silero, FireRedVAD, ...) that segmenter's own sensitivity preset applies, so a
 flat 0.25 or a 3 s cap never rides above, say, TEN's tuned gradient. Cohere is
 not covered. Values the user set are kept (setdefault semantics).
+
+One exception (owner, 2026-10-08): with TEN and FireRedVAD the longest segment
+is 4 s at every sensitivity for Qwen3-ASR and anime-whisper, as with WhisperSeg
+(their presets say 6/5/4 s and 7/6/5 s). Only that value; the rest of their
+presets stays theirs. Other pipelines using TEN or FireRedVAD are not touched.
 """
 
 from typing import Any, Dict, Optional
@@ -24,11 +29,21 @@ from whisperjav.config.qwen3_whisperseg_vad import apply_qwen3_segmenter_default
 from whisperjav.config.segmenter_presets import resolve_segmenter_sensitivity
 
 
+CHRONOSJAV_GENERATORS = ("qwen3", "anime-whisper")
+
+# Longest segment for TEN and FireRedVAD in ChronosJAV, every sensitivity (owner, 2026-10-08).
+LONGEST_SEGMENT_S = {"ten": 4.0, "firered-vad": 4.0}
+
+
 def apply_chronosjav_segmenter_defaults(
     overrides: Dict[str, Any], generator: str, segmenter: str, sensitivity: str
 ) -> Dict[str, Any]:
-    """Fill the ChronosJAV defaults for this generator into `overrides` when
-    the segmenter is WhisperSeg; otherwise leave it unchanged. Returns it."""
+    """Fill the ChronosJAV defaults for this generator into `overrides`: the
+    full set for WhisperSeg, the longest segment only for TEN and FireRedVAD;
+    otherwise leave it unchanged. Returns it."""
+    if segmenter in LONGEST_SEGMENT_S and generator in CHRONOSJAV_GENERATORS:
+        overrides.setdefault("max_speech_duration_s", LONGEST_SEGMENT_S[segmenter])
+        return overrides
     if segmenter != "whisperseg":
         return overrides
     if generator == "anime-whisper":
@@ -43,7 +58,8 @@ def resolve_chronosjav_segmenter_config(
     overrides: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """The segmenter config a pass resolves to: the segmenter's sensitivity
-    preset, then the ChronosJAV defaults (WhisperSeg only), then `overrides`
+    preset, then the ChronosJAV defaults (WhisperSeg; longest segment for TEN
+    and FireRedVAD), then `overrides`
     (the user's values win). Same functions the entry points call."""
     merged = dict(overrides or {})
     apply_chronosjav_segmenter_defaults(merged, generator, segmenter, sensitivity)
