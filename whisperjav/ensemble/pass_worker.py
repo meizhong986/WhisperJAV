@@ -1225,7 +1225,8 @@ def _build_pipeline(
         # WhisperSeg only, inject ALL anime-table segmenter_config defaults
         # (threshold, neg_threshold, min_silence_duration_ms, max_speech_duration_s,
         # decoder, grow floor ...) or the Qwen3-ASR values (threshold 0.25, longest
-        # segment 4.0 s since v1.9.4), so they reach the Phase-4 segmenter AND the
+        # segment 4.0 s since v1.9.4; for TEN and FireRedVAD only that 4.0 s,
+        # owner 2026-10-08), so they reach the Phase-4 segmenter AND the
         # vad-grouped framer. setdefault semantics: GUI custom params / sliders /
         # CLI collected above always win.
         apply_chronosjav_segmenter_defaults(
