@@ -1,0 +1,3309 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/WhisperJAV/CHANGELOG_v1.9.3/">
+      
+      
+      
+      
+        
+          <link rel="alternate" href="./" hreflang="en">
+        
+          <link rel="alternate" href="../zh/CHANGELOG_v1.9.3/" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>WhisperJAV v1.9.3 — Development Change Log - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#whisperjav-v193-development-change-log" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              WhisperJAV v1.9.3 — Development Change Log
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Select language">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="../zh/CHANGELOG_v1.9.3/" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipelines/crispasr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CrispASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV Upgrade Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#2026-09-17-a-shortfall-inside-a-two-pass-run-now-reaches-the-run-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-09-17 — a shortfall inside a two-pass run now reaches the run summary
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2026-09-17 — a shortfall inside a two-pass run now reaches the run summary">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#one-channel-instead-of-two" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One channel instead of two
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-route-and-what-carries-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The route, and what carries it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verified
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-09-17-the-agreed-error-handling-rules-and-htdemucs-finally-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-09-17 — the agreed error-handling rules, and htdemucs finally run
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2026-09-17 — the agreed error-handling rules, and htdemucs finally run">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-rule-as-agreed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The rule, as agreed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#htdemucs-no-longer-has-rules-of-its-own" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        htdemucs no longer has rules of its own
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-shortfall-now-reaches-the-run-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A shortfall now reaches the run summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#htdemucs-has-been-run-at-last" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        htdemucs has been run, at last
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verified-this-sitting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verified this sitting
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-09-17-phase-6-opened-the-windows-installer-a1-and-the-mechanism-a2-needs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-09-17 — phase 6 opened: the Windows installer (A1), and the mechanism A2 needs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2026-09-17 — phase 6 opened: the Windows installer (A1), and the mechanism A2 needs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a1-the-installer-looked-frozen-because-it-was-314-and-four-probable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A1 — the installer looked frozen because it was (#314 and four probable)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a2-hf-endpoint-and-nothing-else-yet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A2 — --hf-endpoint, and nothing else yet
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-09-17-a-clean-up-that-fails-while-it-is-running-now-stops-the-run-too" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-09-17 — a clean-up that fails while it is running now stops the run too
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-09-17-the-adversary-audit-of-this-sitting-and-the-defects-it-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-09-17 — the adversary audit of this sitting, and the defects it found
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2026-09-17 — the adversary audit of this sitting, and the defects it found">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-failure-advice-never-reached-the-provider-it-was-written-for" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The failure advice never reached the provider it was written for
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-local-servers-log-was-deleted-before-the-user-could-read-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The local server's log was deleted before the user could read it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-start-up-chat-check-asked-in-the-wrong-shape-for-the-translate-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The start-up chat check asked in the wrong shape for the translate CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#balanced-refused-the-vad-only-split-through-one-flag-and-accepted-it-through-another" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Balanced refused the VAD-only split through one flag and accepted it through another
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#single-mode-fidelity-never-received-the-flag-at-all" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single-mode fidelity never received the flag at all
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#one-scenes-hiccup-failed-the-whole-file-with-a-message-about-the-wrong-thing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One scene's hiccup failed the whole file, with a message about the wrong thing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-qwen-enhancer-still-rejected-the-form-the-other-flags-accept" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --qwen-enhancer still rejected the form the other flags accept
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#htdemucs-three-corrections-none-of-them-run-against-the-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        htdemucs: three corrections, none of them run against the model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-duration-fallback-answered-about-the-wrong-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The duration fallback answered about the wrong file
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-gui-showed-off-while-sending-the-flag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The GUI showed "off" while sending the flag
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verified-this-sitting_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verified this sitting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#left-for-the-owner-not-implemented" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Left for the owner — not implemented
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-09-17-four-of-the-owners-decisions-carried-out" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-09-17 — four of the owner's decisions carried out
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2026-09-17 — four of the owner&#39;s decisions carried out">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#balanced-no-longer-offers-the-vad-only-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Balanced no longer offers the VAD-only split
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#translation-now-proves-it-can-chat-before-the-run-starts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Translation now proves it can chat before the run starts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#each-translation-provider-gets-advice-that-applies-to-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Each translation provider gets advice that applies to it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-qwen-customize-window-and-the-row-agree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Qwen Customize window and the row agree
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-09-17-one-rule-for-a-component-that-cannot-run-and-the-vad-only-split-made-real-in-fidelity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-09-17 — one rule for a component that cannot run, and the VAD-only split made real in fidelity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2026-09-17 — one rule for a component that cannot run, and the VAD-only split made real in fidelity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-chosen-component-that-cannot-run-now-stops-the-run-whichever-it-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A chosen component that cannot run now stops the run, whichever it is
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enhance-for-vad-only-now-does-what-its-name-says-in-fidelity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Enhance for VAD only" now does what its name says — in fidelity
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-09-17-htdemucs-vocal-isolation-and-the-first-clean-up-that-refuses-to-fail-quietly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-09-17 — htdemucs vocal isolation, and the first clean-up that refuses to fail quietly
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2026-09-17 — htdemucs vocal isolation, and the first clean-up that refuses to fail quietly">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-arrives-and-from-where" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What arrives, and from where
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#it-stops-the-run-instead-of-handing-back-untouched-audio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        It stops the run instead of handing back untouched audio
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-09-17-ffmpeg-dsp-works-from-the-gui-again-and-enhance-for-vad-says-what-it-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-09-17 — FFmpeg DSP works from the GUI again, and enhance-for-vad says what it does
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2026-09-17 — FFmpeg DSP works from the GUI again, and enhance-for-vad says what it does">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#choosing-ffmpeg-dsp-in-the-gui-no-longer-stops-the-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing FFmpeg DSP in the GUI no longer stops the run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-enhance-for-vad-actually-does-per-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What enhance-for-vad actually does, per pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-09-17-two-defects-the-owner-reported-the-wasted-second-read-and-the-hidden-vad-only-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-09-17 — two defects the owner reported: the wasted second read, and the hidden VAD-only control
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2026-09-17 — two defects the owner reported: the wasted second read, and the hidden VAD-only control">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#audio-extraction-read-the-file-twice-the-second-read-bought-a-header-field" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Audio extraction read the file twice; the second read bought a header field
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-enhance-for-vad-only-control-was-not-removed-it-was-hidden-almost-all-the-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The "Enhance for VAD only" control was not removed — it was hidden almost all the time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#two-things-found-while-in-that-code-both-his-to-decide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two things found while in that code, both his to decide
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-09-16-phase-5-the-expert-colab-notebook-and-why-local-translation-returned-nothing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-09-16 — phase 5: the expert Colab notebook, and why local translation returned nothing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2026-09-16 — phase 5: the expert Colab notebook, and why local translation returned nothing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-expert-notebook-now-offers-what-192-offers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The expert notebook now offers what 1.9.2 offers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#local-translation-returned-nothing-the-installed-llama-cpp-python-build-rejects-its-own-replies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local translation returned nothing — the installed llama-cpp-python build rejects its own replies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pip-install-whisperjavlocal-llm-installed-nothing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pip install whisperjav[local-llm] installed nothing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-colab-installers-pinned-wheel-could-never-be-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Colab installer's pinned wheel could never be found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-notebooks-install-a-fixed-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The notebooks install a fixed release
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kaggle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kaggle
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-09-16-three-adversarial-reviews-and-the-data-loss-defect-they-led-to" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-09-16 — three adversarial reviews, and the data-loss defect they led to
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-09-16-d1-and-d2-tested-in-the-gui-by-the-owner-one-defect-of-ours-backed-out-one-pre-existing-defect-fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-09-16 — D1 and D2 tested in the GUI by the owner: one defect of ours backed out, one pre-existing defect fixed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-09-16-phase-4-continued-three-more-translation-targets-the-dead-transcription-tab-translation-bindings-removed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-09-16 — phase 4 continued: three more translation targets; the dead Transcription-tab translation bindings removed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-09-16-phase-4-the-french-target-defect-fixed-c1-was-already-resolved-on-2026-08-29-and-the-comparison-re-measured-that-fix-one-new-defect-found-and-left-open" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-09-16 — phase 4: the French target defect fixed; C1 was already resolved on 2026-08-29 and the comparison re-measured that fix; one new defect found and left open
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-09-16-phase-3-the-linux-gui-prerequisite-is-stated-where-a-linux-user-will-see-it-g1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-09-16 — phase 3: the Linux GUI prerequisite is stated where a Linux user will see it (G1)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-09-16-phase-2-the-four-what-the-user-sees-while-a-run-is-working-items-and-the-two-pass-settings-save" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-09-16 — phase 2: the four "what the user sees while a run is working" items, and the two-pass settings save
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-09-16-phase-1-of-the-matters-map-four-contributor-pull-requests-merged-locally-labels-applied" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-09-16 — phase 1 of the matters map: four contributor pull requests merged locally; labels applied
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/en/CHANGELOG_v1.9.3.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="whisperjav-v193-development-change-log">WhisperJAV v1.9.3 — Development Change Log<a class="headerlink" href="#whisperjav-v193-development-change-log" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p>Developer-facing record of what changed on <code>dev_v1.9.3</code>, why, and how it was
+verified. The user-facing texts derived from this file now exist:
+<code>docs/release_notes_v1.9.3_for_users.md</code> is what goes on the release page, and
+<code>docs/release_notes_v1.9.3.md</code> is the detailed record organised by outcome. Same conventions as <code>docs/CHANGELOG_v1.9.2.md</code>: one
+entry per landed change, newest first; "Decision" lines record who decided what,
+so a later reader can tell policy from mechanism.</p>
+<p><strong>SYNC</strong> — requirements doc <code>docs/requirements/v1.9.3_vision_mission_highe-leve-features_v1.txt</code> <strong>v1</strong> (mtime 2026-09-14 14:20, 3,946 bytes, md5 <code>736f0c97…</code>) | release plan <strong><code>docs/plans/V193_RELEASE_PLAN.md</code> rev 1.5</strong> (working record; <strong>owner-facing planning moved 2026-09-16 to <code>docs/plans/V193_MATTERS_MAP.md</code> rev 2</strong> — the map of matters, his decisions verbatim, the 7 phases; §2.1 and the D1–D43 table are superseded) | tracker rev <strong>53.0</strong> | change log <strong><code>docs/CHANGELOG_v1.9.3.md</code> through 2026-09-16, phases 1–4</strong> (<strong>committed 2026-09-16 on the owner's word</strong>, together with the v1.9.2 log's SYNC edit; the v1.9.2 log is closed at its 2026-09-14 entry) | owner pack: the v1.9.2 pack <code>73c5c95d</code> stays at r4.5; <strong>the v1.9.3 pack opens at the Phase 2 scope gate</strong> (owner, 2026-09-14) | branch <strong><code>dev_v1.9.3</code> @ <code>5147986</code></strong> (PRs #388 #363 #376 #364 merged locally 2026-09-16; then phases 2–4: <code>ac902b4</code> F1, <code>7788a2b</code> F2, <code>d9afb7e</code> F3, <code>58b9f97</code> F4, <code>19c20d5</code> D1, <code>25863cf</code> G1, <code>ed79c1d</code> C2, <code>3ee80a8</code> languages, <code>5197fd1</code>+<code>528e64b</code>+<code>7d5406e</code> GUI, then the three review-remediation commits <code>8eb8d00</code> <code>6393781</code> <code>5147986</code>), <code>main</code> @ <code>e8c1c6e</code>, <code>origin/main</code> @ <code>63f256e</code> = tag <code>v1.9.2</code>; <strong>nothing pushed — owner decision 2026-09-14: no push until the 1.9.3 release</strong> | GitHub 2026-09-16: <strong>32 comments posted</strong> (25 phase-1 non-G2 + 4 G2 + #366 retest + #305 + #397) and <strong>5 closures</strong> (PRs #365 #362 #361 #360, issue #397); every comment id in <code>docs/plans/V193_PHASE1_POSTED.log</code> | <strong>Owner 2026-09-15: F4 (MOSS) dropped from 1.9.3 → next release (perhaps 1.10); step-4 postings APPROVED and POSTED (ten comments + issues #429 #430); replan without MOSS ordered — </strong>scope proposal produced (D2.0) and adversary-gated (25 findings applied); it sits in the release plan §2.1 with 43 numbered decisions for the Phase 2 sitting.<strong> Phase 0 gate (document set, Q5–Q10) still open.</strong>
+<strong>CLOSED FOR THE RELEASE, 2026-09-17</strong> at <code>46194c7</code>. Version bumped to <strong>1.9.3</strong> via
+<code>installer/VERSION</code> (the only hand-edited file; <code>whisperjav/__version__.py</code> is generated).
+Installer built: <code>WhisperJAV-1.9.3-Windows-x86_64.exe</code>, 303 MB. Test suite run in full for
+the first time -- 101 files, 2245 passed, 136 failed, of which <strong>131 predate this branch</strong>
+(verified file by file against <code>ef50e86</code>); the 5 that did not are fixed. Not yet done:
+the owner's installation of the built .exe, the merge to <code>main</code>, the tag and the push.</p>
+<p>Rule: a session that changes the release plan, the tracker, this file or the pack brings the others to the same state before it ends (CLAUDE.md rule A7).</p>
+</blockquote>
+<hr />
+<h2 id="2026-09-17-a-shortfall-inside-a-two-pass-run-now-reaches-the-run-summary">2026-09-17 — a shortfall inside a two-pass run now reaches the run summary<a class="headerlink" href="#2026-09-17-a-shortfall-inside-a-two-pass-run-now-reaches-the-run-summary" title="Permanent link">&para;</a></h2>
+<p><strong>Owner, 2026-09-17:</strong> <em>"do the ensemble propagation."</em> This closes the gap left by the previous
+entry: the single-file paths reported a shortfall, the two-pass path did not.</p>
+<p>It is the path that matters most, because two-pass is currently the only way to choose an audio
+clean-up from the command line — there is no top-level <code>--speech-enhancer</code>.</p>
+<h3 id="one-channel-instead-of-two">One channel instead of two<a class="headerlink" href="#one-channel-instead-of-two" title="Permanent link">&para;</a></h3>
+<p>The first attempt had each pipeline leave its notes on itself, which <code>main.py</code> read after
+<code>process()</code>. That works only where the caller still holds the pipeline object, and there are three
+callers, not one: the plain path does hold it, the async path builds its outcome from the returned
+metadata, and a pass runs in a <strong>separate process</strong> where the object never existed as far as the
+parent is concerned.</p>
+<p>So the notes now travel in the metadata every pipeline already returns —
+<code>summary["degradations"]</code> — and all three callers read that one thing. The object attribute stays as
+the place the notes are collected during a run; it is no longer what anyone reads.</p>
+<h3 id="the-route-and-what-carries-it">The route, and what carries it<a class="headerlink" href="#the-route-and-what-carries-it" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Hop</th>
+<th>What was added</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pipeline → metadata</td>
+<td>each of the five pipelines writes <code>summary["degradations"]</code> beside the timings it already records</td>
+</tr>
+<tr>
+<td>worker → parent</td>
+<td><code>FileResult</code> gained a <code>degradations</code> field; results cross the process boundary as plain dicts, so it travels with the rest</td>
+</tr>
+<tr>
+<td>orchestrator → summary</td>
+<td>gathers them per file, labelled <code>pass 1:</code> / <code>pass 2:</code>, because "2 of 40 scenes" means different things depending on which pass produced the audio being read</td>
+</tr>
+<tr>
+<td>summary → the user</td>
+<td><code>main.py</code> combines them with the existing "pass 2 failed" reason and the file is reported <strong><code>suspect</code></strong> with all of it</td>
+</tr>
+</tbody>
+</table>
+<p>A pass that <strong>failed</strong> contributes nothing: its output is not used, so its shortfalls are not the
+user's problem, and the file is already marked degraded for the failure itself.</p>
+<h3 id="verified">Verified<a class="headerlink" href="#verified" title="Permanent link">&para;</a></h3>
+<p>A real two-pass run (<code>--ensemble --pass1-pipeline fidelity --pass1-speech-enhancer htdemucs
+--pass1-enhance-for-vad</code>, and again with ffmpeg-dsp): exit 0, <code>done</code>, <code>suspect 0</code> — the clean path is
+unchanged. With <code>--debug</code>, the metadata written by the pipeline <strong>inside the worker process</strong> carries
+<code>"degradations": []</code> alongside <code>total_processing_time_seconds</code> and <code>final_subtitles_refined</code>, so the
+channel is live rather than merely wired.</p>
+<p><code>tests/test_ensemble_carries_degradations.py</code> (new, 13 tests) covers each hop with the real code,
+including the orchestrator's actual merge method: a shortfall in pass 1 is labelled and reported,
+two passes are told apart, a failed pass 2 contributes nothing, a result from before this change
+does not crash the gathering, and the combination in <code>main.py</code> produces <code>suspect</code> while still
+delivering the subtitles. <code>tests/test_degradation_reaches_the_summary.py</code> 13, and its guard now also
+checks that every pipeline writes the summary key rather than only passing the list.</p>
+<p><strong>Stated plainly:</strong> what has been exercised live is the empty case — the field is produced, carried
+and read. The non-empty case is covered by tests against the real code at every hop, not by a live
+run, because making one scene of a real clean-up fail on demand is not something that can be
+arranged from outside.</p>
+<hr />
+<h2 id="2026-09-17-the-agreed-error-handling-rules-and-htdemucs-finally-run">2026-09-17 — the agreed error-handling rules, and htdemucs finally run<a class="headerlink" href="#2026-09-17-the-agreed-error-handling-rules-and-htdemucs-finally-run" title="Permanent link">&para;</a></h2>
+<p><strong>Owner, 2026-09-17:</strong> <em>"The D rows, agreed"</em> and <em>"only all-fail is fatal, agreed"</em>, on the table at
+<code>docs/plans/V193_ERROR_HANDLING_TABLE.md</code>. That table was written because I had misread his stop rule
+and made every per-scene failure fatal; it is now the agreed reference, and the code follows it.</p>
+<h3 id="the-rule-as-agreed">The rule, as agreed<a class="headerlink" href="#the-rule-as-agreed" title="Permanent link">&para;</a></h3>
+<p>A clean-up the user chose that <strong>cannot install or cannot start</strong> stops the run — that was always his
+rule and was already implemented. What is new is the rest of the picture:</p>
+<ul>
+<li><strong>Some scenes fail, others succeed:</strong> those scenes go through uncleaned, the run continues, and
+  <strong>the user is told how many</strong> — see below.</li>
+<li><strong>Every scene fails:</strong> the file fails. A clean-up that ran and cleaned nothing is the same as one
+  that could not run, so it is refused the same way.</li>
+</ul>
+<p><code>enhance_scenes</code> carries this for every pipeline at once — balanced, fidelity, qwen, transformers and
+decoupled all enhance through that one function.</p>
+<h3 id="htdemucs-no-longer-has-rules-of-its-own">htdemucs no longer has rules of its own<a class="headerlink" href="#htdemucs-no-longer-has-rules-of-its-own" title="Permanent link">&para;</a></h3>
+<p>It raised on <em>everything</em>, including a failure on one piece of audio, while the other four enhancers
+reported a per-scene failure and let the run continue. One bad scene failed a whole file. It now
+reports a per-piece failure the way they do, and raises only for something that means the clean-up
+cannot be had at all: not installed, weights will not load, a model with no vocal stem.</p>
+<h3 id="a-shortfall-now-reaches-the-run-summary">A shortfall now reaches the run summary<a class="headerlink" href="#a-shortfall-now-reaches-the-run-summary" title="Permanent link">&para;</a></h3>
+<p>The rule that makes degrading acceptable rather than silent. A file whose clean-up half-failed is
+reported as <strong><code>suspect</code></strong>, with the count and the reason, in the RUN SUMMARY — not in a log line
+nobody reads. Anyone who wants no degradation at all already has the switch: <strong><code>--fail-on suspect</code></strong>
+makes the run exit non-zero.</p>
+<p>No vocabulary was invented for this. WhisperJAV already had per-file states
+(<code>done / empty / suspect / failed / skipped</code>) and a <code>degraded</code> / <code>degraded_reason</code> channel built for a
+failed pass 2; the shortfall travels through the same one.</p>
+<p><strong>Where it works and where it does not, stated plainly.</strong> The single-file paths carry it: each
+pipeline collects the notes and <code>main.py</code> reads them after <code>process()</code>. The <strong>two-pass / ensemble path
+does not yet</strong> — those passes run in a separate process and return a typed result that has no field
+for it, the same boundary that already stops the speech-positive streak getting back (there is a
+comment in <code>main.py</code> saying so). Carrying it across means changing that result type, and that is the
+next piece rather than something to rush.</p>
+<h3 id="htdemucs-has-been-run-at-last">htdemucs has been run, at last<a class="headerlink" href="#htdemucs-has-been-run-at-last" title="Permanent link">&para;</a></h3>
+<p><code>demucs</code> was installed on the owner's machine, so the backend that had <strong>never been executed</strong> was
+finally exercised:</p>
+<ul>
+<li>Directly on audio: the model loaded on CUDA, fetched its 84 MB of weights from Meta's CDN, and
+  returned a vocal stem — same length, float32, all finite.</li>
+<li>Through the whole pipeline: an 8-second clip through <code>--ensemble --pass1-pipeline fidelity
+  --pass1-model tiny --pass1-speech-enhancer htdemucs --pass1-enhance-for-vad</code>. Exit 0, subtitles
+  written, and the temp directory shows both tracks of the VAD-only split at 16 kHz — the cleaned-up
+  one for finding the speech, the untouched one for the recogniser.</li>
+</ul>
+<p><strong>Two of the four things this branch had never proved are now proved.</strong> What remains: the translation
+chat check has still never met a real llama-cpp server, and the GUI changes are still not
+click-confirmed.</p>
+<h3 id="verified-this-sitting">Verified this sitting<a class="headerlink" href="#verified-this-sitting" title="Permanent link">&para;</a></h3>
+<p><code>test_enhance_scene_fallback_rate</code> 14, <code>test_degradation_reaches_the_summary</code> 13 (new),
+<code>test_htdemucs_enhancer</code> 23, <code>test_enhance_for_vad_dual_track</code> 17, <code>test_speech_enhancer_spec</code> 30.
+<code>python -m whisperjav.main --help</code> exits 0.</p>
+<hr />
+<h2 id="2026-09-17-phase-6-opened-the-windows-installer-a1-and-the-mechanism-a2-needs">2026-09-17 — phase 6 opened: the Windows installer (A1), and the mechanism A2 needs<a class="headerlink" href="#2026-09-17-phase-6-opened-the-windows-installer-a1-and-the-mechanism-a2-needs" title="Permanent link">&para;</a></h2>
+<p><strong>Owner, 2026-09-17:</strong> <em>"proceed to 6."</em></p>
+<h3 id="a1-the-installer-looked-frozen-because-it-was-314-and-four-probable">A1 — the installer looked frozen because it was (#314 and four probable)<a class="headerlink" href="#a1-the-installer-looked-frozen-because-it-was-314-and-four-probable" title="Permanent link">&para;</a></h3>
+<p>Every package install ran through <code>subprocess.run(capture_output=True)</code>, so pip's output was held
+until the command finished — and pip prints nothing at all while a single wheel downloads. On the
+PyTorch wheels that is minutes of an unmoving screen with no way to tell a slow download from a dead
+installer.</p>
+<p>Installs now stream. Every line goes to the log file; the lines that say what is happening
+(<code>Collecting</code>, <code>Downloading</code>, <code>Installing</code>, errors) go to the screen as they happen; and when pip
+says nothing at all, a heartbeat with the elapsed time arrives every fifteen seconds. Verified
+against real subprocesses, not by reading: a chatty command's lines appear while it runs, a silent
+one still produces heartbeats, and a command that hangs without printing anything is still killed at
+the timeout — the 30-minute limit the old code got from <code>subprocess.run</code> had to be rebuilt by hand,
+so it was worth proving it still fires.</p>
+<p><strong>The network check now says what it tried.</strong> It names the addresses it is contacting and the proxy
+it is using, and repeats both when it fails. A user behind a company proxy or in China could not act
+on "network check failed" without knowing what was attempted. Reaching PyPI is still required and
+still fatal; <code>download.pytorch.org</code> is reported but not required, because the CPU route takes
+PyTorch from PyPI. A host that answers 403 to a bare GET counts as reachable — <code>download.pytorch.org</code>
+does exactly that, and reporting it as unreachable would send every user chasing a fault they do not
+have.</p>
+<p><strong>The installer stopped writing into the user's global git config.</strong> It wrote eight settings there,
+including an <code>http.proxy</code> pointing at a proxy that may only exist today, and nothing ever offered to
+undo them — a permanent change to git for everything else that person does on that machine. They now
+go into this install's environment through <code>GIT_CONFIG_COUNT</code>, which reaches every git the install
+starts, including the one pip runs for a <code>git+https</code> install. Verified: a real git process reads
+every setting and the global config is untouched. On a git older than 2.31, which cannot read them
+that way, they are skipped with a plain line rather than written to disk.</p>
+<h3 id="a2-hf-endpoint-and-nothing-else-yet">A2 — <code>--hf-endpoint</code>, and nothing else yet<a class="headerlink" href="#a2-hf-endpoint-and-nothing-else-yet" title="Permanent link">&para;</a></h3>
+<p>Machines that cannot reach huggingface.co had nothing to set inside WhisperJAV; the only mention of
+a mirror anywhere in the tree was one line of advice printed by the model loader.</p>
+<p><code>--hf-endpoint URL</code> sends Hugging Face downloads to an address the user chooses. huggingface_hub
+reads <code>HF_ENDPOINT</code> when it is imported, so it is applied from the raw argument scan in both entry
+points, before anything pulls the hub library in — the same place and for the same reason as
+<code>--offline</code>. Get that wrong and the flag is accepted and silently does nothing, so <code>--dump-params</code>
+now reports both the value asked for and the <code>ENDPOINT</code> huggingface_hub actually ended up with,
+beside the two offline fields that already worked this way. Verified in both argument forms.
+<code>tests/test_hf_endpoint_flag.py</code>, 12 tests.</p>
+<p><strong>WhisperJAV names no mirror.</strong> The flag takes whatever address the user gives it. Which mirrors to
+recommend, the GUI checkbox, the pip index variable and the China page itself are the owner's
+decisions and are not started.</p>
+<p><strong>For that page when it is written:</strong> <code>--hf-endpoint</code> covers what goes through huggingface_hub.
+Silero via torch.hub, the openai-whisper weights and the ModelScope enhancers have their own
+download paths, and htdemucs fetches its model from Meta's own site rather than Hugging Face. None of
+those are redirected by a Hugging Face mirror, and the page has to say so.</p>
+<hr />
+<h2 id="2026-09-17-a-clean-up-that-fails-while-it-is-running-now-stops-the-run-too">2026-09-17 — a clean-up that fails while it is running now stops the run too<a class="headerlink" href="#2026-09-17-a-clean-up-that-fails-while-it-is-running-now-stops-the-run-too" title="Permanent link">&para;</a></h2>
+<p><strong>Owner, 2026-09-17,</strong> answering the open item the audit left him: <em>"yes stop."</em> He also confirmed
+the new refusal of <code>--mode balanced --enhance-for-vad</code> (<em>"confirm"</em>).</p>
+<p>The rule he set earlier that day — a clean-up the user chose that cannot run stops the run — had
+only ever been implemented for a clean-up that cannot <em>start</em>: a package that will not import,
+caught by the start-up check, plus htdemucs, which raises on everything. The four other backends
+(clearvoice, bs-roformer, zipenhancer, ffmpeg-dsp) each return a failed result when the weights
+cannot be fetched, the card runs out of memory, FFmpeg exits non-zero or the backend throws — and
+<code>enhance_scenes</code> logged a warning, put the untouched scene in the list and carried on. The run ended
+at 0 with a subtitle file made partly from audio the user had asked to have cleaned up.</p>
+<p><code>enhance_scenes</code> now raises <code>SpeechEnhancerUnavailable</code> on any scene whose clean-up failed, whether
+the backend reported the failure or threw. The message names the clean-up, which scene of how many,
+what went wrong, what it means and the way out. Every pipeline enhances its scenes through that one
+function, so the rule reaches balanced, fidelity, qwen, transformers and decoupled at once, however
+the backend was reached.</p>
+<p><strong>What this changes for users:</strong> a run that used to finish with one or two scenes quietly
+un-enhanced now stops. That is the intent — but it does mean a single transient failure on one scene
+of a long file fails that file. It is worth watching once real backends are exercised; a tolerance
+(stop only when every scene fails) would be a different decision, not a bug fix.</p>
+<p><code>tests/test_enhancer_failure_stops_run.py</code> (renamed from the sample-rate test written an hour
+earlier, whose premise this replaces): 8 tests — a backend that reports failure, one that throws,
+what the message must say, and that no path hands back untouched audio. The sample-rate guarantee it
+used to cover is still tested for the scenes that do come back.</p>
+<hr />
+<h2 id="2026-09-17-the-adversary-audit-of-this-sitting-and-the-defects-it-found">2026-09-17 — the adversary audit of this sitting, and the defects it found<a class="headerlink" href="#2026-09-17-the-adversary-audit-of-this-sitting-and-the-defects-it-found" title="Permanent link">&para;</a></h2>
+<p><strong>Owner, 2026-09-17:</strong> <em>"run the adversary audit. 1b - solve for any issues and bugs with care.
+There are no deadlines, take your time. Make sure nothing gets broken."</em></p>
+<p>Three adversarial reviews, one per piece of the day's work (speech enhancement, translation
+start-up, GUI/CLI wiring), each framed around the code rather than around the claims made for it.
+Every finding below was re-checked against the code before anything was changed, and every fix has
+a command or a test behind it. The items the reviews raised that are the owner's to decide are
+listed at the end and were <strong>not</strong> implemented.</p>
+<h3 id="the-failure-advice-never-reached-the-provider-it-was-written-for">The failure advice never reached the provider it was written for<a class="headerlink" href="#the-failure-advice-never-reached-the-provider-it-was-written-for" title="Permanent link">&para;</a></h3>
+<p>The advice added earlier the same day keyed on <code>pysubtrans_name</code>. That field is the name of
+PySubtrans's <em>client class</em>, not the provider the user chose: local, ollama, glm, groq and custom
+are all <code>Custom Server</code> there, and the local run's config is rebuilt as <code>Custom Server</code> before it
+reaches the translator. So the <code>local</code> and <code>ollama</code> branches could never run. Every local, Ollama,
+GLM, Groq and custom run got the line written for a server the user had named themselves — and
+<strong>Ollama users were worse off than before the change</strong>, because they used to be told <code>ollama logs</code>.</p>
+<p>Each provider config now carries <code>whisperjav_provider</code>, the name the user types after
+<code>--translate-provider</code>, and the advice reads that. A cloud provider redirected to a
+<code>--translate-endpoint</code> on this machine is no longer called a cloud service either: the address
+decides. The advice function was lifted out of <code>translate_subtitle</code> so it can be tested at all —
+<code>tests/test_translation_server_log_advice.py</code>, 14 tests, covering every shipped provider.</p>
+<h3 id="the-local-servers-log-was-deleted-before-the-user-could-read-it">The local server's log was deleted before the user could read it<a class="headerlink" href="#the-local-servers-log-was-deleted-before-the-user-could-read-it" title="Permanent link">&para;</a></h3>
+<p>The advice names a file, and <code>stop_local_server()</code> removed that file as the run ended. Naming the
+log now marks it to be kept, and the path is logged again when the server stops. An ordinary run
+still cleans up after itself.</p>
+<h3 id="the-start-up-chat-check-asked-in-the-wrong-shape-for-the-translate-cli">The start-up chat check asked in the wrong shape for the translate CLI<a class="headerlink" href="#the-start-up-chat-check-asked-in-the-wrong-shape-for-the-translate-cli" title="Permanent link">&para;</a></h3>
+<p>The check sent a non-streaming chat request. <code>whisperjav-translate --provider local</code> translates
+with <code>stream=True</code>; the GUI and <code>--translate</code> path do not. These are two different paths on the
+server — llama-cpp-python validates a single reply against a response model and sends streamed
+chunks without validating them, which is exactly where the known defect lives — so the check could
+have stopped a CLI run that was going to work, and passed a run that was going to fail. It now asks
+in whichever shape the caller will use. A 2xx with an empty body is named instead of surfacing as a
+JSON error.</p>
+<p><code>tests/test_local_chat_check.py</code> was rewritten: the wiring test was a search of the source file, and
+is now the readiness check actually running against a stub that answers all three endpoints. 13
+tests, including both "broken only when streaming" and "broken only when not streaming" builds.</p>
+<h3 id="balanced-refused-the-vad-only-split-through-one-flag-and-accepted-it-through-another">Balanced refused the VAD-only split through one flag and accepted it through another<a class="headerlink" href="#balanced-refused-the-vad-only-split-through-one-flag-and-accepted-it-through-another" title="Permanent link">&para;</a></h3>
+<p><code>--pass1-enhance-for-vad</code> on a balanced pass was refused, but the pass configuration is built as
+<em>this pass's flag OR the global <code>--enhance-for-vad</code></em>, and the refusal only read the pass flag.
+Verified before the fix: <code>--ensemble --pass1-pipeline balanced --pass1-speech-enhancer clearvoice
+--enhance-for-vad</code> exited 0 with <code>enhance_for_vad: true</code> on a balanced pass — the exact thing the
+owner refused. The refusal now reads the same combination the run will use, and names whichever
+flag the user actually typed.</p>
+<p><code>--mode balanced --enhance-for-vad</code> was likewise accepted and ignored; it is now refused in the same
+words. <code>--pipeline decoupled</code> is not caught by either rule, because <code>--mode</code> still reads <code>balanced</code>
+from its default on a decoupled run.</p>
+<h3 id="single-mode-fidelity-never-received-the-flag-at-all">Single-mode fidelity never received the flag at all<a class="headerlink" href="#single-mode-fidelity-never-received-the-flag-at-all" title="Permanent link">&para;</a></h3>
+<p><code>--mode fidelity --enhance-for-vad</code> was accepted and did nothing: <code>pipeline_args</code> had no
+<code>enhance_for_vad</code> key, so <code>FidelityPipeline</code> always saw <code>False</code>. The split only ever happened
+through <code>--ensemble</code> or the GUI. It is now passed. <strong>See the open item below</strong>: single-file mode has
+no way to choose a clean-up in the first place, so this is a gap closed rather than a feature
+reached.</p>
+<p>The flag's help text said "Qwen/Decoupled pipelines only", which was already untrue. It now names
+where it applies, where it is refused, and where it is accepted and ignored — the documentation the
+owner's 2026-09-17 decision made a condition of that ignoring.</p>
+<h3 id="one-scenes-hiccup-failed-the-whole-file-with-a-message-about-the-wrong-thing">One scene's hiccup failed the whole file, with a message about the wrong thing<a class="headerlink" href="#one-scenes-hiccup-failed-the-whole-file-with-a-message-about-the-wrong-thing" title="Permanent link">&para;</a></h3>
+<p>Scenes are extracted at 48 kHz when an enhancer is configured. <code>enhance_scenes</code> resampled what it
+enhanced down to 16 kHz but handed back the untouched 48 kHz file for any scene whose clean-up
+failed. In the VAD-only split that list is paired scene by scene with originals at 16 kHz, and the
+recogniser refuses two tracks at different rates. So a transient failure on one scene failed the
+entire file with "the audio is 16000 Hz and the cleaned-up copy is 48000 Hz" — a message pointing at
+sample rates rather than at the clean-up that actually failed. Every scene returned is now at 16 kHz.
+<code>tests/test_enhance_scene_fallback_rate.py</code>, 6 tests.</p>
+<h3 id="-qwen-enhancer-still-rejected-the-form-the-other-flags-accept"><code>--qwen-enhancer</code> still rejected the form the other flags accept<a class="headerlink" href="#-qwen-enhancer-still-rejected-the-form-the-other-flags-accept" title="Permanent link">&para;</a></h3>
+<p>The same <code>choices=</code> list that broke FFmpeg DSP for the two-pass flags was still on <code>--qwen-enhancer</code>,
+so <code>--mode qwen --qwen-enhancer ffmpeg-dsp:loudnorm</code> exited 2 with "invalid choice". It now takes the
+same <code>backend[:detail]</code> spec, and the detail is separated into the model before it reaches the
+factory, which only knows plain backend names. Not GUI-reachable; it bit CLI and notebook users.</p>
+<h3 id="htdemucs-three-corrections-none-of-them-run-against-the-model">htdemucs: three corrections, none of them run against the model<a class="headerlink" href="#htdemucs-three-corrections-none-of-them-run-against-the-model" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Its docstring promised a failed result for a single-scene failure "so the rest of the file can go
+  on". No path returns one — every failure stops the run, which is what the owner asked for. The
+  words were wrong, not the behaviour.</li>
+<li>Any error whose text merely contained "cuda" was reported as the graphics card running out of
+  memory, sending users to free memory they had not run out of. It now matches what running out of
+  memory actually says.</li>
+<li>The model was loaded <em>after</em> the audio was read, though the reason to load it early is to stop
+  before spending time on audio. Reordered.</li>
+</ul>
+<p><strong>Still true: no audio has been through htdemucs on this machine.</strong> <code>demucs</code> is not installed.</p>
+<h3 id="the-duration-fallback-answered-about-the-wrong-file">The duration fallback answered about the wrong file<a class="headerlink" href="#the-duration-fallback-answered-about-the-wrong-file" title="Permanent link">&para;</a></h3>
+<p>With no ffprobe on the machine, the duration came from the extraction log — which is the <em>source
+container's</em> <code>Duration:</code> line, not the extracted stream's, and which gives nothing at all when the
+source prints <code>Duration: N/A</code>. The extracted file's own WAV header is now read first, which is still
+a header read and is about the right file. The log stays as the last resort.</p>
+<h3 id="the-gui-showed-off-while-sending-the-flag">The GUI showed "off" while sending the flag<a class="headerlink" href="#the-gui-showed-off-while-sending-the-flag" title="Permanent link">&para;</a></h3>
+<p>The "Enhance for VAD only" tick box and the stored value are two separate things, and only the
+balanced rule ever wrote the box. Ticking the option inside the Customize window, or loading a
+preset saved with it on, left the row showing unticked while the run still sent the flag. Repainting
+the row now always shows what will run. <strong>Not click-confirmed — this needs the owner at the GUI.</strong></p>
+<h3 id="verified-this-sitting_1">Verified this sitting<a class="headerlink" href="#verified-this-sitting_1" title="Permanent link">&para;</a></h3>
+<p><code>python -m whisperjav.main --help</code> exits 0. The nine-command sweep over <code>--enhance-for-vad</code> and
+<code>--qwen-enhancer</code> (refusals exit 2 with the intended message; <code>--mode fidelity</code>, <code>--mode qwen</code>,
+<code>--pipeline decoupled</code>, and ensemble fidelity+qwen all exit 0 and still set the flag). Test files run
+one at a time: <code>test_translation_server_log_advice</code> 14, <code>test_local_chat_check</code> 13,
+<code>test_enhance_scene_fallback_rate</code> 6, <code>test_llama_server_shim</code> 10, <code>test_local_llm_health_check</code> 33,
+<code>test_enhance_for_vad_dual_track</code> 17, <code>test_speech_enhancer_spec</code> 30, <code>test_htdemucs_enhancer</code> 22,
+<code>test_audio_extraction_duration</code> 9, <code>test_qwen_customize_model</code> 6. <code>node --check</code> on <code>app.js</code>.</p>
+<p><strong>A real transcription with the fidelity VAD-only split, which had never been run.</strong> An 8-second
+clip through <code>--ensemble --pass1-pipeline fidelity --pass1-model tiny --pass1-speech-enhancer
+ffmpeg-dsp --pass1-enhance-for-vad</code>: exit 0, subtitles written, and the temp directory shows the two
+tracks the split promises — <code>enhanced_scenes/clip_scene_0000_enhanced.wav</code> at 16 kHz for finding the
+speech and <code>resampled_scenes/clip_scene_0000_resampled.wav</code> at 16 kHz, untouched, for the
+recogniser, both from the 48 kHz original. The log confirms which went where. That retires one of
+the four things this branch had never proved.</p>
+<h3 id="left-for-the-owner-not-implemented">Left for the owner — not implemented<a class="headerlink" href="#left-for-the-owner-not-implemented" title="Permanent link">&para;</a></h3>
+<ol>
+<li>~~<strong>A clean-up that fails at run time still degrades silently.</strong>~~ <strong>ANSWERED the same day:</strong>
+   owner, <em>"yes stop"</em> — carried out, see the entry above.</li>
+<li><strong>Single-file mode cannot choose a clean-up at all.</strong> There is no top-level <code>--speech-enhancer</code>;
+   only <code>--pass1/2-speech-enhancer</code> and <code>--qwen-enhancer</code> exist, and the fidelity preset resolves no
+   enhancer. So the VAD-only split in fidelity is reachable only through two-pass/ensemble or the GUI.</li>
+<li><strong>The Transformers Customize window</strong> still discards the model picked in it, the same shape as the
+   Qwen window fixed earlier that day.</li>
+<li><strong>The Customize window's Enhancer tab ticks are collected nowhere</strong>, so DSP effects chosen there
+   change nothing; only the inline row panel reaches the command.</li>
+<li><strong>htdemucs always receives a mono downmix</strong>, so its stereo model runs in its least favourable
+   configuration. Nobody has measured what that costs.</li>
+</ol>
+<hr />
+<h2 id="2026-09-17-four-of-the-owners-decisions-carried-out">2026-09-17 — four of the owner's decisions carried out<a class="headerlink" href="#2026-09-17-four-of-the-owners-decisions-carried-out" title="Permanent link">&para;</a></h2>
+<p><strong>Decisions (owner, 2026-09-17):</strong> <em>"balanced shall not have the VAD only enhancement"</em>; <em>"No
+external VAD speech segmenter shall be available for balanced"</em>; <em>"agree with your recommendation"</em>
+on a start-up translation check; <em>"I agree"</em> on the wrong Ollama advice; <em>"I agree"</em> on the Qwen
+Customize window. Also, on a Python 3.13 translation-helper file: <strong>no</strong> — <em>"my main strategy is
+that I will not fight colab native stack. If python 13 breaks the wheels then the solution pieces
+that require new wheels are no longer supported until new precompiled wheels are found and
+provided."</em></p>
+<h3 id="balanced-no-longer-offers-the-vad-only-split">Balanced no longer offers the VAD-only split<a class="headerlink" href="#balanced-no-longer-offers-the-vad-only-split" title="Permanent link">&para;</a></h3>
+<p>Balanced finds the speech inside faster-whisper's own call, on the very audio it transcribes, so
+there is no second track to give the cleaned-up audio to. The flag was being accepted and both
+tracks enhanced — the silent difference the other balanced rules exist to prevent. It is now
+<strong>refused</strong> for a balanced pass, in the same shape and wording as the segmenter refusal beside it;
+the GUI hides the box <strong>and clears the stored value</strong>, so a setting left from another pipeline
+cannot travel into a run through a control the user can no longer see; and the GUI's command builder
+will not send it for a balanced pass either. Still accepted for fidelity and qwen.</p>
+<p>The related confirmation needed no change: no external speech segmenter has been available for
+balanced since 1.9.2, and the existing refusal covers it.</p>
+<h3 id="translation-now-proves-it-can-chat-before-the-run-starts">Translation now proves it can chat before the run starts<a class="headerlink" href="#translation-now-proves-it-can-chat-before-the-run-starts" title="Permanent link">&para;</a></h3>
+<p>Everything the local-server readiness check did used <code>/v1/completions</code>. Translation sends
+<code>/v1/chat/completions</code>, and a build can serve one and fail the other every time — which is exactly
+what happened on Colab: healthy server, then failure 86.9 s later with nothing translated. A new
+phase asks for one short chat completion before the server is reported ready, and a failure there
+stops it coming up with a message written for the user. Where the answer mentions a refusal or a
+validation error it adds that this build rejects its own chat replies and that WhisperJAV already
+repairs the known form, so this is a variant it does not cover.</p>
+<p><strong>One existing test had to change</strong>, and the reason matters: its stub returned a body with no
+<code>choices</code> for every request, which was fine while only <code>/v1/completions</code> was asked for but no longer
+represents a <strong>working</strong> server. The stub was corrected; the check was not weakened to fit it.</p>
+<h3 id="each-translation-provider-gets-advice-that-applies-to-it">Each translation provider gets advice that applies to it<a class="headerlink" href="#each-translation-provider-gets-advice-that-applies-to-it" title="Permanent link">&para;</a></h3>
+<p>Every server error used to end with <em>"Check Ollama server logs: ollama logs"</em> — including the local
+provider, which is llama-cpp-python and nothing to do with Ollama. Now: the local provider is
+pointed at the log WhisperJAV itself writes and whose path it prints at start-up; Ollama gets
+Ollama's; a custom server is the user's own; anything else is a cloud service with no local log.</p>
+<h3 id="the-qwen-customize-window-and-the-row-agree">The Qwen Customize window and the row agree<a class="headerlink" href="#the-qwen-customize-window-and-the-row-agree" title="Permanent link">&para;</a></h3>
+<p>The window showed its own model while the row was what ran, so a model chosen there was displayed as
+accepted and discarded. It now <strong>shows the row's model</strong> — adding it to the list where the window's
+own list does not carry it, rather than substituting, which is how they came to disagree — and
+<strong>writes a choice back to the row</strong>, guarded so a value the row cannot show is reported rather than
+lost. Transformers has the same shape and is <strong>not</strong> changed; the comment now says so plainly
+instead of calling it "a separate matter".</p>
+<p><strong>Verified:</strong> 6 new tests for the chat check against a stub server (including the exact Colab fault),
+6 new for the balanced refusal and the GUI guards, 6 new reading the Qwen wiring; plus 33, 30, 27,
+22, 17, 10 and 7 across the existing suites, and <code>node --check</code> on the GUI script. <strong>Not verified:</strong>
+the chat check has not run against a real local server — there is no model on this machine — and a
+GUI change is not verified until the owner clicks it.</p>
+<hr />
+<h2 id="2026-09-17-one-rule-for-a-component-that-cannot-run-and-the-vad-only-split-made-real-in-fidelity">2026-09-17 — one rule for a component that cannot run, and the VAD-only split made real in fidelity<a class="headerlink" href="#2026-09-17-one-rule-for-a-component-that-cannot-run-and-the-vad-only-split-made-real-in-fidelity" title="Permanent link">&para;</a></h2>
+<p><strong>Decision (owner, 2026-09-17):</strong> <em>"I think all speech segmenters have to have uniform behaviour: if
+user selected any but they cannot run then it is a failure and the process shall stop with helpful
+communication"</em>; <em>"please make the VAD Only Enhancement feature audio separation path to work for
+balanced and fidelity"</em>; and, on the earlier finding, <em>"it is ok for faster, fast, and transformers
+and crispASR to ignore that"</em>, with <em>"please rely on the code as comments and docstrings can be out
+of date or mistaken."</em></p>
+<h3 id="a-chosen-component-that-cannot-run-now-stops-the-run-whichever-it-is">A chosen component that cannot run now stops the run, whichever it is<a class="headerlink" href="#a-chosen-component-that-cannot-run-now-stops-the-run-whichever-it-is" title="Permanent link">&para;</a></h3>
+<p><strong>Clean-ups</strong> were not uniform: htdemucs stopped, while zipenhancer, clearvoice and bs-roformer
+warned, fell back to "none" and produced subtitles from the untouched audio — a poor file from a run
+that exited 0. Now every clean-up that has to be installed is fatal. <code>none</code> and <code>ffmpeg-dsp</code> are
+not, because they cannot be missing. The fatal set is <strong>derived</strong> from the dependency table rather
+than listed by hand, and a test asserts the two agree.</p>
+<p><strong>Segmenters</strong> already stopped — but inside the recogniser, saying <em>"Speech Segmenter not configured
+- this is an architecture violation"</em>, which tells a user nothing.
+<code>ensure_segmenter_backend_available()</code> now checks the chosen segmenter before any audio is read and
+prints the same kind of box. It sits beside <code>ensure_segmenter_model_available()</code> — that one is about
+a <strong>model</strong> that must be downloaded, this one about a <strong>package</strong> that must be installed — and runs
+first, because reporting a download failure for a missing package sends the user the wrong way.</p>
+<p>Both boxes list the alternatives <strong>actually present on that machine</strong>, computed at the time, rather
+than a fixed list that might name something else that is also missing.</p>
+<h3 id="enhance-for-vad-only-now-does-what-its-name-says-in-fidelity">"Enhance for VAD only" now does what its name says — in fidelity<a class="headerlink" href="#enhance-for-vad-only-now-does-what-its-name-says-in-fidelity" title="Permanent link">&para;</a></h3>
+<p><code>WhisperProASR.transcribe()</code> takes an optional second file: the cleaned-up copy of the same audio,
+used <strong>only</strong> to find the speech, while the recogniser still hears the original. Omitted, both jobs
+read the one file exactly as before. The two tracks must be the same recording at the same rate, or
+it refuses — a clock difference would put every subtitle in the wrong place, and a length difference
+beyond 0.1 s means it is not the same audio. The fidelity pipeline builds both tracks and pairs them
+by position, with a length check, because pairing the wrong scenes would misplace everything.</p>
+<p><strong>Balanced is not done, and not by this route.</strong> Its speech detection happens <em>inside</em>
+faster-whisper's own <code>transcribe(vad_filter=True)</code> call, on the same buffer it recognises — there is
+no second track to hand it. Splitting them means switching the built-in VAD off and driving
+recognition from an external detector, which is what 1.9.2 deliberately removed (requirement S2/S9),
+and the balanced pipeline is on the owner's frozen list. <strong>Left alone; his decision.</strong></p>
+<p><strong>Verified:</strong> 11 new tests, which prove the split for real — with a second file given, the array
+handed to the segmenter is the one read from <em>that</em> file, not merely that the argument is accepted.
+Plus 22 (3 updated for the new rule), 30, 27, 7, 10 and 33 across the other suites. Both start-up
+checks were called with every value an ordinary run passes and let all of them through, and a real
+fidelity run on a media file reached the extraction step — so no existing configuration is stopped
+by this. <strong>Not verified:</strong> no full transcription has been run with the split active; that needs a
+model and real audio.</p>
+<hr />
+<h2 id="2026-09-17-htdemucs-vocal-isolation-and-the-first-clean-up-that-refuses-to-fail-quietly">2026-09-17 — htdemucs vocal isolation, and the first clean-up that refuses to fail quietly<a class="headerlink" href="#2026-09-17-htdemucs-vocal-isolation-and-the-first-clean-up-that-refuses-to-fail-quietly" title="Permanent link">&para;</a></h2>
+<p><strong>Decision (owner, 2026-09-17):</strong> add Demucs v4 for vocal isolation; <em>"htdemucs for all pipelines to
+be available"</em>; it <em>"installs only when picked"</em>; <em>"there needs to be good checks in place so if the
+installation fails or unsuccessful, the program is resilient and informs the users with clear
+errors"</em>; and, asked whether a failure should stop the run or carry on without clean-up,
+<em>"I think it should fail with good user communication."</em></p>
+<h3 id="what-arrives-and-from-where">What arrives, and from where<a class="headerlink" href="#what-arrives-and-from-where" title="Permanent link">&para;</a></h3>
+<p>Two things, neither shipped with WhisperJAV. <strong>The package</strong>, <code>pip install demucs</code> — checked on
+PyPI: 4.1.0 is a pure-Python wheel, and the only two dependencies with compiled code (<code>lameenc</code>,
+<code>sphn</code>) publish prebuilt wheels for Python 3.10–3.14 on Windows x64 and Linux x86_64, so nothing is
+built on the user's machine. <strong>The weights</strong>, 84,141,911 bytes confirmed by request today, fetched
+once from <code>dl.fbaipublicfiles.com</code> and cached. That is <strong>Meta's own site, not Hugging Face</strong> — so
+<code>--offline</code> and any Hugging Face mirror or endpoint do not cover it. <strong>That matters for phase 6:</strong>
+the China work will not help this download.</p>
+<h3 id="it-stops-the-run-instead-of-handing-back-untouched-audio">It stops the run instead of handing back untouched audio<a class="headerlink" href="#it-stops-the-run-instead-of-handing-back-untouched-audio" title="Permanent link">&para;</a></h3>
+<p>The enhancement framework degrades quietly by design — a backend that cannot run is warned about,
+replaced by "none", and the run finishes. Right for a clean-up that only helps a little; wrong for
+one chosen because the audio needs it, where the user would get a poor subtitle file from a run that
+exited 0.</p>
+<p>So: a new <code>SpeechEnhancerUnavailable</code>; a <code>FATAL_WHEN_UNAVAILABLE</code> set in the factory derived from a
+per-backend flag, containing only htdemucs; both creation paths in <code>pipeline_helper</code> raising instead
+of falling back for such a backend, and both enhancement loops re-raising instead of swallowing;
+and <code>ensure_speech_enhancer_available()</code> checking it <strong>before any audio is read</strong>, in the same shape
+and with the same exit status as the segmenter-model check approved on 2026-09-12. What the user
+sees is a box naming what was asked for, that nothing has been transcribed and why continuing would
+be worse, the one install command, the three clean-ups already present, and the Hugging Face note.
+<strong>Every other backend's behaviour is unchanged</strong>, and a test pins that.</p>
+<p>Offered in both <code>--passN-speech-enhancer</code> flags, in <code>--qwen-enhancer</code> (which now shares one list
+instead of keeping its own copy), in both passes of the GUI's Audio Clean-up dropdown, and in the
+notebook, which installs <code>demucs</code> when it is chosen. Deliberately <strong>not</strong> in any extra, with a
+comment saying why: the program, the GUI, the notebook and the failure message all name one command.</p>
+<p><strong>Verified:</strong> 17 new tests; <code>test_speech_enhancer_spec.py</code> 30, <code>test_v192_small_fixes.py</code> 27,
+<code>test_audio_extraction_duration.py</code> 7, <code>test_llama_server_shim.py</code> 10; the notebook matrix at 0
+failures; both GUI assets parse; <code>--help</code> exits 0. Two real runs on a generated media file with
+demucs absent — one two-pass, one single-pass qwen — stopped with the box and exit 1 <strong>before the
+extraction step</strong>. The start-up check was called with every value an ordinary run passes and let all
+of them through.</p>
+<p><strong>Not verified:</strong> htdemucs has never been run. demucs is not installed here, so no audio has gone
+through the model — separation quality, speed and memory use are unmeasured. The failure paths are
+what has been exercised; the success path has not.</p>
+<hr />
+<h2 id="2026-09-17-ffmpeg-dsp-works-from-the-gui-again-and-enhance-for-vad-says-what-it-does">2026-09-17 — FFmpeg DSP works from the GUI again, and enhance-for-vad says what it does<a class="headerlink" href="#2026-09-17-ffmpeg-dsp-works-from-the-gui-again-and-enhance-for-vad-says-what-it-does" title="Permanent link">&para;</a></h2>
+<p><strong>Decision (owner, 2026-09-17):</strong> <em>"I agree with your recommendation about name-with-effects"</em>;
+<em>"it is ok for faster, fast, and transformers and crispASR to ignore that. please document that"</em>;
+<em>"please rely on the code as comments and docstrings can be out of date or mistaken"</em>. He also
+confirmed by clicking that the VAD-only row committed earlier today is visible again.</p>
+<h3 id="choosing-ffmpeg-dsp-in-the-gui-no-longer-stops-the-run">Choosing FFmpeg DSP in the GUI no longer stops the run<a class="headerlink" href="#choosing-ffmpeg-dsp-in-the-gui-no-longer-stops-the-run" title="Permanent link">&para;</a></h3>
+<p><code>--passN-speech-enhancer</code> takes a detail after a colon again. Everything downstream always
+understood it -- <code>pass_worker._parse_speech_enhancer</code> splits the value, the detail travels as the
+enhancer's model, and <code>FFmpegDSPBackend.__init__</code> splits a comma-separated model into its effects.
+The #306 fix in 1.9.2 (<code>7934fac</code>) put a plain <code>choices=</code> list on these two flags to catch typos, and
+that also rejected every value containing a colon -- which is precisely what the GUI builds for
+FFmpeg DSP. <strong>Reproduced before the change:</strong> <code>--pass1-speech-enhancer ffmpeg-dsp:loudnorm</code> exited 2
+with <code>invalid choice</code>.</p>
+<p><code>main.speech_enhancer_spec()</code> replaces the <code>choices=</code> list on both flags. It keeps #306's protection
+in argparse's own wording and extends it to the detail, so a mistyped effect is refused at the
+boundary too instead of being dropped mid-run. <code>FFMPEG_DSP_EFFECTS</code> is hardcoded beside
+<code>SPEECH_ENHANCER_CHOICES</code> so <code>--help</code> still pays no import cost; a test catches drift from
+<code>AVAILABLE_EFFECTS</code>. <code>--qwen-enhancer</code> is untouched -- it has <code>--qwen-enhancer-model</code> already.</p>
+<p>The expert notebook's eight FFmpeg filter checkboxes are back, per pass, now that the form is
+accepted; they were removed this morning only because it was not.</p>
+<h3 id="what-enhance-for-vad-actually-does-per-pipeline">What enhance-for-vad actually does, per pipeline<a class="headerlink" href="#what-enhance-for-vad-actually-does-per-pipeline" title="Permanent link">&para;</a></h3>
+<p>Read from the pipeline sources, not their comments — the <code>api.py</code> comment saying "Only effective for
+Qwen pipeline" was wrong in both directions:</p>
+<table>
+<thead>
+<tr>
+<th>Pipelines</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>qwen, and the decoupled pipeline behind it</td>
+<td>The real dual track: cleaned-up audio to the segmenter, original to the recogniser</td>
+</tr>
+<tr>
+<td>balanced, fidelity</td>
+<td>The flag is read and reported in the log, but the cleaned-up audio goes to <strong>both</strong></td>
+</tr>
+<tr>
+<td>fast, faster, transformers, kotoba-faster-whisper, crispasr</td>
+<td>Never read</td>
+</tr>
+</tbody>
+</table>
+<p>The owner accepted the third group on condition it is documented. <code>ENHANCE_FOR_VAD_IGNORED_BY</code> in
+<code>pass_worker.py</code> names them; the pass worker now logs one line when the flag is set for such a pass,
+so a user who asked for it is told rather than left to infer it from silence; and
+<code>--passN-enhance-for-vad</code>'s help states all three behaviours. A test derives the ignore list from
+<code>inspect.getsource()</code> of each class in <code>PIPELINE_CLASSES</code>, so the documentation cannot drift from
+the code. <strong>Balanced and fidelity enhancing both tracks is unchanged and still open</strong> — separating
+them needs recogniser-side work.</p>
+<p><strong>Verified:</strong> <code>tests/test_speech_enhancer_spec.py</code> (new, 30 tests) — accepted and normalised forms,
+every backend and every known effect, the refused forms with #306's wording, no drift, both flags
+through argparse, and that the detail reaches the real filter chain
+(<code>loudnorm,denoise</code> → <code>loudnorm=I=-16:TP=-1.5:LRA=11,afftdn=nf=-25</code>). <code>test_v192_small_fixes.py</code>
+still passes (27), so #306's own tests still hold. The notebook matrix re-ran at 0 failures with the
+two-pass case now emitting <code>--pass1-speech-enhancer ffmpeg-dsp:loudnorm</code>. <strong>Not verified:</strong> no ASR
+run was made; the filter chain was built and inspected, not applied to a recording end to end.</p>
+<hr />
+<h2 id="2026-09-17-two-defects-the-owner-reported-the-wasted-second-read-and-the-hidden-vad-only-control">2026-09-17 — two defects the owner reported: the wasted second read, and the hidden VAD-only control<a class="headerlink" href="#2026-09-17-two-defects-the-owner-reported-the-wasted-second-read-and-the-hidden-vad-only-control" title="Permanent link">&para;</a></h2>
+<p><strong>Decision (owner, 2026-09-17):</strong> three further requirements for 1.9.3 — the duplicate read in audio
+extraction, the missing VAD-only control in the GUI's Ensemble tab, and Demucs (htdemucs) as a
+vocal-isolation backend. He gave the go for the first two, and clarified for the third that
+<strong>htdemucs is to be available for all pipelines</strong>. Whether it installs by default is still open.</p>
+<h3 id="audio-extraction-read-the-file-twice-the-second-read-bought-a-header-field">Audio extraction read the file twice; the second read bought a header field<a class="headerlink" href="#audio-extraction-read-the-file-twice-the-second-read-bought-a-header-field" title="Permanent link">&para;</a></h3>
+<p><code>extract()</code> ran FFmpeg, then <code>_get_audio_duration</code> ran FFmpeg <strong>again</strong> over the whole extracted
+file with <code>-f null -</code>, which decodes every sample and throws them away, purely to read the
+<code>Duration:</code> line FFmpeg prints before it starts decoding. Every pipeline calls <code>extract()</code>, so this
+happened on every file of every run.</p>
+<p>Nothing decodes now: ffprobe reads the header and stops; if ffprobe is absent, the extraction run's
+own output is reused, since FFmpeg already printed the duration there; failing both, <code>0.0</code>, as
+before. The parser is now a static helper and survives <code>Duration: N/A</code>, which the old loop would
+have raised on.</p>
+<p><strong>Measured</strong> on a 90-minute test video (86 MB source, 173 MB extracted WAV, local SSD):
+header read <strong>31 ms</strong>, old full decode <strong>406 ms</strong>, extraction-log fallback <strong>141 ms</strong> — all three
+agreeing to within 0.01 s. 13× faster, 0.37 s per file saved here. The absolute saving is small on a
+fast local disk and larger wherever the audio is slow to read — a network share, a sleeping drive,
+or Google Drive under Colab, where the extracted file actually lives for notebook users.
+<code>tests/test_audio_extraction_duration.py</code> (new, 7 tests) covers the real extraction, agreement with
+the old answer, the no-ffprobe fallback, the failure case, and the three parsing shapes.</p>
+<h3 id="the-enhance-for-vad-only-control-was-not-removed-it-was-hidden-almost-all-the-time">The "Enhance for VAD only" control was not removed — it was hidden almost all the time<a class="headerlink" href="#the-enhance-for-vad-only-control-was-not-removed-it-was-hidden-almost-all-the-time" title="Permanent link">&para;</a></h3>
+<p>Both rows are still in the markup, each with its checkbox, both starting at <code>display: none</code>. The
+only thing that ever revealed them was <code>updateEnhanceForVadCheckbox()</code>, and its only two callers
+were the change handlers of the two enhancer dropdowns. Nothing refreshed it when the window opened,
+when the tab was shown, when a pipeline changed, or after a preset was loaded — so a pass that
+<strong>already</strong> had an enhancer selected kept the checkbox invisible until the user re-picked the
+enhancer by hand.</p>
+<p><code>updateDspPanel</code> now ends by refreshing that row — both depend on the same one thing, the pass's
+enhancer — and <code>updateRowGreyingState</code> now ends by calling <code>updateDspPanel</code>. Its two early-return
+branches already did; the ordinary path, which is what runs at start-up and after a preset load, did
+not. That also fixes the same latent gap for Pass 1's FFmpeg DSP panel.</p>
+<p><strong>Checked:</strong> the two functions were pulled out of the shipped <code>app.js</code> and run against a stub DOM
+for eight cases (no enhancer, each of the four enhancers, second pass off, on, and running an
+external tool) — correct in all eight; <code>node --check</code> parses the file; the call sites were listed to
+show the refresh is now reached from start-up, a preset load and the pass-2 toggle.
+<strong>Not verified:</strong> whether this is the fault he saw. A GUI change is not verified until he clicks it.</p>
+<h3 id="two-things-found-while-in-that-code-both-his-to-decide">Two things found while in that code, both his to decide<a class="headerlink" href="#two-things-found-while-in-that-code-both-his-to-decide" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>The checkbox promises more than it delivers on most pipelines.</strong> A comment in <code>api.py</code> claimed
+  the flag was "Only effective for Qwen pipeline; pass_worker.py silently ignores for others". False
+  in both directions. Checked today: <strong>qwen</strong> and the <strong>decoupled</strong> pipeline do the dual track;
+  <strong>balanced</strong> and <strong>fidelity</strong> read the flag and say so in an INFO line at run time, but send the
+  enhanced audio to <strong>both</strong> VAD and ASR — the separation needs ASR-module changes
+  (<code>balanced_pipeline.py:177</code>, <code>fidelity_pipeline.py:111</code>); <strong>fast</strong>, <strong>faster</strong>, <strong>transformers</strong>
+  and <strong>crispasr</strong> never read it at all. The GUI offers the checkbox wherever an enhancer is set.
+  The comment now records the truth; what the user is shown is his call.</li>
+<li><strong>Choosing FFmpeg DSP in the Ensemble tab stops the run.</strong> <code>api.py</code> builds
+  <code>--passN-speech-enhancer ffmpeg-dsp:&lt;effects&gt;</code>, and since the #306 fix in 1.9.2 (<code>7934fac</code>,
+  2026-08-30) that flag has <code>choices=SPEECH_ENHANCER_CHOICES</code>, which does not include the colon
+  form. <strong>Reproduced:</strong> <code>--pass1-speech-enhancer ffmpeg-dsp:loudnorm</code> exits 2 with
+  <code>invalid choice: 'ffmpeg-dsp:loudnorm'</code> before any audio is read. So a GUI two-pass run with
+  FFmpeg DSP selected fails immediately. The same colon form is why the notebook's four filter
+  checkboxes had to go. <strong>Not fixed</strong> — the repair changes what the program accepts, which is his.
+  The recommendation is to accept <code>ffmpeg-dsp:&lt;effects&gt;</code> again, validating the part before the colon
+  against the same list and the effects against the backend's own names, which restores the effect
+  choices and keeps the typo protection #306 asked for.</li>
+</ul>
+<hr />
+<h2 id="2026-09-16-phase-5-the-expert-colab-notebook-and-why-local-translation-returned-nothing">2026-09-16 — phase 5: the expert Colab notebook, and why local translation returned nothing<a class="headerlink" href="#2026-09-16-phase-5-the-expert-colab-notebook-and-why-local-translation-returned-nothing" title="Permanent link">&para;</a></h2>
+<p><strong>Decision (owner, 2026-09-16):</strong> phase 5 goes ahead; <code>WhisperJAV_colab_edition_expert.ipynb</code> is
+the notebook to work on; its job is to <em>"make available the new features and options to the users of
+the notebook … whisperseg, fireredVAD, QwenASR, animewhisper and etc. The only items that cannot be
+made available to the notebook are BYOP externals."</em> Install pinned to the 1.9.3 tag; Kaggle left as
+it is and marked unmaintained; Python handled per Colab practice.</p>
+<h3 id="the-expert-notebook-now-offers-what-192-offers">The expert notebook now offers what 1.9.2 offers<a class="headerlink" href="#the-expert-notebook-now-offers-what-192-offers" title="Permanent link">&para;</a></h3>
+<p>Before this change the notebook was a v1.8.12 form: five pipelines, four segmenters, four Whisper
+models, no FireRedVAD, no Qwen, no anime-whisper, no <code>--vad-version</code>, one translation target and
+five providers. Worse, it emitted <code>--speech-segmenter whisperseg</code> together with <code>--mode balanced</code>,
+which <code>validate_balanced_vad_options</code> has refused since 1.9.2 (exit 2, requirement S2/S9) — so a
+user who pressed run on the defaults got a usage error before any audio was read.</p>
+<p>Step 1 now offers, per pass: six pipelines (balanced, fidelity, fast, faster, transformers, qwen),
+the three sensitivities, the Whisper models, the four Kotoba models for transformers, <code>qwen3</code> and
+<code>anime-whisper</code> for qwen, all ten speech segmenters including <code>whisperseg</code> and <code>firered-vad</code>, the
+three built-in VAD builds for balanced, four scene detectors, four audio clean-up backends, all
+seven merge strategies, ten translation providers, nine target languages and three tones.
+CrispASR and XXL are not offered: they need an executable the user supplies, which a Colab session
+does not have.</p>
+<ul>
+<li><strong>Balanced and the speech segmenter.</strong> Balanced runs faster-whisper's built-in VAD and does not
+  accept an external segmenter; the equivalent control is <code>--vad-version</code>. The form therefore has
+  two separate controls, and Step 1 <em>refuses</em> the combination in the form, naming the two ways out,
+  instead of letting the run fail. <code>main.py</code> is unchanged: what the program accepts was not touched.</li>
+<li><strong>Step 2 speaks each pipeline's own flags.</strong> qwen gets <code>--qwen-*</code>, transformers gets <code>--hf-*</code>,
+  the Whisper pipelines get <code>--model</code> / <code>--speech-segmenter</code> / <code>--scene-detection-method</code>, and a
+  two-pass run uses the uniform <code>--passN-*</code> family, with an anime-whisper pass carried as
+  <code>--passN-qwen-params '{"generator_backend": "anime-whisper"}'</code> (<code>pass_worker.prepare_qwen_params</code>,
+  line 434). The command is printed before it runs.</li>
+<li><strong>The four ffmpeg filter checkboxes were removed.</strong> <code>--passN-speech-enhancer</code> takes a plain name;
+  the <code>ffmpeg-dsp:amplify</code> form the old notebook emitted is rejected by argparse. Nothing on the CLI
+  can carry a choice of individual ffmpeg effects, so a control that pretended to was dropped.
+  <strong>Owner's to decide</strong> whether the CLI should gain one.</li>
+<li><strong>Python check corrected.</strong> It read <code>&gt;= (3,14)</code> while its message said "3.13+ not supported …
+  requires 3.10-3.12". It now reports the supported range 3.10–3.13 truthfully, and only reports:
+  Colab's runtime Python is not ours to change.
+<strong>Verified:</strong> the notebook's own Step 1 and its two command builders were exec'd out of the shipped
+<code>.ipynb</code> for 22 settings combinations, and each generated command was handed to
+<code>whisperjav.main --dump-params</code> (parses and resolves, runs no ASR). 18 combinations resolved with
+exit 0; the 4 that must not run (balanced + whisperseg, single pass with scene detection off, cloud
+translation with no key, custom provider with no address) were refused by Step 1 itself. 0 failures.
+The run that found the <code>ffmpeg-dsp:amplify</code> defect is the same harness. Separately, the translate
+command Step 3 builds was checked the same way for all ten providers and a spread of target
+languages and tones: 11 commands, all accepted by <code>whisperjav-translate --show-settings</code>, 0
+failures. Nothing was run on Colab —
+<strong>no claim is made here about a real Colab session.</strong></li>
+</ul>
+<h3 id="local-translation-returned-nothing-the-installed-llama-cpp-python-build-rejects-its-own-replies">Local translation returned nothing — the installed llama-cpp-python build rejects its own replies<a class="headerlink" href="#local-translation-returned-nothing-the-installed-llama-cpp-python-build-rejects-its-own-replies" title="Permanent link">&para;</a></h3>
+<p>The owner's screenshot: four <code>SERVER ERROR</code> attempts, each <code>500 2 validation errors</code>, the first
+<code>'loc': ('response','CreateChatCompletionResponse','choices',0,'message','refusal'), 'msg': 'Field
+required'</code>, raised inside <code>llama_cpp/server/app.py</code> line 376, ending
+<code>Failed to communicate with server after 3 retries</code> and <code>Translation FAILED after 86.9s</code>.
+The <strong>two</strong> errors are one cause, not two: the route's response model is
+<code>Union[llama_cpp.ChatCompletion, str]</code>, so Pydantic reports a failure per union member, and
+<code>('response','str')</code> is just the <code>str</code> member refusing a dict.</p>
+<p>Provider <code>local</code> starts llama-cpp-python's own HTTP server as a subprocess
+(<code>local_backend.py:2196</code>, reached from <code>translate/cli.py:718</code> and <code>translate/service.py:466</code>) and
+talks to it over the chat-completions API. That route declares
+<code>response_model=Union[llama_cpp.ChatCompletion, str]</code> (<code>server/app.py:380</code>) and the non-streaming
+branch returns <code>run_in_threadpool(llama.create_chat_completion, **kwargs)</code> (<code>server/app.py:526</code>), so
+FastAPI validates the server's <em>own reply</em>.</p>
+<p>In the JamePeng fork of llama-cpp-python, at the tag Colab installs today
+(<code>v0.3.49-cu126-linux-20260831</code>, <code>llama_cpp/llama_types.py:109-117</code>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>class ChatCompletionResponseMessage(TypedDict):
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    content: Optional[str]
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    refusal: Optional[str]          # required: no NotRequired
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    role: Literal["assistant"]
+</code></pre></div>
+<p>while that same tag's <code>_convert_text_completion_to_chat</code> builds the message as
+<code>{"role": ..., "content": ...}</code> and nothing else. The reply therefore fails its own validation and
+every non-streaming chat completion is an HTTP 500. The key is <code>Optional[str]</code>, so supplying <code>None</code>
+satisfies it. Upstream <code>abetlen/llama-cpp-python</code> does not carry <code>refusal</code> on that type (checked at
+tag <code>v0.3.21</code> and at <code>main</code>), and neither do this project's own pinned 0.3.21 wheels — so the escape
+is the <strong>version</strong>, not the fork.</p>
+<p><strong>Who is affected.</strong> Any install that ends up on a recent fork build. Colab gets there because
+<code>install_colab.sh</code> looks for the pinned wheel (<code>LLAMA_CPP_VERSION=0.3.21</code>) in
+<code>mei986/whisperjav-wheels</code>, whose <code>cu126</code> folder holds one file —
+<code>llama_cpp_python-0.3.21-cp312-cp312-linux_x86_64.whl</code> — and Colab now runs Python 3.13; with no
+match the script falls through to <strong>the newest JamePeng release</strong>, unpinned. The Windows
+installer (<code>installer/templates/post_install.py.template</code>) and <code>install.py</code> have their own wheel
+logic and the same fallback, so this is not Colab-only. Every JamePeng release carrying a cp313
+cu126 linux wheel (0.3.46 through 0.3.49) has the defect, so pinning to an older one is not a way
+out. Provider <code>custom</code> pointed at a llama-cpp server <strong>the user started themselves</strong> is not covered
+by the fix below — that process is not ours to launch.</p>
+<p><strong>The fix.</strong> <code>whisperjav/translate/llama_server_shim.py</code> (new) is started in place of
+<code>-m llama_cpp.server</code>. It checks whether the installed build's
+<code>ChatCompletionResponseMessage.__required_keys__</code> actually contains <code>refusal</code>; <strong>only then</strong> does it
+wrap <code>Llama.create_chat_completion</code> to <code>setdefault("refusal", None)</code> on each choice's message, then
+hands over to <code>llama_cpp.server.__main__.main()</code>. <code>local_backend.py</code> launches it <strong>by file path, not
+with <code>-m</code></strong>, so the server subprocess imports <code>llama_cpp</code> and nothing of WhisperJAV — the
+translation package and its dependencies are not dragged into that interpreter. Its two stale-server
+scans (<code>:1785</code>, <code>:1802</code>) also match <code>llama_server_shim</code>.</p>
+<p>The wrapper is called on the streaming path too — the streaming branch passes
+<code>llama_cpp.Llama.create_chat_completion</code> unbound (<code>server/app.py:506</code>, invoked at <code>:207</code>) — and
+returns the iterator unmodified, which is why streaming is unaffected. Its gate is one key on one
+type: the same fork declares <code>refusal</code> required on <code>ChatCompletionLogprobs</code> while never setting it
+there either, so a chat request asking for logprobs would fail the same way and the shim would not
+notice. WhisperJAV never asks for logprobs, so nothing user-facing turns on it today.</p>
+<p><strong>What was verified, and what was not.</strong> <code>tests/test_llama_server_shim.py</code> (new, 10 tests, all
+passing) covers both arms against the llama-cpp-python in the <code>WJ</code> environment (upstream 0.3.23,
+which does <strong>not</strong> have the defect): the repair declines and leaves the method untouched on a clean
+build; with the type made to require <code>refusal</code>, it fires, the reply gains <code>refusal: None</code>, the reply
+text and an existing refusal value are preserved, a streaming reply passes through, and applying it
+twice is harmless. Two further tests show the shim runs as a script without importing <code>whisperjav</code>,
+and that it accepts the server's own options (<code>--model</code>, <code>--n_gpu_layers</code>, <code>--n_ctx</code>, <code>--host</code>,
+<code>--port</code>) and exits 0 — with <code>PYTHONIOENCODING=utf-8</code>, because llama-cpp-python's own help text
+contains an emoji that a cp1252 console cannot print; <code>-m llama_cpp.server --help</code> fails identically
+without it, so that is not the shim's doing.</p>
+<p><strong>Not verified:</strong> no build carrying the defect exists on this machine, so the repair has never run
+against one, and nothing at run time reports whether it worked. The diagnosis rests on the fork's
+source at the tag quoted above plus the owner's error text — not on a reproduction. One supporting
+fact: the server readiness probe is <code>/v1/completions</code>, not chat (<code>local_backend.py:1607</code>), which is
+consistent with a server that reports healthy and only fails 86 seconds later at translate time,
+and inconsistent with VRAM, model or network explanations.</p>
+<p><strong>Proposed, not done (his call).</strong> Add one non-streaming chat request to the readiness check after
+the completions probe. It is the one measurement that separates "this build is broken" from
+everything else, and it would turn a 500 at translate time into a clear message at start-up — but it
+is a new way for a run to stop early, so it is not being added without his word.</p>
+<h3 id="pip-install-whisperjavlocal-llm-installed-nothing"><code>pip install whisperjav[local-llm]</code> installed nothing<a class="headerlink" href="#pip-install-whisperjavlocal-llm-installed-nothing" title="Permanent link">&para;</a></h3>
+<p><code>_install_server_deps</code> asked pip for the extra <code>local-llm</code>. No such extra exists; the name in
+<code>pyproject.toml:176</code> is <code>llm</code>. pip warns and exits <strong>0</strong> on an unknown extra, so the function
+reported success while installing no server dependency at all, and a first-time local translation
+could then fail for want of uvicorn or fastapi with no sign of why. Corrected to <code>whisperjav[llm]</code>
+in all five places. The Colab path never depended on it: <code>install_colab.sh</code> installs the <code>llm</code> extra
+directly.</p>
+<h3 id="the-colab-installers-pinned-wheel-could-never-be-found">The Colab installer's pinned wheel could never be found<a class="headerlink" href="#the-colab-installers-pinned-wheel-could-never-be-found" title="Permanent link">&para;</a></h3>
+<p><code>install_colab.sh</code> built the wheel filename with the platform tag
+<code>manylinux_2_17_x86_64.manylinux2014_x86_64</code>, while the file in <code>mei986/whisperjav-wheels</code> is
+spelled <code>linux_x86_64</code>. The pinned source therefore never matched, on any Python, and every install
+took the unpinned fallback. It now tries both spellings. <strong>Checked live:</strong> the old spelling returns
+404 for cp312 and cp313; the new one finds <code>llama_cpp_python-0.3.21-cp312-cp312-linux_x86_64.whl</code>.
+On Python 3.13 there is still nothing to find — the dataset has no cp313 wheel — so Colab continues
+to take the fallback until one is built. <strong>His call:</strong> whether to build one
+(<code>notebook/build_llama_cpp_wheel.ipynb</code> exists for it, but it clones the JamePeng fork, so it would
+have to check out a tag at or below 0.3.21 or it would ship the same defect on the pinned path).</p>
+<h3 id="the-notebooks-install-a-fixed-release">The notebooks install a fixed release<a class="headerlink" href="#the-notebooks-install-a-fixed-release" title="Permanent link">&para;</a></h3>
+<p><code>install_colab.sh</code> now takes <code>WHISPERJAV_BRANCH="${WHISPERJAV_REF:-main}"</code>, and the expert notebook
+sets <code>WHISPERJAV_REF=v1.9.3</code> and clones <code>--branch v1.9.3</code>. Other callers are unaffected.
+<strong>This notebook cannot install until the tag exists</strong> — that happens in phase 7.</p>
+<h3 id="kaggle">Kaggle<a class="headerlink" href="#kaggle" title="Permanent link">&para;</a></h3>
+<p><code>WhisperJAV_kaggle_parallel_edition.ipynb</code> is unchanged apart from a banner at the top saying it is
+no longer maintained, that its settings may no longer match what WhisperJAV accepts, that reported
+problems are not being fixed, and pointing at the expert Colab notebook. It still emits
+<code>--speech-segmenter</code> with the balanced pipeline and so still fails on its defaults; that is what
+"unmaintained" now tells the reader. <code>WhisperJAV_colab_edition.ipynb</code> was already retired and was
+not touched.</p>
+<hr />
+<h2 id="2026-09-16-three-adversarial-reviews-and-the-data-loss-defect-they-led-to">2026-09-16 — three adversarial reviews, and the data-loss defect they led to<a class="headerlink" href="#2026-09-16-three-adversarial-reviews-and-the-data-loss-defect-they-led-to" title="Permanent link">&para;</a></h2>
+<p><strong>Decision (owner, 2026-09-16):</strong> <em>"I would rather all the deficiencies, errors and bugs are
+fixed so we do not leave tech debt to next release."</em> Three reviews ran: two over the
+session's commits (<code>c5405b5..7d5406e</code>, disjoint Python and GUI scopes), then one over the
+remediation those produced. Commits <code>8eb8d00</code>, <code>6393781</code>, <code>5147986</code>.</p>
+<ul>
+<li><strong>The cleanup deleted files WhisperJAV never wrote (<code>5147986</code>).</strong> <code>cleanup_temp_directory</code>
+  removed <strong>every</strong> file at the root of the temp directory. Harmless for the default folder
+  under the system temp, which WhisperJAV owns — but <code>--temp-dir</code> can point anywhere, and
+  <code>whisperjav --temp-dir D:\MyVideos D:\MyVideos</code> destroyed everything in <code>D:\MyVideos</code> at
+  the end of the run. It now deletes only the shapes WhisperJAV writes
+  (<code>_extracted.wav</code>, <code>_enhanced.wav</code>, <code>_resampled.wav</code>, <code>_raw.srt</code>, <code>_stitched.srt</code>,
+  <code>_master.json</code>) and keeps anything it does not recognise — litter is preferable to data
+  loss. Demonstrated on a folder holding a video, unrelated media, a text file, a finished
+  subtitle and two intermediates: the intermediates and working folders went, <strong>the other
+  four survived; all four were deleted before</strong>.
+  The behaviour predates this session. It was fixed now because the media-listing text added
+  earlier in the session stood in front of it telling users their files "are still going to
+  be processed".</li>
+<li><strong>Six working folders, not four.</strong> <code>resampled_scenes</code> and <code>crispasr_out</code> were in neither
+  the cleanup list nor the labelling list, so they were never tidied up and never labelled.
+  Both now read <code>WHISPERJAV_WORK_DIRS</code> from <code>whisperjav/utils/media_leftovers.py</code>.</li>
+<li><strong>The preset loader blanked a dropdown instead of restoring it.</strong> <code>8eb8d00</code>'s message
+  claimed <code>setSilent</code> "restores what was there"; it verified and logged but never restored,
+  so loading a preset whose model the current pipeline cannot run left the Model dropdown
+  empty while the state kept the preset's value — and the next save wrote that blank to the
+  settings file. <code>applyToForm</code>'s new guard could not catch the blank coming back either
+  (<code>'' !== ''</code> is false). Both fixed.</li>
+<li><strong>Legacy passes are now filtered at startup</strong>, so a fresh load on Balanced no longer
+  offers turbo from <code>index.html</code>'s static list.</li>
+<li><strong>The recursion clause no longer hides a search that happened</strong> — discovery expands each
+  argument with <code>glob(recursive=True)</code> and walks any directory it finds, so an unexpanded
+  <code>"D:/Media/*"</code> does recurse.</li>
+<li><strong>Tests that could not fail, replaced.</strong> Two asserted against hand-built literals or
+  iterated the same tuple the code under test iterates; one had been nested inside another
+  by an earlier edit and never ran. Two new files: <code>tests/test_temp_cleanup_safety.py</code>
+  (27 tests, mostly about the user's files surviving) and <code>tests/test_gui_model_lists.py</code>
+  (5), which moves the model-list invariant out of a scratchpad file — where nothing would
+  have caught the same mistake at the next model addition — and guards against its own
+  parser silently failing. <strong>92 tests now pass across five files, run individually.</strong></li>
+</ul>
+<p><strong>What the reviews say about this session's method, recorded because it recurred four times.</strong>
+Work passed its own checks while misreporting what it did: C1 was called a clean negative
+result when it was re-measuring the owner's own fix; D1 shipped a badge announcing a preset
+that was not in force; the first model-sync attempt would have overwritten the user's model
+silently; and <code>8eb8d00</code> claimed a restore it had not implemented. Static checks and the
+sandboxed round-trip passed every time. <strong>The checks that actually found these were the
+owner's click-through and adversarial reviews framed around the code rather than around the
+author's claims.</strong> The third review was briefed to read the code first and test the commit
+message against it, and it was the most productive of the three.</p>
+<p><strong>Standing correction for later readers:</strong> a comment, docstring or change-log line in this
+tree is a claim to verify, not evidence. Verified instances this session: a test docstring
+denying it loaded the ASR stack while loading five heavy modules; an invariant falsified by
+its own commit; "Standard library only" on a module whose import pulls numpy; a claim about
+shell globs that <code>media_discovery.py</code> contradicts; and two wrong line citations in this file.</p>
+<p><strong>Confirmed in the GUI by the owner, 2026-09-16:</strong> loading a saved preset whose model the
+current pipeline cannot run now keeps a valid model in the row instead of blanking the
+dropdown. That was the defect <code>5147986</code> fixed and the one check no static test could make —
+<em>"I tested the GUI for that testcase and it worked"</em>. <strong>The GUI work of this session is
+verified.</strong></p>
+<p><strong>Still open, and the owner's to decide:</strong> the wording of the messages users see that were
+added or changed this session — the note beside a file in the listing, the three English
+post-processing lines and two audio-extraction lines, the Linux installer's closing text,
+the new "cannot use this working folder" error and its exit code, and the two GUI console
+warnings. One of those warnings is wrong as written: it prints the internal pipeline id
+(<code>balanced</code>) rather than the label the row shows (<code>Balanced</code>).</p>
+<h2 id="2026-09-16-d1-and-d2-tested-in-the-gui-by-the-owner-one-defect-of-ours-backed-out-one-pre-existing-defect-fixed">2026-09-16 — D1 and D2 tested in the GUI by the owner: one defect of ours backed out, one pre-existing defect fixed<a class="headerlink" href="#2026-09-16-d1-and-d2-tested-in-the-gui-by-the-owner-one-defect-of-ours-backed-out-one-pre-existing-defect-fixed" title="Permanent link">&para;</a></h2>
+<p><strong>D2 — nothing wrong.</strong> Ensemble tab → a Fidelity pass → segmenter FireRedVAD → Customize renders correctly:
+Detection (Speech Threshold 0.3), Processing (Smoothing Window 5 frames), Filters (Min Speech 150 ms,
+Min Silence 150 ms, Max Speech 5 s), Grouping (Group Gap 1 s, Max Group Duration 5), Padding (Start 50 ms,
+End 100 ms). No change made. This closes D2.</p>
+<p><strong>D1 — the 14 two-pass selectors work.</strong> Verified by the owner across a real restart: Fidelity / Aggressive /
+Silero / None / FireRedVAD / Large V2 on pass 1, pass 2 enabled with Transformers / Auditok / Kotoba, and the
+merge strategy all came back. The save → disk → load round trip carries 17 of 17 keys.</p>
+<ul>
+<li>
+<p><strong>Backed out — a badge that misreported what would run (<code>528e64b</code>; ours, introduced in <code>19c20d5</code>).</strong>
+  <code>SettingsPersistence.restorePresets()</code> restored the saved <code>pass1Preset</code> / <code>pass2Preset</code> onto
+  <code>EnsembleManager</code>'s state. <code>updateBadges()</code> (~<code>app.js:2256</code>) derives the green preset badge, the
+  "Edit Parameters" button label and the modal's <code>[Custom]</code> title from <code>presetName</code> <strong>alone</strong>, while the
+  parameters a preset names live in <code>passState.params</code> — which <code>restorePresets</code> could not restore. After a
+  restart the GUI therefore announced that preset <code>MKATEST193</code> was in force while <code>params</code> was <code>null</code> and a
+  run would have used <strong>defaults</strong>. It also resurrected a cleared preset: Reset to Defaults nulls
+  <code>presetName</code> and refreshes the badge, but does not rewrite the saved settings, so the old name returned at
+  the next restart — the owner's "after I reset to defaults, I still see my saved preset".
+  <code>restorePresets</code> is now a documented no-op; the badge tells the truth (after a restart the pass is on
+  defaults). <code>collectAll</code> still saves both names, so the Customize-modal half of D1 has the data when it is
+  done. <strong>Restoring the label honestly requires loading the preset through the presets API and applying its
+  values — that is D1 step two and was not attempted.</strong>
+  <strong>Note for a later reader:</strong> the sandboxed round-trip test passed 17/17 and could not have caught this,
+  because the defect was in what the GUI <em>claimed</em>, not in what it stored. Only the click-through found it.</p>
+</li>
+<li>
+<p><strong>Fixed — the Customize modal kept the previous pipeline's tab labels (<code>528e64b</code>; pre-existing).</strong>
+  The modal has one set of tab buttons shared by every pipeline. <code>generateTransformersTabs</code> (<code>app.js:3326</code>)
+  and <code>generateQwenTabs</code> (<code>:3670</code>) rename them in place — Qwen turns Segmenter into "Generation", Quality
+  into "Audio", Enhancer into "Alignment", Scene into "Output", and hides Context — and nothing renamed them
+  back. The legacy path used by fidelity and the other classic pipelines generated its panels but never set
+  the labels. Opening a Fidelity pass's Customize after a Qwen one therefore showed Qwen's labels over
+  Fidelity's content, and <strong>the Segmenter tab appeared to have vanished when it had only been renamed</strong>
+  (the owner's screenshot: correct Fidelity content — Whisper model, Turbo, CUDA — under
+  Model / Audio / Generation / Alignment / Output). The legacy path now restores <code>index.html</code>'s own labels
+  and Context's hidden state before filling the panels, as the other two paths already did.
+  Still needs a click-through: open a Transformers pass's Customize, close it, open a Fidelity pass's.</p>
+</li>
+</ul>
+<p><strong>Owner's observation, recorded, no action:</strong> that the saved settings work per pass rather than per tab. That
+is the design — <code>pass1_preset</code> and <code>pass2_preset</code> are separate keys — and he confirmed it was an observation,
+not a defect report.</p>
+<p><strong>Decisions (owner, 2026-09-16):</strong> the <code>.subtrans</code> target-language fix is <strong>parked for the 1.10.x release</strong>,
+not done in 1.9.3 (the recommendation to fix it was accepted, the timing was not). Working translation
+controls for the Transcription tab go to <strong>2.x</strong>, pending a possible GUI revamp — further out than the
+1.10.x note recorded in the entry below, which this supersedes.</p>
+<h2 id="2026-09-16-phase-4-continued-three-more-translation-targets-the-dead-transcription-tab-translation-bindings-removed">2026-09-16 — phase 4 continued: three more translation targets; the dead Transcription-tab translation bindings removed<a class="headerlink" href="#2026-09-16-phase-4-continued-three-more-translation-targets-the-dead-transcription-tab-translation-bindings-removed" title="Permanent link">&para;</a></h2>
+<p><strong>Decisions (owner, 2026-09-16):</strong> on adding languages, <em>"yes if minimal work"</em>; on the Transcription tab,
+<em>"yes the transcription tab needs working translation controls. However it is a bigger job to design GUI and
+it should be parked for [1].10.x release"</em>; on the dangling element ids, <em>"please correct"</em>.</p>
+<ul>
+<li>
+<p><strong>Italian, Thai and Korean added</strong> (<code>3ee80a8</code>). Requested on #351 (Italian) and #268 (Thai); Korean added
+  alongside. The work was minimal because <strong>there is no allow-list to satisfy</strong>: PySubtrans substitutes
+  <code>target_language</code> into the prompt as a free string (<code>Options.py:301-304</code>), so a target costs the choice and
+  nothing else — per-language quality is the model's, not WhisperJAV's. <code>SUPPORTED_TARGETS</code> goes from six to
+  nine; <code>main.py</code>'s choices and both GUI dropdowns follow. Verified: all three exit 0 through the real CLI
+  where they exited 2 before; <code>tests/test_translate_targets.py</code> still passes, and it fails if one of the four
+  lists is updated without the others.</p>
+</li>
+<li>
+<p><strong>Five dead translation bindings removed from <code>app.js</code></strong> (<code>5197fd1</code>). <code>translateAfterTranscription</code>,
+  <code>translateQuickSettings</code>, <code>quickTranslateProvider</code>, <code>quickTranslateTarget</code> and <code>ensembleTranslateTarget</code>
+  exist in no asset file, so every binding on them was a silent no-op. The consequential one sat in
+  <code>isEnabled()</code>, which therefore always evaluated false on the Transcription tab and Advanced Options —
+  translation could not be switched on from either. It now returns <code>false</code> explicitly, so the behaviour is
+  stated rather than reached by accident, and the comments point at the 1.10.x work.
+  <strong>No user-visible change: every removed path was already inert.</strong> Giving those tabs real translation
+  controls is parked for 1.10.x by the owner's decision above.
+  <strong>No reporter exists for this:</strong> 28 threads were searched for anyone describing a missing or unreachable
+  translation control and none matched — the gap was found by reading the code, not from a report.</p>
+</li>
+<li>
+<p><strong>D1, the half that needs no GUI: verified.</strong> The page now sends 17 keys for the Ensemble tab (14 controls</p>
+</li>
+<li><code>rememberSettings</code> + the two preset names). Driving the real <code>WhisperJAVAPI.save_gui_settings</code> /
+  <code>get_gui_settings</code> through a full save → file → load cycle, <strong>17/17 survive</strong> camelCase → snake_case → disk
+  → back. Run against a sandboxed <code>APPDATA</code>; the owner's real
+  <code>%APPDATA%/WhisperJAV/gui_settings.json</code> was verified byte-identical before and after (md5 <code>0ada9602…</code>).
+  The click-through (set, tick Remember settings, restart, confirm) is still owed and needs the GUI.</li>
+</ul>
+<h2 id="2026-09-16-phase-4-the-french-target-defect-fixed-c1-was-already-resolved-on-2026-08-29-and-the-comparison-re-measured-that-fix-one-new-defect-found-and-left-open">2026-09-16 — phase 4: the French target defect fixed; C1 was already resolved on 2026-08-29 and the comparison re-measured that fix; one new defect found and left open<a class="headerlink" href="#2026-09-16-phase-4-the-french-target-defect-fixed-c1-was-already-resolved-on-2026-08-29-and-the-comparison-re-measured-that-fix-one-new-defect-found-and-left-open" title="Permanent link">&para;</a></h2>
+<p><strong>Decision (owner, 2026-09-16):</strong> "go ahead with step 4."</p>
+<ul>
+<li>
+<p><strong>C1 step one (map row C1, his #393 note) — done; it closes step one but does NOT identify the cause.</strong>
+  At runtime <code>get_instruction_content()</code> resolves <strong>Gist → cache → bundled</strong>
+  (<code>whisperjav/translate/instructions.py:170-236</code>), so a prompt change must be made in the Gist to reach
+  users — which is what #393 warns about. As of 2026-09-16 the live Gists match the bundled defaults:
+  <code>pornify</code> <strong>byte-identical</strong>; <code>standard</code> identical after newline normalisation (54 CRLF vs LF, zero
+  differing lines — and line endings cannot reach the prompt anyway, <code>InstructionsHelpers.py:42-43</code> strips
+  every line). Neither Gist nor any bundled file carries a <strong><code>### target_language</code> section</strong> — checked
+  explicitly, because <code>InstructionsHelpers.py:70</code> feeds <code>Options.py:326-327</code>, where one such section would
+  force every user of that tone to a fixed language regardless of what they asked for. <code>contextual</code> has no
+  Gist and is bundled-only, so for that tone the comparison says nothing.
+  <strong>Why they match today — the cause was found and fixed on 2026-08-29, by the owner, before this phase began.</strong>
+  The GitHub threads (read at the end of this phase, after the code work) record it: on #397 he established that
+  the <code>pornify</code> Gist was an eight-month-old copy predating <code>5ada48a</code>, telling users to write "like a raunchy
+  American adult movie" with <strong>worked examples entirely in English</strong>, and he synced the Gist to the repository
+  version the same day. The Gist revision history confirms it: <code>bd34016a…</code> was rewritten
+  <strong>2026-08-29T16:21:47Z, +59/−50</strong>. Because instructions are fetched per run, that fix reached every user
+  immediately, with no release. <strong>The comparison ordered in map row C1 therefore measured the owner's own
+  repair, three weeks after the fact</strong> — the matching files are the evidence that C1 was already dealt with,
+  not evidence that the instruction files were never the cause.
+  <strong>Confirmed by the reporter:</strong> yhxkry retested on 2026-08-31 with a local LM Studio model and reported correct
+  Chinese output. <strong>C1's reported symptom is resolved on the thread that raised it.</strong> Nothing was changed in
+  this phase on C1's account, and no prompt change is proposed; the Gist text remains the owner's to edit.
+  <strong>Process note for a later reader:</strong> this session reached "the files match, so the instruction files are not
+  the cause" from the code alone, and offered an English-few-shot-exemplar hypothesis that was in fact a
+  rediscovery of the already-fixed cause. Reading the two threads first would have prevented both. An
+  <code>assessment-adversary</code> review caught the overreach (its caveat — "today's Gist is not the Gist those users
+  ran" — was exactly right) but could not supply the thread history either.</p>
+</li>
+<li>
+<p><strong>C2 — French was selectable in the GUI and rejected by the CLI.</strong> <code>SUPPORTED_TARGETS</code>
+  (<code>translate/providers.py:85</code>) has six targets including <code>french</code>, both GUI dropdowns offer French, and
+  <code>whisperjav-translate --target</code> derives its choices from that set — but <code>main.py</code>'s <code>--translate-target</code>
+  carried a hand-kept list of five. Choosing French in the GUI therefore built <code>--translate-target french</code>
+  (<code>webview_gui/api.py:3355</code>) and the run died before it started with
+  <code>invalid choice: 'french'</code> and <strong>exit 2</strong>. Reproduced on that exact command and confirmed fixed (exit 0),
+  with <code>spanish</code> as the control both times; <code>--help</code> now lists <code>french</code>.
+  Also fixed: <code>translate/service.py:344</code>, the hand-kept list used to strip an existing language suffix from
+  an output name, was missing <code>portuguese</code> and <code>french</code>, so re-translating <code>x.french.srt</code> produced
+  <code>x.french.french.srt</code>. It now derives from <code>SUPPORTED_TARGETS</code>.
+  <code>tests/test_translate_targets.py</code> — 5 passed; it holds <code>main.py</code>'s choices, both GUI dropdowns and the
+  suffix list to <code>SUPPORTED_TARGETS</code> so they cannot drift apart again.</p>
+</li>
+<li>
+<p><strong>OPEN, and the one genuinely new finding of this phase: a stale <code>.subtrans</code> can return the previous run's
+  English.</strong> Unrelated to the instruction files, never previously reported or asked about, and <strong>not fixed</strong>.
+  The project file next to the input is deleted <strong>only</strong> when the stamped <code>whisperjav_version</code> differs or the
+  file is unreadable (<code>core.py:466-491</code>; stamped at <code>:807-818</code>) — the block contains <strong>no reference to the
+  target language at all</strong> (verified: zero occurrences of "target" in it). <code>core.py:587</code> then sets
+  <code>translator.resume = True</code> unconditionally and <code>SubtitleTranslator.py:124-126</code> skips every already-translated
+  scene. So: translate a file once with the default target (<strong>english</strong> — <code>translate/settings.py:20</code>), then
+  re-run the same file asking for Chinese on the same WhisperJAV version, and the earlier English lines are
+  written to the Chinese output path (<code>core.py:502-503</code>). Deleting the <code>.subtrans</code> by hand is the way round it.
+  This fits #305's wording precisely — he reported "<strong>部分</strong>翻译内容变成英文", <em>part</em> of the output in English,
+  which is what skipping already-translated scenes produces and which the instruction-file cause does not
+  explain. <strong>Whether WhisperJAV should clear the <code>.subtrans</code> when the target language changes is an owner
+  decision</strong> (it is a behaviour change to resume), so nothing was altered. #305 has been asked the one question
+  that decides it; no instrument is needed, since a run already prints "Resuming from existing project file
+  (.subtrans)" (<code>core.py:506-512</code>).</p>
+</li>
+<li>
+<p><strong>Postings (owner's word, 2026-09-16: "do the postings").</strong> #305 — a follow-up to his own 2026-08-29 retest
+  request plus the <code>.subtrans</code> question, thread left <strong>open</strong> pending his answer. #397 — closed, with a note
+  recording that yhxkry confirmed the fix on 2026-08-31 and that @jasmineamber, asked in the same comment,
+  never replied; the note makes <strong>no fix claim</strong> (#397 is on the never-say-fixed list), credits yhxkry with
+  finding the cause, and says a reply will reopen it. The owner's instruction was "close with the note that
+  closed due to no response"; the note attributes the silence to @jasmineamber rather than to yhxkry, who did
+  respond — the instruction stands, the attribution was corrected so the public text is true.
+  <strong>No other C1 recipients exist:</strong> 24 translation-adjacent open issues were checked and only #397 and #305
+  report the symptom; the map's "7 reporters" counts participants across those two threads (yhxkry,
+  loggias06row, jasmineamber, ric-reff), not seven issues.</p>
+</li>
+<li>
+<p><strong>Noted for an upstream report, not C1.</strong> PySubtrans <code>Instructions.py:89-92</code> builds tag keys that already
+  contain their brackets and <code>ReplaceTags</code> (<code>:104-108</code>) then searches for <code>[{name}]</code>, i.e. <code>[[ to language]]</code>
+  — so <strong>every tag substitution inside <code>InitialiseInstructions</code> is a no-op</strong>. Harmless today, but
+  <code>Instructions.py:94</code> injects <em>every</em> settings key as a substitutable tag, <code>api_key</code> included; if upstream
+  ever fixes <code>ReplaceTags</code>, instruction text containing <code>[api_key]</code> would paste the key into the outgoing
+  prompt. WhisperJAV is unaffected because <code>PySubtrans/__init__.py:93-96</code> re-injects the caller's explicit
+  prompt and <code>Options.BuildUserPrompt</code> (<code>Options.py:297-311</code>) does the real substitution from
+  <code>target_language</code>, which WhisperJAV sets at <code>core.py:318</code>.</p>
+</li>
+<li>
+<p><strong>Found while tracing C1/C3 — the Transcription tab has no working translation control.</strong> <code>app.js</code> reads
+  five translation element IDs that <code>index.html</code> never defines: <code>translateAfterTranscription</code> (7436, <strong>7525</strong>),
+  <code>translateQuickSettings</code> (7437), <code>quickTranslateProvider</code> (7457, 7564), <code>quickTranslateTarget</code> (7458, 7565)
+  and <code>ensembleTranslateTarget</code> (7473). Line 7525 is inside <code>TranslateIntegrationManager.isEnabled()</code>, so on
+  tab 1 and tab 2 that method reads a null checkbox and <strong>can never return true</strong> — translation cannot be
+  enabled from the Transcription tab at all. The settings branch behind it
+  (<code>getSettings()</code>, 7564-7565) would have forced <code>provider: 'local'</code> and <code>target: 'english'</code> regardless of
+  the user's choice, but is unreachable for the same reason. Translation works only from the Ensemble tab,
+  where the target is mapped correctly (<code>target: fullSettings.targetLang</code>, 7548).
+  <strong>Reported, not fixed</strong> — what the Transcription tab should offer is the owner's decision.</p>
+</li>
+</ul>
+<h2 id="2026-09-16-phase-3-the-linux-gui-prerequisite-is-stated-where-a-linux-user-will-see-it-g1">2026-09-16 — phase 3: the Linux GUI prerequisite is stated where a Linux user will see it (G1)<a class="headerlink" href="#2026-09-16-phase-3-the-linux-gui-prerequisite-is-stated-where-a-linux-user-will-see-it-g1" title="Permanent link">&para;</a></h2>
+<p><strong>Decision (owner, 2026-09-16):</strong> "G1 is a yes"; then "proceed to step 3".</p>
+<p>The failure in #366 is that following the distro instructions is not enough: pywebview ships <strong>no Linux
+backend by default</strong>, and apt/dnf WebKit packages land system-wide where a plain virtual environment cannot
+see them, so <code>whisperjav-gui</code> stops with <code>ModuleNotFoundError: No module named 'gi'</code>. Both routes out were
+already written down (<code>docs/en/guides/installation_linux.md:180-199</code> and <code>:764-772</code>) but appeared nowhere a
+user meets before hitting the error: <code>installer/install_linux.sh</code> had no GTK/Qt/WebKit line at all, and
+<code>README.md:399</code> said only "GUI needs WebKit2GTK".</p>
+<ul>
+<li><strong><code>installer/install_linux.sh</code></strong> — the success banner now prints the symptom and the two routes: the Qt
+  backend (<code>pip install "pywebview[qt]"</code>), or recreating the venv with <code>--system-site-packages</code> so it can
+  see the distro's bindings, plus a pointer to the full guide. <strong>It prints; it installs nothing</strong> — which
+  route is right depends on the user's environment, and the script must not choose for them.
+  Verified: <code>bash -n installer/install_linux.sh</code> parses; the banner was rendered from the shipped block and
+  reads as intended.</li>
+<li><strong><code>README.md</code></strong> — the bare "GUI needs WebKit2GTK" sentence is replaced by the reason (system-wide packages
+  are invisible to a venv), the symptom, and the same two routes.</li>
+</ul>
+<p>No Python changed; no installer behaviour changed.</p>
+<h2 id="2026-09-16-phase-2-the-four-what-the-user-sees-while-a-run-is-working-items-and-the-two-pass-settings-save">2026-09-16 — phase 2: the four "what the user sees while a run is working" items, and the two-pass settings save<a class="headerlink" href="#2026-09-16-phase-2-the-four-what-the-user-sees-while-a-run-is-working-items-and-the-two-pass-settings-save" title="Permanent link">&para;</a></h2>
+<p><strong>Decision (owner, 2026-09-16):</strong> "we have done planning of 1.9.3. We now implement the plan step by step…
+we proceed with the frozen view and complete step by step." F1–F4 and D1 are map §5 step 2.</p>
+<ul>
+<li>
+<p><strong>F1 — progress lines read <code>[839/1]</code> in a multi-file run (#429).</strong> <code>ProgressDisplayAdapter.__init__</code> set
+  <code>self.total_files = 1</code> and nothing ever updated it; the real count was set on the <em>manager</em>
+  (<code>whisperjav/main.py:1196</code>), and the adapter is what feeds
+  <code>UnifiedProgressManager.start_file_processing</code>, which prints the line
+  (<code>whisperjav/utils/unified_progress.py:249</code>). The adapter now takes the count as a constructor argument,
+  falling back to the manager's value and then to 1. <code>create_progress_adapter</code> passes it through.
+  Verified: <code>tests/test_progress_file_count.py</code> — 6 passed (the fallback case fails on the old code);
+  and a two-file run driven through the real manager prints <code>[1/2] Starting: one.mp4</code>,
+  <code>[2/2] Starting: two.mp4</code>. <code>--no-progress</code> uses <code>DummyProgressAdapter</code> and is untouched.
+  Files: <code>whisperjav/utils/progress_adapter.py</code>, <code>whisperjav/main.py</code>.</p>
+</li>
+<li>
+<p><strong>F2 — the English post-processing stage was silent (#372 follow-up).</strong> The three steps that can block —
+  loading the hallucination filter (a network fetch), cleaning, writing the final SRT — were <code>logger.debug</code>
+  and so invisible without <code>--debug</code>. Raised to <code>logger.info</code> at <code>srt_postprocessing.py:226,:241,:246</code>.
+  The two cheap steps either side (preparing the work dir, backing up the original) stay at debug.
+  Verified: a real English-target post-processing run on a three-line SRT prints all three lines at INFO
+  (the logger's default level) and produced the cleaned file.</p>
+</li>
+<li>
+<p><strong>F3 — audio extraction was silent and untimed.</strong> <code>audio_extraction.py:48</code> is now INFO, and the success
+  line reports how long FFmpeg took. <strong>No timeout was added</strong> (planner + owner): extraction of a long file
+  on a slow or sleeping drive legitimately runs for minutes and killing it would lose the run.
+  Verified: a real extraction of a synthesised 3-second clip prints
+  <code>Extracting audio from sample.mp4</code> and <code>Audio extracted: sample.wav (duration: 3.0s, took 0.1s)</code>.</p>
+</li>
+<li>
+<p><strong>F4 — a folder of input can quietly include WhisperJAV's own leftovers.</strong> Discovery walks folders
+  recursively, so a working folder yields intermediates from an earlier run. The listing now labels files
+  shaped like WhisperJAV's own output (<code>*_extracted.wav</code>, or under a <code>scenes</code> folder — the shapes come from
+  <code>base_pipeline.py:65,:82</code>) and adds one summary line giving the file and folder counts and saying that
+  folders were searched recursively. <strong>Nothing is removed from the list and nothing prompts</strong> — a user's own
+  file may carry any name and sit in any folder. Verified: a real CLI run over a folder holding one ordinary
+  file and two leftover-shaped files printed the two labels and the summary, and processed <strong>all three</strong>
+  (<code>done 0  empty 3  … total 3</code>), which is the guarantee that matters.
+  Verified also: <code>tests/test_media_listing_leftovers.py</code> — 11 passed; <code>--help</code> still exits 0.
+  Files: <code>whisperjav/main.py</code>.</p>
+</li>
+<li>
+<p><strong>D1 step one — the Ensemble tab's two-pass settings were not saved (#381).</strong> The Python side has
+  accepted and returned all 16 ensemble keys since 1.9.2 (<code>webview_gui/api.py</code> <code>_GUI_SETTINGS_MAP</code>); the
+  page side listed none, so "Remember settings" lost the whole two-pass setup on restart. Added the 14
+  form controls to <code>SettingsPersistence.FIELDS</code> (<code>pass1-*</code>, <code>pass2-*</code>, <code>merge-strategy</code>), and the two
+  preset <em>names</em> — which live on <code>EnsembleManager.state</code>, not in the DOM — through <code>collectAll</code> and the
+  <code>restorePresets</code> stub, now implemented and called from <code>loadFromBackend</code> after the selectors are back.
+  Restoring a preset name only restores the label; it never re-applies a preset over the restored values.
+  Verified: <code>node --check</code> parses <code>app.js</code>; all 16 backend ensemble keys are now covered on the page side
+  (checked by comparing <code>_GUI_SETTINGS_MAP</code> against <code>FIELDS</code> plus the two explicit keys).
+  <strong>Not verified by clicking:</strong> the map's named test, <code>tests/test_gui_refactor.py</code>, imports
+  <code>whisperjav.gui.whisperjav_gui</code>, a module removed at <code>c354d1d</code> when the webview GUI replaced it — the file
+  has been dead since then and cannot check this. The set-toggle-restart click-through is still owed.
+  Files: <code>whisperjav/webview_gui/assets/app.js</code>.</p>
+</li>
+</ul>
+<p><strong>Not done:</strong> D1 step two (the Customize modal values — #381's second half) and D2 (what the Customize panel
+shows after FireRedVAD) both need the GUI opened and clicked, which this session could not do.</p>
+<h2 id="2026-09-16-phase-1-of-the-matters-map-four-contributor-pull-requests-merged-locally-labels-applied">2026-09-16 — phase 1 of the matters map: four contributor pull requests merged locally; labels applied<a class="headerlink" href="#2026-09-16-phase-1-of-the-matters-map-four-contributor-pull-requests-merged-locally-labels-applied" title="Permanent link">&para;</a></h2>
+<p><strong>Decision (owner, 2026-09-16):</strong> the 43-row decision table was rejected ("trees but nothing about forest");
+owner-facing planning now lives in <code>docs/plans/V193_MATTERS_MAP.md</code> (matters A–J, his decisions verbatim,
+priority I → H → E → D → G → F → C → B → A → J, seven phases). "Go on phase 1 confirmed"; "Please process H1
+clean PRs"; "I6 is yes" (labels); "G1 is a yes" (Linux prerequisites, phase 3); E1: the merge tool stays 2.x,
+weifu8435 is told "let me look into it" and a standalone utility of the owner's is a phase-6 item.</p>
+<p><strong>Merged locally into <code>dev_v1.9.3</code></strong> (every open PR targets <code>main</code>, which is not pushed until the release, so
+the authors are told at the release push, not now):
+- <code>784696d</code> <strong>PR #388</strong> (AKB0700) — <code>.github/workflows/automated-execution.yml</code>: compile + bare import on
+  Python 3.12 on push / pull request. Never run in this repository yet; first run at the release push.
+- <code>6ff5175</code> <strong>PR #363</strong> (triatomic) — an "Auto-scroll" checkbox in the GUI console header
+  (<code>webview_gui/assets/index.html</code>, <code>app.js</code> <code>ConsoleManager._autoScroll</code>): unchecked, new lines no longer
+  pull the console to the bottom. <strong>Not verified by clicking it; the diff was read (18/−10 lines).</strong>
+- <code>e626d05</code> <strong>PR #376</strong> (Mimic-me) — <code>whisperjav/bench/regression.py</code>, <code>regression_cli.py</code>, <code>tests/bench/</code>,
+  <code>bench/</code> scaffolding, and a new console command <code>whisperjav-accuracy-gate</code> in <code>pyproject.toml</code>. No runtime
+  effect on transcription. Verified: <code>py_compile</code> both modules; <code>tests/bench/test_regression.py</code> 19 passed;
+  <code>python -m whisperjav.bench.regression_cli --help</code> prints the three sub-commands. (The console-script entry
+  appears on PATH only after the package is reinstalled.)
+- <code>c5405b5</code> <strong>PR #364</strong> (triatomic) — a <code>contextual</code> translation tone: <code>translate/defaults/contextual.txt</code>,
+  <code>--tone</code> / <code>--translate-tone</code> choices, the two GUI tone dropdowns. <strong>Also changes behaviour:</strong> a temperature
+  saved in the translation settings file now applies only when the run's tone equals the tone the file was
+  saved with (before, a saved temperature overrode every tone's default); Ollama's curated temperature no longer
+  replaces the contextual/pornify defaults. Verified: <code>py_compile</code>; both <code>--help</code> outputs list the new tone.
+  The online instruction files exist only for <code>standard</code> and <code>pornify</code> (<code>translate/instructions.py:15-18</code>), so a
+  contextual run uses the bundled file and logs one line "No URL configured for tone: contextual".</p>
+<p><strong>Labels (owner: "I6 is yes"):</strong> the nine existing labels applied to 139 open issues from the register's kind
+(bug 65, enhancement 48, question 22, documentation 4); the eight settings-recipe threads (#410 #265 #374 #386</p>
+<h1 id="387-390-413-423-and-431-left-unlabelled-no-existing-label-fits-nothing-else-posted">387 #390 #413 #423) and #431 left unlabelled — no existing label fits. Nothing else posted.<a class="headerlink" href="#387-390-413-423-and-431-left-unlabelled-no-existing-label-fits-nothing-else-posted" title="Permanent link">&para;</a></h1>
+<p><strong>Not done:</strong> the phase-1 reply texts (<code>docs/plans/V193_PHASE1_TEXTS.md</code>) — drafted from the owner's words,
+checked, approved by him 2026-09-17 ("go on all the texts"; the four to weifu8435/yangming2027 held per his grouping), posting pending; the H2 comments to the seven PR
+authors (same file, same gate); the #363 GUI click.</p>
+<h2 id="2026-09-15-moss-deferred-to-the-next-release-the-owed-acknowledgements-posted-replan-ordered-docs-only">2026-09-15 — MOSS deferred to the next release; the owed acknowledgements posted; replan ordered (docs only)<a class="headerlink" href="#2026-09-15-moss-deferred-to-the-next-release-the-owed-acknowledgements-posted-replan-ordered-docs-only" title="Permanent link">&para;</a></h2>
+<p><strong>No code change.</strong> <strong>Decision (owner, 2026-09-15):</strong> requirement F4 — the MOSS-Transcribe-Diarize ASR — is
+dropped from 1.9.3 and moved to the next release ("perhaps 1.10"). The architect's option record and its
+adversary gate (<code>docs/plans/V193_SESSION_DATA_2026_09_14/D1.5_F4_MOSS_design_options.md</code>) are kept for that
+release; the decisive facts: the package requires <code>transformers&gt;=5.6.0</code>, the shipped stack resolves to 4.57.6,
+memory for a 65-minute single pass is about 11 GB at the published token budget, and a 3-hour film exceeds the
+model's context in one pass.</p>
+<p><strong>Posted, on the owner's approval:</strong> one-line acknowledgements on nine threads that had never been answered
+(#424 #417 #422 #418 #423 #420 #410 #425 #426) and the owner's appreciation message on #374; <strong>issues #429</strong>
+(progress lines read <code>[839/1]</code> — the progress adapter is created with <code>total_files = 1</code>,
+<code>whisperjav/utils/progress_adapter.py:21</code>, and nothing updates it; cosmetic; no fix scheduled) <strong>and #430</strong> (the
+clustering crash fixed in <code>e8c1c6e</code>; left open until the release) opened. Comment ids in the tracker, rev 53.0.</p>
+<p><strong>Decision (owner, 2026-09-15):</strong> replan v1.9.3 without MOSS with exact PRs, issues and features and their
+reasons. Done the same day: the scope proposal was produced by a dedicated planner
+(<code>docs/plans/V193_SESSION_DATA_2026_09_14/D2.0_v193_scope_proposal.md</code>), adversary-gated (25 findings, applied),
+and placed in the release plan §2.1 — 15 work packages, dispositions for all 11 PRs, the issue list, features
+in/out, notebook and China-install slices, an ordered sequence, and 43 numbered owner decisions. Nothing in it
+is started; it waits for the owner's decision sitting.</p>
+<h2 id="2026-09-14-v193-planning-opened-records-brought-to-one-state-docs-only">2026-09-14 — v1.9.3 planning opened; records brought to one state (docs only)<a class="headerlink" href="#2026-09-14-v193-planning-opened-records-brought-to-one-state-docs-only" title="Permanent link">&para;</a></h2>
+<p><strong>No code change.</strong> The owner delivered the v1.9.3 requirements document and asked for the
+document organisation, a phase-based plan and the immediate steps. The approved plan is
+<code>docs/plans/V193_RELEASE_PLAN.md</code> (rev 1.1 after the adversary gate). Created today: this file; the release plan; tracker rev 52.9.
+<code>docs/plans/V193_PLAN_PROPOSAL.md</code> (rev 3, 2026-09-13) is superseded and carries a pointer.</p>
+<p><strong>Decisions (owner, 2026-09-14), verbatim in the release plan §4:</strong> the 1.9.2 VAD / Silero loader /
+adapters / Balanced freeze stays for this cycle; the F4 (MOSS-Transcribe-Diarize) tech-stack and design
+decision goes to a dedicated planner/architect, not to the orchestrating session; the v1.9.3 owner pack
+opens at the scope gate; no push until the 1.9.3 release.</p>
+<p><strong>Facts recorded for Phase 1, verified in this tree (no change made):</strong>
+- Both live notebooks fail by default on 1.9.2 code: <code>whisperjav/main.py:2094-2099</code> exits 2 for
+  <code>--mode balanced</code> with any <code>--speech-segmenter</code>; <code>notebook/WhisperJAV_colab_edition_expert.ipynb</code>
+  defaults to <code>balanced</code> + <code>whisperseg</code> and emits the flag; the Kaggle notebook emits it the same way.
+  <code>installer/install_colab.sh:26,179</code> installs <code>@main</code>.
+- Installer: <code>installer/templates/post_install.py.template:560-571</code> probes pypi.org only and is fatal at
+  <code>:2668-2670</code>, before proxy detection at <code>:2735</code>; PyTorch index URLs hard-coded at <code>:197,:203</code>;
+  <code>docs/en/faq.md:330</code> points China users to a note that does not exist.
+- MOSS-Transcribe-Diarize (F4), read on the owner's instruction from the Hugging Face repository as well as
+  GitHub: the package pins <code>transformers&gt;=5.6.0,&lt;6.0.0</code> (GitHub <code>pyproject.toml</code>); "50+ languages", and the
+  HF model card names <strong>Japanese</strong> among the 14 MLC-SLM Challenge languages (an earlier statement this
+  day that Japanese was not named was true of the GitHub README only — corrected); whole-file single-pass
+  inference, 128k context, up to 90 minutes; 1.82 GB bf16 weights; no VRAM figure published. WhisperJAV's
+  <code>pyproject.toml:241</code> pins <code>transformers&lt;5.0</code> with the comment "Removal deferred to v1.9.x (needs Qwen3-ASR
+  fork patch + Cohere ship …)" — whether the cap moves in 1.9.3 is an owner decision not yet taken. Full
+  record: release plan §6.1. An adversary gate (g1) ran on the planning records and its 18 findings were
+  applied (release plan §7.1).</p>
+<h2 id="carried-from-dev_v193-before-this-log-existed">Carried from <code>dev_v1.9.3</code> before this log existed<a class="headerlink" href="#carried-from-dev_v193-before-this-log-existed" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong><code>e8c1c6e</code> — keep a clip that is too short to split as one scene, instead of failing it.</strong>
+  <code>whisperjav/vendor/semantic_audio_clustering.py</code> (<code>WJAV mod E</code>, 13 insertions / 4 deletions): fewer
+  than two strided feature rows (an input under ~0.48 s — 16 centred frames at hop 512 / 16 kHz) now skips <code>AgglomerativeClustering</code>, logs one
+  INFO line and uses a single-cluster label array. Ships with 1.9.3 by the owner's decision of 2026-09-14
+  (hotfix <code>v1.9.2.post1</code> prepared then abandoned). Full mechanism, verification table and the decision:
+  <code>docs/CHANGELOG_v1.9.2.md</code>, entry "2026-09-14 — the three post-release matters closed"; record
+  <code>docs/plans/V192_HOTFIX_PLAN.md</code> §4; git operations <code>docs/plans/V193_BRANCHING_RECORD.md</code>.</li>
+<li><code>7dd00fc</code>, <code>3b92e6c</code>, <code>920f910</code>, <code>8602e8d</code> — documentation commits of the v1.9.2 post-release sessions
+  (<code>.gitignore</code> for <code>docs/requirements/</code>, the v1.9.2 change-log entries, the rewritten user release note).</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
