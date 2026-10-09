@@ -917,9 +917,9 @@ def parse_arguments():
                                 "anime-whisper 100 / 50 / 30 by sensitivity)")
     qwen_audio_group.add_argument("--qwen-max-speech-duration", type=float, default=None,
                            help="Force-split any single speech segment longer than this (seconds). "
-                                "Default with the WhisperSeg segmenter: 4 for Qwen3-ASR and "
-                                "anime-whisper, at every sensitivity; with other segmenters, the "
-                                "segmenter's own sensitivity preset. The binding cap on subtitle "
+                                "Default with the WhisperSeg, TEN and FireRedVAD segmenters: 4 for "
+                                "Qwen3-ASR and anime-whisper, at every sensitivity; with other "
+                                "segmenters, the segmenter's own sensitivity preset. The binding cap on subtitle "
                                 "length — lower = shorter, more granular subtitles.")
 
     # ── Qwen3-ASR: Generation ─────────────────────────────────────────────
@@ -1552,7 +1552,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         # 0.42/0.32/0.22 gradient and making the sensitivity selector inert.
         # One decision for every entry point (config/chronosjav_vad.py): anime
         # table / Qwen3-ASR values (threshold 0.25, longest segment 4.0 s since
-        # v1.9.4), WhisperSeg only, user values kept.
+        # v1.9.4), WhisperSeg only; for TEN and FireRedVAD the longest segment
+        # 4.0 s only (owner, 2026-10-08). User values kept.
         from whisperjav.config.chronosjav_vad import apply_chronosjav_segmenter_defaults
         apply_chronosjav_segmenter_defaults(
             _user_vad_overrides, _gen_backend_early, _qwen_segmenter, _qwen_sensitivity)
