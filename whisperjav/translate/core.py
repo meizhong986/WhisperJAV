@@ -73,13 +73,12 @@ def should_disable_deepseek_thinking(model: str) -> bool:
 
     Only ``-flash`` is switched off. ``-pro`` *is* the reasoning model, so a user
     who selects it has asked for reasoning and we leave their choice alone. Models
-    outside the v4 family are untouched, since an unrecognised field could be
-    rejected outright.
+    outside the v4 family are untouched, except the current ``deepseek-flash``.
     """
     if not model:
         return False
     m = model.lower()
-    return 'deepseek-v4' in m and 'pro' not in m
+    return m == 'deepseek-flash' or ('deepseek-v4' in m and 'pro' not in m)
 
 
 def apply_deepseek_thinking_patch(translator, model: str, debug: bool = False) -> bool:
