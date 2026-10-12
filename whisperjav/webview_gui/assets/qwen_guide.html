@@ -263,7 +263,7 @@
 
   <div class="param">
     <span class="param-name">Sensitivity Preset</span>
-    <span class="param-default">Balanced (GUI Ensemble pass 1, anime-whisper: Aggressive)</span>
+    <span class="param-default">Balanced (GUI Ensemble: Aggressive for anime-whisper, and for Qwen3-ASR on pass 1)</span>
     <div class="param-desc">
       Controls how readily the speech segmenter detects voice. What it changes depends on the model.
       Values below are for the default segmenter, WhisperSeg; other segmenters use their own presets.
@@ -398,7 +398,7 @@
 
   <div class="param">
     <span class="param-name">Segmenter Backend</span>
-    <span class="param-default">WhisperSeg (Qwen3-ASR on pass 2: TEN VAD)</span>
+    <span class="param-default">WhisperSeg (GUI Ensemble: FireRedVAD for Qwen3-ASR on pass 1; TEN VAD on pass 2)</span>
     <div class="param-desc">
       Within each scene, the segmenter finds where people's voices are. Each stretch of voice is a
       <em>segment</em>. Segments that follow each other closely are joined into one <em>frame</em>,

@@ -46,7 +46,7 @@ Dedicated pipeline using models trained on anime and JAV dialogue.
 4. Click **Start**
 
 !!! tip
-    For maximum quality, use anime-whisper in Pass 1 and Qwen3-ASR in Pass 2 with Smart Merge.
+    For maximum quality, tick Pass 2: since 1.9.5 the Ensemble tab starts with Qwen3-ASR (FireRedVAD) in Pass 1 and Anime-Whisper (TEN VAD) in Pass 2, both on Aggressive.
 
 ---
 
