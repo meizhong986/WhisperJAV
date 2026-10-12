@@ -541,7 +541,11 @@ python install.py
 REM 仅升级 WhisperJAV（不更改依赖项）
 pip install -U --no-deps git+https://github.com/meizhong986/whisperjav.git
 
-REM 升级所有依赖项（可能更改 PyTorch -- 请谨慎使用）
+REM 连同所有依赖项一起升级 -- 不建议在 GPU 安装上使用
+REM 在 Windows 上，PyPI 只提供仅 CPU 版的 PyTorch（CUDA 版只在 download.pytorch.org 上），
+REM 因此任何涉及 PyTorch 的依赖解析都会悄悄地把您的 GPU 版替换为 CPU 版。
+REM 它还可能改动其他已固定版本的包。建议改用 "whisperjav-upgrade"，
+REM 它会传入保护 GPU 相关包的约束条件。
 pip install -U "whisperjav[all] @ git+https://github.com/meizhong986/whisperjav.git"
 ```
 

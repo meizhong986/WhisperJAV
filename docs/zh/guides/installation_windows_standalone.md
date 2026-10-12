@@ -136,7 +136,7 @@ C:\Users\[用户名]\AppData\Local\WhisperJAV
 ### 步骤 6：安装选项
 
 安装程序将显示可选设置：
-- **添加到 PATH：** 默认启用。允许从命令行运行 `whisperjav`，并支持后续通过 `pip install -U` 进行升级。
+- **添加到 PATH：** 默认启用。允许从命令行运行 `whisperjav`，并支持后续通过 `whisperjav-upgrade` 进行升级。
 - **创建快捷方式：** 在桌面创建快捷方式以便快速访问。
 
 点击"安装"开始。
@@ -282,8 +282,12 @@ WhisperJAV 1.8.9
 如果已启用 PATH（默认设置），无需重新下载安装程序即可升级：
 
 ```cmd
-pip install -U "whisperjav[all] @ git+https://github.com/meizhong986/whisperjav.git"
+whisperjav-upgrade
 ```
+
+**请勿使用普通的 `pip install -U whisperjav...` 升级。** 在 Windows 上，PyPI 只提供**仅 CPU** 版的
+PyTorch；CUDA 版只在 `download.pytorch.org` 上提供。因此，任何涉及 PyTorch 的依赖解析都会悄悄地把您的
+GPU 版替换为 CPU 版。同一命令还会改动其他已固定版本的包。`whisperjav-upgrade` 会传入保护 GPU 相关包的约束条件。
 
 ### 保留配置
 
@@ -518,7 +522,7 @@ cmd /C START /WAIT WhisperJAV-1.8.9-Windows-x86_64.exe /S /AddToPath=0 /InstallL
 
 ### 问：如何更新到新版本？
 
-**答：** 下载并运行新的安装程序。如果安装到同一目录，安装程序会检测到旧版本并提供替换选项。您的用户设置会被保留。或者，如果已启用 PATH，可以运行：`pip install -U "whisperjav[all] @ git+https://github.com/meizhong986/whisperjav.git"`
+**答：** 下载并运行新的安装程序。如果安装到同一目录，安装程序会检测到旧版本并提供替换选项。您的用户设置会被保留。或者，如果已启用 PATH，可以运行 `whisperjav-upgrade`，它在升级时会保护您的 GPU 版 PyTorch。请勿使用普通的 `pip install -U whisperjav...`：在 Windows 上，PyPI 只提供仅 CPU 版的 PyTorch，可能会悄悄替换掉您的 GPU 版本。
 
 ### 问：支持哪些视频格式？
 
