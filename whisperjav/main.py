@@ -122,6 +122,8 @@ from whisperjav.modules.silero_vad_adapter import DEFAULT_VAD_VERSION, VAD_VERSI
 from whisperjav.config.segmenter_presets import (
     BALANCED_DEFAULT_SEGMENTER,
     DEFAULT_SCENE_DETECTOR,
+    ENSEMBLE_DEFAULT_SENSITIVITY,
+    ENSEMBLE_PASS_DEFAULTS,
     FIDELITY_DEFAULT_SEGMENTER,
     SINGLE_PASS_EXTERNAL_OK,
     effective_segmenter_for_pass,
@@ -331,9 +333,10 @@ def parse_arguments():
     twopass_group.add_argument("--pass1-pipeline", default="balanced",
                                choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen", "crispasr"],
                                help="Pipeline for pass 1 (default: balanced). 'crispasr' requires --crispasr-exe")
-    twopass_group.add_argument("--pass1-sensitivity", default="balanced",
+    twopass_group.add_argument("--pass1-sensitivity", default=None,
                                choices=["conservative", "balanced", "aggressive"],
-                               help="Sensitivity for pass 1 (default: balanced)")
+                               help="Sensitivity for pass 1 (default: aggressive when pass 1 is "
+                                    "Qwen3-ASR, otherwise balanced)")
     twopass_group.add_argument("--pass1-overrides", default=None,
                                help="JSON string of parameter overrides for pass 1 (deprecated)")
     twopass_group.add_argument("--pass1-params", default=None,
@@ -346,7 +349,7 @@ def parse_arguments():
                                choices=["auditok", "silero", "semantic", "none"],
                                help="Scene detection method for pass 1 (default: semantic since v1.9.2)")
     twopass_group.add_argument("--pass1-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none). Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
+                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none). Default: firered-vad when pass 1 is Qwen3-ASR. Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
     twopass_group.add_argument("--pass1-vad-version", default=None,
                                choices=list(VAD_VERSIONS),
                                help="Silero VAD build for pass 1 when --pass1-pipeline is balanced "
@@ -380,9 +383,10 @@ def parse_arguments():
     twopass_group.add_argument("--pass2-pipeline", default=None,
                                choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen", "xxl", "crispasr"],
                                help="Pipeline for pass 2 (enables pass 2). 'xxl' = BYOP XXL Faster Whisper (requires --xxl-exe); 'crispasr' requires --crispasr-exe")
-    twopass_group.add_argument("--pass2-sensitivity", default="balanced",
+    twopass_group.add_argument("--pass2-sensitivity", default=None,
                                choices=["conservative", "balanced", "aggressive"],
-                               help="Sensitivity for pass 2 (default: balanced)")
+                               help="Sensitivity for pass 2 (default: aggressive when pass 2 is "
+                                    "anime-whisper, otherwise balanced)")
     twopass_group.add_argument("--pass2-overrides", default=None,
                                help="JSON string of parameter overrides for pass 2 (deprecated)")
     twopass_group.add_argument("--pass2-params", default=None,
@@ -395,7 +399,7 @@ def parse_arguments():
                                choices=["auditok", "silero", "semantic", "none"],
                                help="Scene detection method for pass 2 (default: semantic since v1.9.2)")
     twopass_group.add_argument("--pass2-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
+                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Default: ten when pass 2 is anime-whisper. Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
     twopass_group.add_argument("--pass2-vad-version", default=None,
                                choices=list(VAD_VERSIONS),
                                help="Silero VAD build for pass 2 when --pass2-pipeline is balanced "
@@ -2289,6 +2293,41 @@ def _finish_run(outcomes: List[FileOutcome], args: argparse.Namespace,
     return status
 
 
+def apply_ensemble_pass_defaults(args) -> None:
+    """
+    Fill in the Ensemble defaults the user did not set (owner, 2026-10-12, v1.9.5):
+    pass 1 Qwen3-ASR runs FireRedVAD at aggressive, pass 2 anime-whisper runs TEN VAD
+    at aggressive (ENSEMBLE_PASS_DEFAULTS). Only for a pass that IS that pipeline,
+    and only for what the command line left out; no pipeline default changes. Every
+    other pass keeps sensitivity balanced, as before. Runs before anything reads the
+    pass settings, so --dump-params shows what the run uses.
+    """
+    for n in ("1", "2"):
+        defaults = {}
+        if getattr(args, f"pass{n}_pipeline", None) == "qwen":
+            qwen_params = {}
+            raw = getattr(args, f"pass{n}_qwen_params", None)
+            if raw:
+                try:
+                    qwen_params = json.loads(raw)
+                except ValueError:
+                    pass  # a malformed value is reported where the pass is built
+            if not isinstance(qwen_params, dict):
+                qwen_params = {}
+            generator = qwen_params.get("generator_backend", "qwen3")
+            defaults = dict(ENSEMBLE_PASS_DEFAULTS.get((n, generator), {}))
+            # A segmenter named inside the JSON (qwen_segmenter) is the user's
+            # choice too; filling --passN-speech-segmenter would override it
+            # (pass_worker applies speech_segmenter after the JSON values).
+            if "qwen_segmenter" in qwen_params:
+                defaults.pop("speech_segmenter", None)
+        if getattr(args, f"pass{n}_sensitivity", None) is None:
+            setattr(args, f"pass{n}_sensitivity",
+                    defaults.get("sensitivity", ENSEMBLE_DEFAULT_SENSITIVITY))
+        if getattr(args, f"pass{n}_speech_segmenter", None) is None and "speech_segmenter" in defaults:
+            setattr(args, f"pass{n}_speech_segmenter", defaults["speech_segmenter"])
+
+
 def validate_balanced_vad_options(args) -> None:
     """
     Enforce requirements S2/S9: the balanced pipeline offers no external speech segmenter.
@@ -2426,6 +2465,8 @@ def main():
         _mr = getattr(args, 'model_refresh_audio_minutes', None)
         if _mr is not None and _mr < 0:
             raise ValueError(f"--model-refresh-audio-minutes: expected 0 (never) or a positive number of minutes, got {_mr}")
+        # v1.9.5: Ensemble defaults for the passes the user left unset.
+        apply_ensemble_pass_defaults(args)
         # S2/S9: balanced has no external segmenter any more (v1.9.2).
         validate_balanced_vad_options(args)
     except ValueError as exc:

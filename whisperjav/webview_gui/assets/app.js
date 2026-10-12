@@ -1320,21 +1320,24 @@ const EnsembleManager = {
     // State - Full Configuration Snapshot approach
     state: {
         pass1: {
-            pipeline: 'anime-whisper',  // v1.9.0: anime-whisper is the pass 1 default
-            sensitivity: 'aggressive',  // v1.9.0: aggressive default (tuned WhisperSeg row)
+            // v1.9.5 (owner, 2026-10-12): pass 1 is Qwen3-ASR / aggressive / semantic /
+            // none / FireRedVAD. Keep in step with ENSEMBLE_PASS_DEFAULTS in
+            // config/segmenter_presets.py and with applyPipelinePresets below.
+            pipeline: 'qwen',
+            sensitivity: 'aggressive',
             sceneDetector: 'semantic',
             speechEnhancer: 'none',
-            speechSegmenter: 'whisperseg',  // v1.9.0: WhisperSeg pairs with anime-whisper
+            speechSegmenter: 'firered-vad',
             vadVersion: '4.0',  // v1.9.2: which Silero build the BUILT-IN VAD runs (balanced only).
                                 // Keep in step with defaultVadVersion below and with
                                 // DEFAULT_VAD_VERSION in modules/silero_vad_adapter.py.
-            model: 'litagin/anime-whisper',
+            model: 'Qwen/Qwen3-ASR-1.7B',
             customized: false,
             params: null,  // null = use defaults, object = full custom config
             presetName: null,  // Name of loaded preset, or null if none
             isTransformers: false,  // Track if using Transformers pipeline
             isQwen: true,  // ChronosJAV umbrella: any of qwen / anime-whisper / cohere
-            isAnimeWhisper: true,  // Track if using Anime-Whisper specifically
+            isAnimeWhisper: false,  // Track if using Anime-Whisper specifically
             isCohere: false,  // Track if using Cohere-Transcribe specifically (v1.8.14)
             isCrispasr: false,  // Track if using CrispASR external provider (v1.9.0)
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
@@ -1343,21 +1346,23 @@ const EnsembleManager = {
         },
         pass2: {
             enabled: false,
-            pipeline: 'qwen',
-            sensitivity: 'balanced',
+            // v1.9.5 (owner, 2026-10-12): pass 2 is Anime-Whisper / aggressive / semantic /
+            // none / TEN VAD, and stays off until the user ticks it.
+            pipeline: 'anime-whisper',
+            sensitivity: 'aggressive',
             sceneDetector: 'semantic',
             speechEnhancer: 'none',
-            speechSegmenter: 'ten',  // v1.9.0: TEN VAD on pass 2 for segmentation diversity vs pass 1's WhisperSeg
+            speechSegmenter: 'ten',  // TEN VAD on pass 2 for segmentation diversity vs pass 1's FireRedVAD
             vadVersion: '4.0',  // v1.9.2: which Silero build the BUILT-IN VAD runs (balanced only).
                                 // Keep in step with defaultVadVersion below and with
                                 // DEFAULT_VAD_VERSION in modules/silero_vad_adapter.py.
-            model: 'Qwen/Qwen3-ASR-1.7B',
+            model: 'litagin/anime-whisper',
             customized: false,
             params: null,
             presetName: null,  // Name of loaded preset, or null if none
             isTransformers: false,
-            isQwen: true,  // Default pipeline is Qwen3-ASR (ChronosJAV umbrella)
-            isAnimeWhisper: false,
+            isQwen: true,  // Default pipeline is Anime-Whisper (ChronosJAV umbrella)
+            isAnimeWhisper: true,
             isCohere: false,  // v1.8.14: Cohere-Transcribe preview (gated HF model)
             isCrispasr: false,  // Track if using CrispASR external provider (v1.9.0)
             isXxl: false,  // Track if using BYOP Faster Whisper XXL
@@ -1910,13 +1915,16 @@ const EnsembleManager = {
         // silero-v3.1 for non-JA audio).
         if (pipelineType === 'anime-whisper') {
             // v1.9.0: pass 1 anime-whisper defaults to aggressive — the tuned
-            // WhisperSeg row (wide-net capture). Pass 2 keeps balanced.
-            const animeSensitivity = passKey === 'pass1' ? 'aggressive' : 'balanced';
+            // WhisperSeg row (wide-net capture).
+            // v1.9.5 (owner, 2026-10-12): pass 2 anime-whisper is TEN VAD at
+            // aggressive (ENSEMBLE_PASS_DEFAULTS, config/segmenter_presets.py).
+            const animeSensitivity = 'aggressive';
+            const animeSegmenter = passKey === 'pass2' ? 'ten' : 'whisperseg';
             sceneSelect.value = 'semantic';
-            segmenterSelect.value = 'whisperseg';
+            segmenterSelect.value = animeSegmenter;
             sensitivitySelect.value = animeSensitivity;
             this.state[passKey].sceneDetector = 'semantic';
-            this.state[passKey].speechSegmenter = 'whisperseg';
+            this.state[passKey].speechSegmenter = animeSegmenter;
             this.state[passKey].sensitivity = animeSensitivity;
             this.state[passKey].framer = 'vad-grouped';
         } else if (pipelineType === 'cohere') {
@@ -1931,15 +1939,17 @@ const EnsembleManager = {
             this.state[passKey].sensitivity = 'balanced';
             this.state[passKey].framer = 'vad-grouped';
         } else if (pipelineType === 'qwen') {
-            // v1.9.0: qwen on pass 2 pairs with TEN VAD for segmentation
-            // diversity vs pass 1's WhisperSeg; pass 1 qwen keeps WhisperSeg.
-            const qwenSegmenter = passKey === 'pass2' ? 'ten' : 'whisperseg';
+            // v1.9.0: qwen on pass 2 pairs with TEN VAD at balanced.
+            // v1.9.5 (owner, 2026-10-12): pass 1 qwen is FireRedVAD at aggressive
+            // (ENSEMBLE_PASS_DEFAULTS, config/segmenter_presets.py).
+            const qwenSegmenter = passKey === 'pass2' ? 'ten' : 'firered-vad';
+            const qwenSensitivity = passKey === 'pass2' ? 'balanced' : 'aggressive';
             sceneSelect.value = 'semantic';
             segmenterSelect.value = qwenSegmenter;
-            sensitivitySelect.value = 'balanced';
+            sensitivitySelect.value = qwenSensitivity;
             this.state[passKey].sceneDetector = 'semantic';
             this.state[passKey].speechSegmenter = qwenSegmenter;
-            this.state[passKey].sensitivity = 'balanced';
+            this.state[passKey].sensitivity = qwenSensitivity;
             this.state[passKey].framer = 'vad-grouped';
         } else {
             // Whisper-based pipeline defaults (balanced, faster, fast, fidelity)
