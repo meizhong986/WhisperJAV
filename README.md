@@ -60,6 +60,30 @@ Any input FFmpeg can read works: MP4, MKV, AVI, WMV, MP3, WAV, FLAC, and so on. 
 
 ---
 
+## New in v1.9.5
+
+**A small fix release on top of 1.9.4.** On 1.9.3 or 1.9.4, upgrade with one command,
+`whisperjav-upgrade --wheel-only`, because 1.9.5 changes no library underneath WhisperJAV. Full
+detail: [**release notes**](docs/release_notes_v1.9.5_for_users.md).
+
+- **Saved output folder (GUI):** with *Remember settings* on, an empty saved output folder sent
+  subtitles into WhisperJAV's program folder. They now go next to the video (#454).
+- **Ollama translations:** repeated `<summary>` and `<scene>` blocks in a local model's reply are now
+  removed before the reply is read (#455, PR #443).
+- **DeepSeek:** the default model is now `deepseek-flash`. DeepSeek still accepts the old name,
+  `deepseek-v4-flash` (PR #457).
+- **Ensemble defaults:** pass 1 is Qwen3-ASR + FireRedVAD and pass 2 is Anime-Whisper + TEN VAD, both
+  Aggressive. Pass 2 stays off until you tick it. Saved settings are kept.
+- **Colab:** the notebook no longer replaces Colab's PyTorch. It adds the CUDA 12 libraries that
+  faster-whisper needs (#456, #447).
+
+**If you run WhisperJAV from scripts:** in a two-pass run, a pass 1 on Qwen3-ASR or a pass 2 on
+anime-whisper now defaults to Aggressive with FireRedVAD (pass 1) or TEN (pass 2). In 1.9.4 it was
+Balanced with WhisperSeg. A pass 1 on Qwen3-ASR stops before transcribing if FireRedVAD is not
+installed. See [Changes](docs/release_notes_v1.9.5_for_users.md#changes).
+
+---
+
 ## New in v1.9.4
 
 **Bug fixes, hardening, and better subtitle timing for ChronosJAV.** On 1.9.3, upgrade with one
