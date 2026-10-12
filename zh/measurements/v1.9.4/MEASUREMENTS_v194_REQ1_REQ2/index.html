@@ -1,0 +1,3597 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/WhisperJAV/zh/measurements/v1.9.4/MEASUREMENTS_v194_REQ1_REQ2/">
+      
+      
+      
+      
+        
+          <link rel="alternate" href="../../../../measurements/v1.9.4/MEASUREMENTS_v194_REQ1_REQ2/" hreflang="en">
+        
+          <link rel="alternate" href="./" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>1.9.4 measurements — REQ1 (audio integrity) and REQ2 (ChronosJAV timing), 2026-10-05 - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#194-measurements-req1-audio-integrity-and-req2-chronosjav-timing-2026-10-05" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../../../" title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              1.9.4 measurements — REQ1 (audio integrity) and REQ2 (ChronosJAV timing), 2026-10-05
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="选择当前语言">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="../../../../measurements/v1.9.4/MEASUREMENTS_v194_REQ1_REQ2/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../../" title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../pipelines/crispasr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CrispASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV 升级指南
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-req1-audio-integrity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. REQ1 — audio integrity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. REQ1 — audio integrity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-the-damage-found-hidden-holes-in-the-audio-track-film-a-2-h-2-min" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 The damage found: hidden holes in the audio track (Film A, 2 h 2 min)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#11b-second-damaged-film-and-the-cost-of-the-filter-owner-asked-before-adopting-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1b Second damaged film, and the cost of the filter (owner asked before adopting it)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-the-gap-filling-filter-on-films-without-damage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 The gap-filling filter on films without damage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-audio-that-starts-later-than-the-video-a-reference-clip-remuxed-with-itsoffset-stream-copy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 Audio that starts later than the video (a reference clip remuxed with -itsoffset, stream copy)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-library-sweep-the-owners-media-library-every-video-file-over-300-mb-43-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.4 Library sweep — the owner's media library, every video file over 300 MB (43 files)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#15-cost-of-the-check-on-2-hour-films" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.5 Cost of the check on 2-hour films
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#16-other-check-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.6 Other check results
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#17-end-to-end-runs-of-the-wired-check-3-minute-stream-copied-clips-of-film-a-2026-10-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.7 End-to-end runs of the wired check (3-minute stream-copied clips of Film A; 2026-10-05)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-req2-chronosjav-subtitle-timing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. REQ2 — ChronosJAV subtitle timing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. REQ2 — ChronosJAV subtitle timing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-set-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Set-up
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-baseline-the-193-defaults-before-the-194-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Baseline (the 1.9.3 defaults, before the 1.9.4 change)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-one-setting-at-a-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 One setting at a time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-what-the-tables-show-observations-not-choices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 What the tables show (observations, not choices)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-limits-of-these-measurements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5 Limits of these measurements
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#26-character-error-trace-owners-request-2026-10-05-keep-the-trace-so-a-preset-can-be-tuned-or-reverted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.6 Character-error trace (owner's request 2026-10-05: keep the trace so a preset can be tuned or reverted)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#27-patterns-in-the-errors-owners-questions-2026-10-05-measure-scriptserror_patternspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.7 Patterns in the errors (owner's questions, 2026-10-05; measure-scripts/error_patterns.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#28-line-and-character-accounting-owners-questions-w1w5-2026-10-05-measure-scriptsline_accountingpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.8 Line and character accounting (owner's questions W1–W5, 2026-10-05; measure-scripts/line_accounting.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#29-why-line-starts-go-wrong-character-accuracy-step-1-measure-scriptsonset_analysispy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.9 Why line starts go wrong (character-accuracy step 1; measure-scripts/onset_analysis.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#210-character-accuracy-step-2-start-pads-added-silence-split-rule-measure-scriptsrun_step2py-score_step2py" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.10 Character-accuracy step 2: start pads, added silence, split rule (measure-scripts/run_step2.py, score_step2.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#211-reach-back-window-the-two-changes-adopted-on-2026-10-06-verification-on-the-product-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.11 Reach-back window; the two changes adopted on 2026-10-06; verification on the product code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#212-193-defaults-against-the-final-194-code-scored-2026-10-06-for-the-release-notes-no-new-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.12 1.9.3 defaults against the final 1.9.4 code (scored 2026-10-06 for the release notes; no new runs)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-numbers-for-release-notes-or-replies-drafts-of-facts-wording-and-use-are-the-owners-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Numbers for release notes or replies (drafts of facts; wording and use are the owner's decision)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-how-to-repeat-measure-scripts-docsmeasurementsv194scripts-others-are-in-the-repository" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. How to repeat (measure-scripts/ = docs/measurements/v1.9.4/scripts; others are in the repository)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-open-for-the-owner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Open for the owner
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/en/measurements/v1.9.4/MEASUREMENTS_v194_REQ1_REQ2.md" title="编辑此页" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="194-measurements-req1-audio-integrity-and-req2-chronosjav-timing-2026-10-05">1.9.4 measurements — REQ1 (audio integrity) and REQ2 (ChronosJAV timing), 2026-10-05<a class="headerlink" href="#194-measurements-req1-audio-integrity-and-req2-chronosjav-timing-2026-10-05" title="Permanent link">&para;</a></h1>
+<p>A record of every measurement run on 2026-10-05, so that later work can repeat it and compare, and so that release
+notes or replies can quote numbers from one place. Facts and numbers only; choices are listed in §5 as open.
+All runs were made in this session; commands, scripts and data locations are in §4.</p>
+<p>Code state for the runs: branch <code>sprint-20260927</code> at <code>f4a4c43</code>. The REQ2 runs used the product code unchanged. The
+REQ1 checks used <code>whisperjav/modules/audio_integrity.py</code> (new, written that day) called from scratch scripts; the
+pipelines were not involved.</p>
+<hr />
+<h2 id="1-req1-audio-integrity">1. REQ1 — audio integrity<a class="headerlink" href="#1-req1-audio-integrity" title="Permanent link">&para;</a></h2>
+<h3 id="11-the-damage-found-hidden-holes-in-the-audio-track-film-a-2-h-2-min">1.1 The damage found: hidden holes in the audio track (Film A, 2 h 2 min)<a class="headerlink" href="#11-the-damage-found-hidden-holes-in-the-audio-track-film-a-2-h-2-min" title="Permanent link">&para;</a></h3>
+<p>Five audio packets (at 35:52, 47:52, 59:52, 71:52, 83:52) state a length of 2.027 s while holding 0.021 s of sound
+(AAC, 1024 samples at 48 kHz). The next packet starts where the stated length ends, so the timeline has a 2.006 s
+hole at each. A player waits through it; WhisperJAV's extraction (<code>ffmpeg -i &lt;film&gt; -vn -acodec pcm_s16le -ar 16000
+-ac 1</code>) joins the sound across it.</p>
+<p>Where audio cut from the film by timestamp (<code>ffmpeg -ss t</code>, 8 s) is found in the extracted WAV (normalised cross-
+correlation; peak 0.975–1.000 everywhere):</p>
+<table>
+<thead>
+<tr>
+<th>Film time t</th>
+<th>Today's extraction: offset</th>
+<th>With <code>-af aresample=async=1:first_pts=0</code>: offset</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0:30</td>
+<td>0.000 s</td>
+<td>0.000 s</td>
+</tr>
+<tr>
+<td>16:40</td>
+<td>0.000 s</td>
+<td>0.000 s</td>
+</tr>
+<tr>
+<td>35:00</td>
+<td>0.000 s</td>
+<td>0.000 s</td>
+</tr>
+<tr>
+<td>36:40</td>
+<td>−2.005 s</td>
+<td>0.000 s</td>
+</tr>
+<tr>
+<td>48:20</td>
+<td>−4.011 s</td>
+<td>0.000 s</td>
+</tr>
+<tr>
+<td>61:40</td>
+<td>−6.016 s</td>
+<td>0.000 s</td>
+</tr>
+<tr>
+<td>73:20</td>
+<td>−8.021 s</td>
+<td>0.000 s</td>
+</tr>
+<tr>
+<td>85:00</td>
+<td>−10.027 s</td>
+<td>0.000 s</td>
+</tr>
+<tr>
+<td>108:20</td>
+<td>−10.027 s</td>
+<td>0.000 s</td>
+</tr>
+<tr>
+<td>121:40</td>
+<td>−10.027 s</td>
+<td>0.000 s</td>
+</tr>
+</tbody>
+</table>
+<p>WAV length: today 7335.829 s, with the filter 7345.856 s (= the audio track). Extraction time (file in memory):
+5.5 s today, 5.1 s with the filter. Negative offset = the audio sits earlier in the WAV than in the film, so every
+subtitle made from it is early by that amount.</p>
+<h3 id="11b-second-damaged-film-and-the-cost-of-the-filter-owner-asked-before-adopting-it">1.1b Second damaged film, and the cost of the filter (owner asked before adopting it)<a class="headerlink" href="#11b-second-damaged-film-and-the-cost-of-the-filter-owner-asked-before-adopting-it" title="Permanent link">&para;</a></h3>
+<p>Film B (five 2.0 s holes): today 0.000 / −2.005 / −4.011 / −5.995 / −8.000 / −10.005 / −10.005 s at 10:00, 38:20,
+50:00, 61:40, 73:20, 86:40, 116:40; with the filter 0.000 s at all seven. WAV 7388.288 → 7398.293 s (= the track).</p>
+<p>Extraction time, same film read from memory, three alternating runs each (one warm-up read first):
+| Film | Today | With the filter |
+|---|---|---|
+| Film B (2 h, damaged) | 5.05 5.02 5.23 (median 5.05 s) | 4.91 4.98 4.91 (median 4.91 s) |
+| Film G (2 h, clean) | 4.61 4.75 4.30 (median 4.61 s) | 4.64 4.52 4.39 (median 4.52 s) |
+| MKV film 2 (MKV) | 3.25 3.27 3.17 (median 3.25 s) | 3.20 3.17 3.30 (median 3.20 s) |
+Same single FFmpeg pass; no video re-encoding; no extra file. <strong>Adopted for 1.9.4 (owner, 2026-10-05).</strong></p>
+<p>After adoption, through WhisperJAV's own <code>AudioExtractor</code>: Film A 0.000 s at 7 points (WAV 7345.856 s); the 3-minute
+damaged clip 0.000 s at 5 points. End to end, Qwen3-ASR on that clip: lines before the 0:53 hole unchanged (6 lines,
+0.0 s); lines after it 1.81 / 1.98 / 2.02 s later than before the fill (one more at 0.88 s, re-segmented). Balanced's
+text after the hole changed between runs, so its lines could not be paired; no conclusion from that comparison.</p>
+<h3 id="12-the-gap-filling-filter-on-films-without-damage">1.2 The gap-filling filter on films without damage<a class="headerlink" href="#12-the-gap-filling-filter-on-films-without-damage" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Container</th>
+<th>WAV length today / with filter</th>
+<th>Offsets at 4 points (today and with filter)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Film E</td>
+<td>MP4</td>
+<td>8107.038 / 8107.038 s</td>
+<td>all 0.000 s</td>
+</tr>
+<tr>
+<td>Film F</td>
+<td>MP4</td>
+<td>8058.137 / 8058.137 s</td>
+<td>all 0.000 s</td>
+</tr>
+<tr>
+<td>MKV film 1.au.college.1979</td>
+<td>MKV</td>
+<td>3929.728 / 3929.728 s</td>
+<td>all 0.000 s</td>
+</tr>
+</tbody>
+</table>
+<h3 id="13-audio-that-starts-later-than-the-video-a-reference-clip-remuxed-with-itsoffset-stream-copy">1.3 Audio that starts later than the video (a reference clip remuxed with <code>-itsoffset</code>, stream copy)<a class="headerlink" href="#13-audio-that-starts-later-than-the-video-a-reference-clip-remuxed-with-itsoffset-stream-copy" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Remux</th>
+<th>Stream starts</th>
+<th>Today</th>
+<th>With filter</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>audio +1.5 s</td>
+<td>video 0.000, audio 1.511</td>
+<td>every point 1.511 s early</td>
+<td>0.000 s</td>
+</tr>
+<tr>
+<td>audio −1.5 s</td>
+<td>video 1.489, audio 0.000 (the muxer renormalised)</td>
+<td>matches the player's timeline</td>
+<td>same as today</td>
+</tr>
+<tr>
+<td>Not tested: a file whose audio timestamps are negative inside the file.</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="14-library-sweep-the-owners-media-library-every-video-file-over-300-mb-43-files">1.4 Library sweep — the owner's media library, every video file over 300 MB (43 files)<a class="headerlink" href="#14-library-sweep-the-owners-media-library-every-video-file-over-300-mb-43-files" title="Permanent link">&para;</a></h3>
+<p>42 run through the check (extraction as today + <code>check_audio_integrity</code>); Film F only through §1.2.
+| Result | Files |
+|---|---|
+| Damaged: five hidden 2.0 s holes, extracted audio 10.0 s short | <strong>Film A</strong> (holes 35:53–1:23:53, every 12 min), <strong>Film C</strong> (37:07–1:25:07, 12 min), <strong>Film B</strong> (37:17–1:25:17, 12 min), <strong>Film D</strong> (47:43–1:51:43, every 16 min) |
+| Does not open (FFmpeg "Invalid data found when processing input"; WhisperJAV fails it at extraction today) | two files |
+| No findings (36) | 36 files: MP4, MKV, AVI and TS; JAV and other films (titles kept off this record) |
+Four damaged out of 40 that open and were checked, all four in the same form. Films I and L, from the same label as Films A and C, are clean.
+The four files checked before the "discard packets" rule (§1.6) was added — Film E, Film G, Film I, Film H —
+had no findings without it; the rule can only remove packets a player never plays.</p>
+<h3 id="15-cost-of-the-check-on-2-hour-films">1.5 Cost of the check on 2-hour films<a class="headerlink" href="#15-cost-of-the-check-on-2-hour-films" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>What</th>
+<th>Time</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Stream list (ffprobe header)</td>
+<td>0.3–0.5 s</td>
+</tr>
+<tr>
+<td>Packet list, read right after the extraction, film still in memory</td>
+<td>0.3–6.5 s (most 2–5 s)</td>
+</tr>
+<tr>
+<td>Packet list, read after the extraction, film no longer in memory</td>
+<td>46.4 s (Film D), 61.8 s (Film K), 86.9 s (Film J)</td>
+</tr>
+<tr>
+<td>Packet list read alongside the extraction (Film I, 5.39 GB)</td>
+<td>both finished at 36.9 s: no added time</td>
+</tr>
+<tr>
+<td>Packet list, cold, before any extraction (Film A, 5.86 GB)</td>
+<td>97 s (2.8 s on a second read)</td>
+</tr>
+<tr>
+<td>Extraction itself, cold, 2-hour films</td>
+<td>23–98 s (disk-bound; F: reads about 60 MB/s)</td>
+</tr>
+<tr>
+<td>The wired version reads the packet list alongside the extraction.</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="16-other-check-results">1.6 Other check results<a class="headerlink" href="#16-other-check-results" title="Permanent link">&para;</a></h3>
+<ul>
+<li>60 s stream-copied cut of Film I with 40 × 200 bytes overwritten: 182 FFmpeg <code>[error]</code> lines, extracted audio 1.8 s
+  short of the track → reported. FFmpeg prints two <code>[error]</code> lines per damaged packet.</li>
+<li>The clean 60 s cut itself: before the rule, reported 1.0 s short (47 lead-in packets flagged <code>D</code>, discard, at
+  negative times); with discard-flagged packets ignored, no findings.</li>
+<li>MKV files report no per-stream duration (<code>N/A</code>); the length checks fall back to the packet timeline and the
+  container duration.</li>
+<li>3-minute stream-copied cut of Film A from 35:00 (end-to-end test file): one 2.0 s hole at 0:53, extracted audio
+  2.0 s short → reported.</li>
+</ul>
+<h3 id="17-end-to-end-runs-of-the-wired-check-3-minute-stream-copied-clips-of-film-a-2026-10-05">1.7 End-to-end runs of the wired check (3-minute stream-copied clips of Film A; 2026-10-05)<a class="headerlink" href="#17-end-to-end-runs-of-the-wired-check-3-minute-stream-copied-clips-of-film-a-2026-10-05" title="Permanent link">&para;</a></h3>
+<p>Damaged clip: one 2.0 s hidden hole at 0:53. Clean clip: from 16:40, no hole.
+| Run | Exit | Result in the run summary and manifest |
+|---|---|---|
+| Qwen3-ASR (<code>--mode qwen</code>), damaged | 0 | <code>suspect</code>: "audio integrity: 1 gap(s) in the audio track, 2.0 s in all (2.0 s at 0:00:53); 17 cue(s) …" |
+| Qwen3-ASR, clean | 0 | console "Audio check: no problems found (1.8 s)." |
+| Balanced, damaged | 0 | <code>suspect</code> with the same reason |
+| Fidelity <code>--model turbo</code>, damaged | 0 | <code>suspect</code> with the same reason |
+| Ensemble (anime-whisper pass 1 + Qwen3-ASR pass 2), damaged | 0 | <code>suspect</code>, reason given once ("pass 1: audio integrity: …") |
+| Balanced <code>--async-processing</code>, damaged | 0 | <code>suspect</code> with the same reason |
+| Qwen3-ASR <code>--fail-on suspect</code>, damaged | 1 | <code>failed</code>: "stopped before transcription: audio integrity: …", after 9 s, no traceback |
+| Ensemble <code>--fail-on suspect</code>, damaged | 1 | both passes stop; <code>failed</code> with the same reason |
+Two faults found by these runs and fixed the same day, then re-run: the console line also printed a "extracted audio
+2.0 s shorter" clause that the gap already explains (now left out when the gaps account for it); the ensemble's run
+summary said only "ensemble pass failed" for a stopped file (now names the reason). The ensemble prints the console
+warning once per pass.</p>
+<hr />
+<h2 id="2-req2-chronosjav-subtitle-timing">2. REQ2 — ChronosJAV subtitle timing<a class="headerlink" href="#2-req2-chronosjav-subtitle-timing" title="Permanent link">&para;</a></h2>
+<h3 id="21-set-up">2.1 Set-up<a class="headerlink" href="#21-set-up" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Clips:</strong> 7 Netflix scenes ("The Naked Director", S01E03–S02E05) in <code>test_media/Ground_Truths/Netflix</code>, with
+  Japanese ground-truth subtitles: 305 lines in all. These are TV-drama scenes, not JAV.</li>
+<li><strong>Runs:</strong> the command the GUI Ensemble tab builds for a pass-1-only run, default timestamp mode (no aligner),
+  semantic scene detection, WhisperSeg speech segmenter (<code>measure-scripts/measure/run_chronosjav_reference_runs.py</code>):</li>
+<li><strong>Qwen3-ASR:</strong> <code>Qwen/Qwen3-ASR-1.7B</code>, sensitivity balanced (hysteresis decoder, onset 0.25, end level 0.10,
+    longest segment 5 s, pads 100/100 ms, group gap 0.3 s, group cap 3.0 s).</li>
+<li><strong>anime-whisper:</strong> <code>litagin/anime-whisper</code>, sensitivity aggressive = the GUI Ensemble default (offline decoder,
+    threshold 0.15, grow floor 0.05, gap merge 350 ms, longest segment 4 s, pads 0/30 ms, group gap 0.2 s, cap 2.0 s).</li>
+<li><strong>One setting changed per run</strong>, through <code>--pass1-qwen-params</code> (pads, grow floor, gap merge, longest segment) or
+  <code>--pass1-params</code> (end threshold); the recorder confirmed the value reached the segmenter.</li>
+<li><strong>Scoring</strong> (<code>whisperjav.bench.timing</code>): each ground-truth line is paired with at most one of our lines (time
+  overlap + text similarity). Start error = our start − theirs, end error = our end − theirs; positive = late.
+  "Common" columns compare two runs on the ground-truth lines both matched. <strong>Character error rate (CER):</strong> the whole
+  text of each clip against the ground truth's, after NFKC and keeping letters and digits only, sound notes in
+  brackets removed; pooled over the clips. Netflix text is not word-for-word, so CER is for comparing runs only.</li>
+<li><strong>Repeatability:</strong> baseline run 1 and run 2 gave identical results for both models (same lines matched, same
+  errors to the millisecond). One run per setting is therefore used.</li>
+</ul>
+<h3 id="22-baseline-the-193-defaults-before-the-194-change">2.2 Baseline (the 1.9.3 defaults, before the 1.9.4 change)<a class="headerlink" href="#22-baseline-the-193-defaults-before-the-194-change" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Our lines</th>
+<th>GT lines matched</th>
+<th>Start error, median</th>
+<th>End error, median</th>
+<th>End, average lean</th>
+<th>Ends within 0.5 s</th>
+<th>CER</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Qwen3-ASR</td>
+<td>220</td>
+<td>169</td>
+<td>0.342 s</td>
+<td>1.062 s</td>
+<td>+1.114 s</td>
+<td>50</td>
+<td>0.390</td>
+</tr>
+<tr>
+<td>anime-whisper (GUI default)</td>
+<td>227</td>
+<td>188</td>
+<td>0.178 s</td>
+<td>0.708 s</td>
+<td>+0.589 s</td>
+<td>75</td>
+<td>0.392</td>
+</tr>
+</tbody>
+</table>
+<p>Why ends are late (matched lines with end error over 0.5 s):
+| | Our line also covers the next GT line | Late tail only | Our median line length | GT median line length |
+|---|---|---|---|---|
+| Qwen3-ASR | 75 (median 2.20 s late) | 33 (median 0.93 s) | 3.66 s | 2.25 s |
+| anime-whisper | 49 (median 1.61 s late) | 47 (median 0.84 s) | 3.04 s | 2.25 s |</p>
+<p>What the segmenter produced (recorded during the runs):
+| | Segments | Groups | Segment length median / p90 | Segments cut by the length limit, not at a pause |
+|---|---|---|---|---|
+| Qwen3-ASR | 266 | 262 | 3.44 / 4.92 s | 127 (48 %) |
+| anime-whisper | 385 | 379 | 2.62 / 3.88 s | 258 (67 %) |
+Almost every segment is its own line; the group settings rarely join two. The speech probability stays above the end
+level through long stretches of these scenes, so the length limit, not a pause, ends most lines.</p>
+<h3 id="23-one-setting-at-a-time">2.3 One setting at a time<a class="headerlink" href="#23-one-setting-at-a-time" title="Permanent link">&para;</a></h3>
+<p>A = on the ground-truth lines both runs matched (baseline → setting). B = each run on its own.</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Setting (default)</th>
+<th>Common / lost</th>
+<th>Start median A</th>
+<th>End median A</th>
+<th>End lean A</th>
+<th>Lines</th>
+<th>Matched</th>
+<th>Ends ≤ 0.5 s</th>
+<th>Median line</th>
+<th>CER</th>
+<th>Cut by limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Qwen3-ASR</td>
+<td>baseline</td>
+<td>169 / 0</td>
+<td>0.342</td>
+<td>1.062</td>
+<td>+1.114</td>
+<td>220</td>
+<td>169</td>
+<td>50</td>
+<td>3.58</td>
+<td>0.390</td>
+<td>127 / 266</td>
+</tr>
+<tr>
+<td></td>
+<td>end threshold 0.20 (0.10)</td>
+<td>161 / 8</td>
+<td>0.388→0.316</td>
+<td>1.062→1.005</td>
+<td>+1.086→+1.053</td>
+<td>217</td>
+<td>166</td>
+<td>52</td>
+<td>3.52</td>
+<td>0.387</td>
+<td>128 / 280</td>
+</tr>
+<tr>
+<td></td>
+<td>end pad 0 ms (100)</td>
+<td>168 / 1</td>
+<td>0.361→0.361</td>
+<td>1.066→1.061</td>
+<td>+1.126→+1.081</td>
+<td>221</td>
+<td>168</td>
+<td>51</td>
+<td>3.54</td>
+<td>0.389</td>
+<td>126 / 266</td>
+</tr>
+<tr>
+<td></td>
+<td>longest segment 4 s (5)</td>
+<td>156 / 13</td>
+<td>0.328→0.311</td>
+<td>1.057→0.677</td>
+<td>+1.073→+0.652</td>
+<td>245</td>
+<td>186</td>
+<td>79</td>
+<td>3.28</td>
+<td>0.394</td>
+<td>170 / 309</td>
+</tr>
+<tr>
+<td></td>
+<td>longest segment 3 s</td>
+<td>159 / 10</td>
+<td>0.328→0.348</td>
+<td>1.052→0.507</td>
+<td>+1.064→+0.132</td>
+<td>307</td>
+<td>209</td>
+<td>105</td>
+<td>2.60</td>
+<td>0.435</td>
+<td>250 / 389</td>
+</tr>
+<tr>
+<td></td>
+<td><strong>longest segment 2.5 s</strong></td>
+<td>160 / 9</td>
+<td>0.361→0.327</td>
+<td>0.999→0.489</td>
+<td>+1.057→−0.130</td>
+<td>333</td>
+<td>213</td>
+<td><strong>113</strong></td>
+<td>2.32</td>
+<td>0.428</td>
+<td>309 / 448</td>
+</tr>
+<tr>
+<td></td>
+<td>longest segment 2 s</td>
+<td>159 / 10</td>
+<td>0.328→0.508</td>
+<td>1.062→0.555</td>
+<td>+1.082→−0.156</td>
+<td>358</td>
+<td>212</td>
+<td>99</td>
+<td>1.98</td>
+<td>0.431</td>
+<td>415 / 554</td>
+</tr>
+<tr>
+<td>anime-whisper</td>
+<td>baseline</td>
+<td>188 / 0</td>
+<td>0.178</td>
+<td>0.708</td>
+<td>+0.589</td>
+<td>227</td>
+<td>188</td>
+<td>75</td>
+<td>2.96</td>
+<td>0.392</td>
+<td>258 / 385</td>
+</tr>
+<tr>
+<td></td>
+<td>end pad 0 ms (30)</td>
+<td>187 / 1</td>
+<td>0.176→0.176</td>
+<td>0.695→0.675</td>
+<td>+0.588→+0.584</td>
+<td>227</td>
+<td>187</td>
+<td>76</td>
+<td>2.94</td>
+<td>0.391</td>
+<td>258 / 385</td>
+</tr>
+<tr>
+<td></td>
+<td>grow floor 0.10 (0.05)</td>
+<td>184 / 4</td>
+<td>0.181→0.178</td>
+<td>0.695→0.606</td>
+<td>+0.584→+0.570</td>
+<td>222</td>
+<td>184</td>
+<td>82</td>
+<td>2.95</td>
+<td>0.394</td>
+<td>234 / 382</td>
+</tr>
+<tr>
+<td></td>
+<td>grow floor 0.15</td>
+<td>184 / 4</td>
+<td>0.181→0.178</td>
+<td>0.695→0.596</td>
+<td>+0.584→+0.562</td>
+<td>221</td>
+<td>184</td>
+<td>82</td>
+<td>2.96</td>
+<td>0.392</td>
+<td>230 / 377</td>
+</tr>
+<tr>
+<td></td>
+<td>gap merge 150 ms (350)</td>
+<td>188 / 0</td>
+<td>0.178→0.181</td>
+<td>0.708→0.694</td>
+<td>+0.589→+0.580</td>
+<td>228</td>
+<td>188</td>
+<td>77</td>
+<td>2.93</td>
+<td>0.391</td>
+<td>255 / 395</td>
+</tr>
+<tr>
+<td></td>
+<td><strong>longest segment 3 s</strong> (4)</td>
+<td>180 / 8</td>
+<td>0.175→0.191</td>
+<td>0.708→0.428</td>
+<td>+0.594→+0.183</td>
+<td>260</td>
+<td>194</td>
+<td>106</td>
+<td>2.45</td>
+<td>0.399</td>
+<td>364 / 491</td>
+</tr>
+<tr>
+<td></td>
+<td>longest segment 2.5 s</td>
+<td>179 / 9</td>
+<td>0.170→0.332</td>
+<td>0.695→0.437</td>
+<td>+0.582→−0.056</td>
+<td>278</td>
+<td>199</td>
+<td>113</td>
+<td>2.11</td>
+<td>0.419</td>
+<td>452 / 579</td>
+</tr>
+<tr>
+<td></td>
+<td>longest segment 2 s</td>
+<td>179 / 9</td>
+<td>0.170→0.352</td>
+<td>0.695→0.476</td>
+<td>+0.582→−0.360</td>
+<td>309</td>
+<td>200</td>
+<td>106</td>
+<td>1.66</td>
+<td>0.453</td>
+<td>560 / 687</td>
+</tr>
+<tr>
+<td></td>
+<td><strong>longest segment 3 s + grow floor 0.15</strong></td>
+<td>178 / 10</td>
+<td>0.175→0.196</td>
+<td>0.708→0.364</td>
+<td>+0.593→+0.151</td>
+<td>258</td>
+<td>192</td>
+<td>112</td>
+<td>2.42</td>
+<td>0.392</td>
+<td>332 / 479</td>
+</tr>
+<tr>
+<td>Times in seconds. "Lost" = ground-truth lines the baseline matched and the setting did not.</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>CER split (characters against 3,115 ground-truth characters):
+| Run | Our characters | Substituted | Missing | Extra |
+|---|---|---|---|---|
+| Qwen3-ASR baseline | 2788 | 709 (0.228) | 416 (0.134) | 89 (0.029) |
+| Qwen3-ASR longest segment 3 s | 2818 | 782 (0.251) | 435 (0.140) | 138 (0.044) |
+| anime-whisper baseline | 2522 | 493 (0.158) | 660 (0.212) | 67 (0.022) |</p>
+<h3 id="24-what-the-tables-show-observations-not-choices">2.4 What the tables show (observations, not choices)<a class="headerlink" href="#24-what-the-tables-show-observations-not-choices" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The longest-segment limit is the only setting that moves timing substantially; end level, grow floor, gap merge and
+  end pad move the end median by at most 0.10 s.</li>
+<li>Qwen3-ASR: 2.5 s doubles the ends within 0.5 s (50 → 113) and halves the end median (1.06 → 0.49 s) with no start
+  loss; every limit of 3 s or less raises CER from 0.390 to 0.428–0.435. 4 s is the step with no text cost: ends
+  within 0.5 s 50 → 79, end median 1.06 → 0.68 s, CER 0.390 → 0.394, start median 0.33 → 0.31 s.</li>
+<li>anime-whisper: 3 s raises ends within 0.5 s from 75 to 106 and lowers the end median from 0.71 to 0.43 s, for
+  +0.007 CER and +0.016 s start median; 2.5 s and 2 s double the start error and raise CER more. 3 s together with
+  grow floor 0.15 is the best measured: ends within 0.5 s 75 → 112, end median 0.71 → 0.36 s, CER unchanged (0.392),
+  start median 0.18 → 0.20 s, 10 ground-truth lines lost against 8 for 3 s alone.</li>
+<li>Shorter limits write more lines (Qwen3-ASR 220 → 333 at 2.5 s against 305 in the ground truth) and match more
+  ground-truth lines (169 → 213).</li>
+</ul>
+<h3 id="25-limits-of-these-measurements">2.5 Limits of these measurements<a class="headerlink" href="#25-limits-of-these-measurements" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Seven drama scenes, 305 lines; no JAV scene with moans and action sound (the users' complaint, S2/S4 in the research
+  report) is in the set. The direction of the effect on JAV audio is not measured.</li>
+<li>The Netflix lines follow subtitling rules (out-time at least 0.5 s after speech, lines linked with short gaps); part
+  of every "error" is that convention.</li>
+<li>CER against non-verbatim text; only the differences between runs mean anything.</li>
+<li>One run per setting, justified by the baseline's identical repeat; not repeated for the settings themselves.</li>
+<li>One sensitivity per model was measured at first (Qwen3-ASR balanced, anime-whisper aggressive). The
+  adversary review (2026-10-05) noted anime-whisper conservative and balanced run the hysteresis decoder and were
+  unmeasured; the confirming runs (§2.6) then measured them: timing gains as on aggressive, with a text cost
+  (CER +4 % and +5.5 % relative). Qwen3-ASR conservative (6 → 4 s) remains unmeasured.</li>
+</ul>
+<h3 id="26-character-error-trace-owners-request-2026-10-05-keep-the-trace-so-a-preset-can-be-tuned-or-reverted">2.6 Character-error trace (owner's request 2026-10-05: keep the trace so a preset can be tuned or reverted)<a class="headerlink" href="#26-character-error-trace-owners-request-2026-10-05-keep-the-trace-so-a-preset-can-be-tuned-or-reverted" title="Permanent link">&para;</a></h3>
+<p>Every REQ2 run, with the settings it actually used (read from the segmenter recorder, not from notes) and its text
+measures, pooled over the 7 clips. CER = (substituted + missing + extra characters) / 3,115 ground-truth characters
+after normalisation (sound notes in brackets removed, NFKC, letters and digits only). Netflix text is not
+word-for-word, so CER compares runs; it is not an absolute accuracy. "End level None" = WhisperSeg's derived end
+level (threshold − 0.15). "End error med" here counts each run's own matched lines; §2.3 compares runs on the lines
+both matched. Produced by <code>measure-scripts/cer_trace.py</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Run</th>
+<th>Model</th>
+<th>Sensitivity</th>
+<th>Longest segment (s)</th>
+<th>Decoder</th>
+<th>Grow floor</th>
+<th>Gap merge (ms)</th>
+<th>End level</th>
+<th>End pad (ms)</th>
+<th>Group cap / gap (s)</th>
+<th>Lines</th>
+<th>Matched</th>
+<th>Ends ≤ 0.5 s</th>
+<th>End error med (s)</th>
+<th>CER</th>
+<th>Substituted</th>
+<th>Missing</th>
+<th>Extra</th>
+<th>Our chars</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>qwen3_whisperseg</td>
+<td>Qwen3-ASR</td>
+<td>balanced</td>
+<td>5.0</td>
+<td>hysteresis</td>
+<td>-</td>
+<td>-</td>
+<td>None</td>
+<td>100</td>
+<td>3.0 / 0.3</td>
+<td>220</td>
+<td>169</td>
+<td>50</td>
+<td>1.06</td>
+<td>0.390</td>
+<td>0.228</td>
+<td>0.134</td>
+<td>0.029</td>
+<td>2788</td>
+</tr>
+<tr>
+<td>q_neg020</td>
+<td>Qwen3-ASR</td>
+<td>balanced</td>
+<td>5.0</td>
+<td>hysteresis</td>
+<td>-</td>
+<td>-</td>
+<td>0.2</td>
+<td>100</td>
+<td>3.0 / 0.3</td>
+<td>217</td>
+<td>166</td>
+<td>52</td>
+<td>1.02</td>
+<td>0.387</td>
+<td>0.212</td>
+<td>0.144</td>
+<td>0.031</td>
+<td>2764</td>
+</tr>
+<tr>
+<td>q_endpad0</td>
+<td>Qwen3-ASR</td>
+<td>balanced</td>
+<td>5.0</td>
+<td>hysteresis</td>
+<td>-</td>
+<td>-</td>
+<td>None</td>
+<td>0</td>
+<td>3.0 / 0.3</td>
+<td>221</td>
+<td>168</td>
+<td>51</td>
+<td>1.06</td>
+<td>0.389</td>
+<td>0.228</td>
+<td>0.132</td>
+<td>0.029</td>
+<td>2795</td>
+</tr>
+<tr>
+<td>q_maxseg4</td>
+<td>Qwen3-ASR</td>
+<td>balanced</td>
+<td>4.0</td>
+<td>hysteresis</td>
+<td>-</td>
+<td>-</td>
+<td>None</td>
+<td>100</td>
+<td>3.0 / 0.3</td>
+<td>245</td>
+<td>186</td>
+<td>79</td>
+<td>0.72</td>
+<td>0.394</td>
+<td>0.194</td>
+<td>0.159</td>
+<td>0.041</td>
+<td>2747</td>
+</tr>
+<tr>
+<td>q_maxseg3</td>
+<td>Qwen3-ASR</td>
+<td>balanced</td>
+<td>3.0</td>
+<td>hysteresis</td>
+<td>-</td>
+<td>-</td>
+<td>None</td>
+<td>100</td>
+<td>3.0 / 0.3</td>
+<td>307</td>
+<td>209</td>
+<td>105</td>
+<td>0.50</td>
+<td>0.435</td>
+<td>0.251</td>
+<td>0.140</td>
+<td>0.044</td>
+<td>2818</td>
+</tr>
+<tr>
+<td>q_maxseg25</td>
+<td>Qwen3-ASR</td>
+<td>balanced</td>
+<td>2.5</td>
+<td>hysteresis</td>
+<td>-</td>
+<td>-</td>
+<td>None</td>
+<td>100</td>
+<td>3.0 / 0.3</td>
+<td>333</td>
+<td>213</td>
+<td>113</td>
+<td>0.47</td>
+<td>0.428</td>
+<td>0.224</td>
+<td>0.156</td>
+<td>0.048</td>
+<td>2776</td>
+</tr>
+<tr>
+<td>q_maxseg2</td>
+<td>Qwen3-ASR</td>
+<td>balanced</td>
+<td>2.0</td>
+<td>hysteresis</td>
+<td>-</td>
+<td>-</td>
+<td>None</td>
+<td>100</td>
+<td>3.0 / 0.3</td>
+<td>358</td>
+<td>212</td>
+<td>99</td>
+<td>0.54</td>
+<td>0.431</td>
+<td>0.231</td>
+<td>0.160</td>
+<td>0.039</td>
+<td>2738</td>
+</tr>
+<tr>
+<td>anime_whisperseg</td>
+<td>anime-whisper</td>
+<td>aggressive</td>
+<td>4.0</td>
+<td>offline</td>
+<td>0.05</td>
+<td>350</td>
+<td>-</td>
+<td>30</td>
+<td>2.0 / 0.2</td>
+<td>227</td>
+<td>188</td>
+<td>75</td>
+<td>0.71</td>
+<td>0.392</td>
+<td>0.158</td>
+<td>0.212</td>
+<td>0.022</td>
+<td>2522</td>
+</tr>
+<tr>
+<td>a_endpad0</td>
+<td>anime-whisper</td>
+<td>aggressive</td>
+<td>4.0</td>
+<td>offline</td>
+<td>0.05</td>
+<td>350</td>
+<td>-</td>
+<td>0</td>
+<td>2.0 / 0.2</td>
+<td>227</td>
+<td>187</td>
+<td>76</td>
+<td>0.68</td>
+<td>0.391</td>
+<td>0.158</td>
+<td>0.212</td>
+<td>0.022</td>
+<td>2523</td>
+</tr>
+<tr>
+<td>a_floor010</td>
+<td>anime-whisper</td>
+<td>aggressive</td>
+<td>4.0</td>
+<td>offline</td>
+<td>0.1</td>
+<td>350</td>
+<td>-</td>
+<td>30</td>
+<td>2.0 / 0.2</td>
+<td>222</td>
+<td>184</td>
+<td>82</td>
+<td>0.61</td>
+<td>0.394</td>
+<td>0.158</td>
+<td>0.216</td>
+<td>0.021</td>
+<td>2508</td>
+</tr>
+<tr>
+<td>a_floor015</td>
+<td>anime-whisper</td>
+<td>aggressive</td>
+<td>4.0</td>
+<td>offline</td>
+<td>0.15</td>
+<td>350</td>
+<td>-</td>
+<td>30</td>
+<td>2.0 / 0.2</td>
+<td>221</td>
+<td>184</td>
+<td>82</td>
+<td>0.60</td>
+<td>0.392</td>
+<td>0.154</td>
+<td>0.218</td>
+<td>0.021</td>
+<td>2501</td>
+</tr>
+<tr>
+<td>a_gap150</td>
+<td>anime-whisper</td>
+<td>aggressive</td>
+<td>4.0</td>
+<td>offline</td>
+<td>0.05</td>
+<td>150</td>
+<td>-</td>
+<td>30</td>
+<td>2.0 / 0.2</td>
+<td>228</td>
+<td>188</td>
+<td>77</td>
+<td>0.69</td>
+<td>0.391</td>
+<td>0.159</td>
+<td>0.211</td>
+<td>0.022</td>
+<td>2525</td>
+</tr>
+<tr>
+<td>a_maxseg3</td>
+<td>anime-whisper</td>
+<td>aggressive</td>
+<td>3.0</td>
+<td>offline</td>
+<td>0.05</td>
+<td>350</td>
+<td>-</td>
+<td>30</td>
+<td>2.0 / 0.2</td>
+<td>260</td>
+<td>194</td>
+<td>106</td>
+<td>0.43</td>
+<td>0.399</td>
+<td>0.144</td>
+<td>0.241</td>
+<td>0.013</td>
+<td>2406</td>
+</tr>
+<tr>
+<td>a_maxseg3_floor015</td>
+<td>anime-whisper</td>
+<td>aggressive</td>
+<td>3.0</td>
+<td>offline</td>
+<td>0.15</td>
+<td>350</td>
+<td>-</td>
+<td>30</td>
+<td>2.0 / 0.2</td>
+<td>258</td>
+<td>192</td>
+<td>112</td>
+<td>0.37</td>
+<td>0.392</td>
+<td>0.138</td>
+<td>0.241</td>
+<td>0.013</td>
+<td>2405</td>
+</tr>
+<tr>
+<td>a_maxseg25</td>
+<td>anime-whisper</td>
+<td>aggressive</td>
+<td>2.5</td>
+<td>offline</td>
+<td>0.05</td>
+<td>350</td>
+<td>-</td>
+<td>30</td>
+<td>2.0 / 0.2</td>
+<td>278</td>
+<td>199</td>
+<td>113</td>
+<td>0.42</td>
+<td>0.419</td>
+<td>0.141</td>
+<td>0.262</td>
+<td>0.017</td>
+<td>2352</td>
+</tr>
+<tr>
+<td>a_maxseg2</td>
+<td>anime-whisper</td>
+<td>aggressive</td>
+<td>2.0</td>
+<td>offline</td>
+<td>0.05</td>
+<td>350</td>
+<td>-</td>
+<td>30</td>
+<td>2.0 / 0.2</td>
+<td>309</td>
+<td>200</td>
+<td>106</td>
+<td>0.47</td>
+<td>0.453</td>
+<td>0.141</td>
+<td>0.291</td>
+<td>0.021</td>
+<td>2274</td>
+</tr>
+<tr>
+<td>a_cons_old6</td>
+<td>anime-whisper</td>
+<td>conservative</td>
+<td>6.0</td>
+<td>hysteresis</td>
+<td>-</td>
+<td>-</td>
+<td>None</td>
+<td>100</td>
+<td>3.0 / 0.3</td>
+<td>169</td>
+<td>142</td>
+<td>46</td>
+<td>1.14</td>
+<td>0.397</td>
+<td>0.163</td>
+<td>0.223</td>
+<td>0.011</td>
+<td>2453</td>
+</tr>
+<tr>
+<td>a_cons_new3</td>
+<td>anime-whisper</td>
+<td>conservative</td>
+<td>3.0</td>
+<td>hysteresis</td>
+<td>-</td>
+<td>-</td>
+<td>None</td>
+<td>100</td>
+<td>3.0 / 0.3</td>
+<td>236</td>
+<td>193</td>
+<td>97</td>
+<td>0.50</td>
+<td>0.413</td>
+<td>0.140</td>
+<td>0.257</td>
+<td>0.016</td>
+<td>2366</td>
+</tr>
+<tr>
+<td>a_bal_old5</td>
+<td>anime-whisper</td>
+<td>balanced</td>
+<td>5.0</td>
+<td>hysteresis</td>
+<td>-</td>
+<td>-</td>
+<td>None</td>
+<td>50</td>
+<td>2.5 / 0.25</td>
+<td>177</td>
+<td>154</td>
+<td>51</td>
+<td>1.13</td>
+<td>0.400</td>
+<td>0.175</td>
+<td>0.208</td>
+<td>0.017</td>
+<td>2518</td>
+</tr>
+<tr>
+<td>a_bal_new3</td>
+<td>anime-whisper</td>
+<td>balanced</td>
+<td>3.0</td>
+<td>hysteresis</td>
+<td>-</td>
+<td>-</td>
+<td>None</td>
+<td>50</td>
+<td>2.5 / 0.25</td>
+<td>233</td>
+<td>190</td>
+<td>95</td>
+<td>0.50</td>
+<td>0.422</td>
+<td>0.146</td>
+<td>0.263</td>
+<td>0.013</td>
+<td>2339</td>
+</tr>
+<tr>
+<td>a_cons_4</td>
+<td>anime-whisper</td>
+<td>conservative</td>
+<td>4.0</td>
+<td>hysteresis</td>
+<td>-</td>
+<td>-</td>
+<td>None</td>
+<td>100</td>
+<td>3.0 / 0.3</td>
+<td>201</td>
+<td>168</td>
+<td>74</td>
+<td>0.60</td>
+<td>0.399</td>
+<td>0.161</td>
+<td>0.219</td>
+<td>0.019</td>
+<td>2492</td>
+</tr>
+<tr>
+<td>a_bal_4</td>
+<td>anime-whisper</td>
+<td>balanced</td>
+<td>4.0</td>
+<td>hysteresis</td>
+<td>-</td>
+<td>-</td>
+<td>None</td>
+<td>50</td>
+<td>2.5 / 0.25</td>
+<td>200</td>
+<td>170</td>
+<td>74</td>
+<td>0.61</td>
+<td>0.402</td>
+<td>0.165</td>
+<td>0.217</td>
+<td>0.020</td>
+<td>2500</td>
+</tr>
+</tbody>
+</table>
+<p>The rows <code>a_cons_*</code> and <code>a_bal_*</code> are the confirming runs for anime-whisper conservative and balanced (hysteresis
+decoder; 1.9.3 value passed explicitly vs the 1.9.4 default). On the ground-truth lines both runs matched
+(<code>measure-scripts/compare_pairs.py</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Base -&gt; candidate</th>
+<th>Common lines</th>
+<th>Lost</th>
+<th>Start median (s)</th>
+<th>End median (s)</th>
+<th>End mean (s)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>a_cons_old6 -&gt; a_cons_new3</td>
+<td>135</td>
+<td>7</td>
+<td>0.225 -&gt; 0.178</td>
+<td>1.030 -&gt; 0.495</td>
+<td>+1.361 -&gt; +0.079</td>
+</tr>
+<tr>
+<td>a_bal_old5 -&gt; a_bal_new3</td>
+<td>147</td>
+<td>7</td>
+<td>0.282 -&gt; 0.219</td>
+<td>1.094 -&gt; 0.507</td>
+<td>+1.065 -&gt; +0.091</td>
+</tr>
+<tr>
+<td>a_cons_old6 -&gt; a_cons_4</td>
+<td>135</td>
+<td>7</td>
+<td>0.225 -&gt; 0.195</td>
+<td>1.131 -&gt; 0.663</td>
+<td>+1.390 -&gt; +0.609</td>
+</tr>
+<tr>
+<td>a_bal_old5 -&gt; a_bal_4</td>
+<td>143</td>
+<td>11</td>
+<td>0.300 -&gt; 0.252</td>
+<td>1.052 -&gt; 0.576</td>
+<td>+1.069 -&gt; +0.586</td>
+</tr>
+</tbody>
+</table>
+<p><strong>What the trace shows</strong>
+- A shorter longest segment always moves text from "substituted" to "missing": fewer wrong characters, more text not
+  written at all. The total CER can stay flat while text is lost (anime-whisper aggressive 3 s + grow floor 0.15:
+  CER 0.392 → 0.392, missing 0.212 → 0.241, 4.6 % fewer characters written).
+- At the 1.9.4 defaults, relative CER change against 1.9.3: Qwen3-ASR balanced +1 % (0.390 → 0.394); anime-whisper
+  aggressive 0 %; anime-whisper conservative <strong>+4 %</strong> (0.397 → 0.413); anime-whisper balanced <strong>+5.5 %</strong>
+  (0.400 → 0.422). The +10 % figures belong to Qwen3-ASR at 3 s and below (0.428–0.435), which were not adopted.
+- For the same rows, timing: lines ending within 0.5 s of the ground truth roughly double (46 → 97, 51 → 95) and the
+  median end error halves (about 1.1 → 0.5 s).</p>
+<ul>
+<li>The middle value, 4 s, for anime-whisper conservative and balanced (owner's request, same day): text as
+  in 1.9.3 (CER 0.397 → 0.399 and 0.400 → 0.402; characters written +1.6 % and −0.7 %), timing about two thirds of
+  the 3 s gain (ends within 0.5 s 46 → 74 and 51 → 74; median end error about 1.1 → 0.6 s). Aggressive at 4 s with
+  grow floor 0.15 (<code>a_floor015</code>): CER 0.392, characters −0.8 %, ends within 0.5 s 75 → 82. Qwen3-ASR at 4 s: CER
+  +1 %. So 4 s is, for every measured model and sensitivity, the step with no material text cost.</li>
+</ul>
+<p><strong>Where each value lives (to tune or revert)</strong>
+| Model, sensitivity | Longest segment now (1.9.3) | Where | Other measured lever |
+|---|---|---|---|
+| Qwen3-ASR, all | 4.0 s (6 / 5 / 4 s) | <code>whisperjav/config/qwen3_whisperseg_vad.py</code>, <code>QWEN3_WHISPERSEG_DEFAULTS["max_speech_duration_s"]</code> | — |
+| anime-whisper conservative | 4.0 s (6 s) | <code>whisperjav/config/anime_whisper_vad.py</code>, row "conservative", <code>max_speech_duration_s</code> | split rule <code>dip_search_from</code> 0.3, <code>dip_accept_any</code> (from 2026-10-06, §2.10–2.11) |
+| anime-whisper balanced | 4.0 s (5 s) | same file, row "balanced" | the same split rule |
+| anime-whisper aggressive | 4.0 s (4 s) | same file, row "aggressive" | <code>grow_floor</code> 0.15 (0.05) |
+Removing a row's <code>max_speech_duration_s</code> returns it to the WhisperSeg YAML preset
+(<code>whisperjav/config/v4/ecosystems/tools/whisperseg-speech-segmentation.yaml</code>: 6 / 5 / 4 s), which other pipelines
+and Cohere also use; change the YAML only with that in mind. All values reach every entry point through
+<code>whisperjav/config/chronosjav_vad.py</code>. Not measured: values between the tested ones (e.g. 4 s for anime-whisper
+conservative and balanced).</p>
+<h3 id="27-patterns-in-the-errors-owners-questions-2026-10-05-measure-scriptserror_patternspy">2.7 Patterns in the errors (owner's questions, 2026-10-05; <code>measure-scripts/error_patterns.py</code>)<a class="headerlink" href="#27-patterns-in-the-errors-owners-questions-2026-10-05-measure-scriptserror_patternspy" title="Permanent link">&para;</a></h3>
+<p>Six runs: Qwen3-ASR 5 s / 4 s, anime-whisper aggressive 4 s / 3 s + grow floor 0.15, anime-whisper balanced
+5 s / 3 s. Method: each clip's whole ground-truth text is aligned with our text character by character; every
+missing character is traced to its ground-truth line, its place in the line, and an estimated time (in proportion
+to the line's span). Patterns, not exact counts: the ground truth is not word-for-word.</p>
+<ul>
+<li><strong>Missing text is mostly whole lines.</strong> 59–69 % of missing characters are in ground-truth lines we did not match
+  at all. Going shorter adds loss both ways (anime aggressive 4 → 3 s: +91 missing, 57 in whole lines, 34 inside
+  matched lines; anime balanced 5 → 3 s: +169, 72 and 97).</li>
+<li><strong>What goes missing.</strong> The most frequent single gaps are interjections and short replies (う, あ, っ, ん, はい,
+  うん, ああ, あっ) and particles (は, を, も, の) — about one tenth of the missing characters; part of that is the
+  deliberate はい / うん / あ line filter. The rest is ordinary speech.</li>
+<li><strong>Start or end of a line.</strong> Missing characters are slightly over-represented in the first quarter of a line
+  (25–28 % against 23.6 % of all characters; more so at shorter limits), and for Qwen3-ASR also the last quarter
+  (27–28 %). They do not cluster at our line edges: within 0.3 s of an edge, 15–20 % of missing characters
+  against 13–22 % of all characters. Shorter windows make the models drop speech inside the window; the cut
+  points do not slice words.</li>
+<li><strong>Timing by line length.</strong> Short ground-truth lines (1–2 s) have the worst ends (median 0.9–1.6 s at 1.9.3
+  values: our line runs into the next one), and gain most from a shorter limit (2–3 s lines: 0.66–0.97 →
+  0.27–0.45 s at 3 s). Long ones (3–5 s) have the worst starts (about 0.5 s) because we split them; for anime
+  aggressive 3 s makes these starts worse (0.48 → 0.95 s). Lines cut by the length limit end far worse at 1.9.3
+  values (Qwen3-ASR 1.54 vs 0.78 s; anime balanced 1.68 vs 0.66 s); at shorter limits the gap mostly closes.</li>
+<li><strong>End error vs text errors.</strong> Per-line Spearman correlation between end error and missing or wrong characters:
+  −0.03 to +0.14 in all six runs — essentially none. For anime-whisper, lines ending more than 0.5 s late carry
+  somewhat more missing text (0.12–0.17 vs 0.09–0.13 per character). Timing and text loss are largely separate.</li>
+</ul>
+<h3 id="28-line-and-character-accounting-owners-questions-w1w5-2026-10-05-measure-scriptsline_accountingpy">2.8 Line and character accounting (owner's questions W1–W5, 2026-10-05; <code>measure-scripts/line_accounting.py</code>)<a class="headerlink" href="#28-line-and-character-accounting-owners-questions-w1w5-2026-10-05-measure-scriptsline_accountingpy" title="Permanent link">&para;</a></h3>
+<p>Base: all 305 ground-truth lines and 3,115 characters. Each clip's whole text is aligned character by character;
+every ground-truth character is exactly one of correct / wrong / missing. A <strong>missing line</strong> has none of its
+characters in our text. "Produced lines" are all other ground-truth lines; their characters are split into correct /
+wrong / missing. Positions: first quarter, middle half, last quarter of the line (expected 24 % / 52 % / 24 %).</p>
+<table>
+<thead>
+<tr>
+<th>Run</th>
+<th>Our lines</th>
+<th>Missing lines</th>
+<th>Chars in missing lines</th>
+<th>Produced lines: correct</th>
+<th>wrong</th>
+<th>missing</th>
+<th>Extra chars</th>
+<th>Missing in first / last quarter</th>
+<th>Wrong in first / last quarter</th>
+<th>Expected first / last</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>a_cons_old6</td>
+<td>169</td>
+<td>15.4%</td>
+<td>8.0%</td>
+<td>66.7%</td>
+<td>17.7%</td>
+<td>15.6%</td>
+<td>34</td>
+<td>30% / 25%</td>
+<td>28% / 20%</td>
+<td>24% / 24%</td>
+</tr>
+<tr>
+<td>a_cons_4</td>
+<td>201</td>
+<td>17.4%</td>
+<td>9.0%</td>
+<td>68.2%</td>
+<td>17.6%</td>
+<td>14.2%</td>
+<td>60</td>
+<td>28% / 26%</td>
+<td>29% / 20%</td>
+<td>24% / 24%</td>
+</tr>
+<tr>
+<td>a_cons_new3</td>
+<td>236</td>
+<td>18.0%</td>
+<td>10.5%</td>
+<td>67.4%</td>
+<td>15.7%</td>
+<td>16.9%</td>
+<td>51</td>
+<td>30% / 25%</td>
+<td>29% / 20%</td>
+<td>24% / 24%</td>
+</tr>
+<tr>
+<td>a_bal_old5</td>
+<td>177</td>
+<td>14.8%</td>
+<td>6.4%</td>
+<td>65.9%</td>
+<td>18.7%</td>
+<td>15.4%</td>
+<td>52</td>
+<td>29% / 25%</td>
+<td>27% / 22%</td>
+<td>24% / 24%</td>
+</tr>
+<tr>
+<td>a_bal_4</td>
+<td>200</td>
+<td>17.7%</td>
+<td>9.0%</td>
+<td>67.8%</td>
+<td>18.2%</td>
+<td>14.0%</td>
+<td>61</td>
+<td>28% / 24%</td>
+<td>29% / 23%</td>
+<td>24% / 24%</td>
+</tr>
+<tr>
+<td>a_bal_new3</td>
+<td>233</td>
+<td>18.7%</td>
+<td>10.9%</td>
+<td>66.4%</td>
+<td>16.4%</td>
+<td>17.2%</td>
+<td>42</td>
+<td>32% / 24%</td>
+<td>28% / 22%</td>
+<td>24% / 24%</td>
+</tr>
+<tr>
+<td>anime_whisperseg</td>
+<td>227</td>
+<td>14.8%</td>
+<td>7.0%</td>
+<td>67.7%</td>
+<td>17.0%</td>
+<td>15.2%</td>
+<td>67</td>
+<td>29% / 22%</td>
+<td>29% / 22%</td>
+<td>24% / 24%</td>
+</tr>
+<tr>
+<td>a_floor015</td>
+<td>221</td>
+<td>15.4%</td>
+<td>7.2%</td>
+<td>67.7%</td>
+<td>16.6%</td>
+<td>15.7%</td>
+<td>64</td>
+<td>29% / 24%</td>
+<td>29% / 21%</td>
+<td>24% / 24%</td>
+</tr>
+<tr>
+<td>a_maxseg3_floor015</td>
+<td>258</td>
+<td>17.7%</td>
+<td>9.0%</td>
+<td>68.2%</td>
+<td>15.2%</td>
+<td>16.6%</td>
+<td>41</td>
+<td>31% / 24%</td>
+<td>30% / 20%</td>
+<td>24% / 24%</td>
+</tr>
+<tr>
+<td>qwen3_whisperseg</td>
+<td>220</td>
+<td>11.1%</td>
+<td>5.1%</td>
+<td>67.3%</td>
+<td>24.0%</td>
+<td>8.7%</td>
+<td>89</td>
+<td>27% / 33%</td>
+<td>26% / 22%</td>
+<td>24% / 24%</td>
+</tr>
+<tr>
+<td>q_maxseg4</td>
+<td>245</td>
+<td>13.1%</td>
+<td>6.5%</td>
+<td>69.2%</td>
+<td>20.7%</td>
+<td>10.0%</td>
+<td>128</td>
+<td>29% / 30%</td>
+<td>26% / 21%</td>
+<td>24% / 24%</td>
+</tr>
+<tr>
+<td>q_maxseg3</td>
+<td>307</td>
+<td>10.2%</td>
+<td>4.0%</td>
+<td>63.5%</td>
+<td>26.1%</td>
+<td>10.4%</td>
+<td>138</td>
+<td>28% / 30%</td>
+<td>26% / 22%</td>
+<td>24% / 24%</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>5–6 s keeps the most text (fewest missing lines, about 15 %) but packs it into long lines that span two ground-
+  truth lines (late ends). 3 s misses more whole lines (18–19 %) and more characters inside produced lines (about
+  17 %), leaning to line starts. 4 s misses about as many whole lines as 3 s but writes the most complete lines
+  (anime-whisper: missing 14 %, correct 68 %); its total error rate equals 1.9.3's. Qwen3-ASR at 3 s misses fewer
+  lines but gets more characters wrong (26 %): it guesses where anime-whisper drops.</li>
+<li>Inside produced lines, missing and wrong characters lean to the first quarter (28–32 % and 26–30 %); the line's
+  very first character is wrong about twice as often as an average character.</li>
+</ul>
+<h3 id="29-why-line-starts-go-wrong-character-accuracy-step-1-measure-scriptsonset_analysispy">2.9 Why line starts go wrong (character-accuracy step 1; <code>measure-scripts/onset_analysis.py</code>)<a class="headerlink" href="#29-why-line-starts-go-wrong-character-accuracy-step-1-measure-scriptsonset_analysispy" title="Permanent link">&para;</a></h3>
+<p>Runs at the option-B values (anime-whisper conservative / balanced / aggressive at 4 s, Qwen3-ASR at 4 s). Each
+matched pair is aligned on its own; the audio window the model received is rebuilt from the recording.
+- The effect is real and it is "wrong", not "missing": first character wrong 24–33 % against about 14 % for all
+  characters; first-character missing about average. Line ends are fine (last character wrong 8–11 %).
+- About a third of first-character substitutions are spellings of names (お→美, ケ→賢, み→ミ, ニ→二). Others look
+  like a lost first sound: 君→ミ (ki-mi → mi), 黒→ロ (ku-ro → ro), 俺→レ (o-re → re), 弁→ン (be-n → n).
+- Lines that start at a forced split: first character wrong or missing 47–54 %, against 28–39 % after a pause.
+- Window start minus ground-truth start: more than 0.3 s late → first character wrong or missing 83–91 % (24–33
+  lines per run); 0–0.3 s early → 16–32 % (best); more than 0.3 s early → 39–42 %.
+- Of the late-window lines, 55–65 % start at a forced split; in 6–11 per run the opening is at the end of our
+  previous line (the split moved it); in 16–21 per run (about one matched line in ten) it is not found: not heard.
+- Ends: a window ending more than 0.3 s before the ground-truth end loses the last character 56–72 % (16–21 lines).
+- Step 2 (owner's go, same day) tests start pads, added silence and the forced-split rule (<code>run_step2.py</code>,
+  <code>experiment_hooks/</code>).</p>
+<h3 id="210-character-accuracy-step-2-start-pads-added-silence-split-rule-measure-scriptsrun_step2py-score_step2py">2.10 Character-accuracy step 2: start pads, added silence, split rule (<code>measure-scripts/run_step2.py</code>, <code>score_step2.py</code>)<a class="headerlink" href="#210-character-accuracy-step-2-start-pads-added-silence-split-rule-measure-scriptsrun_step2py-score_step2py" title="Permanent link">&para;</a></h3>
+<p>Each experiment against its option-B baseline (same 7 clips). Pads are set through the normal settings; added
+silence and the split rule through <code>measure-scripts/experiment_hooks/</code> (an experiment-only module; no product code
+changed). Every run's recording confirms the intended settings. "Late lines" = matched lines whose audio window
+starts more than 0.3 s after the ground-truth line. Start / end = medians on the lines both runs matched.</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Run</th>
+<th>CER</th>
+<th>Characters written</th>
+<th>Missing lines</th>
+<th>First char wrong</th>
+<th>Late lines</th>
+<th>Ends within 0.5 s</th>
+<th>Start (s)</th>
+<th>End (s)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>anime aggressive</td>
+<td>baseline (pad 0 / 30 ms)</td>
+<td>0.392</td>
+<td>2,501</td>
+<td>15.4 %</td>
+<td>31.5 %</td>
+<td>29</td>
+<td>82</td>
+<td>0.175</td>
+<td>0.596</td>
+</tr>
+<tr>
+<td></td>
+<td>start pad 100 ms</td>
+<td>0.390</td>
+<td>2,518</td>
+<td>15.1 %</td>
+<td>31.9 %</td>
+<td>28</td>
+<td>82</td>
+<td>0.178</td>
+<td>0.596</td>
+</tr>
+<tr>
+<td></td>
+<td>start pad 200 ms</td>
+<td>0.391</td>
+<td>2,514</td>
+<td>14.8 %</td>
+<td>31.9 %</td>
+<td>29</td>
+<td>82</td>
+<td>0.176</td>
+<td>0.596</td>
+</tr>
+<tr>
+<td></td>
+<td>start pad 300 ms</td>
+<td>0.388</td>
+<td>2,521</td>
+<td>14.4 %</td>
+<td>32.3 %</td>
+<td>29</td>
+<td>81</td>
+<td>0.176</td>
+<td>0.596</td>
+</tr>
+<tr>
+<td></td>
+<td>200 ms silence before</td>
+<td>0.387</td>
+<td>2,472</td>
+<td>15.7 %</td>
+<td>28.3 %</td>
+<td>29</td>
+<td>82</td>
+<td>0.172</td>
+<td>0.579</td>
+</tr>
+<tr>
+<td></td>
+<td>200 ms silence before and after</td>
+<td>identical to "before" (Whisper pads its input to 30 s with silence anyway)</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Qwen3-ASR</td>
+<td>baseline (pad 100 / 100 ms)</td>
+<td>0.394</td>
+<td>2,747</td>
+<td>13.1 %</td>
+<td>24.2 %</td>
+<td>33</td>
+<td>79</td>
+<td>0.291</td>
+<td>0.695</td>
+</tr>
+<tr>
+<td></td>
+<td>start pad 0 ms</td>
+<td>0.394</td>
+<td>2,742</td>
+<td>10.8 %</td>
+<td>25.5 %</td>
+<td>34</td>
+<td>79</td>
+<td>0.286</td>
+<td>0.695</td>
+</tr>
+<tr>
+<td></td>
+<td>start pad 200 ms</td>
+<td>0.387</td>
+<td>2,724</td>
+<td>12.1 %</td>
+<td>25.1 %</td>
+<td>33</td>
+<td>81</td>
+<td>0.314 (was 0.300)</td>
+<td>0.695</td>
+</tr>
+<tr>
+<td></td>
+<td>start pad 300 ms</td>
+<td>0.389</td>
+<td>2,763</td>
+<td>11.1 %</td>
+<td>25.7 %</td>
+<td>33</td>
+<td>80</td>
+<td>0.384 (was 0.311)</td>
+<td>0.695</td>
+</tr>
+<tr>
+<td></td>
+<td>200 ms silence before</td>
+<td>0.409</td>
+<td>2,848</td>
+<td>11.5 %</td>
+<td>23.0 %</td>
+<td>32</td>
+<td>79</td>
+<td>0.286</td>
+<td>0.677</td>
+</tr>
+<tr>
+<td></td>
+<td>200 ms silence before and after</td>
+<td>0.401</td>
+<td>2,822</td>
+<td>11.1 %</td>
+<td>25.5 %</td>
+<td>33</td>
+<td>79</td>
+<td>0.290</td>
+<td>0.680</td>
+</tr>
+<tr>
+<td></td>
+<td>split: dip search from 30 %, any dip</td>
+<td>0.418</td>
+<td>2,790</td>
+<td>11.8 %</td>
+<td>21.8 %</td>
+<td>30</td>
+<td>102</td>
+<td>0.303 (was 0.290)</td>
+<td>0.477 (was 0.655)</td>
+</tr>
+<tr>
+<td>anime balanced</td>
+<td>baseline (4 s)</td>
+<td>0.402</td>
+<td>2,500</td>
+<td>17.7 %</td>
+<td>32.9 %</td>
+<td>26</td>
+<td>74</td>
+<td>0.232</td>
+<td>0.614</td>
+</tr>
+<tr>
+<td></td>
+<td>split: dip search from 30 %, any dip</td>
+<td>0.405</td>
+<td>2,513</td>
+<td>17.4 %</td>
+<td>32.1 %</td>
+<td>27</td>
+<td>101</td>
+<td>0.238</td>
+<td>0.450</td>
+</tr>
+</tbody>
+</table>
+<p><strong>What it shows</strong>
+- Start pads: small text gains (CER −0.5 to −1.8 % relative; fewer missing lines), but the late lines do not move
+  (28–34 per run in every variant). They mostly start at a forced split, with no gap before them, so a start pad
+  cannot reach back into the previous segment. For Qwen3-ASR a 300 ms start pad also makes starts later on screen
+  (0.311 → 0.384 s), because today the pad is part of the displayed time.
+- Added silence: anime-whisper gains a little (CER −1.3 %, first character wrong 31.5 → 28.3 %, fewer extra
+  characters); silence after the window changes nothing. Qwen3-ASR gets worse (CER +3.8 %; more text written, more
+  of it wrong).
+- Split rule: for anime-whisper balanced it gives most of the 3 s timing gain (ends within 0.5 s 74 → 101, end
+  error 0.61 → 0.45 s) at almost no text cost (CER +0.7 %, characters +0.5 %) — where 3 s cost +5.5 %. For
+  Qwen3-ASR the same rule gains timing (79 → 102) but costs text (CER +6 %): shorter windows again.
+- Not fixed by any of these: the 16–21 lines per run whose opening is never heard. A window that may reach back
+  into the previous segment for the model only (Clar3: the model's window separate from the displayed time) is the
+  remaining candidate; it needs a code change.
+- Effects of 1–2 % relative are measured on 7 clips; runs are repeatable (identical on repeat), but small
+  differences may not hold on other material.</p>
+<h3 id="211-reach-back-window-the-two-changes-adopted-on-2026-10-06-verification-on-the-product-code">2.11 Reach-back window; the two changes adopted on 2026-10-06; verification on the product code<a class="headerlink" href="#211-reach-back-window-the-two-changes-adopted-on-2026-10-06-verification-on-the-product-code" title="Permanent link">&para;</a></h3>
+<p><strong>Reach-back (owner's Clar3, tested 2026-10-06; <code>experiment_hooks/</code>, <code>WJ_EXP_REACHBACK_MS</code>).</strong> Each window started
+300 ms earlier for the ASR model only (it may reach into the previous window); the original start became the
+window's display start, so subtitle times did not move (start median 0.176 → 0.176 s, 0.290 → 0.282 s). Result:
+| Model | CER | Missing lines | In produced lines: wrong / missing | Extra characters | First char wrong |
+|---|---|---|---|---|---|
+| anime aggressive: baseline → reach-back | 0.392 → 0.400 | 15.4 → 15.1 % | 16.6 → 18.6 % / 15.7 → 13.5 % | 64 → 71 | 31.5 → 32.6 % |
+| Qwen3-ASR: baseline → reach-back | 0.394 → 0.427 | 13.1 → 10.2 % | 20.7 → 23.3 % / 10.0 → 10.1 % | 128 → 197 | 24.2 → 25.8 % |
+More audio recovers some missing text, but the model also transcribes the end of the previous line again (more
+wrong and extra characters). Not adopted. (For these two runs the recorder logged the windows before the hook moved
+them, so their "late lines" counts in <code>onset_analysis.py</code> describe the original windows.)</p>
+<p><strong>Adopted (owner, 2026-10-06: "agreed with all 3"):</strong>
+- anime-whisper: 200 ms of silence before every window (<code>leading_silence_ms</code>, passed by the qwen/ChronosJAV pipeline
+  only; the generator's own default is 0, so the decoupled pipeline is unchanged).
+- WhisperSeg hysteresis forced split: two new settings, <code>dip_search_from</code> (default 0.6) and <code>dip_accept_any</code>
+  (default False), i.e. unchanged unless set; the anime-whisper table sets 0.3 and True for conservative and
+  balanced. Aggressive (offline decoder) and Qwen3-ASR keep the old rule.</p>
+<p><strong>Verification on the product code (no experiment settings), each against its option-B baseline:</strong>
+| Run | CER | Characters written | Missing lines | Ends within 0.5 s | End / start median (common lines) |
+|---|---|---|---|---|---|
+| anime conservative: split + lead-in (<code>f_ac</code>, <code>f_ac2</code>, identical) | 0.399 → 0.399 | 2,492 → 2,532 (+1.6 %) | 17.4 → 19.0 % | 74 → 101 | 0.553 → 0.383 s / 0.195 → 0.225 s |
+| anime balanced: split + lead-in (<code>f_ab</code>) | 0.402 → 0.394 | 2,500 → 2,532 (+1.3 %) | 17.7 → 18.7 % | 74 → 103 | 0.583 → 0.442 s / 0.225 → 0.236 s |
+| anime aggressive: lead-in (<code>f_aa</code>, <code>f_aa2</code>) | 0.392 → 0.387 | 2,501 → 2,472 (−1.2 %) | 15.4 → 15.7 % | 82 → 82 | unchanged |
+| Qwen3-ASR (<code>f_q</code>) | byte-for-byte identical to the baseline (7 of 7 files) | | | | |
+- <code>f_aa</code> and <code>f_aa2</code> are byte-for-byte identical to the experiment run <code>aa_lead200</code>: the product lead-in is the
+  experiment's lead-in.
+- <code>f_ac</code> was suspected of running without the lead-in (it started 11 s before the lead-in was moved from the
+  generator default to the pipeline); <code>f_ac2</code> on the final code is byte-for-byte identical to it, so both ran with
+  it (the worker loads both files at start). The split rule alone was measured on balanced only (<code>ab_dip30</code>).
+- The conservative and balanced rows are the first measurements of the combined change (adversary review: they are
+  new evidence, not checks of an earlier experiment).
+- The 14 entry-point runs (recorder) show <code>dip_search_from</code> 0.3 / <code>dip_accept_any</code> True for anime conservative and
+  balanced on the command line and in the ensemble, and 0.6 / False for every Qwen3-ASR run and for anime aggressive.</p>
+<p><strong>Adversary review of these two changes (2026-10-06, one <code>assessment-adversary</code>, read-only) and what was done:</strong>
+- Code correct; Qwen3-ASR and other segmenters unchanged; the GUI dialog neither sends nor drops the new settings.
+- "Subtitle times unaffected" was too strong: window edges do not move, but inside a window the text is split into
+  sentences with times proportional to text length, so different text moves those inner split points. Wording
+  corrected here.
+- The lead-in reached <code>--pipeline decoupled --generator anime-whisper</code> through the class default: fixed (default 0,
+  ChronosJAV passes 200).
+- There is no user switch to turn the lead-in off (owner's decision; not added).
+- The owner's words for these decisions were not in his words file: added (<code>docs/plans/OWNER_WORDS_SPRINT_20260927.md</code>).
+- Stale "3 s" lines in this record: corrected. Latent: the segmenter factory turns any string into <code>True</code> for a
+  boolean setting (<code>bool("false")</code>); no current path sends a string.
+- Unmeasured risk noted by the reviewer: very short windows become mostly silence for the model, where Whisper models
+  can invent text; JAV has many short sounds. Drama clips only.</p>
+<h3 id="212-193-defaults-against-the-final-194-code-scored-2026-10-06-for-the-release-notes-no-new-runs">2.12 1.9.3 defaults against the final 1.9.4 code (scored 2026-10-06 for the release notes; no new runs)<a class="headerlink" href="#212-193-defaults-against-the-final-194-code-scored-2026-10-06-for-the-release-notes-no-new-runs" title="Permanent link">&para;</a></h3>
+<p>The release-note figures. Existing runs only, re-scored: the 1.9.3 baselines (<code>req2_baseline/*/run1</code>;
+<code>req2_confirm/a_cons_old6</code>, <code>a_bal_old5</code>, which pass the 1.9.3 values explicitly) against the product-verification runs
+on the final code (<code>step2/f_q</code>, <code>f_ac2</code>, <code>f_ab</code>, <code>f_aa</code>; §2.11). Commands, from the repository root:
+<code>python measure-scripts/cer_trace.py &lt;runs…&gt;</code> and <code>python measure-scripts/compare_pairs.py &lt;base&gt; &lt;candidate&gt; …</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Model, sensitivity</th>
+<th>End median, common lines (s)</th>
+<th>Change</th>
+<th>Ends ≤ 0.5 s</th>
+<th>Matched</th>
+<th>Start median, common (s)</th>
+<th>Lost</th>
+<th>End mean (s)</th>
+<th>CER</th>
+<th>CER change (relative)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Qwen3-ASR balanced</td>
+<td>1.057 → 0.677</td>
+<td>−36 %</td>
+<td>50 → 79</td>
+<td>169 → 186</td>
+<td>0.328 → 0.311</td>
+<td>13</td>
+<td>+1.073 → +0.652</td>
+<td>0.390 → 0.394</td>
+<td>+1.0 % (worse)</td>
+</tr>
+<tr>
+<td>anime-whisper conservative</td>
+<td>1.131 → 0.482</td>
+<td>−57 %</td>
+<td>46 → 101</td>
+<td>142 → 183</td>
+<td>0.222 → 0.225</td>
+<td>9</td>
+<td>+1.377 → +0.413</td>
+<td>0.397 → 0.399</td>
+<td>+0.5 %</td>
+</tr>
+<tr>
+<td>anime-whisper balanced</td>
+<td>1.112 → 0.435</td>
+<td>−61 %</td>
+<td>51 → 103</td>
+<td>154 → 187</td>
+<td>0.289 → 0.253</td>
+<td>8</td>
+<td>+1.112 → +0.389</td>
+<td>0.400 → 0.394</td>
+<td>−1.5 % (better)</td>
+</tr>
+<tr>
+<td>anime-whisper aggressive</td>
+<td>0.690 → 0.596</td>
+<td>−14 %</td>
+<td>75 → 82</td>
+<td>188 → 184</td>
+<td>0.178 → 0.172</td>
+<td>8</td>
+<td>+0.569 → +0.554</td>
+<td>0.392 → 0.387</td>
+<td>−1.3 % (better)</td>
+</tr>
+<tr>
+<td>"Common" = the ground-truth lines both runs matched (133–180 per row); "Lost" = lines 1.9.3 matched and 1.9.4 did not.</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Same limits as §2.5: seven drama scenes, not JAV; Qwen3-ASR measured at balanced only.</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-numbers-for-release-notes-or-replies-drafts-of-facts-wording-and-use-are-the-owners-decision">3. Numbers for release notes or replies (drafts of facts; wording and use are the owner's decision)<a class="headerlink" href="#3-numbers-for-release-notes-or-replies-drafts-of-facts-wording-and-use-are-the-owners-decision" title="Permanent link">&para;</a></h2>
+<ul>
+<li>"In one library, 4 of the 40 video files checked had the same hidden fault: five 2-second holes in the audio track. In such a
+  file every subtitle after the first hole came out early, by up to 10 seconds."</li>
+<li>"The audio check reads the file alongside the audio extraction; on 2-hour films it added no measurable time."</li>
+<li>"Of 36 undamaged files (MP4, MKV, AVI, TS) none was reported."</li>
+<li>Timing figures: the 1.9.4 defaults chosen from them are in §5; nothing is released yet.</li>
+</ul>
+<h2 id="4-how-to-repeat-measure-scripts-docsmeasurementsv194scripts-others-are-in-the-repository">4. How to repeat (<code>measure-scripts/</code> = docs/measurements/v1.9.4/scripts; others are in the repository)<a class="headerlink" href="#4-how-to-repeat-measure-scripts-docsmeasurementsv194scripts-others-are-in-the-repository" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>What</th>
+<th>Command / script</th>
+<th>Data</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Source-audio probe with timings</td>
+<td><code>measure-scripts/measure/probe_source_audio_faults.py &lt;film&gt; --work &lt;dir&gt; --ffmpeg-dir &lt;bin&gt;</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Offset of extracted audio vs film time</td>
+<td><code>measure-scripts/offset_check.py</code>, <code>fix_test.py &lt;film&gt; &lt;dir&gt; t1 t2 …</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Late-starting audio</td>
+<td><code>measure-scripts/offset_start_test.py</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Check on real files / sweep</td>
+<td><code>measure-scripts/integrity_real.py &lt;work&gt; &lt;files…&gt;</code></td>
+<td>sweep outputs: <code>measure-scripts/sweep_out.txt</code>, <code>sweep2_out.txt</code></td>
+</tr>
+<tr>
+<td>Packet-list cost after / alongside extraction</td>
+<td><code>measure-scripts/scan_cost.py &lt;film&gt; after|parallel &lt;dir&gt;</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>REQ2 baseline (2 runs each)</td>
+<td><code>measure-scripts/measure/run_chronosjav_reference_runs.py --python &lt;WJ python&gt; --media-dir test_media/Ground_Truths/Netflix --out &lt;measure folder&gt;/req2_baseline --runs 2 --pairs qwen3_whisperseg anime_whisperseg --record</code></td>
+<td><code>&lt;measure folder&gt;\req2_baseline</code></td>
+</tr>
+<tr>
+<td>REQ2 settings</td>
+<td><code>measure-scripts/run_levers.py &lt;measure folder&gt;/req2_levers [names]</code> (each run's exact command is in its <code>command.json</code>)</td>
+<td><code>&lt;measure folder&gt;\req2_levers</code></td>
+</tr>
+<tr>
+<td>Scoring</td>
+<td><code>python -m whisperjav.bench.timing_cli --ref-dir test_media/Ground_Truths/Netflix --base &lt;run&gt;</code>; <code>measure-scripts/measure/score_reference_runs.py</code>; <code>measure-scripts/score_levers.py</code>, <code>late_ends.py</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>The scripts in <code>measure-scripts/</code> were written for one machine. Repository paths are found from the script's own location and ffmpeg / ffprobe / python are taken from PATH; the media library, the working folder and the measurement output folder are placeholders (<code>&lt;media library&gt;</code>, <code>&lt;work folder&gt;</code>, <code>&lt;measure folder&gt;</code>) to fill in before re-running. Films are labelled A, B, …; the label-to-title key is kept off the repository.</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h2 id="5-open-for-the-owner">5. Open for the owner<a class="headerlink" href="#5-open-for-the-owner" title="Permanent link">&para;</a></h2>
+<ol>
+<li>~~The extraction fix~~ — adopted 2026-10-05 (§1.1b).</li>
+<li>~~REQ2 defaults~~ — DECIDED 2026-10-05 (owner) and committed (77d2078 … a943545): with WhisperSeg, longest
+   segment Qwen3-ASR 4.0 s and anime-whisper 3.0 s at every sensitivity, then changed the same day to option B
+   (anime-whisper 4.0 s, commits e2a30af … fd384d4) after the confirming runs showed 3 s writes 3.5–7 % less text;
+   anime-whisper aggressive grow floor 0.15; group cap and group gap unchanged (grouping joined only 4–6 pairs per run, so it was not the cause of
+   joined sentences). Verified on all 14 entry-point runs with the segmenter recorder (CLI and ensemble, both
+   models, three sensitivities, plus a user value of 5.5 s that wins). Same day: the GUI Customize dialog's
+   decoder default fixed (it showed "offline" where hysteresis runs), and the qwen_guide.html segmenter entry
+   rewritten.</li>
+<li>~~Where the measurements live~~ — docs/measurements/v1.9.4 (owner, 2026-10-05).</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
