@@ -477,8 +477,8 @@
                                                 <option value="transformers">Transformers (HF)</option>
                                             </optgroup>
                                             <optgroup label="ChronosJAV">
-                                                <option value="qwen">Qwen3-ASR</option>
-                                                <option value="anime-whisper" selected>Anime-Whisper</option>
+                                                <option value="qwen" selected>Qwen3-ASR</option>
+                                                <option value="anime-whisper">Anime-Whisper</option>
                                                 <option value="cohere" disabled>Cohere-Transcribe (not available yet)</option>
                                             </optgroup>
                                             <optgroup label="External (CrispASR)">
@@ -550,8 +550,8 @@
                                             <!-- <option value="whisper-vad-tiny">Whisper VAD (tiny)</option> -->
                                             <!-- <option value="whisper-vad-medium">Whisper VAD (medium)</option> -->
                                             <option value="ten">TEN VAD</option>
-                                            <option value="whisperseg" selected title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). F1=0.787 on Netflix-GT JAV. For non-Japanese audio, switch to Silero v3.1.">WhisperSeg (JA-ASMR)</option>
-                                            <option value="firered-vad" title="FireRedTeam DFSMN VAD (~0.6M params, 100+ languages). Installed with WhisperJAV since v1.9.2.">FireRedVAD</option>
+                                            <option value="whisperseg" title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). F1=0.787 on Netflix-GT JAV. For non-Japanese audio, switch to Silero v3.1.">WhisperSeg (JA-ASMR)</option>
+                                            <option value="firered-vad" selected title="FireRedTeam DFSMN VAD (~0.6M params, 100+ languages). Installed with WhisperJAV since v1.9.2.">FireRedVAD</option>
                                             <option value="none">None</option>
                                         </select>
                                     </div>
@@ -645,8 +645,8 @@
                                                 <option value="transformers">Transformers (HF)</option>
                                             </optgroup>
                                             <optgroup label="ChronosJAV">
-                                                <option value="qwen" selected>Qwen3-ASR</option>
-                                                <option value="anime-whisper">Anime-Whisper</option>
+                                                <option value="qwen">Qwen3-ASR</option>
+                                                <option value="anime-whisper" selected>Anime-Whisper</option>
                                                 <option value="cohere" disabled>Cohere-Transcribe (not available yet)</option>
                                             </optgroup>
                                             <optgroup label="External (BYOP)">
@@ -660,8 +660,8 @@
                                     <div class="col-separator"></div>
                                     <div class="col-sensitivity">
                                         <select id="pass2-sensitivity" class="form-select compact" disabled>
-                                            <option value="aggressive">Aggressive</option>
-                                            <option value="balanced" selected>Balanced</option>
+                                            <option value="aggressive" selected>Aggressive</option>
+                                            <option value="balanced">Balanced</option>
                                             <option value="conservative">Conservative</option>
                                         </select>
                                     </div>
@@ -720,7 +720,7 @@
                                             <!-- <option value="whisper-vad">Whisper VAD (small)</option> -->
                                             <!-- <option value="whisper-vad-tiny">Whisper VAD (tiny)</option> -->
                                             <!-- <option value="whisper-vad-medium">Whisper VAD (medium)</option> -->
-                                            <option value="ten" selected title="TEN VAD — pass 2 default for segmentation diversity vs pass 1's WhisperSeg.">TEN VAD (default)</option>
+                                            <option value="ten" selected title="TEN VAD — pass 2 default for segmentation diversity vs pass 1's FireRedVAD.">TEN VAD (default)</option>
                                             <option value="whisperseg" title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). F1=0.787 on Netflix-GT JAV. For non-Japanese audio, switch to Silero v3.1.">WhisperSeg (JA-ASMR)</option>
                                             <option value="firered-vad" title="FireRedTeam DFSMN VAD (~0.6M params, 100+ languages). Installed with WhisperJAV since v1.9.2.">FireRedVAD</option>
                                             <option value="none">None</option>

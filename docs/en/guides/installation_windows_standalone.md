@@ -151,7 +151,7 @@ You can change this to any location. Keep these guidelines in mind:
 ### Step 6: Installation Options
 
 The installer will show optional settings:
-- **Add to PATH:** Enabled by default. Allows running `whisperjav` from the command line and enables future upgrades via `pip install -U`.
+- **Add to PATH:** Enabled by default. Allows running `whisperjav` from the command line and enables future upgrades via `whisperjav-upgrade`.
 - **Create shortcuts:** Creates a desktop shortcut for easy access.
 
 Click "Install" to begin.

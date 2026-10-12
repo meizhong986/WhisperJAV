@@ -99,6 +99,21 @@ BALANCED_DEFAULT_SEGMENTER = "faster-whisper"
 # extra install; its model weights download from HuggingFace on first use.
 FIDELITY_DEFAULT_SEGMENTER = "firered-vad"
 
+# Owner, 2026-10-12 (v1.9.5): the Ensemble defaults are pass 1 Qwen3-ASR with
+# FireRedVAD and pass 2 anime-whisper with TEN VAD, both aggressive. Keyed by
+# (pass, ChronosJAV generator); the generator comes from --passN-qwen-params
+# "generator_backend" (qwen3 when absent). On the command line they apply only
+# when the pass IS that pipeline and the user named no segmenter or sensitivity
+# (main.py apply_ensemble_pass_defaults); no pipeline default changes. The GUI
+# Ensemble tab applies the same values when the pipeline is picked (assets/app.js
+# applyPipelinePresets and the EnsembleManager start-up state). Keep them in step.
+ENSEMBLE_PASS_DEFAULTS = {
+    ("1", "qwen3"): {"speech_segmenter": "firered-vad", "sensitivity": "aggressive"},
+    ("2", "anime-whisper"): {"speech_segmenter": "ten", "sensitivity": "aggressive"},
+}
+# Every other pass keeps the sensitivity it had before v1.9.5.
+ENSEMBLE_DEFAULT_SENSITIVITY = "balanced"
+
 # Non-Silero segmenters that main.py must NOT downgrade on a single-pass run.
 #
 # main.py's routing guard sends every non-Silero backend back to silero-v3.1 on a

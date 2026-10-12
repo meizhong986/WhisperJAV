@@ -60,6 +60,30 @@ Any input FFmpeg can read works: MP4, MKV, AVI, WMV, MP3, WAV, FLAC, and so on. 
 
 ---
 
+## New in v1.9.5
+
+**A small fix release on top of 1.9.4.** On 1.9.3 or 1.9.4, upgrade with one command,
+`whisperjav-upgrade --wheel-only`, because 1.9.5 changes no library underneath WhisperJAV. Full
+detail: [**release notes**](docs/release_notes_v1.9.5_for_users.md).
+
+- **Saved output folder (GUI):** with *Remember settings* on, an empty saved output folder sent
+  subtitles into WhisperJAV's program folder. They now go next to the video (#454).
+- **Ollama translations:** repeated `<summary>` and `<scene>` blocks in a local model's reply are now
+  removed before the reply is read (#455, PR #443).
+- **DeepSeek:** the default model is now `deepseek-flash`. DeepSeek still accepts the old name,
+  `deepseek-v4-flash` (PR #457).
+- **Ensemble defaults:** pass 1 is Qwen3-ASR + FireRedVAD and pass 2 is Anime-Whisper + TEN VAD, both
+  Aggressive. Pass 2 stays off until you tick it. Saved settings are kept.
+- **Colab:** the notebook no longer replaces Colab's PyTorch. It adds the CUDA 12 libraries that
+  faster-whisper needs (#456, #447).
+
+**If you run WhisperJAV from scripts:** in a two-pass run, a pass 1 on Qwen3-ASR or a pass 2 on
+anime-whisper now defaults to Aggressive with FireRedVAD (pass 1) or TEN (pass 2). In 1.9.4 it was
+Balanced with WhisperSeg. A pass 1 on Qwen3-ASR stops before transcribing if FireRedVAD is not
+installed. See [Changes](docs/release_notes_v1.9.5_for_users.md#changes).
+
+---
+
 ## New in v1.9.4
 
 **Bug fixes, hardening, and better subtitle timing for ChronosJAV.** On 1.9.3, upgrade with one
@@ -227,7 +251,7 @@ The same decoupled design is why new models can be added without rebuilding the 
 
 Different pipelines miss different lines. Ensemble mode runs your file through two pipelines and merges the results.
 
-**The v1.9 default pairing:** pass 1 = **anime-whisper** with WhisperSeg VAD, pass 2 = **Qwen3-ASR** with TEN VAD — two different recognizers *and* two different VADs, so their blind spots don't overlap.
+**The v1.9.5 default pairing:** pass 1 = **Qwen3-ASR** with FireRedVAD, pass 2 = **anime-whisper** with TEN VAD, both on Aggressive — two different recognizers *and* two different VADs, so their blind spots don't overlap. In the GUI, pass 2 runs once you tick it.
 
 ```bash
 whisperjav video.mp4 --ensemble \
@@ -334,7 +358,7 @@ A few known-good recipes:
 
 | Goal | Pass 1 | Pass 2 | Merge |
 |---|---|---|---|
-| The v1.9 default | anime-whisper · semantic · WhisperSeg · aggressive | Qwen3-ASR · semantic · TEN | `pass1_primary` |
+| The v1.9.5 default | Qwen3-ASR · semantic · FireRedVAD · aggressive | anime-whisper · semantic · TEN · aggressive | `pass1_primary` |
 | Classic + modern | balanced · large-v2 | qwen (or the Anime-Galgame finetune) | `pass1_primary` |
 | Quiet/ASMR recall | fidelity · aggressive | anime-whisper · aggressive | `longest` |
 | Second opinion on the model only | your usual recipe | same recipe, different ASR model | `pass1_primary` |

@@ -58,19 +58,21 @@ DEFAULT_GUI_SETTINGS = {
     "async_processing": False,
 
     # Tab 3 — Ensemble  (values MUST match index.html `selected` attrs)
-    "pass1_pipeline": "anime-whisper",
+    # v1.9.5 (owner, 2026-10-12): pass 1 Qwen3-ASR + FireRedVAD, pass 2
+    # Anime-Whisper + TEN VAD, both aggressive; pass 2 off by default.
+    "pass1_pipeline": "qwen",
     "pass1_sensitivity": "aggressive",
     "pass1_scene_detector": "semantic",
     "pass1_speech_enhancer": "none",
-    "pass1_speech_segmenter": "whisperseg",
-    "pass1_model": "litagin/anime-whisper",
+    "pass1_speech_segmenter": "firered-vad",
+    "pass1_model": "Qwen/Qwen3-ASR-1.7B",
     "pass2_enabled": False,
-    "pass2_pipeline": "qwen",
-    "pass2_sensitivity": "balanced",
+    "pass2_pipeline": "anime-whisper",
+    "pass2_sensitivity": "aggressive",
     "pass2_scene_detector": "semantic",
     "pass2_speech_enhancer": "none",
     "pass2_speech_segmenter": "ten",
-    "pass2_model": "Qwen/Qwen3-ASR-1.7B",
+    "pass2_model": "litagin/anime-whisper",
     "merge_strategy": "pass1_primary",
     "pass1_preset": "",
     "pass2_preset": "",

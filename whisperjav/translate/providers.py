@@ -11,7 +11,10 @@ PROVIDER_CONFIGS = {
         # 'deepseek-v4-pro' (thinking, was deepseek-reasoner).
         # Source: https://api-docs.deepseek.com/zh-cn/
         # Users wanting the thinking model can override via: --model deepseek-v4-pro
-        'model': 'deepseek-v4-flash',
+        # v1.9.5 (PR #457): DeepSeek's API page (read 2026-10-12) names the flash
+        # model 'deepseek-flash'; 'deepseek-v4-flash' is still accepted but its
+        # model is retired. Flash can think; core.py switches thinking off for it.
+        'model': 'deepseek-flash',
         'env_var': 'DEEPSEEK_API_KEY',
         'api_base': 'https://api.deepseek.com'
     },
