@@ -1228,6 +1228,30 @@ const DirectoryControls = {
         }
     },
 
+    // #454: called after Remember settings restores the form. The "Save next to source
+    // video" box is not saved; the Output field is, and the field is what the run sends
+    // as --output-dir. So set the box from the field: blank or "source" means next to
+    // the video (a blank used to stay under a ticked box and reach the program as
+    // --output-dir "", which wrote into site-packages); any other folder means that
+    // folder, with the box unticked so the screen shows where the files will go.
+    syncOutputDir() {
+        const sourceCheckbox = document.getElementById('outputToSource');
+        const outputDirInput = document.getElementById('outputDir');
+        const browseBtn = document.getElementById('browseOutputBtn');
+        if (!sourceCheckbox || !outputDirInput) return;
+        const value = (outputDirInput.value || '').trim();
+        const toSource = !value || value.toLowerCase() === 'source';
+        sourceCheckbox.checked = toSource;
+        if (toSource) {
+            outputDirInput.value = 'source';
+        } else {
+            this._savedOutputDir = outputDirInput.value;
+        }
+        AppState.outputDir = outputDirInput.value;
+        outputDirInput.disabled = toSource;
+        if (browseBtn) browseBtn.disabled = toSource;
+    },
+
     async browseOutput() {
         try {
             const result = await pywebview.api.select_output_directory();
@@ -8417,6 +8441,9 @@ const SettingsPersistence = {
             if (toggle) toggle.checked = this.enabled;
             if (this.enabled) {
                 this.applyToForm(settings);
+                // #454: the box must agree with the restored Output field; save the result
+                DirectoryControls.syncOutputDir();
+                this.scheduleSave();
                 // after the selectors are back, restore each pass's preset label
                 await this.restorePresets(settings);
             }

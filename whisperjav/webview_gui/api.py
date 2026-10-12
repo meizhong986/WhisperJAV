@@ -99,6 +99,19 @@ class WhisperJAVAPI:
         self._process_started_at: float = 0.0
         self._run_summary: Optional[Dict[str, Any]] = None
 
+    def _output_dir(self, options: Dict[str, Any]) -> Any:
+        """
+        The output folder to pass on as --output-dir.
+
+        #454: a blank value (an empty folder saved by Remember settings) counts as
+        not given. Passed on as --output-dir "", it resolved against this
+        process's working folder, site-packages, and the subtitles landed there.
+        """
+        value = options.get('output_dir')
+        if value is None or not str(value).strip():
+            return self.default_output
+        return value
+
     # ========================================================================
     # Process Management
     # ========================================================================
@@ -172,7 +185,7 @@ class WhisperJAVAPI:
         if scene_method:
             args += ["--scene-detection-method", scene_method]
 
-        output_dir = options.get('output_dir', self.default_output)
+        output_dir = self._output_dir(options)
         args += ["--output-dir", output_dir]
 
         # Optional paths
@@ -282,7 +295,7 @@ class WhisperJAVAPI:
         args += ["--subs-language", subs_language]
 
         # Output directory
-        output_dir = options.get('output_dir', self.default_output)
+        output_dir = self._output_dir(options)
         args += ["--output-dir", output_dir]
 
         # Device is always passed (essential arg)
@@ -374,7 +387,7 @@ class WhisperJAVAPI:
         args += ["--subs-language", subs_language]
 
         # Output directory
-        output_dir = options.get('output_dir', self.default_output)
+        output_dir = self._output_dir(options)
         args += ["--output-dir", output_dir]
 
         # CrispASR-specific args
@@ -441,7 +454,7 @@ class WhisperJAVAPI:
             List of expected output SRT file paths
         """
         inputs = options.get('inputs', [])
-        output_dir = options.get('output_dir', self.default_output)
+        output_dir = self._output_dir(options)
         source_language = options.get('source_language', 'japanese')
 
         # Also check 'mode' key for backward compatibility with start_process
@@ -1977,7 +1990,7 @@ class WhisperJAVAPI:
         args += ["--task", task]
 
         # Output directory
-        output_dir = options.get('output_dir', self.default_output)
+        output_dir = self._output_dir(options)
         args += ["--output-dir", output_dir]
 
         # Parameter overrides - pass as JSON
@@ -3367,7 +3380,7 @@ class WhisperJAVAPI:
         args += ["--merge-strategy", merge_strategy]
 
         # Output directory
-        output_dir = config.get('output_dir', self.default_output)
+        output_dir = self._output_dir(config)
         args += ["--output-dir", output_dir]
 
         # Subtitle language mode
