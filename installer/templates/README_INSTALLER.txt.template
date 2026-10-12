@@ -28,52 +28,29 @@ WHAT'S NEW IN v{{VERSION}}
 {{! being built, because nobody rewrote it. Rewrite it or delete it; do not
 {{! leave the previous release's text in place. Lines starting {{! are stripped
 {{! by build_release.py and never reach the user.
-1. SUBTITLES STAY IN TIME IN FILMS WITH DAMAGED AUDIO
-   - Some downloaded films have hidden holes in their audio track. In those
-     files every subtitle after the first hole came out early -- by up to 10
-     seconds in the films we measured.
-   - WhisperJAV now fills the holes with silence while extracting the audio,
-     so subtitle times stay in step with the video.
-   - Every file is checked. A damaged file is still transcribed, and the run
-     summary lists it as "suspect", with the reason. To stop such files
-     instead, tick "Treat 'suspect' files as failures" on the Transcription
-     Adv. Options tab.
+1. SAVED OUTPUT FOLDER (GUI)
+   - With "Remember settings" on, an empty saved output folder sent your
+     subtitles into WhisperJAV's program folder. They now go next to the
+     video, as the "Save next to source video" box shows.
 
-2. CHRONOSJAV TIMING (Qwen3-ASR and anime-whisper)
-   - An attempt to make lines end closer to the speech. The longest piece
-     of speech sent to the model is now 4 seconds at every sensitivity, with
-     the WhisperSeg, TEN and FireRedVAD speech segmenters. On seven drama
-     scenes, measured with WhisperSeg, the typical late end shrank by 10 to
-     24 %, with the text about the same. Not yet measured on JAV.
-   - TEN now cuts long speech at the quietest point, never past the limit.
-   - Qwen3-ASR with WhisperSeg: no padding after each piece of speech (it
-     was 100 ms).
-   - anime-whisper hears 200 ms of silence before each piece of audio,
-     except with the Silero speech segmenters, where it is off. The new
-     "Silence Before Each Window (ms)" setting changes it; 0 turns it off.
-   - The Customize Parameters window shows the values the run will use.
+2. TRANSLATION
+   - Ollama: local models sometimes repeat <summary> and <scene> blocks in
+     a reply, and these could end up as subtitle lines. WhisperJAV now
+     removes the repeated blocks before reading the reply. Ollama only.
+   - DeepSeek: the default model is now deepseek-flash, DeepSeek's current
+     name. DeepSeek still accepts the old name, deepseek-v4-flash. If you
+     saved deepseek-v4-flash, it is kept.
 
-3. TRANSLATION
-   - Gemini's default model is now gemini-3.6-flash. Google has shut down
-     the old default, gemini-2.0-flash.
-   - Your translation choices are remembered between launches.
-   - Two-pass translation to a custom server now sends your API key.
-   - A custom server keeps its own temperature unless you set one.
+3. ENSEMBLE MODE DEFAULTS
+   - Pass 1 now starts as Qwen3-ASR with FireRedVAD, and pass 2 as
+     Anime-Whisper with TEN VAD, both on Aggressive. Pass 2 stays off
+     until you tick it.
+   - With "Remember settings" on, your saved rows are kept until you
+     change them.
 
-4. OTHER FIXES
-   - On Balanced and Faster, a speech piece of a few milliseconds at the
-     edge of a scene, which could crash the run, is now joined to its
-     neighbour.
-   - If the ForcedAligner cannot be loaded, the transcribed text is kept
-     and the file is marked "suspect", instead of the job failing.
-   - The command line finds the bundled FFmpeg without activating the
-     environment first.
-   - Single-pass Fidelity now uses the TEN, WhisperSeg or whisper-vad speech
-     segmenter you choose.
-
-5. INSTALLING
-   - If PyTorch does not load after it is installed (a damaged download
-     cache), the installer downloads it once more, past the cache.
+4. INSTALLING
+   - On 1.9.3 or 1.9.4, "whisperjav-upgrade --wheel-only" is enough:
+     1.9.5 changes no library underneath WhisperJAV.
 
 For the full release notes, see the v{{VERSION}} release page:
 https://github.com/meizhong986/WhisperJAV/releases
