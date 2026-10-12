@@ -7453,7 +7453,8 @@ const TranslatorManager = {
     providerModels: {
         local: ['gemma-9b', 'llama-8b', 'llama-3b', 'auto'],
         // #325: deepseek-chat/-reasoner deprecate 2026-07-24; v4 names per
-        // https://api-docs.deepseek.com/ (flash = non-thinking, pro = thinking)
+        // https://api-docs.deepseek.com/ (pro = thinking; flash is sent with thinking off).
+        // v1.9.5 (PR #457): flash is now 'deepseek-flash'; 'deepseek-v4-flash' still accepted.
         deepseek: ['deepseek-flash', 'deepseek-v4-pro'],
         gemini: ['gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite'],  // WP-002: 2.0 / 1.5 are retired
         claude: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022', 'claude-3-opus-20240229'],
@@ -8008,7 +8009,8 @@ const TranslationSettingsModal = {
     providerModels: {
         local: ['gemma-9b', 'llama-8b', 'llama-3b', 'auto'],
         // #325: deepseek-chat/-reasoner deprecate 2026-07-24; v4 names per
-        // https://api-docs.deepseek.com/ (flash = non-thinking, pro = thinking)
+        // https://api-docs.deepseek.com/ (pro = thinking; flash is sent with thinking off).
+        // v1.9.5 (PR #457): flash is now 'deepseek-flash'; 'deepseek-v4-flash' still accepted.
         deepseek: ['deepseek-flash', 'deepseek-v4-pro'],
         gemini: ['gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite'],  // WP-002: 2.0 / 1.5 are retired
         claude: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022', 'claude-3-opus-20240229'],

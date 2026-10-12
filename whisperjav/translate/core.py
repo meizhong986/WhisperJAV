@@ -793,7 +793,7 @@ def translate_subtitle(
         translator = init_translator(options, translation_provider=provider)
 
         # =====================================================================
-        # DeepSeek: turn reasoning off for v4-flash (#395)
+        # DeepSeek: turn reasoning off for flash (deepseek-flash, deepseek-v4-flash) (#395)
         # =====================================================================
         # DeepSeek made v4 models reason by default server-side, which is slow,
         # rate-limit hungry, and can leak reasoning text into the subtitles.
