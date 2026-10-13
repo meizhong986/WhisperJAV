@@ -130,12 +130,17 @@ class ConfigManager:
             # Validate before saving
             self._validate_config(self._config)
             
-            # Create backup if requested
+            # Create backup if requested. v1.10.0: backups go to the user settings
+            # folder, never next to asr_config.json, which sits inside the package
+            # (backups written there were packed into the 1.9.x wheels).
             if backup and self.config_path.exists():
-                backup_path = self.config_path.with_suffix(
+                from whisperjav.settings.gui_settings import get_gui_settings_path
+                backup_dir = get_gui_settings_path().parent / "config_backups"
+                backup_path = backup_dir / self.config_path.with_suffix(
                     f'.backup.{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
-                )
+                ).name
                 try:
+                    backup_dir.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(self.config_path, backup_path)
                     logger.info(f"Created backup: {backup_path}")
                 except Exception as e:
