@@ -60,6 +60,7 @@ docs/design/
 docs/plan/
 docs/plans/
 docs/requirements/
+docs/measurements/
 docs/research/
 docs/drafts/
 docs/testing/
@@ -121,9 +122,12 @@ installer/generated/
 installer/*.whl
 installer/build_log_*.txt
 
-# Reference scripts (local development only, except translate_docs.py)
-scripts/
+# Reference scripts (local development only, except translate_docs.py and the
+# measurement tools in scripts/measure/ -- owner, 2026-10-13: tools go into git,
+# measurement documents (docs/measurements/) stay private)
+scripts/*
 !scripts/translate_docs.py
+!scripts/measure/
 
 # Analysis output files
 *_ANALYSIS_REPORT.md
