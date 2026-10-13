@@ -375,7 +375,14 @@ exclude = ["tests*", "docs*", "installer*", "notebook*"]
 
 [tool.setuptools.package-data]
 whisperjav = [
-    "config/*.json",
+    # v1.10.0 (N1): named one by one -- "config/*.json" also packed the
+    # untracked asr_config.backup.*.json files lying in the working folder.
+    "config/asr_config.json",
+    "config/asr_config.pre_v189_cleanup.json",
+    "config/asr_config_v1.6_beta.json",
+    "config/asr_config_v1_5_4.json",
+    "config/config.template.json",
+    "config/ollama_models.json",
     "config/v4/**/*.yaml",
     "config/v4/**/*.md",
     "config/components/**/*.py",
