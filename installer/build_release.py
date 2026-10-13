@@ -10,6 +10,11 @@ Usage:
     python build_release.py --dry-run # Preview without changes
     python build_release.py --clean   # Remove generated files
     python build_release.py --validate # Validate only
+    python build_release.py --check-tree          # Only: no uncommitted/untracked files?
+    python build_release.py --check-wheel <wheel> # Only: every package file tracked by git?
+
+A full build stops if the working tree is not committed (checked after phase 1)
+or if the wheel holds a package file that git does not track.
 """
 
 import os
@@ -386,6 +391,17 @@ __version_info__ = {{
         print(f"\n  Generated {generated_count} files")
         return True
 
+    def remove_stale_build_dirs(self):
+        """v1.10.0 (N1): remove setuptools' leftovers from earlier builds.
+
+        A stale whisperjav.egg-info/SOURCES.txt and build/lib/ carry files from old
+        builds into the new wheel even after the package-data rules stop matching them.
+        """
+        for stale in (self.project_root / "build", self.project_root / "whisperjav.egg-info"):
+            if stale.exists():
+                shutil.rmtree(stale)
+                print(f"  Removed stale {stale.name}/")
+
     def build_wheel(self):
         """Build wheel package."""
         self.print_header("Phase 3: Build Wheel Package")
@@ -401,6 +417,8 @@ __version_info__ = {{
         if dist_dir.exists():
             for whl in dist_dir.glob("*.whl"):
                 whl.unlink()
+
+        self.remove_stale_build_dirs()
 
         # Build wheel (PEP 517 via python -m build)
         try:
@@ -431,6 +449,73 @@ __version_info__ = {{
             return False
 
         return True
+
+    def _git_lines(self, *args):
+        """Run a git command in the project root; return its output lines."""
+        result = subprocess.run(
+            ["git", *args], cwd=self.project_root, capture_output=True, text=True, check=True
+        )
+        return [line for line in result.stdout.splitlines() if line]
+
+    def check_tree(self):
+        """v1.10.0 (N1): stop if the working tree holds uncommitted or untracked files.
+
+        The wheel is built from the working folder, so anything lying there can end up
+        in it. Runs after phase 1, so a __version__.py that differs from VERSION must be
+        committed first. Ignored files are not listed here; check_wheel() catches those.
+        """
+        self.print_header("Check: Working Tree Committed")
+        try:
+            dirty = self._git_lines("status", "--porcelain")
+        except (OSError, subprocess.CalledProcessError) as e:
+            print(f"  {RED}✗{RESET} git status failed: {e}")
+            return False
+        if not dirty:
+            print(f"  {GREEN}✓{RESET} No uncommitted or untracked files")
+            return True
+        print(f"  {RED}✗{RESET} {len(dirty)} uncommitted or untracked file(s):")
+        for line in dirty:
+            print(f"      {line}")
+        if self.dry_run:
+            print(f"  [DRY-RUN] A real build would stop here")
+            return True
+        print("  Commit, move or delete them, then build again.")
+        return False
+
+    def check_wheel(self, wheel_path):
+        """v1.10.0 (N1): stop if the wheel holds a package file that git does not track.
+
+        Catches ignored files the package-data rules pick up (the 1.9.x wheels shipped
+        50 asr_config.backup.*.json files this way).
+        """
+        import zipfile
+
+        self.print_header("Check: Wheel Holds Only Tracked Files")
+        wheel_path = Path(wheel_path)
+        if not wheel_path.exists():
+            if self.dry_run:
+                print(f"  [DRY-RUN] Would check {wheel_path.name}")
+                return True
+            print(f"  {RED}✗{RESET} Wheel not found: {wheel_path}")
+            return False
+        try:
+            tracked = set(self._git_lines("ls-files", "whisperjav"))
+        except (OSError, subprocess.CalledProcessError) as e:
+            print(f"  {RED}✗{RESET} git ls-files failed: {e}")
+            return False
+        with zipfile.ZipFile(wheel_path) as zf:
+            entries = [n for n in zf.namelist() if n.startswith("whisperjav/") and not n.endswith("/")]
+        untracked = sorted(n for n in entries if n not in tracked)
+        if not untracked:
+            print(f"  {GREEN}✓{RESET} All {len(entries)} package files in {wheel_path.name} are tracked by git")
+            return True
+        print(f"  {RED}✗{RESET} {len(untracked)} file(s) in {wheel_path.name} are not tracked by git:")
+        for name in untracked:
+            print(f"      {name}")
+        if self.dry_run:
+            print(f"  [DRY-RUN] A real build would stop here")
+            return True
+        return False
 
     def copy_static_files(self):
         """Copy static files (LICENSE, icon) to generated directory."""
@@ -512,7 +597,10 @@ __version_info__ = {{
         steps = [
             ("Update __version__.py", self.update_version_py),
             ("Generate from templates", self.generate_from_templates),
+            ("Check working tree", self.check_tree),
             ("Build wheel package", self.build_wheel),
+            ("Check wheel contents", lambda: self.check_wheel(
+                self.project_root / "dist" / f"whisperjav-{self.version}-py3-none-any.whl")),
             ("Copy static files", self.copy_static_files),
             ("Run validation", self.run_validation),
         ]
@@ -538,9 +626,19 @@ def main():
     parser.add_argument('--dry-run', action='store_true', help='Preview without making changes')
     parser.add_argument('--clean', action='store_true', help='Remove generated files')
     parser.add_argument('--validate', action='store_true', help='Run validation only')
+    parser.add_argument('--check-tree', action='store_true',
+                        help='Only check that the working tree has no uncommitted or untracked files')
+    parser.add_argument('--check-wheel', metavar='WHEEL',
+                        help='Only check that every package file in WHEEL is tracked by git')
     args = parser.parse_args()
 
     builder = ReleaseBuilder(dry_run=args.dry_run)
+
+    if args.check_tree:
+        return 0 if builder.check_tree() else 1
+
+    if args.check_wheel:
+        return 0 if builder.check_wheel(args.check_wheel) else 1
 
     if args.clean:
         builder.clean()
