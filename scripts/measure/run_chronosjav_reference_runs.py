@@ -1,5 +1,7 @@
-"""ChronosJAV reference runs: Qwen3-ASR (balanced) and anime-whisper (aggressive), each with every speech segmenter
-(WhisperSeg, TEN, FireRedVAD, Silero), run N times over a folder of reference clips. The command lines are the ones
+"""ChronosJAV reference runs: Qwen3-ASR and anime-whisper, each with every speech segmenter (WhisperSeg, TEN,
+FireRedVAD, Silero), run N times over a folder of reference clips. Without --sensitivities, Qwen3-ASR runs at balanced
+and anime-whisper at aggressive (the 1.9.3 baseline batch); with --sensitivities, every pair runs at each one given
+and its folder name ends in the sensitivity (e.g. qwen3_ten_conservative). The command lines are the ones
 the GUI's Ensemble tab builds for a pass-1-only run in the default timestamp mode (no aligner).
 
 Optional recording: with --record, the speech segmenter recorder (segmenter_recorder/sitecustomize.py) is put on
@@ -10,7 +12,8 @@ which shows whether the recorder left the output unchanged.
 
 Usage:
     python run_chronosjav_reference_runs.py --python <install>\\python.exe --media-dir <clips> --out <folder>
-        [--runs 2] [--pairs qwen3_whisperseg anime_ten ...] [--record] [--compare-with <folder>]
+        [--runs 2] [--pairs qwen3_whisperseg anime_ten ...] [--sensitivities conservative balanced aggressive]
+        [--record] [--compare-with <folder>]
 
 Each run goes to <out>/<pair>/run<k>/ with command.json, run.log and the SRTs; a DONE marker lets an interrupted
 batch resume. A summary is written to <out>/status.json.
@@ -23,10 +26,11 @@ import subprocess
 import time
 from pathlib import Path
 
+DEFAULT_SENSITIVITY = {"qwen3": "balanced", "anime": "aggressive"}
 GENERATORS = {
-    "qwen3": ["--pass1-sensitivity", "balanced", "--pass1-model", "Qwen/Qwen3-ASR-1.7B",
+    "qwen3": ["--pass1-model", "Qwen/Qwen3-ASR-1.7B",
               "--pass1-qwen-params", json.dumps({"framer": "vad-grouped"})],
-    "anime": ["--pass1-sensitivity", "aggressive", "--pass1-model", "litagin/anime-whisper",
+    "anime": ["--pass1-model", "litagin/anime-whisper",
               "--pass1-qwen-params", json.dumps({"framer": "vad-grouped", "generator_backend": "anime-whisper",
                                                  "timestamp_mode": "vad_only", "assembly_cleaner": "passthrough",
                                                  "stepdown": False})],
@@ -34,6 +38,7 @@ GENERATORS = {
 SEGMENTERS = ["whisperseg", "ten", "firered-vad", "silero"]
 PAIRS = [f"{g}_{s}" for g in GENERATORS for s in SEGMENTERS]
 RECORDER = Path(__file__).resolve().parent / "segmenter_recorder"
+TRACER = Path(__file__).resolve().parent / "call_tracer"
 
 
 def main():
@@ -43,21 +48,31 @@ def main():
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--runs", type=int, default=2)
     ap.add_argument("--pairs", nargs="+", default=PAIRS, choices=PAIRS)
+    ap.add_argument("--sensitivities", nargs="+", choices=["conservative", "balanced", "aggressive"],
+                    help="run every pair at each of these (folder name gets the sensitivity)")
     ap.add_argument("--record", action="store_true", help="also record speech segmenter data (framing.jsonl)")
+    ap.add_argument("--trace", action="store_true",
+                    help="trace threshold/padding values at the calls that use them (calls.jsonl); not with --record")
+    ap.add_argument("--glob", default="*.mkv", help="which clips in --media-dir (default *.mkv)")
     ap.add_argument("--compare-with", type=Path, help="earlier batch folder; compare SRTs with its run1")
     a = ap.parse_args()
 
-    media = [str(p) for p in sorted(a.media_dir.glob("*.mkv"))]
+    media = [str(p) for p in sorted(a.media_dir.glob(a.glob))]
     status = []
     for run in range(1, a.runs + 1):
-        for pair in a.pairs:
+        if a.sensitivities:
+            jobs = [(p, s, f"{p}_{s}") for p in a.pairs for s in a.sensitivities]
+        else:
+            jobs = [(p, DEFAULT_SENSITIVITY[p.split("_", 1)[0]], p) for p in a.pairs]
+        for pair, sens, name in jobs:
             gen, seg = pair.split("_", 1)
-            out = a.out / pair / f"run{run}"
+            out = a.out / name / f"run{run}"
             if (out / "DONE").exists():
                 continue
             out.mkdir(parents=True, exist_ok=True)
             cmd = [a.python, "-m", "whisperjav.main", *media, "--ensemble", "--pass1-pipeline", "qwen",
-                   *GENERATORS[gen], "--pass1-scene-detector", "semantic", "--pass1-speech-segmenter", seg,
+                   "--pass1-sensitivity", sens, *GENERATORS[gen],
+                   "--pass1-scene-detector", "semantic", "--pass1-speech-segmenter", seg,
                    "--merge-strategy", "pass1_primary", "--output-dir", str(out),
                    "--subs-language", "native", "--language", "japanese"]
             (out / "command.json").write_text(json.dumps(cmd, indent=1), encoding="utf-8")
@@ -66,15 +81,19 @@ def main():
                 rec_file = out / "framing.jsonl"
                 rec_file.unlink(missing_ok=True)
                 env.update(PYTHONPATH=str(RECORDER), WJ_RECORD_OUT=str(rec_file))
+            elif a.trace:
+                trace_file = out / "calls.jsonl"
+                trace_file.unlink(missing_ok=True)
+                env.update(PYTHONPATH=str(TRACER), WJ_TRACE_OUT=str(trace_file))
             t0 = time.monotonic()
             with open(out / "run.log", "w", encoding="utf-8", errors="replace") as log:
                 rc = subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT, env=env).returncode
             text = (out / "run.log").read_text(encoding="utf-8", errors="replace")
-            rec = {"pair": pair, "run": run, "exit": rc, "seconds": round(time.monotonic() - t0, 1),
+            rec = {"pair": name, "run": run, "exit": rc, "seconds": round(time.monotonic() - t0, 1),
                    "backend_seen": f"backend={seg}" in text, "no_aligner": "0.0% aligner" in text,
                    "n_srt": len(list(out.glob("*.srt")))}
             if a.compare_with:
-                ref = a.compare_with / pair / "run1"
+                ref = a.compare_with / name / "run1"
                 names = sorted(p.name for p in ref.glob("*.srt"))
                 rec["srts_identical"] = sum((out / n).exists() and filecmp.cmp(ref / n, out / n, shallow=False)
                                             for n in names)
