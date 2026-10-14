@@ -191,9 +191,6 @@ OPTIONAL_IMPORTS: Set[str] = {
     "nvidia",         # nvidia-ml-py for GPU detection
     "pynvml",         # Alternative NVIDIA ML bindings
 
-    # Local LLM (installed separately with CUDA detection)
-    "llama_cpp",      # llama-cpp-python is installed separately
-
     # Optional speech backends (try/except guarded)
     "nemo",           # NVIDIA NeMo speech
     "whisperx",       # WhisperX alternative
