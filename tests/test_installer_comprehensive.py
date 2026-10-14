@@ -81,32 +81,25 @@ class TestDriverVersionParsing:
 class TestCUDAVersionSelection:
     """Test CUDA version selection based on driver."""
 
-    def test_select_cu128_for_modern_driver(self):
-        """Test CUDA 12.8 selection for driver 570+."""
+    def test_select_cu130_for_driver_580(self):
+        """v1.10.0: driver 580+ gets CUDA 13.0 (the only stack)."""
         from whisperjav.installer.core.detector import _select_cuda_version
 
-        # Driver 570+ should get cu128
-        cuda, url, msg = _select_cuda_version((570, 0, 0))
-        assert cuda == "cu128"
-        assert "cu128" in url
+        cuda, url, msg = _select_cuda_version((580, 0, 0))
+        assert cuda == "cu130"
+        assert "cu130" in url
 
-        cuda, url, msg = _select_cuda_version((580, 10, 5))
-        assert cuda == "cu128"
+        cuda, url, msg = _select_cuda_version((610, 47, 0))
+        assert cuda == "cu130"
 
-    def test_select_cu118_for_older_driver(self):
-        """Test CUDA 11.8 selection for driver 450-569."""
+    def test_driver_below_580_gets_no_cuda_build(self):
+        """v1.10.0: below 580 there is no CUDA build; install.py stops and asks for an update."""
         from whisperjav.installer.core.detector import _select_cuda_version
 
-        # Driver 450-569 should get cu118
-        cuda, url, msg = _select_cuda_version((450, 0, 0))
-        assert cuda == "cu118"
-        assert "cu118" in url
-
-        cuda, url, msg = _select_cuda_version((569, 99, 99))
-        assert cuda == "cu118"
-
-        cuda, url, msg = _select_cuda_version((520, 50, 0))
-        assert cuda == "cu118"
+        for driver in [(579, 99, 99), (570, 0, 0), (520, 50, 0), (450, 0, 0)]:
+            cuda, url, msg = _select_cuda_version(driver)
+            assert cuda is None, driver
+            assert "580" in msg
 
     def test_select_cpu_for_old_driver(self):
         """Test CPU fallback for very old drivers."""
@@ -228,18 +221,24 @@ class TestGPUDetection:
         # Mock driver version query
         driver_result = MagicMock()
         driver_result.returncode = 0
-        driver_result.stdout = "570.00.00\n"
+        driver_result.stdout = "580.00.00\n"
 
         # Mock GPU name query
         name_result = MagicMock()
         name_result.returncode = 0
         name_result.stdout = "NVIDIA GeForce RTX 4090\n"
 
-        mock_run.side_effect = [driver_result, name_result]
+        # v1.10.0: the compute capability is read too
+        cc_result = MagicMock()
+        cc_result.returncode = 0
+        cc_result.stdout = "8.9\n"
+
+        mock_run.side_effect = [driver_result, name_result, cc_result]
 
         result = detect_gpu()
         assert result.detected is True
-        assert result.cuda_version == "cu128"
+        assert result.cuda_version == "cu130"
+        assert result.compute_capability == (8, 9)
         assert result.detection_method == "nvidia-smi"
         assert "RTX 4090" in result.name
 
@@ -481,12 +480,12 @@ class TestCUDADriverMatrix:
             prev_driver = entry.min_driver
 
     def test_matrix_has_entries(self):
-        """Test that CUDA matrix has at least cu118 and cu128."""
-        from whisperjav.installer.core.config import CUDA_DRIVER_MATRIX
+        """v1.10.0: the matrix chooses CUDA 13.0 only; cu128 is an index for the fallback."""
+        from whisperjav.installer.core.config import CUDA_DRIVER_MATRIX, TORCH_INDEXES
 
         cuda_versions = {entry.cuda_version for entry in CUDA_DRIVER_MATRIX}
-        assert "cu118" in cuda_versions, "Missing cu118 entry"
-        assert "cu128" in cuda_versions, "Missing cu128 entry"
+        assert cuda_versions == {"cu130"}
+        assert set(TORCH_INDEXES) == {"cu130", "cu128", "cpu"}
 
     def test_torch_index_urls_valid(self):
         """Test that torch index URLs are valid."""
@@ -525,7 +524,7 @@ class TestConfigConstants:
             PYTHON_MAX_VERSION,
         )
 
-        assert PYTHON_MIN_VERSION < PYTHON_MAX_VERSION
+        assert PYTHON_MIN_VERSION <= PYTHON_MAX_VERSION
         assert PYTHON_MIN_VERSION >= (3, 10)
         assert PYTHON_MAX_VERSION <= (3, 13)
 
@@ -1010,7 +1009,7 @@ class TestPostInstallTemplate:
 
         # The extras the Windows installer ships — build_release.py installer_extras
         installer_extras = [
-            "cli", "gui", "translate", "llm", "enhance",
+            "cli", "gui", "translate", "enhance",
             "huggingface", "qwen", "analysis", "compatibility",
         ]
 
