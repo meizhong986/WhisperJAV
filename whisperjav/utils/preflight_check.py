@@ -61,6 +61,29 @@ except ImportError:
         BRIGHT = RESET_ALL = ''
 
 
+# v1.10.0 (item 2): texts the owner approved (W43, M1b) or that wait for his wording (DRAFT).
+RELEASE_195_URL = "https://github.com/meizhong986/WhisperJAV/releases/tag/v1.9.5"
+MIN_COMPUTE_CAPABILITY_110 = (7, 5)
+OLD_CARD_TEXT_110 = f"WhisperJAV 1.10 does not support this card; WhisperJAV 1.9.5 does: {RELEASE_195_URL}"
+# DRAFT, not yet approved by the owner:
+CUBLAS12_MISSING_TEXT = ("The CUDA 12 files that Balanced, Fast and Faster need on the GPU ({files}) "
+                         "are missing from the ctranslate2 folder. Run the WhisperJAV installer again.")
+# DRAFT, not yet approved by the owner (W43 (3) approved that the line exists):
+CU128_STACK_TEXT = ("This PC runs the CUDA 12.8 build of WhisperJAV: when it was installed, the CUDA 12 "
+                    "library could not be loaded next to CUDA 13.")
+
+
+def cublas12_files_missing() -> List[str]:
+    """Placed cuBLAS 12 files missing on a CUDA 13.0 install ([] otherwise; spec C)."""
+    try:
+        from whisperjav.installer.cublas12 import missing_files, read_stack
+        if read_stack() != "cu130":
+            return []
+        return missing_files()
+    except Exception:
+        return []
+
+
 class CheckStatus(Enum):
     """Status of a pre-flight check."""
     PASS = "PASS"
@@ -95,6 +118,7 @@ class PreflightChecker:
         self._check_python_version()
         self._check_cuda_availability()
         self._check_pytorch_cuda()
+        self._check_cublas12_for_faster_whisper()
         self._check_gpu_memory()
         self._check_ffmpeg()
         self._check_disk_space()
@@ -107,12 +131,35 @@ class PreflightChecker:
         # Return False if any fatal check failed
         return not any(r.fatal and r.status == CheckStatus.FAIL for r in self.results)
     
+    def _check_cublas12_for_faster_whisper(self):
+        """v1.10.0: the stack this PC was installed with, and its cuBLAS 12 files."""
+        try:
+            from whisperjav.installer.cublas12 import read_stack
+            stack = read_stack()
+        except Exception:
+            return
+        if stack == "cu128":
+            self.results.append(CheckResult(
+                name="CUDA build", status=CheckStatus.INFO, message=CU128_STACK_TEXT))
+            return
+        if stack != "cu130":
+            return
+        missing = cublas12_files_missing()
+        if missing:
+            self.results.append(CheckResult(
+                name="cuBLAS 12 for faster-whisper", status=CheckStatus.FAIL,
+                message=CUBLAS12_MISSING_TEXT.format(files=", ".join(missing))))
+        else:
+            self.results.append(CheckResult(
+                name="cuBLAS 12 for faster-whisper", status=CheckStatus.PASS,
+                message="cublas64_12.dll and cublasLt64_12.dll are in the ctranslate2 folder"))
+
     def _check_python_version(self):
         """Check Python version compatibility."""
         version = sys.version_info
         version_str = f"{version.major}.{version.minor}.{version.micro}"
         
-        if version >= (3, 10) and version < (3, 13):
+        if version[:2] == (3, 13):
             self.results.append(CheckResult(
                 name="Python Version",
                 status=CheckStatus.PASS,
@@ -123,7 +170,7 @@ class PreflightChecker:
                 name="Python Version",
                 status=CheckStatus.FAIL,
                 message=f"Python {version_str} is not supported",
-                details=["Supported versions: 3.10, 3.11, 3.12 (3.13+ breaks openai-whisper)"],
+                details=["Supported version: 3.13 (WhisperJAV 1.10)"],
                 fatal=True
             ))
     
@@ -147,6 +194,11 @@ class PreflightChecker:
                     except Exception:  # noqa: BLE001 - cannot judge; report availability only
                         capability, arch_list = None, []
                     if capability and not cuda_build_supports_device(capability, arch_list):
+                        if tuple(capability) < MIN_COMPUTE_CAPABILITY_110:
+                            first = [OLD_CARD_TEXT_110]
+                        else:
+                            first = ["1. Install a PyTorch build with kernels for this card",
+                                     "   (see https://pytorch.org/get-started/locally/)"]
                         self.results.append(CheckResult(
                             name="CUDA Availability",
                             status=CheckStatus.FAIL,
@@ -157,8 +209,7 @@ class PreflightChecker:
                                 f"This build has kernels for: {', '.join(arch_list)}",
                                 "",
                                 "Solutions:",
-                                "1. Install a PyTorch build with kernels for this card",
-                                "   (see https://pytorch.org/get-started/locally/)",
+                                *first,
                                 "2. Or use --accept-cpu-mode to run in CPU mode (slower)",
                             ],
                             fatal=True
@@ -504,11 +555,16 @@ class PreflightChecker:
         failures = [r for r in self.results if r.status == CheckStatus.FAIL]
         warnings = [r for r in self.results if r.status == CheckStatus.WARN]
         passes = [r for r in self.results if r.status == CheckStatus.PASS]
-        
+        infos = [r for r in self.results if r.status == CheckStatus.INFO]
+
         # Display each group
         for result in passes:
             self._display_result(result, Fore.GREEN)
-        
+
+        # v1.10.0: the CUDA 12.8 line (W43 (3)) is INFO; nothing was shown for INFO before.
+        for result in infos:
+            self._display_result(result, Fore.CYAN)
+
         for result in warnings:
             self._display_result(result, Fore.YELLOW)
             
@@ -962,6 +1018,9 @@ def enforce_gpu_requirement(accept_cpu_mode=False):
         # Check for any GPU (CUDA or MPS)
         best_device = get_best_device()
         if best_device in ('cuda', 'mps'):
+            missing = cublas12_files_missing()
+            if missing:
+                print(f"\n{Fore.YELLOW}{CUBLAS12_MISSING_TEXT.format(files=', '.join(missing))}{Style.RESET_ALL}\n")
             return True
 
         # #411 (owner, 2026-09-06): a GPU is present but this PyTorch build has no
@@ -978,8 +1037,12 @@ def enforce_gpu_requirement(accept_cpu_mode=False):
             print(f"  {_dd.CUDA_UNUSABLE_REASON}\n")
             print("Running on this card would end as an empty file reported as success.\n")
             print(f"{Fore.CYAN}Your options:{Style.RESET_ALL}")
-            print("  - Install a PyTorch build with kernels for this card")
-            print("    (see https://pytorch.org/get-started/locally/), or")
+            cap = _dd.CUDA_UNUSABLE_CAPABILITY
+            if cap is not None and tuple(cap) < MIN_COMPUTE_CAPABILITY_110:
+                print(f"  - {OLD_CARD_TEXT_110}, or")
+            else:
+                print("  - Install a PyTorch build with kernels for this card")
+                print("    (see https://pytorch.org/get-started/locally/), or")
             print("  - Continue on the CPU instead (much slower; the ChronosJAV pipelines")
             print("    pick CUDA on their own and may still fail there).")
             print("\n  Run 'whisperjav --check' for detailed diagnostics\n")
