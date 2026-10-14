@@ -273,24 +273,41 @@ class TestEnvironmentConfiguration:
 # Upgrade Package Tests (with mocked subprocess)
 # =============================================================================
 
-class TestUpgradePackage:
-    """Tests for upgrade_package() function with mocked subprocess."""
+LOCKED = Path(__file__).parent.parent / "whisperjav" / "installer" / "locked"
 
-    def test_upgrade_success(self, temp_install_dir, capsys):
-        """Test successful package upgrade."""
+
+@pytest.fixture
+def recorded_cu130(temp_install_dir, monkeypatch):
+    """v1.10.0 (item 2f): an installer install records its PyTorch build, and the new
+    release's package carries the locked files (the real tracked ones stand in)."""
+    (temp_install_dir / "whisperjav_stack.txt").write_text("cu130\n", encoding="utf-8")
+    monkeypatch.setattr(upgrade, "_installed_locked_file",
+                        lambda python_exe, stack: LOCKED / f"requirements_{stack}.txt")
+    return temp_install_dir
+
+
+class TestUpgradePackage:
+    """upgrade_package_with_extras() on an installer install, subprocess mocked (item 2f)."""
+
+    def test_upgrade_success(self, recorded_cu130, capsys):
+        """The release without dependencies, then its locked file, never a range install."""
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "Successfully installed whisperjav"
         mock_result.stderr = ""
 
-        with patch('subprocess.run', return_value=mock_result):
-            result = upgrade.upgrade_package(temp_install_dir)
+        with patch('subprocess.run', return_value=mock_result) as run:
+            result = upgrade.upgrade_package_with_extras(recorded_cu130, "all")
             assert result is True
+        commands = [c.args[0] for c in run.call_args_list]
+        assert all("--no-deps" in cmd for cmd in commands), commands
+        assert not any("-U" in cmd and "--no-deps" not in cmd for cmd in commands)
 
         captured = capsys.readouterr()
+        assert "Upgrading with release-pinned dependencies (CUDA 13.0)..." in captured.out
         assert "successfully" in captured.out.lower()
 
-    def test_upgrade_failure(self, temp_install_dir, capsys):
+    def test_upgrade_failure(self, recorded_cu130, capsys):
         """Test failed package upgrade."""
         mock_result = MagicMock()
         mock_result.returncode = 1
@@ -298,16 +315,16 @@ class TestUpgradePackage:
         mock_result.stderr = "Error: Could not find package"
 
         with patch('subprocess.run', return_value=mock_result):
-            result = upgrade.upgrade_package(temp_install_dir)
+            result = upgrade.upgrade_package_with_extras(recorded_cu130, "all")
             assert result is False
 
         captured = capsys.readouterr()
         assert "failed" in captured.out.lower()
 
-    def test_upgrade_timeout(self, temp_install_dir, capsys):
+    def test_upgrade_timeout(self, recorded_cu130, capsys):
         """Test package upgrade timeout."""
         with patch('subprocess.run', side_effect=subprocess.TimeoutExpired("pip", 1800)):
-            result = upgrade.upgrade_package(temp_install_dir)
+            result = upgrade.upgrade_package_with_extras(recorded_cu130, "all")
             assert result is False
 
         captured = capsys.readouterr()
@@ -317,8 +334,9 @@ class TestUpgradePackage:
         """Test upgrade when pip is not found."""
         empty_dir = tmp_path / "nopip"
         empty_dir.mkdir()
+        (empty_dir / "whisperjav_stack.txt").write_text("cu130\n", encoding="utf-8")
 
-        result = upgrade.upgrade_package(empty_dir)
+        result = upgrade.upgrade_package_with_extras(empty_dir, "all")
         assert result is False
 
         captured = capsys.readouterr()
@@ -579,8 +597,9 @@ class TestUpdateLauncher:
 class TestFullUpgradeFlow:
     """Integration test for the full upgrade flow with mocked subprocess."""
 
-    def test_full_upgrade_flow_success(self, temp_install_dir, capsys, monkeypatch):
+    def test_full_upgrade_flow_success(self, recorded_cu130, capsys, monkeypatch):
         """Test complete upgrade flow succeeds."""
+        temp_install_dir = recorded_cu130
         # Isolate from real environment
         monkeypatch.setattr(sys, 'prefix', str(temp_install_dir))
 
