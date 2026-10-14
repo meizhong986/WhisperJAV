@@ -30,6 +30,7 @@ Features:
 """
 
 import os
+import re
 import sys
 import glob
 import json
@@ -74,13 +75,6 @@ GITHUB_RELEASES_API = os.environ.get(
 )
 GITHUB_REPO = os.environ.get('WHISPERJAV_UPGRADE_REPO') or GITHUB_GIT_URL
 
-# Packages to fix AFTER main installation (ensure consistent versions).
-# numpy: the same range as pyproject.toml (v1.10.0; numba 0.68 needs <2.6).
-FIX_PACKAGES = [
-    "numpy>=2.5,<2.6",
-    "librosa>=0.11.0",
-]
-
 # Files to preserve during upgrade (user data)
 PRESERVE_PATTERNS = [
     ".whisperjav_cache",
@@ -109,13 +103,19 @@ VALID_EXTRAS = [
 
 IS_WINDOWS = platform.system() == 'Windows'
 
-# PyTorch index URLs for uv sync (source installs). v1.10.0: cu130 is the stack;
-# cu128 is the per-PC fallback of item 2 spec D.
+# PyTorch builds. v1.10.0: cu130 is the stack; cu128 is the per-PC fallback of item 2
+# spec D. v1.10.0 (item 2f, owner W53-W56): every upgrade installs the new release's
+# locked versions for the build this PC has -- uv.lock exported per build into
+# whisperjav/installer/locked/ -- and never resolves version ranges.
 PYTORCH_INDEXES = {
     "cpu": "https://download.pytorch.org/whl/cpu",
     "cu128": "https://download.pytorch.org/whl/cu128",
     "cu130": "https://download.pytorch.org/whl/cu130",
 }
+VARIANT_LABELS = {"cu130": "CUDA 13.0", "cu128": "CUDA 12.8", "cpu": "CPU"}
+# uv.lock extra per build; macOS ("metal") uses cpu, whose index has the Apple wheels.
+LOCKED_EXTRAS = {"cu130": "cu130", "cu128": "cu128", "cpu": "cpu", "metal": "cpu"}
+TORCH_PACKAGE_NAMES = ("torch", "torchaudio", "torchvision")
 
 
 # =============================================================================
@@ -234,6 +234,100 @@ def place_cublas12_after_upgrade(install_dir: Path) -> None:
 
 
 # =============================================================================
+# Release-pinned dependencies (item 2f)
+# =============================================================================
+
+def _requirement_name(line: str) -> str:
+    """'torch==2.11.0+cu130' / 'stable-ts @ git+...' / 'x==1 ; marker' -> normalized name."""
+    name = re.split(r"[=<>!~;@\[\s]", line.strip(), maxsplit=1)[0]
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def _conda_python_packages(install_dir: Path) -> Dict[str, str]:
+    """Python packages conda put into this installation: normalized name -> version.
+
+    Owner W52: conda never owns a package pip/uv installs, so these lines are left out.
+    """
+    owned: Dict[str, str] = {}
+    for record in (install_dir / "conda-meta").glob("*.json"):
+        try:
+            data = json.loads(record.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        files = data.get("files") or []
+        if any(str(f).replace("\\", "/").lower().startswith("lib/site-packages/") for f in files):
+            owned[re.sub(r"[-_.]+", "-", str(data.get("name", ""))).lower()] = str(data.get("version", ""))
+    return owned
+
+
+def _installed_locked_file(python_exe: Path, stack: str) -> Optional[Path]:
+    """The locked file of `stack` inside the whisperjav package this Python now has."""
+    try:
+        r = subprocess.run(
+            [str(python_exe), "-c",
+             "import importlib.util; "
+             "print(list(importlib.util.find_spec('whisperjav').submodule_search_locations)[0])"],
+            capture_output=True, text=True, timeout=60)
+    except Exception:
+        return None
+    if r.returncode != 0 or not r.stdout.strip():
+        return None
+    path = Path(r.stdout.strip().splitlines()[-1]) / "installer" / "locked" / f"requirements_{stack}.txt"
+    return path if path.is_file() else None
+
+
+def install_locked_requirements(install_dir: Path, stack: str) -> bool:
+    """Install the release-pinned dependencies of the whisperjav package just installed.
+
+    Everything but PyTorch from PyPI, then PyTorch's three packages from the build's
+    index; both --no-deps, as the file is complete. Lines for packages conda owns here
+    are left out (owner W52).
+    """
+    python_exe, pip_exe = _find_python(install_dir), _find_pip(install_dir)
+    if python_exe is None or pip_exe is None:
+        print_error("pip not found in installation")
+        return False
+    locked = _installed_locked_file(python_exe, stack)
+    if locked is None:
+        print_error(f"The new release has no locked requirements file for {stack}")
+        return False
+    lines = [l.strip() for l in locked.read_text(encoding="utf-8").splitlines()
+             if l.strip() and not l.lstrip().startswith("#")]
+    conda_owned = _conda_python_packages(install_dir)
+    torch_lines = [l for l in lines if _requirement_name(l) in TORCH_PACKAGE_NAMES]
+    rest = [l for l in lines
+            if _requirement_name(l) not in TORCH_PACKAGE_NAMES and _requirement_name(l) not in conda_owned]
+
+    print(f"      Upgrading with release-pinned dependencies ({VARIANT_LABELS[stack]})...")
+    rest_file = install_dir / f"requirements_upgrade_{stack}.txt"
+    try:
+        rest_file.write_text("\n".join(rest) + "\n", encoding="utf-8")
+        steps = [
+            ([str(pip_exe), "install", "--no-deps", "-r", str(rest_file)], "dependencies"),
+            ([str(pip_exe), "install", "--no-deps", *torch_lines,
+              "--index-url", PYTORCH_INDEXES[stack]], "PyTorch"),
+        ]
+        for cmd, what in steps:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+            if result.returncode != 0:
+                print_error(f"Installing the release-pinned {what} failed: {(result.stderr or '')[:500]}")
+                return False
+    except subprocess.TimeoutExpired:
+        print_error("Package upgrade timed out")
+        return False
+    except Exception as e:
+        print_error(f"Package upgrade error: {e}")
+        return False
+    finally:
+        try:
+            rest_file.unlink()
+        except OSError:
+            pass
+    print_success(f"Release-pinned dependencies installed ({len(rest) + len(torch_lines)} packages)")
+    return True
+
+
+# =============================================================================
 # Source Install Detection
 # =============================================================================
 
@@ -302,7 +396,7 @@ def _detect_cuda_for_source() -> str:
             # e.g. "12.8" -> "cu128"
             normalized = cuda_ver.replace(".", "")
             key = f"cu{normalized}"
-            if key in PYTORCH_INDEXES:
+            if key in VARIANT_LABELS:
                 return key
             return "cu130"
     except Exception:
@@ -389,25 +483,22 @@ def _run_uv_sync_upgrade(source_root: Path, extras: str = "all") -> bool:
         env_type = "conda" if os.environ.get("CONDA_PREFIX") == target_env else "venv"
         print(f"      Upgrading into {env_type} environment: {target_env}")
 
-    cmd = ["uv", "sync"]
+    # --frozen: the versions uv.lock records, never re-resolved (item 2f). The three
+    # PyTorch builds are extras that cannot be combined, so never --all-extras.
+    cmd = ["uv", "sync", "--frozen"]
 
     # --inexact for external envs: don't remove packages we didn't install
     if is_external:
         cmd.append("--inexact")
 
-    if extras == "all":
-        # Sync all extras
-        cmd.extend(["--all-extras"])
-    else:
-        for extra in extras.split(","):
-            extra = extra.strip()
-            if extra:
-                cmd.extend(["--extra", extra])
+    for extra in extras.split(","):
+        extra = extra.strip()
+        if extra:
+            cmd.extend(["--extra", extra])
+    variant = LOCKED_EXTRAS.get(cuda_version, "cpu")
+    cmd.extend(["--extra", variant])
 
-    # Override pytorch index based on GPU
-    if cuda_version != "metal" and cuda_version in PYTORCH_INDEXES:
-        cmd.extend(["--index", f"pytorch={PYTORCH_INDEXES[cuda_version]}"])
-
+    print(f"      Upgrading with release-pinned dependencies ({VARIANT_LABELS[variant]})...")
     print(f"      Running: {' '.join(cmd)}")
     try:
         result = subprocess.run(
@@ -920,95 +1011,6 @@ def check_network() -> bool:
         return False
 
 
-def upgrade_package(install_dir: Path) -> bool:
-    """
-    Upgrade the whisperjav package from GitHub with all dependencies.
-
-    For source installs (has uv.lock), uses ``git pull && uv sync``.
-    For conda-constructor installs, uses pip with GPU constraints.
-
-    Args:
-        install_dir: Path to installation directory
-
-    Returns:
-        True if successful, False otherwise
-    """
-    # Source install path: git pull + uv sync
-    source_root = _find_source_root()
-    if source_root:
-        print("      Source install detected — using git pull + uv sync")
-        return _run_uv_sync_upgrade(source_root, extras="all")
-
-    # Conda-constructor / pip install path: pip with GPU constraints
-    pip_exe = _find_pip(install_dir)
-    if pip_exe is None:
-        print_error("pip not found in installation")
-        return False
-
-    gpu_args = _gpu_constraint_args(install_dir)
-    print("      Installing whisperjav from GitHub (this may take several minutes)...")
-    print("      (New dependencies will be downloaded as needed)")
-    if gpu_args:
-        print("      (GPU constraints active — CUDA wheels protected)")
-    try:
-        result = subprocess.run(
-            [str(pip_exe), 'install', '-U'] + gpu_args + [GITHUB_REPO],
-            capture_output=True,
-            text=True,
-            timeout=1800
-        )
-        if result.returncode != 0:
-            print_error(f"Package upgrade failed: {result.stderr[:500]}")
-            return False
-    except subprocess.TimeoutExpired:
-        print_error("Package upgrade timed out")
-        return False
-    except Exception as e:
-        print_error(f"Package upgrade error: {e}")
-        return False
-
-    print_success("Package upgraded successfully")
-    return True
-
-
-def fix_package_versions(install_dir: Path) -> bool:
-    """
-    Fix package versions after main installation.
-
-    Ensures numpy and librosa are at the correct versions.
-
-    Args:
-        install_dir: Path to installation directory
-
-    Returns:
-        True if successful, False otherwise
-    """
-    pip_exe = _find_pip(install_dir)
-    if pip_exe is None:
-        print_error("pip not found in installation")
-        return False
-
-    # GPU protection: --constraint prevents pip from replacing CUDA wheels
-    gpu_args = _gpu_constraint_args(install_dir)
-    print("      Upgrading numpy and librosa to latest versions...")
-    try:
-        result = subprocess.run(
-            [str(pip_exe), 'install', '--upgrade'] + gpu_args + FIX_PACKAGES,
-            capture_output=True,
-            text=True,
-            timeout=300
-        )
-        if result.returncode == 0:
-            print_success("numpy and librosa upgraded")
-            return True
-        else:
-            print_warning("Package upgrade had issues, but continuing...")
-            return True
-    except Exception as e:
-        print_warning(f"Package upgrade error: {e}")
-        return True  # Non-fatal
-
-
 def update_launcher(install_dir: Path) -> bool:
     """
     Update the WhisperJAV-GUI.exe launcher in the installation root.
@@ -1291,40 +1293,17 @@ def upgrade_package_with_extras(install_dir: Path, extras: str) -> bool:
         print(f"      Source install detected — using git pull + uv sync [{extras}]")
         return _run_uv_sync_upgrade(source_root, extras=extras)
 
-    # Conda-constructor / pip install path
-    pip_exe = _find_pip(install_dir)
-    if pip_exe is None:
-        print_error("pip not found in installation")
+    # Conda-constructor / pip install path (item 2f): the new release's package without
+    # dependencies, then its locked file for the build this PC has. The installer
+    # installed every extra, and the locked file is the whole set, so --extras does
+    # not narrow it here.
+    stack = read_installed_stack(install_dir)
+    if stack not in VARIANT_LABELS:
+        print_error("This installation's PyTorch build is not recorded (whisperjav_stack.txt)")
         return False
-
-    if extras == "all":
-        install_spec = f"whisperjav[all] @ {GITHUB_REPO}"
-    else:
-        extras_list = [e.strip() for e in extras.split(",") if e.strip()]
-        extras_str = ",".join(extras_list)
-        install_spec = f"whisperjav[{extras_str}] @ {GITHUB_REPO}"
-
-    gpu_args = _gpu_constraint_args(install_dir)
-    print(f"      Installing whisperjav[{extras}] from GitHub...")
-    print("      (This may take several minutes)")
-    if gpu_args:
-        print("      (GPU constraints active — CUDA wheels protected)")
-
-    try:
-        result = subprocess.run(
-            [str(pip_exe), 'install', '-U'] + gpu_args + [install_spec],
-            capture_output=True,
-            text=True,
-            timeout=1800
-        )
-        if result.returncode != 0:
-            print_error(f"Package upgrade failed: {result.stderr[:500]}")
-            return False
-    except subprocess.TimeoutExpired:
-        print_error("Package upgrade timed out")
+    if not upgrade_package_wheel_only(install_dir):
         return False
-    except Exception as e:
-        print_error(f"Package upgrade error: {e}")
+    if not install_locked_requirements(install_dir, stack):
         return False
 
     print_success(f"Package upgraded successfully with [{extras}] extras")
@@ -1665,12 +1644,11 @@ def main() -> int:
                 print_error("Rollback failed - installation may be in inconsistent state")
         return 1
 
-    # Step 2: Fix package versions (numpy/librosa) — skipped for source installs
+    # Step 2: the versions are the release's locked ones (step 1, item 2f); the old
+    # numpy/librosa "newest" step is gone. cuBLAS 12 is placed again on CUDA 13.0.
     print_step(2, total_steps, "Fixing package versions...")
     if _find_source_root():
         print_success("Source install — uv.lock handles version pinning")
-    else:
-        fix_package_versions(install_dir)
     place_cublas12_after_upgrade(install_dir)
 
     # Step 3: Update launcher
