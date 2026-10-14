@@ -72,13 +72,6 @@ PROVIDER_CONFIGS = {
         'supports_system_messages': True,
         'supports_streaming': True,
     },
-    # DEPRECATED in v1.8.10. To be removed in a later release.
-    # Users should migrate to 'ollama' provider.
-    'local': {
-        'pysubtrans_name': 'Local',  # Marker for local LLM bypass
-        'model': 'llama-8b',          # Default: good quality, 6GB VRAM
-        'env_var': None               # No API key needed
-    },
     'custom': {
         'pysubtrans_name': 'Custom Server',  # Custom Server avoids Responses API misrouting (#178)
         'model': '',                   # User provides via --translate-model
@@ -88,11 +81,27 @@ PROVIDER_CONFIGS = {
 
 # Every entry carries the name the user types after --translate-provider.
 # 'pysubtrans_name' cannot serve that purpose: it is the name of PySubtrans's
-# client class, and local, ollama, glm, groq and custom all use 'Custom Server'.
+# client class, and ollama, glm, groq and custom all use 'Custom Server'.
 # Code that has to tell the providers apart -- which server failed, whose log to
 # point at -- reads 'whisperjav_provider'.
 for _provider_key, _provider_config in PROVIDER_CONFIGS.items():
     _provider_config.setdefault('whisperjav_provider', _provider_key)
+
+
+# v1.10.0 (REQ2, owner W22 (1), W42 (2)): the 'local' provider -- the llama-cpp-python
+# server WhisperJAV started itself -- is removed; Ollama is the only local translator.
+# A saved 'local' choice is read as 'ollama' with one console line (settings.py);
+# 'local' typed on a command line stops with an error. Texts approved by the owner (W43).
+REMOVED_LOCAL_PROVIDER = 'local'
+LOCAL_MODEL_NAMES = {'llama-8b', 'gemma-9b', 'llama-3b', 'auto'}  # the removed provider's models
+SAVED_LOCAL_NOTICE = ("Local translation with llama-cpp was removed in 1.10; "
+                      "your saved choice now uses Ollama.")
+
+
+def removed_local_provider_error(flag: str = '--provider') -> str:
+    """The error for 'local' typed after a provider flag (owner's text M5, W43)."""
+    return (f"Error: {flag} local (llama-cpp) was removed in WhisperJAV 1.10. "
+            f"Use {flag} ollama for local translation.")
 
 
 SUPPORTED_SOURCES = {'japanese', 'korean', 'chinese', 'english'}
