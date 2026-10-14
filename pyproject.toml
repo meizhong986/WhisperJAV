@@ -31,7 +31,9 @@ readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "MeiZhong"}]
 maintainers = [{name = "MeiZhong"}]
-requires-python = ">=3.10,<3.14"
+# v1.10.0: Python 3.13 only (owner, REQ2). The lower bound also stops a 1.9.x
+# `whisperjav-upgrade` on Python 3.10 from installing 1.10 out of `main`.
+requires-python = ">=3.13,<3.14"
 keywords = [
     "whisper",
     "transcription",
@@ -53,9 +55,6 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Multimedia :: Sound/Audio :: Speech",
     "Topic :: Multimedia :: Video",
@@ -80,7 +79,10 @@ dependencies = [
     #
     # CTranslate2 4.6.2 reproduces the #125 crash on exit (0xC0000409); 4.8.1 does not.
     "faster-whisper @ git+https://github.com/SYSTRAN/faster-whisper.git@ed9a06cd89a93e47838f564998a6c09b655d7f43",
-    "ctranslate2==4.8.1",
+    # v1.10.0: 4.8.3 (#459), taken without measurement (owner, W36 (4)). It has no
+    # CUDA 13 build; on Windows it runs on the cuBLAS 12 DLLs the installer places
+    # in its package folder.
+    "ctranslate2==4.8.3",
 
     # Audio/video handling
     "ffmpeg-python @ git+https://github.com/kkroening/ffmpeg-python.git",
@@ -115,8 +117,11 @@ dependencies = [
 # PyTorch ecosystem (resolved from named 'pytorch' index, see [tool.uv.sources])
 # Install with: pip install whisperjav[torch]
 torch = [
-    "torch",
-    "torchaudio",
+    # v1.10.0: pinned. torchaudio has no release after 2.11.0, so PyTorch stays
+    # there; the CUDA build (cu130, or cu128 as the per-PC fallback) is chosen by
+    # the installer.
+    "torch==2.11.0",
+    "torchaudio==2.11.0",
 ]
 
 # CLI audio processing features
@@ -130,7 +135,14 @@ cli = [
     "pydub",
 
     # Scientific computing
-    "numpy>=2.0.0",
+    # numpy, v1.10.0 (owner, W44: plan ahead for MOSS and the other roadmap items).
+    # PyPI metadata read 2026-10-14: numba 0.68 (the newest) needs numpy <2.6; MOSS-
+    # Transcribe-Diarize (GitHub pyproject) >=1.26,<3; crispasr >=1.20; transformers 5
+    # >=1.17; nemo_toolkit 3.0 >=1.22; scipy 1.18 <2.8; librosa 1.0 >=2.1; numpy 2.5
+    # needs Python >=3.12. 2.5.x satisfies all of them. funasr-onnx caps numpy at
+    # 1.26.4, which has no Python 3.13 wheels, so SenseVoice (R05) would come through funasr
+    # or CrispASR instead. Raise the upper bound only together with numba.
+    "numpy>=2.5,<2.6",
     "scipy>=1.13.0",
 
     # Audio analysis
@@ -168,17 +180,6 @@ translate = [
     "openai>=1.35.0",     # GPT provider
     "google-genai>=1.39.0",  # Gemini provider
     "google-api-core>=2.14.0",  # Required by pysubtrans Gemini provider (undeclared transitive dep)
-]
-
-# Local LLM support (server dependencies)
-# Install with: pip install whisperjav[llm]
-# Note: llama-cpp-python itself is installed separately with CUDA detection
-llm = [
-    "uvicorn>=0.22.0",
-    "fastapi>=0.100.0",
-    "pydantic-settings>=2.0.1",
-    "sse-starlette>=1.6.1",
-    "starlette-context>=0.3.6,<0.4",
 ]
 
 # Speech enhancement backends
@@ -311,7 +312,7 @@ dev = [
 # Full installation with all features
 # Install with: pip install whisperjav[all]
 all = [
-    "whisperjav[cli,gui,translate,llm,enhance,huggingface,qwen,analysis,compatibility]",
+    "whisperjav[cli,gui,translate,enhance,huggingface,qwen,analysis,compatibility]",
 ]
 
 # Google Colab optimized (no GUI, focused on transcription + translation)
@@ -490,15 +491,15 @@ exclude_lines = [
 # the PyTorch CUDA index while all other packages use PyPI.
 #
 # Override CUDA version at install time:
-#   uv sync --index pytorch=https://download.pytorch.org/whl/cu118
+#   uv sync --index pytorch=https://download.pytorch.org/whl/cu128
 #   uv sync --index pytorch=https://download.pytorch.org/whl/cpu
 
 [tool.uv]
 # Named index for PyTorch GPU wheels
-# Default: CUDA 12.8 (most common modern NVIDIA setup)
+# Default: CUDA 13.0 (the 1.10 stack; driver 580 or newer)
 [[tool.uv.index]]
 name = "pytorch"
-url = "https://download.pytorch.org/whl/cu128"
+url = "https://download.pytorch.org/whl/cu130"
 explicit = true  # Only torch/torchaudio use this index, not numpy/scipy/etc.
 
 [tool.uv.sources]
