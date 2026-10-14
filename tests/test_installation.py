@@ -51,7 +51,7 @@ class TestPyprojectToml:
 
         extras = data.get("project", {}).get("optional-dependencies", {})
         expected_extras = [
-            "cli", "gui", "translate", "llm", "enhance",
+            "cli", "gui", "translate", "enhance",
             "huggingface", "analysis", "compatibility", "all", "colab",
         ]
 
