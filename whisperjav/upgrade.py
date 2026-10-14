@@ -16,8 +16,10 @@ Usage:
     whisperjav-upgrade --version          # Show script version
 
 Features:
-    - Upgrades whisperjav package from GitHub @main branch with all dependencies
-    - Supports modular extras (cli, gui, translate, llm, enhance, etc.)
+    - Upgrades whisperjav to the newest release of its own series (1.10.x for 1.10),
+      never to GitHub's main branch (v1.10.0, item 2e)
+    - Keeps the PC's PyTorch build (CUDA 13.0, the CUDA 12.8 fallback, or CPU)
+    - Supports modular extras (cli, gui, translate, enhance, etc.)
     - Automatic snapshot creation for safe rollback
     - Pre-upgrade compatibility checking
     - Fixes numpy/librosa versions (clearvoice metadata workaround)
@@ -59,15 +61,23 @@ UPGRADE_SCRIPT_VERSION = "2.0.0"
 #   set WHISPERJAV_UPGRADE_REPO=git+file:///c:/repos/whisperjav-test@main
 # =============================================================================
 
-# GitHub repository URL
-GITHUB_REPO = os.environ.get(
-    'WHISPERJAV_UPGRADE_REPO',
-    'git+https://github.com/meizhong986/whisperjav.git@main'
+# Where the package comes from.
+#
+# v1.10.0 (item 2e, spec H): the newest release tag of the installed series --
+# v1.10.* for 1.10 -- read from GitHub's releases list; never `main`. A later 1.11
+# or 2.0 is a fresh install, not an upgrade. WHISPERJAV_UPGRADE_REPO still
+# overrides it (tests, a local wheel, a release candidate).
+GITHUB_GIT_URL = "git+https://github.com/meizhong986/whisperjav.git"
+GITHUB_RELEASES_API = os.environ.get(
+    'WHISPERJAV_UPGRADE_RELEASES_API',
+    'https://api.github.com/repos/meizhong986/whisperjav/releases?per_page=100'
 )
+GITHUB_REPO = os.environ.get('WHISPERJAV_UPGRADE_REPO') or GITHUB_GIT_URL
 
-# Packages to fix AFTER main installation (ensure consistent versions)
+# Packages to fix AFTER main installation (ensure consistent versions).
+# numpy: the same range as pyproject.toml (v1.10.0; numba 0.68 needs <2.6).
 FIX_PACKAGES = [
-    "numpy>=2.0.0",
+    "numpy>=2.5,<2.6",
     "librosa>=0.11.0",
 ]
 
@@ -93,19 +103,134 @@ SNAPSHOT_DIR_NAME = ".whisperjav_snapshots"
 
 # Valid extras for modular installation
 VALID_EXTRAS = [
-    "cli", "gui", "translate", "llm", "enhance",
+    "cli", "gui", "translate", "enhance",
     "huggingface", "analysis", "compatibility", "all",
 ]
 
 IS_WINDOWS = platform.system() == 'Windows'
 
-# PyTorch index URLs for uv sync (source installs)
+# PyTorch index URLs for uv sync (source installs). v1.10.0: cu130 is the stack;
+# cu128 is the per-PC fallback of item 2 spec D.
 PYTORCH_INDEXES = {
     "cpu": "https://download.pytorch.org/whl/cpu",
-    "cu118": "https://download.pytorch.org/whl/cu118",
-    "cu124": "https://download.pytorch.org/whl/cu124",
     "cu128": "https://download.pytorch.org/whl/cu128",
+    "cu130": "https://download.pytorch.org/whl/cu130",
 }
+
+
+# =============================================================================
+# Upgrade source: the newest release of this series (item 2e)
+# =============================================================================
+
+def _series(version: str) -> Optional[Tuple[int, int]]:
+    """(major, minor) of a version or tag, e.g. "v1.10.2" -> (1, 10)."""
+    import re
+    m = re.match(r"^v?(\d+)\.(\d+)\.(\d+)", (version or "").strip())
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def newest_release_in_series(current_version: str, releases: List[Dict]) -> Optional[str]:
+    """Tag of the newest published, non-pre-release release in current_version's series.
+
+    `releases` is GitHub's releases list (dicts with tag_name, draft, prerelease).
+    """
+    from whisperjav.version_checker import compare_versions
+
+    series = _series(current_version)
+    if series is None:
+        return None
+    best = None
+    for rel in releases or []:
+        tag = rel.get("tag_name") or ""
+        if rel.get("draft") or rel.get("prerelease") or _series(tag) != series:
+            continue
+        if best is None or compare_versions(tag, best) > 0:
+            best = tag
+    return best
+
+
+def _fetch_releases(timeout: int = 15) -> Optional[List[Dict]]:
+    import urllib.request
+    try:
+        request = urllib.request.Request(
+            GITHUB_RELEASES_API,
+            headers={'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'WhisperJAV-upgrade'},
+        )
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            data = json.loads(response.read().decode('utf-8'))
+        return data if isinstance(data, list) else None
+    except Exception:
+        return None
+
+
+def resolve_upgrade_source(current_version: Optional[str]) -> Tuple[Optional[str], str]:
+    """(pip-installable source, explanation). Source None = do not upgrade.
+
+    WHISPERJAV_UPGRADE_REPO wins. Otherwise the newest v<major>.<minor>.* release tag
+    of the installed series; never main.
+    """
+    override = os.environ.get('WHISPERJAV_UPGRADE_REPO')
+    if override:
+        return override, f"WHISPERJAV_UPGRADE_REPO={override}"
+    if not current_version or _series(current_version) is None:
+        return None, "the installed version could not be read"
+    releases = _fetch_releases()
+    if releases is None:
+        return None, "GitHub's releases list could not be read"
+    tag = newest_release_in_series(current_version, releases)
+    major, minor = _series(current_version)
+    if tag is None:
+        return None, f"no published {major}.{minor} release was found"
+    return f"{GITHUB_GIT_URL}@{tag}", f"newest {major}.{minor} release: {tag}"
+
+
+# =============================================================================
+# The PC's stack (item 2 spec D): kept on every upgrade
+# =============================================================================
+
+def read_installed_stack(install_dir: Optional[Path] = None) -> Optional[str]:
+    """cu130, cu128 or cpu, as the installer recorded it; None if not recorded."""
+    try:
+        from whisperjav.installer.cublas12 import read_stack
+        return read_stack(str(install_dir) if install_dir else None)
+    except Exception:
+        return None
+
+
+def place_cublas12_after_upgrade(install_dir: Path) -> None:
+    """On a CUDA 13.0 Windows install, place cuBLAS 12 again after the package step.
+
+    A reinstalled ctranslate2 brings its unused cuDNN DLL back, and a newer
+    nvidia-cublas-cu12 must reach CTranslate2's folder (item 2 spec C).
+    """
+    if not IS_WINDOWS or read_installed_stack(install_dir) != "cu130":
+        return
+    python_exe = _find_python(install_dir)
+    if python_exe is None:
+        return
+    # A source install's `uv sync` removes packages pyproject.toml does not list, and
+    # nvidia-cublas-cu12 is one (review 2026-10-14): put it back before placing.
+    try:
+        from whisperjav.installer.cublas12 import CUBLAS12_PACKAGE, cublas12_source_dir  # noqa: F401
+        probe = subprocess.run([str(python_exe), "-c", "import nvidia.cublas"],
+                               capture_output=True, text=True, timeout=60)
+        if probe.returncode != 0:
+            uv_exe = shutil.which("uv")
+            cmd = ([uv_exe, "pip", "install", "--python", str(python_exe), CUBLAS12_PACKAGE] if uv_exe
+                   else [str(python_exe), "-m", "pip", "install", CUBLAS12_PACKAGE])
+            subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+    except Exception as e:
+        print_warning(f"Could not reinstall cuBLAS 12 for faster-whisper: {e}")
+    try:
+        r = subprocess.run([str(python_exe), "-m", "whisperjav.installer.cublas12", "place"],
+                           capture_output=True, text=True, timeout=300)
+        line = (r.stdout or r.stderr or "").strip().splitlines()[:1]
+        if r.returncode == 0:
+            print_success("cuBLAS 12 placed for faster-whisper")
+        else:
+            print_warning(f"Could not place cuBLAS 12 for faster-whisper: {line[0] if line else r.returncode}")
+    except Exception as e:
+        print_warning(f"Could not place cuBLAS 12 for faster-whisper: {e}")
 
 
 # =============================================================================
@@ -135,13 +260,19 @@ def _find_source_root() -> Optional[Path]:
 
 
 def _detect_cuda_for_source() -> str:
-    """Detect CUDA version for source-install upgrades.
+    """Detect CUDA build for source-install upgrades.
 
-    Returns: "cpu", "cu118", "cu124", "cu128", or "metal".
+    Returns: "cpu", "cu130", "cu128", or "metal". The stack the installer recorded
+    wins (v1.10.0: an upgrade never moves a PC to another stack). Without a record,
+    Linux gets cu128 (owner, W45) and Windows cu130 at driver 580+.
     """
     # Apple Silicon
     if sys.platform == "darwin" and platform.machine() == "arm64":
         return "metal"
+
+    recorded = read_installed_stack()
+    if recorded:
+        return recorded
 
     # Try nvidia-smi
     try:
@@ -152,12 +283,10 @@ def _detect_cuda_for_source() -> str:
         driver = result.stdout.strip().split('\n')[0]
         if driver:
             major = int(driver.split('.')[0])
-            if major >= 570:
-                return "cu128"
-            elif major >= 525:
-                return "cu124"
-            else:
-                return "cu118"
+            # Linux stays on CUDA 12.8 for 1.10.0 (owner, W45; see install.py).
+            if major >= 580 and not sys.platform.startswith("linux"):
+                return "cu130"
+            return "cu128"
     except Exception:
         pass
 
@@ -175,7 +304,7 @@ def _detect_cuda_for_source() -> str:
             key = f"cu{normalized}"
             if key in PYTORCH_INDEXES:
                 return key
-            return "cu128"
+            return "cu130"
     except Exception:
         pass
 
@@ -665,7 +794,7 @@ def check_upgrade_compatibility(install_dir: Path, extras: str = "all") -> Tuple
         result = _run_bounded(
             [
                 str(pip_exe), 'install', '--dry-run', '--ignore-installed',
-                f"{install_spec} @ {GITHUB_REPO}"
+                f"{install_spec} @ {GITHUB_REPO}"  # set by main() to the resolved source
             ],
             timeout=300,
         )
@@ -1221,7 +1350,6 @@ Available extras:
   cli         - Audio processing, VAD, scene detection
   gui         - PyWebView GUI interface
   translate   - AI-powered subtitle translation
-  llm         - Local LLM server for offline translation
   enhance     - Speech enhancement (denoising, vocal isolation)
   huggingface - HuggingFace Transformers integration
   analysis    - Scientific analysis and visualization
@@ -1444,6 +1572,24 @@ def main() -> int:
         print("Please check your network connection and try again.")
         return 1
 
+    # Where the new version comes from: the newest release of this series (item 2e).
+    # Source installs (a git clone) pull their own branch instead.
+    global GITHUB_REPO
+    if not _find_source_root():
+        source, why = resolve_upgrade_source(current_version)
+        if source is None:
+            print_error(f"Cannot upgrade: {why}.")
+            return 1
+        tag = source.rsplit("@", 1)[-1] if "@" in source else ""
+        if (tag and current_version and not os.environ.get('WHISPERJAV_UPGRADE_REPO')
+                and _series(tag) == _series(current_version)):
+            from whisperjav.version_checker import compare_versions
+            if compare_versions(tag, current_version) <= 0:
+                print_success(f"WhisperJAV {current_version} is the newest {tag[1:].rsplit('.', 1)[0]} release.")
+                return 0
+        GITHUB_REPO = source
+        print(f"Upgrade source: {why}")
+
     # Pre-upgrade compatibility check
     if not args.skip_compat_check and not args.wheel_only:
         print("\nChecking compatibility...")
@@ -1525,6 +1671,7 @@ def main() -> int:
         print_success("Source install — uv.lock handles version pinning")
     else:
         fix_package_versions(install_dir)
+    place_cublas12_after_upgrade(install_dir)
 
     # Step 3: Update launcher
     print_step(3, total_steps, "Updating launcher executable...")
