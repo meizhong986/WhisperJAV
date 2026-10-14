@@ -42,6 +42,15 @@ def temp_install_dir(tmp_path):
     return install_dir
 
 
+@pytest.fixture(autouse=True)
+def _never_a_source_install(monkeypatch):
+    """These tests run from the repository folder, which has pyproject.toml and uv.lock and so
+    looks like a source install -- and the source-install path runs a real `git pull` there
+    (it did on 2026-10-14; it failed only because the tree had uncommitted changes). The pip
+    path is the one under test."""
+    monkeypatch.setattr(upgrade, "_find_source_root", lambda: None)
+
+
 @pytest.fixture
 def reset_module(monkeypatch):
     """Reset module-level constants after each test."""
