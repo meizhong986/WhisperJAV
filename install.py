@@ -9,7 +9,7 @@ longer needed because uv resolves per-package indexes natively via
 ``[tool.uv.sources]`` in pyproject.toml.
 
 Prerequisites:
-    - Python 3.10-3.12 (with pip — used to auto-install uv if missing)
+    - Python 3.13 (with pip — used to auto-install uv if missing)
     - FFmpeg in system PATH
     - Git
 
@@ -18,14 +18,11 @@ Usage:
 
 Options:
     --cpu-only              Install CPU-only PyTorch (no CUDA)
-    --cuda VERSION          Install PyTorch for specific CUDA version (e.g. cu118, cu124, cu128)
+    --cuda VERSION          Install PyTorch for a specific CUDA build: cu130 (default) or cu128
     --no-speech-enhancement Skip speech enhancement packages
     --minimal               Minimal install (transcription only)
     --dev                   Install in development/editable mode
     --local                 Force local .venv even if conda/venv is active
-    --local-llm             Install local LLM support (prebuilt wheel)
-    --local-llm-build       Install local LLM support (build from source if needed)
-    --no-local-llm          Skip local LLM installation
     --skip-preflight        Skip preflight checks (disk space, network, etc.)
     --log-file PATH         Custom log file path
     --help                  Show this help message
@@ -33,9 +30,8 @@ Options:
 Examples:
     python install.py                    # Standard install (auto-detect GPU)
     python install.py --cpu-only         # CPU-only install
-    python install.py --cuda cu118       # Explicit CUDA 11.8
+    python install.py --cuda cu128       # CUDA 12.8 build instead of CUDA 13.0
     python install.py --minimal --dev    # Minimal dev install
-    python install.py --local-llm        # Include local LLM (no prompt)
 """
 
 import os
@@ -52,13 +48,27 @@ from pathlib import Path
 
 _source_dir = Path(__file__).parent
 
-# PyTorch index URLs by CUDA version
+# PyTorch index URLs by CUDA build. v1.10.0 (REQ2): cu130 is the stack; cu128 is
+# the per-PC fallback when cuBLAS 12 cannot be loaded next to CUDA 13 (item 2 spec D).
 PYTORCH_INDEXES = {
     "cpu": "https://download.pytorch.org/whl/cpu",
-    "cu118": "https://download.pytorch.org/whl/cu118",
-    "cu124": "https://download.pytorch.org/whl/cu124",
     "cu128": "https://download.pytorch.org/whl/cu128",
+    "cu130": "https://download.pytorch.org/whl/cu130",
 }
+# Linux stays on CUDA 12.8 for 1.10.0 (owner, W45): on Linux, pip-installed cuBLAS 12 is found
+# only with LD_LIBRARY_PATH set before Python starts (faster-whisper's README), so with CUDA 13
+# nothing would load it for CTranslate2; with CUDA 12.8, PyTorch loads it, as in 1.9.5.
+IS_LINUX = sys.platform.startswith("linux")
+DEFAULT_CUDA = "cu128" if IS_LINUX else "cu130"
+
+# The owner's texts (W43) and the links they name; the same as the Windows installer's.
+ISSUES_URL = "https://github.com/meizhong986/WhisperJAV/issues"
+RELEASE_195_URL = "https://github.com/meizhong986/WhisperJAV/releases/tag/v1.9.5"
+NVIDIA_DRIVER_URL = "https://www.nvidia.com/Download/index.aspx"
+MIN_COMPUTE_CAPABILITY = (7, 5)
+MIN_DRIVER_CUDA13 = (580, 0, 0)
+MIN_DRIVER_CUDA128 = (570, 0, 0)
+MIN_DRIVER = MIN_DRIVER_CUDA128 if IS_LINUX else MIN_DRIVER_CUDA13
 
 # =============================================================================
 # Bootstrap: Import installer module (for GPU detection + preflight)
@@ -77,45 +87,6 @@ try:
     _INSTALLER_AVAILABLE = True
 except ImportError:
     _INSTALLER_AVAILABLE = False
-
-# Bootstrap llama_build_utils for --local-llm
-try:
-    import importlib.util
-    import types
-
-    _translate_dir = _source_dir / "whisperjav" / "translate"
-
-    for _pkg_name, _pkg_path in [
-        ("whisperjav", _source_dir / "whisperjav"),
-        ("whisperjav.translate", _translate_dir),
-    ]:
-        if _pkg_name not in sys.modules:
-            _pkg = types.ModuleType(_pkg_name)
-            _pkg.__path__ = [str(_pkg_path)]
-            _pkg.__package__ = _pkg_name
-            sys.modules[_pkg_name] = _pkg
-
-    _cuda_config_path = _translate_dir / "llama_cuda_config.py"
-    _cuda_spec = importlib.util.spec_from_file_location(
-        "whisperjav.translate.llama_cuda_config", _cuda_config_path)
-    _cuda_mod = importlib.util.module_from_spec(_cuda_spec)
-    sys.modules["whisperjav.translate.llama_cuda_config"] = _cuda_mod
-    _cuda_spec.loader.exec_module(_cuda_mod)
-
-    _utils_path = _translate_dir / "llama_build_utils.py"
-    _utils_spec = importlib.util.spec_from_file_location(
-        "whisperjav.translate.llama_build_utils", _utils_path)
-    _utils_mod = importlib.util.module_from_spec(_utils_spec)
-    _utils_mod.__package__ = "whisperjav.translate"
-    sys.modules["whisperjav.translate.llama_build_utils"] = _utils_mod
-    _utils_spec.loader.exec_module(_utils_mod)
-
-    get_llama_cpp_source_info = _utils_mod.get_llama_cpp_source_info
-    get_prebuilt_wheel_url = _utils_mod.get_prebuilt_wheel_url
-except Exception:
-    get_llama_cpp_source_info = None
-    get_prebuilt_wheel_url = None
-
 
 # =============================================================================
 # Logging
@@ -176,7 +147,7 @@ def _uv_cmd() -> list:
 # =============================================================================
 
 def _check_env_python_version(env_path: str) -> bool:
-    """Check if the Python in an environment is compatible (3.10-3.12).
+    """Check if the Python in an environment is compatible (3.13).
 
     Returns True if compatible or if check fails (fail-open — preflight
     will catch hard failures later).
@@ -198,10 +169,10 @@ def _check_env_python_version(env_path: str) -> bool:
         )
         if result.returncode == 0:
             major, minor = map(int, result.stdout.strip().split())
-            if major == 3 and 10 <= minor <= 12:
+            if major == 3 and minor == 13:
                 return True
             log(f"  [WARN] Active environment Python {major}.{minor} is outside "
-                f"supported range (3.10-3.12)")
+                f"the supported version (3.13)")
             log(f"         Environment: {env_path}")
             log(f"         Falling back to local .venv instead.")
             return False
@@ -343,7 +314,7 @@ def run_preflight_checks() -> bool:
         status = "[OK]" if is_compatible else "[!!]"
         log(f"  {status} {py_result.message}")
         if not is_compatible:
-            log("  ERROR: Python version not compatible (requires 3.10-3.12)")
+            log("  ERROR: Python version not compatible (requires 3.13)")
             all_passed = False
 
         ff_result = _check_ffmpeg()
@@ -358,8 +329,8 @@ def run_preflight_checks() -> bool:
     else:
         # Fallback checks
         major, minor = sys.version_info[:2]
-        if major < 3 or (major == 3 and minor < 10) or (major == 3 and minor > 12):
-            log(f"  [!!] Python {major}.{minor} not compatible (requires 3.10-3.12)")
+        if (major, minor) != (3, 13):
+            log(f"  [!!] Python {major}.{minor} not compatible (requires 3.13)")
             all_passed = False
         else:
             log(f"  [OK] Python {major}.{minor}")
@@ -391,7 +362,8 @@ def run_preflight_checks() -> bool:
 def detect_cuda_version(args) -> str:
     """Determine CUDA version from args + GPU detection.
 
-    Returns: "cpu", "cu118", "cu124", "cu128", or "metal" (Apple Silicon).
+    Returns: "cpu", "cu130", "cu128", "metal" (Apple Silicon), or "stop" (an old card
+    or driver, item 2 spec E/F; the reason has been shown).
     """
     if args.cpu_only:
         return "cpu"
@@ -402,8 +374,8 @@ def detect_cuda_version(args) -> str:
         key = f"cu{cuda}"
         if key in PYTORCH_INDEXES:
             return key
-        log(f"  [WARN] Unknown CUDA version '{args.cuda}', defaulting to cu128")
-        return "cu128"
+        log(f"  [WARN] Unknown CUDA version '{args.cuda}', defaulting to {DEFAULT_CUDA}")
+        return DEFAULT_CUDA
 
     # --force-cuda: manual override when GPU detection fails (#200 Optimus laptops)
     if hasattr(args, 'force_cuda') and args.force_cuda:
@@ -412,19 +384,27 @@ def detect_cuda_version(args) -> str:
         if key in PYTORCH_INDEXES:
             log(f"  --force-cuda: using {key} (bypassing GPU detection)")
             return key
-        log(f"  [WARN] --force-cuda '{args.force_cuda}' not recognized, using cu128")
-        return "cu128"
+        log(f"  [WARN] --force-cuda '{args.force_cuda}' not recognized, using {DEFAULT_CUDA}")
+        return DEFAULT_CUDA
 
     # Auto-detect
     if _INSTALLER_AVAILABLE:
         gpu_info = detect_gpu()
-        if gpu_info.detected:
+        if gpu_info.detected and gpu_info.cuda_version != "metal":
             log(f"  GPU detected: {gpu_info.name}")
             if gpu_info.driver_version:
-                log(f"  Driver: {gpu_info.driver_version[0]}.{gpu_info.driver_version[1]}")
-            cuda = gpu_info.cuda_version or "cpu"
+                log(f"  Driver: {gpu_info.driver_version[0]}.{gpu_info.driver_version[1]:02d}")
+            gate = gpu_support_gate(gpu_info)
+            if gate != "gpu":
+                return gate
+            # The detector chooses by the CUDA 13 rule (driver 580+); the gate has already
+            # checked this platform's own floor, so the platform's build is used.
+            cuda = DEFAULT_CUDA
             log(f"  Selected: {cuda}")
             return cuda
+        elif gpu_info.detected:
+            log(f"  {gpu_info.message}")
+            return "metal"
         else:
             log(f"  {gpu_info.message}")
 
@@ -443,12 +423,66 @@ def detect_cuda_version(args) -> str:
         gpu_name = result.stdout.strip().split('\n')[0]
         if gpu_name:
             log(f"  GPU detected: {gpu_name}")
-            return "cu128"
+            return DEFAULT_CUDA
     except Exception:
         pass
 
     log("  No NVIDIA GPU detected — using CPU")
     return "cpu"
+
+
+def wait_for_answer(prompt: str, valid, on_no_console: str) -> str:
+    """Ask until one of `valid` is typed. No time limit (owner, W37 (2))."""
+    while True:
+        try:
+            answer = input(prompt).strip()
+        except (EOFError, KeyboardInterrupt):
+            log(f"  (no answer could be read; using '{on_no_console}')")
+            return on_no_console
+        if answer in valid:
+            return answer
+
+
+def gpu_support_gate(gpu_info) -> str:
+    """Old card or old driver, before anything is installed (item 2 spec E, F).
+
+    Returns "gpu", "cpu" (the user chose it) or "stop". Texts: the owner's (W43).
+    """
+    cc = getattr(gpu_info, "compute_capability", None)
+    name = gpu_info.name or "Unknown GPU"
+    if cc is not None and tuple(cc) < MIN_COMPUTE_CAPABILITY:
+        log("")
+        log("!" * 60)
+        log(f"Your graphics card, {name} (compute capability {cc[0]}.{cc[1]}), is older than "
+            "WhisperJAV 1.10 supports. 1.10 needs a GTX 16-series, RTX 20-series or newer card.")
+        log("Choose: 1 = my card is identified wrongly (show where to report it, then stop); "
+            "2 = install for the CPU only (much slower); 3 = stop.")
+        log(f"WhisperJAV 1.9.5 still supports this card: {RELEASE_195_URL}.")
+        log("!" * 60)
+        answer = wait_for_answer("Type 1, 2 or 3 and press Enter: ", ("1", "2", "3"), "3")
+        if answer == "2":
+            log("  Installing for the CPU only, as chosen.")
+            return "cpu"
+        if answer == "1":
+            log(f"Please report it here: {ISSUES_URL} (attach install_log.txt).")
+        log("The installer will now stop.")
+        return "stop"
+
+    if gpu_info.driver_version and tuple(gpu_info.driver_version) < MIN_DRIVER:
+        v = gpu_info.driver_version
+        log("")
+        log("!" * 60)
+        log(f"Your NVIDIA driver ({v[0]}.{v[1]:02d}) is older than WhisperJAV 1.10 needs "
+            f"({MIN_DRIVER[0]} or newer). "
+            f"Update it from {NVIDIA_DRIVER_URL}, restart the PC, and run this installer again. "
+            "Nothing has been installed. Press Enter to close.")
+        log("!" * 60)
+        try:
+            input()
+        except (EOFError, KeyboardInterrupt):
+            pass
+        return "stop"
+    return "gpu"
 
 
 # =============================================================================
@@ -461,7 +495,7 @@ def run_uv_sync(extras: list, cuda_version: str, dev: bool = False,
 
     Args:
         extras: List of extra names to install (e.g. ["cli", "gui"]).
-        cuda_version: "cpu", "cu118", "cu128", or "metal".
+        cuda_version: "cpu", "cu130", "cu128", or "metal".
         dev: If True, include dev dependencies.
         target_env: Path to target environment (conda/venv), or None for .venv.
         is_external: If True, the target env is one we didn't create — add --inexact.
@@ -565,14 +599,14 @@ def run_uv_sync(extras: list, cuda_version: str, dev: bool = False,
 
 
 # =============================================================================
-# llama-cpp-python (special handling — CUDA wheel URL logic)
+# One-off package installs (cuBLAS 12 for faster-whisper)
 # =============================================================================
 
 def run_uv_pip_install(args: list, description: str, allow_fail: bool = False) -> bool:
     """Run uv pip install for one-off package installs.
 
-    Used for packages that can't go through uv sync (e.g., llama-cpp-python
-    with platform-specific wheel URLs).
+    Used for packages that are not in pyproject.toml (nvidia-cublas-cu12, which only
+    a CUDA 13.0 install on Windows needs).
 
     Args:
         args: Arguments to pass after 'uv pip install'.
@@ -608,75 +642,6 @@ def run_uv_pip_install(args: list, description: str, allow_fail: bool = False) -
         return False
 
 
-def _install_local_llm(build_from_source: bool):
-    """Install llama-cpp-python with platform-specific handling."""
-
-    log("\n    Installing llama-cpp-python for local LLM translation...")
-
-    is_apple_silicon = (sys.platform == "darwin" and platform_module.machine() == "arm64")
-    is_intel_mac = (sys.platform == "darwin" and platform_module.machine() != "arm64")
-
-    if is_apple_silicon:
-        log("    Apple Silicon detected — checking for prebuilt Metal wheel...")
-        prebuilt_installed = False
-        if get_prebuilt_wheel_url:
-            wheel_url, wheel_backend = get_prebuilt_wheel_url(verbose=True)
-            if wheel_url:
-                log(f"    Found prebuilt wheel: {wheel_backend}")
-                prebuilt_installed = run_uv_pip_install(
-                    [wheel_url], f"Install llama-cpp-python ({wheel_backend})", allow_fail=True
-                )
-                if prebuilt_installed:
-                    run_uv_pip_install(
-                        ["llama-cpp-python[server]"],
-                        "Install llama-cpp-python server extras", allow_fail=True
-                    )
-
-        if not prebuilt_installed:
-            log("    Building from source with Metal support...")
-            if get_llama_cpp_source_info:
-                git_url, backend, cmake_args, env_vars = get_llama_cpp_source_info()
-                for key, value in env_vars.items():
-                    os.environ[key] = value
-                if cmake_args:
-                    os.environ["CMAKE_ARGS"] = cmake_args
-                run_uv_pip_install([git_url], f"Install llama-cpp-python ({backend})", allow_fail=True)
-
-    elif is_intel_mac:
-        if build_from_source and get_llama_cpp_source_info:
-            log("    Intel Mac detected — building CPU-only version.")
-            git_url, backend, cmake_args, env_vars = get_llama_cpp_source_info()
-            for key, value in env_vars.items():
-                os.environ[key] = value
-            run_uv_pip_install([git_url], f"Install llama-cpp-python ({backend})", allow_fail=True)
-        else:
-            log("    Intel Mac — no prebuilt wheels. Use --local-llm-build to build from source.")
-
-    else:
-        # Windows/Linux
-        if get_prebuilt_wheel_url:
-            wheel_url, wheel_backend = get_prebuilt_wheel_url(verbose=True)
-            if wheel_url:
-                log(f"    Backend: {wheel_backend}")
-                run_uv_pip_install([wheel_url], f"Install llama-cpp-python ({wheel_backend})", allow_fail=True)
-                run_uv_pip_install(
-                    ["llama-cpp-python[server]"],
-                    "Install llama-cpp-python server extras", allow_fail=True
-                )
-            elif build_from_source and get_llama_cpp_source_info:
-                log("    No prebuilt wheel — building from source...")
-                git_url, backend, cmake_args, env_vars = get_llama_cpp_source_info()
-                for key, value in env_vars.items():
-                    os.environ[key] = value
-                if cmake_args:
-                    os.environ["CMAKE_ARGS"] = cmake_args
-                run_uv_pip_install([git_url], f"Install llama-cpp-python ({backend})", allow_fail=True)
-            else:
-                log("    No prebuilt wheel available. Use --local-llm-build to build from source.")
-        else:
-            log("    ERROR: llama_build_utils not available")
-
-
 # =============================================================================
 # Timed User Input
 # =============================================================================
@@ -701,6 +666,83 @@ def timed_input(prompt: str, timeout_seconds: int, default_response: str) -> str
         print(f"\n[Auto-continuing after {timeout_seconds}s timeout — using default: '{default_response}']")
         return default_response
     return result[0]
+
+
+# =============================================================================
+# cuBLAS 12 for faster-whisper on a CUDA 13.0 install (item 2 spec C, D)
+# =============================================================================
+
+CUBLAS12_PACKAGE = "nvidia-cublas-cu12==12.8.4.1"
+
+
+def _run_in_env(python: str, *args: str) -> tuple:
+    """Run `python args...` in the target environment; (ok, first output line)."""
+    import subprocess
+    try:
+        r = subprocess.run([python, *args], capture_output=True, text=True, timeout=600,
+                           cwd=str(Path.home()))  # not the source folder: test the installed package
+    except Exception as e:
+        return False, str(e)
+    out = (r.stdout or "").strip().splitlines()
+    err = (r.stderr or "").strip().splitlines()
+    return r.returncode == 0, (out[0] if out else (err[-1] if err else f"exit code {r.returncode}"))
+
+
+def _write_stack(python: str, stack: str):
+    ok, detail = _run_in_env(python, "-c",
+                             f"from whisperjav.installer.cublas12 import write_stack; write_stack({stack!r})")
+    log(f"  Stack recorded: {stack}" if ok else f"  [WARN] Could not record the stack: {detail}")
+
+
+def setup_cublas12(target_env: str, extras: list, dev: bool, is_external: bool) -> bool:
+    """Windows, CUDA 13.0: place cuBLAS 12 for CTranslate2; fall back to CUDA 12.8.
+
+    Returns False if installing or placing cuBLAS 12 failed (an ordinary install
+    failure, not a reason to change the stack) or if the fallback itself failed. Only a
+    failed load check moves the PC to CUDA 12.8 (spec D; review 2026-10-14).
+    """
+    python = _venv_python(target_env)
+    log_section("CUDA 12 library for faster-whisper")
+    if not run_uv_pip_install(["--python", python, CUBLAS12_PACKAGE],
+                              "Install cuBLAS 12 (for faster-whisper next to CUDA 13)"):
+        return False
+    ok, detail = _run_in_env(python, "-m", "whisperjav.installer.cublas12", "place")
+    log(f"  Place cuBLAS 12 in CTranslate2's folder: {detail}")
+    if not ok:
+        return False
+    passed, detail = _run_in_env(python, "-m", "whisperjav.installer.cublas12", "check")
+    log(f"  cuBLAS 12 load check (fresh process): {detail}")
+    if passed:
+        _write_stack(python, "cu130")
+        return True
+
+    log(f"  cuBLAS 12 check FAILED: {detail}")
+    log("")
+    log("!" * 60)
+    log("WARNING: This PC could not load the CUDA 12 library (cublas64_12.dll) that Balanced, "
+        "Fast, Faster and Kotoba need next to CUDA 13. WhisperJAV will now install its CUDA 12.8 "
+        f"build instead of the standard CUDA 13 build. Please report this so it can be fixed: "
+        f"{ISSUES_URL} — attach install_log.txt. Press Enter to continue.")
+    log("!" * 60)
+    try:
+        input()
+    except (EOFError, KeyboardInterrupt):
+        pass
+    if not run_uv_sync(extras, "cu128", dev=dev, target_env=target_env, is_external=is_external):
+        return False
+    # Found without importing ctranslate2: importing it would load the DLLs being removed.
+    _run_in_env(python, "-c",
+                "import os, importlib.util; "
+                "d = list(importlib.util.find_spec('ctranslate2').submodule_search_locations)[0]; "
+                "[os.remove(os.path.join(d, n)) for n in ('cublas64_12.dll', 'cublasLt64_12.dll') "
+                "if os.path.exists(os.path.join(d, n))]")
+    run_uv_pip_install(["--python", python, "--reinstall", "--no-deps", "ctranslate2==4.8.3"],
+                       "Reinstall CTranslate2 as shipped", allow_fail=True)
+    import subprocess
+    subprocess.run(_uv_cmd() + ["pip", "uninstall", "--python", python, "nvidia-cublas-cu12"],
+                   capture_output=True, text=True)
+    _write_stack(python, "cu128")
+    return True
 
 
 # =============================================================================
@@ -768,7 +810,7 @@ def create_failure_file(error_message: str):
             f.write(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
             f.write("Troubleshooting:\n")
             f.write("- Check install_log.txt for details\n")
-            f.write("- Ensure uv, Python 3.10-3.12, FFmpeg, and Git are in PATH\n")
+            f.write("- Ensure uv, Python 3.13, FFmpeg, and Git are in PATH\n")
             f.write("- Try: uv cache clean\n")
             f.write("- For network issues, check firewall/proxy settings\n\n")
             f.write("Support: https://github.com/meizhong986/WhisperJAV/issues\n")
@@ -789,25 +831,24 @@ def main():
     parser.add_argument("--cpu-only", action="store_true",
                         help="Install CPU-only PyTorch")
     parser.add_argument("--cuda", type=str, default=None, metavar="VERSION",
-                        help="CUDA version (e.g. cu118, cu124, cu128)")
+                        help="CUDA build: cu130 (default) or cu128")
     parser.add_argument("--no-speech-enhancement", action="store_true",
                         help="Skip speech enhancement packages")
     parser.add_argument("--minimal", action="store_true",
                         help="Minimal install (transcription only)")
     parser.add_argument("--dev", action="store_true",
                         help="Install in development/editable mode")
-    parser.add_argument("--local-llm", action="store_true",
-                        help="Install local LLM support (fast — prebuilt wheel)")
-    parser.add_argument("--local-llm-build", action="store_true",
-                        help="Install local LLM support (build from source if needed)")
-    parser.add_argument("--no-local-llm", action="store_true",
-                        help="Skip local LLM installation")
+    # llama-cpp local translation was removed in v1.10.0 (REQ2). The flags are still
+    # accepted so that existing commands do not stop; hidden from --help.
+    parser.add_argument("--local-llm", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--local-llm-build", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--no-local-llm", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--skip-preflight", action="store_true",
                         help="Skip preflight checks")
     parser.add_argument("--local", action="store_true",
                         help="Force local .venv even if conda/venv is active")
     parser.add_argument("--force-cuda", type=str, default=None, metavar="VERSION",
-                        help="Force CUDA version even if GPU detection fails (e.g. cu118, cu128). "
+                        help="Force CUDA build even if GPU detection fails (cu130 or cu128). "
                              "Useful for Optimus laptops where NVML/nvidia-smi may not detect the GPU.")
     parser.add_argument("--log-file", type=str, default=None, metavar="PATH",
                         help="Custom log file path")
@@ -820,9 +861,9 @@ def main():
 
     args = parser.parse_args()
 
-    # Map legacy flags
+    # Map legacy flags. cu118 is gone in v1.10.0; --cuda118 gets the CUDA 12.8 build.
     if args.cuda118 and not args.cuda:
-        args.cuda = "cu118"
+        args.cuda = "cu128"
     if args.cuda128 and not args.cuda:
         args.cuda = "cu128"
 
@@ -861,15 +902,14 @@ def main():
     # -------------------------------------------------------------------------
     target_env, is_external = _detect_target_env(force_local=args.local)
 
-    # --upgrade implies non-interactive mode
-    if args.upgrade:
-        args.no_local_llm = True
-
     # -------------------------------------------------------------------------
     # GPU detection
     # -------------------------------------------------------------------------
     log_section("GPU Detection")
     cuda_version = detect_cuda_version(args)
+    if cuda_version == "stop":
+        create_failure_file("Stopped before installing: graphics card or driver older than 1.10 supports")
+        sys.exit(1)
 
     # -------------------------------------------------------------------------
     # Determine extras
@@ -877,7 +917,7 @@ def main():
     if args.minimal:
         extras = ["cli"]
     else:
-        extras = ["cli", "gui", "translate", "llm", "huggingface", "qwen",
+        extras = ["cli", "gui", "translate", "huggingface", "qwen",
                    "analysis", "compatibility"]
         if not args.no_speech_enhancement:
             extras.append("enhance")
@@ -921,27 +961,23 @@ def main():
         create_failure_file("uv sync failed — check install_log.txt for details")
         sys.exit(1)
 
-    # -------------------------------------------------------------------------
-    # Local LLM (llama-cpp-python) — handled separately
-    # -------------------------------------------------------------------------
     if args.local_llm or args.local_llm_build:
-        _install_local_llm(args.local_llm_build)
-    elif args.no_local_llm:
-        log("\n    Skipping local LLM (--no-local-llm specified)")
+        log("")
+        log("  llama-cpp local translation was removed in WhisperJAV 1.10; --local-llm does "
+            "nothing. Use Ollama for local translation.")
+
+    # -------------------------------------------------------------------------
+    # cuBLAS 12 for faster-whisper (Windows, CUDA 13.0); stack record
+    # -------------------------------------------------------------------------
+    if cuda_version == "cu130" and sys.platform == "win32":
+        if not setup_cublas12(target_env, extras, args.dev, is_external):
+            log("    INSTALLATION FAILED (cuBLAS 12 for faster-whisper)")
+            create_failure_file("cuBLAS 12 install, placing or CUDA 12.8 fallback failed — check install_log.txt")
+            sys.exit(1)
+    elif cuda_version in ("cu130", "cu128"):
+        _write_stack(_venv_python(target_env), cuda_version)
     else:
-        log("")
-        log("=" * 60)
-        log("  LOCAL LLM TRANSLATION")
-        log("=" * 60)
-        log("")
-        log("WhisperJAV can translate subtitles using local AI models,")
-        log("allowing offline translation without API keys.")
-        log("")
-        response = timed_input("Install local LLM translation? (Y/n): ", 30, "y").strip().lower()
-        if response in ('', 'y', 'yes'):
-            _install_local_llm(build_from_source=False)
-        else:
-            log("Skipping local LLM. Install later: pip install llama-cpp-python[server]")
+        _write_stack(_venv_python(target_env), "cpu")
 
     # -------------------------------------------------------------------------
     # Verification
