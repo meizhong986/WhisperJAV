@@ -8,7 +8,7 @@ Covers ALL 15 source files changed vs main:
   D  VAD padding defaults (silero_v6, ten, factory)
   E  CLI argument parsing (new v1.8.7 flags in main.py)
   F  --enhance-for-vad structural integrity (pipelines, orchestrator, exports)
-  G  Metal/MPS diagnostic (local_backend ServerDiagnostics + _parse_server_stderr)
+  G  (removed in v1.10.0 with local_backend.py: llama-cpp local translation is gone)
   H  compute_max_output_tokens safety envelope
   I  GUI streaming wiring (api.py)
   J  Installer build consistency
@@ -76,7 +76,6 @@ class TestCoreImports:
     @pytest.mark.parametrize("module", [
         pytest.param("whisperjav.translate.cli", marks=pytest.mark.skip(reason="cli.py runs argparse at import time — tested via source inspection in TestIssue196TranslationChain")),
         "whisperjav.translate.core",
-        "whisperjav.translate.local_backend",
         "whisperjav.modules.transformers_asr",
         "whisperjav.modules.speech_segmentation.backends.silero_v6",
         "whisperjav.modules.speech_segmentation.backends.ten",
@@ -156,20 +155,21 @@ class TestIssue196TranslationChain:
         assert client.settings.get_bool("stream_responses", False) is True
 
     def test_stream_true_forced_in_cli_source(self):
+        # v1.10.0: the llama-cpp branch is gone; Ollama still always streams.
         cli_path = os.path.join(REPO, "whisperjav", "translate", "cli.py")
         src = open(cli_path, encoding="utf-8").read()
         assert "stream=True," in src
-        assert "Always stream for local LLM" in src
+        assert "Always stream for local models" in src
 
     def test_stream_cloud_user_controlled(self):
         cli_path = os.path.join(REPO, "whisperjav", "translate", "cli.py")
         src = open(cli_path, encoding="utf-8").read()
         assert "stream=args.stream" in src
 
-    def test_supports_streaming_in_local_provider_config_source(self):
-        cli_path = os.path.join(REPO, "whisperjav", "translate", "cli.py")
-        src = open(cli_path, encoding="utf-8").read()
-        assert "'supports_streaming': True" in src
+    def test_supports_streaming_in_ollama_provider_config(self):
+        # v1.10.0: was the llama-cpp provider config in cli.py; Ollama's is in providers.py.
+        from whisperjav.translate.providers import PROVIDER_CONFIGS
+        assert PROVIDER_CONFIGS["ollama"]["supports_streaming"] is True
 
     def test_supports_streaming_passthrough_in_core(self):
         core_path = os.path.join(REPO, "whisperjav", "translate", "core.py")
@@ -575,151 +575,6 @@ class TestEnhanceForVADStructure:
         src = open(src_path, encoding="utf-8").read()
         assert "_vad_scene_paths" in src
         assert "_orch_vad_paths" in src
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# G  METAL / MPS DIAGNOSTIC (local_backend.py)
-# ─────────────────────────────────────────────────────────────────────────────
-
-class TestMetalMPSDiagnostic:
-    """ServerDiagnostics correctly identifies Metal vs CUDA vs CPU backends."""
-
-    def setup_method(self):
-        from whisperjav.translate.local_backend import ServerDiagnostics, _parse_server_stderr
-        self.ServerDiagnostics = ServerDiagnostics
-        self.parse = _parse_server_stderr
-
-    def _write_stderr(self, content):
-        f = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8")
-        f.write(content)
-        f.close()
-        return f.name
-
-    # ── ServerDiagnostics dataclass ──────────────────────────────────────────
-
-    def test_server_diagnostics_has_using_metal_field(self):
-        d = self.ServerDiagnostics()
-        assert hasattr(d, "using_metal")
-        assert d.using_metal is False
-
-    def test_server_diagnostics_has_using_cuda_field(self):
-        d = self.ServerDiagnostics()
-        assert hasattr(d, "using_cuda")
-
-    def test_is_gpu_accelerated_true_for_metal(self):
-        d = self.ServerDiagnostics(gpu_layers_loaded=33, total_layers=33, using_metal=True)
-        assert d.is_gpu_accelerated is True
-
-    def test_is_gpu_accelerated_true_for_cuda(self):
-        d = self.ServerDiagnostics(gpu_layers_loaded=33, total_layers=33, using_cuda=True)
-        assert d.is_gpu_accelerated is True
-
-    def test_is_gpu_accelerated_false_for_cpu(self):
-        d = self.ServerDiagnostics()
-        assert d.is_gpu_accelerated is False
-
-    def test_metal_status_summary_says_metal_mps(self):
-        d = self.ServerDiagnostics(gpu_layers_loaded=33, total_layers=33, using_metal=True)
-        summary = d.get_status_summary()
-        assert "Metal/MPS" in summary
-
-    def test_metal_status_summary_does_not_say_cuda(self):
-        d = self.ServerDiagnostics(gpu_layers_loaded=33, total_layers=33, using_metal=True)
-        summary = d.get_status_summary()
-        assert "CUDA" not in summary, f"Metal server incorrectly labelled CUDA: {summary}"
-
-    def test_cuda_status_summary_says_cuda(self):
-        d = self.ServerDiagnostics(gpu_layers_loaded=33, total_layers=33, using_cuda=True)
-        assert "CUDA" in d.get_status_summary()
-
-    def test_partial_cuda_status_says_partial(self):
-        d = self.ServerDiagnostics(gpu_layers_loaded=20, total_layers=33, using_cuda=True)
-        assert "Partial" in d.get_status_summary()
-
-    def test_cpu_only_status_says_cpu_only(self):
-        d = self.ServerDiagnostics()
-        assert "CPU ONLY" in d.get_status_summary()
-
-    # ── _parse_server_stderr ─────────────────────────────────────────────────
-
-    _METAL_LOG = """
-llm_load_tensors: offloading 33 repeating layers to GPU
-llm_load_tensors: offloaded 33/33 layers to GPU
-ggml_metal_init: allocating
-ggml_metal_init: found device: Apple M1 Pro
-llm_load_tensors: VRAM used: 5.20 GiB
-"""
-    _CUDA_LOG = """
-llm_load_tensors: offloading 33 repeating layers to GPU
-llm_load_tensors: offloaded 33/33 layers to GPU
-ggml_cuda_init: found 1 CUDA devices
-ggml_cuda_init: CUDA0: NVIDIA GeForce RTX 3060, 12288 MiB
-llm_load_tensors: VRAM used: 5.20 GiB
-"""
-    _CUDA_PARTIAL_LOG = """
-llm_load_tensors: offloading 20 repeating layers to GPU
-llm_load_tensors: offloaded 20/33 layers to GPU
-ggml_cuda_init: found 1 CUDA devices
-llm_load_tensors: VRAM used: 3.10 GiB
-"""
-    _CPU_LOG = """
-llm_load_tensors: using CPU backend
-"""
-    _METAL_WITH_CUDA_ERROR_LOG = """
-ggml_cuda_init: no CUDA devices found, CUDA not available
-llm_load_tensors: offloading 33 repeating layers to GPU
-llm_load_tensors: offloaded 33/33 layers to GPU
-ggml_metal_init: allocating
-ggml_metal_init: found device: Apple M1 Pro
-llm_load_tensors: VRAM used: 5.20 GiB
-"""
-    _M2_METAL_CUDA_BEFORE_LOG = """
-ggml_cuda_init: no CUDA devices found
-ggml_metal_init: allocating
-ggml_metal_init: found device: Apple M2 Max
-llm_load_tensors: offloaded 48/48 layers to GPU
-llm_load_tensors: VRAM used: 8.10 GiB
-"""
-
-    @pytest.mark.parametrize("log,exp_metal,exp_cuda,exp_layers,exp_gpu", [
-        ("_METAL_LOG", True, False, 33, True),
-        ("_CUDA_LOG", False, True, 33, True),
-        ("_CUDA_PARTIAL_LOG", False, True, 20, True),
-        ("_CPU_LOG", False, False, 0, False),
-        ("_METAL_WITH_CUDA_ERROR_LOG", True, False, 33, True),
-        ("_M2_METAL_CUDA_BEFORE_LOG", True, False, 48, True),
-    ])
-    def test_parse_stderr(self, log, exp_metal, exp_cuda, exp_layers, exp_gpu):
-        content = getattr(self, log)
-        p = self._write_stderr(content)
-        try:
-            d = self.parse(p)
-        finally:
-            os.unlink(p)
-        assert d.using_metal == exp_metal, f"{log}: using_metal={d.using_metal}, expected {exp_metal}"
-        assert d.using_cuda == exp_cuda, f"{log}: using_cuda={d.using_cuda}, expected {exp_cuda}"
-        assert d.gpu_layers_loaded == exp_layers, f"{log}: layers={d.gpu_layers_loaded}, expected {exp_layers}"
-        assert d.is_gpu_accelerated == exp_gpu, f"{log}: is_gpu_accelerated={d.is_gpu_accelerated}, expected {exp_gpu}"
-
-    def test_metal_with_cuda_error_text_is_not_mislabeled_cuda(self):
-        """M1 Mac logs 'CUDA not available' before metal init — must not be labelled CUDA."""
-        p = self._write_stderr(self._METAL_WITH_CUDA_ERROR_LOG)
-        try:
-            d = self.parse(p)
-        finally:
-            os.unlink(p)
-        assert d.using_metal is True
-        assert d.using_cuda is False
-        assert "Metal/MPS" in d.get_status_summary()
-        assert "CUDA" not in d.get_status_summary()
-
-    def test_assess_server_viability_uses_backend_variable(self):
-        """_assess_server_viability must not hardcode 'CUDA' string."""
-        from whisperjav.translate import local_backend
-        src = inspect.getsource(local_backend._assess_server_viability)
-        # Should use a variable like _backend, not f-string with literal "CUDA"
-        assert '"CUDA"' not in src or '_backend' in src, \
-            "_assess_server_viability still hardcodes 'CUDA' string"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
