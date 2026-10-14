@@ -30,11 +30,6 @@ translate
     AI-powered subtitle translation using PySubtrans.
     Includes: pysubtrans, openai, google-genai
 
-llm
-    Local LLM server for offline translation.
-    Includes: uvicorn, fastapi, sse-starlette
-    Note: llama-cpp-python must be installed separately with CUDA support.
-
 enhance
     Speech enhancement (denoising, vocal isolation).
     Includes: modelscope, clearvoice, bs-roformer-infer
