@@ -4,10 +4,11 @@ WhisperJAV v{{VERSION}} Post-Install Script
 
 This script runs after the conda environment is created and:
 1. Performs comprehensive preflight checks (disk space, network, WebView2)
-2. Detects NVIDIA GPU and installs appropriate PyTorch build
+2. Detects NVIDIA GPU and chooses the PyTorch build (CUDA 13.0, or CPU)
 3. Offers CPU-only fallback for systems without NVIDIA GPU
-4. Installs all Python dependencies from requirements_v{{VERSION}}.txt
-5. Installs WhisperJAV from GitHub
+4. Installs the release-pinned dependencies of that build from
+   requirements_v{{VERSION}}_<build>.txt (uv.lock exported by build_release.py), then PyTorch
+5. Installs WhisperJAV from the bundled wheel
 6. Creates desktop shortcut
 7. Provides detailed installation summary
 
@@ -19,13 +20,12 @@ import sys
 import re
 import json
 import time
-import shlex
 import shutil
 import subprocess
 import traceback
 from datetime import datetime
 from pathlib import Path
-from typing import NamedTuple, Optional, Sequence, Tuple
+from typing import Dict, List, NamedTuple, Optional, Sequence, Tuple
 
 try:
     import pynvml  # type: ignore
@@ -120,20 +120,27 @@ USE_UV = os.path.exists(UV_EXE)
 if USE_UV:
     os.environ["UV_HTTP_TIMEOUT"] = "300"  # 5 minutes for large downloads
 
-# v1.10.0 (REQ2): one stack -- PyTorch 2.11.0 for CUDA 13.0, pinned (torchaudio has no
-# release after 2.11.0). CUDA 12.8 is used only where the cuBLAS 12 check fails on
-# this PC (item 2 spec D, owner W37 (3)). Keep in step with pyproject.toml.
-TORCH_PACKAGES = "torch==2.11.0 torchaudio==2.11.0 torchvision==0.26.0"
-NUMPY_REQUIREMENT = "numpy>=2.5,<2.6"
+# v1.10.0 (REQ2): one stack -- PyTorch 2.11.0 for CUDA 13.0 (torchaudio has no release
+# after 2.11.0). CUDA 12.8 is used only where the cuBLAS 12 check fails on this PC (item
+# 2 spec D, owner W37 (3)).
+# v1.10.0 (item 2f, owner W53-W56): every package version -- PyTorch included -- comes
+# from the locked file of the PyTorch build selected for this PC, exported from uv.lock
+# by build_release.py, so the packages WhisperJAV runs on are not resolved from version
+# ranges at install time. (Still not pinned: lief and nvidia-ml-py, installed further down
+# for the launcher icon and driver detection, and the build tools of the few packages
+# that ship as source only.)
 CU130_INDEX = "https://download.pytorch.org/whl/cu130"
 CU128_INDEX = "https://download.pytorch.org/whl/cu128"
+CPU_INDEX = "https://download.pytorch.org/whl/cpu"
+PYTORCH_INDEXES = {"cu130": CU130_INDEX, "cu128": CU128_INDEX, "cpu": CPU_INDEX}
+VARIANT_LABELS = {"cu130": "CUDA 13.0", "cu128": "CUDA 12.8", "cpu": "CPU"}
+TORCH_PACKAGE_NAMES = ("torch", "torchaudio", "torchvision")
 MIN_TORCH_CUDA_VERSION: Tuple[int, int, int] = (13, 0, 0)
 MIN_TORCH_CUDA_VERSION_FALLBACK: Tuple[int, int, int] = (12, 8, 0)
-CPU_FALLBACK_COMMAND = f"pip3 install {TORCH_PACKAGES} {NUMPY_REQUIREMENT}"
-# The CUDA 12.8 fallback replaces the three PyTorch packages only (--no-deps): a reinstall
-# with dependencies pulled newer packages from PyTorch's index past other packages' limits
-# (fsspec past datasets' <=2025.3.0; review 2026-10-14).
-CU128_COMMAND = f"pip3 install {TORCH_PACKAGES} --index-url {CU128_INDEX} --no-deps"
+# PyTorch is always installed --no-deps, its three packages only, from its build's index:
+# a reinstall with dependencies pulled newer packages from PyTorch's index past other
+# packages' limits (fsspec past datasets' <=2025.3.0; review 2026-10-14). Its
+# dependencies come with the rest of the locked file, which is installed first.
 
 # Cards and drivers 1.10 supports (item 2 spec E and F). PyTorch 2.11.0 cu130 has
 # kernels from compute capability 7.5 (Turing) up: its arch list on the owner's PC
@@ -174,10 +181,81 @@ def create_stopped_file(reason: str) -> None:
         log(f"WARNING: could not write {STOPPED_MARKER}: {e}")
 
 
+def locked_requirements_path(variant: str) -> str:
+    """The locked file for one PyTorch build, shipped next to this script."""
+    return os.path.join(sys.prefix, f"requirements_v{{VERSION}}_{variant}.txt")
+
+
+def requirement_name(line: str) -> str:
+    """'torch==2.11.0+cu130' / 'stable-ts @ git+...' / 'x==1 ; marker' -> normalized name."""
+    name = re.split(r"[=<>!~;@\[\s]", line.strip(), maxsplit=1)[0]
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def locked_requirement_lines(variant: str) -> List[str]:
+    """The requirement lines of the locked file (comments and blank lines dropped)."""
+    with open(locked_requirements_path(variant), encoding="utf-8") as f:
+        return [line.strip() for line in f if line.strip() and not line.lstrip().startswith("#")]
+
+
+def torch_pip_args(variant: str) -> List[str]:
+    """Install arguments for the three PyTorch packages of one build, from the locked file."""
+    lines = [l for l in locked_requirement_lines(variant) if requirement_name(l) in TORCH_PACKAGE_NAMES]
+    if not lines:
+        raise RuntimeError(f"no PyTorch lines in {locked_requirements_path(variant)}")
+    return ["install", "--no-deps", *lines, "--index-url", PYTORCH_INDEXES[variant]]
+
+
+def variant_of_cuda_build(cuda_build: str) -> Optional[str]:
+    """The installed PyTorch's CUDA version ('13.0', '12.8', '' for CPU) -> cu130 / cu128 / cpu."""
+    if not cuda_build:
+        return "cpu"
+    if cuda_build.startswith("13"):
+        return "cu130"
+    if cuda_build.startswith("12.8"):
+        return "cu128"
+    return None
+
+
+def conda_python_packages() -> Dict[str, str]:
+    """Python packages conda put into this environment: normalized name -> version.
+
+    Owner W52: conda never owns a package pip/uv installs. Phase 4 leaves these out of
+    the locked file, so uv never replaces a conda package (packaging is the one found in
+    a dry-run solve of construct.yaml on 2026-10-14). Versions are not compared -- see
+    the item 2f spec, "Changes found while coding", for the open decision.
+    """
+    owned: Dict[str, str] = {}
+    meta = Path(sys.prefix) / "conda-meta"
+    for record in meta.glob("*.json"):
+        try:
+            data = json.loads(record.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        files = data.get("files") or []
+        if any(str(f).replace("\\", "/").lower().startswith("lib/site-packages/") for f in files):
+            owned[re.sub(r"[-_.]+", "-", str(data.get("name", ""))).lower()] = str(data.get("version", ""))
+    return owned
+
+
+def release_pinned_install_lines(locked_lines: List[str], conda_owned: Dict[str, str]) -> List[str]:
+    """The locked lines phase 4 installs: all but PyTorch's three and conda's packages."""
+    install_lines = []
+    for line in locked_lines:
+        name = requirement_name(line)
+        if name in TORCH_PACKAGE_NAMES:
+            continue
+        if name in conda_owned:
+            log(f"Kept conda's {name} {conda_owned[name]} (locked file: {line.split(';')[0].strip()})")
+            continue
+        install_lines.append(line)
+    return install_lines
+
+
 class DriverMatrixEntry(NamedTuple):
     min_driver: Tuple[int, int, int]
     cuda_version: str
-    pip_command: str
+    variant: str
 
 
 class DriverInfo(NamedTuple):
@@ -197,6 +275,7 @@ class TorchInstallPlan(NamedTuple):
     driver_detected: Optional[Tuple[int, int, int]]
     gpu_name: Optional[str]
     reason: str
+    variant: str = "cu130"  # v1.10.0 (item 2f): the locked file this plan installs from
 
 
 TORCH_DRIVER_MATRIX: Sequence[DriverMatrixEntry] = (
@@ -204,11 +283,7 @@ TORCH_DRIVER_MATRIX: Sequence[DriverMatrixEntry] = (
     # The cu128 and cu118 rows are gone: an older driver on a supported card stops the
     # install and asks for a driver update (owner, W36 (2)); cu128 remains only as the
     # per-PC fallback of phase 5.1.
-    DriverMatrixEntry(
-        MIN_DRIVER_CUDA13,
-        "CUDA 13.0",
-        f"pip3 install {TORCH_PACKAGES} {NUMPY_REQUIREMENT} --index-url {CU130_INDEX}"
-    ),
+    DriverMatrixEntry(MIN_DRIVER_CUDA13, "CUDA 13.0", "cu130"),
 )
 
 
@@ -608,7 +683,7 @@ def verify_existing_torch_stack() -> Tuple[bool, Optional[str]]:
         log(f"Existing PyTorch satisfies CUDA >= {format_version_tuple(min_cuda)}. Skipping reinstall.")
         # Create GPU constraints to protect pre-existing torch from overwrites.
         # If this fails, abort — continuing without protection risks silent
-        # CUDA→CPU replacement in Phase 3.5/4 (much harder to debug).
+        # CUDA→CPU replacement by a later install (much harder to debug).
         gpu_pins = {k: facts[k] for k in ("torch", "torchaudio", "torchvision") if k in facts}
         _torch_cuda_build = cuda_str
         if not create_gpu_constraints(gpu_pins):
@@ -626,32 +701,24 @@ def verify_existing_torch_stack() -> Tuple[bool, Optional[str]]:
     return False, None
 
 
-def normalize_pip_command(command: str) -> list[str]:
-    parts = shlex.split(command)
-    if len(parts) < 2:
-        raise ValueError(f"Invalid pip command: {command}")
-    head = parts[0].lower()
-    if head not in {"pip", "pip3"}:
-        raise ValueError(f"Unsupported pip executable '{parts[0]}' in command: {command}")
-    return parts[1:]
-
-
 def select_torch_install_plan(driver_info: DriverInfo, force_cpu: bool = False) -> TorchInstallPlan:
     if force_cpu:
         reason = "CPU-only install chosen for a graphics card older than 1.10 supports."
     elif driver_info.driver_version:
         for entry in TORCH_DRIVER_MATRIX:
             if driver_info.driver_version >= entry.min_driver:
+                args = torch_pip_args(entry.variant)
                 return TorchInstallPlan(
-                    pip_args=normalize_pip_command(entry.pip_command),
-                    pip_command=entry.pip_command,
+                    pip_args=args,
+                    pip_command="pip3 " + " ".join(args),
                     description=f"Install PyTorch/Torchaudio/Torchvision ({entry.cuda_version})",
                     uses_gpu=True,
                     target_label=entry.cuda_version,
                     driver_requirement=entry.min_driver,
                     driver_detected=driver_info.driver_version,
                     gpu_name=driver_info.gpu_name,
-                    reason=""
+                    reason="",
+                    variant=entry.variant,
                 )
 
         min_required = TORCH_DRIVER_MATRIX[-1].min_driver
@@ -663,16 +730,18 @@ def select_torch_install_plan(driver_info: DriverInfo, force_cpu: bool = False) 
     else:
         reason = "No NVIDIA GPU or driver detected."
 
+    args = torch_pip_args("cpu")
     return TorchInstallPlan(
-        pip_args=normalize_pip_command(CPU_FALLBACK_COMMAND),
-        pip_command=CPU_FALLBACK_COMMAND,
+        pip_args=args,
+        pip_command="pip3 " + " ".join(args),
         description="Install PyTorch/Torchaudio/Torchvision (CPU-only)",
         uses_gpu=False,
         target_label="CPU",
         driver_requirement=None,
         driver_detected=driver_info.driver_version,
         gpu_name=driver_info.gpu_name,
-        reason=reason
+        reason=reason,
+        variant="cpu",
     )
 
 
@@ -1006,25 +1075,29 @@ def check_cuda_driver() -> DriverInfo:
     return driver_info
 
 
-def install_pytorch(driver_info: Optional[DriverInfo] = None, force_cpu: bool = False) -> Optional[str]:
-    """
-    Install PyTorch/Torchaudio with best available acceleration.
+def plan_pytorch(driver_info: Optional[DriverInfo] = None,
+                 force_cpu: bool = False) -> Tuple[Optional[TorchInstallPlan], Optional[str]]:
+    """Choose the PyTorch build for this PC, before anything is installed.
 
-    Returns:
-        None on success, or a failure reason string for diagnostics.
+    Returns (None, None) when a valid PyTorch is already there and is kept, (plan, None)
+    when the plan's build is to be installed, or (None, reason) to stop. v1.10.0 (item
+    2f): split from install_pytorch so the locked file of the chosen build can be
+    installed first -- PyTorch is installed --no-deps and imports only once its
+    dependencies are in place.
     """
-    log_section("PyTorch Installation")
-
     existing_ok, existing_error = verify_existing_torch_stack()
     if existing_ok:
-        return None
+        return None, None
     if existing_error:
         # Torch exists and is valid, but constraints couldn't be written.
         # Don't waste time reinstalling — the filesystem problem won't fix itself.
-        return existing_error
+        return None, existing_error
 
     driver_info = driver_info or detect_nvidia_driver()
-    plan = select_torch_install_plan(driver_info, force_cpu=force_cpu) if force_cpu else select_torch_install_plan(driver_info)
+    try:
+        plan = select_torch_install_plan(driver_info, force_cpu=force_cpu) if force_cpu else select_torch_install_plan(driver_info)
+    except (OSError, RuntimeError) as exc:
+        return None, f"The installer's locked requirements file is missing or damaged: {exc}"
 
     if plan.uses_gpu:
         log(
@@ -1045,7 +1118,26 @@ def install_pytorch(driver_info: Optional[DriverInfo] = None, force_cpu: bool = 
         response = timed_input("Install CPU-only PyTorch? (Y/n): ", 20, "y").strip().lower()
         if response != 'y':
             log("User declined CPU-only PyTorch installation.")
-            return "User declined CPU-only PyTorch"
+            return None, "User declined CPU-only PyTorch"
+    return plan, None
+
+
+def install_pytorch(driver_info: Optional[DriverInfo] = None, force_cpu: bool = False,
+                    plan: Optional[TorchInstallPlan] = None) -> Optional[str]:
+    """
+    Install PyTorch/Torchaudio with best available acceleration.
+
+    Without a plan it chooses one first (plan_pytorch). Returns None on success, or a
+    failure reason string for diagnostics.
+    """
+    log_section("PyTorch Installation")
+
+    if plan is None:
+        plan, error = plan_pytorch(driver_info, force_cpu=force_cpu)
+        if error:
+            return error
+        if plan is None:
+            return None  # the existing PyTorch is kept
 
     if not install_pytorch_and_torchaudio(plan):
         return "PyTorch package installation failed (pip/uv error)"
@@ -1084,7 +1176,7 @@ def install_pytorch(driver_info: Optional[DriverInfo] = None, force_cpu: bool = 
         # Lock GPU packages: pin torch/torchaudio to prevent subsequent pip installs
         # from replacing CUDA wheels with CPU-only versions from PyPI.
         # If this fails, abort — continuing without protection risks silent
-        # CUDA→CPU replacement in Phase 3.5/4 (much harder to debug).
+        # CUDA→CPU replacement by a later install (much harder to debug).
         gpu_pins = {k: facts[k] for k in ("torch", "torchaudio", "torchvision") if k in facts}
         if not create_gpu_constraints(gpu_pins):
             log("FATAL: Cannot write GPU constraints file.")
@@ -2205,7 +2297,10 @@ def install_cuda128_fallback() -> Optional[str]:
     ctranslate2 is reinstalled so its folder is as shipped.
     """
     log_section("Phase 5.1b: Installing the CUDA 12.8 build")
-    args = normalize_pip_command(CU128_COMMAND) + ["--reinstall" if USE_UV else "--force-reinstall"]
+    try:
+        args = torch_pip_args("cu128") + ["--reinstall" if USE_UV else "--force-reinstall"]
+    except (OSError, RuntimeError) as exc:
+        return f"CUDA 12.8 fallback: the locked requirements file is missing or damaged: {exc}"
     if not run_pip(args, "Install PyTorch/Torchaudio/Torchvision (CUDA 12.8)", use_constraints=False):
         return "CUDA 12.8 fallback: PyTorch installation failed (pip/uv error)"
     ok, err = torch_imports_in_fresh_process()
@@ -2227,8 +2322,12 @@ def install_cuda128_fallback() -> Optional[str]:
             except OSError as e:
                 return f"CUDA 12.8 fallback: could not remove {path}: {e}"
     uninstall_package(CUBLAS12_PACKAGE.split("==")[0], "Remove nvidia-cublas-cu12 (not needed with CUDA 12.8)")
+    try:  # the locked version, not a copy of it here (review 2026-10-14, item 2f)
+        ct2 = [l for l in locked_requirement_lines("cu128") if requirement_name(l) == "ctranslate2"][0]
+    except (OSError, IndexError) as exc:
+        return f"CUDA 12.8 fallback: no ctranslate2 line in the locked requirements file ({exc})"
     if not run_pip(["install", "--no-deps", "--reinstall" if USE_UV else "--force-reinstall",
-                    "ctranslate2==4.8.3"], "Reinstall CTranslate2 as shipped", use_constraints=False):
+                    ct2], "Reinstall CTranslate2 as shipped", use_constraints=False):
         return "CUDA 12.8 fallback: CTranslate2 reinstall failed"
     return None
 
@@ -2450,79 +2549,55 @@ def main() -> int:
         create_stopped_file(gate_reason)
         return 0  # not a failure (D1): NSIS shows the closing dialog for the marker
 
-    # === Phase 3: PyTorch Installation ===
-    log_section("Phase 3: PyTorch Installation")
-    pytorch_error = install_pytorch(driver_info, force_cpu=(gate == "cpu"))
-    if pytorch_error:
-        create_failure_file(f"PyTorch installation failed: {pytorch_error}")
+    # === Phase 3: PyTorch build for this PC (item 2f) ===
+    # Chosen before anything is installed: the locked file of that build is installed
+    # next, then PyTorch itself (--no-deps; it needs the packages of phase 4 to import).
+    log_section("Phase 3: PyTorch Build Selection")
+    torch_plan, plan_error = plan_pytorch(driver_info, force_cpu=(gate == "cpu"))
+    if plan_error:
+        create_failure_file(f"PyTorch installation failed: {plan_error}")
+        return 1
+    # The build actually selected: the plan's, or the one already installed and kept
+    # (a repair run). Never a build that was only detected (owner, W56).
+    variant = torch_plan.variant if torch_plan else variant_of_cuda_build(_torch_cuda_build or "")
+    if variant is None:
+        create_failure_file(f"Installed PyTorch has an unexpected CUDA build: {_torch_cuda_build}")
         return 1
 
-    # === Phase 3.5: Git-Based Core Packages ===
-    # These packages are installed from GitHub and need special handling:
-    # - They benefit from git timeout/retry logic
-    # - They must be installed AFTER PyTorch (dependency)
-    # - They are excluded from requirements.txt to avoid pip/uv git issues
-    # - --no-deps: All runtime dependencies are managed separately
-    #   (torch from Phase 3, everything else from Phase 4 requirements.txt).
-    #   This avoids dependency resolution entirely, which is both faster and
-    #   eliminates any risk of uv replacing CUDA torch with CPU torch.
-    #   PEP 517 build dependencies are still handled via build isolation.
-    log_section("Phase 3.5: Core Whisper Packages (Git-based)")
-
-    git_packages = [
-        # Core ASR packages (order matters - whisper before stable-ts)
-        ("openai-whisper @ git+https://github.com/openai/whisper@main", "OpenAI Whisper"),
-        ("stable-ts @ git+https://github.com/meizhong986/stable-ts-fix-setup.git@main", "Stable-TS (WhisperJAV fork)"),
-        # faster-whisper is pinned to a commit on SYSTRAN master, not to the 1.2.1
-        # release: that commit carries the Silero v6.2 weights and the new VAD
-        # parameters. Because it is a git address, the requirements generator
-        # filters it out of requirements_v{{VERSION}}.txt, so it has to be
-        # installed here or it is never installed at all.
-        # --no-deps is safe: faster-whisper needs ctranslate2 only at run time,
-        # and Phase 4 installs the pinned ctranslate2==4.8.3 from requirements.
-        ("faster-whisper @ git+https://github.com/SYSTRAN/faster-whisper.git@ed9a06cd89a93e47838f564998a6c09b655d7f43", "Faster-Whisper (SYSTRAN master @ ed9a06c)"),
-        # FFmpeg Python bindings
-        ("ffmpeg-python @ git+https://github.com/kkroening/ffmpeg-python.git", "FFmpeg-Python"),
-        # Speech enhancement (enhance extra - included in standalone installer)
-        ("clearvoice @ git+https://github.com/meizhong986/ClearerVoice-Studio.git#subdirectory=clearvoice", "ClearVoice Speech Enhancement"),
-    ]
-
-    log("Installing core packages from GitHub...")
-    log("These packages require git and may take a few minutes.")
-    log("")
+    # === Phase 4: Release-pinned dependencies (item 2f) ===
+    # Every line of the locked file except PyTorch's three packages and what conda
+    # already put here (owner W52), --no-deps: the file is complete, so nothing is
+    # resolved on this PC. Git packages are in it at the commits uv.lock records.
+    log_section("Phase 4: Release-Pinned Dependencies")
+    try:
+        locked_lines = locked_requirement_lines(variant)
+    except OSError as exc:
+        log(f"ERROR: cannot read {locked_requirements_path(variant)}: {exc}")
+        create_failure_file(f"Missing requirements file: {locked_requirements_path(variant)}")
+        return 1
+    install_lines = release_pinned_install_lines(locked_lines, conda_python_packages())
+    install_file = os.path.join(sys.prefix, f"requirements_v{{VERSION}}_{variant}_install.txt")
+    with open(install_file, "w", encoding="utf-8") as f:
+        f.write("\n".join(install_lines) + "\n")
 
     # Proactively detect and propagate system proxy for bundled git.
     # Chinese users often have proxies at OS level that bundled git can't see.
     detect_and_configure_proxy()
 
-    for package_spec, description in git_packages:
-        if not run_pip(
-            ["install", "--no-deps", package_spec, "--progress-bar", "on"],
-            f"Install {description}"
-        ):
-            create_failure_file(f"{description} installation failed")
-            return 1
-
-    log("")
-    log("Core Whisper packages installed successfully.")
-
-    # === Phase 4: Python Dependencies ===
-    log_section("Phase 4: Python Dependencies Installation")
-
-    req_path = os.path.join(sys.prefix, "requirements_v{{VERSION}}.txt")
-    if not os.path.exists(req_path):
-        log(f"ERROR: requirements_v{{VERSION}}.txt not found at {req_path}")
-        create_failure_file(f"Missing requirements file: {req_path}")
-        return 1
-
-    log(f"Installing dependencies from: {req_path}")
-    log("This will download ~500MB of packages. Please wait...")
-
+    log(f"Installing release-pinned dependencies ({VARIANT_LABELS[variant]})...")
+    log(f"  {len(install_lines)} packages from {locked_requirements_path(variant)}")
     if not run_pip(
-        ["install", "-r", req_path, "--progress-bar", "on"],
+        ["install", "--no-deps", "-r", install_file, "--progress-bar", "on"],
         "Install Python dependencies"
     ):
         create_failure_file("Dependencies installation failed")
+        return 1
+
+    # === Phase 4.5: PyTorch ===
+    log_section("Phase 4.5: PyTorch Installation")
+    pytorch_error = install_pytorch(driver_info, force_cpu=(gate == "cpu"), plan=torch_plan) if torch_plan else None
+    if pytorch_error:
+        create_failure_file(f"PyTorch installation failed: {pytorch_error}")
         return 1
 
     # === Phase 5: WhisperJAV Application ===
