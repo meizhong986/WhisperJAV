@@ -350,6 +350,7 @@ PACKAGES: List[Package] = [
     ),
     Package(
         name="torchvision",
+        version="==0.26.0",  # v1.10.0 (item 2f): pinned with torch, as in pyproject.toml's cu130/cu128/cpu extras
         extra=Extra.CORE,
         source=InstallSource.INDEX_URL,
         index_url="https://download.pytorch.org/whl/{cuda}",
@@ -444,11 +445,10 @@ PACKAGES: List[Package] = [
     # ctranslate2 is listed first so the pinned version is in place when
     # faster-whisper is resolved.
     #
-    # The Windows installer runs them the other way round -- faster-whisper is
-    # installed in Phase 3.5 from git, ctranslate2 in Phase 4 from the generated
-    # requirements file. That is safe only because Phase 3.5 passes --no-deps, so
-    # faster-whisper never resolves ctranslate2 for itself; it needs it at run
-    # time, not at install time.
+    # The Windows installer installs both from its locked file in one --no-deps
+    # step (v1.10.0, item 2f: uv.lock exported per PyTorch build), so faster-whisper
+    # never resolves ctranslate2 for itself; it needs it at run time, not at
+    # install time.
     Package(
         name="ctranslate2",
         version="==4.8.3",
@@ -702,7 +702,7 @@ PACKAGES: List[Package] = [
         order=77,
         reason="ClearVoice speech enhancement - custom fork with relaxed librosa",
     ),
-    # ClearVoice transitive deps (explicit for --no-deps safety in Phase 3.5):
+    # ClearVoice transitive deps (explicit for --no-deps safety in the installer):
     # These are declared in ClearVoice's pyproject.toml but skipped with --no-deps.
     # Version pins are relaxed from ClearVoice's exact pins to avoid conflicts.
     Package(
@@ -1024,6 +1024,12 @@ PACKAGES: List[Package] = [
         extra=Extra.DEV,
         order=113,
         reason="Git hooks for code quality",
+    ),
+    Package(
+        name="build",
+        extra=Extra.DEV,
+        order=114,
+        reason="v1.10.0 (item 2f): installer/build_release.py builds the wheel with it",
     ),
 ]
 
