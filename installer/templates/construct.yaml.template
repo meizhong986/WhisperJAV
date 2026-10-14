@@ -20,7 +20,7 @@ channels:
 
 # Minimal base environment (heavy dependencies in post-install)
 specs:
-  - python=3.10.18  # Pinned for stability (tested version)
+  - python=3.13.16  # v1.10.0 (REQ2): Python 3.13, the newest 3.13.x on conda-forge and defaults (2026-10-14)
   - openssl=3.6.2   # Pinned to bypass the ASN.1 Windows cert store bug
   - pip             # Package installer
   - git             # Required for GitHub installs
