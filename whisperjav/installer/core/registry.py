@@ -101,7 +101,6 @@ class Extra(Enum):
     CLI = "cli"             # Audio processing, VAD, scene detection
     GUI = "gui"             # PyWebView GUI
     TRANSLATE = "translate" # AI translation (pysubtrans, OpenAI, Gemini)
-    LLM = "llm"             # Local LLM server (FastAPI, uvicorn)
     ENHANCE = "enhance"     # Speech enhancement (ZipEnhancer, ClearVoice, BS-RoFormer, FFmpeg-DSP)
     HUGGINGFACE = "huggingface"  # HuggingFace Transformers
     QWEN = "qwen"           # Qwen3-ASR support (v1.8.3+)
@@ -124,7 +123,7 @@ class InstallSource(Enum):
     PYPI = auto()           # Standard PyPI (default)
     GIT = auto()            # Git repository
     INDEX_URL = auto()      # PyPI-like index (e.g., PyTorch CUDA wheels)
-    WHEEL_URL = auto()      # Direct wheel URL (e.g., HuggingFace llama-cpp)
+    WHEEL_URL = auto()      # Direct wheel URL
 
 
 class Platform(Enum):
@@ -221,7 +220,7 @@ class Package:
         Generate pyproject.toml dependency specification.
 
         Returns string like:
-        - "numpy>=2.0.0"
+        - "numpy>=2.5,<2.6"
         - "openai-whisper @ git+https://github.com/openai/whisper@main"
         - "pywin32>=305; sys_platform == 'win32'"
         """
@@ -331,6 +330,7 @@ PACKAGES: List[Package] = [
     #
     Package(
         name="torch",
+        version="==2.11.0",  # v1.10.0: pinned, as in pyproject.toml (torchaudio ends at 2.11.0)
         extra=Extra.CORE,
         source=InstallSource.INDEX_URL,
         index_url="https://download.pytorch.org/whl/{cuda}",
@@ -340,6 +340,7 @@ PACKAGES: List[Package] = [
     ),
     Package(
         name="torchaudio",
+        version="==2.11.0",
         extra=Extra.CORE,
         source=InstallSource.INDEX_URL,
         index_url="https://download.pytorch.org/whl/{cuda}",
@@ -367,11 +368,12 @@ PACKAGES: List[Package] = [
     #
     Package(
         name="numpy",
-        version=">=2.0.0",
+        version=">=2.5,<2.6",
         extra=Extra.CLI,
         order=20,
         required=True,
-        reason="Scientific computing (numpy 2.x required) - MUST be before numba (ABI compatibility)",
+        reason="Scientific computing - MUST be before numba (ABI compatibility). v1.10.0: 2.5.x "
+               "satisfies numba 0.68 (<2.6) and every roadmap item read (pyproject.toml comment)",
     ),
     Package(
         name="scipy",
@@ -436,6 +438,9 @@ PACKAGES: List[Package] = [
     # not. It is also the exact build the maintainer develops and tests against.
     #
     # CT2 4.6.2 reproduces the #125 crash on exit (0xC0000409); 4.8.1 does not.
+    # v1.10.0: 4.8.3 (#459), taken without measurement (owner, W36 (4)). On a CUDA 13
+    # Windows install it runs on the cuBLAS 12 DLLs placed in its folder
+    # (whisperjav/installer/cublas12.py).
     # ctranslate2 is listed first so the pinned version is in place when
     # faster-whisper is resolved.
     #
@@ -446,12 +451,12 @@ PACKAGES: List[Package] = [
     # time, not at install time.
     Package(
         name="ctranslate2",
-        version="==4.8.1",
+        version="==4.8.3",
         extra=Extra.CORE,
         order=33,
         required=True,
         reason="Inference engine behind faster-whisper. Pinned exactly: 4.6.2 "
-               "reproduces the #125 crash on exit, 4.8.1 does not.",
+               "reproduces the #125 crash on exit; 4.8.3 since v1.10.0 (#459).",
     ),
     Package(
         name="faster-whisper",
@@ -596,49 +601,6 @@ PACKAGES: List[Package] = [
         order=62,
         import_name="google.api_core",
         reason="Required by pysubtrans Gemini provider (undeclared transitive dep)",
-    ),
-
-    # =========================================================================
-    # PHASE 5: LLM Server Packages (Order 63-69)
-    # =========================================================================
-    #
-    # NOTE: llama-cpp-python itself is installed separately with CUDA detection
-    # These are just the server dependencies
-    #
-    Package(
-        name="uvicorn",
-        version=">=0.22.0",
-        extra=Extra.LLM,
-        order=63,
-        reason="ASGI server for LLM API",
-    ),
-    Package(
-        name="fastapi",
-        version=">=0.100.0",
-        extra=Extra.LLM,
-        order=64,
-        reason="API framework for LLM server",
-    ),
-    Package(
-        name="pydantic-settings",
-        version=">=2.0.1",
-        extra=Extra.LLM,
-        order=65,
-        reason="Configuration management for LLM server",
-    ),
-    Package(
-        name="sse-starlette",
-        version=">=1.6.1",
-        extra=Extra.LLM,
-        order=66,
-        reason="Server-Sent Events for streaming LLM responses",
-    ),
-    Package(
-        name="starlette-context",
-        version=">=0.3.6,<0.4",
-        extra=Extra.LLM,
-        order=67,
-        reason="Request context for Starlette - pinned to 0.3.x for compatibility",
     ),
 
     # =========================================================================
