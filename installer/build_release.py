@@ -15,6 +15,11 @@ Usage:
 
 A full build stops if the working tree is not committed (checked after phase 1)
 or if the wheel holds a package file that git does not track.
+
+v1.10.0 (item 2f): the dependency lists come from uv.lock, one per PyTorch build
+(cu130, cu128, cpu), exported into whisperjav/installer/locked/ (tracked by git, so a
+lock change shows up as uncommitted files and stops the build until committed).
+Needs uv on PATH (uv.lock's required-version names the lowest).
 """
 
 import os
@@ -25,16 +30,6 @@ import configparser
 import argparse
 from pathlib import Path
 from datetime import datetime
-
-# Python 3.11+ has tomllib built-in
-try:
-    import tomllib
-except ImportError:
-    # For Python 3.10, use tomli if available
-    try:
-        import tomli as tomllib
-    except ImportError:
-        tomllib = None
 
 # Configure UTF-8 encoding for Windows console.
 #
@@ -56,6 +51,9 @@ RED = '\033[91m'
 YELLOW = '\033[93m'
 BLUE = '\033[94m'
 RESET = '\033[0m'
+
+# v1.10.0 (item 2f): the PyTorch builds uv.lock holds; one locked file each.
+LOCKED_VARIANTS = ("cu130", "cu128", "cpu")
 
 class ReleaseBuilder:
     def __init__(self, dry_run=False):
@@ -169,94 +167,58 @@ class ReleaseBuilder:
             content = content.replace(placeholder, value)
         return content
 
-    def generate_requirements_from_pyproject(self):
+    def locked_requirements_dir(self):
+        """whisperjav/installer/locked/ -- the exported files, shipped in the wheel too."""
+        return self.project_root / "whisperjav" / "installer" / "locked"
+
+    def export_locked_requirements(self):
+        """v1.10.0 (item 2f): export uv.lock once per PyTorch build, exact versions, no hashes.
+
+        Every install -- this installer, install.py, whisperjav-upgrade -- installs one of
+        these files, so users get the versions development tested (owner, W53-W56).
+        Stops if uv.lock no longer matches pyproject.toml: run `uv lock`, commit, build again.
         """
-        Generate requirements.txt from pyproject.toml.
+        self.print_header("Phase 1.5: Export Locked Requirements (uv.lock)")
+        uv = shutil.which("uv")
+        if not uv:
+            print(f"  {RED}✗{RESET} uv not found on PATH (see installer/build_env.yml for the version)")
+            return False
+        check = subprocess.run([uv, "lock", "--check"], cwd=self.project_root, capture_output=True, text=True)
+        if check.returncode != 0:
+            print(f"  {RED}✗{RESET} uv.lock does not match pyproject.toml:")
+            print(f"      {(check.stderr or check.stdout).strip()[:500]}")
+            print("  Run `uv lock`, commit uv.lock, then build again.")
+            return False
+        print(f"  {GREEN}✓{RESET} uv.lock matches pyproject.toml")
 
-        Extracts dependencies from [project.dependencies] and selected
-        [project.optional-dependencies] extras, excluding git-based
-        dependencies which are handled separately in post_install.py.
-
-        This ensures requirements.txt is always in sync with pyproject.toml.
-        """
-        pyproject_path = self.project_root / "pyproject.toml"
-
-        if not pyproject_path.exists():
-            print(f"  {YELLOW}⚠{RESET} pyproject.toml not found, using template fallback")
-            return None
-
-        if tomllib is None:
-            print(f"  {YELLOW}⚠{RESET} tomllib not available (Python 3.10 without tomli), using template fallback")
-            return None
-
-        try:
-            with open(pyproject_path, "rb") as f:
-                config = tomllib.load(f)
-        except Exception as e:
-            print(f"  {YELLOW}⚠{RESET} Failed to parse pyproject.toml: {e}")
-            return None
-
-        project = config.get("project", {})
-        core_deps = project.get("dependencies", [])
-        optional_deps = project.get("optional-dependencies", {})
-
-        # Extras to include for the Windows installer
-        # These match what the installer needs for full functionality
-        installer_extras = [
-            "cli",
-            "gui",
-            "translate",
-            "enhance",
-            "huggingface",
-            "qwen",
-            "analysis",
-            "compatibility",
-        ]
-
-        # Collect all dependencies (excluding git-based ones)
-        all_deps = set()
-
-        # Add core dependencies
-        for dep in core_deps:
-            if "git+" not in dep and "@" not in dep:
-                all_deps.add(dep)
-
-        # Add optional dependencies for selected extras
-        for extra in installer_extras:
-            if extra in optional_deps:
-                for dep in optional_deps[extra]:
-                    # Skip self-references like "whisperjav[cli]"
-                    if not dep.startswith("whisperjav["):
-                        # Skip git-based dependencies
-                        if "git+" not in dep and "@" not in dep:
-                            all_deps.add(dep)
-
-        # Sort dependencies alphabetically (case-insensitive)
-        sorted_deps = sorted(all_deps, key=lambda x: x.lower().split("[")[0].split(">")[0].split("<")[0].split("=")[0])
-
-        # Build requirements.txt content
-        header = f"""# WhisperJAV v{self.version} Requirements
-# ================================
-# Auto-generated from pyproject.toml by build_release.py
-# Do NOT edit this file directly - edit pyproject.toml instead.
-#
-# Extras included: {', '.join(installer_extras)}
-#
-# Note: The following are installed separately in post_install_v{self.version}.py:
-# - Phase 3: PyTorch (CUDA version detected at install time)
-# - Phase 3.5: Git-based packages (require git, benefit from retry logic):
-#   - openai-whisper (core ASR)
-#   - stable-ts (WhisperJAV fork for Japanese)
-#   - faster-whisper (pinned to SYSTRAN master @ ed9a06c)
-#   - ffmpeg-python (audio/video processing)
-#   - clearvoice (speech enhancement)
-#
-# Installation: pip install -r requirements_v{self.version}.txt
-
-"""
-        content = header + "\n".join(sorted_deps) + "\n"
-
-        return content
+        out_dir = self.locked_requirements_dir()
+        for variant in LOCKED_VARIANTS:
+            command = ["export", "--frozen", "--no-hashes", "--no-emit-project", "--no-header",
+                       "--extra", "all", "--extra", variant, "--format", "requirements-txt"]
+            result = subprocess.run([uv, *command], cwd=self.project_root, capture_output=True,
+                                    text=True, encoding="utf-8")
+            if result.returncode != 0:
+                print(f"  {RED}✗{RESET} uv export ({variant}) failed: {result.stderr.strip()[:500]}")
+                return False
+            content = (
+                f"# WhisperJAV -- release-pinned dependencies, PyTorch build {variant}\n"
+                f"# Exported from uv.lock by installer/build_release.py; do not edit -- change\n"
+                f"# pyproject.toml, run `uv lock`, then build again.\n"
+                f"# uv {' '.join(command)}\n"
+                + result.stdout
+            )
+            path = out_dir / f"requirements_{variant}.txt"
+            if self.dry_run:
+                print(f"  [DRY-RUN] Would write {path.relative_to(self.project_root)}")
+                continue
+            old = path.read_bytes() if path.exists() else None
+            out_dir.mkdir(exist_ok=True)
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
+                f.write(content)
+            state = "unchanged" if old == path.read_bytes() else "UPDATED -- commit it"
+            pins = len([l for l in content.splitlines() if l and not l.startswith((" ", "#"))])
+            print(f"  {GREEN}✓{RESET} {path.relative_to(self.project_root)} ({pins} packages, {state})")
+        return True
 
     def print_header(self, title):
         """Print formatted header."""
@@ -321,12 +283,11 @@ __version_info__ = {{
             self.generated_dir.mkdir(exist_ok=True)
 
         # Template to output filename mapping
-        # Note: requirements.txt is generated from pyproject.toml, not a template
+        # The requirements files are not templates: they are exported from uv.lock (item 2f)
         file_mappings = {
             'construct.yaml.template': f'construct_v{self.version}.yaml',
             'post_install.bat.template': f'post_install_v{self.version}.bat',
             'post_install.py.template': f'post_install_v{self.version}.py',
-            # 'requirements.txt.template' removed - now generated from pyproject.toml
             'WhisperJAV_Launcher.py.template': f'WhisperJAV_Launcher_v{self.version}.py',
             'README_INSTALLER.txt.template': f'README_INSTALLER_v{self.version}.txt',
             'build_installer.bat.template': f'build_installer_v{self.version}.bat',
@@ -358,34 +319,19 @@ __version_info__ = {{
 
             generated_count += 1
 
-        # Generate requirements.txt from pyproject.toml
-        print(f"\n  Generating requirements.txt from pyproject.toml...")
-        requirements_output = f'requirements_v{self.version}.txt'
-        requirements_content = self.generate_requirements_from_pyproject()
-
-        if requirements_content:
+        # v1.10.0 (item 2f): the locked files, under the installer's versioned names.
+        for variant in LOCKED_VARIANTS:
+            src = self.locked_requirements_dir() / f"requirements_{variant}.txt"
+            output_name = f"requirements_v{self.version}_{variant}.txt"
             if self.dry_run:
-                print(f"  [DRY-RUN] Would generate {requirements_output} from pyproject.toml")
+                print(f"  [DRY-RUN] Would copy {src.name} to {output_name}")
+            elif not src.exists():
+                print(f"  {RED}✗{RESET} {src} missing (phase 1.5 writes it)")
+                return False
             else:
-                output_path = self.generated_dir / requirements_output
-                output_path.write_text(requirements_content, encoding='utf-8')
-                # Count lines (excluding blank and comment lines)
-                dep_count = len([l for l in requirements_content.split('\n') if l and not l.startswith('#')])
-                print(f"  {GREEN}✓{RESET} Generated {requirements_output} ({dep_count} dependencies)")
+                shutil.copy(src, self.generated_dir / output_name)
+                print(f"  {GREEN}✓{RESET} Copied {output_name}")
             generated_count += 1
-        else:
-            # Fallback to template if pyproject.toml parsing failed
-            template_path = self.templates_dir / 'requirements.txt.template'
-            if template_path.exists():
-                content = template_path.read_text(encoding='utf-8')
-                content = self._substitute_placeholders(content)
-                if self.dry_run:
-                    print(f"  [DRY-RUN] Would generate {requirements_output} from template (fallback)")
-                else:
-                    output_path = self.generated_dir / requirements_output
-                    output_path.write_text(content, encoding='utf-8')
-                    print(f"  {YELLOW}⚠{RESET} Generated {requirements_output} from template (fallback)")
-                generated_count += 1
 
         print(f"\n  Generated {generated_count} files")
         return True
@@ -595,6 +541,7 @@ __version_info__ = {{
 
         steps = [
             ("Update __version__.py", self.update_version_py),
+            ("Export locked requirements", self.export_locked_requirements),
             ("Generate from templates", self.generate_from_templates),
             ("Check working tree", self.check_tree),
             ("Build wheel package", self.build_wheel),
