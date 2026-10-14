@@ -3825,6 +3825,19 @@ class WhisperJAVAPI:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def saved_local_provider_notice(self, seen_in_browser: bool = False) -> Dict[str, Any]:
+        """v1.10.0: the owner's line for a saved llama-cpp choice, for the GUI console.
+
+        {text: ''} unless a saved 'local' choice was read as Ollama -- from the
+        translate settings file (settings.py) or, when seen_in_browser, from the
+        GUI's browser storage. The backend console gets the line once as well.
+        """
+        try:
+            from whisperjav.translate.settings import saved_local_provider_notice
+            return {"success": True, "text": saved_local_provider_notice(bool(seen_in_browser))}
+        except Exception as e:
+            return {"success": False, "text": "", "error": str(e)}
+
     # #435: the choices on the Ensemble translation row and the AI SRT Translate tab.
     # They lived only in browser storage, which private_mode (main.py, #236/#240)
     # clears at every launch, so they were forgotten. Kept in the translate settings
@@ -4135,12 +4148,11 @@ class WhisperJAVAPI:
                 except Exception as e:
                     return {"success": False, "error": f"Ollama check failed: {e}"}
 
-            # Local/Custom providers don't require API keys
-            if provider in ('local', 'custom'):
+            # Custom providers don't require API keys
+            if provider == 'custom':
                 return {
                     "success": True,
-                    "message": f"{provider.capitalize()} provider - no API key required",
-                    "local": provider == 'local'
+                    "message": "Custom provider - no API key required",
                 }
 
             # Get API key
