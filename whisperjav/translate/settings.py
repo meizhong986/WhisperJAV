@@ -52,6 +52,63 @@ def get_settings_path() -> Path:
     return settings_path.expanduser()
 
 
+_saved_local_notice_printed = False
+_saved_local_seen = False
+
+
+def migrate_saved_local_provider(settings: dict) -> bool:
+    """Read a saved 'local' (llama-cpp) choice as 'ollama', in place.
+
+    v1.10.0 removed the 'local' provider (REQ2). The choice can be saved in three
+    places in this file: the top-level 'provider' and the two GUI tab rows under
+    'gui_tab_state' (#435). A model saved with it named a llama-cpp model
+    (llama-8b ...), which Ollama does not have, so it is dropped and Ollama's own
+    default is used. The file itself is not rewritten here. Prints the owner's
+    one console line (W22 (1)) once per process. Returns True if anything changed.
+    """
+    global _saved_local_seen
+    from .providers import LOCAL_MODEL_NAMES, REMOVED_LOCAL_PROVIDER
+
+    changed = False
+    if settings.get('provider') == REMOVED_LOCAL_PROVIDER:
+        settings['provider'] = 'ollama'
+        if settings.get('model') in LOCAL_MODEL_NAMES:
+            settings['model'] = None
+        changed = True
+    tabs = settings.get('gui_tab_state')
+    if isinstance(tabs, dict):
+        for values in tabs.values():
+            if isinstance(values, dict) and values.get('provider') == REMOVED_LOCAL_PROVIDER:
+                values['provider'] = 'ollama'
+                for key in ('model', 'modelOverride', 'customModel'):
+                    if values.get(key) in LOCAL_MODEL_NAMES:
+                        values.pop(key)
+                changed = True
+    if changed:
+        _saved_local_seen = True
+        saved_local_provider_notice()
+    return changed
+
+
+def saved_local_provider_notice(seen_elsewhere: bool = False) -> str:
+    """The owner's line for a saved llama-cpp choice, or '' if none was seen.
+
+    Prints it to the console once per process. `seen_elsewhere` is for a saved
+    choice this module never read -- the GUI's browser storage.
+    """
+    global _saved_local_notice_printed, _saved_local_seen
+    from .providers import SAVED_LOCAL_NOTICE
+
+    if seen_elsewhere:
+        _saved_local_seen = True
+    if not _saved_local_seen:
+        return ''
+    if not _saved_local_notice_printed:
+        _saved_local_notice_printed = True
+        print(SAVED_LOCAL_NOTICE, file=sys.stderr)
+    return SAVED_LOCAL_NOTICE
+
+
 def load_settings() -> dict:
     """Load settings from file, return defaults if not found."""
     settings_path = get_settings_path()
@@ -70,6 +127,7 @@ def load_settings() -> dict:
             return DEFAULT_SETTINGS.copy()
 
         logger.debug(f"Loaded settings from {settings_path}")
+        migrate_saved_local_provider(settings)
         return settings
 
     except json.JSONDecodeError as e:
