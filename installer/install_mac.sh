@@ -18,9 +18,6 @@
 #   --no-speech-enhancement Skip speech enhancement packages
 #   --minimal               Minimal install (transcription only)
 #   --dev                   Install in development/editable mode
-#   --local-llm             Install local LLM support (prebuilt wheel)
-#   --local-llm-build       Install local LLM support (build from source)
-#   --no-local-llm          Skip local LLM installation
 #   --help                  Show help message
 #
 # Author: Senior Architect
@@ -98,28 +95,28 @@ check_python() {
         py_version="$(python3 --version 2>&1)"
         echo -e "${GREEN}Python: $py_version${NC}"
 
-        # Check version range (3.10-3.12)
+        # Check version (v1.10.0: 3.13 only)
         local py_minor
         py_minor="$(python3 -c 'import sys; print(sys.version_info.minor)' 2>/dev/null)"
-        if [[ "$py_minor" -lt 10 || "$py_minor" -gt 12 ]]; then
+        if [[ "$py_minor" -ne 13 ]]; then
             echo ""
             echo -e "${RED}Python 3.$py_minor is not supported.${NC}"
-            echo "WhisperJAV requires Python 3.10, 3.11, or 3.12."
+            echo "WhisperJAV 1.10 requires Python 3.13."
             echo ""
             echo "Install a supported version with:"
-            echo "  brew install python@3.12"
+            echo "  brew install python@3.13"
             echo ""
             echo "Or use pyenv:"
             echo "  brew install pyenv"
-            echo "  pyenv install 3.12"
-            echo "  pyenv global 3.12"
+            echo "  pyenv install 3.13"
+            echo "  pyenv global 3.13"
             exit 1
         fi
     else
         echo ""
         echo -e "${RED}Python 3 is not installed.${NC}"
         echo "Install it with:"
-        echo "  brew install python@3.12"
+        echo "  brew install python@3.13"
         echo ""
         echo "Or download from: https://www.python.org/downloads/"
         exit 1
@@ -197,8 +194,8 @@ check_venv_requirement() {
         echo ""
         echo -e "${GREEN}Option 2: Use pyenv to manage Python versions${NC}"
         echo "  brew install pyenv"
-        echo "  pyenv install 3.12"
-        echo "  pyenv global 3.12"
+        echo "  pyenv install 3.13"
+        echo "  pyenv global 3.13"
         echo ""
 
         # Ask user if they want to continue
