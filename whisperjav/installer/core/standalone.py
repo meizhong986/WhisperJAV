@@ -581,10 +581,6 @@ def run_pip_command(
     # Set uv-specific environment variables
     if uv_path:
         run_env["UV_HTTP_TIMEOUT"] = "300"
-        # Fix #218: uv rejects HuggingFace wheels where internal version
-        # (e.g., "0.2.26+cu118") doesn't match filename ("0.2.26").
-        # This is common for CUDA-specific llama-cpp-python builds.
-        run_env["UV_SKIP_WHEEL_FILENAME_CHECK"] = "1"
 
     git_timeouts_configured = False
     last_stdout = ""
