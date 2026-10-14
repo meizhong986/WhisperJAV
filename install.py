@@ -48,18 +48,17 @@ from pathlib import Path
 
 _source_dir = Path(__file__).parent
 
-# PyTorch index URLs by CUDA build. v1.10.0 (REQ2): cu130 is the stack; cu128 is
-# the per-PC fallback when cuBLAS 12 cannot be loaded next to CUDA 13 (item 2 spec D).
-PYTORCH_INDEXES = {
-    "cpu": "https://download.pytorch.org/whl/cpu",
-    "cu128": "https://download.pytorch.org/whl/cu128",
-    "cu130": "https://download.pytorch.org/whl/cu130",
-}
+# PyTorch builds. v1.10.0 (REQ2): cu130 is the stack; cu128 is the per-PC fallback when
+# cuBLAS 12 cannot be loaded next to CUDA 13 (item 2 spec D). Their indexes are in
+# pyproject.toml ([tool.uv.index]); uv.lock holds all three (item 2f).
+CUDA_BUILDS = ("cpu", "cu128", "cu130")
 # Linux stays on CUDA 12.8 for 1.10.0 (owner, W45): on Linux, pip-installed cuBLAS 12 is found
 # only with LD_LIBRARY_PATH set before Python starts (faster-whisper's README), so with CUDA 13
 # nothing would load it for CTranslate2; with CUDA 12.8, PyTorch loads it, as in 1.9.5.
 IS_LINUX = sys.platform.startswith("linux")
 DEFAULT_CUDA = "cu128" if IS_LINUX else "cu130"
+# v1.10.0 (item 2f): the uv.lock extra of each PyTorch build this script can choose.
+LOCKED_EXTRAS = {"cu130": "cu130", "cu128": "cu128", "cpu": "cpu", "metal": "cpu"}
 
 # The owner's texts (W43) and the links they name; the same as the Windows installer's.
 ISSUES_URL = "https://github.com/meizhong986/WhisperJAV/issues"
@@ -372,7 +371,7 @@ def detect_cuda_version(args) -> str:
         # Normalize: "118" -> "cu118", "12.8" -> "cu128"
         cuda = cuda.replace(".", "")
         key = f"cu{cuda}"
-        if key in PYTORCH_INDEXES:
+        if key in CUDA_BUILDS:
             return key
         log(f"  [WARN] Unknown CUDA version '{args.cuda}', defaulting to {DEFAULT_CUDA}")
         return DEFAULT_CUDA
@@ -381,7 +380,7 @@ def detect_cuda_version(args) -> str:
     if hasattr(args, 'force_cuda') and args.force_cuda:
         cuda = args.force_cuda.lower().replace("cuda", "").replace("cu", "").replace(".", "")
         key = f"cu{cuda}"
-        if key in PYTORCH_INDEXES:
+        if key in CUDA_BUILDS:
             log(f"  --force-cuda: using {key} (bypassing GPU detection)")
             return key
         log(f"  [WARN] --force-cuda '{args.force_cuda}' not recognized, using {DEFAULT_CUDA}")
@@ -491,7 +490,11 @@ def gpu_support_gate(gpu_info) -> str:
 
 def run_uv_sync(extras: list, cuda_version: str, dev: bool = False,
                 target_env: str = None, is_external: bool = False) -> bool:
-    """Run ``uv sync`` with the given extras and pytorch index override.
+    """Run ``uv sync --frozen`` with the given extras and the PyTorch build's extra.
+
+    v1.10.0 (item 2f): uv.lock holds every PyTorch build (extras cu130, cu128, cpu), so
+    an install takes the locked versions as they are and never rewrites uv.lock. The
+    old ``--index pytorch=<url>`` override made uv re-resolve on cu128 and CPU.
 
     Args:
         extras: List of extra names to install (e.g. ["cli", "gui"]).
@@ -513,7 +516,7 @@ def run_uv_sync(extras: list, cuda_version: str, dev: bool = False,
     else:
         log(f"  No active environment — installing into .venv")
 
-    cmd = _uv_cmd() + ["sync"]
+    cmd = _uv_cmd() + ["sync", "--frozen"]
 
     # --inexact for external envs: don't remove packages we didn't install
     if is_external:
@@ -527,21 +530,9 @@ def run_uv_sync(extras: list, cuda_version: str, dev: bool = False,
     for extra in extras:
         cmd.extend(["--extra", extra])
 
-    # Override pytorch index based on GPU detection
-    # For macOS ("metal"), don't override — pyproject.toml sources already
-    # route macOS to default PyPI via platform marker.
-    if cuda_version != "metal" and cuda_version in PYTORCH_INDEXES:
-        cmd.extend(["--index", f"pytorch={PYTORCH_INDEXES[cuda_version]}"])
-        # v1.8.13 (#300, #313): when the PyTorch index is added, also tell uv
-        # to consider all indexes when resolving each package, not just the
-        # first one that has it. Without this, bs-roformer-infer's
-        # `requests>=2.31` requirement deadlocks against the PyTorch index's
-        # pinned `requests==2.28.1` because uv only looks at PyTorch's
-        # version. With this flag uv also checks PyPI for a compatible
-        # `requests` version. The "unsafe" naming refers to dependency-
-        # confusion risk, but here we're already using the PyTorch index by
-        # explicit configuration — no new attack surface introduced.
-        cmd.extend(["--index-strategy", "unsafe-best-match"])
+    # The PyTorch build. macOS ("metal") takes the cpu extra: that index carries
+    # the Apple Silicon wheels (pyproject.toml, [tool.uv.sources]).
+    cmd.extend(["--extra", LOCKED_EXTRAS[cuda_version]])
 
     if dev:
         # dev deps are defined as [project.optional-dependencies] extra,
