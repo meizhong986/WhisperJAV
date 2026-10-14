@@ -114,7 +114,7 @@ dependencies = [
 
 [project.optional-dependencies]
 
-# PyTorch ecosystem (resolved from named 'pytorch' index, see [tool.uv.sources])
+# PyTorch versions (the build -- cu130, cu128 or cpu -- comes from the extras below)
 # Install with: pip install whisperjav[torch]
 torch = [
     # v1.10.0: pinned. torchaudio has no release after 2.11.0, so PyTorch stays
@@ -122,6 +122,27 @@ torch = [
     # the installer.
     "torch==2.11.0",
     "torchaudio==2.11.0",
+]
+
+# v1.10.0 (item 2f): the PyTorch build, exactly one per install. uv.lock holds all
+# three side by side, never mixed ([tool.uv] conflicts); each takes torch,
+# torchaudio and torchvision from its own index ([tool.uv.sources]).
+# Windows: cu130 (default) or cu128 (the per-PC fallback). Linux: cu128 (owner,
+# W45). CPU: old-card choice 2, no NVIDIA GPU, and macOS.
+cu130 = [
+    "torch==2.11.0",
+    "torchaudio==2.11.0",
+    "torchvision==0.26.0",
+]
+cu128 = [
+    "torch==2.11.0",
+    "torchaudio==2.11.0",
+    "torchvision==0.26.0",
+]
+cpu = [
+    "torch==2.11.0",
+    "torchaudio==2.11.0",
+    "torchvision==0.26.0",
 ]
 
 # CLI audio processing features
@@ -303,6 +324,7 @@ dev = [
     "pytest-cov",
     "ruff>=0.1.0",
     "pre-commit",
+    "build",  # v1.10.0 (item 2f): installer/build_release.py builds the wheel with it
 ]
 
 # =============================================================================
@@ -400,6 +422,9 @@ whisperjav = [
     "assets/vad/*.onnx",
     "assets/vad/*.txt",
     "assets/vad/*.md",
+    # v1.10.0 (item 2f): uv.lock exported per PyTorch build; whisperjav-upgrade
+    # installs the new release's file from the wheel it has just installed.
+    "installer/locked/requirements_*.txt",
 ]
 
 # -----------------------------------------------------------------------------
@@ -486,28 +511,56 @@ exclude_lines = [
 # -----------------------------------------------------------------------------
 # Tool Configuration: uv (Package Manager)
 # -----------------------------------------------------------------------------
-# uv replaces pip's 6-stage installation with a single `uv sync` command.
-# Named indexes solve the GPU lock-in problem: torch/torchaudio resolve from
-# the PyTorch CUDA index while all other packages use PyPI.
-#
-# Override CUDA version at install time:
-#   uv sync --index pytorch=https://download.pytorch.org/whl/cu128
-#   uv sync --index pytorch=https://download.pytorch.org/whl/cpu
+# v1.10.0 (item 2f): uv.lock is the one source of exact versions for development,
+# source installs, the installer and upgrades. Pick the PyTorch build with its
+# extra; never override an index (that re-resolves and rewrites uv.lock):
+#   uv sync --frozen --extra all --extra cu130     (Windows default)
+#   uv sync --frozen --extra all --extra cu128     (Windows fallback; Linux)
+#   uv sync --frozen --extra all --extra cpu
+# installer/build_release.py exports the lock once per build to
+# whisperjav/installer/locked/requirements_<variant>.txt (exact versions, no hashes).
 
 [tool.uv]
-# Named index for PyTorch GPU wheels
-# Default: CUDA 13.0 (the 1.10 stack; driver 580 or newer)
+# uv 0.9.26 made this lock and ships in the installer (installer/build_env.yml).
+required-version = ">=0.9.26"
+conflicts = [
+    [{ extra = "cu130" }, { extra = "cu128" }, { extra = "cpu" }],
+]
+
 [[tool.uv.index]]
-name = "pytorch"
+name = "pytorch-cu130"
 url = "https://download.pytorch.org/whl/cu130"
-explicit = true  # Only torch/torchaudio use this index, not numpy/scipy/etc.
+explicit = true  # Only torch/torchaudio/torchvision use these indexes, not numpy/scipy/etc.
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [tool.uv.sources]
-# macOS gets torch from default PyPI (has built-in MPS support for Apple Silicon)
-# Linux/Windows get torch from the named pytorch CUDA index
+# Each extra takes the three packages from its own index on every platform: uv
+# 0.9.26 did not narrow an extra's source by platform marker (with markers, the
+# exports still carried +cu130 for Linux and macOS). Which extra a platform uses
+# is the installers' choice: Windows cu130, or cu128 as the fallback; Linux
+# cu128 (owner, W45); no NVIDIA GPU and macOS cpu (that index carries the Apple
+# Silicon wheels).
 torch = [
-    { index = "pytorch", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu130", extra = "cu130" },
+    { index = "pytorch-cu128", extra = "cu128" },
+    { index = "pytorch-cpu", extra = "cpu" },
 ]
 torchaudio = [
-    { index = "pytorch", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu130", extra = "cu130" },
+    { index = "pytorch-cu128", extra = "cu128" },
+    { index = "pytorch-cpu", extra = "cpu" },
+]
+torchvision = [
+    { index = "pytorch-cu130", extra = "cu130" },
+    { index = "pytorch-cu128", extra = "cu128" },
+    { index = "pytorch-cpu", extra = "cpu" },
 ]
