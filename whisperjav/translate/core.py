@@ -89,7 +89,7 @@ def clean_resumed_translation_tags(project) -> int:
 def cap_batch_size_for_context(max_batch_size: int, n_ctx: int) -> int:
     """Cap translation batch size to fit within the LLM context window.
 
-    Local LLMs (e.g., gemma-9b via llama-cpp) have limited context windows.
+    Local LLMs (e.g., models run by Ollama) have limited context windows.
     PySubtrans formats each subtitle line with numbered headers, original text,
     and translation placeholders. Both the prompt (input) and the expected
     response must fit within n_ctx tokens.
@@ -412,30 +412,15 @@ def server_log_hint(provider_config: dict, verbose: bool = False):
     """
     Where this run's server keeps its own log, as lines to print.
 
-    Which server that is depends on the provider the user chose: "local" is the
-    llama-cpp-python server WhisperJAV starts on this machine and whose log path
-    it prints; "ollama" is Ollama; a server the user gave an address for is
-    theirs; anything else is a service on the internet with no local log at all.
+    Which server that is depends on the provider the user chose: "ollama" is
+    Ollama; a server the user gave an address for is theirs; anything else is a
+    service on the internet with no local log at all.
 
     Read 'whisperjav_provider', never 'pysubtrans_name': the latter is the name
-    of PySubtrans's client class, and local, ollama, glm, groq and custom are
-    all 'Custom Server' there.
+    of PySubtrans's client class, and ollama, glm, groq and custom are all
+    'Custom Server' there.
     """
     name = str(provider_config.get('whisperjav_provider', '')).lower()
-
-    if name == 'local':
-        try:
-            from whisperjav.translate import local_backend
-            # Without this the log is deleted when the server stops, which is
-            # before the user can go and read it.
-            local_backend.keep_server_log()
-            path = getattr(local_backend, '_server_stderr_path', None)
-        except Exception:
-            path = None
-        if path:
-            return [f"The local translation server's own log: {path}"]
-        return ["The local translation server writes its own log; its path is "
-                "printed as [LOCAL-LLM] Server log: when the server starts."]
 
     if name == 'ollama':
         if verbose:
@@ -945,9 +930,8 @@ def translate_subtitle(
                               file=sys.stderr)
                     else:
                         # Owner, 2026-09-17: this used to tell every provider to
-                        # "check Ollama server logs", including the local one,
-                        # which is llama-cpp-python and has nothing to do with
-                        # Ollama. The advice now matches the server in use.
+                        # "check Ollama server logs". The advice now matches the
+                        # server in use.
                         _where = _server_log_hint()
                         for _line in _where:
                             print(f"[TRANSLATE]   {_line}", file=sys.stderr)
