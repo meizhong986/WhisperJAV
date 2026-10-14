@@ -692,9 +692,13 @@ def parse_arguments():
     )
     translation_group.add_argument(
         "--translate-provider",
+        # 'local' (llama-cpp) was removed in v1.10.0. It is still accepted so that typing
+        # it gets the owner's error text and exit 1 (parse_arguments); the metavar keeps
+        # it out of --help.
         choices=["deepseek", "openrouter", "gemini", "claude", "gpt", "glm", "groq", "ollama", "local", "custom"],
+        metavar="{deepseek,openrouter,gemini,claude,gpt,glm,groq,ollama,custom}",
         default="deepseek",
-        help="Translation AI provider (default: deepseek). Use 'ollama' for Ollama local LLM. 'local' is deprecated in v1.8.10 — use 'ollama' instead. Use 'custom' with --translate-endpoint for any OpenAI-compatible API."
+        help="Translation AI provider (default: deepseek). Use 'ollama' for local translation with Ollama. Use 'custom' with --translate-endpoint for any OpenAI-compatible API."
     )
     translation_group.add_argument(
         "--translate-target",
@@ -721,18 +725,20 @@ def parse_arguments():
     )
     translation_group.add_argument(
         "--translate-model",
-        help="Translation model override. For local provider: llama-8b (default, 6GB VRAM), gemma-9b (best, 8GB VRAM), llama-3b (basic, 3GB VRAM), or 'auto'"
+        help="Translation model override (default: the provider's own default model)"
     )
     translation_group.add_argument(
         "--translate-gpu-layers",
         type=int,
         default=-1,
-        help="GPU layers for local LLM (-1=all to GPU, 0=CPU only). Only used with --translate-provider local"
+        # Only the removed 'local' provider used it (v1.10.0). Still accepted, with no
+        # effect, so that existing scripts that pass it do not stop; hidden from --help.
+        help=argparse.SUPPRESS
     )
     translation_group.add_argument(
         "--stream",
         action="store_true",
-        help="Enable streaming for cloud translation providers. Local LLM always streams regardless of this flag."
+        help="Enable streaming for cloud translation providers. Ollama always streams regardless of this flag."
     )
     translation_group.add_argument(
         "--translate-quiet",
@@ -1056,7 +1062,13 @@ def parse_arguments():
 
     parser.add_argument("--version", action="version", version=f"WhisperJAV {__version__}")
 
-    return parser.parse_args()
+    args = parser.parse_args()
+    # v1.10.0 (owner, W42 (2)): the removed 'local' provider typed on the command line.
+    if args.translate_provider == "local":
+        from whisperjav.translate.providers import removed_local_provider_error
+        print(removed_local_provider_error("--translate-provider"), file=sys.stderr)
+        sys.exit(1)
+    return args
 
 
 def add_signatures_to_srt(srt_path: str, producer_credit: str = None,
@@ -1839,7 +1851,6 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                             stream=getattr(args, 'stream', False),
                             debug=getattr(args, 'debug', False),
                             extra_context=build_translation_context(args),
-                            n_gpu_layers=getattr(args, 'translate_gpu_layers', -1),
                             endpoint=getattr(args, 'translate_endpoint', None),
                             ollama_url=getattr(args, 'ollama_url', None),
                             auto_confirm=getattr(args, 'yes', False),
@@ -2169,7 +2180,6 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
                                     stream=getattr(args, 'stream', False),
                                     debug=getattr(args, 'debug', False),
                                     extra_context=build_translation_context(args),
-                                    n_gpu_layers=getattr(args, 'translate_gpu_layers', -1),
                                     endpoint=getattr(args, 'translate_endpoint', None)
                                 )
 
@@ -3635,7 +3645,6 @@ def main():
                             stream=getattr(args, 'stream', False),
                             debug=getattr(args, 'debug', False),
                             extra_context=extra_context,
-                            n_gpu_layers=getattr(args, 'translate_gpu_layers', -1),
                             endpoint=getattr(args, 'translate_endpoint', None)
                         )
 
