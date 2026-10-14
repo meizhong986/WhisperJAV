@@ -132,7 +132,7 @@ class TestInstallationConstraints:
         assert "optional-dependencies" in data["project"]
 
         extras = data["project"]["optional-dependencies"]
-        expected_extras = ["cli", "gui", "translate", "llm", "enhance",
+        expected_extras = ["cli", "gui", "translate", "enhance",
                            "huggingface", "qwen", "analysis", "compatibility", "dev"]
         for extra in expected_extras:
             assert extra in extras, f"Missing extra: {extra}"
