@@ -216,7 +216,6 @@ def translate_with_config(
     debug: bool = False,
     extra_context: Optional[str] = None,
     progress_callback: Optional[Callable[[str], None]] = None,
-    n_gpu_layers: int = -1,
     endpoint: Optional[str] = None,
     ollama_url: Optional[str] = None,
     auto_confirm: bool = False,
@@ -304,8 +303,8 @@ def translate_with_config(
     # Load user settings
     settings = load_settings()
 
-    # Resolve API key (not needed for local/custom/ollama providers)
-    if provider in ('local', 'custom', 'ollama'):
+    # Resolve API key (not needed for custom/ollama providers)
+    if provider in ('custom', 'ollama'):
         resolved_api_key = api_key or ''
     else:
         resolved_api_key = _resolve_api_key(provider_config, api_key)
@@ -457,92 +456,6 @@ def translate_with_config(
                 emit_raw_output=True,
             )
 
-        # For local provider WITHOUT custom endpoint: start llama.cpp server
-        # If local + endpoint: skip server launch, use the endpoint directly (cloud path)
-        elif provider == 'local' and not endpoint:
-            import warnings
-            warnings.warn(
-                "provider='local' is deprecated as of v1.8.10 and will be removed in a later release. "
-                "Use provider='ollama' instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            from .local_backend import start_local_server, stop_local_server
-
-            # =========================================================================
-            # DIAGNOSTIC: Local LLM Provider
-            # =========================================================================
-            print(f"\n[SERVICE] Local LLM Provider Mode", file=sys.stderr)
-            print(f"[SERVICE]   n_gpu_layers: {n_gpu_layers} (-1 = all layers on GPU)", file=sys.stderr)
-
-            # Start local LLM server
-            print(f"[SERVICE] Starting local LLM server...", file=sys.stderr)
-            try:
-                api_base, server_port, server_diagnostics = start_local_server(
-                    model=resolved_model,
-                    n_gpu_layers=n_gpu_layers
-                )
-                print(f"[SERVICE]   Server started at: {api_base}", file=sys.stderr)
-                print(f"[SERVICE]   Port: {server_port}", file=sys.stderr)
-                if server_diagnostics.inference_speed_tps > 0:
-                    print(f"[SERVICE]   Inference speed: {server_diagnostics.inference_speed_tps:.1f} tokens/sec", file=sys.stderr)
-            except Exception as e:
-                print(f"[SERVICE]   ERROR: Failed to start local server: {e}", file=sys.stderr)
-                raise TranslationError(f"Failed to start local server: {e}")
-
-            # Use Custom Server provider - designed for local OpenAI-compatible servers
-            # This uses /v1/chat/completions endpoint which llama-cpp-python supports
-            server_address = api_base.replace('/v1', '')
-            local_provider_config = {
-                'pysubtrans_name': 'Custom Server',
-                # PySubtrans talks to it as a custom server; WhisperJAV
-                # started it and knows where its log is.
-                'whisperjav_provider': 'local',
-                'server_address': server_address,
-                'endpoint': '/v1/chat/completions',
-                'supports_conversation': True,
-                'supports_system_messages': True,
-            }
-
-            print(f"[SERVICE] Local provider config for PySubtrans:", file=sys.stderr)
-            print(f"[SERVICE]   pysubtrans_name: Custom Server", file=sys.stderr)
-            print(f"[SERVICE]   server_address: {server_address}", file=sys.stderr)
-            print(f"[SERVICE]   endpoint: /v1/chat/completions", file=sys.stderr)
-
-            # Auto-cap batch size to fit within local LLM context window.
-            # Default n_ctx=8192 can't handle 30 subtitle lines — the prompt
-            # exceeds the context and PySubtrans gets truncated/garbled responses
-            # ("Hit API token limit" + "No matches"). See #183.
-            local_n_ctx = 8192  # matches start_local_server() default
-            capped_batch_size = cap_batch_size_for_context(resolved_max_batch_size, local_n_ctx)
-            if capped_batch_size < resolved_max_batch_size:
-                print(f"[SERVICE]   NOTE: Batch size auto-reduced from {resolved_max_batch_size} to "
-                      f"{capped_batch_size} to fit {local_n_ctx}-token context window", file=sys.stderr)
-                resolved_max_batch_size = capped_batch_size
-
-            try:
-                result_path = translate_subtitle(
-                    input_path=str(input_file),
-                    output_path=resolved_output_path,
-                    provider_config=local_provider_config,
-                    model='local',
-                    api_key='',  # Local server doesn't require API key
-                    source_lang=source_lang,
-                    target_lang=target_lang,
-                    instruction_file=resolved_instruction_file,
-                    scene_threshold=resolved_scene_threshold,
-                    max_batch_size=resolved_max_batch_size,
-                    stream=stream,
-                    debug=debug,
-                    provider_options=provider_options,
-                    extra_context=extra_context,
-                    emit_raw_output=True
-                )
-            finally:
-                # Always stop server when done
-                print(f"[SERVICE] Stopping local LLM server...", file=sys.stderr)
-                stop_local_server()
-                print(f"[SERVICE]   Server stopped, GPU memory released", file=sys.stderr)
         else:
             # =========================================================================
             # DIAGNOSTIC: Cloud Provider
