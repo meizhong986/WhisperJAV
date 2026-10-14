@@ -5952,15 +5952,15 @@ const EnsembleManager = {
         if (TranslateIntegrationManager.isEnabled()) {
             const translateSettings = TranslateIntegrationManager.getSettings();
             config.translate = true;
-            config.translate_provider = translateSettings.provider || 'local';
+            config.translate_provider = translateSettings.provider || 'ollama';
             config.translate_target = translateSettings.target || 'english';
             config.translate_tone = translateSettings.tone || 'standard';
             // Use model override if provided, otherwise use selected model
             config.translate_model = translateSettings.modelOverride || translateSettings.model || null;
-            // The local provider takes no API key. A custom endpoint may need one (#420: a
-            // local proxy answered 401 "Missing API key" because the key was dropped here,
-            // while the AI SRT Translate tab sends it), so it is sent when entered.
-            config.translate_api_key = (translateSettings.provider === 'local') ? null : (translateSettings.apiKey || null);
+            // A custom endpoint may need an API key (#420: a local proxy answered 401
+            // "Missing API key" because the key was dropped here, while the AI SRT
+            // Translate tab sends it), so it is sent when entered.
+            config.translate_api_key = translateSettings.apiKey || null;
             config.translate_title = translateSettings.movieTitle || null;
             config.translate_actress = translateSettings.actress || null;
             config.translate_plot = translateSettings.plot || null;
@@ -7244,6 +7244,31 @@ const OllamaPullModal = {
 // ============================================================
 // Provider UI Manager — centralized provider-change handler
 // ============================================================
+// v1.10.0 (REQ2, owner W22 (1)): llama-cpp ('local') was removed; Ollama is the only
+// local translator. A saved 'local' choice -- in browser storage or in the translate
+// settings file -- is read as 'ollama'. The backend prints the owner's one line (W43)
+// once; it is shown in this console once as well.
+function migrateRemovedProvider(provider) {
+    if (provider !== 'local') return provider;
+    if (!migrateRemovedProvider._noted) {
+        migrateRemovedProvider._noted = true;
+        reportSavedLocalProvider(true);
+    }
+    return 'ollama';
+}
+
+async function reportSavedLocalProvider(seenInBrowser) {
+    try {
+        const r = await pywebview.api.saved_local_provider_notice(!!seenInBrowser);
+        if (r && r.text && !reportSavedLocalProvider._shown) {
+            reportSavedLocalProvider._shown = true;
+            ConsoleManager.log(r.text, 'warning');
+        }
+    } catch (e) {
+        console.warn('Could not report the saved llama-cpp choice:', e);
+    }
+}
+
 const ProviderUIManager = {
     // Tab context element mapping
     tabElements: {
@@ -7252,16 +7277,14 @@ const ProviderUIManager = {
             model: 'ensembleTranslateModel',
             modelOverride: 'ensembleTranslateModelOverride',
             apiKeyRow: null,
-            ollamaPanel: 'ensembleOllamaPanel',
-            deprecation: 'ensembleDeprecationHint'
+            ollamaPanel: 'ensembleOllamaPanel'
         },
         srt: {
             provider: 'translatorProvider',
             model: 'translatorModel',
             modelOverride: 'translatorCustomModel',
             apiKeyRow: 'translatorApiKeyRow',
-            ollamaPanel: 'srtOllamaPanel',
-            deprecation: 'srtDeprecationHint'
+            ollamaPanel: 'srtOllamaPanel'
         }
     },
 
@@ -7269,8 +7292,14 @@ const ProviderUIManager = {
         const els = this.tabElements[tabContext];
         if (!els) return;
 
+        // v1.10.0: a saved llama-cpp ('local') choice is read as Ollama.
+        if (provider === 'local') {
+            provider = migrateRemovedProvider(provider);
+            const dd = document.getElementById(els.provider);
+            if (dd) dd.value = provider;
+        }
+
         const ollamaPanel = document.getElementById(els.ollamaPanel);
-        const deprecation = document.getElementById(els.deprecation);
         const apiKeyRow = els.apiKeyRow ? document.getElementById(els.apiKeyRow) : null;
         const modelEl = document.getElementById(els.model);
         const modelOverrideEl = document.getElementById(els.modelOverride);
@@ -7283,14 +7312,12 @@ const ProviderUIManager = {
         if (!provider || provider === '') {
             // Blank placeholder — hide everything
             if (ollamaPanel) ollamaPanel.style.display = 'none';
-            if (deprecation) deprecation.style.display = 'none';
             if (apiKeyRow) apiKeyRow.style.display = 'none';
             return;
         }
 
         if (provider === 'ollama') {
             if (apiKeyRow) apiKeyRow.style.display = 'none';
-            if (deprecation) deprecation.style.display = 'none';
             if (ollamaPanel) ollamaPanel.style.display = 'block';
 
             // Show "Looking for Ollama server..." immediately
@@ -7310,18 +7337,10 @@ const ProviderUIManager = {
                 if (modelOverrideEl) modelOverrideEl.style.display = '';
                 this.updateModelDropdown('ollama', tabContext);
             }
-        } else if (provider === 'local') {
-            if (apiKeyRow) apiKeyRow.style.display = 'none';
-            if (ollamaPanel) ollamaPanel.style.display = 'none';
-            if (deprecation) deprecation.style.display = 'block';
-            if (modelEl) modelEl.style.display = '';
-            if (modelOverrideEl) modelOverrideEl.style.display = '';
-            this.updateModelDropdown('local', tabContext);
         } else {
             // Cloud / custom provider
             if (apiKeyRow) apiKeyRow.style.display = '';
             if (ollamaPanel) ollamaPanel.style.display = 'none';
-            if (deprecation) deprecation.style.display = 'none';
             if (modelEl) modelEl.style.display = '';
             if (modelOverrideEl) modelOverrideEl.style.display = '';
             this.updateModelDropdown(provider, tabContext);
@@ -7338,12 +7357,6 @@ const ProviderUIManager = {
         const modelSelect = document.getElementById(els.model);
         if (!modelSelect) return;
 
-        const localModelLabels = {
-            'gemma-9b': 'gemma-9b (8GB)',
-            'llama-8b': 'llama-8b (6GB)',
-            'llama-3b': 'llama-3b (3GB)',
-            'auto': 'auto'
-        };
 
         const currentValue = modelSelect.value;
 
@@ -7360,15 +7373,11 @@ const ProviderUIManager = {
         modelSelect.innerHTML = '<option value="">Default</option>' +
             models.map(m => {
                 let label = m;
-                if (provider === 'local') label = localModelLabels[m] || m;
                 return `<option value="${m}">${label}</option>`;
             }).join('');
 
         if (currentValue) modelSelect.value = currentValue;
 
-        if (provider === 'local' && models.includes('gemma-9b')) {
-            if (!currentValue) modelSelect.value = 'gemma-9b';
-        }
     },
 
     _buildOllamaDropdown(modelSelect, currentValue, tabContext) {
@@ -7461,7 +7470,6 @@ const TranslatorManager = {
 
     // Provider model options (Ollama models are now driven by OllamaStateManager)
     providerModels: {
-        local: ['gemma-9b', 'llama-8b', 'llama-3b', 'auto'],
         // #325: deepseek-chat/-reasoner deprecate 2026-07-24; v4 names per
         // https://api-docs.deepseek.com/ (pro = thinking; flash is sent with thinking off).
         // v1.9.5 (PR #457): flash is now 'deepseek-flash'; 'deepseek-v4-flash' still accepted.
@@ -7521,18 +7529,11 @@ const TranslatorManager = {
         const modelSelect = document.getElementById('translatorModel');
         if (!modelSelect) return;
 
-        const localModelLabels = {
-            'gemma-9b': 'gemma-9b (8GB)',
-            'llama-8b': 'llama-8b (6GB)',
-            'llama-3b': 'llama-3b (3GB)',
-            'auto': 'auto'
-        };
 
         const models = this.providerModels[provider] || [];
         modelSelect.innerHTML = '<option value="">Default</option>' +
             models.map(m => {
                 let label = m;
-                if (provider === 'local') label = localModelLabels[m] || m;
                 return `<option value="${m}">${label}</option>`;
             }).join('');
     },
@@ -7541,10 +7542,9 @@ const TranslatorManager = {
         const statusEl = document.getElementById('translatorApiStatus');
         if (!statusEl) return;
 
-        // Ollama/Local/custom providers don't need API key
-        if (provider === 'ollama' || provider === 'local' || provider === 'custom') {
+        // Ollama/custom providers don't need API key
+        if (provider === 'ollama' || provider === 'custom') {
             if (provider === 'ollama') statusEl.textContent = 'Ollama (No API Key)';
-            else if (provider === 'local') statusEl.textContent = 'Local (No API)';
             else statusEl.textContent = 'Custom (No API)';
             statusEl.className = 'api-status configured';
             return;
@@ -7897,7 +7897,7 @@ const TranslateIntegrationManager = {
             // 'quickTranslateProvider'/'quickTranslateTarget', two ids that do not exist --
             // reading them returned these same values while looking as though the user's
             // choice had been honoured. Parked for 1.10.x with the controls themselves.
-            return { provider: 'local', target: 'english' };
+            return { provider: 'ollama', target: 'english' };
         }
     },
 
@@ -8017,7 +8017,6 @@ const TranslateIntegrationManager = {
 const TranslationSettingsModal = {
     // Provider model options (Ollama models are now driven by OllamaStateManager)
     providerModels: {
-        local: ['gemma-9b', 'llama-8b', 'llama-3b', 'auto'],
         // #325: deepseek-chat/-reasoner deprecate 2026-07-24; v4 names per
         // https://api-docs.deepseek.com/ (pro = thinking; flash is sent with thinking off).
         // v1.9.5 (PR #457): flash is now 'deepseek-flash'; 'deepseek-v4-flash' still accepted.
@@ -8173,6 +8172,7 @@ const TranslationSettingsModal = {
             if (saved) {
                 const parsed = JSON.parse(saved);
                 this.settings = { ...this.settings, ...parsed };
+                if (this.settings.provider) this.settings.provider = migrateRemovedProvider(this.settings.provider);
             }
         } catch (e) {
             console.warn('Could not load translation settings from localStorage:', e);
@@ -8235,38 +8235,26 @@ const TranslationSettingsModal = {
         const modelSelect = document.getElementById('ensembleTranslateModel');
         if (!modelSelect) return;
 
-        const localModelLabels = {
-            'gemma-9b': 'gemma-9b (8GB)',
-            'llama-8b': 'llama-8b (6GB)',
-            'llama-3b': 'llama-3b (3GB)',
-            'auto': 'auto'
-        };
 
         const models = this.providerModels[provider] || [];
         modelSelect.innerHTML = '<option value="">Default</option>' +
             models.map(m => {
                 let label = m;
-                if (provider === 'local') label = localModelLabels[m] || m;
                 return `<option value="${m}">${label}</option>`;
             }).join('');
 
-        // Set default model for local provider to gemma-9b
-        if (provider === 'local' && models.includes('gemma-9b')) {
-            modelSelect.value = 'gemma-9b';
-        }
     },
 
     async testConnection() {
         const btn = document.getElementById('translationTestConnection');
         const statusEl = document.getElementById('translationApiStatus');
-        const provider = document.getElementById('ensembleTranslateProvider')?.value || 'local';
+        const provider = document.getElementById('ensembleTranslateProvider')?.value || 'ollama';
         const apiKey = document.getElementById('translationApiKey')?.value || '';
 
-        // Ollama/Local/custom providers don't need API key testing
-        if (provider === 'ollama' || provider === 'local' || provider === 'custom') {
+        // Ollama/custom providers don't need API key testing
+        if (provider === 'ollama' || provider === 'custom') {
             if (statusEl) {
                 if (provider === 'ollama') statusEl.textContent = 'Ollama (No API Key)';
-                else if (provider === 'local') statusEl.textContent = 'Local (No API)';
                 else statusEl.textContent = 'Custom (No API)';
                 statusEl.className = 'api-status connected';
             }
@@ -8275,8 +8263,7 @@ const TranslationSettingsModal = {
                 ConsoleManager.log('Custom endpoint selected - not tested here; the API key is sent if you entered one', 'info');
                 return;
             }
-            const label = provider === 'ollama' ? 'Ollama' : 'Local LLM';
-            ConsoleManager.log(`${label} provider selected - no API key required`, 'info');
+            ConsoleManager.log('Ollama provider selected - no API key required', 'info');
             return;
         }
 
@@ -8591,7 +8578,7 @@ window.addEventListener('pywebviewready', async () => {
     }
     const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 
-    const savedEnsemble = (tabState.ensemble || {}).provider || lsGet('whisperjav_ensemble_provider');
+    const savedEnsemble = migrateRemovedProvider((tabState.ensemble || {}).provider || lsGet('whisperjav_ensemble_provider'));
     if (savedEnsemble) {
         const dd = document.getElementById('ensembleTranslateProvider');
         if (dd) {
@@ -8604,7 +8591,7 @@ window.addEventListener('pywebviewready', async () => {
             });
         }
     }
-    const savedSrt = (tabState.srt || {}).provider || lsGet('whisperjav_srt_provider');
+    const savedSrt = migrateRemovedProvider((tabState.srt || {}).provider || lsGet('whisperjav_srt_provider'));
     if (savedSrt) {
         const dd = document.getElementById('translatorProvider');
         if (dd) {
@@ -8615,6 +8602,8 @@ window.addEventListener('pywebviewready', async () => {
     }
     TranslationTabState.apply(tabState);
     TranslationTabState.bind();
+    // A saved llama-cpp choice the backend found in the settings file (v1.10.0).
+    reportSavedLocalProvider(false);
 });
 
 // #435: remember the translation choices of the Ensemble row and the AI SRT Translate
