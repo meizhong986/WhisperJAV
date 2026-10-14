@@ -2074,16 +2074,6 @@ button:focus-visible,
     font-weight: 500;
 }
 
-.provider-deprecation-hint {
-    font-size: 11px;
-    color: #856404;
-    background: rgba(255, 193, 7, 0.1);
-    border: 1px solid rgba(255, 193, 7, 0.25);
-    border-radius: var(--border-radius);
-    padding: 6px 12px;
-    margin-top: 8px;
-}
-
 /* Ollama Pull Modal — smaller variant */
 .modal-sm {
     max-width: 400px;
