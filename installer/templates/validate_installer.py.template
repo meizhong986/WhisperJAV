@@ -48,7 +48,10 @@ REQUIRED_FILES = [
     "construct_v{{VERSION}}.yaml",
     "post_install_v{{VERSION}}.bat",
     "post_install_v{{VERSION}}.py",
-    "requirements_v{{VERSION}}.txt",
+    # v1.10.0 (item 2f): uv.lock exported once per PyTorch build
+    "requirements_v{{VERSION}}_cu130.txt",
+    "requirements_v{{VERSION}}_cu128.txt",
+    "requirements_v{{VERSION}}_cpu.txt",
     "WhisperJAV_Launcher_v{{VERSION}}.py",
     "README_INSTALLER_v{{VERSION}}.txt",
     "LICENSE.txt",
@@ -221,48 +224,45 @@ def validate_module_paths():
 
 
 def validate_requirements_encoding():
-    """Check that requirements.txt is valid UTF-8 without encoding issues"""
-    print_header("Phase 4: Requirements File Encoding Check")
+    """Check the three locked requirements files: UTF-8, and only exact versions.
 
-    filename = "requirements_v{{VERSION}}.txt"
+    v1.10.0 (item 2f): each line is `name==version` or `name @ git+url@<commit>`
+    (with an optional `; marker`), so every user gets the versions development tested.
+    """
+    print_header("Phase 4: Locked Requirements Files Check")
 
-    if not check_file_exists(filename):
-        print_check(f"{filename} encoding", False, "File not found")
-        return False
+    all_passed = True
+    for variant in ("cu130", "cu128", "cpu"):
+        filename = f"requirements_v{{VERSION}}_{variant}.txt"
+        if not check_file_exists(filename):
+            print_check(f"{filename}", False, "File not found")
+            all_passed = False
+            continue
+        try:
+            with open(filename, 'r', encoding='utf-8') as f:
+                lines = [line.strip() for line in f
+                         if line.strip() and not line.lstrip().startswith('#')]
+        except UnicodeDecodeError as e:
+            print_check(f"{filename}", False, f"UTF-8 decode error: {e}")
+            all_passed = False
+            continue
 
-    try:
-        with open(filename, 'r', encoding='utf-8') as f:
-            content = f.read()
-
-        # Check for weird spacing (sign of encoding issues)
-        if '  ' in content[:100]:  # Check first 100 chars for double spaces
-            print_check(
-                f"{filename} encoding",
-                False,
-                "Suspicious spacing detected - possible encoding issue"
-            )
-            return False
-
-        # Try to parse as requirements
-        lines = [line.strip() for line in content.split('\n') if line.strip() and not line.startswith('#')]
-
+        loose = [line for line in lines
+                 if "==" not in line.split(";")[0] and " @ git+" not in line]
+        torch_ok = any(line.startswith("torch==") and (variant in line) for line in lines)
         if len(lines) < 5:
-            print_check(
-                f"{filename} encoding",
-                False,
-                f"Too few packages ({len(lines)}) - file may be corrupted"
-            )
-            return False
+            print_check(f"{filename}", False, f"Too few packages ({len(lines)}) - file may be corrupted")
+            all_passed = False
+        elif loose:
+            print_check(f"{filename}", False, f"{len(loose)} line(s) without an exact version, e.g. {loose[0]}")
+            all_passed = False
+        elif not torch_ok:
+            print_check(f"{filename}", False, f"no torch=={variant} line")
+            all_passed = False
+        else:
+            print_check(f"{filename}", True, f"{len(lines)} packages, all exact")
 
-        print_check(f"{filename} encoding", True, f"{len(lines)} packages found")
-        return True
-
-    except UnicodeDecodeError as e:
-        print_check(f"{filename} encoding", False, f"UTF-8 decode error: {e}")
-        return False
-    except Exception as e:
-        print_check(f"{filename} encoding", False, f"Error: {e}")
-        return False
+    return all_passed
 
 
 def validate_assets():
