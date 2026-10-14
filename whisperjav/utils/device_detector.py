@@ -27,6 +27,9 @@ from whisperjav.utils.logger import logger
 # kernels for it (#411: GTX 1060, sm_61, cu128 wheel built for sm_75 and up).
 # Read by the start-up gate to say why the GPU is not used.
 CUDA_UNUSABLE_REASON: Optional[str] = None
+# The compute capability of that card, so the start-up gate can tell a card older than
+# 1.10 supports (below 7.5: 1.9.5 still runs it) from one newer than the build.
+CUDA_UNUSABLE_CAPABILITY: Optional[Tuple[int, int]] = None
 
 
 def cuda_build_supports_device(capability: Tuple[int, int], arch_list) -> bool:
@@ -73,8 +76,9 @@ def _check_cuda_available() -> Tuple[bool, Optional[str]]:
     Returns:
         (is_available, gpu_name)
     """
-    global CUDA_UNUSABLE_REASON
+    global CUDA_UNUSABLE_REASON, CUDA_UNUSABLE_CAPABILITY
     CUDA_UNUSABLE_REASON = None
+    CUDA_UNUSABLE_CAPABILITY = None
     try:
         import torch
         if torch.cuda.is_available():
@@ -93,6 +97,7 @@ def _check_cuda_available() -> Tuple[bool, Optional[str]]:
                         f"but this PyTorch build has kernels only for "
                         f"{', '.join(arch_list)}. The GPU cannot be used by this build."
                     )
+                    CUDA_UNUSABLE_CAPABILITY = (int(capability[0]), int(capability[1]))
                     logger.warning(CUDA_UNUSABLE_REASON)
                     return False, None
                 return True, gpu_name
