@@ -15,6 +15,8 @@ from pathlib import Path
 import pytest
 
 TEMPLATE = Path(__file__).parent.parent / "installer" / "templates" / "post_install.py.template"
+# v1.10.0 (item 2f): the plans read PyTorch's lines from the shipped locked files.
+LOCKED = Path(__file__).parent.parent / "whisperjav" / "installer" / "locked"
 
 
 def _load():
@@ -33,6 +35,7 @@ def m(tmp_path, monkeypatch):
     monkeypatch.setattr(mod, "STACK_FILE", str(tmp_path / "whisperjav_stack.txt"))
     monkeypatch.setattr(mod, "log", lambda msg: lines.append(str(msg)))
     monkeypatch.setattr(mod, "log_section", lambda msg: lines.append(str(msg)))
+    monkeypatch.setattr(mod, "locked_requirements_path", lambda v: str(LOCKED / f"requirements_{v}.txt"))
     mod._lines = lines
     return mod
 
@@ -86,7 +89,10 @@ def test_old_card_answer_2_installs_for_the_cpu_only(m, monkeypatch):
     assert (gate, reason) == ("cpu", None)
     assert m._stopped_on_purpose is False
     plan = m.select_torch_install_plan(_info(m, cc=(6, 1)), force_cpu=True)
-    assert plan.uses_gpu is False and "torch==2.11.0" in plan.pip_command
+    assert plan.uses_gpu is False and plan.variant == "cpu"
+    assert plan.pip_args[:2] == ["install", "--no-deps"]
+    assert any(a.startswith("torch==2.11.0+cpu") for a in plan.pip_args)
+    assert plan.pip_args[-2:] == ["--index-url", "https://download.pytorch.org/whl/cpu"]
 
 
 def test_old_card_with_no_console_stops(m, monkeypatch):
@@ -136,8 +142,14 @@ def test_driver_580_gets_pytorch_2_11_0_for_cuda_13(m, monkeypatch):
     assert m.gpu_support_gate(_info(m, driver=(580, 0, 0))) == ("gpu", None)
     plan = m.select_torch_install_plan(_info(m, driver=(580, 0, 0)))
     assert plan.uses_gpu is True and plan.target_label == "CUDA 13.0"
-    assert plan.pip_args == ["install", "torch==2.11.0", "torchaudio==2.11.0", "torchvision==0.26.0",
-                             "numpy>=2.5,<2.6", "--index-url", "https://download.pytorch.org/whl/cu130"]
+    # v1.10.0 (item 2f): the three PyTorch lines of the cu130 locked file, --no-deps;
+    # numpy and the rest come from the locked file in phase 4.
+    assert plan.variant == "cu130"
+    assert plan.pip_args[:2] == ["install", "--no-deps"]
+    assert plan.pip_args[-2:] == ["--index-url", "https://download.pytorch.org/whl/cu130"]
+    names = {a.split("=")[0] for a in plan.pip_args[2:-2]}
+    assert names == {"torch", "torchaudio", "torchvision"}
+    assert "torch==2.11.0+cu130" in plan.pip_args and "torchaudio==2.11.0+cu130" in plan.pip_args
 
 
 def test_old_card_is_asked_before_the_driver(m, monkeypatch):
