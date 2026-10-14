@@ -22,10 +22,13 @@ channels:
 specs:
   - python=3.13.16  # v1.10.0 (REQ2): Python 3.13, the newest 3.13.x on conda-forge and defaults (2026-10-14)
   - openssl=3.6.2   # Pinned to bypass the ASN.1 Windows cert store bug
-  - pip             # Package installer
-  - git             # Required for GitHub installs
-  - ffmpeg>=6,<8    # Audio/video processing (v6 or v7 required, v8+ incompatible)
-  - menuinst        # Desktop/Start Menu shortcut creation
+  # v1.10.0 (item 2f, owner W56 C4): exact versions, as a conda solve of these six
+  # entries gave them on 2026-10-14. conda supplies only these and their own
+  # dependencies; every WhisperJAV dependency comes from the locked files below.
+  - pip=26.2.1      # Package installer
+  - git=2.56.0      # Required for GitHub installs
+  - ffmpeg=7.1.1    # Audio/video processing (v6 or v7 required, v8+ incompatible)
+  - menuinst=2.5.2  # Desktop/Start Menu shortcut creation
 
 
 # Default installation path (user can override during install)
@@ -38,13 +41,15 @@ post_install: post_install_v{{VERSION}}.bat
 extra_files:
   - post_install_v{{VERSION}}.bat
   - post_install_v{{VERSION}}.py
-  - requirements_v{{VERSION}}.txt
+  - requirements_v{{VERSION}}_cu130.txt  # v1.10.0 (item 2f): uv.lock, one file per PyTorch build
+  - requirements_v{{VERSION}}_cu128.txt
+  - requirements_v{{VERSION}}_cpu.txt
   - WhisperJAV_Launcher_v{{VERSION}}.py
   - README_INSTALLER_v{{VERSION}}.txt
   - LICENSE.txt
   - whisperjav_icon.ico
   - whisperjav-{{VERSION}}-py3-none-any.whl
-  - uv.exe  # Fast package installer (10-30x faster than pip, ~30MB)
+  - uv.exe  # Fast package installer; v1.10.0 (item 2f): uv 0.9.26 from WJ110_build (installer/build_env.yml)
 
 # Installer metadata
 license_file: LICENSE.txt
