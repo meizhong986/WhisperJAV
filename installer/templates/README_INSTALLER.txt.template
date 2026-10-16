@@ -61,7 +61,7 @@ WHAT THIS INSTALLER DOES
 This installer sets up a complete, self-contained WhisperJAV environment:
 
 1. Base Environment Setup (~1-2 minutes)
-   - Python 3.10.18 with conda package manager
+   - Python 3.13.16 with conda package manager
    - FFmpeg for audio/video processing
    - Git for GitHub package installs
 
