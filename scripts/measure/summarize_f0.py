@@ -47,6 +47,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--batch", required=True, type=Path)
     ap.add_argument("--window", type=float, default=1.0)
+    ap.add_argument("--pipelines", nargs="+", default=PIPELINES,
+                    help="pipeline folders to score (default: the six baseline pipelines)")
     a = ap.parse_args()
 
     refs = a.batch / "refs"
@@ -58,7 +60,7 @@ def main():
     status = json.loads(status_path.read_text(encoding="utf-8")) if status_path.exists() else {}
 
     rows, data = [], {"subeval": SUBEVAL_VERSION, "window": a.window, "pipelines": {}}
-    for p in PIPELINES:
+    for p in a.pipelines:
         test = a.batch / p
         if not test.is_dir():
             continue
