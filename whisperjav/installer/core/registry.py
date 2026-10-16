@@ -101,7 +101,7 @@ class Extra(Enum):
     CLI = "cli"             # Audio processing, VAD, scene detection
     GUI = "gui"             # PyWebView GUI
     TRANSLATE = "translate" # AI translation (pysubtrans, OpenAI, Gemini)
-    ENHANCE = "enhance"     # Speech enhancement (ZipEnhancer, ClearVoice, BS-RoFormer, FFmpeg-DSP)
+    ENHANCE = "enhance"     # Speech enhancement (ZipEnhancer, BS-RoFormer, htdemucs, FFmpeg-DSP)
     HUGGINGFACE = "huggingface"  # HuggingFace Transformers
     QWEN = "qwen"           # Qwen3-ASR support (v1.8.3+)
     ANALYSIS = "analysis"   # Scientific analysis and visualization
@@ -348,16 +348,6 @@ PACKAGES: List[Package] = [
         required=True,
         reason="Audio processing for PyTorch - must match torch version",
     ),
-    Package(
-        name="torchvision",
-        version="==0.26.0",  # v1.10.0 (item 2f): pinned with torch, as in pyproject.toml's cu130/cu128/cpu extras
-        extra=Extra.CORE,
-        source=InstallSource.INDEX_URL,
-        index_url="https://download.pytorch.org/whl/{cuda}",
-        order=12,
-        required=True,
-        reason="PyTorch vision - required by ClearVoice enhancement backend; must match torch CUDA index",
-    ),
 
     # =========================================================================
     # PHASE 3: Scientific Stack (Order 20-29)
@@ -486,6 +476,13 @@ PACKAGES: List[Package] = [
         reason="Audio segment manipulation for scene detection",
     ),
     Package(
+        name="audioop-lts",
+        extra=Extra.CLI,
+        order=41,
+        import_name="audioop",
+        reason="audioop for pydub: Python 3.13 removed it (v1.10.0 item 3: it came through gradio before)",
+    ),
+    Package(
         name="librosa",
         version=">=0.11.0",
         extra=Extra.CLI,
@@ -612,8 +609,8 @@ PACKAGES: List[Package] = [
     # Reference: https://modelscope.cn/models/iic/speech_zipenhancer_ans_multiloss_16k_base
     #
     # IMPORTANT - Version Sensitivity:
-    # - datasets: ModelScope requires >=3.0.0,<=3.6.0 (as of 2026-03)
-    # - modelscope: >=1.20 required, 1.22.0+ recommended
+    # - datasets: ModelScope 1.40's tested range >=4.0.0,<=4.8.4 (see pyproject.toml)
+    # - modelscope: >=1.40 (the first release that accepts datasets 4.x)
     # - setuptools: Required at RUNTIME by modelscope (uses pkg_resources in utils/plugins.py)
     # - einops: Required by modelscope framework for tensor operations
     #
@@ -624,7 +621,7 @@ PACKAGES: List[Package] = [
     #
     Package(
         name="modelscope",
-        version=">=1.20",
+        version=">=1.40",
         extra=Extra.ENHANCE,
         order=70,
         reason="ModelScope framework for ZipEnhancer speech enhancement",
@@ -664,10 +661,10 @@ PACKAGES: List[Package] = [
     ),
     Package(
         name="datasets",
-        version=">=3.0.0,<=3.6.0",
+        version=">=4.0.0,<=4.8.4",
         extra=Extra.ENHANCE,
         order=73,
-        reason="HuggingFace datasets - must match modelscope constraint (>=3.0.0)",
+        reason="HuggingFace datasets - ModelScope's tested range",
     ),
     Package(
         name="simplejson",
@@ -694,44 +691,13 @@ PACKAGES: List[Package] = [
         import_name="PIL",
         reason="Image processing - required by modelscope framework",
     ),
-    Package(
-        name="clearvoice",
-        extra=Extra.ENHANCE,
-        source=InstallSource.GIT,
-        git_url="git+https://github.com/meizhong986/ClearerVoice-Studio.git#subdirectory=clearvoice",
-        order=77,
-        reason="ClearVoice speech enhancement - custom fork with relaxed librosa",
-    ),
-    # ClearVoice transitive deps (explicit for --no-deps safety in the installer):
-    # These are declared in ClearVoice's pyproject.toml but skipped with --no-deps.
-    # Version pins are relaxed from ClearVoice's exact pins to avoid conflicts.
-    Package(
-        name="gdown",
-        extra=Extra.ENHANCE,
-        order=77,
-        reason="Google Drive downloader - used by ClearVoice for model downloads",
-    ),
+    # v1.10.0 (item 3, owner W73): ClearVoice is no longer included, and with it gdown,
+    # opencv-python, python-speech-features, scenedetect, torchinfo and yamlargparse.
     Package(
         name="joblib",
         extra=Extra.ENHANCE,
         order=77,
-        reason="Lightweight parallelism - ClearVoice transitive dep (also via scikit-learn)",
-    ),
-    Package(
-        name="opencv-python",
-        version=">=4.10.0",
-        extra=Extra.ENHANCE,
-        order=77,
-        import_name="cv2",
-        reason="Computer vision - required by ClearVoice. 4.10.0+ for numpy 2.x support",
-    ),
-    Package(
-        name="python-speech-features",
-        version=">=0.6",
-        extra=Extra.ENHANCE,
-        order=77,
-        import_name="python_speech_features",
-        reason="Speech feature extraction - required by ClearVoice",
+        reason="Lightweight parallelism (scikit-learn)",
     ),
     Package(
         name="rotary-embedding-torch",
@@ -739,26 +705,7 @@ PACKAGES: List[Package] = [
         extra=Extra.ENHANCE,
         order=77,
         import_name="rotary_embedding_torch",
-        reason="Rotary positional embeddings - required by ClearVoice model architecture",
-    ),
-    Package(
-        name="scenedetect",
-        version=">=0.6",
-        extra=Extra.ENHANCE,
-        order=77,
-        reason="Video scene detection - required by ClearVoice",
-    ),
-    Package(
-        name="torchinfo",
-        extra=Extra.ENHANCE,
-        order=77,
-        reason="PyTorch model summary utility - required by ClearVoice",
-    ),
-    Package(
-        name="yamlargparse",
-        extra=Extra.ENHANCE,
-        order=77,
-        reason="YAML-based argument parser - required by ClearVoice configuration",
+        reason="Rotary positional embeddings - required by BS-RoFormer",
     ),
     Package(
         name="bs-roformer-infer",
@@ -786,27 +733,25 @@ PACKAGES: List[Package] = [
     # =========================================================================
     Package(
         name="huggingface-hub",
-        version=">=0.25.0",
+        version=">=1.0,<2",
         extra=Extra.HUGGINGFACE,
         order=80,
         reason="HuggingFace cache management for model downloads",
     ),
     Package(
         name="transformers",
-        version=">=4.40.0,<5.0",
+        version=">=5.20,<6",
         extra=Extra.HUGGINGFACE,
         order=81,
         reason=(
-            "HuggingFace Transformers for ASR pipeline (kotoba-whisper). "
-            "Upper bound <5.0 added in v1.8.14: transformers 5.x breaks the "
-            "Qwen3-ASR fork (@check_model_inputs() decorator API change at "
-            "modeling_qwen3_asr.py:986). Pin removed in v1.9.0 once Qwen3-ASR "
-            "is patched and Cohere preview ships."
+            "HuggingFace Transformers for ASR pipeline (kotoba-whisper). v1.10.0 (item 3): "
+            "5.20 is the first release with every model class the 1.10.x roadmap names; "
+            "Qwen3-ASR runs through the qwen-asr fork."
         ),
     ),
     Package(
         name="accelerate",
-        version=">=0.26.0",
+        version=">=1.15",
         extra=Extra.HUGGINGFACE,
         order=82,
         reason="Efficient model loading for Transformers",
@@ -832,11 +777,13 @@ PACKAGES: List[Package] = [
     #
     Package(
         name="qwen-asr",
-        version=">=0.0.6",
         extra=Extra.QWEN,
+        source=InstallSource.GIT,
+        git_url="git+https://github.com/meizhong986/Qwen3-ASR.git@10cfb322e42c74cd75a6be622054c9becfeb3082",
         order=84,
         import_name="qwen_asr",  # pip name (qwen-asr) != import name (qwen_asr)
-        reason="Qwen3-ASR transformers backend for multilingual ASR with ForcedAligner",
+        reason="Qwen3-ASR transformers backend with ForcedAligner. v1.10.0 (item 3): the WhisperJAV "
+               "fork of qwen-asr 0.0.6, which runs on transformers 5",
     ),
 
     # =========================================================================
