@@ -268,7 +268,8 @@ class StableTSASR:
         try:
             snapshot_dir = snapshot_download(
                 repo_id=self.model_repo,
-                resume_download=not force,
+                # v1.10.0 (item 3): huggingface-hub 1.x removed resume_download; it
+                # always resumes an interrupted download.
                 force_download=force,
                 local_files_only=False,
                 allow_patterns=[
