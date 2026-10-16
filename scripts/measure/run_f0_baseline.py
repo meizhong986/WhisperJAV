@@ -39,6 +39,16 @@ PIPELINES["chronos_anime"] = [
                                                   "stepdown": False}),
     *_CHRONOS_TAIL, "--pass1-speech-segmenter", "ten", "--pass1-model", "litagin/anime-whisper", *_COMMON_TAIL,
 ]
+BASELINE = list(PIPELINES)
+
+# Item 3 (transformers 5) extra comparisons, run only when named with --pipelines: the parts transformers 5 and
+# huggingface-hub 1.x touch that the six baseline commands do not (WhisperSeg, Transformers mode, the enhancers).
+_QWEN_FIRERED = PIPELINES["chronos_qwen3"]
+PIPELINES["chronos_qwen3_whisperseg"] = [a if a != "firered-vad" else "whisperseg" for a in _QWEN_FIRERED]
+PIPELINES["transformers"] = ["--mode", "transformers", "--sensitivity", "aggressive"]
+for _name, _enh in (("zipenhancer", "zipenhancer"), ("zipenhancer_onnx", "zipenhancer:onnx"),
+                    ("htdemucs", "htdemucs"), ("bs_roformer", "bs-roformer")):
+    PIPELINES[f"chronos_qwen3_{_name}"] = [*_QWEN_FIRERED, "--pass1-speech-enhancer", _enh]
 
 PROBE = r"""
 import importlib.metadata as md, importlib.util, sys
@@ -68,7 +78,7 @@ def main():
     ap.add_argument("--python", required=True, help="python.exe of the WhisperJAV install to run")
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--media-dir", type=Path, default=MEDIA_DIR, help=f"folder holding the two films (default {MEDIA_DIR})")
-    ap.add_argument("--pipelines", nargs="+", default=list(PIPELINES), choices=list(PIPELINES))
+    ap.add_argument("--pipelines", nargs="+", default=BASELINE, choices=list(PIPELINES))
     a = ap.parse_args()
 
     media = [a.media_dir / f for f in FILMS]
