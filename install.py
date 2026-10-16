@@ -35,6 +35,7 @@ Examples:
 """
 
 import os
+import re
 import sys
 import argparse
 import shutil
@@ -428,6 +429,63 @@ def detect_cuda_version(args) -> str:
 
     log("  No NVIDIA GPU detected — using CPU")
     return "cpu"
+
+
+def _release_version() -> str:
+    match = re.search(r'^__version__\s*=\s*"([^"]+)"',
+                      (_source_dir / "whisperjav" / "__version__.py").read_text(encoding="utf-8"), re.M)
+    return match.group(1) if match else "1.10"
+
+
+def _wheel_fits_this_pc(platform_tag: str) -> bool:
+    """Does a wheel's platform tag (win_amd64, manylinux_2_28_x86_64, ...) fit this PC?"""
+    machine = platform_module.machine().lower()
+    arches = {"amd64": ("x86_64", "amd64"), "x86_64": ("x86_64", "amd64"),
+              "arm64": ("arm64", "aarch64"), "aarch64": ("arm64", "aarch64")}.get(machine, (machine,))
+    if sys.platform == "win32":
+        system = platform_tag.startswith("win")
+    elif IS_LINUX:
+        system = platform_tag.startswith(("manylinux", "musllinux", "linux"))
+    elif sys.platform == "darwin":
+        system = platform_tag.startswith("macosx")
+        if system and platform_tag.endswith("universal2"):
+            return True
+    else:
+        system = False
+    return system and platform_tag.endswith(tuple(f"_{a}" for a in arches))
+
+
+def lock_has_pytorch_for_this_pc(cuda_version: str) -> bool:
+    """D3 (owner W57): does uv.lock hold a PyTorch wheel of this build for this PC?
+
+    Each build's torch comes from its own index (pyproject.toml); the wheels uv.lock
+    records under that index are every platform the build can be installed on.
+    """
+    index = f'source = {{ registry = "https://download.pytorch.org/whl/{LOCKED_EXTRAS[cuda_version]}" }}'
+    text = (_source_dir / "uv.lock").read_text(encoding="utf-8")
+    for block in text.split("[[package]]"):
+        if not block.lstrip().startswith('name = "torch"\n') or index not in block:
+            continue
+        for wheel in re.findall(r'url = "[^"]+/([^/"]+)\.whl"', block):
+            if _wheel_fits_this_pc(wheel.rsplit("-", 1)[-1]):
+                return True
+    return False
+
+
+def unsupported_build_message(cuda_version: str) -> str:
+    """The reason this PyTorch build cannot be installed on this PC, or "" (D3, owner W57)."""
+    version = _release_version()
+    if IS_LINUX and cuda_version == "cu130":
+        return (f"CUDA 13.0 is not offered on Linux in WhisperJAV {version}. "
+                f"Use --cuda cu128 (the Linux default) or --cpu-only.")
+    if sys.platform == "darwin" and cuda_version in ("cu130", "cu128"):
+        return "macOS has no CUDA builds. Run without --cuda; WhisperJAV installs the Apple build."
+    if not lock_has_pytorch_for_this_pc(cuda_version):
+        label = {"cu130": "CUDA 13.0", "cu128": "CUDA 12.8"}.get(cuda_version, "CPU")
+        return (f"PyTorch has no {label} build for this computer ({sys.platform}, "
+                f"{platform_module.machine()}) in WhisperJAV {version}, so it cannot be installed here. "
+                f"Nothing was installed.")
+    return ""
 
 
 def wait_for_answer(prompt: str, valid, on_no_console: str) -> str:
@@ -901,6 +959,13 @@ def main():
     if cuda_version == "stop":
         create_failure_file("Stopped before installing: graphics card or driver older than 1.10 supports")
         sys.exit(1)
+    # D3 (owner W57): a build 1.10 does not offer on this PC stops here, before anything
+    # is installed, instead of failing inside uv sync.
+    unsupported = unsupported_build_message(cuda_version)
+    if unsupported:
+        log(f"  {unsupported}")
+        create_failure_file(unsupported)
+        sys.exit(1)
 
     # -------------------------------------------------------------------------
     # Determine extras
@@ -944,7 +1009,9 @@ def main():
                                   target_env=target_env, is_external=is_external)
             if success:
                 log("    [OK] Installation succeeded without speech enhancement.")
-                log("    You can install it later: uv sync --extra enhance")
+                # The build actually chosen: without it uv would put PyPI's PyTorch in.
+                log(f"    You can install it later: uv sync --frozen --extra all "
+                    f"--extra {LOCKED_EXTRAS[cuda_version]}")
 
     if not success:
         log("")
