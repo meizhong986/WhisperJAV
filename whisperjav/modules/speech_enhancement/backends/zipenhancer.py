@@ -58,8 +58,7 @@ class ZipEnhancerBackend:
     """
     ZipEnhancer speech enhancement backend.
 
-    A lightweight alternative to ClearVoice with better quality scores
-    and dramatically lower VRAM usage (~50x smaller model).
+    A lightweight speech enhancer: 2M parameters, about 500 MB of VRAM.
 
     Two model options:
     - "torch": ModelScope pipeline (requires GPU, better quality)

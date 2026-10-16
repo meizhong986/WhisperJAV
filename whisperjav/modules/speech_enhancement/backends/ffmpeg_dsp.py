@@ -115,7 +115,7 @@ class FFmpegDSPBackend:
     Implements SpeechEnhancer protocol but designed for
     lightweight preprocessing before AI enhancement.
 
-    Unlike AI enhancers (ZipEnhancer, ClearVoice), this backend:
+    Unlike AI enhancers (ZipEnhancer, BS-RoFormer), this backend:
     - Uses no GPU (CPU-only via FFmpeg)
     - Has zero model loading time
     - Can chain multiple effects efficiently

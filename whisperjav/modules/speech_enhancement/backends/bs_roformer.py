@@ -11,7 +11,7 @@ Available models:
 Installation: pip install bs-roformer-infer
 
 Note: BS-RoFormer is primarily designed for music source separation
-at 44.1kHz. For speech-only content, ClearVoice may be more appropriate.
+at 44.1kHz. For speech-only content, ZipEnhancer may be more appropriate.
 """
 
 from typing import Union, List, Dict, Any, Optional

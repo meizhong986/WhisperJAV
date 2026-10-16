@@ -6,7 +6,6 @@ defined in base.py.
 
 Available backends:
 - none: Passthrough (no enhancement)
-- clearvoice: ClearerVoice speech enhancement
 - bs_roformer: BS-RoFormer vocal isolation
 """
 
