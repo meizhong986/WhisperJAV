@@ -22,9 +22,6 @@ from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
-from whisperjav.pipelines.kotoba_faster_whisper_pipeline import (
-    KotobaFasterWhisperPipeline,
-)
 from whisperjav.pipelines.transformers_pipeline import TransformersPipeline
 from whisperjav.pipelines.qwen_pipeline import QwenPipeline
 from whisperjav.pipelines.crispasr_pipeline import CrispASRPipeline
@@ -38,7 +35,6 @@ PIPELINE_CLASSES = {
     "fast": FastPipeline,
     "faster": FasterPipeline,
     "fidelity": FidelityPipeline,
-    "kotoba-faster-whisper": KotobaFasterWhisperPipeline,
     "transformers": TransformersPipeline,
     "qwen": QwenPipeline,  # Dedicated Qwen3-ASR pipeline (ADR-004)
     "crispasr": CrispASRPipeline,  # Standalone external-provider pipeline (docs/plans/crispasr_v190/08)
@@ -48,7 +44,7 @@ PIPELINE_CLASSES = {
 # source on 2026-09-17, not against their docstrings. Kept in step by
 # tests/test_speech_enhancer_spec.py, which greps the pipeline modules.
 ENHANCE_FOR_VAD_IGNORED_BY = frozenset({
-    "fast", "faster", "transformers", "kotoba-faster-whisper", "crispasr",
+    "fast", "faster", "transformers", "crispasr",
 })
 
 DEFAULT_HF_PARAMS = {
@@ -248,7 +244,6 @@ PIPELINE_BACKENDS = {
     "fast": "stable_ts",
     "faster": "stable_ts",
     "fidelity": "openai_whisper",
-    "kotoba-faster-whisper": "kotoba_faster_whisper",
 }
 
 
@@ -266,7 +261,7 @@ def get_valid_provider_params(pipeline_name: str) -> set:
 
     valid = PROVIDER_PARAMS_COMMON.copy()
 
-    if backend in ("faster_whisper", "kotoba_faster_whisper"):
+    if backend == "faster_whisper":
         valid.update(PROVIDER_PARAMS_FASTER_WHISPER)
     elif backend == "openai_whisper":
         valid.update(PROVIDER_PARAMS_OPENAI_WHISPER)
@@ -626,6 +621,20 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
         # _run_xxl_pass calls _write_dropbox_and_exit → os._exit() → never returns
         # This line should never be reached, but guard against it
         return  # pragma: no cover
+
+    # v1.10.0 (item 3, owner W75): a speech enhancer WhisperJAV no longer includes
+    # (ClearVoice) stops the pass here, before any audio is read. main.py checks the
+    # command line; this covers whatever else builds a pass configuration.
+    removed = _removed_enhancer_in_pass(pass_config, pass_number)
+    if removed:
+        logger.error("[Worker %s] Pass %s: %s", os.getpid(), pass_number, removed)
+        _write_dropbox_and_exit(result_file, {
+            "results": [
+                FileResult(basename=info["basename"], status="failed", error=removed).__dict__
+                for info in media_files
+            ],
+            "worker_error": removed,
+        }, tracer, 1)
 
     try:
         pipeline = _build_pipeline(
@@ -1028,7 +1037,7 @@ def _build_pipeline(
     #   balanced, fidelity -- the flag is read and reported in an INFO line, but
     #     the enhanced audio goes to BOTH; separating them needs recogniser-side
     #     changes (balanced_pipeline.py, fidelity_pipeline.py).
-    #   fast, faster, transformers, kotoba-faster-whisper, crispasr -- never read.
+    #   fast, faster, transformers, crispasr -- never read.
     #     The owner accepted that on 2026-09-17; it is stated here and in --help
     #     so it is not mistaken for an oversight.
     #
@@ -1645,17 +1654,23 @@ def apply_custom_params(
 
 # Map GUI speech enhancer values to factory-compatible backend names
 # Supports two formats:
-#   1. Legacy: "clearvoice" -> uses default model
-#   2. New:    "clearvoice:MossFormer2_SE_48K" -> backend + specific model
+#   1. Legacy: "bs-roformer" -> uses default model
+#   2. New:    "bs-roformer:vocals" -> backend + specific model
 #   3. FFmpeg DSP: "ffmpeg-dsp:loudnorm,denoise" -> backend + comma-separated effects
 SPEECH_ENHANCER_MAP = {
     "": "none",                 # Empty string -> disabled
     "ffmpeg-dsp": "ffmpeg-dsp", # FFmpeg DSP audio filters
     "none": "none",             # Explicit disable
     "zipenhancer": "zipenhancer",       # ZipEnhancer 16kHz (recommended, lightweight)
-    "clearvoice": "clearvoice", # Default ClearVoice (uses MossFormer2_SE_48K)
     "bs-roformer": "bs-roformer",       # BS-RoFormer vocal isolation
 }
+
+
+def _removed_enhancer_in_pass(pass_config: Dict[str, Any], pass_number: int) -> Optional[str]:
+    """The stop message when this pass names a removed speech enhancer (ClearVoice), else None."""
+    from whisperjav.modules.speech_enhancement.factory import removed_backend_in_pass
+
+    return removed_backend_in_pass(pass_config, pass_number)
 
 
 def _parse_speech_enhancer(enhancer_value: str) -> tuple:
@@ -1664,9 +1679,9 @@ def _parse_speech_enhancer(enhancer_value: str) -> tuple:
 
     Supports formats:
         - "none" -> ("none", None)
-        - "clearvoice" -> ("clearvoice", None)  # Uses factory default
-        - "clearvoice:MossFormer2_SE_48K" -> ("clearvoice", "MossFormer2_SE_48K")
+        - "bs-roformer" -> ("bs-roformer", None)  # Uses factory default
         - "bs-roformer:vocals" -> ("bs-roformer", "vocals")
+        - "ffmpeg-dsp:loudnorm,denoise" -> ("ffmpeg-dsp", "loudnorm,denoise")
 
     Returns:
         Tuple of (backend_name, model_name or None)
