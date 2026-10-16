@@ -1049,30 +1049,42 @@ class TestInstallAbortsOnCoreFailure:
         path = project_root / "installer" / "templates" / "post_install.py.template"
         return path.read_text(encoding="utf-8")
 
-    def test_constructor_is_told_to_propagate_a_failed_post_install(self):
-        """conda-constructor swallows the exit code unless this variable is set.
+    def test_a_failed_post_install_reaches_nsis(self):
+        """The post-install's exit code must reach NSIS's retry dialog, and the script
+        must run in a console window of its own.
 
-        Its _nsis.py catches the CalledProcessError, writes to stderr and returns
-        normally; only `if os.environ.get("NSIS_SCRIPTS_RAISE_ERRORS")` makes it
-        exit non-zero. Without this line NSIS never learns the install failed.
+        Up to constructor 3.11.3 the script ran through _nsis.py, which swallowed a
+        non-zero exit unless NSIS_SCRIPTS_RAISE_ERRORS was set, and its cmd.exe got a
+        console window. Constructor 3.17.3 (v1.10.0, i1) runs the bat hidden under
+        nsExec; ours starts it in its own window (post_install.py shows progress and
+        asks questions there) with `start /wait`, which returns the bat's exit code
+        into AbortRetryNSExecWait (checked 2026-10-16 with exit codes 0, 1, 3 in a
+        path with a space). The bat must pass Python's exit code on.
         """
         content = self._nsis()
+        runner = ('push \'start "" /wait "$CMD_EXE" /D /C ""$INSTDIR\\pkgs\\post_install.bat"" '
+                  '& call exit !ERRORLEVEL!\'')
+        assert runner in content, "post_install.bat is not run in its own window with its exit code passed on"
+        assert "call AbortRetryNSExecWait" in content[content.find(runner):][:300]
+        assert '_nsis.py" post_install' not in content
+        assert '"$INSTDIR\\pkgs\\post_install.bat" > "${STEP_LOG}"' not in content  # the hidden stock runner
 
-        # Match the instruction that sets it, not the comment that explains it:
-        # a name mentioned in a comment sets no variable. (The same weakness made
-        # the old git-package test unable to fail until v1.9.2.)
-        setter = 'SetEnvironmentVariable(t,t)i("NSIS_SCRIPTS_RAISE_ERRORS", "1")'
-        assert setter in content, (
-            "The NSIS script does not SET NSIS_SCRIPTS_RAISE_ERRORS, so a failed "
-            "post-install would be silently discarded by constructor's runner"
-        )
+        bat = (Path(__file__).parent.parent / "installer" / "templates" / "post_install.bat.template").read_text(
+            encoding="utf-8")
+        python_run = bat.find('"%~dp0..\\python.exe" "%~dp0..\\post_install_v{{VERSION}}.py"')
+        assert python_run != -1
+        assert "exit /b %errorlevel%" in bat[python_run:], "the bat does not return Python's exit code"
 
-        var_pos = content.find(setter)
-        call_pos = content.find('_nsis.py" post_install')
-        assert call_pos != -1, "post_install invocation not found"
-        assert var_pos < call_pos, (
-            "NSIS_SCRIPTS_RAISE_ERRORS must be set BEFORE post_install runs"
-        )
+    def test_a_previous_installation_is_removed_only_after_the_path_checks(self):
+        """Replacing a previous installation deletes it, so constructor's path checks
+        (length, spaces, characters, writable) must run first (review 2026-10-16)."""
+        content = self._nsis()
+        start = content.index("Function OnDirectoryLeave")
+        body = content[start:content.index("FunctionEnd", start)]
+        assert body.index("GetFullPathName") < body.index("MAX_RELATIVE_PATH_LENGTH") \
+            < body.index("pathgood:") < body.index("Call IsWhisperJAVInstallation") \
+            < body.index("Call RemoveExistingWhisperJAV") < body.index("whisperjav_continue:")
+        assert "${LogSet} on" not in body
 
     def test_the_install_aborts_when_the_failure_marker_exists(self):
         content = self._nsis()
