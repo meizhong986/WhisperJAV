@@ -1317,6 +1317,15 @@ const DirectoryControls = {
 // Two-Pass Ensemble Manager
 // ============================================================
 const EnsembleManager = {
+    // v1.10.0 (item 3, owner W75): speech enhancers WhisperJAV no longer includes.
+    // A remembered setting or an Ensemble preset can still name one. That pass is
+    // then marked until the user chooses an entry in its enhancer list, and Start
+    // is refused while it is marked (text M2, owner W79). removedEnhancer holds the
+    // saved value while the mark stands, so the settings file keeps it until the
+    // user chooses (it is not rewritten on load).
+    REMOVED_ENHANCERS: { clearvoice: 'ClearVoice' },
+    removedEnhancer: { pass1: null, pass2: null },
+
     // State - Full Configuration Snapshot approach
     state: {
         pass1: {
@@ -1595,6 +1604,7 @@ const EnsembleManager = {
                 return;
             }
             this.state.pass1.speechEnhancer = e.target.value;
+            this.clearRemovedEnhancer('pass1');
             this.updateDspPanel('pass1');
             this.updateEnhanceForVadCheckbox('pass1');
         });
@@ -1626,6 +1636,7 @@ const EnsembleManager = {
                 return;
             }
             this.state.pass2.speechEnhancer = e.target.value;
+            this.clearRemovedEnhancer('pass2');
             this.updateDspPanel('pass2');
             this.updateEnhanceForVadCheckbox('pass2');
         });
@@ -2053,7 +2064,7 @@ const EnsembleManager = {
         // whenever the list was rebuilt.
         // A compatibility list that shares no value with legacyModels would leave this
         // empty and throw inside a change handler, half-updating the row. Not reachable
-        // today (the only such entry, kotoba-faster-whisper, is not offered in the row),
+        // today (every compatibility list shares a value with legacyModels),
         // but fall back to the unfiltered list rather than crash.
         if (!models.length) {
             ConsoleManager.log(
@@ -2289,6 +2300,49 @@ const EnsembleManager = {
         this.updateCrispasrPanel();
     },
 
+    // v1.10.0 (item 3): removed speech enhancers -- see REMOVED_ENHANCERS above.
+    isRemovedEnhancer(value) {
+        const backend = String(value || '').split(':')[0].trim().toLowerCase();
+        return Object.prototype.hasOwnProperty.call(this.REMOVED_ENHANCERS, backend);
+    },
+
+    markRemovedEnhancer(passKey, value) {
+        this.removedEnhancer[passKey] = value;
+        const select = document.getElementById(`${passKey}-enhancer`);
+        if (!select) return;
+        // The list shows the removed name in a disabled entry while the mark stands.
+        // Without it the list would show an ordinary entry (None), and choosing the
+        // entry already shown fires no change event, so the mark could not be cleared.
+        let marker = select.querySelector('option[data-removed-enhancer]');
+        if (!marker) {
+            marker = document.createElement('option');
+            marker.value = '';
+            marker.disabled = true;
+            marker.dataset.removedEnhancer = '1';
+            select.insertBefore(marker, select.firstChild);
+        }
+        const backend = String(value).split(':')[0].trim().toLowerCase();
+        marker.textContent = `${this.REMOVED_ENHANCERS[backend]} (no longer included)`;
+        marker.selected = true;
+        this.updateDspPanel(passKey);
+    },
+
+    clearRemovedEnhancer(passKey) {
+        this.removedEnhancer[passKey] = null;
+        const marker = document.getElementById(`${passKey}-enhancer`)
+            ?.querySelector('option[data-removed-enhancer]');
+        if (marker) marker.remove();
+    },
+
+    // The passes that will run with a removed enhancer still marked. A pass whose
+    // enhancer list does not apply (pass 2 off, XXL, CrispASR) is not counted: its
+    // list cannot be used, so the user could not clear the mark.
+    passesWithRemovedEnhancer() {
+        return ['pass1', 'pass2'].filter(k => this.removedEnhancer[k]
+            && (k === 'pass1' || this.state.pass2.enabled)
+            && !this.state[k].isXxl && !this.state[k].isCrispasr);
+    },
+
     // DSP Effects Panel Management
     updateDspPanel(passId) {
         const panel = document.getElementById(`${passId}-dsp-panel`);
@@ -2475,11 +2529,6 @@ const EnsembleManager = {
         vad: [
             'threshold', 'min_speech_duration_ms',
             'max_speech_duration_s', 'min_silence_duration_ms', 'speech_pad_ms'
-        ],
-        // Internal VAD parameters for kotoba-faster-whisper pipeline
-        internalVad: [
-            'vad_filter', 'vad_threshold', 'min_speech_duration_ms',
-            'max_speech_duration_s', 'min_silence_duration_ms', 'speech_pad_ms'
         ]
         // Engine options = everything else (varies by pipeline backend)
     },
@@ -2505,8 +2554,7 @@ const EnsembleManager = {
         // === External VAD parameters (Silero VAD for balanced/fidelity) ===
         threshold: { type: 'float', ge: 0.0, le: 1.0, step: 0.01 },
 
-        // === Internal VAD parameters (kotoba-faster-whisper) ===
-        // Also applies to external Silero VAD - use larger ranges to cover both
+        // === VAD parameters (faster-whisper's built-in VAD and external Silero VAD) ===
         vad_filter: { type: 'boolean', default: true },
         vad_threshold: { type: 'float', ge: 0.0, le: 1.0, step: 0.01 },
         min_speech_duration_ms: { type: 'int', ge: 0, le: 5000, step: 10 },        // Fixed: was 1000, backend allows 5000
@@ -2515,8 +2563,8 @@ const EnsembleManager = {
         speech_pad_ms: { type: 'int', ge: 0, le: 2000, step: 10 },                 // Fixed: was 500, backend allows 2000
 
         // === Engine parameters (NEW - were missing) ===
-        repetition_penalty: { type: 'float', ge: 1.0, le: 3.0, step: 0.1 },          // Added: for faster_whisper/kotoba
-        no_repeat_ngram_size: { type: 'int', ge: 0, le: 10, step: 1 },             // Added: for faster_whisper/kotoba
+        repetition_penalty: { type: 'float', ge: 1.0, le: 3.0, step: 0.1 },          // Added: for faster_whisper
+        no_repeat_ngram_size: { type: 'int', ge: 0, le: 10, step: 1 },             // Added: for faster_whisper
         chunk_length: { type: 'int', ge: 1, le: 30, step: 1 },                     // Added: for faster_whisper
 
         // === Boolean parameters (explicit type for robustness) ===
@@ -2547,7 +2595,6 @@ const EnsembleManager = {
         faster: ['large-v2', 'large-v3'],
         fast: ['large-v2', 'large-v3'],
         fidelity: ['large-v2', 'large-v3', 'turbo'],
-        'kotoba-faster-whisper': ['kotoba-tech/kotoba-whisper-v2.0-faster', 'RoachLin/kotoba-whisper-v2.2-faster']
     },
 
     async openCustomize(passKey) {
@@ -2734,9 +2781,7 @@ const EnsembleManager = {
                 ...allDefaults.decoder,
                 ...allDefaults.engine
             };
-            // Determine if this is kotoba pipeline (uses internal VAD)
-            const isKotobaPipeline = pipeline === 'kotoba-faster-whisper';
-            await this.generateQualityTab('tab-quality', qualityParams, currentValues, isKotobaPipeline, allDefaults.engine);
+            await this.generateQualityTab('tab-quality', qualityParams, currentValues, allDefaults.engine);
 
             // Generate Segmenter tab (backend-specific parameters)
             const segmenterBackend = passState.speechSegmenter || 'silero';
@@ -2828,62 +2873,12 @@ const EnsembleManager = {
         container.appendChild(control);
     },
 
-    generateInternalVadTab(tabId, engineParams, currentValues) {
-        const container = document.getElementById(tabId);
-
-        // Internal VAD parameters for kotoba pipeline
-        const internalVadParams = {
-            vad_filter: engineParams.vad_filter !== undefined ? engineParams.vad_filter : true,
-            vad_threshold: engineParams.vad_threshold !== undefined ? engineParams.vad_threshold : 0.01,
-            min_speech_duration_ms: engineParams.min_speech_duration_ms || 90,
-            max_speech_duration_s: engineParams.max_speech_duration_s || 28.0,
-            min_silence_duration_ms: engineParams.min_silence_duration_ms || 150,
-            speech_pad_ms: engineParams.speech_pad_ms || 400
-        };
-
-        // Add description header
-        const descDiv = document.createElement('div');
-        descDiv.className = 'tab-description';
-        descDiv.innerHTML = `
-            <p><strong>Internal VAD (faster-whisper built-in)</strong></p>
-            <p>Kotoba pipeline uses faster-whisper's internal Silero VAD for speech detection within each scene.</p>
-        `;
-        container.appendChild(descDiv);
-
-        // Generate controls for each internal VAD parameter
-        for (const [paramName, defaultValue] of Object.entries(internalVadParams)) {
-            const currentValue = currentValues[paramName] !== undefined ? currentValues[paramName] : defaultValue;
-            const metadata = this.parameterMetadata[paramName] || {};
-            const param = {
-                name: paramName,
-                // AUDIT FIX: Pass paramName to inferType for metadata-based type detection
-                type: this.inferType(defaultValue, paramName),
-                description: this.getInternalVadDescription(paramName),
-                constraints: metadata
-            };
-            container.innerHTML += this.generateParamControl(param, currentValue);
-        }
-    },
-
-    getInternalVadDescription(paramName) {
-        const descriptions = {
-            vad_filter: 'Enable/disable internal VAD filtering (recommended: ON)',
-            vad_threshold: 'Speech detection threshold (lower = more sensitive, 0.01 default)',
-            min_speech_duration_ms: 'Minimum speech segment duration in milliseconds',
-            max_speech_duration_s: 'Maximum speech segment duration before splitting',
-            min_silence_duration_ms: 'Minimum silence duration to trigger split',
-            speech_pad_ms: 'Padding added around detected speech segments'
-        };
-        return descriptions[paramName] || '';
-    },
-
     // ========== New Tab Generation Methods (Phase 2) ==========
 
     /**
      * Generate Quality tab - combines transcriber, decoder, and engine params.
-     * For kotoba pipeline, also includes internal VAD params in a separate section.
      */
-    async generateQualityTab(tabId, qualityParams, currentValues, isKotobaPipeline, engineParams) {
+    async generateQualityTab(tabId, qualityParams, currentValues, engineParams) {
         const container = document.getElementById(tabId);
         if (!container) return;
 
@@ -2907,16 +2902,6 @@ const EnsembleManager = {
                 params: ['word_timestamps', 'repetition_penalty', 'no_repeat_ngram_size', 'chunk_length', 'max_initial_timestamp']  // M2 fix: added chunk_length
             }
         };
-
-        // Add kotoba internal VAD section if applicable
-        if (isKotobaPipeline && engineParams) {
-            groups.internalVad = {
-                label: 'Internal VAD (Kotoba)',
-                description: 'Built-in speech detection for kotoba-faster-whisper',
-                params: ['vad_filter', 'vad_threshold', 'min_speech_duration_ms',
-                         'max_speech_duration_s', 'min_silence_duration_ms', 'speech_pad_ms']
-            };
-        }
 
         // Generate each group
         for (const [groupKey, group] of Object.entries(groups)) {
@@ -4256,7 +4241,7 @@ const EnsembleManager = {
                 'Enhanced audio drives VAD segment boundaries; original (non-enhanced) ' +
                 'audio is fed to the ASR model. Prevents enhancement artifacts from ' +
                 'degrading transcription while still benefiting from cleaner VAD. ' +
-                'Requires a non-passthrough speech enhancer (e.g. clearvoice, bs-roformer).';
+                'Requires a non-passthrough speech enhancer (e.g. zipenhancer, htdemucs).';
             efvControl.appendChild(efvDesc);
             container.appendChild(efvControl);
         }
@@ -4899,7 +4884,7 @@ const EnsembleManager = {
 
         // Collect values from all tab panels (includes context tab for Qwen).
         // Enhancer tab params are routed to a separate dict because neural
-        // enhancer backends (zipenhancer, clearvoice, bs-roformer) expose
+        // enhancer backends (zipenhancer, bs-roformer, htdemucs) expose
         // "device" and "model" keys that collide with the ASR model tab's
         // identically-named keys. The enhancer backend receives its config
         // via --passN-speech-enhancer, not via --passN-params.
@@ -5721,7 +5706,12 @@ const EnsembleManager = {
             if (preset.pipeline) passState.pipeline = preset.pipeline;
             if (preset.sensitivity) passState.sensitivity = preset.sensitivity;
             if (preset.sceneDetector) passState.sceneDetector = preset.sceneDetector;
-            if (preset.speechEnhancer !== undefined) passState.speechEnhancer = preset.speechEnhancer;
+            // v1.10.0 (item 3): a removed enhancer (ClearVoice) is not taken into the
+            // state; the pass is marked below instead.
+            const presetEnhancerRemoved = this.isRemovedEnhancer(preset.speechEnhancer);
+            if (preset.speechEnhancer !== undefined && !presetEnhancerRemoved) {
+                passState.speechEnhancer = preset.speechEnhancer;
+            }
             if (preset.speechSegmenter) passState.speechSegmenter = preset.speechSegmenter;
             if (preset.vadVersion) passState.vadVersion = preset.vadVersion;
             if (preset.model) passState.model = preset.model;
@@ -5762,7 +5752,17 @@ const EnsembleManager = {
             setSilent(`${prefix}-pipeline`, preset.pipeline);
             setSilent(`${prefix}-sensitivity`, preset.sensitivity);
             setSilent(`${prefix}-scene`, preset.sceneDetector);
+            // The list no longer offers a removed enhancer, so setSilent keeps the
+            // current entry and logs its warning naming the preset's value; the pass is
+            // then marked. A preset that sets an enhancer the list offers is a choice,
+            // so it clears an earlier mark.
             setSilent(`${prefix}-enhancer`, preset.speechEnhancer);
+            if (presetEnhancerRemoved) {
+                this.markRemovedEnhancer(passKey, preset.speechEnhancer);
+            } else if (preset.speechEnhancer !== undefined && preset.speechEnhancer !== null
+                    && document.getElementById(`${prefix}-enhancer`)?.value === String(preset.speechEnhancer)) {
+                this.clearRemovedEnhancer(passKey);
+            }
             // v1.9.2: a preset saved before this release can hold an external
             // segmenter for a balanced pass. That combination no longer exists, so
             // rebuild the dropdown for the preset's pipeline and show the VAD
@@ -5977,6 +5977,19 @@ const EnsembleManager = {
             return;
         }
 
+        // v1.10.0 (item 3, owner W75): a pass still marked with a removed enhancer
+        // (ClearVoice) does not start. Text M2 (owner, W79).
+        const marked = this.passesWithRemovedEnhancer();
+        if (marked.length) {
+            const which = marked.length === 2 ? 'Pass 1 and Pass 2'
+                : (marked[0] === 'pass1' ? 'Pass 1' : 'Pass 2');
+            ErrorHandler.show('ClearVoice is no longer included',
+                `${which} ${marked.length === 2 ? 'use' : 'uses'} ClearVoice in your saved settings. ` +
+                `ClearVoice is no longer included in WhisperJAV 1.10. ` +
+                `Choose another speech enhancer for ${which}, then press Start again.`);
+            return;
+        }
+
         try {
             const config = this.collectConfig();
 
@@ -6091,7 +6104,7 @@ const EnsembleManager = {
     /**
      * Update enhancer dropdown options based on backend availability.
      * Called on pywebviewready when API becomes available.
-     * Handles both legacy format ("clearvoice") and new format ("clearvoice:MossFormer2_SE_48K").
+     * Handles both plain format ("bs-roformer") and backend:model format ("bs-roformer:vocals").
      */
     async updateEnhancerAvailability() {
         if (!window.pywebview || !pywebview.api) {
@@ -8386,6 +8399,14 @@ const SettingsPersistence = {
             const el = document.getElementById(id);
             if (el) out[spec.key] = el[spec.prop];
         }
+        // v1.10.0 (item 3): while a pass is marked with a removed enhancer, its saved
+        // value stays as it was; it changes only when the user chooses an entry.
+        if (typeof EnsembleManager !== 'undefined') {
+            for (const pass of ['pass1', 'pass2']) {
+                const saved = EnsembleManager.removedEnhancer[pass];
+                if (saved) out[this.FIELDS[`${pass}-enhancer`].key] = saved;
+            }
+        }
         // The two preset names are not form controls -- they live in EnsembleManager's
         // state, set when a preset is loaded and cleared when a field is edited by hand.
         const ens = (typeof EnsembleManager !== 'undefined') ? EnsembleManager.state : null;
@@ -8425,6 +8446,13 @@ const SettingsPersistence = {
                     `A setting saved earlier, "${wanted}", is no longer one of the ` +
                     `choices, so "${el.value || 'nothing'}" has been kept instead.`,
                     'warn');
+                // v1.10.0 (item 3): a removed enhancer (ClearVoice) marks the pass, so
+                // Start asks the user to choose another one (M2).
+                const pass = { 'pass1-enhancer': 'pass1', 'pass2-enhancer': 'pass2' }[id];
+                if (pass && typeof EnsembleManager !== 'undefined'
+                        && EnsembleManager.isRemovedEnhancer(wanted)) {
+                    EnsembleManager.markRemovedEnhancer(pass, wanted);
+                }
                 continue;
             }
             el.dispatchEvent(new Event('change', { bubbles: true }));
