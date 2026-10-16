@@ -134,9 +134,9 @@ class TransformersPipeline(BasePipeline):
             qwen_scene: Scene detection method for Qwen mode
             qwen_context: Context string to improve transcription accuracy
             qwen_attn: Attention implementation ('auto', 'sdpa', 'flash_attention_2', 'eager')
-            hf_speech_enhancer: Speech enhancement backend for HF mode ('none', 'zipenhancer', 'clearvoice', 'bs-roformer'). Default: 'none'
+            hf_speech_enhancer: Speech enhancement backend for HF mode ('none', 'zipenhancer', 'bs-roformer', 'ffmpeg-dsp', 'htdemucs'). Default: 'none'
             hf_speech_enhancer_model: Optional model variant for HF mode enhancer
-            qwen_enhancer: Speech enhancement backend for Qwen mode ('none', 'clearvoice', 'bs-roformer', 'zipenhancer', 'ffmpeg-dsp'). Default: 'none'
+            qwen_enhancer: Speech enhancement backend for Qwen mode ('none', 'zipenhancer', 'bs-roformer', 'ffmpeg-dsp', 'htdemucs'). Default: 'none'
             qwen_enhancer_model: Optional model variant for Qwen mode enhancer
             qwen_segmenter: Post-ASR VAD filter for Qwen mode ('none', 'silero', 'silero-v4.0', 'silero-v3.1', 'nemo', 'nemo-lite', 'whisper-vad', 'ten'). Filters out ASR segments in non-speech regions. Default: 'none'
             qwen_japanese_postprocess: Apply Japanese-specific subtitle regrouping (default: True). Improves quality by handling sentence particles, aizuchi removal, and natural segmentation.
