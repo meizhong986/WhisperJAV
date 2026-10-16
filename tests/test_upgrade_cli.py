@@ -279,10 +279,13 @@ LOCKED = Path(__file__).parent.parent / "whisperjav" / "installer" / "locked"
 @pytest.fixture
 def recorded_cu130(temp_install_dir, monkeypatch):
     """v1.10.0 (item 2f): an installer install records its PyTorch build, and the new
-    release's package carries the locked files (the real tracked ones stand in)."""
+    release carries the locked files (the real tracked ones stand in for the fetch, and
+    the pre-check's pip dry run is a stand-in that succeeds)."""
     (temp_install_dir / "whisperjav_stack.txt").write_text("cu130\n", encoding="utf-8")
-    monkeypatch.setattr(upgrade, "_installed_locked_file",
-                        lambda python_exe, stack: LOCKED / f"requirements_{stack}.txt")
+    monkeypatch.setattr(upgrade, "fetch_release_locked_file",
+                        lambda source, stack: (LOCKED / f"requirements_{stack}.txt").read_text(encoding="utf-8"))
+    monkeypatch.setattr(upgrade, "_run_bounded",
+                        lambda cmd, timeout: subprocess.CompletedProcess(cmd, 0, "", ""))
     return temp_install_dir
 
 
@@ -330,11 +333,13 @@ class TestUpgradePackage:
         captured = capsys.readouterr()
         assert "timed out" in captured.out.lower()
 
-    def test_upgrade_no_pip(self, tmp_path, capsys):
+    def test_upgrade_no_pip(self, tmp_path, capsys, monkeypatch):
         """Test upgrade when pip is not found."""
         empty_dir = tmp_path / "nopip"
         empty_dir.mkdir()
         (empty_dir / "whisperjav_stack.txt").write_text("cu130\n", encoding="utf-8")
+        monkeypatch.setattr(upgrade, "fetch_release_locked_file",
+                            lambda source, stack: (LOCKED / f"requirements_{stack}.txt").read_text(encoding="utf-8"))
 
         result = upgrade.upgrade_package_with_extras(empty_dir, "all")
         assert result is False
