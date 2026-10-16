@@ -77,7 +77,8 @@ def test_pytorch_comes_from_the_locked_file_of_its_build(pi, variant):
     args = pi.torch_pip_args(variant)
     assert args[:2] == ["install", "--no-deps"]
     assert args[-2:] == ["--index-url", f"https://download.pytorch.org/whl/{variant}"]
-    assert {pi.requirement_name(a) for a in args[2:-2]} == {"torch", "torchaudio", "torchvision"}
+    # Item 3 (owner W78 C2): torchvision left with ClearVoice.
+    assert {pi.requirement_name(a) for a in args[2:-2]} == {"torch", "torchaudio"}
     assert any(a.startswith(f"torch==2.11.0+{variant}") for a in args)
 
 

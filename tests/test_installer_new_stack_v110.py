@@ -142,13 +142,14 @@ def test_driver_580_gets_pytorch_2_11_0_for_cuda_13(m, monkeypatch):
     assert m.gpu_support_gate(_info(m, driver=(580, 0, 0))) == ("gpu", None)
     plan = m.select_torch_install_plan(_info(m, driver=(580, 0, 0)))
     assert plan.uses_gpu is True and plan.target_label == "CUDA 13.0"
-    # v1.10.0 (item 2f): the three PyTorch lines of the cu130 locked file, --no-deps;
-    # numpy and the rest come from the locked file in phase 4.
+    # v1.10.0 (item 2f): the PyTorch lines of the cu130 locked file, --no-deps; numpy
+    # and the rest come from the locked file in phase 4. Item 3 (owner W78 C2): torch
+    # and torchaudio only; torchvision left with ClearVoice.
     assert plan.variant == "cu130"
     assert plan.pip_args[:2] == ["install", "--no-deps"]
     assert plan.pip_args[-2:] == ["--index-url", "https://download.pytorch.org/whl/cu130"]
     names = {a.split("=")[0] for a in plan.pip_args[2:-2]}
-    assert names == {"torch", "torchaudio", "torchvision"}
+    assert names == {"torch", "torchaudio"}
     assert "torch==2.11.0+cu130" in plan.pip_args and "torchaudio==2.11.0+cu130" in plan.pip_args
 
 
@@ -176,7 +177,7 @@ def _phase_stubs(m, monkeypatch, check_ok, tmp_path=None):
     monkeypatch.setattr(m, "torch_imports_in_fresh_process", lambda: (True, ""))
     monkeypatch.setattr(m, "torch_facts_in_fresh_process",
                         lambda: {"torch": "2.11.0+cu128", "torchaudio": "2.11.0+cu128",
-                                 "torchvision": "0.26.0+cu128", "cuda": "12.8", "cuda_available": True})
+                                 "cuda": "12.8", "cuda_available": True})
     monkeypatch.setattr(m, "create_gpu_constraints", lambda pins: calls.append(("pins", dict(pins))) or True)
     return calls
 
