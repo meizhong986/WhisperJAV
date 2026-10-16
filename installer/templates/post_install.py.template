@@ -126,9 +126,13 @@ if USE_UV:
 # v1.10.0 (item 2f, owner W53-W56): every package version -- PyTorch included -- comes
 # from the locked file of the PyTorch build selected for this PC, exported from uv.lock
 # by build_release.py, so the packages WhisperJAV runs on are not resolved from version
-# ranges at install time. (Still not pinned: lief and nvidia-ml-py, installed further down
-# for the launcher icon and driver detection, and the build tools of the few packages
-# that ship as source only.)
+# ranges at install time. (Still resolved here: the build tools of the few packages that
+# ship as source only.)
+# Installer tools, not application dependencies, so not in the lock (owner W57, D2):
+# pinned exactly here. nvidia-ml-py is pure Python; lief 1.0.0 has a cp312-abi3 Windows
+# wheel, and is the version 1.9.5 installs got (D:\195, 2026-10-13).
+NVIDIA_ML_PY_REQUIREMENT = "nvidia-ml-py==13.615.71"
+LIEF_REQUIREMENT = "lief==1.0.0"
 CU130_INDEX = "https://download.pytorch.org/whl/cu130"
 CU128_INDEX = "https://download.pytorch.org/whl/cu128"
 CPU_INDEX = "https://download.pytorch.org/whl/cpu"
@@ -217,39 +221,108 @@ def variant_of_cuda_build(cuda_build: str) -> Optional[str]:
     return None
 
 
-def conda_python_packages() -> Dict[str, str]:
-    """Python packages conda put into this environment: normalized name -> version.
+def pinned_version(line: str) -> Optional[str]:
+    """'packaging==26.3' -> '26.3'; None for a line without ==, such as a git package."""
+    m = re.match(r"^[^=<>!~;@\s]+\s*==\s*([^\s;]+)", line.strip())
+    return m.group(1) if m else None
 
-    Owner W52: conda never owns a package pip/uv installs. Phase 4 leaves these out of
-    the locked file, so uv never replaces a conda package (packaging is the one found in
-    a dry-run solve of construct.yaml on 2026-10-14). Versions are not compared -- see
-    the item 2f spec, "Changes found while coding", for the open decision.
+
+def _metadata_name_version(meta_file: Path) -> Tuple[Optional[str], Optional[str]]:
+    """Name and Version from a METADATA or PKG-INFO file (its header block)."""
+    name = version = None
+    try:
+        with open(meta_file, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if not line.strip():
+                    break
+                if line.startswith("Name:"):
+                    name = line[5:].strip()
+                elif line.startswith("Version:"):
+                    version = line[8:].strip()
+    except OSError:
+        pass
+    return name, version
+
+
+def conda_python_packages() -> Tuple[Dict[str, Tuple[str, str]], List[str]]:
+    """Python packages conda put into this environment, as pip names them.
+
+    Owner W57 (D1): each conda-meta record lists the *.dist-info (or *.egg-info) folder
+    of the Python package it installed; its METADATA gives the PyPI name and version.
+    conda's own package name is not used (msgpack-python, brotli-python and python-build
+    would never match the locked file). Returns ({normalized name: (name, version)},
+    the conda packages that put files into site-packages without such a folder).
     """
-    owned: Dict[str, str] = {}
-    meta = Path(sys.prefix) / "conda-meta"
-    for record in meta.glob("*.json"):
+    found: Dict[str, Tuple[str, str]] = {}
+    unidentified: List[str] = []
+    prefix = Path(sys.prefix)
+    for record in sorted((prefix / "conda-meta").glob("*.json")):
         try:
             data = json.loads(record.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        files = data.get("files") or []
-        if any(str(f).replace("\\", "/").lower().startswith("lib/site-packages/") for f in files):
-            owned[re.sub(r"[-_.]+", "-", str(data.get("name", ""))).lower()] = str(data.get("version", ""))
-    return owned
+        conda_name = str(data.get("name", ""))
+        if conda_name == "python":
+            continue  # the interpreter; its one site-packages file is a README
+        site = [str(f).replace("\\", "/") for f in (data.get("files") or [])
+                if str(f).replace("\\", "/").lower().startswith("lib/site-packages/")]
+        if not site:
+            continue
+        folders = sorted({"/".join(f.split("/")[:3]) for f in site
+                          if f.split("/")[2].lower().endswith((".dist-info", ".egg-info"))})
+        if not folders:
+            unidentified.append(conda_name)
+            continue
+        for folder in folders:
+            path = prefix / folder
+            if path.is_dir():
+                path = path / ("METADATA" if folder.lower().endswith(".dist-info") else "PKG-INFO")
+            name, version = _metadata_name_version(path)
+            if not name or not version:
+                # The folder name: <name>-<version>[-pyX.Y].dist-info / .egg-info
+                parts = folder.split("/")[-1].rsplit(".", 1)[0].split("-")
+                name = name or parts[0]
+                version = version or (parts[1] if len(parts) > 1 else "")
+            found[re.sub(r"[-_.]+", "-", name).lower()] = (name, version)
+    return found, unidentified
 
 
-def release_pinned_install_lines(locked_lines: List[str], conda_owned: Dict[str, str]) -> List[str]:
-    """The locked lines phase 4 installs: all but PyTorch's three and conda's packages."""
-    install_lines = []
+def check_conda_packages(locked_lines: List[str], conda_packages: Dict[str, Tuple[str, str]],
+                         unidentified: List[str]) -> bool:
+    """D1 (owner W57): conda's copy of a pinned package is kept only at the pinned version.
+
+    Every package conda installed that the locked file lists is compared and logged, so
+    a check that compared nothing shows as "Checked 0 packages". A different version
+    (or a pinned git package) stops the install before anything is installed.
+    """
+    for conda_name in unidentified:
+        log(f"conda's {conda_name} put Python files here without package metadata, so it could not be compared.")
+    compared, ok = 0, True
     for line in locked_lines:
-        name = requirement_name(line)
-        if name in TORCH_PACKAGE_NAMES:
+        key = requirement_name(line)
+        if key not in conda_packages:
             continue
-        if name in conda_owned:
-            log(f"Kept conda's {name} {conda_owned[name]} (locked file: {line.split(';')[0].strip()})")
+        compared += 1
+        name, conda_version = conda_packages[key]
+        pinned = pinned_version(line)
+        if pinned is not None and pinned == conda_version:
+            log(f"Keeping conda's {name} {conda_version}: the same version this release is pinned to.")
             continue
-        install_lines.append(line)
-    return install_lines
+        ok = False
+        pinned_text = f"{name} {pinned}" if pinned else line.split(";")[0].strip()
+        log(f"Stopped: conda installed {name} {conda_version}, but this release is pinned to {pinned_text}. "
+            f"Please report this so it can be fixed: {ISSUES_URL} — attach {os.path.basename(LOG_FILE)}.")
+    if ok:
+        log(f"Checked {compared} package{'' if compared == 1 else 's'} that conda installed against the "
+            f"pinned list: all match.")
+    return ok
+
+
+def release_pinned_install_lines(locked_lines: List[str], conda_packages: Dict[str, Tuple[str, str]]) -> List[str]:
+    """The locked lines phase 4 installs: all but PyTorch's three and the ones conda
+    installed (already checked to be at the pinned version by check_conda_packages)."""
+    return [line for line in locked_lines
+            if requirement_name(line) not in TORCH_PACKAGE_NAMES and requirement_name(line) not in conda_packages]
 
 
 class DriverMatrixEntry(NamedTuple):
@@ -400,7 +473,7 @@ def ensure_pynvml_loaded() -> bool:
         log("Installing nvidia-ml-py for NVIDIA driver detection...")
         if run_pip([
             "install",
-            "nvidia-ml-py",
+            NVIDIA_ML_PY_REQUIREMENT,
             "--progress-bar",
             "on"
         ], "Install NVML helper"):
@@ -2383,7 +2456,7 @@ def embed_icon_in_exe(exe_path: str, icon_path: str) -> bool:
         except ImportError:
             log("Installing LIEF library for icon embedding...")
             result = subprocess.run(
-                [sys.executable, "-m", "pip", "install", "lief"],
+                [sys.executable, "-m", "pip", "install", LIEF_REQUIREMENT],
                 capture_output=True,
                 text=True,
                 timeout=60
@@ -2575,7 +2648,11 @@ def main() -> int:
         log(f"ERROR: cannot read {locked_requirements_path(variant)}: {exc}")
         create_failure_file(f"Missing requirements file: {locked_requirements_path(variant)}")
         return 1
-    install_lines = release_pinned_install_lines(locked_lines, conda_python_packages())
+    conda_packages, conda_unidentified = conda_python_packages()
+    if not check_conda_packages(locked_lines, conda_packages, conda_unidentified):
+        create_failure_file("conda installed a package at a version other than the pinned one")
+        return 1
+    install_lines = release_pinned_install_lines(locked_lines, conda_packages)
     install_file = os.path.join(sys.prefix, f"requirements_v{{VERSION}}_{variant}_install.txt")
     with open(install_file, "w", encoding="utf-8") as f:
         f.write("\n".join(install_lines) + "\n")
