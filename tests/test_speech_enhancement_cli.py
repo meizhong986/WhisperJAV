@@ -6,15 +6,15 @@ Black-box test suite for the speech enhancement module.
 Tests the public factory interface and contract.
 
 Usage:
-    # Test with default settings (clearvoice, MossFormer2_SE_48K)
+    # Test with default settings (zipenhancer, torch)
     python tests/test_speech_enhancement_cli.py video.mp4
 
     # Test with specific backend and model
-    python tests/test_speech_enhancement_cli.py video.mp4 --backend clearvoice --model FRCRN_SE_16K
+    python tests/test_speech_enhancement_cli.py video.mp4 --backend bs-roformer --model vocals
 
     # List available backends and models
     python tests/test_speech_enhancement_cli.py --list-backends
-    python tests/test_speech_enhancement_cli.py --list-models clearvoice
+    python tests/test_speech_enhancement_cli.py --list-models ffmpeg-dsp
 
     # Specify output file
     python tests/test_speech_enhancement_cli.py video.mp4 --output enhanced.wav
@@ -420,7 +420,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Test with default settings (clearvoice, MossFormer2_SE_48K)
+  # Test with default settings (zipenhancer, torch)
   python tests/test_speech_enhancement_cli.py video.mp4
 
   # Test with specific model
@@ -436,7 +436,7 @@ Examples:
   python tests/test_speech_enhancement_cli.py --list-backends
 
   # List models for a backend
-  python tests/test_speech_enhancement_cli.py --list-models clearvoice
+  python tests/test_speech_enhancement_cli.py --list-models ffmpeg-dsp
         """
     )
 
@@ -450,8 +450,8 @@ Examples:
     # Backend selection
     parser.add_argument(
         "--backend", "-b",
-        default="clearvoice",
-        help="Speech enhancement backend (default: clearvoice)"
+        default="zipenhancer",
+        help="Speech enhancement backend (default: zipenhancer)"
     )
 
     parser.add_argument(

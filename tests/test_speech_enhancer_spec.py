@@ -33,10 +33,10 @@ class TestAccepted:
     @pytest.mark.parametrize("value,expected", [
         ("none", "none"),
         ("ffmpeg-dsp", "ffmpeg-dsp"),
-        ("clearvoice", "clearvoice"),
+        ("zipenhancer", "zipenhancer"),
         ("ffmpeg-dsp:loudnorm", "ffmpeg-dsp:loudnorm"),
         ("ffmpeg-dsp:loudnorm,denoise,highpass", "ffmpeg-dsp:loudnorm,denoise,highpass"),
-        ("clearvoice:MossFormer2_SE_48K", "clearvoice:MossFormer2_SE_48K"),
+        ("htdemucs:htdemucs", "htdemucs:htdemucs"),
         ("bs-roformer:vocals", "bs-roformer:vocals"),
         # Whitespace is tidied so downstream sees a clean value.
         ("  ffmpeg-dsp : loudnorm , denoise ", "ffmpeg-dsp:loudnorm,denoise"),

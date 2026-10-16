@@ -72,8 +72,8 @@ class TestItIsOffered:
         ordinary dependency, installed with WhisperJAV rather than by hand.
 
         It belongs in the same extra as the other model-based clean-ups, so that
-        nothing about it is special: whatever installs clearvoice and
-        bs-roformer installs demucs.
+        nothing about it is special: whatever installs ZipEnhancer (modelscope)
+        and bs-roformer installs demucs.
         """
         import tomllib
 
@@ -85,7 +85,7 @@ class TestItIsOffered:
 
         # The peers it must travel with.
         assert "bs-roformer-infer" in enhance
-        assert any(spec.startswith("clearvoice") for spec in enhance)
+        assert any(spec.startswith("modelscope") for spec in enhance)
 
     def test_the_windows_installer_includes_that_extra(self):
         build = (REPO / "installer" / "build_release.py").read_text(encoding="utf-8")
@@ -102,7 +102,7 @@ class TestItDoesNotFailQuietly:
         a failure and the process shall stop with helpful communication." That
         is every clean-up the user has to install.
         """
-        for backend in ("zipenhancer", "clearvoice", "bs-roformer", "htdemucs"):
+        for backend in ("zipenhancer", "bs-roformer", "htdemucs"):
             assert backend in FATAL_WHEN_UNAVAILABLE, backend
 
     def test_the_two_that_cannot_be_missing_are_not(self):
@@ -130,7 +130,7 @@ class TestItDoesNotFailQuietly:
             pipeline_helper.create_enhancer_from_config(
                 {"params": {"speech_enhancer": {"backend": "htdemucs"}}})
 
-    @pytest.mark.parametrize("backend", ["zipenhancer", "clearvoice", "bs-roformer"])
+    @pytest.mark.parametrize("backend", ["zipenhancer", "bs-roformer"])
     def test_an_installable_enhancer_that_is_missing_now_stops_the_run(
             self, backend, monkeypatch):
         """
