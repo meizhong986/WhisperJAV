@@ -44,7 +44,7 @@ CONTRACTS (v1.8.5+):
         - Skip enhance_scenes() entirely — no enhanced_scenes/ folder created
         - No disk I/O or CPU resampling overhead
 
-    When a real enhancer is configured (clearvoice, bs-roformer, etc.):
+    When a real enhancer is configured (zipenhancer, bs-roformer, etc.):
         - Extract at 48kHz (SCENE_EXTRACTION_SR) — enhancers need high-SR input
         - enhance_scenes() runs the full pipeline (enhance → resample → save)
         - Output: Enhanced files at 16kHz mono (TARGET_SAMPLE_RATE)
@@ -78,7 +78,7 @@ import logging
 import time
 import soundfile as sf
 
-from .factory import FATAL_WHEN_UNAVAILABLE, SpeechEnhancerFactory
+from .factory import FATAL_WHEN_UNAVAILABLE, SpeechEnhancerFactory, removed_backend_message
 from .base import SpeechEnhancer, SpeechEnhancerUnavailable, resample_audio
 
 logger = logging.getLogger("whisperjav")
@@ -125,6 +125,12 @@ def create_enhancer_from_config(
     # Normalize empty backend to "none"
     if not backend:
         backend = "none"
+
+    # A removed backend (ClearVoice, v1.10.0) is otherwise an unknown name, which
+    # the availability check below would quietly turn into "none".
+    removed = removed_backend_message(backend, "this run")
+    if removed:
+        raise SpeechEnhancerUnavailable(removed)
 
     # Check availability (except for "none" which is always available)
     if backend != "none":
@@ -173,7 +179,7 @@ def create_enhancer_direct(
     The "none" backend performs 48kHz→16kHz resampling without processing.
 
     Args:
-        backend: Enhancer backend name ("none", "clearvoice", "bs-roformer", "ffmpeg-dsp")
+        backend: Enhancer backend name ("none", "zipenhancer", "bs-roformer", "ffmpeg-dsp")
         model: Optional model variant
         **kwargs: Additional parameters
 
@@ -183,6 +189,12 @@ def create_enhancer_direct(
     # Normalize empty backend to "none"
     if not backend:
         backend = "none"
+
+    # A removed backend (ClearVoice, v1.10.0) is otherwise an unknown name, which
+    # the availability check below would quietly turn into "none".
+    removed = removed_backend_message(backend, "this run")
+    if removed:
+        raise SpeechEnhancerUnavailable(removed)
 
     # Check availability (except for "none" which is always available)
     if backend != "none":
@@ -228,7 +240,7 @@ def get_extraction_sample_rate(enhancer_backend: Optional[str] = None) -> int:
     - "none" or empty: 16kHz (no enhancement needed, extract at ASR target SR)
     - Any real backend: 48kHz (enhancers work best with high-SR input)
 
-    Note: If a real backend (e.g. "clearvoice") is configured but unavailable
+    Note: If a real backend (e.g. "zipenhancer") is configured but unavailable
     at runtime, create_enhancer_from_config/create_enhancer_direct will fall
     back to NullSpeechEnhancer.  In that case scenes are already at 48kHz,
     so enhance_scenes() still runs the 48→16 kHz resample — same as before.
