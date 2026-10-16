@@ -46,7 +46,6 @@ class TestResolverComputeType:
         with patch('whisperjav.config.resolver_v3._is_pascal_gpu', return_value=False), \
              patch('whisperjav.config.resolver_v3._is_blackwell_gpu', return_value=False):
             assert _get_compute_type_for_device("cuda", "faster_whisper") == "float16"
-            assert _get_compute_type_for_device("cuda", "kotoba_faster_whisper") == "float16"
 
     def test_ctranslate2_non_cuda_returns_auto(self):
         """CTranslate2 providers on non-CUDA devices return 'auto'."""
@@ -55,7 +54,6 @@ class TestResolverComputeType:
         # CPU, MPS, and hypothetical future devices all get "auto"
         for device in ("cpu", "mps", "xpu"):
             assert _get_compute_type_for_device(device, "faster_whisper") == "auto"
-            assert _get_compute_type_for_device(device, "kotoba_faster_whisper") == "auto"
 
     def test_ctranslate2_cuda_pascal_returns_float32(self):
         """CTranslate2 on Pascal GPU (sm_6x) returns 'float32'."""
@@ -64,7 +62,6 @@ class TestResolverComputeType:
         with patch('whisperjav.config.resolver_v3._is_pascal_gpu', return_value=True), \
              patch('whisperjav.config.resolver_v3._is_blackwell_gpu', return_value=False):
             assert _get_compute_type_for_device("cuda", "faster_whisper") == "float32"
-            assert _get_compute_type_for_device("cuda", "kotoba_faster_whisper") == "float32"
 
     def test_ctranslate2_cuda_blackwell_returns_auto(self):
         """CTranslate2 on Blackwell (RTX 50, sm_120+) returns 'auto' like any other GPU.
@@ -80,7 +77,6 @@ class TestResolverComputeType:
         with patch('whisperjav.config.resolver_v3._is_pascal_gpu', return_value=False), \
              patch('whisperjav.config.resolver_v3._is_blackwell_gpu', return_value=True):
             assert _get_compute_type_for_device("cuda", "faster_whisper") == "auto"
-            assert _get_compute_type_for_device("cuda", "kotoba_faster_whisper") == "auto"
 
     def test_pytorch_providers_return_explicit_types(self):
         """PyTorch providers get explicit float16/float32 based on device."""
@@ -97,7 +93,8 @@ class TestResolverComputeType:
         from whisperjav.config.resolver_v3 import CTRANSLATE2_PROVIDERS
 
         assert "faster_whisper" in CTRANSLATE2_PROVIDERS
-        assert "kotoba_faster_whisper" in CTRANSLATE2_PROVIDERS
+        # v1.10.0 (item 3): the dormant Kotoba faster-whisper pipeline was removed.
+        assert "kotoba_faster_whisper" not in CTRANSLATE2_PROVIDERS
         assert "openai_whisper" not in CTRANSLATE2_PROVIDERS
         assert "stable_ts" not in CTRANSLATE2_PROVIDERS
 
@@ -185,23 +182,6 @@ class TestFasterWhisperProASR:
         """Default compute_type for CPU is 'auto'."""
         from whisperjav.config.resolver_v3 import _get_compute_type_for_device
         assert _get_compute_type_for_device("cpu", "faster_whisper") == "auto"
-
-
-class TestKotobaFasterWhisperASR:
-    """Tests for KotobaFasterWhisperASR compute_type handling."""
-
-    def test_cuda_default_is_float16(self):
-        """Default compute_type for a Turing/Ampere/Ada CUDA GPU is 'float16'."""
-        from whisperjav.config.resolver_v3 import _get_compute_type_for_device
-
-        with patch('whisperjav.config.resolver_v3._is_pascal_gpu', return_value=False), \
-             patch('whisperjav.config.resolver_v3._is_blackwell_gpu', return_value=False):
-            assert _get_compute_type_for_device("cuda", "kotoba_faster_whisper") == "float16"
-
-    def test_cpu_default_is_auto(self):
-        """Default compute_type for CPU is 'auto'."""
-        from whisperjav.config.resolver_v3 import _get_compute_type_for_device
-        assert _get_compute_type_for_device("cpu", "kotoba_faster_whisper") == "auto"
 
 
 class TestWhisperVAD:
