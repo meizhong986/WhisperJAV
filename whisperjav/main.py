@@ -114,7 +114,6 @@ from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
-from whisperjav.pipelines.kotoba_faster_whisper_pipeline import KotobaFasterWhisperPipeline
 from whisperjav.config.legacy import resolve_legacy_pipeline, resolve_ensemble_config, apply_balanced_vad_defaults
 from whisperjav.utils.model_refresh import DEFAULT_MODEL_REFRESH_AUDIO_MINUTES
 from whisperjav.utils.offline_mode import is_offline, hf_endpoint
@@ -167,8 +166,13 @@ LANGUAGE_CODE_MAP = {
 # hardcoded rather than imported so `--help` does not pay the factory import cost.
 # Without `choices=`, a typo such as `zipenhance` was accepted and silently
 # downgraded to no enhancement part-way through a multi-hour run (#306).
-SPEECH_ENHANCER_CHOICES = ["none", "ffmpeg-dsp", "zipenhancer", "clearvoice", "bs-roformer",
-                           "htdemucs"]
+SPEECH_ENHANCER_CHOICES = ["none", "ffmpeg-dsp", "zipenhancer", "bs-roformer", "htdemucs"]
+
+# Speech enhancers WhisperJAV no longer includes (ClearVoice, v1.10.0). They pass
+# argument parsing so that _stop_on_removed_enhancer can name the flag in its
+# message (owner, W75/W79); argparse's own error could not. Kept in step with the
+# factory's REMOVED_BACKENDS by tests/test_clearvoice_removed_v110.py.
+REMOVED_SPEECH_ENHANCERS = ["clearvoice"]
 
 # The effects FFmpegDSPBackend knows. Hardcoded for the same reason
 # SPEECH_ENHANCER_CHOICES is: --help and argument validation must not pay the cost
@@ -184,7 +188,7 @@ def speech_enhancer_spec(value: str) -> str:
 
     The detail is the backend's own second argument: a list of effects for
     ffmpeg-dsp ("ffmpeg-dsp:loudnorm,denoise"), a model name for the others
-    ("clearvoice:MossFormer2_SE_48K"). Everything downstream already understood
+    ("bs-roformer:vocals"). Everything downstream already understood
     that form -- pass_worker._parse_speech_enhancer splits it, and
     FFmpegDSPBackend splits a comma-separated detail into effects -- but the
     #306 fix in v1.9.2 put a plain choices= list on these flags, which rejected
@@ -202,6 +206,10 @@ def speech_enhancer_spec(value: str) -> str:
     """
     backend, separator, detail = value.partition(":")
     backend = backend.strip()
+
+    if backend.lower() in REMOVED_SPEECH_ENHANCERS:
+        # Stopped after parsing, by _stop_on_removed_enhancer, which can name the flag.
+        return value.strip()
 
     if backend not in SPEECH_ENHANCER_CHOICES:
         raise argparse.ArgumentTypeError(
@@ -233,10 +241,45 @@ def speech_enhancer_spec(value: str) -> str:
                     ", ".join(repr(e) for e in FFMPEG_DSP_EFFECTS)))
         return "{}:{}".format(backend, ",".join(effects))
 
-    # clearvoice / zipenhancer / bs-roformer: the detail is a model name. Which
+    # zipenhancer / bs-roformer / htdemucs: the detail is a model name. Which
     # models exist is the backend's business and costs an import to find out, so
     # it is left to the backend, which already falls back with a warning.
     return "{}:{}".format(backend, detail)
+
+
+def _stop_on_removed_enhancer(args) -> None:
+    """
+    Stop the run, before any audio is read, when a speech enhancer WhisperJAV no
+    longer includes (ClearVoice, v1.10.0) is named on the command line.
+
+    Owner, W75: a saved ClearVoice choice stops the run with a message. The GUI,
+    an Ensemble preset or a script can carry it in the three enhancer flags or in
+    the pass parameters (qwen_enhancer, hf_speech_enhancer), which are passed
+    through to the pipeline unchecked. Exit code 2, the usage-error code these
+    flags already use (owner, W78 C5). Text M1 (owner, W79).
+    """
+    found = []
+    for flag in ("pass1_speech_enhancer", "pass2_speech_enhancer", "qwen_enhancer"):
+        found.append((getattr(args, flag, None), "--" + flag.replace("_", "-")))
+    for n in (1, 2):
+        for flag, key in ((f"pass{n}_qwen_params", "qwen_enhancer"),
+                          (f"pass{n}_hf_params", "hf_speech_enhancer")):
+            raw = getattr(args, flag, None)
+            if not raw:
+                continue
+            try:
+                params = json.loads(raw)
+            except (TypeError, ValueError):
+                continue  # reported, with the flag named, where the run reads it
+            if isinstance(params, dict):
+                found.append((params.get(key), f"{key} in --{flag.replace('_', '-')}"))
+    for value, where in found:
+        if not isinstance(value, str):
+            continue
+        if value.split(":", 1)[0].strip().lower() in REMOVED_SPEECH_ENHANCERS:
+            from whisperjav.modules.speech_enhancement.factory import removed_backend_message
+            print(removed_backend_message(value, where), file=sys.stderr)
+            sys.exit(2)
 
 
 def build_translation_context(args) -> str:
@@ -300,7 +343,6 @@ def parse_arguments():
 
     # Core arguments
     parser.add_argument("input", nargs="*", help="Input media file(s), directory, or wildcard pattern.")
-    # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
     parser.add_argument("--mode", choices=["fidelity", "balanced", "fast", "faster", "transformers", "qwen", "crispasr"], default="balanced",
                        help="Processing mode (default: balanced). 'crispasr' = CrispASR external provider (requires --crispasr-exe)")
     parser.add_argument("--model", default=None,
@@ -329,7 +371,6 @@ def parse_arguments():
     twopass_group = parser.add_argument_group("Two-Pass Ensemble Options")
     twopass_group.add_argument("--ensemble", action="store_true",
                                help="Enable two-pass ensemble mode")
-    # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
     twopass_group.add_argument("--pass1-pipeline", default="balanced",
                                choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen", "crispasr"],
                                help="Pipeline for pass 1 (default: balanced). 'crispasr' requires --crispasr-exe")
@@ -363,7 +404,7 @@ def parse_arguments():
                                     + ". A detail may follow a colon: for ffmpeg-dsp a comma-separated "
                                       "list of effects (" + ", ".join(FFMPEG_DSP_EFFECTS) + "), e.g. "
                                       "ffmpeg-dsp:loudnorm,denoise; for the others a model name, e.g. "
-                                      "clearvoice:MossFormer2_SE_48K. An unrecognised name or effect is "
+                                      "bs-roformer:vocals. An unrecognised name or effect is "
                                       "rejected here rather than silently falling back mid-run (#306).")
     twopass_group.add_argument("--pass1-enhance-for-vad", action="store_true", default=False,
                                help="Dual-track mode for pass 1: the cleaned-up audio drives speech "
@@ -379,7 +420,6 @@ def parse_arguments():
                                help="VAD threshold for pass 1 (0.0-1.0)")
     twopass_group.add_argument("--pass1-speech-pad-ms", type=int, default=None,
                                help="Speech padding in ms for pass 1")
-    # Note: kotoba-faster-whisper temporarily hidden from user selection (implementation preserved)
     twopass_group.add_argument("--pass2-pipeline", default=None,
                                choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen", "xxl", "crispasr"],
                                help="Pipeline for pass 2 (enables pass 2). 'xxl' = BYOP XXL Faster Whisper (requires --xxl-exe); 'crispasr' requires --crispasr-exe")
@@ -413,7 +453,7 @@ def parse_arguments():
                                     + ". A detail may follow a colon: for ffmpeg-dsp a comma-separated "
                                       "list of effects (" + ", ".join(FFMPEG_DSP_EFFECTS) + "), e.g. "
                                       "ffmpeg-dsp:loudnorm,denoise; for the others a model name, e.g. "
-                                      "clearvoice:MossFormer2_SE_48K. An unrecognised name or effect is "
+                                      "bs-roformer:vocals. An unrecognised name or effect is "
                                       "rejected here rather than silently falling back mid-run (#306).")
     twopass_group.add_argument("--pass2-enhance-for-vad", action="store_true", default=False,
                                help="Dual-track mode for pass 2: the cleaned-up audio drives speech "
@@ -493,7 +533,7 @@ def parse_arguments():
     hardware_group.add_argument("--compute-type", type=str, default=None,
                                choices=["auto", "float16", "float32", "int8", "int8_float16", "int8_float32"],
                                help="Compute type for ASR processing (default: auto). "
-                                    "CTranslate2 backends (faster_whisper, kotoba) use 'auto' to optimize "
+                                    "CTranslate2 backends (faster-whisper) use 'auto' to optimize "
                                     "based on GPU capability. PyTorch backends use float16 (GPU) or float32 (CPU).")
 
     # Path and logging
@@ -869,10 +909,10 @@ def parse_arguments():
                                 + ", ".join(FFMPEG_DSP_EFFECTS)
                                 + "), for the others a model name. htdemucs and "
                                 "bs-roformer isolate the voice from music and effects; "
-                                "zipenhancer and clearvoice reduce noise; ffmpeg-dsp applies "
+                                "zipenhancer reduces noise; ffmpeg-dsp applies "
                                 "level and filter work.")
     qwen_audio_group.add_argument("--qwen-enhancer-model", type=str, default=None,
-                           help="Speech enhancer model variant (e.g., 'MossFormer2_SE_48K' for clearvoice)")
+                           help="Speech enhancer model variant (e.g., 'torch' for zipenhancer)")
     qwen_audio_group.add_argument("--enhance-for-vad", action="store_true", default=False,
                            help="Dual-track mode: the cleaned-up audio is used to find the speech "
                                 "and the original audio goes to the recogniser. Applies to the "
@@ -1068,6 +1108,8 @@ def parse_arguments():
         from whisperjav.translate.providers import removed_local_provider_error
         print(removed_local_provider_error("--translate-provider"), file=sys.stderr)
         sys.exit(1)
+    # v1.10.0 (item 3, owner W75): a removed speech enhancer (ClearVoice).
+    _stop_on_removed_enhancer(args)
     return args
 
 
@@ -1491,14 +1533,6 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         pipeline.asr_telemetry_enabled = not getattr(args, 'no_asr_telemetry', False)
         # v1.9.2 (CFF1): recogniser refresh budget (minutes of scene audio).
         pipeline.model_refresh_audio_minutes = getattr(args, 'model_refresh_audio_minutes', DEFAULT_MODEL_REFRESH_AUDIO_MINUTES)
-        effective_mode = args.mode
-    elif args.mode == "kotoba-faster-whisper":
-        # Kotoba Faster-Whisper pipeline with scene detection (always on)
-        scene_method = getattr(args, 'scene_detection_method', None) or 'auditok'
-        pipeline = KotobaFasterWhisperPipeline(
-            scene_method=scene_method,
-            **pipeline_args
-        )
         effective_mode = args.mode
     elif args.mode == "transformers":
         # HuggingFace Transformers pipeline with dedicated --hf-* arguments
@@ -2012,9 +2046,6 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
     resolved_config['keep_temp_files'] = args.keep_temp
     resolved_config['subs_language'] = args.subs_language
     resolved_config['language'] = language_code  # Whisper language code
-    
-    # Add scene detection method for kotoba pipeline
-    resolved_config['scene_method'] = getattr(args, 'scene_detection_method', None) or 'auditok'
 
     # #394 per-scene telemetry (read by BalancedPipeline.__init__)
     resolved_config['asr_telemetry'] = getattr(args, 'asr_telemetry', None)
