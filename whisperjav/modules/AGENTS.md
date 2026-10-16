@@ -14,7 +14,6 @@
 | `stable_ts_asr.py` (`StableTSASR`) | Whisper or faster-whisper via stable-ts | **WhisperResult** (`:477`) |
 | `qwen_asr.py` (`QwenASR`) | Qwen3-ASR (transformers) + optional ForcedAligner | WhisperResult |
 | `transformers_asr.py` (`TransformersASR`) | HF transformers (kotoba) chunked long-form | (see file) |
-| `kotoba_faster_whisper_asr.py` | kotoba faster-whisper / ctranslate2 | (see file) |
 | `segment_filters.py` | post-transcription logprob/nonverbal filter (shared) | — |
 
 Constructor convention (Dict/WhisperResult engines): `__init__(model_config: Dict, params: Dict, task: str, tracer=None)`.

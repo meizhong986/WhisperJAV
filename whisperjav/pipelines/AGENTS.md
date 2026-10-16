@@ -14,7 +14,7 @@
 
 ## Two construction paths (the crucial distinction)
 
-- **Legacy** (`balanced/fast/faster/fidelity/kotoba-faster-whisper`): in `LEGACY_PIPELINES`
+- **Legacy** (`balanced/fast/faster/fidelity`): in `LEGACY_PIPELINES`
   (`config/legacy.py:95-140`) → built via `resolve_legacy_pipeline()` →
   `resolve_config_v3()` (Pydantic presets).
 - **Dedicated** (`transformers/qwen/crispasr`): **NOT** in `LEGACY_PIPELINES`. Built via a

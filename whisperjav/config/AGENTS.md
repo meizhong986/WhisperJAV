@@ -13,7 +13,7 @@ Do not reason from it. Current reality below. (Correcting those two docs is an o
 
 ## Current model (v1.8.9+)
 
-- **Legacy modes** (`balanced/faster/fast/fidelity/kotoba`):
+- **Legacy modes** (`balanced/faster/fast/fidelity`):
   `resolve_legacy_pipeline(mode, sensitivity)` → `resolve_config_v3()` →
   **Pydantic component presets = SINGLE source of truth**:
   - `config/components/asr/faster_whisper.py` — decoder/transcriber/engine (incl. `chunk_length`)
