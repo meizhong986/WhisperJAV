@@ -327,5 +327,5 @@ def test_nsis_shows_the_stop_dialog_before_the_failure_dialog():
     nsis = (TEMPLATE.parent / "custom_template.nsi.tmpl.template").read_text(encoding="utf-8")
     stop_at = nsis.index(r'FileExists} "$INSTDIR\INSTALLATION_STOPPED_v{{VERSION}}.txt"')
     fail_at = nsis.index(r'FileExists} "$INSTDIR\INSTALLATION_FAILED_v{{VERSION}}.txt"')
-    post_at = nsis.index("_nsis.py\" post_install")
+    post_at = nsis.index(r'start "" /wait "$CMD_EXE" /D /C ""$INSTDIR\pkgs\post_install.bat""')
     assert post_at < stop_at < fail_at
