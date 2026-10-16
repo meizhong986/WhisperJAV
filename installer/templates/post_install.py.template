@@ -2193,7 +2193,6 @@ def run_post_install_verification() -> Tuple[int, int, list, list]:
 
     # Optional packages (non-critical)
     optional_packages = [
-        ("clearvoice", "ClearVoice"),
         ("transformers", "Transformers"),
     ]
     for module, display in optional_packages:
