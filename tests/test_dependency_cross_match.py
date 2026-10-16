@@ -282,9 +282,8 @@ class TestInstallationConstraints:
                 )
 
     @pytest.mark.parametrize("pkg_info", [
-        ("modelscope", ">=1.20", "modelscope"),
+        ("modelscope", ">=1.40", "modelscope"),
         ("onnxruntime", ">=1.16.0", "onnxruntime"),
-        ("opencv-python", ">=4.10.0", "cv2"),
         ("bs-roformer-infer", None, "bs_roformer"),
     ], ids=lambda x: x[0] if isinstance(x, tuple) else str(x))
     def test_enhance_package_installed(self, pkg_info):
@@ -301,10 +300,10 @@ class TestInstallationConstraints:
                 )
 
     @pytest.mark.parametrize("pkg_info", [
-        ("huggingface-hub", ">=0.25.0", "huggingface_hub"),
-        # v1.8.14: <5.0 upper bound — Qwen3-ASR fork breaks on transformers 5.x.
-        ("transformers", ">=4.40.0,<5.0", "transformers"),
-        ("accelerate", ">=0.26.0", "accelerate"),
+        ("huggingface-hub", ">=1.0,<2", "huggingface_hub"),
+        # v1.10.0 (item 3): transformers 5.20; Qwen3-ASR runs through the qwen-asr fork.
+        ("transformers", ">=5.20,<6", "transformers"),
+        ("accelerate", ">=1.15", "accelerate"),
     ], ids=lambda x: x[0] if isinstance(x, tuple) else str(x))
     def test_huggingface_package_installed(self, pkg_info):
         """HuggingFace packages are importable where applicable."""
