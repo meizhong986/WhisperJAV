@@ -28,7 +28,7 @@ from whisperjav.utils.device_detector import get_best_device
 logger = logging.getLogger("whisperjav")
 
 # CTranslate2-based providers support "auto" compute_type selection
-CTRANSLATE2_PROVIDERS = {"faster_whisper", "kotoba_faster_whisper"}
+CTRANSLATE2_PROVIDERS = {"faster_whisper"}
 
 
 
@@ -135,7 +135,7 @@ def _get_compute_type_for_device(device: str, provider: str) -> str:
     """
     Select optimal compute_type based on device and provider.
 
-    CTranslate2 providers (faster_whisper, kotoba_faster_whisper):
+    CTranslate2 providers (faster_whisper):
     - CUDA + Pascal (sm_6x): "float32" (see Pascal note below)
     - CUDA + Blackwell (sm_120+): "auto" — CTranslate2 picks, which is int8_float16
       there; the float16 this used to force is what garbles output on those cards
