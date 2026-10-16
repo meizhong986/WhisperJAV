@@ -99,7 +99,7 @@ pipeline:
 
   # --- Speech Enhancement ---
   # Optional audio preprocessing before ASR.
-  # Available: none (default), clearvoice, bs-roformer
+  # Available: none (default), zipenhancer, bs-roformer, ffmpeg-dsp, htdemucs
   speech_enhancer: none
   # speech_enhancer_model: null
 
