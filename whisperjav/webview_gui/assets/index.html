@@ -210,9 +210,6 @@
                                             <option value="balanced" selected>balanced&nbsp;&nbsp;&nbsp;&nbsp;(large-v2-int8&nbsp;&nbsp;&nbsp;&nbsp;6GB VRAM)</option>
                                             <option value="fast">fast&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(turbo-int8&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;4GB VRAM)</option>
                                             <option value="faster">faster&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(turbo-int8-batch8&nbsp;&nbsp;6GB VRAM)</option>
-                                            <!-- kotoba-faster-whisper temporarily hidden (implementation preserved)
-                                            <option value="kotoba-faster-whisper">kotoba&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(kotoba-v2-fp16&nbsp;&nbsp;&nbsp;6GB VRAM)</option>
-                                            -->
                                             <option value="transformers">transformers&nbsp;&nbsp;(HF kotoba-bilingual&nbsp;6GB VRAM)</option>
                                             <option value="crispasr">crispasr&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(external provider — set exe path)</option>
                                             <option value="anime" disabled>anime (future placeholder)</option>
@@ -513,12 +510,6 @@
                                                 <option value="zipenhancer">Torch (GPU)</option>
                                                 <option value="zipenhancer:onnx" disabled class="coming-soon">ONNX (Coming Soon)</option>
                                             </optgroup>
-                                            <optgroup label="ClearVoice">
-                                                <option value="clearvoice:MossFormer2_SE_48K" disabled title="Unstable on 8GB VRAM - causes memory fragmentation">MossFormer2 48kHz (Unstable)</option>
-                                                <option value="clearvoice:FRCRN_SE_16K">FRCRN 16kHz</option>
-                                                <option value="clearvoice:MossFormerGAN_SE_16K">MossFormerGAN 16kHz</option>
-                                                <option value="clearvoice:MossFormer2_SS_16K">MossFormer2 SS 16kHz</option>
-                                            </optgroup>
                                             <optgroup label="BS-RoFormer">
                                                 <option value="bs-roformer:vocals" disabled class="coming-soon">Vocals (Coming Soon)</option>
                                             </optgroup>
@@ -683,12 +674,6 @@
                                             <optgroup label="ZipEnhancer (Recommended)">
                                                 <option value="zipenhancer">Torch (GPU)</option>
                                                 <option value="zipenhancer:onnx" disabled class="coming-soon">ONNX (Coming Soon)</option>
-                                            </optgroup>
-                                            <optgroup label="ClearVoice">
-                                                <option value="clearvoice:MossFormer2_SE_48K" disabled title="Unstable on 8GB VRAM - causes memory fragmentation">MossFormer2 48kHz (Unstable)</option>
-                                                <option value="clearvoice:FRCRN_SE_16K">FRCRN 16kHz</option>
-                                                <option value="clearvoice:MossFormerGAN_SE_16K">MossFormerGAN 16kHz</option>
-                                                <option value="clearvoice:MossFormer2_SS_16K">MossFormer2 SS 16kHz</option>
                                             </optgroup>
                                             <optgroup label="BS-RoFormer">
                                                 <option value="bs-roformer:vocals" disabled class="coming-soon">Vocals (Coming Soon)</option>
