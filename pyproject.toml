@@ -125,24 +125,22 @@ torch = [
 ]
 
 # v1.10.0 (item 2f): the PyTorch build, exactly one per install. uv.lock holds all
-# three side by side, never mixed ([tool.uv] conflicts); each takes torch,
-# torchaudio and torchvision from its own index ([tool.uv.sources]).
+# three side by side, never mixed ([tool.uv] conflicts); each takes torch and
+# torchaudio from its own index ([tool.uv.sources]).
 # Windows: cu130 (default) or cu128 (the per-PC fallback). Linux: cu128 (owner,
 # W45). CPU: old-card choice 2, no NVIDIA GPU, and macOS.
+# v1.10.0 (item 3, owner W78 C2): torchvision left with ClearVoice, its only user.
 cu130 = [
     "torch==2.11.0",
     "torchaudio==2.11.0",
-    "torchvision==0.26.0",
 ]
 cu128 = [
     "torch==2.11.0",
     "torchaudio==2.11.0",
-    "torchvision==0.26.0",
 ]
 cpu = [
     "torch==2.11.0",
     "torchaudio==2.11.0",
-    "torchvision==0.26.0",
 ]
 
 # CLI audio processing features
@@ -154,6 +152,9 @@ cli = [
     # Audio I/O
     "soundfile",
     "pydub",
+    # v1.10.0 (item 3): pydub imports audioop, which Python 3.13 no longer has. It came in
+    # through gradio (qwen-asr 0.0.6's demo programs) until the fork dropped them.
+    "audioop-lts",
 
     # Scientific computing
     # numpy, v1.10.0 (owner, W44: plan ahead for MOSS and the other roadmap items).
@@ -211,13 +212,16 @@ translate = [
 #   sudo dnf install libsndfile       (Fedora/RHEL)
 #
 # VERSION NOTES:
-# - datasets: ModelScope requires >=3.0.0,<=3.6.0 (as of modelscope master 2026-03)
-# - modelscope: >=1.20 required, 1.22.0+ recommended.
+# - datasets: v1.10.0 (item 3). ModelScope's pipeline module imports it (ZipEnhancer
+#   needs it); ModelScope 1.40 declares datasets >=4.0.0,<=4.8.4 in its extras, which
+#   WhisperJAV does not install, so the same range is stated here. datasets 4.8.4
+#   caps huggingface-hub below 2.0.
+# - modelscope: >=1.40 (the first release that accepts datasets 4.x).
 # - setuptools: Required by modelscope at runtime (uses pkg_resources in utils/plugins.py)
 # - einops: Required by modelscope framework for tensor operations
 enhance = [
     # ModelScope (ZipEnhancer) - core framework
-    "modelscope>=1.20",
+    "modelscope>=1.40",
     # setuptools: modelscope uses pkg_resources at runtime (not just build-time)
     # setuptools 82.0.0 removed pkg_resources — pin to <82 until modelscope migrates
     "setuptools>=61.0,<82",
@@ -227,27 +231,21 @@ enhance = [
     "oss2",
     "addict",
     "attrs",  # Required by modelscope framework
-    "datasets>=3.0.0,<=3.6.0",  # Must match modelscope's constraint (was >=2.14.0)
+    "datasets>=4.0.0,<=4.8.4",  # ModelScope's tested range (see VERSION NOTES)
     "simplejson",
     "sortedcontainers",
     "packaging",
     "Pillow",  # Required by modelscope framework
 
-    # ClearVoice (fork with relaxed librosa)
-    "clearvoice @ git+https://github.com/meizhong986/ClearerVoice-Studio.git#subdirectory=clearvoice",
-
-    # ClearVoice transitive deps (explicit for --no-deps safety in installer)
-    "gdown",
+    # v1.10.0 (item 3, owner W73): ClearVoice is no longer included, and with it
+    # gdown, opencv-python, python-speech-features, scenedetect, torchinfo and
+    # yamlargparse. joblib (scikit-learn) and rotary-embedding-torch (BS-RoFormer)
+    # are still needed by others.
     "joblib",
-    "opencv-python>=4.10.0",
-    "python-speech-features>=0.6",
-    "rotary-embedding-torch>=0.8",
-    "scenedetect>=0.6",
-    "torchinfo",
-    "yamlargparse",
 
     # BS-RoFormer vocal isolation
     "bs-roformer-infer",
+    "rotary-embedding-torch>=0.8",
 
     # htdemucs vocal isolation (Demucs v4). Owner's decision, 2026-09-17 (second
     # decision, replacing the first): an ordinary dependency like any other, not
@@ -267,9 +265,14 @@ enhance = [
 # HuggingFace ecosystem (for kotoba-whisper, model downloads)
 # Install with: pip install whisperjav[huggingface]
 huggingface = [
-    "huggingface-hub>=0.25.0",
-    "transformers>=4.40.0,<5.0",  # v1.8.14: upper bound — Qwen3-ASR fork breaks on transformers 5.x (`@check_model_inputs()` API change). Removal deferred to v1.9.x (needs Qwen3-ASR fork patch + Cohere ship; also gates the jaykwok -hf CTC-aligner models, which need transformers>=5.13).
-    "accelerate>=0.26.0",
+    # v1.10.0 (item 3): huggingface-hub 2.x waits on datasets (see [enhance]).
+    "huggingface-hub>=1.0,<2",
+    # v1.10.0 (item 3, owner W76, W78): 5.20 is the first release with every model
+    # class the 1.10.x roadmap names (qwen3_asr 5.13, cohere_asr 5.4, vibevoice_asr
+    # 5.3, Parakeet TDT 5.10, canary 5.17, MOSS-Transcribe-Diarize 5.20). Qwen3-ASR
+    # itself runs through the qwen-asr fork ([qwen]). The lock fixes the exact version.
+    "transformers>=5.20,<6",
+    "accelerate>=1.15",
     "hf_xet",  # Faster HuggingFace downloads
 ]
 
@@ -294,7 +297,11 @@ whisperseg-gpu = [
 # Install with: pip install whisperjav[qwen]
 # Note: Requires huggingface extra for transformers backend
 qwen = [
-    "qwen-asr>=0.0.6",
+    # v1.10.0 (item 3, owner W75, W76): the qwen-asr code from the WhisperJAV fork,
+    # which runs on transformers 5 (upstream PR #125, a fix for upstream issue #218,
+    # lower-bound pins, no demo programs). Same package name, so it replaces a PyPI
+    # copy cleanly.
+    "qwen-asr @ git+https://github.com/meizhong986/Qwen3-ASR.git@10cfb322e42c74cd75a6be622054c9becfeb3082",
     "whisperjav[huggingface]",  # Transformers/torch dependency
 ]
 
@@ -530,7 +537,7 @@ conflicts = [
 [[tool.uv.index]]
 name = "pytorch-cu130"
 url = "https://download.pytorch.org/whl/cu130"
-explicit = true  # Only torch/torchaudio/torchvision use these indexes, not numpy/scipy/etc.
+explicit = true  # Only torch and torchaudio use these indexes, not numpy/scipy/etc.
 
 [[tool.uv.index]]
 name = "pytorch-cu128"
@@ -543,7 +550,7 @@ url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
 [tool.uv.sources]
-# Each extra takes the three packages from its own index on every platform: uv
+# Each extra takes the two packages from its own index on every platform: uv
 # 0.9.26 did not narrow an extra's source by platform marker (with markers, the
 # exports still carried +cu130 for Linux and macOS). Which extra a platform uses
 # is the installers' choice: Windows cu130, or cu128 as the fallback; Linux
@@ -555,11 +562,6 @@ torch = [
     { index = "pytorch-cpu", extra = "cpu" },
 ]
 torchaudio = [
-    { index = "pytorch-cu130", extra = "cu130" },
-    { index = "pytorch-cu128", extra = "cu128" },
-    { index = "pytorch-cpu", extra = "cpu" },
-]
-torchvision = [
     { index = "pytorch-cu130", extra = "cu130" },
     { index = "pytorch-cu128", extra = "cu128" },
     { index = "pytorch-cpu", extra = "cpu" },
