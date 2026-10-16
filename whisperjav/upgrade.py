@@ -10,7 +10,7 @@ Usage:
     whisperjav-upgrade --check            # Check for updates only
     whisperjav-upgrade --yes              # Non-interactive mode
     whisperjav-upgrade --wheel-only       # Hot-patch mode (package only)
-    whisperjav-upgrade --extras cli,gui   # Upgrade specific extras only
+    whisperjav-upgrade --extras cli,gui   # Upgrade specific extras (source installs only)
     whisperjav-upgrade --list-snapshots   # List available rollback snapshots
     whisperjav-upgrade --rollback         # Rollback to previous version
     whisperjav-upgrade --version          # Show script version
@@ -19,10 +19,10 @@ Features:
     - Upgrades whisperjav to the newest release of its own series (1.10.x for 1.10),
       never to GitHub's main branch (v1.10.0, item 2e)
     - Keeps the PC's PyTorch build (CUDA 13.0, the CUDA 12.8 fallback, or CPU)
-    - Supports modular extras (cli, gui, translate, enhance, etc.)
+    - Installs the release's pinned package set (installer installs) or
+      `uv sync --frozen` (source installs; extras selectable there only)
     - Automatic snapshot creation for safe rollback
-    - Pre-upgrade compatibility checking
-    - Fixes numpy/librosa versions (clearvoice metadata workaround)
+    - Checks before any change that the release's pinned packages are available
     - Updates desktop shortcuts with correct version
     - Full cleanup of old version-specific files
     - Preserves user data (model cache, configs)
@@ -116,6 +116,22 @@ VARIANT_LABELS = {"cu130": "CUDA 13.0", "cu128": "CUDA 12.8", "cpu": "CPU"}
 # uv.lock extra per build; macOS ("metal") uses cpu, whose index has the Apple wheels.
 LOCKED_EXTRAS = {"cu130": "cu130", "cu128": "cu128", "cpu": "cpu", "metal": "cpu"}
 TORCH_PACKAGE_NAMES = ("torch", "torchaudio", "torchvision")
+ISSUES_URL = "https://github.com/meizhong986/WhisperJAV/issues"
+
+# The owner's texts (item 2f, W58).
+STACK_NOT_RECORDED_TEXT = (
+    "This installation does not record its PyTorch build (whisperjav_stack.txt), so the upgrade "
+    "cannot choose its pinned packages. Nothing was changed. Run the WhisperJAV {series} installer "
+    "again to repair it.")
+EXTRAS_INSTALLER_TEXT = (
+    "--extras applies to source installs only. This installation came from the Windows installer, "
+    "so an upgrade installs the release's full pinned package set. Run again without --extras.")
+
+
+def _series_label() -> str:
+    """'1.10' for WhisperJAV 1.10.x."""
+    from whisperjav.__version__ import __version__
+    return ".".join(__version__.split(".")[:2])
 
 
 # =============================================================================
@@ -243,87 +259,248 @@ def _requirement_name(line: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
-def _conda_python_packages(install_dir: Path) -> Dict[str, str]:
-    """Python packages conda put into this installation: normalized name -> version.
+def _pinned_version(line: str) -> Optional[str]:
+    """'packaging==26.3' -> '26.3'; None for a line without ==, such as a git package."""
+    m = re.match(r"^[^=<>!~;@\s]+\s*==\s*([^\s;]+)", line.strip())
+    return m.group(1) if m else None
 
-    Owner W52: conda never owns a package pip/uv installs, so these lines are left out.
+
+def _metadata_name_version(meta_file: Path) -> Tuple[Optional[str], Optional[str]]:
+    """Name and Version from a METADATA or PKG-INFO file (its header block)."""
+    name = version = None
+    try:
+        with open(meta_file, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if not line.strip():
+                    break
+                if line.startswith("Name:"):
+                    name = line[5:].strip()
+                elif line.startswith("Version:"):
+                    version = line[8:].strip()
+    except OSError:
+        pass
+    return name, version
+
+
+def _conda_python_packages(install_dir: Path) -> Tuple[Dict[str, Tuple[str, str]], List[str]]:
+    """Python packages conda put into this installation, as pip names them.
+
+    Owner W57 (D1), as in the installer: read from the *.dist-info / *.egg-info folder
+    each conda-meta record lists, not from conda's package name. Returns
+    ({normalized name: (name, version)}, conda packages with Python files but no such folder).
     """
-    owned: Dict[str, str] = {}
-    for record in (install_dir / "conda-meta").glob("*.json"):
+    found: Dict[str, Tuple[str, str]] = {}
+    unidentified: List[str] = []
+    for record in sorted((install_dir / "conda-meta").glob("*.json")):
         try:
             data = json.loads(record.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        files = data.get("files") or []
-        if any(str(f).replace("\\", "/").lower().startswith("lib/site-packages/") for f in files):
-            owned[re.sub(r"[-_.]+", "-", str(data.get("name", ""))).lower()] = str(data.get("version", ""))
-    return owned
+        conda_name = str(data.get("name", ""))
+        if conda_name == "python":
+            continue  # the interpreter; its one site-packages file is a README
+        site = [str(f).replace("\\", "/") for f in (data.get("files") or [])
+                if str(f).replace("\\", "/").lower().startswith("lib/site-packages/")]
+        if not site:
+            continue
+        folders = sorted({"/".join(f.split("/")[:3]) for f in site
+                          if f.split("/")[2].lower().endswith((".dist-info", ".egg-info"))})
+        if not folders:
+            unidentified.append(conda_name)
+            continue
+        for folder in folders:
+            path = install_dir / folder
+            if path.is_dir():
+                path = path / ("METADATA" if folder.lower().endswith(".dist-info") else "PKG-INFO")
+            name, version = _metadata_name_version(path)
+            if not name or not version:
+                parts = folder.split("/")[-1].rsplit(".", 1)[0].split("-")
+                name = name or parts[0]
+                version = version or (parts[1] if len(parts) > 1 else "")
+            found[re.sub(r"[-_.]+", "-", name).lower()] = (name, version)
+    return found, unidentified
 
 
-def _installed_locked_file(python_exe: Path, stack: str) -> Optional[Path]:
-    """The locked file of `stack` inside the whisperjav package this Python now has."""
+def check_conda_packages(install_dir: Path, lines: List[str]) -> bool:
+    """D1 (owner W57): conda's copy of a pinned package stays only at the pinned version.
+
+    Every package conda installed that the new release pins is compared and printed, so
+    a check that compared nothing shows as "Checked 0 packages".
+    """
+    conda_packages, unidentified = _conda_python_packages(install_dir)
+    for conda_name in unidentified:
+        print_warning(f"conda's {conda_name} put Python files here without package metadata, "
+                      f"so it could not be compared.")
+    compared, ok = 0, True
+    for line in lines:
+        key = _requirement_name(line)
+        if key not in conda_packages:
+            continue
+        compared += 1
+        name, conda_version = conda_packages[key]
+        pinned = _pinned_version(line)
+        if pinned is not None and pinned == conda_version:
+            print(f"      Keeping conda's {name} {conda_version}: the same version this release is pinned to.")
+            continue
+        ok = False
+        pinned_text = f"{name} {pinned}" if pinned else line.split(";")[0].strip()
+        print_error(f"Stopped: conda installed {name} {conda_version}, but this release is pinned to "
+                    f"{pinned_text}. Nothing was changed. Please report this so it can be fixed: {ISSUES_URL}")
+    if ok:
+        print(f"      Checked {compared} package{'' if compared == 1 else 's'} that conda installed against the "
+              f"pinned list: all match.")
+    return ok
+
+
+def fetch_release_locked_file(source: str, stack: str) -> Optional[str]:
+    """The new release's locked file for `stack`, read before anything changes (D5).
+
+    `source` is what pip installs: git+https://github.com/<owner>/<repo>.git@<tag>, a
+    git+file:// repository @<ref>, a local wheel, or a local source folder.
+    """
+    rel = f"whisperjav/installer/locked/requirements_{stack}.txt"
     try:
-        r = subprocess.run(
-            [str(python_exe), "-c",
-             "import importlib.util; "
-             "print(list(importlib.util.find_spec('whisperjav').submodule_search_locations)[0])"],
-            capture_output=True, text=True, timeout=60)
+        m = re.match(r"^git\+https://github\.com/([^/]+)/([^/@]+?)(?:\.git)?(?:@(.+))?$", source)
+        if m:
+            import urllib.request
+            url = f"https://raw.githubusercontent.com/{m.group(1)}/{m.group(2)}/{m.group(3) or 'HEAD'}/{rel}"
+            request = urllib.request.Request(url, headers={'User-Agent': 'WhisperJAV-upgrade'})
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return response.read().decode("utf-8")
+        m = re.match(r"^git\+file://(.+?)(?:@([^@/]+))?$", source)
+        if m:
+            repo = m.group(1)
+            if re.match(r"^/[A-Za-z]:", repo):
+                repo = repo[1:]  # git+file:///c:/repos/x
+            r = subprocess.run(["git", "-C", repo, "show", f"{m.group(2) or 'HEAD'}:{rel}"],
+                               capture_output=True, text=True, encoding="utf-8", timeout=60)
+            return r.stdout if r.returncode == 0 else None
+        path = Path(source)
+        if path.suffix == ".whl" and path.is_file():
+            import zipfile
+            with zipfile.ZipFile(path) as wheel:
+                return wheel.read(rel).decode("utf-8")
+        if (path / rel).is_file():
+            return (path / rel).read_text(encoding="utf-8")
     except Exception:
         return None
-    if r.returncode != 0 or not r.stdout.strip():
-        return None
-    path = Path(r.stdout.strip().splitlines()[-1]) / "installer" / "locked" / f"requirements_{stack}.txt"
-    return path if path.is_file() else None
+    return None
 
 
-def install_locked_requirements(install_dir: Path, stack: str) -> bool:
-    """Install the release-pinned dependencies of the whisperjav package just installed.
-
-    Everything but PyTorch from PyPI, then PyTorch's three packages from the build's
-    index; both --no-deps, as the file is complete. Lines for packages conda owns here
-    are left out (owner W52).
-    """
-    python_exe, pip_exe = _find_python(install_dir), _find_pip(install_dir)
-    if python_exe is None or pip_exe is None:
-        print_error("pip not found in installation")
-        return False
-    locked = _installed_locked_file(python_exe, stack)
-    if locked is None:
-        print_error(f"The new release has no locked requirements file for {stack}")
-        return False
-    lines = [l.strip() for l in locked.read_text(encoding="utf-8").splitlines()
-             if l.strip() and not l.lstrip().startswith("#")]
-    conda_owned = _conda_python_packages(install_dir)
+def _split_pins(install_dir: Path, lines: List[str]) -> Tuple[List[str], List[str]]:
+    """(lines pip installs from PyPI, PyTorch's three lines); conda's packages left out."""
+    conda_packages, _ = _conda_python_packages(install_dir)
     torch_lines = [l for l in lines if _requirement_name(l) in TORCH_PACKAGE_NAMES]
     rest = [l for l in lines
-            if _requirement_name(l) not in TORCH_PACKAGE_NAMES and _requirement_name(l) not in conda_owned]
+            if _requirement_name(l) not in TORCH_PACKAGE_NAMES and _requirement_name(l) not in conda_packages]
+    return rest, torch_lines
+
+
+def _pin_commands(pip_exe: Path, stack: str, rest_file: str, torch_lines: List[str],
+                  dry_run: bool) -> List[Tuple[List[str], str]]:
+    """The two pip commands of a pinned install; the pre-check runs the same ones with --dry-run."""
+    extra = ["--dry-run"] if dry_run else []
+    return [
+        ([str(pip_exe), "install", *extra, "--no-deps", "-r", rest_file], "dependencies"),
+        ([str(pip_exe), "install", *extra, "--no-deps", *torch_lines,
+          "--index-url", PYTORCH_INDEXES[stack]], "PyTorch"),
+    ]
+
+
+def _unavailable_package(stderr: str) -> Tuple[Optional[str], str]:
+    """(package pip could not find, pip's error line) from a failed pip run."""
+    errors = [l.strip() for l in (stderr or "").splitlines() if l.strip().startswith("ERROR:")]
+    for line in errors:
+        m = re.search(r"No matching distribution found for (\S+)", line)
+        if m:
+            return _requirement_name(m.group(1)), line
+    return None, (errors[0] if errors else (stderr or "").strip()[:300])
+
+
+def prepare_release_pins(install_dir: Path, stack: str, check_availability: bool = True) -> Optional[List[str]]:
+    """Before anything changes (D5, owner W57 INPUT3): read the new release's locked file
+    for this PC's build, compare conda's packages with it (D1), and -- unless skipped --
+    run the pinned install as a pip dry run. None = stop; the reason has been printed.
+    """
+    text = fetch_release_locked_file(GITHUB_REPO, stack)
+    if text is None:
+        print_error(f"Upgrade stopped before any change: the new release's pinned package list for "
+                    f"{VARIANT_LABELS[stack]} could not be read ({GITHUB_REPO}).")
+        return None
+    lines = [l.strip() for l in text.splitlines() if l.strip() and not l.lstrip().startswith("#")]
+    if not check_conda_packages(install_dir, lines):
+        return None
+    if not check_availability:
+        return lines
+    pip_exe = _find_pip(install_dir)
+    if pip_exe is None:
+        print_error("pip not found in installation")
+        return None
+    print(f"      Checking that this release's pinned packages are available for this PC "
+          f"({VARIANT_LABELS[stack]})...")
+    import tempfile
+    rest, torch_lines = _split_pins(install_dir, lines)
+    fd, rest_file = tempfile.mkstemp(prefix="whisperjav_pins_", suffix=".txt")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write("\n".join(rest) + "\n")
+        for cmd, _ in _pin_commands(pip_exe, stack, rest_file, torch_lines, dry_run=True):
+            # Bounded for real (#436): see _run_bounded. Git packages are cloned here.
+            result = _run_bounded(cmd, timeout=1800)
+            if result.returncode != 0:
+                package, pip_line = _unavailable_package(result.stderr)
+                if package:
+                    print_error(f"Upgrade stopped before any change: {package} is not available for this PC "
+                                f"({pip_line}).")
+                else:
+                    print_error(f"Upgrade stopped before any change: {pip_line}")
+                return None
+    except subprocess.TimeoutExpired:
+        print_error("Upgrade stopped before any change: the check timed out.")
+        return None
+    finally:
+        try:
+            os.unlink(rest_file)
+        except OSError:
+            pass
+    print_success(f"All {len(lines)} pinned packages are available.")
+    return lines
+
+
+def install_locked_requirements(install_dir: Path, stack: str, lines: List[str]) -> bool:
+    """Install the new release's pinned packages (the lines prepare_release_pins read).
+
+    Everything but PyTorch from PyPI, then PyTorch's three packages from the build's
+    index; both --no-deps, as the file is complete. conda's packages, checked to be at
+    the pinned version, are left out (owner W52, W57).
+    """
+    pip_exe = _find_pip(install_dir)
+    if pip_exe is None:
+        print_error("pip not found in installation")
+        return False
+    rest, torch_lines = _split_pins(install_dir, lines)
 
     print(f"      Upgrading with release-pinned dependencies ({VARIANT_LABELS[stack]})...")
     rest_file = install_dir / f"requirements_upgrade_{stack}.txt"
     try:
         rest_file.write_text("\n".join(rest) + "\n", encoding="utf-8")
-        steps = [
-            ([str(pip_exe), "install", "--no-deps", "-r", str(rest_file)], "dependencies"),
-            ([str(pip_exe), "install", "--no-deps", *torch_lines,
-              "--index-url", PYTORCH_INDEXES[stack]], "PyTorch"),
-        ]
-        for cmd, what in steps:
+        for cmd, _ in _pin_commands(pip_exe, stack, str(rest_file), torch_lines, dry_run=False):
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
             if result.returncode != 0:
-                print_error(f"Installing the release-pinned {what} failed: {(result.stderr or '')[:500]}")
+                print_error(f"Installing the release's pinned packages failed: {(result.stderr or '')[:500]}")
                 return False
     except subprocess.TimeoutExpired:
         print_error("Package upgrade timed out")
         return False
     except Exception as e:
-        print_error(f"Package upgrade error: {e}")
+        print_error(f"Installing the release's pinned packages failed: {e}")
         return False
     finally:
         try:
             rest_file.unlink()
         except OSError:
             pass
-    print_success(f"Release-pinned dependencies installed ({len(rest) + len(torch_lines)} packages)")
+    print_success(f"Installed the release's pinned packages ({len(lines)}).")
     return True
 
 
@@ -405,6 +582,51 @@ def _detect_cuda_for_source() -> str:
     return "cpu"
 
 
+def _wheel_fits_this_pc(platform_tag: str) -> bool:
+    """Does a wheel's platform tag (win_amd64, manylinux_2_28_x86_64, ...) fit this PC?"""
+    machine = platform.machine().lower()
+    arches = {"amd64": ("x86_64", "amd64"), "x86_64": ("x86_64", "amd64"),
+              "arm64": ("arm64", "aarch64"), "aarch64": ("arm64", "aarch64")}.get(machine, (machine,))
+    if sys.platform == "win32":
+        system = platform_tag.startswith("win")
+    elif sys.platform.startswith("linux"):
+        system = platform_tag.startswith(("manylinux", "musllinux", "linux"))
+    elif sys.platform == "darwin":
+        system = platform_tag.startswith("macosx")
+        if system and platform_tag.endswith("universal2"):
+            return True
+    else:
+        system = False
+    return system and platform_tag.endswith(tuple(f"_{a}" for a in arches))
+
+
+def lock_has_pytorch_for_this_pc(source_root: Path, cuda_version: str) -> bool:
+    """D3 (owner W57): does uv.lock hold a PyTorch wheel of this build for this PC?
+    The same check as install.py's."""
+    index = f'source = {{ registry = "{PYTORCH_INDEXES[LOCKED_EXTRAS.get(cuda_version, "cpu")]}" }}'
+    text = (source_root / "uv.lock").read_text(encoding="utf-8")
+    for block in text.split("[[package]]"):
+        if not block.lstrip().startswith('name = "torch"\n') or index not in block:
+            continue
+        for wheel in re.findall(r'url = "[^"]+/([^/"]+)\.whl"', block):
+            if _wheel_fits_this_pc(wheel.rsplit("-", 1)[-1]):
+                return True
+    return False
+
+
+def unsupported_source_build_message(source_root: Path, cuda_version: str) -> str:
+    """Why a source install's PyTorch build cannot be upgraded on this PC, or "" (D3)."""
+    from whisperjav.__version__ import __version__
+    if sys.platform.startswith("linux") and cuda_version == "cu130":
+        return (f"This installation uses CUDA 13.0, which WhisperJAV {__version__} does not offer on Linux. "
+                f"Nothing was changed. Run install.py again with --cuda cu128 (the Linux default) or --cpu-only.")
+    if not lock_has_pytorch_for_this_pc(source_root, cuda_version):
+        label = VARIANT_LABELS.get(LOCKED_EXTRAS.get(cuda_version, "cpu"), "CPU")
+        return (f"PyTorch has no {label} build for this computer ({sys.platform}, {platform.machine()}) "
+                f"in WhisperJAV {__version__}, so it cannot be upgraded here. Nothing was changed.")
+    return ""
+
+
 def _detect_target_env_for_upgrade() -> tuple:
     """Detect active environment for upgrade targeting.
 
@@ -437,6 +659,13 @@ def _run_uv_sync_upgrade(source_root: Path, extras: str = "all") -> bool:
         True if successful.
     """
     import shutil
+
+    # D3 (owner W57): a build 1.10 does not offer on this PC stops before anything changes.
+    cuda_version = _detect_cuda_for_source()
+    unsupported = unsupported_source_build_message(source_root, cuda_version)
+    if unsupported:
+        print_error(unsupported)
+        return False
 
     # Step 1: git pull
     print("      Pulling latest code from GitHub...")
@@ -473,8 +702,6 @@ def _run_uv_sync_upgrade(source_root: Path, extras: str = "all") -> bool:
     if not uv_exe:
         print_error("uv not found — install from https://docs.astral.sh/uv/")
         return False
-
-    cuda_version = _detect_cuda_for_source()
 
     # Build environment with UV_PROJECT_ENVIRONMENT if targeting an active env
     env = dict(os.environ)
@@ -853,71 +1080,6 @@ def _run_bounded(cmd: List[str], timeout: float) -> subprocess.CompletedProcess:
         return subprocess.CompletedProcess(cmd, returncode, decode(out.read()), decode(err.read()))
 
 
-def check_upgrade_compatibility(install_dir: Path, extras: str = "all") -> Tuple[bool, List[str]]:
-    """
-    Check if upgrade would cause dependency conflicts.
-
-    Args:
-        install_dir: Path to installation directory.
-        extras: Extras to check (comma-separated or "all").
-
-    Returns:
-        Tuple of (is_compatible, list of warnings).
-    """
-    warnings = []
-
-    # Get pip executable
-    pip_exe = _find_pip(install_dir)
-    if pip_exe is None:
-        return False, ["pip not found in installation"]
-
-    # Build the install specifier
-    if extras == "all":
-        install_spec = "whisperjav[all]"
-    else:
-        extras_list = [e.strip() for e in extras.split(",") if e.strip()]
-        install_spec = f"whisperjav[{','.join(extras_list)}]"
-
-    # Use pip's dry-run to check for conflicts (PEP 508 syntax, not #egg=)
-    print("      Checking dependency compatibility...")
-    try:
-        # Bounded for real (#436): see _run_bounded.
-        result = _run_bounded(
-            [
-                str(pip_exe), 'install', '--dry-run', '--ignore-installed',
-                f"{install_spec} @ {GITHUB_REPO}"  # set by main() to the resolved source
-            ],
-            timeout=300,
-        )
-
-        if result.returncode != 0:
-            # Check for specific error patterns
-            stderr = result.stderr
-            if "ResolutionImpossible" in stderr or "conflict" in stderr.lower():
-                warnings.append("Dependency conflicts detected")
-                # Extract relevant error lines
-                for line in stderr.split('\n'):
-                    if 'conflict' in line.lower() or 'requires' in line.lower():
-                        warnings.append(f"  {line.strip()}")
-                return False, warnings
-            else:
-                warnings.append(f"pip check failed: {stderr[:300]}")
-
-        # Check for known problematic packages in the output
-        output = result.stdout + result.stderr
-        if "numpy" in output.lower() and "2.0" in output:
-            warnings.append("NumPy 2.0 may cause compatibility issues with some dependencies")
-
-    except subprocess.TimeoutExpired:
-        warnings.append("Compatibility check timed out")
-    except Exception as e:
-        warnings.append(f"Compatibility check error: {e}")
-
-    # Return compatible if no blocking issues found
-    has_blocking = any("conflict" in w.lower() for w in warnings)
-    return not has_blocking, warnings
-
-
 def validate_extras(extras: str) -> Tuple[bool, List[str]]:
     """
     Validate that extras are recognized.
@@ -1273,16 +1435,18 @@ def upgrade_package_wheel_only(install_dir: Path) -> bool:
     return True
 
 
-def upgrade_package_with_extras(install_dir: Path, extras: str) -> bool:
+def upgrade_package_with_extras(install_dir: Path, extras: str,
+                                locked_lines: Optional[List[str]] = None) -> bool:
     """
     Upgrade the whisperjav package with specific extras.
 
     For source installs (has uv.lock), uses ``git pull && uv sync``.
-    For conda-constructor installs, uses pip with GPU constraints.
+    For conda-constructor installs, the release's wheel, then its pinned packages.
 
     Args:
         install_dir: Path to installation directory.
-        extras: Comma-separated extras or "all".
+        extras: Comma-separated extras or "all" (source installs only).
+        locked_lines: the pinned lines prepare_release_pins read; read here if None.
 
     Returns:
         True if successful, False otherwise.
@@ -1295,19 +1459,19 @@ def upgrade_package_with_extras(install_dir: Path, extras: str) -> bool:
 
     # Conda-constructor / pip install path (item 2f): the new release's package without
     # dependencies, then its locked file for the build this PC has. The installer
-    # installed every extra, and the locked file is the whole set, so --extras does
-    # not narrow it here.
+    # installed every extra, and the locked file is the whole set (owner W57 INPUT2;
+    # main() stops --extras other than all before this).
     stack = read_installed_stack(install_dir)
     if stack not in VARIANT_LABELS:
-        print_error("This installation's PyTorch build is not recorded (whisperjav_stack.txt)")
+        print_error(STACK_NOT_RECORDED_TEXT.format(series=_series_label()))
         return False
+    if locked_lines is None:
+        locked_lines = prepare_release_pins(install_dir, stack, check_availability=False)
+        if locked_lines is None:
+            return False
     if not upgrade_package_wheel_only(install_dir):
         return False
-    if not install_locked_requirements(install_dir, stack):
-        return False
-
-    print_success(f"Package upgraded successfully with [{extras}] extras")
-    return True
+    return install_locked_requirements(install_dir, stack, locked_lines)
 
 
 def parse_args():
@@ -1320,13 +1484,13 @@ Examples:
   whisperjav-upgrade                    # Interactive upgrade (all extras)
   whisperjav-upgrade --check            # Check for updates only
   whisperjav-upgrade --yes              # Non-interactive upgrade
-  whisperjav-upgrade --extras cli,gui   # Upgrade specific extras only
+  whisperjav-upgrade --extras cli,gui   # Upgrade specific extras (source installs only)
   whisperjav-upgrade --wheel-only       # Hot-patch mode (package only)
   whisperjav-upgrade --list-snapshots   # List available rollback snapshots
   whisperjav-upgrade --rollback         # Rollback to previous version
 
-Available extras:
-  cli         - Audio processing, VAD, scene detection
+Available extras (source installs only):
+  cli        - Audio processing, VAD, scene detection
   gui         - PyWebView GUI interface
   translate   - AI-powered subtitle translation
   enhance     - Speech enhancement (denoising, vocal isolation)
@@ -1360,7 +1524,8 @@ Available extras:
         type=str,
         default='all',
         metavar='EXTRAS',
-        help='Extras to upgrade (comma-separated). Default: all'
+        help="Extras to upgrade (source installs only; installer installs always get the release's "
+             "full pinned set)."
     )
 
     parser.add_argument(
@@ -1528,6 +1693,13 @@ def main() -> int:
         print(f"Valid extras: {', '.join(VALID_EXTRAS)}")
         return 1
 
+    # D4 (owner W57 INPUT2): an installer install upgrades to the release's full pinned
+    # set; --extras cannot narrow it, so it is refused rather than ignored.
+    is_source_install = _find_source_root() is not None
+    if not is_source_install and not args.wheel_only and args.extras.strip().lower() != "all":
+        print_error(EXTRAS_INSTALLER_TEXT)
+        return 1
+
     # Interactive confirmation (unless --yes)
     if not args.yes:
         extras_msg = f"[{args.extras}]" if args.extras != "all" else "[all]"
@@ -1554,7 +1726,7 @@ def main() -> int:
     # Where the new version comes from: the newest release of this series (item 2e).
     # Source installs (a git clone) pull their own branch instead.
     global GITHUB_REPO
-    if not _find_source_root():
+    if not is_source_install:
         source, why = resolve_upgrade_source(current_version)
         if source is None:
             print_error(f"Cannot upgrade: {why}.")
@@ -1569,21 +1741,21 @@ def main() -> int:
         GITHUB_REPO = source
         print(f"Upgrade source: {why}")
 
-    # Pre-upgrade compatibility check
-    if not args.skip_compat_check and not args.wheel_only:
-        print("\nChecking compatibility...")
-        is_compat, warnings = check_upgrade_compatibility(install_dir, args.extras)
-
-        if warnings:
-            for warning in warnings:
-                print_warning(warning)
-
-        if not is_compat:
-            print_error("Compatibility check failed.")
-            print("Use --skip-compat-check to bypass this check.")
+    # Pre-upgrade check (D5, owner W57 INPUT3), installer installs only: the new
+    # release's pinned list for this PC's build, conda's packages compared with it, and
+    # the pinned install run as a dry run -- the same commands the upgrade then runs.
+    # Source installs need none: `uv sync --frozen` checks the lock itself.
+    locked_lines = None
+    if not is_source_install and not args.wheel_only:
+        stack = read_installed_stack(install_dir)
+        if stack not in VARIANT_LABELS:
+            print_error(STACK_NOT_RECORDED_TEXT.format(series=_series_label()))
             return 1
-        else:
-            print_success("Compatibility check passed")
+        print("\nChecking compatibility...")
+        locked_lines = prepare_release_pins(install_dir, stack,
+                                            check_availability=not args.skip_compat_check)
+        if locked_lines is None:
+            return 1
 
     # Create snapshot before upgrade (unless --no-snapshot or --wheel-only)
     snapshot_path = None
@@ -1632,7 +1804,7 @@ def main() -> int:
 
     # Step 1: Upgrade package with extras
     print_step(1, total_steps, f"Upgrading WhisperJAV[{args.extras}]...")
-    upgrade_success = upgrade_package_with_extras(install_dir, args.extras)
+    upgrade_success = upgrade_package_with_extras(install_dir, args.extras, locked_lines)
 
     if not upgrade_success:
         print_error("Upgrade failed.")
@@ -1646,10 +1818,11 @@ def main() -> int:
 
     # Step 2: the versions are the release's locked ones (step 1, item 2f); the old
     # numpy/librosa "newest" step is gone. cuBLAS 12 is placed again on CUDA 13.0.
-    print_step(2, total_steps, "Fixing package versions...")
-    if _find_source_root():
-        print_success("Source install — uv.lock handles version pinning")
-    place_cublas12_after_upgrade(install_dir)
+    print_step(2, total_steps, "Placing the CUDA 12 library for faster-whisper...")
+    if IS_WINDOWS and read_installed_stack(install_dir) == "cu130":
+        place_cublas12_after_upgrade(install_dir)
+    else:
+        print_success("Nothing to do for this PyTorch build.")
 
     # Step 3: Update launcher
     print_step(3, total_steps, "Updating launcher executable...")
