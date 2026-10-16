@@ -172,7 +172,7 @@ class TestUpgradeModule:
             list_snapshots,
             rollback_to_snapshot,
             validate_extras,
-            check_upgrade_compatibility,
+            prepare_release_pins,
             upgrade_package_with_extras,
         )
 
@@ -181,7 +181,7 @@ class TestUpgradeModule:
         assert callable(list_snapshots)
         assert callable(rollback_to_snapshot)
         assert callable(validate_extras)
-        assert callable(check_upgrade_compatibility)
+        assert callable(prepare_release_pins)
         assert callable(upgrade_package_with_extras)
 
     def test_validate_extras_valid(self):
