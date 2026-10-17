@@ -1925,13 +1925,14 @@ Section "Install"
     # chose to (graphics card older than 1.10 supports) or because the NVIDIA driver is
     # too old. post_install wrote INSTALLATION_STOPPED and ended with exit code 0, so no
     # retry dialog came up. One closing dialog points back to the message the user has
-    # just read; the install ends without a shortcut. Dialog text: DRAFT for the owner.
+    # just read; the install ends without a shortcut. Dialog text: pre-approved by the owner (W93 c2).
     ${If} ${FileExists} "$INSTDIR\INSTALLATION_STOPPED_v{{VERSION}}.txt"
-        ${Print} "WhisperJAV was not installed: the installer stopped (see the message above)."
-        ${Print} "Details: $INSTDIR\INSTALLATION_STOPPED_v{{VERSION}}.txt"
+        ${Print} "WhisperJAV was not installed: the installer stopped."
+        ${Print} "The reason is saved in: $INSTDIR\INSTALLATION_STOPPED_v{{VERSION}}.txt"
         MessageBox MB_OK|MB_ICONINFORMATION "WhisperJAV was not installed.$\r$\n$\r$\n\
-The installer stopped for the reason shown in the window before this one.$\r$\n$\r$\n\
-Details: $INSTDIR\INSTALLATION_STOPPED_v{{VERSION}}.txt" /SD IDOK
+The installer stopped for the reason shown in its console window.$\r$\n\
+That reason is saved in this file:$\r$\n$\r$\n\
+$INSTDIR\INSTALLATION_STOPPED_v{{VERSION}}.txt" /SD IDOK
         Abort
     ${EndIf}
 
