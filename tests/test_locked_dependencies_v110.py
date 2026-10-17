@@ -94,7 +94,8 @@ def test_phase_4_leaves_out_pytorch_and_what_conda_owns(pi, tmp_path):
     names = {pi.requirement_name(l) for l in lines}
     assert not names & {"torch", "torchaudio", "torchvision", "packaging"}
     assert "tzdata" in names and "numpy" in names and "faster-whisper" in names
-    assert len(lines) == len(locked) - 4
+    # Item 3 (owner W78 C2): torchvision is no longer locked; torch, torchaudio, packaging left out.
+    assert len(lines) == len(locked) - 3
     # W58 texts 1 and 3
     assert "Keeping conda's packaging 26.3: the same version this release is pinned to." in pi._lines
     assert "Checked 1 package that conda installed against the pinned list: all match." in pi._lines
