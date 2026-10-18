@@ -127,16 +127,16 @@ MODELS = {m.name: m for m in (
               "Apache-2.0 per the GGUF repository; the fine-tune (efwkjn/cohere-asr-ja) declares none"),
 )}
 
-# The models each 1.10.0 pipeline offers its users (W118 4, plan 3.3), and its default. Cohere-CrispASR
-# has no default until the step 2b measurement picks one of its two candidates; until then a run must
-# name its model. These lists feed the command line (--passN-model), --help and --check.
+# The models each 1.10.0 pipeline offers its users (W118 4, plan 3.3), and its default. Cohere-CrispASR's
+# default is v0.1, on the step 2b scores (W129 1); cohere-asr-ja stays a choice (Q13). A default of None
+# would make a run name its model. These lists feed the command line (--passN-model), --help and --check.
 PIPELINE_MODELS = {
     "parakeet-crispasr": ("parakeet-tdt-0.6b-ja",),
     "cohere-crispasr": ("cohere-asr-ja-v0.1", "cohere-asr-ja"),
 }
 PIPELINE_DEFAULT_MODEL = {
     "parakeet-crispasr": "parakeet-tdt-0.6b-ja",
-    "cohere-crispasr": None,
+    "cohere-crispasr": "cohere-asr-ja-v0.1",
 }
 # Measured in step 2b but not offered: the plan offers the Parakeet CTC 1.1B "only if step 2b supports
 # it" (plan 3.3, Q13). Only the pipeline constructor reaches it -- the step 2b measurement script --
