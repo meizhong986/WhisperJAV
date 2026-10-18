@@ -14,12 +14,18 @@ One run, stage by stage (master plan 3.2):
   5. this pipeline's SLICE RULE turns the groups into cut points in film time;
   6. one program run over the whole film reads the cut points (--vad-import) and writes -ojf JSON;
   7. each segment is tied to its slice, and this pipeline's PARSER turns it into words;
-  8. scene by scene, this pipeline's LINE BUILDING makes the subtitle lines; the scene SRTs are stitched;
+  8. scene by scene, this pipeline's LINE BUILDING makes the subtitle lines -- Parakeet's own segments,
+     one line each (W129 4) -- and the line-length rule, off until phase D picks its values (W138 3);
+     the scene SRTs are stitched;
   9. this pipeline's POST-PROCESSING, then <name>.ja.whisperjav.srt.
+
+The pass's sensitivity sets only the speech segmenter's detection setting, from that segmenter's own
+preset (master plan 3.8 item 4; W134 2, W136); the 12 s limit and the pads stay this pipeline's.
 
 What it shares with the other CrispASR pipelines is only what CrispASR's formats make the same for every
 engine (owner decision Q20 = A, W118 1): the program runner, the JSON reader, the cut-point writer and the
-downloads, in whisperjav/crispasr/. Every Parakeet-specific rule is in this file.
+downloads, in whisperjav/crispasr/; and the line-length rule, one rule for both (plan 3.8 item 3). Every
+Parakeet-specific rule is in this file.
 
 Times are the engine's own (W116): word times are Parakeet's native ones, only clamped to their slice, and
 no stable-ts silence adjustment moves them.
@@ -34,7 +40,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
+from whisperjav.config.segmenter_presets import ENSEMBLE_DEFAULT_SENSITIVITY, segmenter_detection_settings
 from whisperjav.crispasr import install
+from whisperjav.crispasr.line_length import OFF, LineLimits, lines_from_segments, split_line
 from whisperjav.crispasr.manifest import ModelFile, model_for
 from whisperjav.crispasr.ojf import (CrispSegment, CutPoint, header_mismatch, parse_ojf, place_in_slices,
                                      read_ojf, write_vad_import)
@@ -89,8 +97,9 @@ class ParakeetCrispASRPipeline(BasePipeline):
     SEGMENTER_END_PAD_MS = 0
     SEGMENTER_CHUNK_THRESHOLD_S = 1.0
 
-    # Line building (plan 3.3): REGROUP_JAV over the words. "segments" keeps Parakeet's own segments,
-    # one line each; step 2b compares the two from the same JSON.
+    # Line building (plan 3.3): "segments" keeps Parakeet's own segments, one line each -- the default,
+    # on the step 2b scores (W129 4: REGROUP_JAV's splits between word pieces can cut a word in two).
+    # "regroup", REGROUP_JAV over the words, stays for the measurement script.
     LINE_MODES = ("regroup", "segments")
 
     # Post-processing (plan 3.6): the two text-only filters, and the scene-overlap resolver, which moves
@@ -111,8 +120,10 @@ class ParakeetCrispASRPipeline(BasePipeline):
                  language: str = "ja",
                  subs_language: str = "native",
                  slice_form: str = "speech",
-                 line_mode: str = "regroup",
+                 line_mode: str = "segments",
                  postprocess: Optional[Tuple[str, ...]] = None,
+                 sensitivity: Optional[str] = None,
+                 line_limits: LineLimits = OFF,
                  **kwargs):
         """
         Args:
@@ -122,8 +133,11 @@ class ParakeetCrispASRPipeline(BasePipeline):
             language: the source language; Japanese only (Q19).
             subs_language: "direct-to-english" still writes Japanese, with one console line (Q19).
             slice_form, line_mode, postprocess: the step 2b comparisons (plan 3.4, 3.3, 3.6).
-            **kwargs: pass settings this pipeline does not use (sensitivity, scene detector, speech
-                enhancer, ...) arrive here and are not used.
+            sensitivity: the pass's sensitivity; it sets only the speech segmenter's detection setting.
+                None means balanced, an Ensemble pass's default.
+            line_limits: the line-length rule's limits (plan 3.8 item 3); off by default (W138 3).
+            **kwargs: pass settings this pipeline does not use (scene detector, speech enhancer, ...)
+                arrive here and are not used.
         """
         super().__init__(output_dir=output_dir, temp_dir=temp_dir, keep_temp_files=keep_temp_files,
                          save_metadata_json=save_metadata_json, **kwargs)
@@ -158,6 +172,11 @@ class ParakeetCrispASRPipeline(BasePipeline):
             raise ValueError(f"{self.LABEL}: unknown post-processing step(s) {unknown} "
                              f"({', '.join(self.POSTPROCESS_STEPS)})")
         self.postprocess = steps
+        self.sensitivity = sensitivity or ENSEMBLE_DEFAULT_SENSITIVITY
+        # Only the detection setting (W134 2): the group length and the pads stay this pipeline's.
+        self.segmenter_detection: Dict = (segmenter_detection_settings(self.speech_segmenter, self.sensitivity)
+                                          if self.slice_form == "speech" else {})
+        self.line_limits = line_limits
 
         self.audio_extractor = None
         self._program: Optional[install.ProgramChoice] = None
@@ -169,7 +188,9 @@ class ParakeetCrispASRPipeline(BasePipeline):
         self.degradations: List[str] = []
         self.notes: List[str] = []
 
-        logger.info(f"{self.LABEL} ready: model {self.model.label}, speech segmenter {self.speech_segmenter}, "
+        detection = ", ".join(f"{k} {v}" for k, v in self.segmenter_detection.items())
+        logger.info(f"{self.LABEL} ready: model {self.model.label}, speech segmenter {self.speech_segmenter}"
+                    f"{f' ({self.sensitivity}: {detection})' if detection else ''}, "
                     f"slices {self.slice_form} (at most {self.MAX_SLICE_S:.0f} s), lines {self.line_mode}")
 
     def get_mode_name(self) -> str:
@@ -284,8 +305,11 @@ class ParakeetCrispASRPipeline(BasePipeline):
             "pipeline": self.PIPELINE_NAME,
             "config": {"crispasr": {"model": self.model.name, "repo": self.model.repo_id,
                                     "revision": self.model.revision, "backend": self.model.backend,
-                                    "speech_segmenter": self.speech_segmenter, "slice_form": self.slice_form,
-                                    "line_mode": self.line_mode, "postprocess": list(self.postprocess)}},
+                                    "speech_segmenter": self.speech_segmenter, "sensitivity": self.sensitivity,
+                                    "segmenter_detection": dict(self.segmenter_detection),
+                                    "slice_form": self.slice_form, "line_mode": self.line_mode,
+                                    "line_limits": self.line_limits.as_dict(),
+                                    "postprocess": list(self.postprocess)}},
             "stages": {},
             "output_files": {},
             "summary": {},
@@ -364,6 +388,7 @@ class ParakeetCrispASRPipeline(BasePipeline):
             end_pad_ms=self.SEGMENTER_END_PAD_MS,
             # A padded segment then still fits the window; the slice rule splits anything longer.
             max_speech_duration_s=self.MAX_SLICE_S - pads_s,
+            **self.segmenter_detection,
         )
         groups: List[_Group] = []
         failed = 0
@@ -561,12 +586,13 @@ class ParakeetCrispASRPipeline(BasePipeline):
 
         return report
 
-    def _word_dicts(self, seg: CrispSegment, cut: CutPoint) -> Tuple[List[Dict], int]:
+    def _word_dicts(self, seg: CrispSegment, cut: CutPoint, keep_spaces: bool = False) -> Tuple[List[Dict], int]:
         """This pipeline's parser (plan 3.5): one segment -> word dicts in film time, clamped to its slice.
 
         - Parakeet TDT ("parakeet"): its native words, used directly. Leading and trailing spaces are
-          stripped and blank words dropped. The blank " " tokens, which can start up to 10.9 s before
-          their segment (runs S9, M1), are never read.
+          stripped (kept with ``keep_spaces``, for the line-length rule's parts) and blank words dropped.
+          The blank " " tokens, which can start up to 10.9 s before their segment (runs S9, M1), are
+          never read.
         - Parakeet CTC ("fastconformer-ctc"): its tokens, one 80 ms frame each. A token ends where the
           next one starts; the last ends at the slice end. Blank tokens are dropped.
         - A segment with text but no usable words is shared out over its own times
@@ -588,14 +614,15 @@ class ParakeetCrispASRPipeline(BasePipeline):
             for i, t in enumerate(tokens):
                 end = tokens[i + 1].start if i + 1 < len(tokens) else cut.end
                 start = clamp(t.start)
-                words.append({"word": t.text.strip(), "start": start, "end": max(start, clamp(end))})
+                words.append({"word": t.text if keep_spaces else t.text.strip(), "start": start,
+                              "end": max(start, clamp(end))})
         else:
             for w in seg.words:
-                text = w.text.strip()
-                if not text:
+                if not w.text.strip():
                     continue
                 start = clamp(w.start)
-                words.append({"word": text, "start": start, "end": max(start, clamp(w.end))})
+                words.append({"word": w.text if keep_spaces else w.text.strip(), "start": start,
+                              "end": max(start, clamp(w.end))})
         if not words and seg.text.strip():
             from whisperjav.modules.subtitle_pipeline.reconstruction import split_frame_to_words
 
@@ -680,12 +707,23 @@ class ParakeetCrispASRPipeline(BasePipeline):
             result = reconstruct_from_words(words, scene.path, suppress_silence=False, regroup=False)
         if not getattr(result, "segments", None):
             return False, clamped
-        result.to_srt_vtt(str(scene_srt), word_level=False, segment_level=True, strip=True)
+        if self.line_limits.active:
+            # The line-length rule, the last step of line building (plan 3.8 item 3).
+            from stable_whisper.text_output import result_to_srt_vtt
+
+            lines = lines_from_segments(result.segments, self.line_limits)
+            if not lines:
+                return False, clamped
+            result_to_srt_vtt([{"start": s, "end": e, "text": t} for t, s, e in lines], str(scene_srt),
+                              segment_level=True, word_level=False, strip=True)
+        else:
+            result.to_srt_vtt(str(scene_srt), word_level=False, segment_level=True, strip=True)
         return scene_srt.exists() and scene_srt.stat().st_size > 0, clamped
 
     def _write_segment_lines(self, items: List[Tuple[CrispSegment, CutPoint]], scene: _Scene,
                              scene_srt: Path) -> Tuple[bool, int]:
-        """Parakeet's own segments, one line each, with their native times clamped to the slice."""
+        """Parakeet's own segments, one line each, with their native times clamped to the slice; then
+        the line-length rule, which splits a line only at a punctuation mark between its words."""
         import srt
 
         subs = []
@@ -700,8 +738,14 @@ class ParakeetCrispASRPipeline(BasePipeline):
                 clamped += 1
             if end <= start:
                 continue
-            subs.append(srt.Subtitle(index=len(subs) + 1, start=timedelta(seconds=start - scene.start),
-                                     end=timedelta(seconds=end - scene.start), content=text))
+            parts = [(text, start, end)]
+            if self.line_limits.active:
+                words, _ = self._word_dicts(seg, cut, keep_spaces=True)
+                parts = split_line(text, start, end, [(w["word"], w["start"], w["end"]) for w in words],
+                                   self.line_limits)
+            for part_text, part_start, part_end in parts:
+                subs.append(srt.Subtitle(index=len(subs) + 1, start=timedelta(seconds=part_start - scene.start),
+                                         end=timedelta(seconds=part_end - scene.start), content=part_text))
         if not subs:
             return False, clamped
         scene_srt.write_text(srt.compose(subs), encoding="utf-8")
