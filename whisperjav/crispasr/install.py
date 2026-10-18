@@ -607,12 +607,12 @@ def ensure_model(model: ModelFile, offline: Optional[bool] = None) -> Path:
 def link_or_copy(src: Path, dst: Path, what: Optional[str] = None) -> str:
     """Make ``dst`` the same file as ``src``: a hard link (no extra disk), else a copy.
 
-    Returns "linked" or "copied". An existing ``dst`` is replaced. With ``what`` (plain words for the
-    file), a copy is checked against the free disk space first.
+    Returns "linked" or "copied". An existing ``dst`` is replaced, a symbolic link that leads nowhere
+    included. With ``what`` (plain words for the file), a copy is checked against the free disk space first.
     """
     dst = Path(dst)
-    if dst.exists():
-        dst.unlink()
+    if os.path.lexists(dst):  # exists() is False for a link that leads nowhere, and os.link cannot replace it
+        os.unlink(dst)
     try:
         os.link(src, dst)
         return "linked"
@@ -630,7 +630,9 @@ def stage_model(model_path: Path, run_dir: Path, stage_dir: Optional[Path] = Non
     with Chinese or Japanese characters may not open. Such a file is hard-linked into ``stage_dir``
     (default: the run folder), or copied when a link is impossible (plan 1.7), and named relative to the
     run folder, the program's working folder. A pipeline passes the folder that holds every film's run
-    folder, so one staged file serves the whole pass instead of a copy per film.
+    folder, so one staged file serves the whole pass instead of a copy per film. A symbolic link, as the
+    Hugging Face cache holds its files with Windows Developer Mode on, is followed first: the staged file
+    is the model file itself.
     """
     model_path = Path(model_path)
     if str(model_path).isascii():
@@ -640,7 +642,9 @@ def stage_model(model_path: Path, run_dir: Path, stage_dir: Optional[Path] = Non
     dst = stage_dir / (model_path.name if model_path.name.isascii() else "model.gguf")
     size = model_path.stat().st_size
     if not (dst.is_file() and dst.stat().st_size == size):
-        if link_or_copy(model_path, dst, what="a copy of the model") == "copied":
+        # On Windows os.link links a symbolic link itself, not the file it leads to, and the cache's links are
+        # relative: from stage_dir such a link leads nowhere. Link the file the path leads to.
+        if link_or_copy(os.path.realpath(model_path), dst, what="a copy of the model") == "copied":
             logger.info(f"CrispASR: the model was copied to {stage_dir} ({mb(size)}), because its path "
                         f"has characters the program may not open")
     return os.path.relpath(dst, run_dir)
