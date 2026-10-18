@@ -1396,9 +1396,26 @@ class TestLinkOrCopy:
         monkeypatch.setattr(shutil, "disk_usage", never)
         assert install.link_or_copy(src, tmp_path / "copied.bin") == "copied"
 
+    def test_a_symbolic_link_that_leads_nowhere_is_replaced(self, tmp_path, src):
+        dst = tmp_path / "staged.bin"
+        _symlink_or_skip(os.path.join("..", "blobs", "gone"), dst)
+        assert os.path.lexists(dst) and not dst.exists()
+        assert install.link_or_copy(src, dst) == "linked"
+        assert not dst.is_symlink() and dst.read_bytes() == MODEL_BYTES
+
 
 def _no_link(src, dst):
     raise OSError(17, "The system cannot move the file to a different disk drive")
+
+
+def _symlink_or_skip(target: str, link: Path) -> None:
+    """A relative symbolic link, as the Hugging Face cache makes them. Skipped where this account cannot make one
+    (Windows without Developer Mode or administrator rights): the cache then holds plain files, and the case does
+    not arise."""
+    try:
+        os.symlink(target, link)
+    except (OSError, NotImplementedError) as e:
+        pytest.skip(f"symbolic links cannot be made here: {e}")
 
 
 class TestStageModel:
@@ -1494,6 +1511,47 @@ class TestStageModel:
         model = self._model_in(tmp_path, "ユーザー")
         install.stage_model(model, run_dir, stage_dir=out)
         assert (out / "model.gguf").read_bytes() == MODEL_BYTES
+
+    def _cache_with_links(self, tmp_path, levels: int) -> Path:
+        """The model file in a Hugging Face cache laid out with symbolic links under a Japanese user name, as on a PC
+        with Developer Mode on: snapshots/<revision>/<file> -> ../../blobs/<hash>, and with two levels that blob ->
+        ../../blobs/48/<hash> in the cache's shared blobs (both seen on the measurement PC, 2026-10-18)."""
+        hub = tmp_path / "Users" / "山田太郎" / ".cache" / "huggingface" / "hub"
+        repo = hub / "models--cstr--parakeet-tdt-0.6b-ja-GGUF"
+        (repo / "blobs").mkdir(parents=True)
+        (repo / "snapshots" / "d9e3ba65").mkdir(parents=True)
+        if levels == 2:
+            (hub / "blobs" / "48").mkdir(parents=True)
+            (hub / "blobs" / "48" / "48a639c5").write_bytes(MODEL_BYTES)
+            _symlink_or_skip(os.path.join("..", "..", "blobs", "48", "48a639c5"), repo / "blobs" / "5a61e6c7")
+        else:
+            (repo / "blobs" / "5a61e6c7").write_bytes(MODEL_BYTES)
+        model = repo / "snapshots" / "d9e3ba65" / self.ASCII_NAME
+        _symlink_or_skip(os.path.join("..", "..", "blobs", "5a61e6c7"), model)
+        return model
+
+    @pytest.mark.parametrize("levels", [1, 2], ids=["one-link", "two-links"])
+    def test_a_model_reached_through_relative_links_is_staged_as_the_file_itself(self, tmp_path, levels):
+        model = self._cache_with_links(tmp_path, levels)
+        out = tmp_path / "Users" / "山田太郎" / "AppData" / "Local" / "Temp" / "whisperjav" / "pass1_worker" / "crispasr_out"
+        first, second = out / "film_a_00000001", out / "film_b_00000002"
+        first.mkdir(parents=True)
+        second.mkdir()
+        a = install.stage_model(model, first, stage_dir=out)
+        b = install.stage_model(model, second, stage_dir=out)  # the pass's second film uses the same file
+        staged = out / self.ASCII_NAME
+        assert a == b == os.path.join("..", self.ASCII_NAME)
+        assert not staged.is_symlink()
+        assert (first / a).read_bytes() == (second / b).read_bytes() == MODEL_BYTES
+        assert os.path.samefile(staged, os.path.realpath(model))
+
+    def test_a_link_left_by_an_earlier_run_that_leads_nowhere_is_replaced(self, tmp_path, out, run_dir):
+        model = self._cache_with_links(tmp_path, levels=2)
+        left = out / self.ASCII_NAME  # what a run before this fix left: the cache's own relative link
+        _symlink_or_skip(os.path.join("..", "..", "blobs", "5a61e6c7"), left)
+        assert os.path.lexists(left) and not left.exists()
+        arg = install.stage_model(model, run_dir, stage_dir=out)
+        assert not left.is_symlink() and (run_dir / arg).read_bytes() == MODEL_BYTES
 
     def test_a_copy_without_the_disk_space_for_it_is_refused(self, tmp_path, out, run_dir, monkeypatch):
         model = self._model_in(tmp_path, "ユーザー", name=self.ASCII_NAME)
