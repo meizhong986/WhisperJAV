@@ -962,6 +962,7 @@ class WhisperSegSpeechSegmenter:
                 audio_duration_sec=duration_sec,
                 parameters=self._get_parameters(),
                 processing_time_sec=time.time() - start_time,
+                error=str(e) or type(e).__name__,
             )
 
         if self.segmentation_decoder == "offline":
