@@ -11,6 +11,13 @@ Shared by every CrispASR pipeline (Q20 = A). The base is the second architecture
 - the program is ended whenever WhisperJAV stops or fails, and on Windows it is tied to
   WhisperJAV's process, so it also ends if WhisperJAV itself is killed. There is no time limit:
   a CPU run on a long film can take hours;
+- the program never downloads a model by itself (master plan 3.8 item 6; W130, W133 3, U19). It has
+  no flag that forbids it: when the -m file cannot be opened, it uses a same-named file from its own
+  cache folder, or downloads one if --auto-download is given or if its input is a terminal -- and on
+  Windows it takes the "nothing" input (DEVNULL) for a terminal, asks "Download now? [Y/n]" and takes
+  no answer as yes. So its input is a pipe closed at once, and --cache-dir names an empty folder in
+  the run folder; WhisperJAV never passes --auto-download. A missing model then ends the run with
+  exit code 13;
 - ``run.log`` keeps the command line, the working folder, the exit code and the full stderr, so
   every run can be repeated outside WhisperJAV.
 
@@ -19,6 +26,7 @@ Imports no ASR module.
 
 import os
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -64,8 +72,13 @@ _KNOWN_CRASH_STATUS = {
 WARN_RE = re.compile(r"keeping ASR timestamps|out-of-range dropped|failed to load|"
                      r"exported at --chunk-seconds|input file not found|warning:", re.IGNORECASE)
 # The program fetching something by itself means WhisperJAV's command line missed a switch
-# (plan 4.3, run P1). It is a note, and the command-line tests keep it from shipping.
-DOWNLOAD_RE = re.compile(r"download", re.IGNORECASE)
+# (plan 4.3, run P1). It is a note, and the command-line tests keep it from shipping. Only the lines
+# that start a download count (crispasr_cache.cpp:515, 525, 679; "Auto-downloading"; the question
+# "Download now? [Y/n]", which a terminal input answers yes): the lines a missing model prints
+# otherwise ("Available for download: ...", "Use --auto-download ...") download nothing.
+DOWNLOAD_RE = re.compile(r"downloading|download now\?", re.IGNORECASE)
+# The program could not open the -m file and would have offered a download (U19, probes B and D).
+NOT_FOUND_LOCALLY_RE = re.compile(r"not found locally", re.IGNORECASE)
 PROGRESS_RE = re.compile(r"progress\s*=\s*(\d+)\s*%\s*\((\d+)\s*/\s*(\d+)\s*slices?\)", re.IGNORECASE)
 NO_SPEECH_RE = re.compile(r"no speech detected", re.IGNORECASE)
 # The program's own processor check, before any work (cli.cpp:2579-2613). Both lines end the run with
@@ -101,6 +114,8 @@ FAILURE_PREFIX = "CrispASR: "
 
 
 RUN_FOLDER = "crispasr_out"  # the name WhisperJAV's leftover handling knows (utils/media_leftovers.py)
+# The program's --cache-dir: an empty folder in the film's run folder, so it finds no model of its own.
+NO_CACHE_FOLDER = "no_cache"
 
 
 def film_run_dir(temp_dir: Path, media_basename: str) -> Path:
@@ -146,7 +161,8 @@ class CrispRunRequest:
     def argv(self) -> list[str]:
         return [str(self.exe), "-m", self.model, "--backend", self.backend, "-t", str(self.threads),
                 "-f", self.audio_name, "-l", self.language, "-ojf", "-pp", "-of", self.out_name,
-                "--vad-import", self.cuts_name, *[str(a) for a in self.extra_args]]
+                "--vad-import", self.cuts_name, "--cache-dir", NO_CACHE_FOLDER,
+                *[str(a) for a in self.extra_args]]
 
 
 @dataclass
@@ -387,6 +403,11 @@ def run_crispasr_json(req: CrispRunRequest,
     # A stale file must never pass as this run's output.
     if req.json_path.exists():
         req.json_path.unlink()
+    # The program's cache folder, empty, so it cannot use a model of its own in place of -m's.
+    no_cache = run_dir / NO_CACHE_FOLDER
+    if no_cache.exists():
+        shutil.rmtree(no_cache)
+    no_cache.mkdir()
 
     reported: Optional[tuple[int, int]] = None
 
@@ -410,8 +431,13 @@ def run_crispasr_json(req: CrispRunRequest,
     started = time.monotonic()
     job = _KillOnCloseJob()
     try:
-        proc = subprocess.Popen(argv, cwd=str(run_dir), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+        # A pipe, closed at once: the program then sees no terminal and asks no download question.
+        proc = subprocess.Popen(argv, cwd=str(run_dir), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, creationflags=creationflags)
+        try:
+            proc.stdin.close()
+        except OSError:
+            pass  # the program has already ended
     except OSError as e:
         # A damaged file, or one an antivirus blocked (U17), cannot be started at all.
         job.close()
@@ -493,6 +519,9 @@ def run_crispasr_json(req: CrispRunRequest,
                       f"({lacks.group(1).strip() or 'AVX2'})")
         elif NO_CPU_BACKEND_RE.search(stderr_text):
             detail = "the CrispASR program found no processor support it can run on"
+        elif NOT_FOUND_LOCALLY_RE.search(stderr_text):
+            # DRAFT text, not yet approved by the owner (plan 3.8 item 6).
+            detail = "the model file could not be opened; the CrispASR program may not download one by itself"
 
     _write_run_log(req, rc, seconds, outcome.value, stderr_lines, out_reader.lines)
     return CrispRunResult(outcome=outcome, exit_code=rc, json_path=json_path,
