@@ -361,6 +361,13 @@ def test_the_measurement_only_model_is_accepted_but_not_offered(script, tmp_path
     assert cfg.model is manifest.MODELS["parakeet-ctc-1.1b-ja"] and cfg.label == "parakeet-ctc-1.1b-ja_speech"
 
 
+def test_another_longest_slice_names_its_own_folder(script, tmp_path):
+    cfg = script.parse_args([str(make_film(tmp_path)), "--pipeline", "cohere-crispasr", "--model", "cohere-asr-ja-v0.1",
+                             "--slice-form", "speech", "--max-slice-s", "12", "--out", str(tmp_path / "batch")])
+    assert cfg.max_slice_s == 12.0 and cfg.label == "cohere-asr-ja-v0.1_speech_max12s"
+    assert cfg.folder == tmp_path / "batch" / "cohere-asr-ja-v0.1_speech_max12s"
+
+
 REFUSED = [
     pytest.param(["--pipeline", "cohere-crispasr", "--slice-form", "speech"],
                  "has no default model; name one with --model: cohere-asr-ja-v0.1, cohere-asr-ja", id="cohere-no-model"),
@@ -371,6 +378,8 @@ REFUSED = [
     pytest.param(["--pipeline", "parakeet-crispasr", "--slice-form", "scenes"], "invalid choice", id="slice-form"),
     pytest.param(["--pipeline", "whisper", "--slice-form", "speech"], "invalid choice", id="pipeline"),
     pytest.param(["--pipeline", "parakeet-crispasr"], "required: --slice-form", id="no-slice-form"),
+    pytest.param(["--pipeline", "parakeet-crispasr", "--slice-form", "speech", "--max-slice-s", "0"],
+                 "--max-slice-s must be more than 0 seconds", id="max-slice-zero"),
 ]
 
 
@@ -473,6 +482,25 @@ def test_the_measured_pipeline_keeps_every_default_but_model_slices_and_kept_tem
     assert pipe.speech_segmenter == defaults["speech_segmenter"].default
     assert pipe.save_metadata_json is defaults["save_metadata_json"].default
     assert pipe.lang_code == "ja" and pipe.subs_language == defaults["subs_language"].default
+
+
+def test_another_longest_slice_reaches_the_slices_and_leaves_the_pipeline_class_alone(bench):
+    assert bench.script.main(bench.argv("cohere-crispasr", "cohere-asr-ja-v0.1", "speech", "--max-slice-s", "12")) == 0
+    pipe = bench.built[0]
+    assert isinstance(pipe, CohereCrispASRPipeline) and pipe.MAX_SLICE_S == 12.0
+    assert CohereCrispASRPipeline.MAX_SLICE_S == 30.0
+    assert max(b - a for a, b in bench.program.calls[0].slices) <= 12.0 + 1e-6  # the 15 s speech group is split
+    record = json.loads((bench.out / "cohere-asr-ja-v0.1_speech_max12s" / "film.run.json").read_text(encoding="utf-8"))
+    c = record["configuration"]
+    assert (c["label"], c["max_slice_s"], c["max_slice_s_option"]) == ("cohere-asr-ja-v0.1_speech_max12s", 12.0, 12.0)
+
+
+def test_without_the_option_the_pipeline_s_own_longest_slice_is_used_and_recorded(bench):
+    assert bench.script.main(bench.argv("cohere-crispasr", "cohere-asr-ja-v0.1", "speech")) == 0
+    assert type(bench.built[0]) is CohereCrispASRPipeline
+    assert max(b - a for a, b in bench.program.calls[0].slices) > 12.0  # the 15 s speech group stays whole
+    c = bench.record("cohere-asr-ja-v0.1", "speech")["configuration"]
+    assert (c["max_slice_s"], c["max_slice_s_option"]) == (30.0, None)
 
 
 def lines_of(folder: Path, names) -> dict:
@@ -705,7 +733,7 @@ def test_help_exits_0_and_names_every_option_and_configuration():
     result = subprocess.run([sys.executable, str(SCRIPT), "--help"], capture_output=True, text=True,
                             encoding="utf-8", errors="replace", cwd=str(REPO), timeout=300)
     assert result.returncode == 0, result.stderr[-2000:]
-    for option in ("--pipeline", "--model", "--slice-form", "--out", "--overwrite", "--dry-run"):
+    for option in ("--pipeline", "--model", "--slice-form", "--max-slice-s", "--out", "--overwrite", "--dry-run"):
         assert option in result.stdout
     for pipeline, model, slice_form in SIX:
         assert f"--pipeline {pipeline}" in result.stdout and model in result.stdout
