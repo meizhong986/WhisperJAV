@@ -141,6 +141,7 @@ from whisperjav.config.segmenter_presets import (
     effective_segmenter_for_pass,
     resolve_segmenter_sensitivity,
     segmenter_accepts,
+    segmenter_detection_settings,
 )
 # The CrispASR Ensemble passes (1.10.0): their names, model list and usage checks. Light modules.
 from whisperjav.crispasr.manifest import CRISPASR_PIPELINES, model_for as crispasr_model_for
@@ -3173,8 +3174,10 @@ def main():
             except Exception as cap_err:
                 # Don't let cap surfacing fail the dump; record the error
                 ensemble_dump["_safety_cap_error"] = str(cap_err)
-            # A CrispASR pass resolves its values in the pass worker (model, speech segmenter); show
-            # what the run will use beside the values as typed, which keep their usual keys.
+            # A CrispASR pass resolves its values in the pass worker and the pipeline (model, speech
+            # segmenter, the segmenter's detection setting); show what the run will use beside the
+            # values as typed, which keep their usual keys. Sensitivity sets only that detection
+            # setting (CrispASR master plan 3.8 item 4; W134 2, W136).
             for _key in ("pass1", "pass2"):
                 _p = ensemble_dump.get(_key)
                 if not _p or _p.get("pipeline") not in CRISPASR_PIPELINES:
@@ -3183,12 +3186,15 @@ def main():
                     _model = crispasr_model_for(_p["pipeline"], _p.get("model")).name
                 except ValueError as _refused:
                     _model = f"(refused: {_refused})"
+                _segmenter = effective_segmenter_for_pass(_p["pipeline"], _p.get("speech_segmenter"))
+                _sensitivity = _p.get("sensitivity") or ENSEMBLE_DEFAULT_SENSITIVITY
                 _p["crispasr_effective"] = {
                     "model": _model,
-                    "speech_segmenter": effective_segmenter_for_pass(
-                        _p["pipeline"], _p.get("speech_segmenter")),
+                    "speech_segmenter": _segmenter,
+                    "sensitivity": _sensitivity,
+                    "speech_segmenter_detection": segmenter_detection_settings(_segmenter, _sensitivity),
                     "scene_detector": "semantic",
-                    "not_used": ["sensitivity", "scene_detector", "speech_enhancer", "enhance_for_vad",
+                    "not_used": ["scene_detector", "speech_enhancer", "enhance_for_vad",
                                  "vad_threshold", "speech_pad_ms", "params", "hf_params", "qwen_params",
                                  "device", "compute_type"],
                 }
