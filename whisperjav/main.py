@@ -32,6 +32,19 @@ if _requested_endpoint:
     from whisperjav.utils.offline_mode import enable_hf_endpoint
     enable_hf_endpoint(_requested_endpoint)
 
+# The removed 1.9.x "bring your own CrispASR" mode (owner W118 3; CrispASR master plan 2.5):
+# --mode crispasr, --pass1/2-pipeline crispasr and the --crispasr-* flags stop the run with exit
+# status 2 and a message that names what was typed and points to Ensemble Mode. A raw argv scan,
+# like the two above, for two reasons: argparse no longer knows these flags and values, so its own
+# error could not name them; and the run must stop before the start-up GPU check further down,
+# which may ask a question first. Stops before any audio is read (light module, stdlib only).
+from whisperjav.crispasr.legacy import legacy_crispasr_use as _legacy_crispasr_use
+_legacy_crispasr = _legacy_crispasr_use(_sys.argv[1:])
+if _legacy_crispasr:
+    from whisperjav.crispasr.legacy import legacy_crispasr_message
+    print(legacy_crispasr_message(_legacy_crispasr), file=_sys.stderr)
+    _sys.exit(2)
+
 # ===========================================================================
 # EARLY WARNING SUPPRESSION - Must be before any library imports
 # ===========================================================================
@@ -129,11 +142,16 @@ from whisperjav.config.segmenter_presets import (
     resolve_segmenter_sensitivity,
     segmenter_accepts,
 )
+# The CrispASR Ensemble passes (1.10.0): their names, model list and usage checks. Light modules.
+from whisperjav.crispasr.manifest import CRISPASR_PIPELINES, model_for as crispasr_model_for
+from whisperjav.crispasr.pass_settings import models_help as crispasr_models_help, validate_crispasr_passes
+from whisperjav.crispasr.runner import FAILURE_PREFIX as CRISPASR_FAILURE_PREFIX
 from whisperjav.__version__ import __version__, __version_display__
 
 
 from whisperjav.utils.preflight_check import (
     enforce_gpu_requirement,
+    ensure_crispasr_ready,
     ensure_segmenter_backend_available,
     ensure_segmenter_model_available,
     ensure_speech_enhancer_available,
@@ -343,8 +361,10 @@ def parse_arguments():
 
     # Core arguments
     parser.add_argument("input", nargs="*", help="Input media file(s), directory, or wildcard pattern.")
-    parser.add_argument("--mode", choices=["fidelity", "balanced", "fast", "faster", "transformers", "qwen", "crispasr"], default="balanced",
-                       help="Processing mode (default: balanced). 'crispasr' = CrispASR external provider (requires --crispasr-exe)")
+    # No CrispASR value: the CrispASR pipelines are Ensemble passes only (owner W118 2; the old
+    # 'crispasr' value is stopped before argparse runs, at the top of this file).
+    parser.add_argument("--mode", choices=["fidelity", "balanced", "fast", "faster", "transformers", "qwen"], default="balanced",
+                       help="Processing mode (default: balanced)")
     parser.add_argument("--model", default=None,
                        help="Override the default Whisper model (e.g., large-v2, turbo, large). Overrides config default.")
     parser.add_argument("--language", choices=["japanese", "korean", "chinese", "english"],
@@ -372,8 +392,12 @@ def parse_arguments():
     twopass_group.add_argument("--ensemble", action="store_true",
                                help="Enable two-pass ensemble mode")
     twopass_group.add_argument("--pass1-pipeline", default="balanced",
-                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen", "crispasr"],
-                               help="Pipeline for pass 1 (default: balanced). 'crispasr' requires --crispasr-exe")
+                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen",
+                                        *CRISPASR_PIPELINES],
+                               help="Pipeline for pass 1 (default: balanced). parakeet-crispasr and "
+                                    "cohere-crispasr run CrispASR's own program, which WhisperJAV "
+                                    "downloads the first time it is needed; Japanese only. "
+                                    "--pass1-model picks their model.")
     twopass_group.add_argument("--pass1-sensitivity", default=None,
                                choices=["conservative", "balanced", "aggressive"],
                                help="Sensitivity for pass 1 (default: aggressive when pass 1 is "
@@ -390,7 +414,7 @@ def parse_arguments():
                                choices=["auditok", "silero", "semantic", "none"],
                                help="Scene detection method for pass 1 (default: semantic since v1.9.2)")
     twopass_group.add_argument("--pass1-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none). Default: firered-vad when pass 1 is Qwen3-ASR. Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
+                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none). Default: firered-vad when pass 1 is Qwen3-ASR; whisperseg for parakeet-crispasr and cohere-crispasr, which do not accept none. Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
     twopass_group.add_argument("--pass1-vad-version", default=None,
                                choices=list(VAD_VERSIONS),
                                help="Silero VAD build for pass 1 when --pass1-pipeline is balanced "
@@ -412,17 +436,24 @@ def parse_arguments():
                                     "with qwen and fidelity. NOT accepted when --pass1-pipeline is "
                                     "balanced: balanced finds the speech inside faster-whisper itself, "
                                     "on the same audio it transcribes, so there is nothing to split. "
-                                    "fast, faster, transformers and crispasr ignore it: they run no "
-                                    "separate speech segmenter to feed.")
+                                    "fast, faster, transformers, parakeet-crispasr and cohere-crispasr "
+                                    "ignore it: fast, faster and transformers run no separate speech "
+                                    "segmenter to feed, and the CrispASR pipelines run no audio clean-up.")
     twopass_group.add_argument("--pass1-model", default=None,
-                               help="Model name for pass 1 (e.g., large-v2, kotoba-whisper-v2.0)")
+                               help="Model name for pass 1 (e.g., large-v2, kotoba-whisper-v2.0). "
+                                    "The CrispASR pipelines take a model short name: "
+                                    + crispasr_models_help() + ".")
     twopass_group.add_argument("--pass1-vad-threshold", type=float, default=None,
                                help="VAD threshold for pass 1 (0.0-1.0)")
     twopass_group.add_argument("--pass1-speech-pad-ms", type=int, default=None,
                                help="Speech padding in ms for pass 1")
     twopass_group.add_argument("--pass2-pipeline", default=None,
-                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen", "xxl", "crispasr"],
-                               help="Pipeline for pass 2 (enables pass 2). 'xxl' = BYOP XXL Faster Whisper (requires --xxl-exe); 'crispasr' requires --crispasr-exe")
+                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen", "xxl",
+                                        *CRISPASR_PIPELINES],
+                               help="Pipeline for pass 2 (enables pass 2). 'xxl' = BYOP XXL Faster Whisper "
+                                    "(requires --xxl-exe). parakeet-crispasr and cohere-crispasr run "
+                                    "CrispASR's own program, which WhisperJAV downloads the first time it "
+                                    "is needed; Japanese only. --pass2-model picks their model.")
     twopass_group.add_argument("--pass2-sensitivity", default=None,
                                choices=["conservative", "balanced", "aggressive"],
                                help="Sensitivity for pass 2 (default: aggressive when pass 2 is "
@@ -439,7 +470,7 @@ def parse_arguments():
                                choices=["auditok", "silero", "semantic", "none"],
                                help="Scene detection method for pass 2 (default: semantic since v1.9.2)")
     twopass_group.add_argument("--pass2-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Default: ten when pass 2 is anime-whisper. Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
+                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Default: ten when pass 2 is anime-whisper; whisperseg for parakeet-crispasr and cohere-crispasr, which do not accept none. Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
     twopass_group.add_argument("--pass2-vad-version", default=None,
                                choices=list(VAD_VERSIONS),
                                help="Silero VAD build for pass 2 when --pass2-pipeline is balanced "
@@ -461,10 +492,13 @@ def parse_arguments():
                                     "with qwen and fidelity. NOT accepted when --pass2-pipeline is "
                                     "balanced: balanced finds the speech inside faster-whisper itself, "
                                     "on the same audio it transcribes, so there is nothing to split. "
-                                    "fast, faster, transformers and crispasr ignore it: they run no "
-                                    "separate speech segmenter to feed.")
+                                    "fast, faster, transformers, parakeet-crispasr and cohere-crispasr "
+                                    "ignore it: fast, faster and transformers run no separate speech "
+                                    "segmenter to feed, and the CrispASR pipelines run no audio clean-up.")
     twopass_group.add_argument("--pass2-model", default=None,
-                               help="Model name for pass 2 (e.g., large-v2, kotoba-whisper-v2.0)")
+                               help="Model name for pass 2 (e.g., large-v2, kotoba-whisper-v2.0). "
+                                    "The CrispASR pipelines take a model short name: "
+                                    + crispasr_models_help() + ".")
     twopass_group.add_argument("--pass2-vad-threshold", type=float, default=None,
                                help="VAD threshold for pass 2 (0.0-1.0)")
     twopass_group.add_argument("--pass2-speech-pad-ms", type=int, default=None,
@@ -480,24 +514,6 @@ def parse_arguments():
     byop_group = parser.add_argument_group("BYOP — Bring Your Own Provider")
     byop_group.add_argument("--xxl-exe", default=None,
                             help="Path to faster-whisper-xxl executable (required for --pass2-pipeline xxl)")
-
-    # CrispASR — standalone external-provider pipeline (NOT BYOP/XXL coupled).
-    # docs/plans/crispasr_v190/08_crispasr_simple_pipeline_design.md
-    crispasr_group = parser.add_argument_group(
-        "CrispASR Mode Options (--mode crispasr / --passN-pipeline crispasr)"
-    )
-    crispasr_group.add_argument("--crispasr-exe", default=None,
-                                help="Path to the crispasr external executable "
-                                     "(required for --mode crispasr or --passN-pipeline crispasr)")
-    crispasr_group.add_argument("--crispasr-backend", default="parakeet",
-                                choices=["whispercpp", "parakeet", "cohere"],
-                                help="CrispASR ASR backend (default: parakeet). "
-                                     "'whispercpp' = crispasr's whisper backend (defaults to large-v2). "
-                                     "All curated backends emit native word timestamps; no aligner needed.")
-    crispasr_group.add_argument("--crispasr-args", default="",
-                                help="Extra arguments passed verbatim to crispasr "
-                                     "(shlex-split, appended to argv). Single escape valve "
-                                     "for advanced CrispASR-internal control.")
 
     # Environment check
     parser.add_argument("--check", action="store_true", help="Run environment checks and exit")
@@ -919,7 +935,7 @@ def parse_arguments():
                                 "qwen, fidelity and decoupled pipelines. NOT accepted with "
                                 "balanced, which finds the speech inside faster-whisper itself, on "
                                 "the same audio it transcribes. Accepted but ignored by fast, "
-                                "faster, transformers and crispasr.")
+                                "faster, transformers, parakeet-crispasr and cohere-crispasr.")
     qwen_audio_group.add_argument("--qwen-segmenter", type=str, default="whisperseg",
                            choices=["none", "silero", "silero-v4.0", "silero-v3.1", "silero-v6.2",
                                     "nemo", "nemo-lite", "whisper-vad", "ten", "whisperseg",
@@ -1749,24 +1765,6 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
 
         pipeline = QwenPipeline(**qwen_kwargs)
         effective_mode = args.mode
-    elif args.mode == "crispasr":
-        # CrispASR standalone external-provider pipeline (docs/plans/crispasr_v190/08).
-        # Constructed directly from --crispasr-* args, like transformers/qwen.
-        from whisperjav.pipelines.crispasr_pipeline import CrispASRPipeline
-        initial_output_dir = str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir
-        pipeline = CrispASRPipeline(
-            output_dir=initial_output_dir,
-            temp_dir=args.temp_dir,
-            keep_temp_files=args.keep_temp,
-            save_metadata_json=getattr(args, 'debug', False),
-            progress_display=progress,
-            crispasr_exe=getattr(args, 'crispasr_exe', None),
-            crispasr_backend=getattr(args, 'crispasr_backend', 'parakeet'),
-            crispasr_args=getattr(args, 'crispasr_args', ''),
-            crispasr_language=getattr(args, 'language', 'japanese'),
-            subs_language=args.subs_language,
-        )
-        effective_mode = args.mode
     else:  # fidelity
         pipeline = FidelityPipeline(
             **pipeline_args,
@@ -2510,6 +2508,9 @@ def main():
         apply_ensemble_pass_defaults(args)
         # S2/S9: balanced has no external segmenter any more (v1.9.2).
         validate_balanced_vad_options(args)
+        # 1.10.0: a CrispASR pass needs a model it knows, Japanese audio and a speech
+        # segmenter (CrispASR master plan 2.4; owner Q14, Q19).
+        validate_crispasr_passes(args)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         sys.exit(2)
@@ -2568,16 +2569,6 @@ def main():
             logger.error("--pipeline decoupled does not support --async-processing yet. "
                          "Use synchronous mode (the default).")
             sys.exit(1)
-
-    # v1.9.0 fix (code-review): --mode crispasr crashed under --async-processing
-    # (resolved_config is None on the crispasr path, and process_files_async
-    # dereferences it; even past that, async_processor maps unknown modes to
-    # FidelityPipeline, silently ignoring --crispasr-exe). Fail fast with the
-    # same message shape as the decoupled guard above.
-    if getattr(args, 'mode', None) == 'crispasr' and getattr(args, 'async_processing', False):
-        logger.error("--mode crispasr does not support --async-processing. "
-                     "Use synchronous mode (the default).")
-        sys.exit(1)
 
     # Skip input validation if --dump-params is used (diagnostic mode)
     if not args.input and not args.dump_params:
@@ -2691,13 +2682,6 @@ def main():
             # No config resolution needed - pipeline receives args directly
             resolved_config = None
             logger.debug("Qwen mode: skipping legacy config resolution (uses --qwen-* args)")
-
-        elif args.mode == "crispasr":
-            # CrispASR mode: uses dedicated --crispasr-* arguments, not legacy
-            # config. resolve_legacy_pipeline() would raise (crispasr is not a
-            # LEGACY_PIPELINES entry) — skip it, like transformers/qwen.
-            resolved_config = None
-            logger.debug("CrispASR mode: skipping legacy config resolution (uses --crispasr-* args)")
 
         else:
             # Legacy mode: use pipeline resolver.
@@ -3134,8 +3118,6 @@ def main():
                     ),
                     "hf_params_provided": bool(getattr(args, 'pass1_hf_params', None)),
                     "qwen_params_provided": bool(getattr(args, 'pass1_qwen_params', None)),
-                    "crispasr_exe": getattr(args, 'crispasr_exe', None),
-                    "crispasr_backend": getattr(args, 'crispasr_backend', None),
                     "language": language_code,
                     "device": args.device,
                     "compute_type": args.compute_type,
@@ -3167,8 +3149,6 @@ def main():
                     "device": args.device,
                     "compute_type": args.compute_type,
                     "xxl_exe": getattr(args, 'xxl_exe', None),
-                    "crispasr_exe": getattr(args, 'crispasr_exe', None),
-                    "crispasr_backend": getattr(args, 'crispasr_backend', None),
                 }
             # Apply the same conditional_sensitivity_cap that runs at runtime
             # so the dump shows what pass 2 will ACTUALLY use, not what was
@@ -3193,6 +3173,25 @@ def main():
             except Exception as cap_err:
                 # Don't let cap surfacing fail the dump; record the error
                 ensemble_dump["_safety_cap_error"] = str(cap_err)
+            # A CrispASR pass resolves its values in the pass worker (model, speech segmenter); show
+            # what the run will use beside the values as typed, which keep their usual keys.
+            for _key in ("pass1", "pass2"):
+                _p = ensemble_dump.get(_key)
+                if not _p or _p.get("pipeline") not in CRISPASR_PIPELINES:
+                    continue
+                try:
+                    _model = crispasr_model_for(_p["pipeline"], _p.get("model")).name
+                except ValueError as _refused:
+                    _model = f"(refused: {_refused})"
+                _p["crispasr_effective"] = {
+                    "model": _model,
+                    "speech_segmenter": effective_segmenter_for_pass(
+                        _p["pipeline"], _p.get("speech_segmenter")),
+                    "scene_detector": "semantic",
+                    "not_used": ["sensitivity", "scene_detector", "speech_enhancer", "enhance_for_vad",
+                                 "vad_threshold", "speech_pad_ms", "params", "hf_params", "qwen_params",
+                                 "device", "compute_type"],
+                }
             dump_data["ensemble_config"] = ensemble_dump
         try:
             with open(args.dump_params, 'w', encoding='utf-8') as f:
@@ -3223,6 +3222,17 @@ def main():
             # wrong way (owner, 2026-09-17).
             ensure_segmenter_backend_available(_seg)
             ensure_segmenter_model_available(_seg)
+        # CrispASR passes (CrispASR master plan 1.5, 2.6): the program and the models are made ready
+        # here, downloaded if missing, before any audio is read and before either pass starts. A missing
+        # file under --offline, a processor without AVX2 or a failed download then costs nothing; checked
+        # only inside the pass, a two-pass run would first run the other pass in full, for nothing.
+        _crispasr_passes = [
+            (_n, getattr(args, f"pass{_n}_pipeline"), getattr(args, f"pass{_n}_model", None))
+            for _n in (1, 2)
+            if getattr(args, f"pass{_n}_pipeline", None) in CRISPASR_PIPELINES
+        ]
+        if _crispasr_passes:
+            ensure_crispasr_ready(_crispasr_passes)
     elif resolved_config:
         _seg_cfg = resolved_config.get("params", {}).get("speech_segmenter") or {}
         ensure_segmenter_backend_available(_seg_cfg.get("backend"))
@@ -3236,6 +3246,11 @@ def main():
     # user asked to have cleaned up, from a run that exits 0.
     if args.ensemble:
         for _n in (1, 2):
+            # A CrispASR pass runs no audio clean-up (CrispASR master plan 2.2), so a clean-up
+            # named for it must not stop the run; the pass worker names it among the settings
+            # that pass does not use.
+            if getattr(args, f"pass{_n}_pipeline", None) in CRISPASR_PIPELINES:
+                continue
             ensure_speech_enhancer_available(
                 getattr(args, f"pass{_n}_speech_enhancer", None))
     else:
@@ -3422,11 +3437,6 @@ def main():
                 'params': pass1_params,  # None = use defaults, object = custom
                 'hf_params': pass1_hf_params,  # For transformers pipeline
                 'qwen_params': pass1_qwen_params,  # For qwen pipeline
-                # CrispASR fields (only used when pipeline='crispasr'); shared
-                # across both passes, mirroring the --xxl-exe precedent.
-                'crispasr_exe': getattr(args, 'crispasr_exe', None),
-                'crispasr_backend': getattr(args, 'crispasr_backend', None),
-                'crispasr_args': getattr(args, 'crispasr_args', ''),
                 'language': language_code,  # Source language code (e.g., 'en', 'ja')
                 'device': args.device,  # Hardware override (None = auto-detect)
                 'compute_type': args.compute_type,  # Compute type override (None = auto)
@@ -3452,11 +3462,6 @@ def main():
                     'params': pass2_params,
                     'hf_params': pass2_hf_params,  # For transformers pipeline
                     'qwen_params': pass2_qwen_params,  # For qwen pipeline
-                    # CrispASR fields (only used when pipeline='crispasr'); shared
-                    # across both passes, mirroring the --xxl-exe precedent.
-                    'crispasr_exe': getattr(args, 'crispasr_exe', None),
-                    'crispasr_backend': getattr(args, 'crispasr_backend', None),
-                    'crispasr_args': getattr(args, 'crispasr_args', ''),
                     'language': language_code,  # Source language code (e.g., 'en', 'ja')
                     'device': args.device,  # Hardware override (None = auto-detect)
                     'compute_type': args.compute_type,  # Compute type override (None = auto)
@@ -3556,11 +3561,13 @@ def main():
                 if result.get('error') or status == 'failed':
                     failed_files.append(basename)
                     _why = result.get('error')
-                    # A file stopped for damaged audio (--fail-on suspect) names
-                    # that reason, not the generic text. Other pass-1 errors are
-                    # full tracebacks and stay out of the summary row.
+                    # A file stopped for damaged audio (--fail-on suspect), or one whose
+                    # CrispASR program or files failed (CrispASR master plan 2.6), names
+                    # that reason, not the generic text. Other pass-1 errors are full
+                    # tracebacks and stay out of the summary row.
                     _p1_error = str((result.get('pass1') or {}).get('error') or '')
-                    if not _why and _p1_error.startswith("stopped before transcription"):
+                    if not _why and (_p1_error.startswith("stopped before transcription")
+                                     or _p1_error.startswith(CRISPASR_FAILURE_PREFIX)):
                         _why = _p1_error
                     outcome = failed_outcome(
                         in_path, str(_why or 'ensemble pass failed'),
@@ -3579,7 +3586,11 @@ def main():
                     # (agreed error-handling table, 2026-09-17).
                     _reasons = []
                     if status == 'degraded':
-                        _reasons.append("pass 2 failed; output is pass 1 alone")
+                        _p2_error = str((result.get('pass2') or {}).get('error') or '')
+                        if _p2_error.startswith(CRISPASR_FAILURE_PREFIX):
+                            _reasons.append(f"pass 2 failed ({_p2_error}); output is pass 1 alone")
+                        else:
+                            _reasons.append("pass 2 failed; output is pass 1 alone")
                     _reasons.extend(_summary.get('degradations') or [])
 
                     outcome = classify_output(
@@ -3599,6 +3610,11 @@ def main():
                         # Fallback output is deliberately not translated (below).
                         mark_translation(outcome, "skipped",
                                          error="pass-1 fallback output is not translated")
+                # Routine notes from the passes (owner Q21, CrispASR master plan 2.6): printed
+                # under the file's row in the run summary and kept in the manifest. They are
+                # attached after the verdict and never feed it, so they change no state and no
+                # exit status. A shortfall that should make the file suspect is a degradation.
+                outcome.notes = list(_summary.get('notes') or [])
                 outcomes.append(outcome)
                 _outcome_by_input[str(in_path)] = outcome
                 log_outcome(outcome)
