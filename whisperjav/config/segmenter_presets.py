@@ -274,3 +274,51 @@ def resolve_segmenter_sensitivity(
         )
         return {k: v for k, v in (user_overrides or {}).items() if k in SEGMENTER_PARAMS}
 
+
+# What sensitivity sets in a CrispASR pass (1.10.0; CrispASR master plan 3.8 item 4; owner W134 2,
+# W136, W138 2): only the setting that decides where each segmenter finds speech, read from that
+# segmenter's own preset for that sensitivity. Keyed by tool YAML; each entry maps the YAML key to the
+# backend's argument. resolve_segmenter_sensitivity cannot serve here: it keeps only SEGMENTER_PARAMS,
+# which has no Whisper-VAD or NeMo key, and it keeps the preset's group lengths and pads, which a
+# CrispASR pass sets itself (12 s or 30 s; 100 ms and 0 ms).
+DETECTION_SETTINGS = {
+    "whisperseg-speech-segmentation": {"threshold": "threshold"},
+    "silero-speech-segmentation": {"threshold": "threshold"},
+    "silero-v6-speech-segmentation": {"threshold": "threshold"},
+    "ten-speech-segmentation": {"threshold": "threshold"},
+    "firered-vad-speech-segmentation": {"threshold": "threshold"},
+    # Whisper decides a stretch is silence from both values together.
+    "whisper-vad-speech-segmentation": {"no_speech_threshold": "no_speech_threshold",
+                                        "logprob_threshold": "logprob_threshold"},
+    # Speech starts above onset and ends below offset.
+    "nemo-speech-segmentation": {"vad.onset": "onset", "vad.offset": "offset"},
+}
+
+
+def segmenter_detection_settings(segmenter_backend: Optional[str], sensitivity: str) -> Dict[str, Any]:
+    """The detection setting(s) of a segmenter at a sensitivity, as backend arguments.
+
+    E.g. ("whisperseg", "aggressive") -> {"threshold": 0.25}; ("nemo", "balanced") ->
+    {"onset": 0.8, "offset": 0.6}. Empty for "none" and for a segmenter with no entry in
+    DETECTION_SETTINGS, which then runs with its own built-in values (logged as a warning).
+    """
+    if not segmenter_backend or segmenter_backend in ("none", "faster-whisper"):
+        return {}
+    tool_name = SEGMENTER_TOOL_NAMES.get(segmenter_backend)
+    if tool_name is None and segmenter_backend.startswith("nemo"):
+        tool_name = SEGMENTER_TOOL_NAMES["nemo"]  # nemo-diarization: the same NeMo presets
+    keys = DETECTION_SETTINGS.get(tool_name)
+    if not keys:
+        logger.warning("Sensitivity does not reach the speech segmenter '%s': WhisperJAV does not know "
+                       "its detection setting, so it runs with its own built-in values", segmenter_backend)
+        return {}
+    try:
+        from whisperjav.config.v4 import ConfigManager
+
+        resolved = ConfigManager().get_tool_config(tool_name, sensitivity, None)
+    except Exception as e:  # as resolve_segmenter_sensitivity: a preset that cannot be read stops no run
+        logger.warning("Sensitivity does not reach the speech segmenter '%s': its preset could not be read (%s), "
+                       "so it runs with its own built-in values", segmenter_backend, e)
+        return {}
+    return {arg: resolved[key] for key, arg in keys.items() if key in resolved}
+
