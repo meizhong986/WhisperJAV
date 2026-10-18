@@ -17,6 +17,7 @@ Run with: pytest tests/test_speech_enhancer_spec.py -v
 """
 
 import argparse
+import os
 import subprocess
 import sys
 
@@ -135,9 +136,11 @@ class TestTheFlagsThemselves:
 class TestEnhanceForVadIsIgnoredWhereWeSayItIs:
     """
     The owner accepted on 2026-09-17 that fast, faster, transformers and crispasr
-    ignore --passN-enhance-for-vad, on condition it is documented. The list that
-    documents it must not drift from the pipelines themselves, so this reads their
-    source rather than their docstrings.
+    ignore --passN-enhance-for-vad, on condition it is documented. 1.10.0 removed
+    the crispasr pipeline; its successors parakeet-crispasr and cohere-crispasr run
+    no audio clean-up at all, so they ignore it too. The list that documents it
+    must not drift from the pipelines themselves, so this reads their source rather
+    than their docstrings.
     """
 
     def test_the_list_matches_the_pipeline_sources(self):
@@ -160,9 +163,14 @@ class TestEnhanceForVadIsIgnoredWhereWeSayItIs:
             "pipeline classes actually read")
 
     def test_the_help_names_the_pipelines_that_ignore_it(self):
+        # argparse wraps help text at hyphens too ("parakeet-" / "crispasr"), so the
+        # phrase below survives only an unwrapped line: ask for a wide terminal.
         result = subprocess.run([sys.executable, "-m", "whisperjav.main", "--help"],
                                 capture_output=True, text=True,
-                                encoding="utf-8", errors="replace", timeout=300)
+                                encoding="utf-8", errors="replace", timeout=300,
+                                env={**os.environ, "COLUMNS": "1000"})
         assert result.returncode == 0
         help_text = " ".join(result.stdout.split())
-        assert "fast, faster, transformers and crispasr ignore it" in help_text
+        assert "fast, faster, transformers, parakeet-crispasr and cohere-crispasr ignore it" in help_text
+        assert ("Accepted but ignored by fast, faster, transformers, parakeet-crispasr and "
+                "cohere-crispasr.") in help_text
