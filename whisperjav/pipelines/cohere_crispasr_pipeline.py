@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Cohere-CrispASR: a Japanese fine-tune of Cohere Transcribe, run by CrispASR's own program (1.10.0, item 4).
 
-An Ensemble Mode pass pipeline only (W118 2): ``whisperjav --ensemble --pass1-pipeline cohere-crispasr
---pass1-model <name>``. It has no --mode value and no entry in the Transcription Mode tab. Its model is
-one of two Japanese fine-tunes (W118 4); the step 2b measurement picks the default, so until then a run
-names its model.
+An Ensemble Mode pass pipeline only (W118 2): ``whisperjav --ensemble --pass1-pipeline cohere-crispasr``.
+It has no --mode value and no entry in the Transcription Mode tab. Its model is one of two Japanese
+fine-tunes (W118 4): cohere-asr-ja-v0.1 by default, on the step 2b scores (W129 1), or cohere-asr-ja
+(--pass1-model).
 
 One run, stage by stage (master plan 3.2):
   1. the program and the model are made ready -- downloaded if missing -- before any audio is read,
@@ -16,12 +16,17 @@ One run, stage by stage (master plan 3.2):
   5. this pipeline's SLICE RULE turns the groups into cut points in film time;
   6. one program run over the whole film reads the cut points (--vad-import) and writes -ojf JSON;
   7. each segment is tied to its slice, and this pipeline's PARSER turns its tokens into words;
-  8. scene by scene, this pipeline's LINE BUILDING makes the subtitle lines; the scene SRTs are stitched;
+  8. scene by scene, this pipeline's LINE BUILDING makes the subtitle lines, and the line-length rule,
+     off until phase D picks its values (W138 3); the scene SRTs are stitched;
   9. this pipeline's POST-PROCESSING, then <name>.ja.whisperjav.srt.
+
+The pass's sensitivity sets only the speech segmenter's detection setting, from that segmenter's own
+preset (master plan 3.8 item 4; W134 2, W136); the 30 s limit and the pads stay this pipeline's.
 
 What it shares with the other CrispASR pipelines is only what CrispASR's formats make the same for every
 engine (owner decision Q20 = A, W118 1): the program runner, the JSON reader, the cut-point writer and the
-downloads, in whisperjav/crispasr/. Every Cohere-specific rule is in this file.
+downloads, in whisperjav/crispasr/; and the line-length rule, one rule for both (plan 3.8 item 3). Every
+Cohere-specific rule is in this file.
 
 Times are the engine's own (W116): Cohere's token times are estimated by CrispASR from the decoder (DTW);
 they are only clamped to their slice, and no stable-ts silence adjustment moves them. Each segment ends
@@ -38,7 +43,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
+from whisperjav.config.segmenter_presets import ENSEMBLE_DEFAULT_SENSITIVITY, segmenter_detection_settings
 from whisperjav.crispasr import install
+from whisperjav.crispasr.line_length import OFF, LineLimits, is_closing_marks_only, lines_from_segments
 from whisperjav.crispasr.manifest import ModelFile, model_for
 from whisperjav.crispasr.ojf import (CrispSegment, CutPoint, header_mismatch, parse_ojf, place_in_slices,
                                      read_ojf, write_vad_import)
@@ -116,18 +123,22 @@ class CohereCrispASRPipeline(BasePipeline):
                  slice_form: str = "speech",
                  line_mode: str = "regroup",
                  postprocess: Optional[Tuple[str, ...]] = None,
+                 sensitivity: Optional[str] = None,
+                 line_limits: LineLimits = OFF,
                  **kwargs):
         """
         Args:
-            model_name: a short name from the manifest (plan 3.3). This pipeline has no default model
-                until step 2b picks one, so a run must name it.
+            model_name: a short name from the manifest (plan 3.3); None means this pipeline's default.
             speech_segmenter: WhisperJAV's speech segmenter for the slices; default WhisperSeg. "none"
                 is refused: the slices follow speech (Q14).
             language: the source language; Japanese only (Q19).
             subs_language: "direct-to-english" still writes Japanese, with one console line (Q19).
             slice_form, line_mode, postprocess: the step 2b comparisons (plan 3.4, 3.3, 3.6).
-            **kwargs: pass settings this pipeline does not use (sensitivity, scene detector, speech
-                enhancer, ...) arrive here and are not used.
+            sensitivity: the pass's sensitivity; it sets only the speech segmenter's detection setting.
+                None means balanced, an Ensemble pass's default.
+            line_limits: the line-length rule's limits (plan 3.8 item 3); off by default (W138 3).
+            **kwargs: pass settings this pipeline does not use (scene detector, speech enhancer, ...)
+                arrive here and are not used.
         """
         super().__init__(output_dir=output_dir, temp_dir=temp_dir, keep_temp_files=keep_temp_files,
                          save_metadata_json=save_metadata_json, **kwargs)
@@ -162,6 +173,11 @@ class CohereCrispASRPipeline(BasePipeline):
             raise ValueError(f"{self.LABEL}: unknown post-processing step(s) {unknown} "
                              f"({', '.join(self.POSTPROCESS_STEPS)})")
         self.postprocess = steps
+        self.sensitivity = sensitivity or ENSEMBLE_DEFAULT_SENSITIVITY
+        # Only the detection setting (W134 2): the group length and the pads stay this pipeline's.
+        self.segmenter_detection: Dict = (segmenter_detection_settings(self.speech_segmenter, self.sensitivity)
+                                          if self.slice_form == "speech" else {})
+        self.line_limits = line_limits
 
         self.audio_extractor = None
         self._program: Optional[install.ProgramChoice] = None
@@ -173,7 +189,9 @@ class CohereCrispASRPipeline(BasePipeline):
         self.degradations: List[str] = []
         self.notes: List[str] = []
 
-        logger.info(f"{self.LABEL} ready: model {self.model.label}, speech segmenter {self.speech_segmenter}, "
+        detection = ", ".join(f"{k} {v}" for k, v in self.segmenter_detection.items())
+        logger.info(f"{self.LABEL} ready: model {self.model.label}, speech segmenter {self.speech_segmenter}"
+                    f"{f' ({self.sensitivity}: {detection})' if detection else ''}, "
                     f"slices {self.slice_form} (at most {self.MAX_SLICE_S:.0f} s), lines {self.line_mode}")
 
     def get_mode_name(self) -> str:
@@ -288,8 +306,11 @@ class CohereCrispASRPipeline(BasePipeline):
             "pipeline": self.PIPELINE_NAME,
             "config": {"crispasr": {"model": self.model.name, "repo": self.model.repo_id,
                                     "revision": self.model.revision, "backend": self.model.backend,
-                                    "speech_segmenter": self.speech_segmenter, "slice_form": self.slice_form,
-                                    "line_mode": self.line_mode, "postprocess": list(self.postprocess)}},
+                                    "speech_segmenter": self.speech_segmenter, "sensitivity": self.sensitivity,
+                                    "segmenter_detection": dict(self.segmenter_detection),
+                                    "slice_form": self.slice_form, "line_mode": self.line_mode,
+                                    "line_limits": self.line_limits.as_dict(),
+                                    "postprocess": list(self.postprocess)}},
             "stages": {},
             "output_files": {},
             "summary": {},
@@ -368,6 +389,7 @@ class CohereCrispASRPipeline(BasePipeline):
             end_pad_ms=self.SEGMENTER_END_PAD_MS,
             # A padded segment then still fits the window; the slice rule splits anything longer.
             max_speech_duration_s=self.MAX_SLICE_S - pads_s,
+            **self.segmenter_detection,
         )
         groups: List[_Group] = []
         failed = 0
@@ -570,10 +592,17 @@ class CohereCrispASRPipeline(BasePipeline):
 
         Cohere's "words" list holds the whole segment as one word, so its tokens are read instead:
         - blank tokens are dropped;
-        - a zero-length token is folded into the next one (CrispASR gives many: 24 of 54 in run S1);
+        - a zero-length token that is only punctuation (、 。 ! and the like; not an opening bracket)
+          joins the text before it: a zero-length token still waiting to be placed, else the word before
+          it, whose times it keeps. At the start of a segment it waits for the next word (W129 5 (ii));
+        - any other zero-length token is folded into the next one (CrispASR gives many: 24 of 54 in
+          run S1; W113 X3);
         - times are clamped to the slice.
-        A segment with text but no usable tokens is shared out over its own times (split_frame_to_words),
-        so no text is lost. Returns the word dicts and how many times had to be moved into the slice.
+        A segment whose tokens all have zero length gives one word: its whole text, timed by the segment's
+        own start and end. It is marked "alone": line building gives it a line of its own (W129 5 (iii),
+        W135 3). A segment with text but no usable tokens is shared out over its own times
+        (split_frame_to_words), so no text is lost. Returns the word dicts and how many times had to be
+        moved into the slice.
         """
         clamped = 0
 
@@ -586,9 +615,18 @@ class CohereCrispASRPipeline(BasePipeline):
 
         words: List[Dict] = []
         tokens = [t for t in seg.tokens if t.text.strip()]
+        if tokens and all(t.end <= t.start for t in tokens):
+            # The program gave no times inside this segment.
+            start = clamp(seg.start)
+            text = seg.text.strip() or "".join(t.text for t in tokens).strip()
+            return [{"word": text, "start": start, "end": max(start, clamp(seg.end)), "alone": True}], clamped
         pending = ""
         for i, t in enumerate(tokens):
-            if t.end <= t.start and i + 1 < len(tokens):
+            zero_length = t.end <= t.start
+            if zero_length and not pending and words and is_closing_marks_only(t.text):
+                words[-1]["word"] += t.text
+                continue
+            if zero_length and i + 1 < len(tokens):
                 pending += t.text
                 continue
             start = clamp(t.start)
@@ -647,18 +685,22 @@ class CohereCrispASRPipeline(BasePipeline):
 
     def _write_regrouped_lines(self, items: List[Tuple[CrispSegment, CutPoint]], scene: _Scene,
                                scene_srt: Path) -> Tuple[bool, int]:
-        """REGROUP_JAV over the scene's words, with the engine's own times (suppress_silence off)."""
+        """REGROUP_JAV over the scene's words, with the engine's own times (suppress_silence off); a word
+        marked "alone" on a line of its own; then the line-length rule (plan 3.8 item 3)."""
         from whisperjav.modules.subtitle_pipeline.reconstruction import REGROUP_JAV, reconstruct_from_words
 
         words: List[Dict] = []
+        alone: List[bool] = []
         clamped = 0
         for seg, cut in sorted(items, key=lambda item: item[0].start):
             seg_words, n = self._word_dicts(seg, cut)
             clamped += n
             for w in seg_words:
                 words.append({"word": w["word"], "start": w["start"] - scene.start, "end": w["end"] - scene.start})
+                alone.append(bool(w.get("alone")))
         if not words:
             return False, clamped
+        given = [(w["start"], w["end"]) for w in words]  # before the hold-back below and REGROUP_JAV's clamp
         # stable-ts refuses words whose starts go backwards. Sorting them would reorder the text -- and
         # Cohere's estimated token times can step back -- so the engine's order is kept and only a start
         # that would precede the one before it is held back.
@@ -676,8 +718,50 @@ class CohereCrispASRPipeline(BasePipeline):
             result = reconstruct_from_words(words, scene.path, suppress_silence=False, regroup=False)
         if not getattr(result, "segments", None):
             return False, clamped
-        result.to_srt_vtt(str(scene_srt), word_level=False, segment_level=True, strip=True)
+        if any(alone):
+            self._set_apart(result, alone, given, scene)
+        if self.line_limits.active:
+            # The line-length rule, the last step of line building (plan 3.8 item 3).
+            from stable_whisper.text_output import result_to_srt_vtt
+
+            lines = lines_from_segments(result.segments, self.line_limits)
+            if not lines:
+                return False, clamped
+            result_to_srt_vtt([{"start": s, "end": e, "text": t} for t, s, e in lines], str(scene_srt),
+                              segment_level=True, word_level=False, strip=True)
+        else:
+            result.to_srt_vtt(str(scene_srt), word_level=False, segment_level=True, strip=True)
         return scene_srt.exists() and scene_srt.stat().st_size > 0, clamped
+
+    def _set_apart(self, result, alone: List[bool], times: List[Tuple[float, float]], scene: _Scene) -> None:
+        """Give each word marked "alone" a line of its own, with its segment's own times, in place
+        (W129 5 (iii); W135 3: the 18.8 s line kept whole).
+
+        REGROUP_JAV's clamp ("cm") moves the start of a very long word forward -- on S01E04 it made the
+        18.8 s segment a line of 0.4 s -- so each word set apart gets back the times it was given
+        (``times``, scene-relative). Line building keeps the words and their order, so the i-th word of the
+        result is the i-th word given to it. Where the counts differ, nothing is moved and a debug line
+        says so.
+        """
+        counts = [len(seg.words or []) for seg in result.segments]
+        if sum(counts) != len(alone):
+            logger.debug(f"{self.LABEL}: scene {scene.index}: line building returned {sum(counts)} words of "
+                         f"{len(alone)}; a segment without times inside may share a line")
+            return
+        rebuilt = []
+        first = 0
+        for seg, n in zip(result.segments, counts):
+            marks = alone[first:first + n]
+            for k, m in enumerate(marks):
+                if m:
+                    word = seg.words[k]
+                    word.start, word.end = times[first + k]
+            first += n
+            # The index of the last word of each new line: before and at every word set apart.
+            ends = sorted({i for k, m in enumerate(marks) if m for i in (k - 1, k) if 0 <= i < n - 1})
+            parts = seg.split(ends, reassign_ids=False) if ends else []
+            rebuilt.extend(parts or [seg])
+        result.segments[:] = rebuilt
 
     # -----------------------------------------------------------------------------------------------
     # 9. This pipeline's post-processing (plan 3.6)
