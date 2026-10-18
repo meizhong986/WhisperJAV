@@ -12,7 +12,9 @@ A configuration is a pipeline, a model and a slice form. The six of plan 4.5:
 
 "speech" is each pipeline's own slice rule: speech groups of at most 12 s (Parakeet) or 30 s (Cohere). "windows"
 cuts each scene into equal windows of at most that length. The Parakeet CTC 1.1B is measured here but not offered
-to users: only a pipeline built in code reaches it, never WhisperJAV's command line.
+to users: only a pipeline built in code reaches it, never WhisperJAV's command line. --max-slice-s gives the pipeline
+another longest slice than its own, for one comparison of the step 2 report (item 10 (c): Cohere v0.1 on speech groups
+of at most 12 s); the configuration's folder name then ends in _max<seconds>s.
 
 What the script does:
   1. builds the pipeline as an Ensemble pass does, with the model and slice form above and its temporary files
@@ -118,10 +120,11 @@ class Config:
     overwrite: bool = False
     dry_run: bool = False
     argv: Tuple[str, ...] = ()
+    max_slice_s: Optional[float] = None  # --max-slice-s; None: the pipeline's own longest slice
 
     @property
     def label(self) -> str:
-        return config_label(self.model.name, self.slice_form)
+        return config_label(self.model.name, self.slice_form, self.max_slice_s)
 
     @property
     def basename(self) -> str:
@@ -136,9 +139,10 @@ class Config:
         return self.folder / "temp"
 
 
-def config_label(model_name: str, slice_form: str) -> str:
-    """The configuration's folder name: the model (which names its pipeline) and the slice form."""
-    return f"{model_name}_{slice_form}"
+def config_label(model_name: str, slice_form: str, max_slice_s: Optional[float] = None) -> str:
+    """The configuration's folder name: the model (which names its pipeline), the slice form, and a longest slice
+    other than the pipeline's own when one is given."""
+    return f"{model_name}_{slice_form}" + ("" if max_slice_s is None else f"_max{max_slice_s:g}s")
 
 
 def variant_name(line_mode: str, post: str) -> str:
@@ -199,6 +203,9 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--model", help=_model_help())
     ap.add_argument("--slice-form", required=True, choices=SLICE_FORMS,
                     help="speech: the pipeline's own speech groups; windows: equal windows over the scenes")
+    ap.add_argument("--max-slice-s", type=float, metavar="SECONDS",
+                    help="the longest slice instead of the pipeline's own (12 s Parakeet, 30 s Cohere); the folder "
+                         "name then ends in _max<seconds>s")
     ap.add_argument("--out", required=True, type=Path,
                     help="the batch folder; this configuration's files go into <out>/<model>_<slice form>/")
     ap.add_argument("--overwrite", action="store_true",
@@ -223,9 +230,11 @@ def parse_args(argv: Optional[List[str]] = None) -> Config:
     film = Path(os.path.abspath(a.film))
     if not film.is_file():
         ap.error(f"the film was not found: {film}")
+    if a.max_slice_s is not None and not a.max_slice_s > 0:
+        ap.error(f"--max-slice-s must be more than 0 seconds, not {a.max_slice_s:g}")
     return Config(pipeline=a.pipeline, model=model, slice_form=a.slice_form, film=film,
                   out=Path(os.path.abspath(a.out)), overwrite=a.overwrite, dry_run=a.dry_run,
-                  argv=tuple(sys.argv[1:] if argv is None else argv))
+                  argv=tuple(sys.argv[1:] if argv is None else argv), max_slice_s=a.max_slice_s)
 
 
 def refuse_if_measured(cfg: Config) -> None:
@@ -272,7 +281,9 @@ def describe(cfg: Config) -> List[str]:
         f"model          {m.name}: {m.label}, back end {m.backend}, {m.size / 1e6:,.0f} MB"
         + ("" if offered else "; measured in step 2b only, not offered to users"),
         f"               {m.repo_id}, file {m.filename}, revision {m.revision}",
-        f"slices         {cfg.slice_form}: {SLICE_WORDS[cfg.slice_form]}",
+        f"slices         {cfg.slice_form}: {SLICE_WORDS[cfg.slice_form]}"
+        + ("" if cfg.max_slice_s is None else f"; at most {cfg.max_slice_s:g} s (--max-slice-s), not the "
+                                              f"pipeline's own longest slice"),
         f"film           {cfg.film}",
         f"program        CrispASR {manifest.CRISPASR_VERSION}; builds for this computer: {builds}. The pipeline",
         "               chooses the build when it runs, and downloads the program and the model if they are missing.",
@@ -323,6 +334,8 @@ def build_pipeline(cfg: Config):
     """The measured pipeline: the constructor arguments above, the pipeline's defaults for everything else."""
     cls = pipeline_class(cfg.pipeline)
     check_against(cls, cfg.pipeline)
+    if cfg.max_slice_s is not None:  # the same pipeline with another longest slice; the class itself is not changed
+        cls = type(cls.__name__, (cls,), {"MAX_SLICE_S": float(cfg.max_slice_s), "__module__": cls.__module__})
     return cls(**constructor_arguments(cfg))
 
 
@@ -503,6 +516,7 @@ def run_record(cfg: Config, pipe, md: Optional[Dict], error: Optional[Dict], evi
         "configuration": {
             "label": cfg.label, "pipeline": cfg.pipeline, "pipeline_class": type(pipe).__name__,
             "model": cfg.model.name, "slice_form": cfg.slice_form, "slices": SLICE_WORDS[cfg.slice_form],
+            "max_slice_s": getattr(pipe, "MAX_SLICE_S", None), "max_slice_s_option": cfg.max_slice_s,
             "speech_segmenter": pipe.speech_segmenter, "speech_segmenter_used": cfg.slice_form == "speech",
             "line_mode": pipe.line_mode, "postprocess": list(pipe.postprocess),
             "constructor_arguments": constructor_arguments(cfg),
