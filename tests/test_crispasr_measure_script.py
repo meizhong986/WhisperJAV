@@ -354,6 +354,13 @@ def test_the_parakeet_default_model_comes_from_the_manifest(script, tmp_path):
     assert cfg.label == "parakeet-tdt-0.6b-ja_speech"
 
 
+def test_the_cohere_default_model_comes_from_the_manifest(script, tmp_path):
+    cfg = script.parse_args([str(make_film(tmp_path)), "--pipeline", "cohere-crispasr", "--slice-form", "speech",
+                             "--out", str(tmp_path / "batch")])
+    assert cfg.model.name == manifest.PIPELINE_DEFAULT_MODEL["cohere-crispasr"] == "cohere-asr-ja-v0.1"
+    assert cfg.label == "cohere-asr-ja-v0.1_speech"
+
+
 def test_the_measurement_only_model_is_accepted_but_not_offered(script, tmp_path):
     assert "parakeet-ctc-1.1b-ja" not in manifest.PIPELINE_MODELS["parakeet-crispasr"]
     cfg = script.parse_args([str(make_film(tmp_path)), "--pipeline", "parakeet-crispasr", "--model",
@@ -369,8 +376,6 @@ def test_another_longest_slice_names_its_own_folder(script, tmp_path):
 
 
 REFUSED = [
-    pytest.param(["--pipeline", "cohere-crispasr", "--slice-form", "speech"],
-                 "has no default model; name one with --model: cohere-asr-ja-v0.1, cohere-asr-ja", id="cohere-no-model"),
     pytest.param(["--pipeline", "cohere-crispasr", "--model", "parakeet-ctc-1.1b-ja", "--slice-form", "speech"],
                  "is not a model of cohere-crispasr", id="parakeet-model-on-cohere"),
     pytest.param(["--pipeline", "parakeet-crispasr", "--model", "cohere-asr-ja", "--slice-form", "speech"],
@@ -534,15 +539,16 @@ def test_parakeet_variants_differ_where_their_settings_differ(script, monkeypatc
     assert after["明日も雨。"][0] == pytest.approx(41.201, abs=0.0015)
     assert after["今日は晴れ。"] == before["今日は晴れ。"]
 
-    # the pipeline's own SRT is the variant with its own settings, from the same single program run
+    # the pipeline's own SRT is the variant with its own settings (Parakeet's own segments since W129 4),
+    # from the same single program run
     own = srt_lines(folder / "film.ja.whisperjav.srt")
-    assert own == v["lines-regroup_post-text+overlap"] and own != v["lines-regroup_post-none"]
+    assert own == v["lines-segments_post-text+overlap"] and own != v["lines-regroup_post-text+overlap"]
     assert len(b.program.calls) == 1
 
     record = b.record("parakeet-tdt-0.6b-ja", "speech")
     by_name = {r["name"]: r for r in record["variants"]}
-    assert by_name["lines-regroup_post-text+overlap"]["same_lines_as_pipeline_srt"] is True
-    assert by_name["lines-regroup_post-none"]["same_lines_as_pipeline_srt"] is False
+    assert by_name["lines-segments_post-text+overlap"]["same_lines_as_pipeline_srt"] is True
+    assert by_name["lines-regroup_post-text+overlap"]["same_lines_as_pipeline_srt"] is False
     assert by_name["lines-segments_post-none"]["postprocess_stats"] == {}
     assert by_name["lines-segments_post-text"]["postprocess_stats"]["nonverbal_dropped"] == 1
     assert by_name["lines-segments_post-text+overlap"]["postprocess_stats"]["overlap_shifted"] == 1
@@ -581,7 +587,7 @@ def test_run_json_records_the_configuration_model_program_run_slices_and_variant
     assert c["constructor_arguments"] == {"output_dir": str(folder), "temp_dir": str(folder / "temp"),
                                           "keep_temp_files": True, "model_name": "parakeet-ctc-1.1b-ja",
                                           "slice_form": "speech"}
-    assert (c["line_mode"], c["postprocess"]) == ("regroup", list(ParakeetCrispASRPipeline.DEFAULT_POSTPROCESS))
+    assert (c["line_mode"], c["postprocess"]) == ("segments", list(ParakeetCrispASRPipeline.DEFAULT_POSTPROCESS))
     assert (c["speech_segmenter"], c["speech_segmenter_used"]) == ("whisperseg", True)
 
     pin = manifest.MODELS["parakeet-ctc-1.1b-ja"]
