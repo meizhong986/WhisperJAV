@@ -28,7 +28,8 @@ from whisperjav.pipelines.parakeet_crispasr_pipeline import ParakeetCrispASRPipe
 from whisperjav.pipelines.cohere_crispasr_pipeline import CohereCrispASRPipeline
 from whisperjav.crispasr.install import CrispASRSetupError
 from whisperjav.crispasr.manifest import CRISPASR_PIPELINES
-from whisperjav.crispasr.pass_settings import unused_pass_settings, unused_settings_message
+from whisperjav.crispasr.pass_settings import (ignored_hardware_message, ignored_hardware_settings,
+                                               unused_pass_settings, unused_settings_message)
 from whisperjav.crispasr.runner import FAILURE_PREFIX as CRISPASR_FAILURE_PREFIX, CrispASRRunError
 from whisperjav.utils.logger import logger, setup_logger
 from whisperjav.utils.parameter_tracer import create_tracer, NullTracer
@@ -1439,6 +1440,12 @@ def _build_pipeline(
         if unused:
             logger.info(unused_settings_message(
                 getattr(pipeline_class, "LABEL", pipeline_name), unused))
+        # W122: --device and --compute-type are not used, with a logged warning. The GUI sends
+        # neither for an Ensemble pass, so a GUI run gives none.
+        hardware = ignored_hardware_settings(pass_config)
+        if hardware:
+            logger.warning(ignored_hardware_message(
+                getattr(pipeline_class, "LABEL", pipeline_name), hardware))
         crispasr_kwargs = {
             "output_dir": output_dir,
             "temp_dir": str(pass_temp_dir),
@@ -1454,11 +1461,15 @@ def _build_pipeline(
                 pipeline_name, pass_config.get("speech_segmenter")),
             "language": pass_config.get("language") or "ja",
             "subs_language": subs_language,
+            # Sets only the speech segmenter's detection setting (CrispASR master plan 3.8 item 4;
+            # W134 2, W136). main.py fills in balanced when the pass names none.
+            "sensitivity": pass_config.get("sensitivity"),
         }
         logger.debug(
-            "[Worker %s] Pass %s: Creating %s with model=%s, speech_segmenter=%s",
+            "[Worker %s] Pass %s: Creating %s with model=%s, speech_segmenter=%s, sensitivity=%s",
             os.getpid(), pass_number, pipeline_class.__name__,
             crispasr_kwargs["model_name"] or "(default)", crispasr_kwargs["speech_segmenter"],
+            crispasr_kwargs["sensitivity"],
         )
         try:
             pipeline = pipeline_class(**crispasr_kwargs)
