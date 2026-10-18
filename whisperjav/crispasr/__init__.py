@@ -10,7 +10,11 @@ MOSS-CrispASR in 1.10.2. They share only what the program's own formats make the
     ojf.py        reading its JSON, placing segments in their slices, writing its cut-point file
 
 Everything that differs per engine -- the slice rule, the parser, line building and post-processing --
-lives in that engine's own pipeline class (whisperjav/pipelines/*_crispasr_pipeline.py).
+lives in that engine's own pipeline class (whisperjav/pipelines/*_crispasr_pipeline.py). One rule of
+line building is the same for every engine by decision, not by format, and lives here too:
+
+    line_length.py  the line-length rule: a long line is split only after a punctuation mark
+                    (master plan 3.8 item 3; off until phase D picks its values, W138 3)
 
 Two small modules serve WhisperJAV's command line and Ensemble pass worker:
 
