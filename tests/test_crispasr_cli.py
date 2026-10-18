@@ -36,6 +36,8 @@ from whisperjav.crispasr import manifest
 from whisperjav.crispasr.legacy import legacy_crispasr_message, legacy_crispasr_use
 from whisperjav.crispasr.pass_settings import (
     crispasr_pass_problem,
+    ignored_hardware_message,
+    ignored_hardware_settings,
     models_help,
     unused_pass_settings,
     unused_settings_message,
@@ -149,11 +151,18 @@ class TestAPassThatCannotRunIsRefused:
         assert problem == (f"--pass1-model: '{CTC}' is not a model of parakeet-crispasr; "
                            f"choose one of: parakeet-tdt-0.6b-ja")
 
-    @pytest.mark.parametrize("pipeline", [p for p, d in manifest.PIPELINE_DEFAULT_MODEL.items() if d is None])
-    def test_no_model_is_refused_where_there_is_no_default(self, pipeline):
-        problem = crispasr_pass_problem(1, pipeline, model=None, speech_segmenter=None, language="japanese")
-        assert problem.startswith(f"--pass1-model: {pipeline} has no default model yet")
-        for model in manifest.PIPELINE_MODELS[pipeline]:
+    @pytest.mark.parametrize("pipeline", manifest.CRISPASR_PIPELINES)
+    def test_no_model_named_runs_the_default(self, pipeline):
+        # every pipeline has one since step 2b (Cohere: v0.1, W129 1)
+        assert crispasr_pass_problem(1, pipeline, model=None, speech_segmenter=None, language="japanese") is None
+
+    def test_no_model_is_refused_where_there_is_no_default(self, monkeypatch):
+        # none such today; the refusal stays for a pipeline added before its default is picked
+        monkeypatch.setitem(manifest.PIPELINE_DEFAULT_MODEL, "cohere-crispasr", None)
+        problem = crispasr_pass_problem(1, "cohere-crispasr", model=None, speech_segmenter=None,
+                                        language="japanese")
+        assert problem.startswith("--pass1-model: cohere-crispasr has no default model yet")
+        for model in manifest.PIPELINE_MODELS["cohere-crispasr"]:
             assert model in problem
 
     @pytest.mark.parametrize("language", ["english", "korean", "chinese"])
@@ -226,6 +235,35 @@ class TestTheSettingsAPassDoesNotUse:
         assert unused_settings_message("Parakeet-CrispASR", ["--pass1-scene-detector", "--pass1-speech-enhancer"]) \
             == "Parakeet-CrispASR does not use: --pass1-scene-detector, --pass1-speech-enhancer"
 
+    @pytest.mark.parametrize("sensitivity", ["aggressive", "balanced", "conservative"])
+    def test_sensitivity_is_used_so_never_named(self, sensitivity):
+        assert unused_pass_settings({"pipeline": "cohere-crispasr", "sensitivity": sensitivity}, 1) == []
+
+
+class TestDeviceAndComputeType:
+    """W122: not used, "with logged warnings"; left out (the GUI sends neither) or auto, nothing is said."""
+
+    @pytest.mark.parametrize("config", [{}, {"device": None, "compute_type": None},
+                                        {"device": "auto", "compute_type": "AUTO"}])
+    def test_left_out_or_auto_is_not_named(self, config):
+        assert ignored_hardware_settings(config) == []
+
+    def test_each_value_given_is_named_with_its_flag(self):
+        assert ignored_hardware_settings({"device": "cuda"}) == ["--device cuda"]
+        assert ignored_hardware_settings({"compute_type": "int8"}) == ["--compute-type int8"]
+        assert ignored_hardware_settings({"device": "cpu", "compute_type": "float16"}) == [
+            "--device cpu", "--compute-type float16"]
+
+    def test_the_warning(self):
+        assert ignored_hardware_message("Cohere-CrispASR", ["--device cuda", "--compute-type int8"]) == (
+            "Cohere-CrispASR ignores --device cuda and --compute-type int8: WhisperJAV picks CrispASR's GPU "
+            "or CPU build for this computer by itself, and CrispASR's model files come in one number "
+            "format (8-bit).")
+
+    def test_the_8_bit_in_the_warning_is_true_of_every_model_file(self):
+        names = {name for models in manifest.PIPELINE_MODELS.values() for name in models}
+        assert names and all(manifest.MODELS[name].filename.endswith("-q8_0.gguf") for name in names)
+
 
 class TestTheModelHelp:
     def test_it_lists_every_model_and_marks_the_defaults(self):
@@ -280,9 +318,6 @@ class TestTheCommandLine:
         assert BANNER not in result.stdout          # stopped before anything else ran
 
     @pytest.mark.parametrize("extra,expected", [
-        (["--pass1-pipeline", "cohere-crispasr"],
-         "error: --pass1-model: cohere-crispasr has no default model yet; choose one of: "
-         + ", ".join(manifest.PIPELINE_MODELS["cohere-crispasr"])),
         (["--pass1-pipeline", "parakeet-crispasr", "--pass1-model", "nope"],
          "error: --pass1-model: 'nope' is not a model of parakeet-crispasr; choose one of: "
          + ", ".join(manifest.PIPELINE_MODELS["parakeet-crispasr"])),
@@ -311,7 +346,7 @@ class TestTheCommandLine:
                       "--pass1-pipeline", "parakeet-crispasr",
                       "--pass2-pipeline", "cohere-crispasr", "--pass2-model", "cohere-asr-ja",
                       "--pass2-speech-segmenter", "ten", "--pass2-scene-detector", "auditok",
-                      "--dump-params", dump)
+                      "--pass2-sensitivity", "conservative", "--dump-params", dump)
         assert result.returncode == 0, (result.stdout + result.stderr)[-800:]
         return json.loads(dump.read_text(encoding="utf-8"))["ensemble_config"]
 
@@ -330,17 +365,22 @@ class TestTheCommandLine:
         assert "_safety_cap_error" not in ensemble, ensemble.get("_safety_cap_error")
 
     def test_the_dump_shows_what_each_crispasr_pass_will_use(self, dumped):
-        not_used = ["sensitivity", "scene_detector", "speech_enhancer", "enhance_for_vad", "vad_threshold",
+        # sensitivity is used: it sets the segmenter's detection setting (plan 3.8 item 4)
+        not_used = ["scene_detector", "speech_enhancer", "enhance_for_vad", "vad_threshold",
                     "speech_pad_ms", "params", "hf_params", "qwen_params", "device", "compute_type"]
         assert dumped["pass1"]["crispasr_effective"] == {
             "model": manifest.PIPELINE_DEFAULT_MODEL["parakeet-crispasr"],  # none named: the default
             "speech_segmenter": "whisperseg",                                 # none named: WhisperSeg
+            "sensitivity": "balanced",                                        # none named: balanced
+            "speech_segmenter_detection": {"threshold": 0.35},
             "scene_detector": "semantic",
             "not_used": not_used,
         }
         assert dumped["pass2"]["crispasr_effective"] == {
             "model": "cohere-asr-ja",
             "speech_segmenter": "ten",
+            "sensitivity": "conservative",
+            "speech_segmenter_detection": {"threshold": 0.42},                # TEN's conservative preset
             "scene_detector": "semantic",                                     # --pass2-scene-detector is not used
             "not_used": not_used,
         }
@@ -411,6 +451,9 @@ class TestThePassWorkerBuildsThem:
              "speech_enhancer": "none", "enhance_for_vad": False},
             # A hand-written configuration naming the removed pipeline.
             {"pipeline": "crispasr", "language": "ja"},
+            # --device and --compute-type given on the command line, which main.py puts in every pass.
+            {"pipeline": "parakeet-crispasr", "sensitivity": "aggressive", "model": None,
+             "speech_segmenter": "nemo-lite", "language": "ja", "device": "cuda", "compute_type": "int8"},
         ]
         result = subprocess.run([sys.executable, "-c", WORKER_PROBE, str(root), json.dumps(configs)],
                                 capture_output=True, text=True, encoding="utf-8", errors="replace",
@@ -441,7 +484,18 @@ class TestThePassWorkerBuildsThem:
             "speech_segmenter": "whisperseg",    # none named: WhisperSeg
             "language": "ja",
             "subs_language": "native",
+            "sensitivity": "balanced",           # the pipeline turns it into the detection setting
         }
+        assert not [l for l in built["log"] if "ignores --" in l], built["log"]
+
+    def test_device_and_compute_type_given_are_a_warning_and_sensitivity_reaches_the_pipeline(self, probe):
+        _root, out = probe
+        built = out["builds"][3]
+        assert built["error"] is None
+        assert (built["kwargs"]["sensitivity"], built["kwargs"]["speech_segmenter"]) == ("aggressive", "nemo-lite")
+        assert "device" not in built["kwargs"] and "compute_type" not in built["kwargs"]
+        assert ignored_hardware_message("Parakeet-CrispASR", ["--device cuda", "--compute-type int8"]) \
+            in built["log"]
 
     def test_one_line_names_what_it_does_not_use(self, probe):
         _root, out = probe
@@ -458,7 +512,8 @@ class TestThePassWorkerBuildsThem:
         assert built["error"] is None
         assert built["kwargs"]["model_name"] == "cohere-asr-ja"
         assert built["kwargs"]["speech_segmenter"] == "ten"
-        assert not [l for l in built["log"] if "does not use" in l], built["log"]
+        assert built["kwargs"]["sensitivity"] == "balanced"
+        assert not [l for l in built["log"] if "does not use" in l or "ignores --" in l], built["log"]
 
     def test_a_configuration_naming_the_removed_pipeline_fails_to_build(self, probe):
         _root, out = probe
