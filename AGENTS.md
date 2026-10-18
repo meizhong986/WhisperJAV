@@ -86,7 +86,7 @@ The **interface contracts** between these areas: `docs/architecture/MODULE_CONTR
 - **Call-chain verification is mandatory** before declaring any GUI→CLI feature done (`CLAUDE.md`).
 - **No parallel heavy local processes** (multiple concurrent GPU/ASR runs freeze the machine). Parallel *reasoning* subagents are fine.
 - **Do not push or commit without explicit owner authorization.**
-- Active branch is **`dev_v1.9.0`** (CrispASR WIP); `whisperjav/config/asr_config.json` is intentionally modified — do not commit it. See `memory/project_v190_crispasr_test_loop_resume_pointer.md`.
+- The current cycle's branch and state live in the memory index (`memory/MEMORY.md`), not here (`CLAUDE.md`). The 1.9.0 CrispASR work this line used to point at is superseded: 1.10.0 removed the "bring your own CrispASR" mode and runs CrispASR as the Ensemble pipelines `parakeet-crispasr` / `cohere-crispasr` (`whisperjav/pipelines/AGENTS.md`).
 
 ---
 

@@ -54,6 +54,8 @@ fallback), `tests/test_qwen_pipeline_integration.py`, `tests/test_qwen_japanese_
 
 ## Active context
 
-CrispASR (`pipelines/crispasr_*`) is an **external subprocess** provider, not an in-process engine
-— it does NOT belong here; see `memory/project_v190_crispasr_test_loop_resume_pointer.md`.
+CrispASR (`whisperjav/crispasr/` and `pipelines/*_crispasr_pipeline.py`, 1.10.0) runs CrispASR's own
+program as an **external process**, not an in-process engine — it does NOT belong here; design:
+`docs/plans/v1.10.0-crispasr-master-design-plan.md` (gitignored). The 1.9.x `pipelines/crispasr_*`
+files are removed.
 v1.9.x theme = ASR backend expansion (Cohere, FireRedVAD, etc.).
