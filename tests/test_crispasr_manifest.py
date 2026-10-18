@@ -132,6 +132,11 @@ class TestModels:
             assert default is None or default in PIPELINE_MODELS[pipeline], pipeline
         assert CRISPASR_PIPELINES == tuple(PIPELINE_MODELS)
 
+    def test_the_defaults(self):
+        # Cohere v0.1 on the step 2b scores (W129 1)
+        assert PIPELINE_DEFAULT_MODEL == {"parakeet-crispasr": "parakeet-tdt-0.6b-ja",
+                                          "cohere-crispasr": "cohere-asr-ja-v0.1"}
+
     def test_the_ctc_model_switches_off_the_punctuation_download(self):
         # Without it the program fetches a 58 MB punctuation model by itself (run P1).
         assert MODELS[CTC].extra_args == ("--punc-model", "none")
@@ -164,6 +169,10 @@ class TestModelFor:
         assert model_for("parakeet-crispasr", None) is MODELS["parakeet-tdt-0.6b-ja"]
         assert model_for("parakeet-crispasr", "") is MODELS["parakeet-tdt-0.6b-ja"]
 
+    def test_cohere_has_a_default(self):
+        assert model_for("cohere-crispasr", None) is MODELS["cohere-asr-ja-v0.1"]
+        assert model_for("cohere-crispasr", "") is MODELS["cohere-asr-ja-v0.1"]
+
     @pytest.mark.parametrize("pipeline, name", [
         ("parakeet-crispasr", "parakeet-tdt-0.6b-ja"),
         ("cohere-crispasr", "cohere-asr-ja-v0.1"),
@@ -182,8 +191,7 @@ class TestModelFor:
 
     def test_asking_for_measurement_models_changes_no_default_and_opens_no_other_pipeline(self):
         assert model_for("parakeet-crispasr", None, include_measurement=True) is MODELS["parakeet-tdt-0.6b-ja"]
-        with pytest.raises(ValueError, match="no default model yet"):
-            model_for("cohere-crispasr", None, include_measurement=True)
+        assert model_for("cohere-crispasr", None, include_measurement=True) is MODELS["cohere-asr-ja-v0.1"]
         with pytest.raises(ValueError, match="is not a model of cohere-crispasr"):
             model_for("cohere-crispasr", CTC, include_measurement=True)
         with pytest.raises(ValueError) as caught:
@@ -201,7 +209,9 @@ class TestModelFor:
         with pytest.raises(ValueError, match="is not a model of parakeet-crispasr"):
             model_for("parakeet-crispasr", "cohere-asr-ja")
 
-    def test_cohere_has_no_default_yet_and_says_what_to_choose(self):
+    def test_a_pipeline_without_a_default_says_what_to_choose(self, monkeypatch):
+        # No pipeline is without one today; the refusal stays for a pipeline added before its default is picked.
+        monkeypatch.setitem(PIPELINE_DEFAULT_MODEL, "cohere-crispasr", None)
         with pytest.raises(ValueError) as caught:
             model_for("cohere-crispasr", None)
         text = str(caught.value)
