@@ -24,7 +24,12 @@ from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
 from whisperjav.pipelines.transformers_pipeline import TransformersPipeline
 from whisperjav.pipelines.qwen_pipeline import QwenPipeline
-from whisperjav.pipelines.crispasr_pipeline import CrispASRPipeline
+from whisperjav.pipelines.parakeet_crispasr_pipeline import ParakeetCrispASRPipeline
+from whisperjav.pipelines.cohere_crispasr_pipeline import CohereCrispASRPipeline
+from whisperjav.crispasr.install import CrispASRSetupError
+from whisperjav.crispasr.manifest import CRISPASR_PIPELINES
+from whisperjav.crispasr.pass_settings import unused_pass_settings, unused_settings_message
+from whisperjav.crispasr.runner import FAILURE_PREFIX as CRISPASR_FAILURE_PREFIX, CrispASRRunError
 from whisperjav.utils.logger import logger, setup_logger
 from whisperjav.utils.parameter_tracer import create_tracer, NullTracer
 
@@ -37,14 +42,18 @@ PIPELINE_CLASSES = {
     "fidelity": FidelityPipeline,
     "transformers": TransformersPipeline,
     "qwen": QwenPipeline,  # Dedicated Qwen3-ASR pipeline (ADR-004)
-    "crispasr": CrispASRPipeline,  # Standalone external-provider pipeline (docs/plans/crispasr_v190/08)
+    # CrispASR's own program, Ensemble passes only (1.10.0; CrispASR master plan 3.7). They
+    # replace the 1.9.x "crispasr" pipeline, whose name main.py now stops (exit status 2).
+    "parakeet-crispasr": ParakeetCrispASRPipeline,
+    "cohere-crispasr": CohereCrispASRPipeline,
 }
 
 # Pipelines whose constructors never read enhance_for_vad. Verified against their
-# source on 2026-09-17, not against their docstrings. Kept in step by
+# source on 2026-09-17, not against their docstrings; the two CrispASR pipelines
+# (1.10.0) run no audio clean-up at all. Kept in step by
 # tests/test_speech_enhancer_spec.py, which greps the pipeline modules.
 ENHANCE_FOR_VAD_IGNORED_BY = frozenset({
-    "fast", "faster", "transformers", "crispasr",
+    "fast", "faster", "transformers", "parakeet-crispasr", "cohere-crispasr",
 })
 
 DEFAULT_HF_PARAMS = {
@@ -300,6 +309,11 @@ class FileResult:
     # and the user would be told nothing (agreed error-handling table,
     # 2026-09-17, cross-cutting rule 1).
     degradations: List[str] = field(default_factory=list)
+    # Routine notes from this pass, in plain language (owner Q21, CrispASR master plan
+    # 2.6): printed in the run summary, and they change nothing -- no state, no exit
+    # status. Carried back the same way as degradations, but kept apart from them,
+    # because any degradation makes the file "suspect".
+    notes: List[str] = field(default_factory=list)
 
 
 def prepare_transformers_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -775,6 +789,7 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                         # worker reads the same channel everything else does.
                         degradations=list(
                             result.get("summary", {}).get("degradations") or []),
+                        notes=list(result.get("summary", {}).get("notes") or []),
                     )
                 )
                 logger.debug(
@@ -787,6 +802,12 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                 # --fail-on suspect: a requested stop, not a crash.
                 logger.error("[Worker %s] Pass %s: %s: %s", os.getpid(), pass_number, basename, stop)
                 results.append(FileResult(basename=basename, status="failed", error=str(stop)))
+            except (CrispASRRunError, CrispASRSetupError) as failure:
+                # The CrispASR program or its files failed, with the reason in plain words: the run
+                # summary shows it, prefixed, instead of a traceback (CrispASR master plan 2.6, 4.3).
+                logger.error("[Worker %s] Pass %s: %s: %s", os.getpid(), pass_number, basename, failure)
+                results.append(FileResult(basename=basename, status="failed",
+                                          error=f"{CRISPASR_FAILURE_PREFIX}{failure}"))
             except Exception:
                 logger.exception(
                     "[Worker %s] Pass %s failed for %s", os.getpid(), pass_number, basename
@@ -1028,6 +1049,7 @@ def _build_pipeline(
     pipeline_class = PIPELINE_CLASSES.get(pipeline_name)
     if not pipeline_class:
         raise ValueError(f"Unknown pipeline: {pipeline_name}")
+    is_crispasr = pipeline_name in CRISPASR_PIPELINES
 
     # Pass enhance_for_vad flag to all pipelines via extra_kwargs.
     #
@@ -1037,15 +1059,19 @@ def _build_pipeline(
     #   balanced, fidelity -- the flag is read and reported in an INFO line, but
     #     the enhanced audio goes to BOTH; separating them needs recogniser-side
     #     changes (balanced_pipeline.py, fidelity_pipeline.py).
-    #   fast, faster, transformers, crispasr -- never read.
+    #   fast, faster, transformers -- never read.
     #     The owner accepted that on 2026-09-17; it is stated here and in --help
     #     so it is not mistaken for an oversight.
+    #   parakeet-crispasr, cohere-crispasr (1.10.0) -- never read either: they run
+    #     no audio clean-up at all (CrispASR master plan 2.2). A user who set it on
+    #     such a pass is told below, in one line naming every pass setting the pass
+    #     does not use; the reason the line here gives would be wrong for them.
     #
     # A user who asked for it and is getting nothing is told so once, rather than
     # being left to infer it from the absence of any mention.
     if pass_config.get("enhance_for_vad"):
         extra_kwargs = {**extra_kwargs, "enhance_for_vad": True}
-        if pipeline_name in ENHANCE_FOR_VAD_IGNORED_BY:
+        if pipeline_name in ENHANCE_FOR_VAD_IGNORED_BY and not is_crispasr:
             logger.info(
                 "Pass %s: --pass%s-enhance-for-vad has no effect on the %s pipeline, "
                 "which does not run a separate speech segmenter. The audio clean-up "
@@ -1400,48 +1426,49 @@ def _build_pipeline(
             )
             raise
 
-    # CrispASR — simple standalone external-provider pipeline
-    # (docs/plans/crispasr_v190/08).  Constructs directly from pass_config
-    # like transformers/qwen.  It deliberately does NOT fall through to
-    # resolve_legacy_pipeline(): crispasr is not a LEGACY_PIPELINES entry
-    # (legacy.py:172 would raise), and per legacy.py's own docstring,
-    # dedicated-CLI-arg pipelines construct their config separately.
-    if pipeline_name == "crispasr":
+    # The CrispASR pipelines (1.10.0; CrispASR master plan 3.7): Ensemble passes that run
+    # CrispASR's own program. Built from the three pass settings they use -- model, speech
+    # segmenter, source language -- and returned here, before resolve_legacy_pipeline(),
+    # which raises for any name outside LEGACY_PIPELINES (config/legacy.py). main.py has
+    # already refused a model they do not know, a language other than Japanese and the
+    # segmenter "none" (whisperjav/crispasr/pass_settings.py). The pass settings they do
+    # not use are named in one line and otherwise left alone: the GUI and saved Ensemble
+    # presets carry them for every pipeline.
+    if is_crispasr:
+        unused = unused_pass_settings(pass_config, pass_number)
+        if unused:
+            logger.info(unused_settings_message(
+                getattr(pipeline_class, "LABEL", pipeline_name), unused))
         crispasr_kwargs = {
             "output_dir": output_dir,
             "temp_dir": str(pass_temp_dir),
             "keep_temp_files": keep_temp_files,
-            "save_metadata_json": pass_config.get("save_metadata_json", False),
+            # --debug. The worker carries it in extra_kwargs (the orchestrator's own
+            # settings); pass_config never holds it.
+            "save_metadata_json": bool(extra_kwargs.get("save_metadata_json", False)),
             "progress_display": None,
+            # None: the pipeline's default model (whisperjav/crispasr/manifest.py).
+            "model_name": pass_config.get("model") or None,
+            # WhisperSeg when the pass names none: the one rule main.py's start-up check uses.
+            "speech_segmenter": effective_segmenter_for_pass(
+                pipeline_name, pass_config.get("speech_segmenter")),
+            "language": pass_config.get("language") or "ja",
             "subs_language": subs_language,
-            "crispasr_exe": pass_config.get("crispasr_exe"),
-            "crispasr_args": pass_config.get("crispasr_args") or "",
-            "crispasr_language": pass_config.get("language") or "ja",
         }
-        # Only forward the backend when set so the pipeline default applies
-        # (passing None would override the default with None).
-        _crispasr_backend = pass_config.get("crispasr_backend")
-        if _crispasr_backend:
-            crispasr_kwargs["crispasr_backend"] = _crispasr_backend
         logger.debug(
-            "[Worker %s] Pass %s: Creating CrispASRPipeline with backend=%s, exe=%s",
-            os.getpid(), pass_number,
-            _crispasr_backend or "(default)",
-            crispasr_kwargs["crispasr_exe"],
+            "[Worker %s] Pass %s: Creating %s with model=%s, speech_segmenter=%s",
+            os.getpid(), pass_number, pipeline_class.__name__,
+            crispasr_kwargs["model_name"] or "(default)", crispasr_kwargs["speech_segmenter"],
         )
         try:
-            pipeline = CrispASRPipeline(**crispasr_kwargs)
-            logger.debug(
-                "[Worker %s] Pass %s: CrispASRPipeline created successfully",
-                os.getpid(), pass_number
-            )
-            return pipeline
+            pipeline = pipeline_class(**crispasr_kwargs)
         except Exception as e:
             logger.error(
-                "[Worker %s] Pass %s: FAILED to create CrispASRPipeline - %s: %s",
-                os.getpid(), pass_number, type(e).__name__, e
+                "[Worker %s] Pass %s: FAILED to create %s - %s: %s",
+                os.getpid(), pass_number, pipeline_class.__name__, type(e).__name__, e
             )
             raise
+        return pipeline
 
     # v1.9.2: resolve the scene detector BEFORE the config. The resolved parameter NAMES
     # depend on the backend that will run — semantic reads min_duration / max_duration,
