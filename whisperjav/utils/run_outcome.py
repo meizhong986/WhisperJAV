@@ -60,7 +60,7 @@ import datetime as _dt
 import json
 import sys
 from collections.abc import Iterable, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Optional, Union
 
@@ -83,6 +83,10 @@ FAIL_ON_CHOICES: Sequence[str] = ("empty", "suspect")
 # it immediately after the run it started.
 MANIFEST_NAME = "whisperjav_run.json"
 
+# One line per note under a file's row in the run summary (owner Q21, CrispASR
+# master plan 2.6). DRAFT layout, not yet approved by the owner.
+SUMMARY_NOTE_LINE = "         note: {note}"
+
 
 @dataclass
 class FileOutcome:
@@ -100,6 +104,12 @@ class FileOutcome:
     translation: str = "not requested"      # "not requested" | "done" | "failed" | "skipped"
     error: Optional[str] = None
     processing_time_s: Optional[float] = None
+    # Routine notes about this file (owner Q21, CrispASR master plan 2.6), e.g. that
+    # CrispASR ran on the CPU build: printed under its row in the run summary and
+    # written to the manifest. They are never read by classify_output or
+    # exit_status, so they change no state and --fail-on cannot act on them. A
+    # shortfall that should make the file "suspect" is a degradation instead.
+    notes: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if self.state not in STATES:
@@ -340,6 +350,7 @@ def format_summary(outcomes: Sequence[FileOutcome], fail_on: Iterable[str],
         if o.translated_output:
             extra += f"; translated -> {Path(o.translated_output).name}"
         lines.append(f"{o.state:<8} {_coverage_cell(o):<14} {o.basename}{target}{cues}{extra}")
+        lines.extend(SUMMARY_NOTE_LINE.format(note=note) for note in o.notes)
     lines.append("-" * 60)
     counts = count_states(outcomes)
     lines.append("  ".join(f"{s} {counts[s]}" for s in STATES) + f"  total {len(outcomes)}")
