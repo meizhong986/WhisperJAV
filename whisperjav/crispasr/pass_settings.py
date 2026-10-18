@@ -1,17 +1,19 @@
 """What an Ensemble pass running a CrispASR pipeline accepts, refuses and does not use (1.10.0).
 
 The CrispASR pipelines (parakeet-crispasr, cohere-crispasr) are Ensemble passes only, with no --mode
-value (master plan 2.4, owner W118 2 and 5). Of a pass's settings they use three: the model
-(--passN-model, a short name from the manifest), the speech segmenter (--passN-speech-segmenter)
-and the source language (--language). Everything else about the run is fixed by the pipeline
-(plan 2.2): semantic scenes, no speech enhancer, no sensitivity presets, no custom parameters.
+value (master plan 2.4, owner W118 2 and 5). Of a pass's settings they use four: the model
+(--passN-model, a short name from the manifest), the speech segmenter (--passN-speech-segmenter),
+the sensitivity (--passN-sensitivity), which sets only the segmenter's detection setting (plan 3.8
+item 4; W134 2, W136), and the source language (--language). Everything else about the run is fixed
+by the pipeline (plan 2.2): semantic scenes, no speech enhancer, no custom parameters.
 
 Used by two callers, so the rules have one home:
   - whisperjav/main.py refuses a pass that cannot run (validate_crispasr_passes), as a usage error
     with exit status 2, before any audio is read or anything is downloaded;
   - whisperjav/ensemble/pass_worker.py names, in one log line, the pass settings the user set that
     the pipeline does not use (unused_pass_settings). They are not refused: the GUI and saved
-    Ensemble presets carry them for every pipeline.
+    Ensemble presets carry them for every pipeline. --device and --compute-type, which apply to
+    every pass, get a warning instead (ignored_hardware_settings; W122).
 
 Light: the manifest (standard library only) and the segmenter presets; no ASR import.
 """
@@ -38,6 +40,11 @@ SEGMENTER_NONE_PROBLEM = ("--pass{n}-speech-segmenter none is not available when
 # One info line from the pass worker, e.g.
 # "Parakeet-CrispASR does not use: --pass1-scene-detector, --pass1-speech-enhancer".
 UNUSED_SETTINGS_MESSAGE = "{label} does not use: {flags}"
+
+# One warning from the pass worker (W122), e.g. "Parakeet-CrispASR ignores --device cuda: ...".
+IGNORED_HARDWARE_MESSAGE = ("{label} ignores {flags}: WhisperJAV picks CrispASR's GPU or CPU build for "
+                            "this computer by itself, and CrispASR's model files come in one number "
+                            "format (8-bit).")
 
 # The model short names in --passN-model's help (the offered ones only), e.g.
 # "parakeet-crispasr: parakeet-tdt-0.6b-ja (default); cohere-crispasr: cohere-asr-ja-v0.1, cohere-asr-ja ...".
@@ -92,10 +99,10 @@ def unused_pass_settings(pass_config: Mapping[str, Any], pass_number: int) -> Li
 
     ``pass_config`` is the pass configuration main.py (or the GUI, through main.py) builds. A
     setting equal to what the pipeline does anyway -- the semantic scene detector, the speech
-    enhancer "none" -- is not listed. Sensitivity is left out: main.py fills it in for every pass
-    (apply_ensemble_pass_defaults), so it cannot tell whether the user set it. The enhance-for-vad
-    flag is named in its per-pass form even when it came from --enhance-for-vad, which main.py
-    folds into every pass.
+    enhancer "none" -- is not listed. Sensitivity is used (the segmenter's detection setting), so it
+    is never listed. The enhance-for-vad flag is named in its per-pass form even when it came from
+    --enhance-for-vad, which main.py folds into every pass. --device and --compute-type are
+    ignored_hardware_settings'.
     """
     n = pass_number
     unused = []
@@ -120,6 +127,24 @@ def unused_pass_settings(pass_config: Mapping[str, Any], pass_number: int) -> Li
 def unused_settings_message(label: str, flags: List[str]) -> str:
     """The pass worker's one line naming what a CrispASR pipeline does not use."""
     return UNUSED_SETTINGS_MESSAGE.format(label=label, flags=", ".join(flags))
+
+
+def ignored_hardware_settings(pass_config: Mapping[str, Any]) -> List[str]:
+    """--device and --compute-type as given, when either names anything but auto (W122).
+
+    E.g. ["--device cuda", "--compute-type int8"]. Left out, or auto, they are not listed.
+    """
+    given = []
+    for key, flag in (("device", "--device"), ("compute_type", "--compute-type")):
+        value = pass_config.get(key)
+        if value and str(value).strip().lower() != "auto":
+            given.append(f"{flag} {value}")
+    return given
+
+
+def ignored_hardware_message(label: str, flags: List[str]) -> str:
+    """The pass worker's warning naming the --device / --compute-type values a CrispASR pass ignores."""
+    return IGNORED_HARDWARE_MESSAGE.format(label=label, flags=" and ".join(flags))
 
 
 def models_help() -> str:
