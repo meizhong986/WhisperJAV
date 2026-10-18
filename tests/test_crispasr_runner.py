@@ -63,7 +63,19 @@ STAND_IN = '''\
 import json
 import os
 import sys
+import threading
 import time
+
+
+def stdin_state():
+    """Whether the input is a terminal, and whether reading it ends at once (closed) within 5 s."""
+    if sys.stdin is None:
+        return None, None
+    got = []
+    reader = threading.Thread(target=lambda: got.append(sys.stdin.buffer.read()), daemon=True)
+    reader.start()
+    reader.join(5)
+    return sys.stdin.isatty(), (got[0] == b"" if got else False)
 
 
 def main():
@@ -71,9 +83,14 @@ def main():
         plan = json.load(fh)
     argv = sys.argv[1:]
     out_name = argv[argv.index("-of") + 1]
+    cache = argv[argv.index("--cache-dir") + 1] if "--cache-dir" in argv else None
+    isatty, eof = stdin_state()
     with open("seen.json", "w", encoding="utf-8") as fh:
         json.dump({"argv": argv, "cwd": os.getcwd(), "pid": os.getpid(),
-                   "stale_json_present": os.path.exists(out_name + ".json")}, fh)
+                   "stale_json_present": os.path.exists(out_name + ".json"),
+                   "stdin_isatty": isatty, "stdin_eof": eof,
+                   "cache_dir_entries": sorted(os.listdir(cache)) if cache and os.path.isdir(cache) else None},
+                  fh)
     for kind, value in plan["steps"]:
         if kind == "err":
             sys.stderr.buffer.write(value.encode("utf-8"))
@@ -182,14 +199,23 @@ class TestTheCommandLine:
         req = CrispRunRequest(exe=exe, run_dir=Path("C:/t/crispasr_out"), backend="parakeet", model=MODEL,
                               threads=8)
         assert req.argv() == [str(exe), "-m", MODEL, "--backend", "parakeet", "-t", "8", "-f", "audio.wav",
-                              "-l", "ja", "-ojf", "-pp", "-of", "out", "--vad-import", "cuts.json"]
+                              "-l", "ja", "-ojf", "-pp", "-of", "out", "--vad-import", "cuts.json",
+                              "--cache-dir", "no_cache"]
 
     def test_the_builds_and_the_models_switches_come_last(self):
         req = CrispRunRequest(exe=Path("crispasr"), run_dir=Path("r"), backend="fastconformer-ctc",
                               model="model.gguf", threads=4, extra_args=("--punc-model", "none", "--no-gpu"))
         assert req.argv() == ["crispasr", "-m", "model.gguf", "--backend", "fastconformer-ctc", "-t", "4",
                               "-f", "audio.wav", "-l", "ja", "-ojf", "-pp", "-of", "out",
-                              "--vad-import", "cuts.json", "--punc-model", "none", "--no-gpu"]
+                              "--vad-import", "cuts.json", "--cache-dir", "no_cache",
+                              "--punc-model", "none", "--no-gpu"]
+
+    def test_the_program_is_never_asked_to_download(self):
+        # plan 3.8 item 6: WhisperJAV never passes --auto-download, and -m never asks for "auto"
+        argv = CrispRunRequest(exe=Path("crispasr"), run_dir=Path("r"), backend="cohere", model="..\\m.gguf",
+                               threads=1).argv()
+        assert "--auto-download" not in argv and argv[argv.index("-m") + 1] != "auto"
+        assert argv[argv.index("--cache-dir") + 1] == runner.NO_CACHE_FOLDER == "no_cache"
 
     def test_extra_arguments_are_passed_as_text(self):
         req = CrispRunRequest(exe=Path("crispasr"), run_dir=Path("r"), backend="parakeet", model="m",
@@ -371,6 +397,43 @@ class TestOutcomes:
         assert not req.log_path.exists()
 
 
+class TestNoDownloadByTheProgram:
+    """The program never downloads a model by itself (plan 3.8 item 6; U19): its input is a pipe closed at once,
+    which no program takes for a terminal, and --cache-dir names an empty folder in the run folder."""
+
+    def test_its_input_is_no_terminal_and_ends_at_once(self, make_request, run_dir):
+        run(make_request([("json", COMPLETE_JSON)]))
+        started = seen(run_dir)
+        assert started["stdin_isatty"] is False
+        assert started["stdin_eof"] is True  # reading it ends at once: nobody will ever answer
+
+    def test_its_cache_folder_exists_and_is_empty_even_after_a_run_that_left_files_there(self, make_request,
+                                                                                       run_dir):
+        stale = run_dir / runner.NO_CACHE_FOLDER
+        stale.mkdir()
+        (stale / "parakeet-tdt-0.6b-ja-q8_0.gguf").write_bytes(b"left behind")
+        run(make_request([("json", COMPLETE_JSON)]))
+        assert seen(run_dir)["cache_dir_entries"] == []
+
+    def test_a_model_not_found_locally_is_named_in_plain_words(self, make_request):
+        # what the program prints for a missing -m file when it asks nothing (U19, probes B and D)
+        lines = ("crispasr: model 'C:\\m\\parakeet-tdt-0.6b-ja-q8_0.gguf' not found locally.\n"
+                 "  Available for download: parakeet-tdt-0.6b-ja-q8_0.gguf (~710 MB)\n"
+                 "  License: CC-BY-4.0 (see the original NVIDIA model card)\n"
+                 "  Use --auto-download or -m auto to download automatically.\n"
+                 "crispasr: error: failed to initialise backend 'parakeet'\n")
+        result = run(make_request([("err", lines)], exit_code=13))
+        assert result.outcome is CrispOutcome.FAILED and result.exit_code == 13
+        assert result.meaning == ("the model file could not be opened; the CrispASR program may not download "
+                                  "one by itself")
+        assert result.download_lines == []  # nothing was downloaded, so no download note follows
+
+    def test_without_that_line_exit_13_keeps_its_documented_meaning(self, make_request):
+        result = run(make_request([("err", "crispasr: error: failed to initialise backend 'parakeet'\n")],
+                                  exit_code=13))
+        assert result.meaning == EXIT_MEANING[13]
+
+
 class TestTheProgramsOwnProcessorCheck:
     """The program checks the processor before any work and ends with exit code 1, which otherwise means
     bad arguments (cli.cpp:2579-2613). Its own line gives the plainer reason (CrispRunResult.meaning)."""
@@ -492,6 +555,13 @@ class TestWhatIsCollected:
             "crispasr: progress =  50% (1/2 slices)",
             "crispasr: downloading punctuation model (58 MB) from https://huggingface.co/example",
             "crispasr: Download finished",
+            # what a missing model prints when no download follows (U19, probes B and D): not collected
+            "  Available for download: parakeet-tdt-0.6b-ja-q8_0.gguf (~710 MB)",
+            "  Use --auto-download or -m auto to download automatically.",
+            # the question a terminal input answers yes, and the library's own lines: collected
+            "  Download now? [Y/n] ",
+            "  Auto-downloading (--auto-download is set)...",
+            "crispasr: downloading via WinHTTP...",
         ]
         result = run(make_request([("err", "\n".join(lines) + "\n"), ("json", COMPLETE_JSON)]))
         assert result.outcome is CrispOutcome.OK
@@ -506,7 +576,9 @@ class TestWhatIsCollected:
         assert result.warning_count == 6
         assert result.download_lines == [
             "crispasr: downloading punctuation model (58 MB) from https://huggingface.co/example",
-            "crispasr: Download finished",
+            "Download now? [Y/n]",
+            "Auto-downloading (--auto-download is set)...",
+            "crispasr: downloading via WinHTTP...",
         ]
 
     def test_at_most_500_warnings_are_kept_but_all_are_counted(self, make_request):
