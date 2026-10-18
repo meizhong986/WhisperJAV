@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
+from whisperjav.crispasr.manifest import CRISPASR_PIPELINES
 from whisperjav.utils.logger import logger
 
 # Segmenter params - routed to speech segmentation backends, not passed to Whisper ASR
@@ -99,6 +100,11 @@ BALANCED_DEFAULT_SEGMENTER = "faster-whisper"
 # extra install; its model weights download from HuggingFace on first use.
 FIDELITY_DEFAULT_SEGMENTER = "firered-vad"
 
+# The CrispASR pipelines' speech segmenter when a pass names none (1.10.0; CrispASR master plan
+# 2.2, owner Q14): WhisperSeg, ChronosJAV's own default (--qwen-segmenter). Their slices follow
+# the speech it finds, so they have no "none" (main.py refuses it: whisperjav/crispasr/pass_settings.py).
+CRISPASR_DEFAULT_SEGMENTER = "whisperseg"
+
 # Owner, 2026-10-12 (v1.9.5): the Ensemble defaults are pass 1 Qwen3-ASR with
 # FireRedVAD and pass 2 anime-whisper with TEN VAD, both aggressive. Keyed by
 # (pass, ChronosJAV generator); the generator comes from --passN-qwen-params
@@ -175,13 +181,16 @@ def effective_segmenter_for_pass(
     guarding a segmenter the run does not use -- or missing the one it does.
 
     Balanced ignores the request entirely (v1.9.2, S2/S9: no external segmenter
-    exists there). Fidelity falls back to FireRedVAD. Everything else takes what it
+    exists there). Fidelity falls back to FireRedVAD, and the CrispASR pipelines
+    (parakeet-crispasr, cohere-crispasr) to WhisperSeg. Everything else takes what it
     was given, including None, which leaves the decision to the ASR module.
     """
     if pipeline == "balanced":
         return BALANCED_DEFAULT_SEGMENTER
     if pipeline == "fidelity" and not speech_segmenter:
         return FIDELITY_DEFAULT_SEGMENTER
+    if pipeline in CRISPASR_PIPELINES and not speech_segmenter:
+        return CRISPASR_DEFAULT_SEGMENTER
     return speech_segmenter
 
 
