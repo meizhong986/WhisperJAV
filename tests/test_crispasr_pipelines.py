@@ -36,6 +36,7 @@ import srt
 
 from whisperjav.crispasr import install, manifest
 from whisperjav.crispasr.install import CrispASRSetupError, ProgramChoice, StartCheck
+from whisperjav.crispasr.line_length import OFF, LineLimits
 from whisperjav.crispasr.ojf import CrispSegment, CrispToken, CrispWord, CutPoint, write_vad_import
 from whisperjav.crispasr.runner import RUN_FOLDER, CrispASRRunError, CrispOutcome, CrispRunResult, film_run_dir
 from whisperjav.modules.subtitle_pipeline import reconstruction
@@ -58,7 +59,7 @@ class Kind:
     """One pipeline class and what these tests need to know about it."""
     cls: type
     module: object
-    model: str     # a model this pipeline offers (Cohere-CrispASR has no default yet)
+    model: str     # a model this pipeline offers
     max_s: float   # the engine's slice limit (plan 3.4)
 
 
@@ -205,7 +206,11 @@ def test_parakeet_defaults(tmp_path):
     assert pipe.model is manifest.MODELS[manifest.PIPELINE_DEFAULT_MODEL["parakeet-crispasr"]]
     assert (pipe.model.name, pipe.model.backend) == ("parakeet-tdt-0.6b-ja", "parakeet")
     assert pipe.speech_segmenter == "whisperseg"
-    assert (pipe.slice_form, pipe.line_mode, pipe.lang_code) == ("speech", "regroup", "ja")
+    # Parakeet's own segments, one line each (W129 4); the line-length rule off (W138 3)
+    assert (pipe.slice_form, pipe.line_mode, pipe.lang_code) == ("speech", "segments", "ja")
+    assert pipe.line_limits == OFF and not pipe.line_limits.active
+    # balanced sets WhisperSeg's detection threshold to its built-in 0.35, the value step 2b ran with
+    assert (pipe.sensitivity, pipe.segmenter_detection) == ("balanced", {"threshold": 0.35})
     assert pipe.postprocess == ("nonverbal", "nonlinguistic", "overlap")
     assert (pipe.MAX_SLICE_S, pipe.MIN_SLICE_S) == (12.0, 0.1)
     assert pipe.keep_temp_files is False and pipe.save_metadata_json is False
@@ -214,13 +219,16 @@ def test_parakeet_defaults(tmp_path):
     assert (pipe.output_dir, pipe.temp_dir) == (tmp_path / "out", tmp_path / "temp")
 
 
-def test_cohere_defaults_once_a_model_is_named(tmp_path):
-    pipe = CohereCrispASRPipeline(output_dir=str(tmp_path / "out"), temp_dir=str(tmp_path / "temp"),
-                                  model_name="cohere-asr-ja-v0.1")
+def test_cohere_defaults(tmp_path):
+    pipe = CohereCrispASRPipeline(output_dir=str(tmp_path / "out"), temp_dir=str(tmp_path / "temp"))
     assert pipe.get_mode_name() == pipe.PIPELINE_NAME == "cohere-crispasr"
+    # v0.1 by default, on the step 2b scores (W129 1)
+    assert pipe.model is manifest.MODELS[manifest.PIPELINE_DEFAULT_MODEL["cohere-crispasr"]]
     assert pipe.model is manifest.MODELS["cohere-asr-ja-v0.1"] and pipe.model.backend == "cohere"
     assert pipe.speech_segmenter == "whisperseg"
     assert (pipe.slice_form, pipe.line_mode, pipe.lang_code) == ("speech", "regroup", "ja")
+    assert pipe.line_limits == OFF
+    assert (pipe.sensitivity, pipe.segmenter_detection) == ("balanced", {"threshold": 0.35})
     assert pipe.postprocess == ("nonverbal", "nonlinguistic", "overlap")
     assert (pipe.MAX_SLICE_S, pipe.MIN_SLICE_S) == (30.0, 0.1)
     assert pipe.LINE_MODES == ("regroup",)
@@ -299,11 +307,11 @@ def test_an_unknown_model_is_refused_with_the_choices(kind, tmp_path):
 
 
 @pytest.mark.parametrize("name", [None, ""])
-def test_cohere_without_a_model_is_refused_until_a_default_is_picked(name, tmp_path):
-    with pytest.raises(ValueError, match="no default model yet") as info:
-        CohereCrispASRPipeline(output_dir=str(tmp_path / "out"), temp_dir=str(tmp_path / "temp"), model_name=name)
-    for choice in manifest.PIPELINE_MODELS["cohere-crispasr"]:
-        assert choice in str(info.value)
+def test_cohere_without_a_model_runs_its_default(name, tmp_path):
+    pipe = CohereCrispASRPipeline(output_dir=str(tmp_path / "out"), temp_dir=str(tmp_path / "temp"), model_name=name)
+    assert pipe.model is manifest.MODELS["cohere-asr-ja-v0.1"]
+    # the other fine-tune stays a choice (Q13)
+    assert make(COHERE, tmp_path, model_name="cohere-asr-ja").model is manifest.MODELS["cohere-asr-ja"]
 
 
 @pytest.mark.parametrize("model", manifest.PIPELINE_MODELS["parakeet-crispasr"]
@@ -346,9 +354,83 @@ def test_post_processing_steps_can_be_chosen(kind, tmp_path):
 
 @pytest.mark.parametrize("kind", KINDS)
 def test_pass_settings_the_pipeline_does_not_use_are_accepted(kind, tmp_path):
-    pipe = make(kind, tmp_path, sensitivity="aggressive", scene_detector="auditok", speech_enhancer="none",
-                task="transcribe")
+    pipe = make(kind, tmp_path, scene_detector="auditok", speech_enhancer="none", task="transcribe")
     assert pipe.get_mode_name() == kind.cls.PIPELINE_NAME
+
+
+# Each segmenter's detection setting(s) at aggressive / balanced / conservative, from its own preset YAML
+# (plan 3.8 item 4; W134 2, W136, W138 2). Written out, so a change to a preset file shows here.
+DETECTION = {
+    "whisperseg": [{"threshold": 0.25}, {"threshold": 0.35}, {"threshold": 0.45}],
+    "ten": [{"threshold": 0.22}, {"threshold": 0.32}, {"threshold": 0.42}],
+    "silero-v6.2": [{"threshold": 0.12}, {"threshold": 0.32}, {"threshold": 0.42}],
+    "silero-v4.0": [{"threshold": 0.18}, {"threshold": 0.28}, {"threshold": 0.41}],
+    "silero-v3.1": [{"threshold": 0.18}, {"threshold": 0.28}, {"threshold": 0.41}],
+    "firered-vad": [{"threshold": 0.3}, {"threshold": 0.4}, {"threshold": 0.5}],
+    "whisper-vad": [{"no_speech_threshold": 0.5, "logprob_threshold": -1.5},
+                    {"no_speech_threshold": 0.6, "logprob_threshold": -1.0},
+                    {"no_speech_threshold": 0.7, "logprob_threshold": -0.8}],
+    "whisper-vad-tiny": [{"no_speech_threshold": 0.5, "logprob_threshold": -1.5},
+                         {"no_speech_threshold": 0.6, "logprob_threshold": -1.0},
+                         {"no_speech_threshold": 0.7, "logprob_threshold": -0.8}],
+    "nemo-lite": [{"onset": 0.7, "offset": 0.5}, {"onset": 0.8, "offset": 0.6}, {"onset": 0.85, "offset": 0.7}],
+    "nemo-diarization": [{"onset": 0.7, "offset": 0.5}, {"onset": 0.8, "offset": 0.6},
+                         {"onset": 0.85, "offset": 0.7}],
+}
+SENSITIVITIES = ("aggressive", "balanced", "conservative")
+
+
+@pytest.mark.parametrize("segmenter", sorted(DETECTION))
+@pytest.mark.parametrize("kind", KINDS)
+def test_sensitivity_sets_only_the_segmenters_detection_setting(kind, segmenter, tmp_path):
+    for sensitivity, expected in zip(SENSITIVITIES, DETECTION[segmenter]):
+        pipe = make(kind, tmp_path, speech_segmenter=segmenter, sensitivity=sensitivity)
+        assert (pipe.sensitivity, pipe.segmenter_detection) == (sensitivity, expected)
+
+
+@pytest.mark.parametrize("segmenter", sorted(DETECTION))
+def test_the_detection_settings_pass_the_segmenter_factorys_filter_unchanged(segmenter):
+    """The factory drops arguments a back end does not take (_sanitize_params); these must all arrive."""
+    from whisperjav.modules.speech_segmentation.factory import SpeechSegmenterFactory
+
+    for expected in DETECTION[segmenter]:
+        sent = dict(max_group_duration_s=12.0, chunk_threshold_s=1.0, start_pad_ms=100, end_pad_ms=0,
+                    max_speech_duration_s=11.9, **expected)
+        kept = SpeechSegmenterFactory._sanitize_params(segmenter, dict(sent))
+        assert {k: kept.get(k) for k in expected} == expected
+
+
+@pytest.mark.parametrize("kind", KINDS)
+def test_sensitivity_is_balanced_when_none_is_given(kind, tmp_path):
+    for value in (None, ""):
+        pipe = make(kind, tmp_path, sensitivity=value)
+        assert (pipe.sensitivity, pipe.segmenter_detection) == ("balanced", {"threshold": 0.35})
+
+
+@pytest.mark.parametrize("kind", KINDS)
+def test_window_slices_use_no_segmenter_so_sensitivity_sets_nothing(kind, tmp_path):
+    pipe = make(kind, tmp_path, slice_form="windows", sensitivity="aggressive")
+    assert pipe.segmenter_detection == {}
+    assert make(kind, tmp_path, slice_form="windows", speech_segmenter="none").segmenter_detection == {}
+
+
+@pytest.mark.parametrize("kind", KINDS)
+def test_a_segmenter_whose_detection_setting_is_unknown_runs_its_own_values_with_a_warning(kind, tmp_path,
+                                                                                           console):
+    pipe = make(kind, tmp_path, speech_segmenter="stand-in-vad", sensitivity="aggressive")
+    assert pipe.segmenter_detection == {}
+    assert any("Sensitivity does not reach the speech segmenter 'stand-in-vad'" in line for line in console)
+
+
+@pytest.mark.parametrize("kind", KINDS)
+def test_the_ready_line_and_the_metadata_name_the_sensitivity_and_its_setting(kind, tmp_path, console):
+    pipe = make(kind, tmp_path, sensitivity="conservative")
+    assert any(f"speech segmenter whisperseg (conservative: threshold 0.45)" in line for line in console)
+    md = pipe._new_metadata(tmp_path / "film.mp4", "film")
+    config = md["config"]["crispasr"]
+    assert (config["sensitivity"], config["segmenter_detection"]) == ("conservative", {"threshold": 0.45})
+    assert config["line_limits"] == {"max_s": None, "max_chars": None}
+    assert config["line_mode"] == pipe.line_mode
 
 
 # ---------------------------------------------------------------------------------------------------
@@ -812,6 +894,57 @@ def test_cohere_reads_its_tokens_not_its_one_whole_segment_word(tmp_path):
             == pipe._word_dicts(seg(31.0, 40.0, "テストです", [], tokens), cut))
 
 
+def test_cohere_zero_length_punctuation_joins_the_word_before_it_and_keeps_its_times(tmp_path):
+    # W129 5 (ii): "。" no longer opens the next word
+    pipe = make(COHERE, tmp_path)
+    tokens = [CrispToken("テスト", 31.0, 31.4), CrispToken("。", 31.4, 31.4), CrispToken("です", 31.5, 31.8),
+              CrispToken("、", 31.8, 31.8), CrispToken("!?", 31.8, 31.8), CrispToken("もう", 31.9, 32.1)]
+    words, clamped = pipe._word_dicts(seg(31.0, 40.0, "テスト。です、!?もう", [], tokens), CutPoint(30.0, 40.0))
+    assert_words(words, [("テスト。", 31.0, 31.4), ("です、!?", 31.5, 31.8), ("もう", 31.9, 32.1)])
+    assert clamped == 0
+
+
+def test_cohere_zero_length_punctuation_after_a_waiting_token_joins_that_token(tmp_path):
+    # S01E04, 256.25 s in step 2b: "っ", then "、", both zero-length: the text keeps its order
+    pipe = make(COHERE, tmp_path)
+    tokens = [CrispToken("はい", 30.5, 30.9), CrispToken("っ", 31.0, 31.0), CrispToken("、", 31.0, 31.0),
+              CrispToken("て", 31.0, 31.3)]
+    words, _ = pipe._word_dicts(seg(30.5, 40.0, "はいっ、て", [], tokens), CutPoint(30.0, 40.0))
+    assert_words(words, [("はい", 30.5, 30.9), ("っ、て", 31.0, 31.3)])
+
+
+def test_cohere_zero_length_punctuation_at_a_segment_start_waits_for_the_next_word(tmp_path):
+    pipe = make(COHERE, tmp_path)
+    tokens = [CrispToken("、", 31.0, 31.0), CrispToken("テスト", 31.0, 31.4)]
+    words, _ = pipe._word_dicts(seg(31.0, 40.0, "、テスト", [], tokens), CutPoint(30.0, 40.0))
+    assert_words(words, [("、テスト", 31.0, 31.4)])
+
+
+def test_cohere_a_zero_length_opening_bracket_still_opens_the_next_word(tmp_path):
+    pipe = make(COHERE, tmp_path)
+    tokens = [CrispToken("テスト", 31.0, 31.4), CrispToken("「", 31.4, 31.4), CrispToken("です", 31.5, 31.8),
+              CrispToken("」", 31.8, 31.8)]
+    words, _ = pipe._word_dicts(seg(31.0, 40.0, "テスト「です」", [], tokens), CutPoint(30.0, 40.0))
+    assert_words(words, [("テスト", 31.0, 31.4), ("「です」", 31.5, 31.8)])
+
+
+def test_cohere_a_segment_whose_tokens_all_have_zero_length_is_one_word_set_apart(tmp_path):
+    # W129 5 (iii): Cohere v0.1, S01E04, 204.28-223.08 s in step 2b, 24 tokens all at 204.28 s
+    pipe = make(COHERE, tmp_path)
+    text = "いきます!手の回し!はっ!"
+    tokens = [CrispToken(ch, 204.28, 204.28) for ch in text]
+    words, clamped = pipe._word_dicts(seg(204.28, 223.08, text, [CrispWord(text, 204.28, 223.08)], tokens),
+                                      CutPoint(204.0, 230.0))
+    assert words == [{"word": text, "start": 204.28, "end": 223.08, "alone": True}] and clamped == 0
+    # its times are clamped to the slice, as every time is
+    words, clamped = pipe._word_dicts(seg(204.28, 223.08, text, [], tokens), CutPoint(204.0, 220.0))
+    assert (words[0]["start"], words[0]["end"], clamped) == (204.28, 220.0, 1)
+    # one token with a time is enough for the usual reading
+    timed_one = tokens[:-1] + [CrispToken("!", 204.28, 204.5)]
+    words, _ = pipe._word_dicts(seg(204.28, 223.08, text, [], timed_one), CutPoint(204.0, 230.0))
+    assert [w["word"] for w in words] == [text] and "alone" not in words[0]
+
+
 @pytest.mark.parametrize("kind, model", MODEL_CASES)
 def test_a_segment_with_text_but_nothing_usable_is_shared_out_over_its_clamped_times(kind, model, tmp_path):
     pipe = make(kind, tmp_path, model_name=model)
@@ -931,6 +1064,106 @@ def test_parakeet_segments_line_mode_is_used_by_build_lines(tmp_path, reconstruc
     assert reconstruct_calls == [] and md["stages"]["lines"]["mode"] == "segments"
 
 
+ALONE_TEXT = "いきます!手の回し!はっ!くりぃすけた!くるぅううう"
+
+
+def alone_case(tmp_path: Path, **kwargs):
+    """Cohere: a sentence; a segment the program gave no times inside (18.8 s), alone in its slice; and the next
+    slice's sentence 0.26 s after it -- the shape of S01E04 at 204.28-223.08 s in step 2b."""
+    pipe = make(COHERE, tmp_path, **kwargs)
+    scene = cohere_mod._Scene(0, write_wav(tmp_path / "scene.wav", 1.0), 200.0, 230.0)
+    first, middle, last = CutPoint(200.5, 202.0), CutPoint(202.05, 221.09), CutPoint(221.19, 229.5)
+    before = seg(201.0, first.end, "テストです", tokens=[CrispToken("テスト", 201.0, 201.4), CrispToken("です", 201.4, 201.8)])
+    alone = seg(202.28, 221.08, ALONE_TEXT, tokens=[CrispToken(ch, 202.28, 202.28) for ch in ALONE_TEXT])
+    after = seg(221.34, last.end, "すごい。おいしい。", tokens=[CrispToken("すごい。", 221.34, 221.8),
+                                                         CrispToken("おいしい。", 221.8, 222.5)])
+    return pipe, scene, [(after, last), (alone, middle), (before, first)]
+
+
+def test_cohere_a_segment_without_times_inside_is_a_line_of_its_own_kept_whole(tmp_path):
+    # W135 3: "Keep the 18.8s line unified initially": one line, with its segment's own times. (Here REGROUP_JAV
+    # keeps it apart by itself; the two tests below cover the shapes where it would not.)
+    pipe, scene, items = alone_case(tmp_path)
+    out = tmp_path / "scene.srt"
+    written, clamped = pipe._write_regrouped_lines(items, scene, out)
+    assert written is True and clamped == 0
+    assert_lines(srt_lines(out), [("テストです", 1.0, 1.8), (ALONE_TEXT, 2.28, 21.08), ("すごい。おいしい。", 21.34, 22.5)])
+
+
+def test_cohere_regroupings_clamp_does_not_shorten_a_segment_without_times_inside(tmp_path):
+    # First in its scene and followed closely by a sentence, as on S01E04, REGROUP_JAV's clamp ("cm") moves its
+    # start from 2.28 s to 19.33 s and the sentence joins it; the segment's own times come back
+    pipe, scene, items = alone_case(tmp_path)
+    items = [item for item in items if item[0].text != "テストです"]
+    out = tmp_path / "scene.srt"
+    pipe._write_regrouped_lines(items, scene, out)
+    assert_lines(srt_lines(out), [(ALONE_TEXT, 2.28, 21.08), ("すごい。おいしい。", 21.34, 22.5)])
+
+
+def test_cohere_a_short_segment_without_times_inside_is_not_merged_with_its_neighbours(tmp_path):
+    # REGROUP_JAV alone would join all three (gaps under 1.5 s, under 80 characters, under 8 s)
+    pipe = make(COHERE, tmp_path)
+    scene = cohere_mod._Scene(0, write_wav(tmp_path / "scene.wav", 1.0), 200.0, 230.0)
+    cut = CutPoint(200.5, 229.5)
+    before = seg(201.0, cut.end, "テストです", tokens=[CrispToken("テスト", 201.0, 201.4), CrispToken("です", 201.4, 201.8)])
+    alone = seg(202.0, 202.6, "はっ", tokens=[CrispToken("は", 202.0, 202.0), CrispToken("っ", 202.0, 202.0)])
+    after = seg(202.8, cut.end, "もう一度", tokens=[CrispToken("もう", 202.8, 203.1), CrispToken("一度", 203.1, 203.5)])
+    out = tmp_path / "scene.srt"
+    pipe._write_regrouped_lines([(before, cut), (alone, cut), (after, cut)], scene, out)
+    assert_lines(srt_lines(out), [("テストです", 1.0, 1.8), ("はっ", 2.0, 2.6), ("もう一度", 2.8, 3.5)])
+
+
+def test_cohere_the_line_length_rule_splits_that_line_at_its_marks_with_times_shared_by_characters(tmp_path):
+    # W135 3: "allow the length rule to split it at `!` punctuation marks using estimated proportional timing"
+    pipe, scene, items = alone_case(tmp_path, line_limits=LineLimits(max_s=5.0))
+    out = tmp_path / "scene.srt"
+    pipe._write_regrouped_lines(items, scene, out)
+    lines = srt_lines(out)
+    assert [t for t, _, _ in lines] == ["テストです", "いきます!", "手の回し!", "はっ!", "くりぃすけた!", "くるぅううう",
+                                        "すごい。おいしい。"]
+    # 18.8 s over 26 characters: each part's share of the time is its share of the characters
+    per_char = (21.08 - 2.28) / len("".join(ALONE_TEXT.split()))
+    starts = [2.28]
+    for part in ["いきます!", "手の回し!", "はっ!", "くりぃすけた!"]:
+        starts.append(starts[-1] + per_char * len(part))
+    assert [a for _, a, _ in lines[1:6]] == pytest.approx(starts, abs=0.0015)
+    assert lines[5][2] == pytest.approx(21.08, abs=0.0015)
+
+
+@pytest.mark.parametrize("kind", KINDS)
+def test_the_line_length_rule_splits_a_regrouped_line_only_after_a_mark(kind, tmp_path):
+    pipe = make(kind, tmp_path, line_limits=LineLimits(max_chars=6))
+    scene = kind.module._Scene(0, write_wav(tmp_path / "scene.wav", 1.0), 100.0, 130.0)
+    cut = CutPoint(101.0, 110.0)
+    parts = [("今日", 101.2, 101.5), ("は", 101.5, 101.6), ("晴れ", 101.6, 102.0), ("、", 102.0, 102.1),
+             ("明日", 102.2, 102.6), ("も", 102.6, 102.7), ("晴れ", 102.7, 103.1), ("。", 103.1, 103.2),
+             ("それ", 103.3, 103.6), ("から", 103.6, 104.0)]  # no mark inside the last part
+    items = [(crisp_segment(pipe.model.backend, parts, cut), cut)]
+    out = tmp_path / "scene.srt"
+    pipe._write_regrouped_lines(items, scene, out)
+    assert_lines(srt_lines(out), [("今日は晴れ、", 1.2, 2.1), ("明日も晴れ。", 2.2, 3.2), ("それから", 3.3, 4.0)])
+    # switched off, the same words make one line
+    pipe.line_limits = OFF
+    pipe._write_regrouped_lines(items, scene, out)
+    assert [t for t, _, _ in srt_lines(out)] == ["今日は晴れ、明日も晴れ。それから"]
+
+
+def test_the_line_length_rule_splits_a_parakeet_segment_line_at_the_mark_nearest_its_middle(tmp_path):
+    pipe = make(PARAKEET, tmp_path, line_limits=LineLimits(max_s=3.0))
+    scene = parakeet_mod._Scene(0, write_wav(tmp_path / "scene.wav", 1.0), 100.0, 130.0)
+    cut = CutPoint(100.5, 112.0)
+    words = [CrispWord("あの", 101.0, 101.4), CrispWord("、", 101.4, 101.5), CrispWord("今日", 101.6, 102.0),
+             CrispWord("は", 102.0, 102.2), CrispWord("、", 102.2, 102.3), CrispWord("晴れ", 102.4, 103.0),
+             CrispWord("です", 103.0, 104.6)]
+    long_one = seg(101.0, 104.6, "あの、今日は、晴れです", words=words)
+    no_mark = seg(105.0, 110.0, "テストです", words=[CrispWord("テスト", 105.0, 107.0), CrispWord("です", 107.0, 110.0)])
+    out = tmp_path / "scene.srt"
+    written, clamped = pipe._write_segment_lines([(long_one, cut), (no_mark, cut)], scene, out)
+    assert written is True and clamped == 0
+    # 3.6 s over 3 s: split after the "、" nearest 102.8 s (102.3 s); each part within 3 s; the 5 s line has no mark
+    assert_lines(srt_lines(out), [("あの、今日は、", 1.0, 2.3), ("晴れです", 2.4, 4.6), ("テストです", 5.0, 10.0)])
+
+
 def build_lines_case(kind: Kind, tmp_path: Path, first_word_start: float = 1.2):
     """Two scenes overlapping by 0.6 s; a slice merged across their edge belongs to the earlier scene."""
     pipe = make(kind, tmp_path)
@@ -958,7 +1191,9 @@ def test_build_lines_puts_each_slice_in_its_scene_and_stitches_with_the_scene_of
     assert_lines(srt_lines(scene_srts / "film_scene_0000.srt"), [("テストです。", 1.2, 2.0), ("もう一度。", 20.5, 21.2)])
     assert_lines(srt_lines(scene_srts / "film_scene_0001.srt"), [("今日は晴れ。", 26.0 - 19.8, 27.0 - 19.8)])
     assert_lines(srt_lines(stitched), [("テストです。", 1.2, 2.0), ("もう一度。", 20.5, 21.2), ("今日は晴れ。", 26.0, 27.0)])
-    assert md["stages"]["lines"] == {"mode": "regroup", "scenes_with_lines": 2, "clamped_times": 0}
+    # each pipeline's default: Parakeet's own segments, Cohere's regrouped tokens
+    expected_mode = {"parakeet-crispasr": "segments", "cohere-crispasr": "regroup"}[kind.cls.PIPELINE_NAME]
+    assert md["stages"]["lines"] == {"mode": expected_mode, "scenes_with_lines": 2, "clamped_times": 0}
     assert pipe.notes == []
 
 
@@ -1034,7 +1269,9 @@ def test_speech_groups_are_put_in_film_time_with_their_pauses_and_the_segmenter_
     assert len(made) == 1 and made[0][0] == "whisperseg" and made[0][1] is None
     kwargs = made[0][2]
     assert kwargs.pop("max_speech_duration_s") == pytest.approx(m - 0.1)  # the limit less the 100 ms start pad
-    assert kwargs == {"max_group_duration_s": m, "chunk_threshold_s": 1.0, "start_pad_ms": 100, "end_pad_ms": 0}
+    # balanced's detection threshold, and nothing else of WhisperSeg's preset (W134 2)
+    assert kwargs == {"max_group_duration_s": m, "chunk_threshold_s": 1.0, "start_pad_ms": 100, "end_pad_ms": 0,
+                      "threshold": 0.35}
     assert segmenter.calls == [(f"s{i}.wav", 16000) for i in range(4)]
     assert failed == 1 and segmenter.released == 1
     assert [g.scene for g in groups] == [0, 0, 2]
@@ -1482,9 +1719,10 @@ def test_process_runs_the_program_once_and_writes_the_final_srt(kind, model, tmp
     assert md["output_files"]["final_srt"] == str(st.final) and st.final.is_file()
     lines = srt_lines(st.final)
     if model == "parakeet-ctc-1.1b-ja":
-        # CTC tokens end where the next one starts, so line splits may differ: the text and its order must not
+        # A CTC segment spans its whole slice, and Parakeet's default lines are its segments: the text and
+        # its order are the expected ones, and the first line starts at the first slice
         assert all_text(st.final) == "".join(t for t, _, _ in expected_lines(expected_cuts))
-        assert lines[0][1] == pytest.approx(expected_cuts[0][0] + LEAD_S, abs=0.0015)
+        assert lines[0][1] == pytest.approx(expected_cuts[0][0], abs=0.0015)
     else:
         assert_lines(lines, expected_lines(expected_cuts))
 
