@@ -87,7 +87,6 @@ class TestFailOnIsForwarded:
         """On by default: nothing is emitted unless the checkbox is unticked."""
         assert "--no-asr-telemetry" not in api.build_args(_base_options(tmp_path))
         assert "--no-asr-telemetry" in api.build_args(_base_options(tmp_path, asr_telemetry=False))
-        assert "--no-asr-telemetry" in api.build_args(_base_options(tmp_path, mode="crispasr", asr_telemetry=False))
         cfg = _base_options(tmp_path, asr_telemetry=False)
         cfg.update({"pass1_pipeline": "balanced", "pass1_sensitivity": "balanced"})
         assert "--no-asr-telemetry" in api._build_twopass_args(cfg)
@@ -96,8 +95,8 @@ class TestFailOnIsForwarded:
             "assets" / "index.html").read_text(encoding="utf-8")
 
     def test_every_mode_in_the_dropdown_forwards_the_flag(self, api, tmp_path):
-        """build_args dispatches to per-mode builders (transformers, crispasr,
-        ...); every value the mode dropdown offers must carry --fail-on."""
+        """build_args dispatches to per-mode builders (transformers, ...); every
+        value the mode dropdown offers must carry --fail-on."""
         import re
         from pathlib import Path
 
