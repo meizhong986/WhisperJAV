@@ -26,11 +26,11 @@ from whisperjav.pipelines.transformers_pipeline import TransformersPipeline
 from whisperjav.pipelines.qwen_pipeline import QwenPipeline
 from whisperjav.pipelines.parakeet_crispasr_pipeline import ParakeetCrispASRPipeline
 from whisperjav.pipelines.cohere_crispasr_pipeline import CohereCrispASRPipeline
-from whisperjav.crispasr.install import CrispASRSetupError
+from whisperjav.crispasr.errors import FAILURE_PREFIX as CRISPASR_FAILURE_PREFIX, CrispASRRunError, CrispASRSetupError
 from whisperjav.crispasr.manifest import CRISPASR_PIPELINES
 from whisperjav.crispasr.pass_settings import (ignored_hardware_message, ignored_hardware_settings,
+                                               speech_pad_ignored as crispasr_speech_pad_ignored,
                                                unused_pass_settings, unused_settings_message)
-from whisperjav.crispasr.runner import FAILURE_PREFIX as CRISPASR_FAILURE_PREFIX, CrispASRRunError
 from whisperjav.utils.logger import logger, setup_logger
 from whisperjav.utils.parameter_tracer import create_tracer, NullTracer
 
@@ -43,7 +43,7 @@ PIPELINE_CLASSES = {
     "fidelity": FidelityPipeline,
     "transformers": TransformersPipeline,
     "qwen": QwenPipeline,  # Dedicated Qwen3-ASR pipeline (ADR-004)
-    # CrispASR's own program, Ensemble passes only (1.10.0; CrispASR master plan 3.7). They
+    # CrispASR through its Python binding, Ensemble passes only (1.10.0; route B, W176). They
     # replace the 1.9.x "crispasr" pipeline, whose name main.py now stops (exit status 2).
     "parakeet-crispasr": ParakeetCrispASRPipeline,
     "cohere-crispasr": CohereCrispASRPipeline,
@@ -804,8 +804,8 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                 logger.error("[Worker %s] Pass %s: %s: %s", os.getpid(), pass_number, basename, stop)
                 results.append(FileResult(basename=basename, status="failed", error=str(stop)))
             except (CrispASRRunError, CrispASRSetupError) as failure:
-                # The CrispASR program or its files failed, with the reason in plain words: the run
-                # summary shows it, prefixed, instead of a traceback (CrispASR master plan 2.6, 4.3).
+                # CrispASR or its model failed, with the reason in plain words: the run summary
+                # shows it, prefixed, instead of a traceback.
                 logger.error("[Worker %s] Pass %s: %s: %s", os.getpid(), pass_number, basename, failure)
                 results.append(FileResult(basename=basename, status="failed",
                                           error=f"{CRISPASR_FAILURE_PREFIX}{failure}"))
@@ -1427,9 +1427,9 @@ def _build_pipeline(
             )
             raise
 
-    # The CrispASR pipelines (1.10.0; CrispASR master plan 3.7): Ensemble passes that run
-    # CrispASR's own program. Built from the three pass settings they use -- model, speech
-    # segmenter, source language -- and returned here, before resolve_legacy_pipeline(),
+    # The CrispASR pipelines (1.10.0; route B design 4.1): Ensemble passes that run CrispASR
+    # through its Python binding. Built from the pass settings they use -- model, speech
+    # segmenter, sensitivity, source language, device -- and returned here, before resolve_legacy_pipeline(),
     # which raises for any name outside LEGACY_PIPELINES (config/legacy.py). main.py has
     # already refused a model they do not know, a language other than Japanese and the
     # segmenter "none" (whisperjav/crispasr/pass_settings.py). The pass settings they do
@@ -1440,8 +1440,8 @@ def _build_pipeline(
         if unused:
             logger.info(unused_settings_message(
                 getattr(pipeline_class, "LABEL", pipeline_name), unused))
-        # W122: --device and --compute-type are not used, with a logged warning. The GUI sends
-        # neither for an Ensemble pass, so a GUI run gives none.
+        # --compute-type is not used, with a logged warning; --device is (W194 1). The GUI sends
+        # neither for an Ensemble pass.
         hardware = ignored_hardware_settings(pass_config)
         if hardware:
             logger.warning(ignored_hardware_message(
@@ -1456,15 +1456,31 @@ def _build_pipeline(
             "progress_display": None,
             # None: the pipeline's default model (whisperjav/crispasr/manifest.py).
             "model_name": pass_config.get("model") or None,
-            # WhisperSeg when the pass names none: the one rule main.py's start-up check uses.
+            # The pipeline's default when the pass names none (WhisperSeg for Parakeet, FireRedVAD
+            # for Cohere, W202 2-3): the one rule main.py's start-up check uses.
             "speech_segmenter": effective_segmenter_for_pass(
                 pipeline_name, pass_config.get("speech_segmenter")),
             "language": pass_config.get("language") or "ja",
             "subs_language": subs_language,
-            # Sets only the speech segmenter's detection setting (CrispASR master plan 3.8 item 4;
-            # W134 2, W136). main.py fills in balanced when the pass names none.
+            # Picks the speech segmenter's preset, as the fidelity or the qwen pipeline does
+            # (W199 DIR1, W202). main.py fills in balanced when the pass names none.
             "sensitivity": pass_config.get("sensitivity"),
+            # --device (W194 1: A + Metal); None when the user gave none, as the GUI does.
+            "device": pass_config.get("device"),
+            # --passN-vad-threshold, --passN-speech-pad-ms, applied as fidelity (Parakeet) or the
+            # qwen pipeline (Cohere) applies them (W208; pass_settings.segmenter_settings).
+            "vad_threshold": pass_config.get("vad_threshold"),
+            "speech_pad_ms": pass_config.get("speech_pad_ms"),
         }
+        if crispasr_speech_pad_ignored(pipeline_name, crispasr_kwargs["speech_segmenter"],
+                                       crispasr_kwargs["speech_pad_ms"]):
+            # Fidelity's own warning, below, for the same case.
+            logger.warning(
+                "Pass %s: the speech pad of %dms is ignored -- the '%s' speech "
+                "segmenter has no speech-pad setting. It pads the start and end of "
+                "each segment separately, at the values this pass's sensitivity chose.",
+                pass_number, max(0, int(crispasr_kwargs["speech_pad_ms"])), crispasr_kwargs["speech_segmenter"],
+            )
         logger.debug(
             "[Worker %s] Pass %s: Creating %s with model=%s, speech_segmenter=%s, sensitivity=%s",
             os.getpid(), pass_number, pipeline_class.__name__,
