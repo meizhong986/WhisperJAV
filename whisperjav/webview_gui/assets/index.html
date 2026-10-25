@@ -447,8 +447,8 @@
                                                 <option value="cohere" disabled>Cohere-Transcribe (not available yet)</option>
                                             </optgroup>
                                             <optgroup label="GGUF">
-                                                <option value="parakeet-crispasr">Parakeet-CrispASR</option>
-                                                <option value="cohere-crispasr">Cohere-CrispASR</option>
+                                                <option value="parakeet-crispasr" title="The GGUF (CrispASR) pipelines do not support CJK (Chinese, Japanese, Korean) characters in folder names.">Parakeet-CrispASR</option>
+                                                <option value="cohere-crispasr" title="The GGUF (CrispASR) pipelines do not support CJK (Chinese, Japanese, Korean) characters in folder names.">Cohere-CrispASR</option>
                                             </optgroup>
                                         </select>
                                     </div>
@@ -534,6 +534,9 @@
                                     </div>
                                 </div>
 
+                                <!-- Pass 1 CrispASR status (shown when a GGUF pipeline is selected; T16) -->
+                                <div class="crispasr-status-panel" id="pass1-crispasr-status" style="display: none;"></div>
+
                                 <!-- Pass 1 DSP Effects Panel (shown when FFmpeg DSP selected) -->
                                 <div class="dsp-effects-panel" id="pass1-dsp-panel" style="display: none;">
                                     <div class="dsp-effects-header">
@@ -613,8 +616,8 @@
                                                 <option value="xxl">XXL Faster Whisper</option>
                                             </optgroup>
                                             <optgroup label="GGUF">
-                                                <option value="parakeet-crispasr">Parakeet-CrispASR</option>
-                                                <option value="cohere-crispasr">Cohere-CrispASR</option>
+                                                <option value="parakeet-crispasr" title="The GGUF (CrispASR) pipelines do not support CJK (Chinese, Japanese, Korean) characters in folder names.">Parakeet-CrispASR</option>
+                                                <option value="cohere-crispasr" title="The GGUF (CrispASR) pipelines do not support CJK (Chinese, Japanese, Korean) characters in folder names.">Cohere-CrispASR</option>
                                             </optgroup>
                                         </select>
                                     </div>
@@ -699,6 +702,9 @@
                                         <span id="pass2-badge" class="pass-badge default">DEFAULT</span>
                                     </div>
                                 </div>
+
+                                <!-- Pass 2 CrispASR status (shown when a GGUF pipeline is selected; T16) -->
+                                <div class="crispasr-status-panel" id="pass2-crispasr-status" style="display: none;"></div>
 
                                 <!-- Pass 2 DSP Effects Panel (shown when FFmpeg DSP selected) -->
                                 <div class="dsp-effects-panel" id="pass2-dsp-panel" style="display: none;">
