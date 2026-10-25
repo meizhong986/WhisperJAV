@@ -1577,6 +1577,7 @@ const EnsembleManager = {
         });
         document.getElementById('pass1-model').addEventListener('change', (e) => {
             this.state.pass1.model = e.target.value;
+            this.updateCrispasrStatus('pass1');
         });
 
         // New dropdown event handlers - Pass 2
@@ -1634,6 +1635,7 @@ const EnsembleManager = {
         this.initDspCheckboxes();
         document.getElementById('pass2-model').addEventListener('change', (e) => {
             this.state.pass2.model = e.target.value;
+            this.updateCrispasrStatus('pass2');
         });
 
         // Merge strategy
@@ -1697,6 +1699,54 @@ const EnsembleManager = {
     // The two CrispASR pipelines (1.10.0; CRISPASR_PIPELINES in whisperjav/crispasr/manifest.py).
     isCrispasrPipeline(pipeline) {
         return pipeline === 'parakeet-crispasr' || pipeline === 'cohere-crispasr';
+    },
+
+    CRISPASR_CJK_NOTE: 'The GGUF (CrispASR) pipelines do not support CJK (Chinese, Japanese, Korean) characters in folder names.',
+
+    // Each CrispASR pipeline's speech segmenter when a pass names none (CRISPASR_DEFAULT_SEGMENTERS,
+    // config/segmenter_presets.py; owner W202 2-3); tests/test_gui_crispasr_pipelines.py compares them.
+    crispasrDefaultSegmenter(pipeline) {
+        return pipeline === 'cohere-crispasr' ? 'firered-vad' : 'whisperseg';
+    },
+
+    // The CrispASR status panel under a pass row (owner W133 2; route B design 12, T16): the model,
+    // downloaded or not, and where CrispASR runs, or why it cannot run here. Shown only for a pass
+    // that runs a CrispASR pipeline; filled from api.get_crispasr_status, which never downloads.
+    async updateCrispasrStatus(passKey) {
+        const passState = this.state[passKey];
+        // The CJK folder-name note (owner W203 O14, T24) on the Pipeline dropdown itself while a GGUF
+        // pipeline is selected: a tooltip on an <option> inside an open dropdown may not be shown.
+        const pipelineSelect = document.getElementById(`${passKey}-pipeline`);
+        if (pipelineSelect) pipelineSelect.title = passState.isCrispasr ? this.CRISPASR_CJK_NOTE : '';
+        const panel = document.getElementById(`${passKey}-crispasr-status`);
+        if (!panel) return;
+        const enabled = passKey === 'pass1' || this.state.pass2.enabled;
+        if (!passState.isCrispasr || !enabled) {
+            panel.style.display = 'none';
+            return;
+        }
+        const pipeline = passState.pipeline;
+        const model = passState.model || '';
+        try {
+            const result = await pywebview.api.get_crispasr_status(pipeline, model);
+            // The pass may have changed while CrispASR was asked.
+            if (passState.pipeline !== pipeline || (passState.model || '') !== model || !passState.isCrispasr) return;
+            if (!result || !result.success) {
+                panel.style.display = 'none';
+                return;
+            }
+            panel.replaceChildren(...result.lines.map((text) => {
+                const line = document.createElement('div');
+                line.className = 'crispasr-status-line';
+                line.textContent = text;
+                return line;
+            }));
+            panel.classList.toggle('cannot-run', !result.can_run);
+            panel.style.display = 'block';
+        } catch (error) {
+            console.error('CrispASR status:', error);
+            panel.style.display = 'none';
+        }
     },
 
     handlePipelineChange(passKey, newValue, selectElement) {
@@ -1838,16 +1888,18 @@ const EnsembleManager = {
         const sensitivitySelect = document.getElementById(`${passKey}-sensitivity`);
 
         // The CrispASR pipelines (1.10.0): the same defaults as the command line. The speech
-        // segmenter is WhisperSeg when a pass names none (CRISPASR_DEFAULT_SEGMENTER,
-        // config/segmenter_presets.py); sensitivity is balanced (ENSEMBLE_DEFAULT_SENSITIVITY);
-        // the scene detector is always semantic (CRISPASR_SCENE_DETECTOR, crispasr/pass_settings.py),
-        // so that is what the greyed dropdown shows.
+        // segmenter is each pipeline's own when a pass names none (CRISPASR_DEFAULT_SEGMENTERS,
+        // config/segmenter_presets.py: WhisperSeg for Parakeet, FireRedVAD for Cohere, owner W202);
+        // sensitivity is balanced (ENSEMBLE_DEFAULT_SENSITIVITY); the scene detector is always
+        // semantic (CRISPASR_SCENE_DETECTOR, crispasr/pass_settings.py), so that is what the greyed
+        // dropdown shows.
         if (this.isCrispasrPipeline(pipelineType)) {
+            const segmenter = this.crispasrDefaultSegmenter(pipelineType);
             sceneSelect.value = 'semantic';
-            segmenterSelect.value = 'whisperseg';
+            segmenterSelect.value = segmenter;
             sensitivitySelect.value = 'balanced';
             this.state[passKey].sceneDetector = 'semantic';
-            this.state[passKey].speechSegmenter = 'whisperseg';
+            this.state[passKey].speechSegmenter = segmenter;
             this.state[passKey].sensitivity = 'balanced';
             return;
         }
@@ -2079,6 +2131,7 @@ const EnsembleManager = {
             const guideBtn = document.getElementById(`guide-${passKey}`);
             if (guideBtn) guideBtn.style.display = 'none';
             this.updateDspPanel(passKey);
+            this.updateCrispasrStatus(passKey);
             return;
         }
 
@@ -2096,8 +2149,9 @@ const EnsembleManager = {
             segmenterSelect.disabled = isPass2Disabled;
             segmenterSelect.title = '';
             if (segmenterSelect.value === 'none') {
-                segmenterSelect.value = 'whisperseg';
-                passState.speechSegmenter = 'whisperseg';
+                const segmenter = this.crispasrDefaultSegmenter(passState.pipeline);
+                segmenterSelect.value = segmenter;
+                passState.speechSegmenter = segmenter;
             }
 
             const sceneSelect = document.getElementById(`${passKey}-scene`);
@@ -2112,6 +2166,7 @@ const EnsembleManager = {
             const guideBtn = document.getElementById(`guide-${passKey}`);
             if (guideBtn) guideBtn.style.display = 'none';
             this.updateDspPanel(passKey);
+            this.updateCrispasrStatus(passKey);
             return;
         }
 
@@ -2181,6 +2236,7 @@ const EnsembleManager = {
         // kept whatever the markup said until something was clicked. This runs at
         // start-up, on a pipeline change and after a preset is loaded.
         this.updateDspPanel(passKey);
+        this.updateCrispasrStatus(passKey);
     },
 
     handleSensitivityChange(passKey, newValue, selectElement) {
