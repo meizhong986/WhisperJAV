@@ -1,30 +1,22 @@
-"""Getting CrispASR's program and model files ready, and saying whether they are (master plan 1.2-1.7).
+"""Making CrispASR and its model files ready, and saying whether they are (1.10.0, route B).
 
-The program
-- WhisperJAV downloads it itself the first time a CrispASR pipeline runs, in every environment
-  (installer, WJ110, source installs). Nothing is downloaded with --offline.
-- Plain HTTPS from CrispASR's GitHub release; size and SHA-256 checked against the manifest; a
-  damaged download is deleted and fetched again once, then the run stops with a message.
-- Unpacked to ~/.cache/whisperjav/crispasr/<version>/<build>/, with a ``.verified`` record.
-- Which build runs is decided before the film run, never by re-running (plan 1.4):
-    1. the CUDA 13 build, when PyTorch sees an NVIDIA GPU, is built for CUDA 13, has the three CUDA 13
-       runtime files, and the build's start check finds a CUDA device;
-    2. otherwise the CPU build, with one console line and a note in the end-of-run summary;
-    3. an x86-64 processor without AVX2 cannot run any build: the CrispASR pipelines stop (Q23).
-- The start check runs ``crispasr --diagnostics``. ``--version`` is not enough: the backend list it
-  prints is fixed when the program is compiled (crispasr_diagnostics.cpp:48-73), so it names CUDA even
-  where CUDA cannot load. ``--diagnostics`` lists the devices that actually registered (:279-320).
-- The CUDA 13 runtime files come from the user's own PyTorch (torch/lib) and are put beside the
-  program as hard links (no extra disk), or copied when a link is impossible (plan 1.3).
+CrispASR
+- It is the Python package ``crispasr``, installed with WhisperJAV from the locked list (route B,
+  owner W176): the CUDA build (``+cuda``, its own CUDA 12.8 libraries inside) in the cu130 and cu128
+  variants, the CPU build otherwise (Metal inside on macOS arm64). Nothing is downloaded for it at run
+  time.
+- ``prepare_runtime(device, model)`` says, before any audio is read, whether it can run here and on
+  which device (route B design 4.2, 9): a build for this computer, the package, AVX2, the model's back
+  end in this build, then the device by the --device rule of owner W194 1 (A + Metal).
 
 The models
-- WhisperJAV downloads them, never the program: each file by repository, name and pinned commit,
-  into the Hugging Face cache, at the start of the run, before audio extraction (plan 1.5).
+- WhisperJAV downloads them, never CrispASR (W130, W133 3): each file by repository, name and pinned
+  commit, into the Hugging Face cache, at the start of the run, before audio extraction.
 - Network-free status (cache first) feeds ``whisperjav --check``.
-- A folder the user fills by hand can be named in WHISPERJAV_CRISPASR_MODEL_DIR (Q14).
+- A folder the user fills by hand can be named in WHISPERJAV_CRISPASR_MODEL_DIR.
 - Each file's SHA-256 is checked once and remembered by size and modification time.
-- A model path with characters outside ASCII is hard-linked, else copied, into the run folder,
-  because the program's model loader opens files in the PC's code page (plan 1.7).
+- CrispASR cannot open a model path with Japanese characters on Windows (binding checks of
+  2026-10-24, item 2), so such a file is staged under a plain-ASCII name (``stage_model``).
 """
 
 import hashlib
@@ -32,34 +24,62 @@ import importlib.util
 import json
 import os
 import platform
-import re
 import shutil
 import subprocess
 import sys
-import tarfile
-import time
-import zipfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional, Tuple
 
-from whisperjav.crispasr import manifest
-from whisperjav.crispasr.manifest import CRISPASR_VERSION, CUDA13_RUNTIME_FILES, ModelFile, ProgramBuild
-from whisperjav.crispasr.runner import exit_code_meaning
+from whisperjav.crispasr.errors import CrispASRSetupError
+from whisperjav.crispasr.manifest import ModelFile
 from whisperjav.utils.logger import logger
 from whisperjav.utils.offline_mode import hub_offline
 
+__all__ = ["CrispASRSetupError", "hub_offline"]  # re-exported for the start-up check
+
 MODEL_DIR_ENV = "WHISPERJAV_CRISPASR_MODEL_DIR"
+STAGE_FOLDER = "crispasr_stage"  # the name WhisperJAV's leftover handling knows (utils/media_leftovers.py)
 _MB = 1_000_000
-_DOWNLOAD_TIMEOUT = (30, 120)  # seconds: connect, and between bytes
-# Room for the archive and its unpacked files. The CUDA 13 build is 168 MB zipped and about 212 MB
-# unpacked; the CPU build 9 MB and 22 MB.
-_PROGRAM_SPACE_FACTOR = 2.5
-_MODEL_SPACE_FACTOR = 1.1  # the file size plus 10% (plan 1.5)
+_MODEL_SPACE_FACTOR = 1.1  # the file size plus 10%
 
+# (sys.platform, platform.machine()) pairs CrispASR publishes a wheel for (design 11.1).
+CRISPASR_PLATFORMS = frozenset({
+    ("win32", "AMD64"), ("win32", "x86_64"),
+    ("linux", "x86_64"), ("linux", "aarch64"),
+    ("darwin", "arm64"),
+})
 
-class CrispASRSetupError(RuntimeError):
-    """The program or a model cannot be made ready. The run stops before audio extraction (plan 2.6)."""
+# --- Texts (owner-approved wording, W193 5 / W203 I2; route B design 12) -------------------------
+NOT_INSTALLED_TEXT = "CrispASR is not installed in this WhisperJAV. Run the WhisperJAV installer again."
+# T10i: the cpu variant carries no CrispASR until CrispASR publishes 0.8.44's CPU wheel (#556; owner O16).
+CPU_VARIANT_TEXT = ("This install of WhisperJAV has no GPU support and comes without CrispASR in 1.10.0; "
+                    "the CrispASR pipelines cannot run here.")
+NO_BUILD_TEXT = ("CrispASR has no build for this computer ({platform}, {machine}); "
+                 "the CrispASR pipelines cannot run here.")
+NO_AVX2_TEXT = ("This processor lacks AVX2, which CrispASR needs (Intel since 2013, AMD since 2015). "
+                "The CrispASR pipelines cannot run here.")
+NO_BACKEND_TEXT = "This CrispASR build ({version}) cannot run {model}: it was built without '{backend}'."
+NOT_LOADED_TEXT = "CrispASR could not be loaded on this computer: {reason}"
+DEVICE_CUDA_TEXT = ("--device cuda: CrispASR cannot use an NVIDIA GPU here: {reason}. "
+                    "Use --device auto or --device cpu.")
+NO_STAGE_TEXT = ("CrispASR cannot open the model's folder (its name has non-ASCII characters) and no "
+                 "plain-named folder was found for a link or copy. Put {filename} in a plain-named "
+                 "folder and set " + MODEL_DIR_ENV + " to it.")
+STAGED_LINK_TEXT = "CrispASR: the model was linked to {folder}, because CrispASR cannot open its folder's name"
+STAGED_COPY_TEXT = ("CrispASR: the model was copied to {folder} ({size}), because CrispASR cannot open "
+                    "its folder's name{kept}")
+STAGED_COPY_KEPT = "; the copy is kept for later runs"
+# The device line, once per pass (T6).
+DEVICE_LINE_NVIDIA = "{label} asks CrispASR to use the NVIDIA GPU (CrispASR {version})."
+DEVICE_LINE_METAL = ("{label} asks CrispASR to use the Apple GPU (Metal) (CrispASR {version}); "
+                     "this has not been tested on a Mac yet.")
+DEVICE_LINE_CPU = "{label} runs on the processor, which is slower: {reason}."
+REASON_NO_NVIDIA = "no NVIDIA GPU was found"
+REASON_NO_GPU = "no GPU was found"
+REASON_CPU_BUILD = "this install has CrispASR's CPU build"
+REASON_VULKAN_BUILD = "this install has CrispASR's Vulkan build, which WhisperJAV 1.10.0 does not use"
+REASON_DEVICE_CPU = "--device cpu was given"
 
 
 def mb(n_bytes: int) -> str:
@@ -75,14 +95,6 @@ def whisperjav_cache_root() -> Path:
     return Path.home() / ".cache" / "whisperjav"
 
 
-def program_root() -> Path:
-    return whisperjav_cache_root() / "crispasr" / CRISPASR_VERSION
-
-
-def program_dir(build: ProgramBuild) -> Path:
-    return program_root() / build.key
-
-
 def _verified_models_record() -> Path:
     return whisperjav_cache_root() / "crispasr" / "verified-models.json"
 
@@ -95,7 +107,7 @@ def _check_free_space(folder: Path, needed: int, what: str) -> None:
     try:
         free = shutil.disk_usage(probe).free
     except OSError:
-        return  # cannot tell; the download itself will fail clearly if the disk fills
+        return  # cannot tell; the copy or download itself will fail clearly if the disk fills
     if free < needed:
         raise CrispASRSetupError(
             f"Not enough disk space for {what}: {mb(needed)} needed in {probe}, {mb(free)} free.")
@@ -110,14 +122,13 @@ def _sha256_of(path: Path) -> str:
 
 
 # ---------------------------------------------------------------------------------------------------
-# The processor
+# CrispASR on this computer
 # ---------------------------------------------------------------------------------------------------
 
 def has_avx2() -> Optional[bool]:
-    """Whether this x86-64 processor has AVX2: True, False, or None when it cannot be told.
+    """Whether this x86-64 processor has AVX2: True, False, or None when it cannot be told (not a stop).
 
-    None is not a stop: a program that then cannot run ends with "illegal instruction", which the
-    runner reports in plain words.
+    CrispASR's Windows libraries are built with -DGGML_AVX2=ON (binding checks of 2026-10-24, item 1).
     """
     if platform.machine().lower() not in ("amd64", "x86_64", "x64"):
         return None
@@ -153,332 +164,148 @@ def has_avx2() -> Optional[bool]:
         return None
 
 
-# ---------------------------------------------------------------------------------------------------
-# The program: status, download, unpack
-# ---------------------------------------------------------------------------------------------------
-
-@dataclass
-class ProgramStatus:
-    build: ProgramBuild
-    downloaded: bool
-    exe: Optional[Path] = None
+def platform_supported(sys_platform: Optional[str] = None, machine: Optional[str] = None) -> bool:
+    return ((sys_platform or sys.platform), (machine or platform.machine())) in CRISPASR_PLATFORMS
 
 
-def program_status(build: ProgramBuild) -> ProgramStatus:
-    """Whether this build is downloaded and unpacked. Reads files only: no network, no program start."""
-    folder = program_dir(build)
-    exe = folder / build.exe_name
+def crispasr_installed() -> bool:
     try:
-        record = json.loads((folder / ".verified").read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return ProgramStatus(build, False)
-    if (record.get("version") == CRISPASR_VERSION and record.get("asset") == build.asset
-            and record.get("sha256") == build.sha256 and exe.is_file()):
-        return ProgramStatus(build, True, exe)
-    return ProgramStatus(build, False)
-
-
-def _download(url: str, dest: Path, size: int, sha256: str, what: str) -> Path:
-    """Download ``url`` to ``dest``, checking size and SHA-256. A damaged file is fetched again once."""
-    import requests
-
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    part = dest.with_name(dest.name + ".part")
-    for attempt in (1, 2):
-        logger.info(f"CrispASR: downloading {what} ({mb(size)}) from {url}")
-        h = hashlib.sha256()
-        got = 0
-        next_report = 0.1
-        try:
-            with requests.get(url, stream=True, timeout=_DOWNLOAD_TIMEOUT) as r:
-                r.raise_for_status()
-                with open(part, "wb") as fh:
-                    for chunk in r.iter_content(chunk_size=1024 * 1024):
-                        if not chunk:
-                            continue
-                        fh.write(chunk)
-                        h.update(chunk)
-                        got += len(chunk)
-                        if size and got / size >= next_report:
-                            logger.info(f"CrispASR: {what}: {min(100, int(got * 100 / size))}% "
-                                        f"({mb(got)} of {mb(size)})")
-                            next_report += 0.1
-        except (requests.RequestException, OSError) as e:
-            part.unlink(missing_ok=True)
-            raise CrispASRSetupError(f"Downloading {what} failed: {e}") from e
-        if got == size and h.hexdigest() == sha256:
-            os.replace(part, dest)
-            return dest
-        part.unlink(missing_ok=True)
-        logger.warning(f"CrispASR: the download of {what} is damaged ({got:,} bytes, SHA-256 "
-                       f"{h.hexdigest()[:12]}..., expected {size:,} bytes, {sha256[:12]}...)"
-                       + ("; downloading it again" if attempt == 1 else ""))
-    raise CrispASRSetupError(f"The download of {what} was damaged twice; nothing was installed.")
-
-
-def _safe_extract(archive: Path, into: Path) -> None:
-    """Unpack a release archive; a member that would land outside ``into`` stops it (both formats)."""
-    into.mkdir(parents=True, exist_ok=True)
-    root = into.resolve()
-    try:
-        if archive.name.endswith(".zip"):
-            with zipfile.ZipFile(archive) as zf:
-                for member in zf.namelist():
-                    target = (into / member).resolve()
-                    if target != root and root not in target.parents:
-                        raise CrispASRSetupError(f"Refusing to unpack {archive.name}: '{member}' leaves the folder")
-                zf.extractall(into)
-        else:
-            with tarfile.open(archive, "r:*") as tf:
-                tf.extractall(into, filter="data")
-    except (tarfile.TarError, zipfile.BadZipFile) as e:
-        raise CrispASRSetupError(f"Refusing to unpack {archive.name}: {e}") from e
-
-
-def ensure_program(build: ProgramBuild, offline: Optional[bool] = None) -> Path:
-    """The program file of this build, downloading and unpacking it if needed.
-
-    ``offline`` defaults to WhisperJAV's --offline switch (HF_HUB_OFFLINE), which does not reach a
-    plain HTTPS download on its own.
-    """
-    status = program_status(build)
-    if status.downloaded:
-        return status.exe
-    offline = hub_offline() if offline is None else offline
-    what = f"the CrispASR {CRISPASR_VERSION} {build.label}"
-    if offline:
-        raise CrispASRSetupError(f"{what[0].upper()}{what[1:]} is not downloaded yet ({mb(build.size)}), "
-                                 f"and --offline allows no download.")
-    root = program_root()
-    _check_free_space(root, int(build.size * _PROGRAM_SPACE_FACTOR), what)
-    # The download and unpacking places carry this process's id, so two WhisperJAV runs fetching the
-    # same build at once never write into each other's files.
-    tag = os.getpid()
-    archive = _download(build.url, root / ".download" / f"{tag}-{build.asset}", build.size, build.sha256, what)
-
-    staging = root / f".{build.key}.staging-{tag}"
-    final = program_dir(build)
-    shutil.rmtree(staging, ignore_errors=True)
-    try:
-        _safe_extract(archive, staging)
-        found = [p for p in staging.rglob(build.exe_name) if p.is_file()]
-        if len(found) != 1:
-            raise CrispASRSetupError(f"{build.asset} does not hold exactly one {build.exe_name} "
-                                     f"(found {len(found)}).")
-        finished = program_status(build)
-        if finished.downloaded:
-            # Another run finished the same download first: use its copy, which is in use already.
-            return finished.exe
-        if final.exists():
-            shutil.rmtree(final)
-        shutil.move(str(found[0].parent), str(final))
-        exe = final / build.exe_name
-        if sys.platform != "win32":
-            exe.chmod(exe.stat().st_mode | 0o111)
-        record = {"version": CRISPASR_VERSION, "asset": build.asset, "size": build.size,
-                  "sha256": build.sha256, "unpacked": time.strftime("%Y-%m-%dT%H:%M:%S")}
-        (final / ".verified").write_text(json.dumps(record, indent=1), encoding="utf-8")
-    finally:
-        shutil.rmtree(staging, ignore_errors=True)
-        archive.unlink(missing_ok=True)
-    logger.info(f"CrispASR: {what} is ready in {final}")
-    return exe
-
-
-# ---------------------------------------------------------------------------------------------------
-# The CUDA 13 runtime files and the start check
-# ---------------------------------------------------------------------------------------------------
-
-def torch_lib_dir() -> Optional[Path]:
-    """PyTorch's library folder, found without importing torch."""
-    try:
-        spec = importlib.util.find_spec("torch")
+        return importlib.util.find_spec("crispasr") is not None
     except (ImportError, ValueError):
-        return None
-    if spec is None or not spec.submodule_search_locations:
-        return None
-    return Path(list(spec.submodule_search_locations)[0]) / "lib"
+        return False
 
 
-def place_cuda_runtime(program_folder: Path, source_dir: Path) -> str:
-    """Put PyTorch's three CUDA 13 runtime files beside the program (plan 1.3).
+def is_cpu_variant() -> bool:
+    """Whether this is the cpu variant of WhisperJAV: a PyTorch without a CUDA build label (+cu130, +cu128).
+    Read from the package metadata, so PyTorch is not imported."""
+    from importlib import metadata
 
-    Done before the first run and again whenever a file's size no longer matches PyTorch's. A hard
-    link takes no extra disk and is the same file PyTorch has; a copy is made where a link is
-    impossible (another drive, or not NTFS). Returns "ready", "linked" or "copied".
-    """
-    how = "ready"
-    for name in CUDA13_RUNTIME_FILES:
-        src, dst = Path(source_dir) / name, Path(program_folder) / name
-        if not src.is_file():
-            raise CrispASRSetupError(f"PyTorch's {name} was not found in {source_dir}")
-        if dst.is_file() and dst.stat().st_size == src.stat().st_size:
-            continue
-        if dst.exists():
-            dst.unlink()
-        try:
-            os.link(src, dst)
-            how = "linked" if how == "ready" else how
-        except OSError:
-            shutil.copy2(src, dst)
-            how = "copied"
-    if how == "copied":
-        total = sum((Path(source_dir) / n).stat().st_size for n in CUDA13_RUNTIME_FILES)
-        logger.info(f"CrispASR: PyTorch's CUDA 13 runtime files were copied beside the program "
-                    f"({mb(total)}); a hard link was not possible there.")
-    return how
-
-
-@dataclass
-class StartCheck:
-    ok: bool
-    reason: Optional[str]  # why not, in plain words
-    version: Optional[str] = None
-    git: Optional[str] = None
-    compiled_backends: list = field(default_factory=list)
-    gpu_devices: list = field(default_factory=list)  # "CUDA0: NVIDIA GeForce RTX 3060"
-    exit_code: Optional[int] = None
-
-
-_DIAG_VERSION = re.compile(r"^\s*version\s*:\s*(\S+)", re.MULTILINE)
-_DIAG_GIT = re.compile(r"^\s*git sha\s*:\s*(\S+)", re.MULTILINE)
-_DIAG_COMPILED = re.compile(r"^\s*ggml backends\s*:\s*(\S+)", re.MULTILINE)
-_DIAG_DEVICE = re.compile(r"^\s*\[\d+\]\s+(gpu|igpu)\s+name=(\S+)\s+desc=(.*?)\s+mem=", re.MULTILINE)
-
-
-def parse_diagnostics(text: str) -> StartCheck:
-    version = _DIAG_VERSION.search(text)
-    git = _DIAG_GIT.search(text)
-    compiled = _DIAG_COMPILED.search(text)
-    return StartCheck(
-        ok=False, reason=None,
-        version=version.group(1) if version else None,
-        git=git.group(1) if git else None,
-        compiled_backends=compiled.group(1).split(",") if compiled else [],
-        gpu_devices=[f"{m.group(2)}: {m.group(3).strip()}" for m in _DIAG_DEVICE.finditer(text)])
-
-
-def start_check(exe: Path, build: ProgramBuild, timeout_s: float = 120) -> StartCheck:
-    """Start the program once with ``--diagnostics`` and judge whether this build can run here."""
-    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
     try:
-        p = subprocess.run([str(exe), "--diagnostics"], cwd=str(Path(exe).parent), capture_output=True,
-                           timeout=timeout_s, creationflags=creationflags)
-    except subprocess.TimeoutExpired:
-        return StartCheck(False, f"it did not answer within {timeout_s:.0f} s")
-    except OSError as e:
-        return StartCheck(False, f"it could not be started ({e})")
-    text = (p.stdout or b"").decode("utf-8", "replace") + "\n" + (p.stderr or b"").decode("utf-8", "replace")
-    check = parse_diagnostics(text)
-    check.exit_code = p.returncode
-    if p.returncode != 0:
-        check.reason = exit_code_meaning(p.returncode)
-    elif check.version != CRISPASR_VERSION:
-        check.reason = f"it reports version {check.version or 'unknown'}, not {CRISPASR_VERSION}"
-    elif check.git and not (check.git.startswith(manifest.CRISPASR_GIT)
-                            or manifest.CRISPASR_GIT.startswith(check.git)):
-        check.reason = f"it reports build {check.git}, not {manifest.CRISPASR_GIT}"
-    elif build.gpu == "cuda13" and not any(d.upper().startswith("CUDA") for d in check.gpu_devices):
-        check.reason = "it found no CUDA device"
-    else:
-        check.ok = True
-    return check
+        return "+cu" not in metadata.version("torch")
+    except metadata.PackageNotFoundError:
+        return False
 
 
-def cuda13_unavailable_reason() -> Optional[str]:
-    """Why the CUDA 13 build cannot be used on this PC, or None when it can be tried."""
-    unavailable = cuda13_unavailable()
-    return unavailable.reason if unavailable else None
+def not_installed_text() -> str:
+    """Why CrispASR is missing, in the words that fit this install (T10a, or T10i on the cpu variant)."""
+    return CPU_VARIANT_TEXT if is_cpu_variant() else NOT_INSTALLED_TEXT
+
+
+def installed_build() -> Tuple[str, str]:
+    """The installed crispasr's version and build: ("0.8.44+cuda", "cuda"), ("0.8.44", "cpu"), ...
+
+    The build is read from the version's local label (+cuda, +vulkan); no label is the CPU build.
+    Raises CrispASRSetupError when the package is not installed.
+    """
+    from importlib import metadata
+
+    try:
+        version = metadata.version("crispasr")
+    except metadata.PackageNotFoundError as e:
+        raise CrispASRSetupError(not_installed_text()) from e
+    local = version.partition("+")[2].lower()
+    if local.startswith("cuda"):
+        return version, "cuda"
+    if local.startswith("vulkan"):
+        return version, "vulkan"
+    return version, "cpu"
+
+
+def available_backends() -> List[str]:
+    """The model families the installed CrispASR library was built with. This loads its libraries."""
+    try:
+        import crispasr
+        return list(crispasr.Session.available_backends())
+    except (ImportError, OSError) as e:
+        raise CrispASRSetupError(NOT_LOADED_TEXT.format(reason=e)) from e
 
 
 @dataclass(frozen=True)
-class CudaUnavailable:
-    reason: str     # plain words
-    expected: bool  # a normal set-up for the CPU build (no NVIDIA GPU, a PyTorch without CUDA 13)
+class RuntimeChoice:
+    use_gpu: bool
+    device: str              # "cuda", "metal" or "cpu"
+    reason: Optional[str]    # why the processor, in plain words; None on a GPU
+    note_in_summary: bool    # the processor was not expected: say so in each file's summary too
+    version: str             # the installed crispasr, e.g. "0.8.44+cuda"
+    build: str               # "cuda", "cpu" or "vulkan"
+
+    def device_line(self, label: str) -> str:
+        if self.device == "cuda":
+            return DEVICE_LINE_NVIDIA.format(label=label, version=self.version)
+        if self.device == "metal":
+            return DEVICE_LINE_METAL.format(label=label, version=self.version)
+        return DEVICE_LINE_CPU.format(label=label, reason=self.reason)
 
 
-def cuda13_unavailable() -> Optional[CudaUnavailable]:
-    """Why the CUDA 13 build cannot be used on this PC, or None when it can be tried.
+def _best_device() -> Tuple[str, Optional[str]]:
+    """WhisperJAV's own device check: ("cuda" | "mps" | "cpu", why an NVIDIA card PyTorch sees is unusable)."""
+    from whisperjav.utils import device_detector
 
-    PyTorch's own CUDA build is asked first, so a PC with an NVIDIA card but a PyTorch without CUDA
-    is not told that it has no NVIDIA GPU.
+    best = device_detector.get_best_device()
+    return best, device_detector.CUDA_UNUSABLE_REASON
+
+
+def choose_device(device: Optional[str], build: str, version: str,
+                  sys_platform: Optional[str] = None) -> RuntimeChoice:
+    """The --device rule (owner W194 1, A + Metal; route B design 9.1).
+
+    ``use_gpu=True`` is a request to CrispASR: it sends the same value as leaving it out, and with no
+    usable CUDA the library may run on the processor without an error (design 4.2 step 5).
     """
-    lib = torch_lib_dir()
-    try:
-        import torch
-    except Exception:
-        return CudaUnavailable("PyTorch could not be loaded to look for an NVIDIA GPU", expected=False)
-    cuda = str(getattr(torch.version, "cuda", "") or "")
-    if not cuda:
-        return CudaUnavailable("this install's PyTorch has no CUDA support", expected=True)
-    if not cuda.startswith("13."):
-        return CudaUnavailable(f"this install's PyTorch is built for CUDA {cuda}, not CUDA 13", expected=True)
-    try:
-        available = torch.cuda.is_available()
-    except Exception:
-        available = False
-    if not available:
-        return CudaUnavailable("no NVIDIA GPU was found", expected=True)
-    missing = [n for n in CUDA13_RUNTIME_FILES if lib is None or not (lib / n).is_file()]
-    if missing:
-        return CudaUnavailable(f"PyTorch's CUDA 13 runtime files are missing ({', '.join(missing)})",
-                               expected=False)
-    return None
+    device = (device or "auto").strip().lower()
+    sys_platform = sys_platform or sys.platform
+    if device == "cpu":
+        return RuntimeChoice(False, "cpu", REASON_DEVICE_CPU, False, version, build)
+    if build == "cuda":
+        best, unusable = _best_device()
+        if best == "cuda":
+            return RuntimeChoice(True, "cuda", None, False, version, build)
+        reason = unusable or REASON_NO_NVIDIA
+        if device == "cuda":
+            raise CrispASRSetupError(DEVICE_CUDA_TEXT.format(reason=reason))
+        # A card PyTorch sees but cannot use is not the normal set-up: the note also goes in the summary.
+        return RuntimeChoice(False, "cpu", reason, unusable is not None, version, build)
+    reason = REASON_VULKAN_BUILD if build == "vulkan" else REASON_CPU_BUILD
+    if device == "cuda":
+        raise CrispASRSetupError(DEVICE_CUDA_TEXT.format(reason=reason))
+    if build == "cpu" and sys_platform == "darwin":
+        best, _ = _best_device()
+        if best == "mps":
+            return RuntimeChoice(True, "metal", None, False, version, build)
+        reason = REASON_NO_GPU
+    return RuntimeChoice(False, "cpu", reason, False, version, build)
 
 
-@dataclass
-class ProgramChoice:
-    build: ProgramBuild
-    exe: Path
-    check: StartCheck
-    note: Optional[str] = None  # why the CPU build runs: one console line per pass
-    # Plan 2.6: the note also goes into each file's summary only when the fallback was not expected
-    # (the GPU build's start check failed, PyTorch's CUDA files were missing or could not be placed).
-    # No NVIDIA GPU, or a PyTorch without CUDA 13, is the normal CPU set-up: console line only.
-    note_in_summary: bool = False
+def _installed_here() -> Tuple[str, str]:
+    """A build for this computer, the package, AVX2 -- in that order; the installed version and build."""
+    if not platform_supported():
+        raise CrispASRSetupError(NO_BUILD_TEXT.format(platform=sys.platform, machine=platform.machine()))
+    if not crispasr_installed():
+        raise CrispASRSetupError(not_installed_text())
+    version, build = installed_build()
+    if has_avx2() is False:
+        raise CrispASRSetupError(NO_AVX2_TEXT)
+    return version, build
 
 
-def prepare_program(offline: Optional[bool] = None) -> ProgramChoice:
-    """Choose the build for this PC, make it ready, and check that it starts (plan 1.4).
+def runtime_status(device: Optional[str] = None) -> RuntimeChoice:
+    """What prepare_runtime would choose, without loading CrispASR's libraries: for --check and the GUI."""
+    version, build = _installed_here()
+    return choose_device(device, build, version)
 
-    Raises CrispASRSetupError when no build can run here; the run then stops before audio extraction.
+
+def prepare_runtime(device: Optional[str], model: ModelFile) -> RuntimeChoice:
+    """Whether CrispASR can run ``model`` here, and on which device (route B design 4.2).
+
+    In this order: a build for this computer, the package, AVX2, the model's back end in this build
+    (this loads CrispASR's libraries), then the device. Raises CrispASRSetupError with the reason.
     """
-    builds = manifest.builds_for_this_machine()
-    if not builds:
-        raise CrispASRSetupError(f"CrispASR has no program build for this computer "
-                                 f"({sys.platform}, {platform.machine()}).")
-    if any(b.needs_avx2 for b in builds) and has_avx2() is False:
-        raise CrispASRSetupError("This processor lacks AVX2, which CrispASR's program needs "
-                                 "(Intel since 2013, AMD since 2015). The CrispASR pipelines cannot run here.")
-    gpu = next((b for b in builds if b.gpu == "cuda13"), None)
-    cpu = next((b for b in builds if b.gpu is None), None)
-    in_summary = False
-    if gpu is not None:
-        unavailable = cuda13_unavailable()
-        if unavailable is None:
-            in_summary = True  # from here on, a fallback to the CPU build was not expected
-            exe = ensure_program(gpu, offline)
-            try:
-                place_cuda_runtime(exe.parent, torch_lib_dir())
-            except (CrispASRSetupError, OSError) as e:
-                reason = f"PyTorch's CUDA 13 runtime files could not be placed beside the GPU build ({e})"
-            else:
-                check = start_check(exe, gpu)
-                if check.ok:
-                    return ProgramChoice(gpu, exe, check)
-                reason = f"the GPU build's start check failed: {check.reason}"
-        else:
-            reason, in_summary = unavailable.reason, not unavailable.expected
-        note = f"CrispASR runs on the processor (CPU build), which is slower: {reason}."
-    else:
-        note = "CrispASR runs on the processor (CPU build), which is slower."
-    if cpu is None:
-        raise CrispASRSetupError(f"CrispASR has no CPU build for this computer ({sys.platform}).")
-    exe = ensure_program(cpu, offline)
-    check = start_check(exe, cpu)
-    if not check.ok:
-        raise CrispASRSetupError(f"CrispASR's {cpu.label} cannot start on this computer: {check.reason}.")
-    return ProgramChoice(cpu, exe, check, note, note_in_summary=in_summary)
+    version, build = _installed_here()
+    backends = available_backends()
+    if model.backend not in backends:
+        raise CrispASRSetupError(NO_BACKEND_TEXT.format(version=version, model=model.label,
+                                                        backend=model.backend))
+    return choose_device(device, build, version)
 
 
 # ---------------------------------------------------------------------------------------------------
@@ -521,7 +348,7 @@ def _load_verified() -> dict:
 
 def _remember_verified(path: Path, sha256: str) -> None:
     record = _load_verified()
-    st = path.stat()
+    st = Path(path).stat()
     record[os.path.realpath(path)] = {"size": st.st_size, "mtime_ns": st.st_mtime_ns, "sha256": sha256}
     target = _verified_models_record()
     try:
@@ -531,12 +358,12 @@ def _remember_verified(path: Path, sha256: str) -> None:
         logger.debug(f"CrispASR: could not record the model check ({e})")
 
 
-def _already_verified(path: Path, model: ModelFile) -> bool:
+def _already_verified(path: Path, sha256: str) -> bool:
     entry = _load_verified().get(os.path.realpath(path))
     if not entry:
         return False
-    st = path.stat()
-    return (entry.get("sha256") == model.sha256 and entry.get("size") == st.st_size
+    st = Path(path).stat()
+    return (entry.get("sha256") == sha256 and entry.get("size") == st.st_size
             and entry.get("mtime_ns") == st.st_mtime_ns)
 
 
@@ -565,7 +392,7 @@ def ensure_model(model: ModelFile, offline: Optional[bool] = None) -> Path:
     """The model file on this PC, downloading it if needed, with its SHA-256 checked once.
 
     A damaged file in the cache is deleted and downloaded once more; a damaged file in the user's own
-    folder is reported and never deleted.
+    folder is reported and never deleted. CrispASR's own downloader is never used (W130, W133 3).
     """
     offline = hub_offline() if offline is None else offline
     status = model_status(model)
@@ -578,7 +405,7 @@ def ensure_model(model: ModelFile, offline: Optional[bool] = None) -> Path:
         source = "cache"
     else:
         path, source = status.path, status.source
-    if _already_verified(path, model):
+    if _already_verified(path, model.sha256):
         return path
 
     logger.info(f"CrispASR: checking the model file {model.filename} ({mb(model.size)})")
@@ -604,47 +431,115 @@ def ensure_model(model: ModelFile, offline: Optional[bool] = None) -> Path:
     return path
 
 
-def link_or_copy(src: Path, dst: Path, what: Optional[str] = None) -> str:
-    """Make ``dst`` the same file as ``src``: a hard link (no extra disk), else a copy.
+# ---------------------------------------------------------------------------------------------------
+# A plain-ASCII path for the model (route B design 4.2, owner O14)
+# ---------------------------------------------------------------------------------------------------
 
-    Returns "linked" or "copied". An existing ``dst`` is replaced, a symbolic link that leads nowhere
-    included. With ``what`` (plain words for the file), a copy is checked against the free disk space first.
-    """
-    dst = Path(dst)
-    if os.path.lexists(dst):  # exists() is False for a link that leads nowhere, and os.link cannot replace it
-        os.unlink(dst)
+def _short_path(path: str) -> Optional[str]:
+    """Windows' 8.3 short form of an existing path, or None."""
+    if sys.platform != "win32":
+        return None
     try:
-        os.link(src, dst)
-        return "linked"
+        import ctypes
+        from ctypes import wintypes
+
+        fn = ctypes.windll.kernel32.GetShortPathNameW
+        fn.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD]
+        fn.restype = wintypes.DWORD
+        size = fn(path, None, 0)
+        if not size:
+            return None
+        buf = ctypes.create_unicode_buffer(size)
+        if not fn(path, buf, size):
+            return None
+        return buf.value
+    except Exception:
+        return None
+
+
+def stage_candidates(temp_dir: Path) -> List[Tuple[Path, bool]]:
+    """Folders a staged model may go in, in order, each with whether a copy there outlives the run:
+    %PUBLIC%\\WhisperJAV\\crispasr and %ProgramData%\\WhisperJAV\\crispasr on Windows, then
+    <temp>\\crispasr_stage. Only folders whose own path is all ASCII."""
+    out: List[Tuple[Path, bool]] = []
+    if sys.platform == "win32":
+        for env in ("PUBLIC", "ProgramData"):
+            base = os.environ.get(env, "").strip()
+            if base:
+                out.append((Path(base) / "WhisperJAV" / "crispasr", True))
+    out.append((Path(temp_dir) / STAGE_FOLDER, False))
+    return [(folder, keeps) for folder, keeps in out if str(folder.resolve()).isascii()]
+
+
+def _same_file(a: Path, b: Path) -> bool:
+    try:
+        return os.path.samefile(a, b)
     except OSError:
-        if what:
-            _check_free_space(dst.parent, int(Path(src).stat().st_size * _MODEL_SPACE_FACTOR), what)
-        shutil.copy2(src, dst)
-        return "copied"
+        return False
 
 
-def stage_model(model_path: Path, run_dir: Path, stage_dir: Optional[Path] = None) -> str:
-    """What ``-m`` gets: the model's full path when it is all ASCII, else a short relative ASCII name.
+def stage_model(model_path: Path, temp_dir: Path, sha256: str) -> Path:
+    """The model's path as CrispASR can open it: itself when all ASCII, else a plain-ASCII name.
 
-    The program opens model files with the PC's code page (CreateFileA, gguf_loader.cpp:205), so a path
-    with Chinese or Japanese characters may not open. Such a file is hard-linked into ``stage_dir``
-    (default: the run folder), or copied when a link is impossible (plan 1.7), and named relative to the
-    run folder, the program's working folder. A pipeline passes the folder that holds every film's run
-    folder, so one staged file serves the whole pass instead of a copy per film. A symbolic link, as the
-    Hugging Face cache holds its files with Windows Developer Mode on, is followed first: the staged file
-    is the model file itself.
+    1. An all-ASCII path is used as it is; on Windows the file's 8.3 short path is tried next.
+    2. Otherwise a hard link (no extra disk) is tried in every candidate folder, and only if no link
+       can be made anywhere is a copy made, in the first candidate with room.
+    3. The staged file is named after the model's SHA-256, so the two Cohere models (the same size)
+       never share it. A link is reused only if it is the same file as the model; a copy only if its
+       own SHA-256 check is on record. The file the path leads to is staged (os.path.realpath: the
+       Hugging Face cache holds its files as symbolic links with Windows Developer Mode on).
+    Raises CrispASRSetupError when neither works.
     """
-    model_path = Path(model_path)
+    model_path = Path(model_path).absolute()
     if str(model_path).isascii():
-        return str(model_path)
-    stage_dir = Path(stage_dir) if stage_dir is not None else Path(run_dir)
-    stage_dir.mkdir(parents=True, exist_ok=True)
-    dst = stage_dir / (model_path.name if model_path.name.isascii() else "model.gguf")
-    size = model_path.stat().st_size
-    if not (dst.is_file() and dst.stat().st_size == size):
-        # On Windows os.link links a symbolic link itself, not the file it leads to, and the cache's links are
-        # relative: from stage_dir such a link leads nowhere. Link the file the path leads to.
-        if link_or_copy(os.path.realpath(model_path), dst, what="a copy of the model") == "copied":
-            logger.info(f"CrispASR: the model was copied to {stage_dir} ({mb(size)}), because its path "
-                        f"has characters the program may not open")
-    return os.path.relpath(dst, run_dir)
+        return model_path
+    real = Path(os.path.realpath(model_path))
+    short = _short_path(str(real))
+    if short and short.isascii() and Path(short).is_file():
+        return Path(short)
+
+    name = f"{sha256[:16]}.gguf"
+    candidates = stage_candidates(temp_dir)
+    usable: List[Tuple[Path, bool]] = []
+    for folder, keeps in candidates:
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            continue
+        usable.append((folder, keeps))
+        dst = folder / name
+        if _same_file(dst, real):
+            return dst
+        if dst.is_file() and _already_verified(dst, sha256):
+            return dst  # a copy made by an earlier run, checked when it was made
+    for folder, _keeps in usable:
+        dst = folder / name
+        try:
+            if os.path.lexists(dst):  # a stale link or a copy without a check record: replace it
+                os.unlink(dst)
+            os.link(real, dst)
+        except OSError:
+            continue
+        logger.info(STAGED_LINK_TEXT.format(folder=folder))
+        return dst
+    size = real.stat().st_size
+    for folder, keeps in usable:
+        dst = folder / name
+        part = folder / (name + ".part")
+        try:
+            _check_free_space(folder, int(size * _MODEL_SPACE_FACTOR), "a copy of the model")
+            shutil.copy2(real, part)
+            os.replace(part, dst)
+        except (OSError, CrispASRSetupError) as e:
+            logger.debug(f"CrispASR: no copy of the model in {folder} ({e})")
+            try:
+                part.unlink()
+            except OSError:
+                pass
+            continue
+        _remember_verified(dst, sha256)
+        logger.info(STAGED_COPY_TEXT.format(folder=folder, size=mb(size), kept=STAGED_COPY_KEPT if keeps else ""))
+        return dst
+    logger.error(f"CrispASR: no plain-named folder for the model {model_path} (tried: "
+                 f"{', '.join(str(f) for f, _k in candidates) or 'none'})")
+    raise CrispASRSetupError(NO_STAGE_TEXT.format(filename=model_path.name))
