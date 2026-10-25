@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-The CrispASR pipelines on the command line (1.10.0, CrispASR master plan step 1).
+The CrispASR pipelines on the command line (1.10.0; route B).
 
 What is pinned here:
   - the removed 1.9.x "bring your own CrispASR" mode stops the run with exit status 2 and a
@@ -8,13 +8,14 @@ What is pinned here:
   - the new Ensemble pass values parakeet-crispasr and cohere-crispasr are in --help, and a pass
     that cannot run (unknown model, no model where there is no default, a language other than
     Japanese, the speech segmenter "none") is a usage error with exit status 2 (plan 2.4, Q14, Q19);
-  - a CrispASR pass with no speech segmenter named runs WhisperSeg (plan 2.2);
-  - the pass worker builds the two pipelines from the pass settings they use, and names in one
-    log line the settings they do not use.
+  - a CrispASR pass with no speech segmenter named runs its pipeline's default: WhisperSeg for
+    Parakeet-CrispASR, FireRedVAD for Cohere-CrispASR (W202 2-3);
+  - the pass worker builds the two pipelines from the pass settings they use (--device included,
+    W194 1), and names in one log line the settings they do not use.
 
 whisperjav.main and the pass worker are never imported into this process (CLAUDE.md "Testing"):
 the command line runs as `python -m whisperjav.main`, the worker in a probe subprocess. No run
-here reaches audio, a download or the CrispASR program: every CLI run stops while its arguments
+here reaches audio, a download or CrispASR: every CLI run stops while its arguments
 are checked, or is --help or --dump-params, and the worker probe replaces the two pipeline classes
 with recorders before building them.
 
@@ -31,7 +32,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from whisperjav.config.segmenter_presets import CRISPASR_DEFAULT_SEGMENTER, effective_segmenter_for_pass
+from whisperjav.config.segmenter_presets import CRISPASR_DEFAULT_SEGMENTERS, effective_segmenter_for_pass
 from whisperjav.crispasr import manifest
 from whisperjav.crispasr.legacy import legacy_crispasr_message, legacy_crispasr_use
 from whisperjav.crispasr.pass_settings import (
@@ -39,6 +40,7 @@ from whisperjav.crispasr.pass_settings import (
     ignored_hardware_message,
     ignored_hardware_settings,
     models_help,
+    segmenter_settings,
     unused_pass_settings,
     unused_settings_message,
     validate_crispasr_passes,
@@ -46,7 +48,7 @@ from whisperjav.crispasr.pass_settings import (
 
 REPO = Path(__file__).resolve().parents[1]
 BANNER = "Japanese Adult Video Subtitle Generator"
-# Measured in step 2b, offered only if step 2b supports it (plan 3.3, Q13): never on the command line.
+# The Parakeet CTC model is not offered (W129 2): never on the command line.
 CTC = "parakeet-ctc-1.1b-ja"
 
 
@@ -144,8 +146,7 @@ class TestAPassThatCannotRunIsRefused:
                                         language="japanese")
         assert problem and problem.startswith("--pass2-model:")
 
-    def test_the_measured_only_model_is_refused_like_an_unknown_one(self):
-        assert CTC in manifest.MEASUREMENT_MODELS["parakeet-crispasr"]
+    def test_the_ctc_model_is_refused_like_an_unknown_one(self):
         problem = crispasr_pass_problem(1, "parakeet-crispasr", model=CTC, speech_segmenter=None,
                                         language="japanese")
         assert problem == (f"--pass1-model: '{CTC}' is not a model of parakeet-crispasr; "
@@ -155,15 +156,6 @@ class TestAPassThatCannotRunIsRefused:
     def test_no_model_named_runs_the_default(self, pipeline):
         # every pipeline has one since step 2b (Cohere: v0.1, W129 1)
         assert crispasr_pass_problem(1, pipeline, model=None, speech_segmenter=None, language="japanese") is None
-
-    def test_no_model_is_refused_where_there_is_no_default(self, monkeypatch):
-        # none such today; the refusal stays for a pipeline added before its default is picked
-        monkeypatch.setitem(manifest.PIPELINE_DEFAULT_MODEL, "cohere-crispasr", None)
-        problem = crispasr_pass_problem(1, "cohere-crispasr", model=None, speech_segmenter=None,
-                                        language="japanese")
-        assert problem.startswith("--pass1-model: cohere-crispasr has no default model yet")
-        for model in manifest.PIPELINE_MODELS["cohere-crispasr"]:
-            assert model in problem
 
     @pytest.mark.parametrize("language", ["english", "korean", "chinese"])
     def test_a_language_other_than_japanese_is_refused(self, language):
@@ -176,7 +168,8 @@ class TestAPassThatCannotRunIsRefused:
         problem = crispasr_pass_problem(2, "parakeet-crispasr", model=None, speech_segmenter=segmenter,
                                         language="japanese")
         assert problem.startswith("--pass2-speech-segmenter none is not available")
-        assert CRISPASR_DEFAULT_SEGMENTER in problem
+        assert CRISPASR_DEFAULT_SEGMENTERS["parakeet-crispasr"] in problem
+        assert "it transcribes the VAD groups the speech segmenter finds" in problem
 
     def test_another_segmenter_is_accepted(self):
         assert crispasr_pass_problem(1, "parakeet-crispasr", model=None, speech_segmenter="ten",
@@ -202,11 +195,13 @@ class TestAPassThatCannotRunIsRefused:
 
 
 class TestTheSegmenterDefault:
-    @pytest.mark.parametrize("pipeline", manifest.CRISPASR_PIPELINES)
-    def test_a_crispasr_pass_with_none_named_runs_whisperseg(self, pipeline):
-        assert CRISPASR_DEFAULT_SEGMENTER == "whisperseg"
-        assert effective_segmenter_for_pass(pipeline, None) == "whisperseg"
-        assert effective_segmenter_for_pass(pipeline, "") == "whisperseg"
+    @pytest.mark.parametrize("pipeline, default", [("parakeet-crispasr", "whisperseg"),
+                                                   ("cohere-crispasr", "firered-vad")])
+    def test_a_crispasr_pass_with_none_named_runs_its_pipelines_default(self, pipeline, default):
+        # W202 2 ("prakket balanced whisperseg"), W202 3 ("fireredvad")
+        assert CRISPASR_DEFAULT_SEGMENTERS[pipeline] == default
+        assert effective_segmenter_for_pass(pipeline, None) == default
+        assert effective_segmenter_for_pass(pipeline, "") == default
         assert effective_segmenter_for_pass(pipeline, "ten") == "ten"
 
 
@@ -225,10 +220,10 @@ class TestTheSettingsAPassDoesNotUse:
         config = {"scene_detector": "auditok", "speech_enhancer": "ffmpeg-dsp:loudnorm",
                   "enhance_for_vad": True, "vad_threshold": 0.4, "speech_pad_ms": 0,
                   "params": {"x": 1}, "hf_params": {"y": 2}, "qwen_params": {"z": 3}}
+        # --pass2-vad-threshold and --pass2-speech-pad-ms are used (W208), so not named.
         assert unused_pass_settings(config, 2) == [
             "--pass2-scene-detector", "--pass2-speech-enhancer", "--pass2-enhance-for-vad",
-            "--pass2-vad-threshold", "--pass2-speech-pad-ms", "--pass2-params", "--pass2-hf-params",
-            "--pass2-qwen-params",
+            "--pass2-params", "--pass2-hf-params", "--pass2-qwen-params",
         ]
 
     def test_the_line(self):
@@ -240,24 +235,22 @@ class TestTheSettingsAPassDoesNotUse:
         assert unused_pass_settings({"pipeline": "cohere-crispasr", "sensitivity": sensitivity}, 1) == []
 
 
-class TestDeviceAndComputeType:
-    """W122: not used, "with logged warnings"; left out (the GUI sends neither) or auto, nothing is said."""
+class TestComputeType:
+    """--compute-type is not used, with a logged warning; --device is used (W194 1). Left out or auto,
+    nothing is said."""
 
     @pytest.mark.parametrize("config", [{}, {"device": None, "compute_type": None},
-                                        {"device": "auto", "compute_type": "AUTO"}])
-    def test_left_out_or_auto_is_not_named(self, config):
+                                        {"device": "auto", "compute_type": "AUTO"}, {"device": "cuda"}])
+    def test_left_out_or_auto_is_not_named_and_device_never_is(self, config):
         assert ignored_hardware_settings(config) == []
 
-    def test_each_value_given_is_named_with_its_flag(self):
-        assert ignored_hardware_settings({"device": "cuda"}) == ["--device cuda"]
+    def test_a_compute_type_given_is_named_with_its_flag(self):
         assert ignored_hardware_settings({"compute_type": "int8"}) == ["--compute-type int8"]
-        assert ignored_hardware_settings({"device": "cpu", "compute_type": "float16"}) == [
-            "--device cpu", "--compute-type float16"]
+        assert ignored_hardware_settings({"device": "cpu", "compute_type": "float16"}) == ["--compute-type float16"]
 
     def test_the_warning(self):
-        assert ignored_hardware_message("Cohere-CrispASR", ["--device cuda", "--compute-type int8"]) == (
-            "Cohere-CrispASR ignores --device cuda and --compute-type int8: WhisperJAV picks CrispASR's GPU "
-            "or CPU build for this computer by itself, and CrispASR's model files come in one number "
+        assert ignored_hardware_message("Cohere-CrispASR", ["--compute-type int8"]) == (
+            "Cohere-CrispASR ignores --compute-type int8: CrispASR's model files come in one number "
             "format (8-bit).")
 
     def test_the_8_bit_in_the_warning_is_true_of_every_model_file(self):
@@ -273,14 +266,9 @@ class TestTheModelHelp:
             default = manifest.PIPELINE_DEFAULT_MODEL[pipeline]
             for model in models:
                 assert model + (" (default)" if model == default else "") in text
-            if default is None:
-                assert f"{models[-1]} (no default yet: name one)" in text
 
-    def test_it_does_not_list_the_measured_only_models(self):
-        text = models_help()
-        for models in manifest.MEASUREMENT_MODELS.values():
-            for model in models:
-                assert model not in text
+    def test_it_does_not_list_the_ctc_model(self):
+        assert CTC not in models_help()
 
 
 # ===========================================================================
@@ -297,9 +285,14 @@ class TestTheCommandLine:
         for models in manifest.PIPELINE_MODELS.values():
             for model in models:
                 assert model in text
-        for models in manifest.MEASUREMENT_MODELS.values():
-            for model in models:
-                assert model not in text   # measured in step 2b, not offered (plan 3.3)
+        assert CTC not in text   # not offered (W129 2)
+        # T1, T2, T24 (route B design 12)
+        assert "run through CrispASR, installed with WhisperJAV" in text
+        assert ("The GGUF (CrispASR) pipelines do not support CJK (Chinese, Japanese, Korean) characters "
+                "in folder names.") in text
+        assert "auto uses the NVIDIA GPU, or the Apple GPU (Metal) on Apple silicon" in text
+        assert "whisperseg for parakeet-crispasr and firered-vad for cohere-crispasr" in text
+        assert "CrispASR's own program" not in text
         assert "--crispasr-exe" not in text and "--crispasr-backend" not in text
         assert "--crispasr-args" not in text
         assert "{fidelity,balanced,fast,faster,transformers,qwen}" in text   # --mode has no crispasr
@@ -321,7 +314,7 @@ class TestTheCommandLine:
         (["--pass1-pipeline", "parakeet-crispasr", "--pass1-model", "nope"],
          "error: --pass1-model: 'nope' is not a model of parakeet-crispasr; choose one of: "
          + ", ".join(manifest.PIPELINE_MODELS["parakeet-crispasr"])),
-        # measured in step 2b, offered only if step 2b supports it (plan 3.3): not on the command line
+        # not offered (W129 2): not on the command line
         (["--pass1-pipeline", "parakeet-crispasr", "--pass1-model", CTC],
          f"error: --pass1-model: '{CTC}' is not a model of parakeet-crispasr; choose one of: parakeet-tdt-0.6b-ja"),
         (["--pass1-pipeline", "parakeet-crispasr", "--language", "english"],
@@ -346,7 +339,7 @@ class TestTheCommandLine:
                       "--pass1-pipeline", "parakeet-crispasr",
                       "--pass2-pipeline", "cohere-crispasr", "--pass2-model", "cohere-asr-ja",
                       "--pass2-speech-segmenter", "ten", "--pass2-scene-detector", "auditok",
-                      "--pass2-sensitivity", "conservative", "--dump-params", dump)
+                      "--pass2-sensitivity", "conservative", "--device", "cpu", "--dump-params", dump)
         assert result.returncode == 0, (result.stdout + result.stderr)[-800:]
         return json.loads(dump.read_text(encoding="utf-8"))["ensemble_config"]
 
@@ -365,25 +358,49 @@ class TestTheCommandLine:
         assert "_safety_cap_error" not in ensemble, ensemble.get("_safety_cap_error")
 
     def test_the_dump_shows_what_each_crispasr_pass_will_use(self, dumped):
-        # sensitivity is used: it sets the segmenter's detection setting (plan 3.8 item 4)
-        not_used = ["scene_detector", "speech_enhancer", "enhance_for_vad", "vad_threshold",
-                    "speech_pad_ms", "params", "hf_params", "qwen_params", "device", "compute_type"]
-        assert dumped["pass1"]["crispasr_effective"] == {
+        # T17: the resolved speech segmenter settings, as the fidelity or the qwen pipeline resolves them
+        not_used = ["scene_detector", "speech_enhancer", "enhance_for_vad",
+                    "params", "hf_params", "qwen_params", "compute_type"]
+        p1 = dumped["pass1"]["crispasr_effective"]
+        assert p1 == {
             "model": manifest.PIPELINE_DEFAULT_MODEL["parakeet-crispasr"],  # none named: the default
-            "speech_segmenter": "whisperseg",                                 # none named: WhisperSeg
+            "speech_segmenter": "whisperseg",                                 # none named: Parakeet's default
             "sensitivity": "balanced",                                        # none named: balanced
-            "speech_segmenter_detection": {"threshold": 0.35},
+            "speech_segmenter_settings": segmenter_settings("parakeet-crispasr", "whisperseg", "balanced").as_dict(),
+            "device": "cpu",                                                  # --device as given
             "scene_detector": "semantic",
             "not_used": not_used,
         }
-        assert dumped["pass2"]["crispasr_effective"] == {
-            "model": "cohere-asr-ja",
-            "speech_segmenter": "ten",
-            "sensitivity": "conservative",
-            "speech_segmenter_detection": {"threshold": 0.42},                # TEN's conservative preset
-            "scene_detector": "semantic",                                     # --pass2-scene-detector is not used
-            "not_used": not_used,
-        }
+        s1 = p1["speech_segmenter_settings"]
+        assert (s1["threshold"], s1["max_group_duration_s"], s1["max_speech_duration_s"], s1["chunk_threshold_s"]) \
+            == (0.35, 6.0, 6.0, 1.0)                                          # fidelity's WhisperSeg; 6 s (W202 1)
+        p2 = dumped["pass2"]["crispasr_effective"]
+        assert (p2["model"], p2["speech_segmenter"], p2["sensitivity"], p2["scene_detector"]) == \
+            ("cohere-asr-ja", "ten", "conservative", "semantic")              # --pass2-scene-detector is not used
+        s2 = p2["speech_segmenter_settings"]
+        assert (s2["max_group_duration_s"], s2["chunk_threshold_s"], s2["max_speech_duration_s"],
+                s2["start_pad_ms"], s2["end_pad_ms"]) == (3.0, 0.3, 4.0, 100, 100)  # the qwen pipeline's
+        assert s2["threshold"] == 0.42                                        # TEN's conservative preset (W202 4)
+
+    def test_the_dump_shows_the_vad_threshold_and_speech_pad_flags_at_work(self, tmp_path):
+        # W208 "make the flags work": Parakeet as fidelity, Cohere as the qwen pipeline.
+        dump = tmp_path / "params.json"
+        result = _cli(tmp_path / "x.mp4", "--ensemble",
+                      "--pass1-pipeline", "parakeet-crispasr",
+                      "--pass1-vad-threshold", "0.5", "--pass1-speech-pad-ms", "120",
+                      "--pass2-pipeline", "cohere-crispasr",
+                      "--pass2-vad-threshold", "1.7", "--pass2-speech-pad-ms", "50",
+                      "--device", "cpu", "--dump-params", dump)
+        assert result.returncode == 0, (result.stdout + result.stderr)[-800:]
+        ensemble = json.loads(dump.read_text(encoding="utf-8"))["ensemble_config"]
+        s1 = ensemble["pass1"]["crispasr_effective"]["speech_segmenter_settings"]
+        assert (s1["speech_segmenter"], s1["threshold"], s1["speech_pad_ms"], s1["max_group_duration_s"]) \
+            == ("whisperseg", 0.5, 120, 6.0)                                  # the 6 s cap still holds
+        s2 = ensemble["pass2"]["crispasr_effective"]["speech_segmenter_settings"]
+        assert (s2["speech_segmenter"], s2["threshold"], s2["start_pad_ms"], s2["end_pad_ms"]) \
+            == ("firered-vad", 1.0, 50, 50)                                   # clamped to 1.0; both pads
+        for p in ("pass1", "pass2"):
+            assert not {"vad_threshold", "speech_pad_ms"} & set(ensemble[p]["crispasr_effective"]["not_used"])
 
 
 # ===========================================================================
@@ -454,6 +471,9 @@ class TestThePassWorkerBuildsThem:
             # --device and --compute-type given on the command line, which main.py puts in every pass.
             {"pipeline": "parakeet-crispasr", "sensitivity": "aggressive", "model": None,
              "speech_segmenter": "nemo-lite", "language": "ja", "device": "cuda", "compute_type": "int8"},
+            # A speech pad for a backend with no speech-pad setting (fidelity ignores it, with a warning).
+            {"pipeline": "parakeet-crispasr", "sensitivity": "balanced", "model": None,
+             "speech_segmenter": "firered-vad", "language": "ja", "speech_pad_ms": 80},
         ]
         result = subprocess.run([sys.executable, "-c", WORKER_PROBE, str(root), json.dumps(configs)],
                                 capture_output=True, text=True, encoding="utf-8", errors="replace",
@@ -481,27 +501,39 @@ class TestThePassWorkerBuildsThem:
             "save_metadata_json": True,          # --debug, carried in the worker's extra kwargs
             "progress_display": None,
             "model_name": None,                  # the pipeline's default model
-            "speech_segmenter": "whisperseg",    # none named: WhisperSeg
+            "speech_segmenter": "whisperseg",    # none named: Parakeet's default (W202 2)
             "language": "ja",
             "subs_language": "native",
-            "sensitivity": "balanced",           # the pipeline turns it into the detection setting
+            "sensitivity": "balanced",           # picks the speech segmenter's preset
+            "device": None,                      # --device left out (the GUI sends none)
+            "vad_threshold": 0.4,                # used since W208
+            "speech_pad_ms": 100,                # used since W208 (WhisperSeg has the setting)
         }
         assert not [l for l in built["log"] if "ignores --" in l], built["log"]
+        assert not [l for l in built["log"] if "speech pad of" in l], built["log"]
 
-    def test_device_and_compute_type_given_are_a_warning_and_sensitivity_reaches_the_pipeline(self, probe):
+    def test_a_speech_pad_the_backend_cannot_take_is_a_warning(self, probe):
+        _root, out = probe
+        built = out["builds"][4]
+        assert built["error"] is None
+        assert built["kwargs"]["speech_pad_ms"] == 80
+        assert [l for l in built["log"] if "the speech pad of 80ms is ignored -- the 'firered-vad' speech "
+                "segmenter has no speech-pad setting" in l], built["log"]
+
+    def test_device_reaches_the_pipeline_and_compute_type_is_a_warning(self, probe):
         _root, out = probe
         built = out["builds"][3]
         assert built["error"] is None
         assert (built["kwargs"]["sensitivity"], built["kwargs"]["speech_segmenter"]) == ("aggressive", "nemo-lite")
-        assert "device" not in built["kwargs"] and "compute_type" not in built["kwargs"]
-        assert ignored_hardware_message("Parakeet-CrispASR", ["--device cuda", "--compute-type int8"]) \
-            in built["log"]
+        assert built["kwargs"]["device"] == "cuda" and "compute_type" not in built["kwargs"]
+        assert ignored_hardware_message("Parakeet-CrispASR", ["--compute-type int8"]) in built["log"]
+        assert not [l for l in built["log"] if "--device" in l], built["log"]
 
     def test_one_line_names_what_it_does_not_use(self, probe):
         _root, out = probe
         log = out["builds"][0]["log"]
         assert ("Parakeet-CrispASR does not use: --pass1-scene-detector, --pass1-speech-enhancer, "
-                "--pass1-enhance-for-vad, --pass1-vad-threshold, --pass1-speech-pad-ms, --pass1-params, "
+                "--pass1-enhance-for-vad, --pass1-params, "
                 "--pass1-hf-params, --pass1-qwen-params") in log
         # The generic enhance-for-vad line would give a wrong reason for these pipelines.
         assert not [l for l in log if "has no effect on the" in l], log
