@@ -17,8 +17,8 @@ from pathlib import Path
 #   scenes, scene_srts, raw_subs   pipelines/base_pipeline.py
 #   enhanced_scenes                modules/speech_enhancement/pipeline_helper.py
 #   resampled_scenes               modules/speech_enhancement/pipeline_helper.py
-#   crispasr_out                   the CrispASR pipelines' program working folders
-#                                  (crispasr/runner.py, film_run_dir)
+#   crispasr_stage                 a CrispASR model staged under a plain-ASCII name
+#                                  (crispasr/install.py, stage_model; 1.10.0 route B)
 # main.py's cleanup routine imports THIS tuple rather than keeping its own copy: the two
 # lists were maintained separately and both had drifted, each missing resampled_scenes and
 # crispasr_out, so those folders were neither cleaned up nor labelled.
@@ -28,7 +28,7 @@ WHISPERJAV_WORK_DIRS = (
     "resampled_scenes",
     "scene_srts",
     "raw_subs",
-    "crispasr_out",
+    "crispasr_stage",
 )
 
 # Suffixes WhisperJAV gives to audio it writes itself:
