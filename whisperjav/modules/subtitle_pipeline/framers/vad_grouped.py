@@ -176,6 +176,9 @@ class VadGroupedFramer:
                 "speech_regions": speech_regions_per_frame,
                 "speech_starts": speech_starts_per_frame,
                 "segmenter_params": seg_result.parameters,
+                # Set when the segmenter caught its own failure and returned no groups: not silence.
+                # Read by the CrispASR pipelines to count failed scenes.
+                "segmenter_error": getattr(seg_result, "error", None),
             },
         )
 
