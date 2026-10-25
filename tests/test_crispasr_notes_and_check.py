@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
 Routine notes reach the run summary without changing anything, and --check reports CrispASR
-(1.10.0, CrispASR master plan step 1).
+(1.10.0; route B).
 
-Notes (owner Q21, plan 2.6). The CrispASR pipelines put routine notes -- the CPU build ran, the
-program printed warnings -- in summary["notes"], apart from "degradations", because any
+Notes (owner Q21, plan 2.6). The CrispASR pipelines put routine notes -- CrispASR ran on the
+processor unexpectedly, VAD groups gave no text -- in summary["notes"], apart from "degradations", because any
 degradation makes a file "suspect" and fails a run under --fail-on suspect. The route, and what
 each class below pins:
 
@@ -14,15 +14,15 @@ each class below pins:
   main.py   -> FileOutcome.notes                   -> a "note:" line under the file's row and the
                                                       manifest; the state and exit status unchanged
 
-A CrispASR failure (plan 2.6): the worker keeps the program's or the setup's reason, prefixed, as
+A CrispASR failure (plan 2.6): the worker keeps the run's or the setup's reason, prefixed, as
 the file's error, and main.py shows it instead of "ensemble pass failed".
 
-The start-up check (plan 1.5, 2.6): main() makes CrispASR's program and each CrispASR pass's model
+The start-up check (route B design 4.2): main() makes CrispASR, the device and each CrispASR pass's model
 ready after the passes' segmenter checks and before media discovery; ensure_crispasr_ready stops
 the run with status 1 and a box when they cannot be made ready.
 
---check (plan 2.3, 3.7): one line for the program build this PC would use and one per model it
-offers, read from files only -- it never downloads, never starts the program and is never fatal.
+--check (route B design 12, T3): one line for CrispASR -- its version, build and device -- and one per
+model it offers; it never downloads, never loads CrispASR and is never fatal.
 
 whisperjav.main and whisperjav.ensemble are never imported into this process (CLAUDE.md
 "Testing"): the worker, orchestrator and main.py hops run in probe subprocesses with stand-ins
@@ -303,8 +303,7 @@ WORKER_FAIL_PROBE = textwrap.dedent("""
     import pickle, sys
     from pathlib import Path
     import whisperjav.ensemble.pass_worker as pw
-    from whisperjav.crispasr.install import CrispASRSetupError
-    from whisperjav.crispasr.runner import CrispASRRunError
+    from whisperjav.crispasr.errors import CrispASRRunError, CrispASRSetupError
 
     root = Path(sys.argv[1])
     media = []
@@ -594,26 +593,27 @@ class TestMainMakesCrispASRReadyAtStartUp:
 
 
 class TestEnsureCrispASRReady:
-    """utils/preflight_check.ensure_crispasr_ready with install's own steps replaced (no download)."""
+    """utils/preflight_check.ensure_crispasr_ready with install's own steps replaced (no download, no CrispASR)."""
 
     BOTH = [(1, "parakeet-crispasr", None), (2, "cohere-crispasr", "cohere-asr-ja")]
     REASON = "Downloading the model Cohere ASR ja (q8_0) failed: stand-in connection refused"
 
     @pytest.fixture
     def steps(self, monkeypatch):
-        state = SimpleNamespace(asked=[], fail_on=None, offline=False)
+        state = SimpleNamespace(asked=[], fail_on=None, offline=False, device=None, stage_roots=[])
 
         def forbidden(*args, **kwargs):
-            raise AssertionError("the start-up check's test must not download or start anything")
+            raise AssertionError("the start-up check's test must not download or load anything")
 
-        for name in ("ensure_program", "start_check", "place_cuda_runtime", "_download", "_hf_download"):
+        for name in ("_hf_download", "available_backends"):
             monkeypatch.setattr(install, name, forbidden)
 
-        def prepare_program(offline=None):
-            state.asked.append("program")
-            if state.fail_on == "program":
+        def prepare_runtime(device, model):
+            state.asked.append(f"runtime {model.name}")
+            state.device = device
+            if state.fail_on == "runtime":
                 raise install.CrispASRSetupError(self.REASON)
-            return SimpleNamespace(note=None)
+            return install.RuntimeChoice(True, "cuda", None, False, "0.8.44+cuda", "cuda")
 
         def ensure_model(model, offline=None):
             state.asked.append(model.name)
@@ -621,8 +621,14 @@ class TestEnsureCrispASRReady:
                 raise install.CrispASRSetupError(self.REASON)
             return Path("model.gguf")
 
-        monkeypatch.setattr(install, "prepare_program", prepare_program)
+        def stage_model(path, temp_dir, sha256):
+            state.asked.append("stage")
+            state.stage_roots.append(Path(temp_dir))
+            return Path(path)
+
+        monkeypatch.setattr(install, "prepare_runtime", prepare_runtime)
         monkeypatch.setattr(install, "ensure_model", ensure_model)
+        monkeypatch.setattr(install, "stage_model", stage_model)
         monkeypatch.setattr(install, "hub_offline", lambda: state.offline)
         return state
 
@@ -631,15 +637,23 @@ class TestEnsureCrispASRReady:
         """The printed box without its colour codes, one string per line."""
         return re.sub(r"\x1b\[[0-9;]*m", "", text).splitlines()
 
-    def test_the_program_then_each_passes_model_and_nothing_printed(self, steps, capsys):
-        assert pf.ensure_crispasr_ready(self.BOTH) is True
-        assert steps.asked == ["program", manifest.PIPELINE_DEFAULT_MODEL["parakeet-crispasr"], "cohere-asr-ja"]
+    def test_each_pass_runtime_then_model_then_staging_and_nothing_printed(self, steps, capsys, tmp_path):
+        assert pf.ensure_crispasr_ready(self.BOTH, device="cuda", temp_dir=str(tmp_path)) is True
+        assert steps.asked == ["runtime parakeet-tdt-0.6b-ja", "parakeet-tdt-0.6b-ja", "stage",
+                               "runtime cohere-asr-ja", "cohere-asr-ja", "stage"]
+        assert steps.device == "cuda" and steps.stage_roots == [tmp_path, tmp_path]
         assert capsys.readouterr().out == ""
 
-    @pytest.mark.parametrize("fail_on, asked", [("program", ["program"]),
-                                                ("cohere-asr-ja", ["program", "parakeet-tdt-0.6b-ja",
-                                                                   "cohere-asr-ja"])])
-    def test_a_file_that_cannot_be_made_ready_stops_the_run_with_status_1(self, steps, capsys, fail_on, asked):
+    def test_without_a_temp_folder_the_systems_whisperjav_folder_is_used(self, steps):
+        import tempfile
+        pf.ensure_crispasr_ready(self.BOTH[:1])
+        assert steps.stage_roots == [Path(tempfile.gettempdir()) / "whisperjav"]
+
+    @pytest.mark.parametrize("fail_on, asked", [("runtime", ["runtime parakeet-tdt-0.6b-ja"]),
+                                                ("cohere-asr-ja", ["runtime parakeet-tdt-0.6b-ja",
+                                                                   "parakeet-tdt-0.6b-ja", "stage",
+                                                                   "runtime cohere-asr-ja", "cohere-asr-ja"])])
+    def test_a_pass_that_cannot_be_made_ready_stops_the_run_with_status_1(self, steps, capsys, fail_on, asked):
         steps.fail_on = fail_on
         with pytest.raises(SystemExit) as stop:
             pf.ensure_crispasr_ready(self.BOTH)
@@ -647,13 +661,14 @@ class TestEnsureCrispASRReady:
         assert steps.asked == asked
         text = " ".join(" ".join(line.strip("║ ") for line in self._box(capsys.readouterr().out)).split())
         assert "CrispASR is not ready for this run" in text
-        assert "parakeet-crispasr (pass 1), cohere-crispasr (pass 2)" in text
+        assert ("This run uses parakeet-crispasr (pass 1), cohere-crispasr (pass 2). WhisperJAV checks CrispASR "
+                "and downloads its model the first time it is needed. That did not work:") in text   # T4
         assert self.REASON in text
         assert "Nothing has been transcribed." in text
         assert "--offline" not in text
 
     def test_under_offline_the_box_says_downloads_are_switched_off(self, steps, capsys):
-        steps.fail_on, steps.offline = "program", True
+        steps.fail_on, steps.offline = "runtime", True
         with pytest.raises(SystemExit):
             pf.ensure_crispasr_ready(self.BOTH[:1])
         text = " ".join(" ".join(line.strip("║ ") for line in self._box(capsys.readouterr().out)).split())
@@ -661,22 +676,22 @@ class TestEnsureCrispASRReady:
         assert "Run once without --offline first." in text
 
     def test_without_exit_on_fail_it_answers_false_and_prints_nothing(self, steps, capsys):
-        steps.fail_on = "program"
+        steps.fail_on = "runtime"
         assert pf.ensure_crispasr_ready(self.BOTH, exit_on_fail=False) is False
         assert capsys.readouterr().out == ""
 
     def test_any_other_error_is_not_turned_into_the_box(self, steps, monkeypatch):
         # Only a setup failure is the user's to act on; anything else stays a bug with its traceback.
-        def broken(offline=None):
+        def broken(device, model):
             raise RuntimeError("stand-in bug")
 
-        monkeypatch.setattr(install, "prepare_program", broken)
+        monkeypatch.setattr(install, "prepare_runtime", broken)
         with pytest.raises(RuntimeError, match="stand-in bug"):
             pf.ensure_crispasr_ready(self.BOTH)
 
     @pytest.mark.parametrize("passes", [BOTH[:1], BOTH], ids=["one pass", "two passes"])
     def test_the_box_keeps_its_frame(self, steps, capsys, passes):
-        steps.fail_on, steps.offline = "program", True
+        steps.fail_on, steps.offline = "runtime", True
         with pytest.raises(SystemExit):
             pf.ensure_crispasr_ready(passes)
         box = [line for line in self._box(capsys.readouterr().out) if line]
@@ -686,43 +701,34 @@ class TestEnsureCrispASRReady:
 
 
 # ===========================================================================
-# --check (in process; the install module's file reads are replaced, its downloads forbidden)
+# --check (in process; install's checks replaced; nothing downloads and CrispASR is never loaded)
 # ===========================================================================
 
-WIN_BUILDS = manifest.builds_for_this_machine("win32", "AMD64")
-GPU_BUILD = next(b for b in WIN_BUILDS if b.gpu == "cuda13")
-CPU_BUILD = next(b for b in WIN_BUILDS if b.gpu is None)
 MODEL_NAMES = list(dict.fromkeys(n for names in manifest.PIPELINE_MODELS.values() for n in names))
 
 
 @pytest.fixture
 def crispasr_pc(monkeypatch):
-    """A Windows PC as --check sees it, set up per test; anything that downloads or runs fails."""
-    state = {"builds": WIN_BUILDS, "avx2": True, "cuda_reason": None, "program": set(), "models": set(),
-             "model_error": None}
+    """A Windows PC with the CUDA build and an NVIDIA GPU, as --check sees it, set up per test."""
+    state = {"supported": True, "installed": True, "build": ("0.8.44+cuda", "cuda"), "avx2": True,
+             "best": ("cuda", None), "models": set(), "model_error": None, "build_error": None}
 
     def forbidden(*args, **kwargs):
-        raise AssertionError("--check must not download anything or start the program")
+        raise AssertionError("--check must not download anything or load CrispASR")
 
-    for name in ("ensure_program", "ensure_model", "prepare_program", "start_check", "place_cuda_runtime",
-                 "_download", "_hf_download"):
+    for name in ("ensure_model", "prepare_runtime", "available_backends", "_hf_download", "stage_model"):
         monkeypatch.setattr(install, name, forbidden)
-    monkeypatch.setattr(manifest, "builds_for_this_machine", lambda *a, **k: list(state["builds"]))
+    monkeypatch.setattr(install, "platform_supported", lambda *a: state["supported"])
+    monkeypatch.setattr(install, "crispasr_installed", lambda: state["installed"])
     monkeypatch.setattr(install, "has_avx2", lambda: state["avx2"])
 
-    def cuda_reason():
-        if isinstance(state["cuda_reason"], Exception):
-            raise state["cuda_reason"]
-        return state["cuda_reason"]
+    def installed_build():
+        if state["build_error"] is not None:
+            raise state["build_error"]
+        return state["build"]
 
-    monkeypatch.setattr(install, "cuda13_unavailable_reason", cuda_reason)
-
-    def program_status(build):
-        if isinstance(state["program"], Exception):
-            raise state["program"]
-        return install.ProgramStatus(build, build.key in state["program"])
-
-    monkeypatch.setattr(install, "program_status", program_status)
+    monkeypatch.setattr(install, "installed_build", installed_build)
+    monkeypatch.setattr(install, "_best_device", lambda: state["best"])
 
     def model_status(model):
         if model.name == state["model_error"]:
@@ -739,58 +745,72 @@ def _crispasr_results():
     return checker.results
 
 
-def _program(results):
-    lines = [r for r in results if r.name == pf.CRISPASR_PROGRAM_NAME]
+def _crispasr(results):
+    lines = [r for r in results if r.name == pf.CRISPASR_NAME]
     assert len(lines) == 1, results
     return lines[0]
 
 
 class TestCheckReportsCrispASR:
-    def test_the_gpu_build_not_downloaded_is_info(self, crispasr_pc):
-        line = _program(_crispasr_results())
-        assert line.status == CheckStatus.INFO and not line.fatal
-        assert line.message == (f"{manifest.CRISPASR_VERSION}, {GPU_BUILD.label}: not downloaded yet "
-                                f"({install.mb(GPU_BUILD.size)}); fetched when a CrispASR pipeline first runs")
+    """T3 (route B design 12)."""
 
-    def test_the_cpu_build_names_why_and_downloaded_is_pass(self, crispasr_pc):
-        crispasr_pc["cuda_reason"] = "no NVIDIA GPU was found"
-        crispasr_pc["program"] = {CPU_BUILD.key}
-        line = _program(_crispasr_results())
+    def test_the_cuda_build_on_the_nvidia_gpu_is_pass(self, crispasr_pc):
+        line = _crispasr(_crispasr_results())
+        assert line.status == CheckStatus.PASS and not line.fatal
+        assert line.message == "0.8.44+cuda (CUDA build), runs on the NVIDIA GPU"
+
+    def test_the_processor_with_its_reason(self, crispasr_pc):
+        crispasr_pc["best"] = ("cpu", None)
+        line = _crispasr(_crispasr_results())
         assert line.status == CheckStatus.PASS
-        assert line.message == f"{manifest.CRISPASR_VERSION}, {CPU_BUILD.label} (no NVIDIA GPU was found): downloaded"
+        assert line.message == "0.8.44+cuda (CUDA build), runs on the processor (no NVIDIA GPU was found)"
 
-    def test_pytorch_that_cannot_be_asked_means_the_cpu_build(self, crispasr_pc):
-        crispasr_pc["cuda_reason"] = ImportError("torch is broken")
-        line = _program(_crispasr_results())
-        assert CPU_BUILD.label in line.message and "PyTorch could not be checked (torch is broken)" in line.message
-        assert line.status == CheckStatus.INFO and not line.fatal
+    def test_the_cpu_build(self, crispasr_pc, monkeypatch):
+        crispasr_pc["build"] = ("0.8.44", "cpu")
+        monkeypatch.setattr(install.sys, "platform", "win32")
+        line = _crispasr(_crispasr_results())
+        assert line.message == "0.8.44 (CPU build), runs on the processor (this install has CrispASR's CPU build)"
+
+    def test_not_installed_is_a_warning(self, crispasr_pc, monkeypatch):
+        crispasr_pc["installed"] = False
+        monkeypatch.setattr(install, "is_cpu_variant", lambda: False)
+        line = _crispasr(_crispasr_results())
+        assert line.status == CheckStatus.WARN and not line.fatal
+        assert line.message == ("not installed; the CrispASR pipelines cannot run here. Run the WhisperJAV "
+                                "installer again.")
+
+    def test_not_installed_on_the_cpu_variant_says_why(self, crispasr_pc, monkeypatch):
+        crispasr_pc["installed"] = False
+        monkeypatch.setattr(install, "is_cpu_variant", lambda: True)
+        line = _crispasr(_crispasr_results())
+        assert line.status == CheckStatus.WARN and line.message == install.CPU_VARIANT_TEXT
 
     def test_a_processor_without_avx2_is_a_warning(self, crispasr_pc):
         crispasr_pc["avx2"] = False
-        line = _program(_crispasr_results())
+        line = _crispasr(_crispasr_results())
         assert line.status == CheckStatus.WARN and not line.fatal
         assert line.message == pf.CRISPASR_NO_AVX2_TEXT
 
     def test_an_unknown_avx2_answer_is_not_a_stop(self, crispasr_pc):
         crispasr_pc["avx2"] = None
-        assert _program(_crispasr_results()).status == CheckStatus.INFO
+        assert _crispasr(_crispasr_results()).status == CheckStatus.PASS
 
     def test_a_computer_with_no_build_is_a_warning(self, crispasr_pc):
-        crispasr_pc["builds"] = []
-        line = _program(_crispasr_results())
+        crispasr_pc["supported"] = False
+        line = _crispasr(_crispasr_results())
         assert line.status == CheckStatus.WARN and not line.fatal
-        assert "no program build for this computer" in line.message
+        assert line.message.startswith("no CrispASR build for this computer")
 
     def test_a_failing_check_is_a_warning_not_a_crash(self, crispasr_pc):
-        crispasr_pc["program"] = OSError("disk unreadable")
+        crispasr_pc["build_error"] = OSError("metadata unreadable")
         results = _crispasr_results()
-        line = _program(results)
-        assert line.status == CheckStatus.WARN and "disk unreadable" in line.message
+        line = _crispasr(results)
+        assert line.status == CheckStatus.WARN and "metadata unreadable" in line.message
         assert len(results) == 1 + len(MODEL_NAMES)          # the models are still listed
 
     def test_one_line_per_model(self, crispasr_pc):
         crispasr_pc["models"] = {MODEL_NAMES[0]}
-        models = [r for r in _crispasr_results() if r.name != pf.CRISPASR_PROGRAM_NAME]
+        models = [r for r in _crispasr_results() if r.name != pf.CRISPASR_NAME]
         assert [r.name for r in models] == [f"CrispASR model {n}" for n in MODEL_NAMES]
         assert models[0].status == CheckStatus.PASS and models[0].message.endswith(": downloaded")
         for line, name in zip(models[1:], MODEL_NAMES[1:]):
@@ -799,18 +819,13 @@ class TestCheckReportsCrispASR:
             assert line.message.endswith(f": not downloaded ({install.mb(model.size)})")
             assert model.label in line.message
 
-    def test_a_model_that_is_only_measured_has_no_line(self, crispasr_pc):
-        # The Parakeet CTC 1.1B is offered only if step 2b supports it (plan 3.3): --check does not list it.
-        results = _crispasr_results()
-        measured = [m for models in manifest.MEASUREMENT_MODELS.values() for m in models]
-        assert "parakeet-ctc-1.1b-ja" in measured
-        for model in measured:
-            assert pf.CRISPASR_MODEL_NAME.format(model=model) not in [r.name for r in results]
-            assert not [r for r in results if model in r.message or manifest.MODELS[model].label in r.message]
+    def test_the_ctc_model_has_no_line(self, crispasr_pc):
+        names = [r.name for r in _crispasr_results()]
+        assert pf.CRISPASR_MODEL_NAME.format(model="parakeet-ctc-1.1b-ja") not in names
 
     def test_a_failing_model_check_is_a_warning_on_that_line_only(self, crispasr_pc):
         crispasr_pc["model_error"] = MODEL_NAMES[1]
-        models = [r for r in _crispasr_results() if r.name != pf.CRISPASR_PROGRAM_NAME]
+        models = [r for r in _crispasr_results() if r.name != pf.CRISPASR_NAME]
         assert [r.name for r in models] == [f"CrispASR model {n}" for n in MODEL_NAMES]
         assert models[1].status == CheckStatus.WARN and not models[1].fatal
         assert models[1].message == pf.CRISPASR_CHECK_FAILED.format(error="cache unreadable")
@@ -824,7 +839,7 @@ class TestCheckReportsCrispASR:
         crispasr_pc["avx2"] = False                          # the worst case: a warning
         checker = PreflightChecker(verbose=False)
         assert checker.run_all_checks() is True
-        assert any(r.name == pf.CRISPASR_PROGRAM_NAME for r in checker.results)
+        assert any(r.name == pf.CRISPASR_NAME for r in checker.results)
 
 
 if __name__ == "__main__":
