@@ -73,17 +73,20 @@ CUBLAS12_MISSING_TEXT = ("The CUDA 12 files that Balanced, Fast and Faster need 
 CU128_STACK_TEXT = ("This PC runs the CUDA 12.8 build of WhisperJAV: when it was installed, the CUDA 12 "
                     "library could not be loaded next to CUDA 13.")
 
-# 1.10.0, the CrispASR pipelines (CrispASR master plan 2.3, 3.7). DRAFT, not yet approved by the owner.
-CRISPASR_PROGRAM_NAME = "CrispASR program"
-CRISPASR_PROGRAM_TEXT = "{version}, {build}{why}: {state}"
-CRISPASR_DOWNLOADED = "downloaded"
-CRISPASR_PROGRAM_NOT_DOWNLOADED = "not downloaded yet ({size}); fetched when a CrispASR pipeline first runs"
-CRISPASR_NO_BUILD_TEXT = ("CrispASR has no program build for this computer ({platform}, {machine}); "
-                          "the CrispASR pipelines cannot run here")
-CRISPASR_NO_AVX2_TEXT = ("this processor lacks AVX2, which CrispASR's program needs; the CrispASR "
-                         "pipelines cannot run here")
+# 1.10.0, the CrispASR pipelines (route B design 12, T3 and T4; W193 5, W203 I2).
+CRISPASR_NAME = "CrispASR"
+CRISPASR_TEXT = "{version} ({build}), runs on {device}{why}"
+CRISPASR_BUILD_NAMES = {"cuda": "CUDA build", "cpu": "CPU build", "vulkan": "Vulkan build"}
+CRISPASR_DEVICE_NAMES = {"cuda": "the NVIDIA GPU", "metal": "the Apple GPU (Metal)", "cpu": "the processor"}
+CRISPASR_NOT_INSTALLED_TEXT = ("not installed; the CrispASR pipelines cannot run here. Run the WhisperJAV "
+                               "installer again.")
+CRISPASR_NO_BUILD_TEXT = ("no CrispASR build for this computer ({platform}, {machine}); the CrispASR "
+                          "pipelines cannot run here")
+CRISPASR_NO_AVX2_TEXT = "this processor lacks AVX2, which CrispASR needs; the CrispASR pipelines cannot run here"
+CRISPASR_DEVICE_PROBLEM = "{version} ({build}): {reason}"
 CRISPASR_MODEL_NAME = "CrispASR model {model}"
 CRISPASR_MODEL_TEXT = "{label}, for {pipeline}: {state}"
+CRISPASR_DOWNLOADED = "downloaded"
 CRISPASR_MODEL_NOT_DOWNLOADED = "not downloaded ({size})"
 CRISPASR_CHECK_FAILED = "could not be checked: {error}"
 
@@ -564,21 +567,18 @@ class PreflightChecker:
                 ))
 
     def _check_crispasr(self):
-        """CrispASR's program and models, for the CrispASR pipelines: on this PC or not (1.10.0).
+        """CrispASR and its models, for the CrispASR pipelines (1.10.0, route B).
 
-        One line for the program build this PC would use, and one per model the CrispASR
-        pipelines offer (CrispASR master plan 2.3). It reads files only: it never downloads
-        anything, never starts the program and is never fatal. "Not downloaded" is INFO, not
-        WARN: it is the normal state until a CrispASR pipeline first runs, which fetches what it
-        needs, and a user who never runs one never needs them. A computer or processor that can
-        run no build is a WARN.
+        One line for CrispASR -- its version, its build and the device it would run on with --device
+        auto -- and one per model the CrispASR pipelines offer. It never downloads anything, never loads
+        CrispASR's libraries and is never fatal. A model not downloaded is INFO: the normal state until
+        a CrispASR pipeline first runs, which fetches it. A computer that cannot run CrispASR is a WARN.
         """
         try:
             from whisperjav.crispasr import install, manifest
         except Exception:
             return  # the CrispASR package cannot be loaded; there is nothing to report on
-        self.results.append(self._crispasr_line(
-            CRISPASR_PROGRAM_NAME, self._crispasr_program_result, install, manifest))
+        self.results.append(self._crispasr_line(CRISPASR_NAME, self._crispasr_runtime_result, install))
         listed = set()
         for pipeline, names in manifest.PIPELINE_MODELS.items():
             for name in names:
@@ -612,41 +612,29 @@ class PreflightChecker:
         )
 
     @staticmethod
-    def _crispasr_program_result(install, manifest) -> "CheckResult":
-        """The line for the CrispASR program build this PC would use (master plan 1.4)."""
-        builds = manifest.builds_for_this_machine()
-        no_build = CheckResult(
-            name=CRISPASR_PROGRAM_NAME, status=CheckStatus.WARN,
-            message=CRISPASR_NO_BUILD_TEXT.format(platform=sys.platform, machine=platform.machine()))
-        if not builds:
-            return no_build
-        if any(b.needs_avx2 for b in builds) and install.has_avx2() is False:
-            return CheckResult(name=CRISPASR_PROGRAM_NAME, status=CheckStatus.WARN,
-                               message=CRISPASR_NO_AVX2_TEXT)
-        gpu = next((b for b in builds if b.gpu == "cuda13"), None)
-        build, why = next((b for b in builds if b.gpu is None), None), ""
-        if gpu is not None:
-            # The rule the run uses before its start check (install.prepare_program): the CUDA 13
-            # build when PyTorch sees an NVIDIA GPU and is built for CUDA 13, else the CPU build.
-            try:
-                reason = install.cuda13_unavailable_reason()
-            except Exception as e:  # noqa: BLE001 -- PyTorch could not be asked
-                reason = f"PyTorch could not be checked ({e})"
-            if reason is None:
-                build = gpu
-            else:
-                why = f" ({reason})"
-        if build is None:
-            return no_build
-        downloaded = install.program_status(build).downloaded
-        state = (CRISPASR_DOWNLOADED if downloaded
-                 else CRISPASR_PROGRAM_NOT_DOWNLOADED.format(size=install.mb(build.size)))
-        return CheckResult(
-            name=CRISPASR_PROGRAM_NAME,
-            status=CheckStatus.PASS if downloaded else CheckStatus.INFO,
-            message=CRISPASR_PROGRAM_TEXT.format(version=manifest.CRISPASR_VERSION, build=build.label,
-                                                 why=why, state=state),
-        )
+    def _crispasr_runtime_result(install) -> "CheckResult":
+        """The CrispASR line: what the run would use with --device auto (route B design 9.1)."""
+        if not install.platform_supported():
+            return CheckResult(name=CRISPASR_NAME, status=CheckStatus.WARN,
+                               message=CRISPASR_NO_BUILD_TEXT.format(platform=sys.platform,
+                                                                     machine=platform.machine()))
+        if not install.crispasr_installed():
+            message = install.CPU_VARIANT_TEXT if install.is_cpu_variant() else CRISPASR_NOT_INSTALLED_TEXT
+            return CheckResult(name=CRISPASR_NAME, status=CheckStatus.WARN, message=message)
+        if install.has_avx2() is False:
+            return CheckResult(name=CRISPASR_NAME, status=CheckStatus.WARN, message=CRISPASR_NO_AVX2_TEXT)
+        version, build = install.installed_build()
+        build_name = CRISPASR_BUILD_NAMES.get(build, build)
+        try:
+            choice = install.choose_device(None, build, version)
+        except install.CrispASRSetupError as e:  # pragma: no cover - auto never refuses
+            return CheckResult(name=CRISPASR_NAME, status=CheckStatus.WARN,
+                               message=CRISPASR_DEVICE_PROBLEM.format(version=version, build=build_name, reason=e))
+        why = f" ({choice.reason})" if choice.reason else ""
+        return CheckResult(name=CRISPASR_NAME, status=CheckStatus.PASS,
+                           message=CRISPASR_TEXT.format(version=version, build=build_name,
+                                                        device=CRISPASR_DEVICE_NAMES.get(choice.device, choice.device),
+                                                        why=why))
 
     def _display_results(self):
         """Display all check results in a formatted manner."""
@@ -801,36 +789,41 @@ def ensure_segmenter_model_available(backend, *, model_dir=None,
 
 
 
-def ensure_crispasr_ready(passes, *, exit_on_fail: bool = True) -> bool:
+def ensure_crispasr_ready(passes, *, device=None, temp_dir=None, exit_on_fail: bool = True) -> bool:
     """
-    Make CrispASR's program and each CrispASR pass's model ready before a run starts.
+    Make CrispASR, the device and each CrispASR pass's model ready before a run starts.
 
     ``passes`` lists (pass number, pipeline, --passN-model value or None) for every Ensemble pass
-    that names a CrispASR pipeline. What is missing is downloaded here, unless --offline: the CrispASR
-    master plan (1.5, 2.6) wants a missing file, --offline or a failed download to stop the run before
-    any audio is read, so the failure costs nothing. Checked only inside the pass, a two-pass run would
-    first run the other pass in full, for nothing.
+    that names a CrispASR pipeline; ``device`` is --device. A missing model is downloaded here, unless
+    --offline, and staged under a plain-ASCII name when its path has other characters (route B design
+    4.2): a missing package, a processor without AVX2, --device cuda without an NVIDIA GPU, a missing
+    file under --offline or a failed download then stops the run before any audio is read. Checked
+    only inside the pass, a two-pass run would first run the other pass in full, for nothing.
 
-    The pass worker prepares the same files again before its first film; by then that is a quick
-    check. On failure this prints what the user can do and ends the run with status 1, as the other
-    start-up checks here do; ``exit_on_fail=False`` returns False instead.
+    The pass worker prepares the same again before its first film; by then that is a quick check. On
+    failure this prints what the user can do and ends the run with status 1, as the other start-up
+    checks here do; ``exit_on_fail=False`` returns False instead.
     """
+    import tempfile
+
     from whisperjav.crispasr import install, manifest
 
+    stage_root = Path(temp_dir) if temp_dir else Path(tempfile.gettempdir()) / "whisperjav"
     try:
-        install.prepare_program()
-        for _n, pipeline, model in passes:
-            install.ensure_model(manifest.model_for(pipeline, model))
+        for _n, pipeline, model_name in passes:
+            model = manifest.model_for(pipeline, model_name)
+            install.prepare_runtime(device, model)
+            path = install.ensure_model(model)
+            install.stage_model(path, stage_root, model.sha256)
         return True
     except install.CrispASRSetupError as exc:
         if not exit_on_fail:
             return False
-        # DRAFT wording, the owner's to decide (CrispASR master plan 2.6).
         names = ", ".join(f"{pipeline} (pass {n})" for n, pipeline, _m in passes)
         lines = ["CrispASR is not ready for this run", ""]
         # Wrapped, so the box keeps its frame however many passes are named.
-        lines += textwrap.wrap(f"This run uses {names}. WhisperJAV fetches CrispASR's program and model the "
-                               f"first time they are needed. That did not work:", BOX_WIDTH - 4)
+        lines += textwrap.wrap(f"This run uses {names}. WhisperJAV checks CrispASR and downloads its model "
+                               f"the first time it is needed. That did not work:", BOX_WIDTH - 4)
         lines += [""]
         lines += [f"  {chunk}" for chunk in textwrap.wrap(str(exc), BOX_WIDTH - 8)[:4]]
         lines += [
