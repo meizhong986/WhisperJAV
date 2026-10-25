@@ -25,6 +25,14 @@ Covered:
 Run with: python -m pytest tests/test_crispasr_measure_script.py -q -p no:cacheprovider
 """
 
+import pytest
+
+# Kept (owner W193 3: "keep them. We might use them if we need tune ups towards the end of the 1.10.0 dev."),
+# but the script still drives the removed program route (whisperjav/crispasr/runner.py, install.prepare_program):
+# it is reworked for route B in the tuning round (route B design 14, 17). Until then this file is skipped.
+pytest.skip("scripts/measure/crispasr_step2b.py still uses the removed CrispASR program route; reworked in "
+            "the tuning round (route B design 17)", allow_module_level=True)
+
 import importlib.util
 import inspect
 import json
