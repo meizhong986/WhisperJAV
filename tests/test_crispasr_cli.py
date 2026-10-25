@@ -288,7 +288,8 @@ class TestTheCommandLine:
         assert CTC not in text   # not offered (W129 2)
         # T1, T2, T24 (route B design 12)
         assert "run through CrispASR, installed with WhisperJAV" in text
-        assert ("The GGUF (CrispASR) pipelines do not support CJK (Chinese, Japanese, Korean) characters "
+        assert ("Experimental in 1.10.0 (early release). "   # owner W212 D4 1
+                "The GGUF (CrispASR) pipelines do not support CJK (Chinese, Japanese, Korean) characters "
                 "in folder names.") in text
         assert "auto uses the NVIDIA GPU, or the Apple GPU (Metal) on Apple silicon" in text
         assert "whisperseg for parakeet-crispasr and firered-vad for cohere-crispasr" in text
