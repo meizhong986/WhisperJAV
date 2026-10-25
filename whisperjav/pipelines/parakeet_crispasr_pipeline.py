@@ -11,7 +11,7 @@ W175). What is Parakeet's own (route B design 6):
   - each VAD group's tokens become one or more subtitles, cut only at natural cues -- sentence-end
     marks, pauses, 、 and spaces followed by a pause -- with Parakeet's own token times (option P2,
     W175; W203, W204);
-  - no audio analytics, as fidelity.
+  - the audio analytics, as fidelity and Cohere-CrispASR (W211 C2).
 """
 
 from whisperjav.pipelines.crispasr_pipeline import CrispASRPipeline, EngineRow
@@ -22,4 +22,4 @@ class ParakeetCrispASRPipeline(CrispASRPipeline):
 
     PIPELINE_NAME = "parakeet-crispasr"
     LABEL = "Parakeet-CrispASR"
-    ENGINE = EngineRow(line_rule="tokens", audio_analytics=False)
+    ENGINE = EngineRow(line_rule="tokens", audio_analytics=True)
