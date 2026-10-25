@@ -174,13 +174,20 @@ def test_the_default_segmenters_in_app_js_are_the_command_lines():
 
 @pytest.mark.parametrize("select_id", ["pass1-pipeline", "pass2-pipeline"])
 def test_the_gguf_pipelines_carry_the_cjk_note(select_id):
-    note = ("The GGUF (CrispASR) pipelines do not support CJK (Chinese, Japanese, Korean) characters in "
+    note = ("Experimental in 1.10.0 (early release). "   # owner W212 D4 1
+            "The GGUF (CrispASR) pipelines do not support CJK (Chinese, Japanese, Korean) characters in "
             "folder names.")
     group = re.search(r'<optgroup label="GGUF">(.*?)</optgroup>', _select(HTML, select_id), re.S).group(1)
     assert group.count(f'title="{note}"') == 2
     # and on the Pipeline dropdown itself while a GGUF pipeline is selected
     assert f"CRISPASR_CJK_NOTE: '{note}'" in JS
     assert "pipelineSelect.title = passState.isCrispasr ? this.CRISPASR_CJK_NOTE : '';" in JS
+
+
+def test_the_sensitivity_tooltip_names_the_preset():
+    # owner W212 D4 2: sensitivity picks a preset, not only the detection threshold
+    assert ("sensitivitySelect.title = 'Picks the speech segmenter\\'s preset: the detection threshold and "
+            "related settings';") in JS
 
 
 @pytest.mark.parametrize("pass_key", ["pass1", "pass2"])
