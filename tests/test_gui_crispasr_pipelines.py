@@ -7,6 +7,9 @@ What is pinned here:
   - Parakeet-CrispASR and Cohere-CrispASR are offered in the Ensemble tab only, in the Pass 1 and Pass 2 menus, under
     the group "GGUF" (W195 I2; "CrispASR" in W194 3), with their clean names (W118, W129 7);
   - the model menus in app.js are the manifest's offered models, the default first;
+  - each pipeline's default speech segmenter in app.js is the command line's (W202 2-3); the GGUF pipelines carry
+    the CJK folder-name note (W203 O14, T24); a status panel under each pass row shows the model and the device
+    (W133 2, T16), asked from api.get_crispasr_status, which never downloads;
   - the command line the GUI builds for such a pass carries the model, the speech segmenter and the sensitivity, and
     no scene detector, speech enhancer or 1.9.x flag; and WhisperJAV's own command line accepts it
     (--dump-params, which runs no ASR).
@@ -92,7 +95,7 @@ def test_the_transcription_mode_tab_offers_no_crispasr():
 def test_both_passes_offer_both_pipelines_under_gguf(select_id):
     group = re.search(r'<optgroup label="GGUF">(.*?)</optgroup>', _select(HTML, select_id), re.S)
     assert group, f"{select_id} has no GGUF group"
-    options = re.findall(r'<option value="([^"]+)">([^<]+)</option>', group.group(1))
+    options = re.findall(r'<option value="([^"]+)"[^>]*>([^<]+)</option>', group.group(1))
     assert options == [(p, LABELS[p]) for p in CRISPASR_PIPELINES]
 
 
@@ -155,3 +158,86 @@ def test_whisperjav_accepts_the_command_line_the_gui_builds(api, tmp_path):
     ensemble = json.loads(dump.read_text(encoding="utf-8"))["ensemble_config"]
     assert ensemble["pass1"]["crispasr_effective"]["model"] == "parakeet-tdt-0.6b-ja"
     assert ensemble["pass2"]["crispasr_effective"]["model"] == "cohere-asr-ja-v0.1"
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Route B (1.10.0): the default speech segmenters, the CJK note, the status panel
+# ---------------------------------------------------------------------------------------------------------------
+
+def test_the_default_segmenters_in_app_js_are_the_command_lines():
+    from whisperjav.config.segmenter_presets import CRISPASR_DEFAULT_SEGMENTERS
+
+    body = re.search(r"crispasrDefaultSegmenter\(pipeline\) \{(.*?)\n    \},", JS, re.S).group(1)
+    assert "pipeline === 'cohere-crispasr' ? 'firered-vad' : 'whisperseg'" in body
+    assert CRISPASR_DEFAULT_SEGMENTERS == {"parakeet-crispasr": "whisperseg", "cohere-crispasr": "firered-vad"}
+
+
+@pytest.mark.parametrize("select_id", ["pass1-pipeline", "pass2-pipeline"])
+def test_the_gguf_pipelines_carry_the_cjk_note(select_id):
+    note = ("The GGUF (CrispASR) pipelines do not support CJK (Chinese, Japanese, Korean) characters in "
+            "folder names.")
+    group = re.search(r'<optgroup label="GGUF">(.*?)</optgroup>', _select(HTML, select_id), re.S).group(1)
+    assert group.count(f'title="{note}"') == 2
+    # and on the Pipeline dropdown itself while a GGUF pipeline is selected
+    assert f"CRISPASR_CJK_NOTE: '{note}'" in JS
+    assert "pipelineSelect.title = passState.isCrispasr ? this.CRISPASR_CJK_NOTE : '';" in JS
+
+
+@pytest.mark.parametrize("pass_key", ["pass1", "pass2"])
+def test_each_pass_has_a_hidden_status_panel(pass_key):
+    assert f'<div class="crispasr-status-panel" id="{pass_key}-crispasr-status" style="display: none;"></div>' in HTML
+    assert f"this.updateCrispasrStatus('{pass_key}');" in JS  # refreshed when the model changes
+
+
+class TestTheStatusPanel:
+    @pytest.fixture
+    def stubbed(self, api, monkeypatch):
+        from whisperjav.crispasr import install
+
+        state = {"downloaded": False, "runtime": {"device": "cuda", "reason": None}}
+        monkeypatch.setattr(install, "model_status",
+                            lambda model: install.ModelStatus(model, state["downloaded"]))
+        monkeypatch.setattr(install, "ensure_model", lambda *a, **k: pytest.fail("the panel must not download"))
+        monkeypatch.setattr(type(api), "_crispasr_runtime", lambda self: state["runtime"])
+        return state
+
+    def test_a_model_not_downloaded_and_the_nvidia_gpu(self, api, stubbed):
+        result = api.get_crispasr_status("cohere-crispasr", "")
+        assert result == {"success": True, "can_run": True, "lines": [
+            "Model: Cohere Transcribe ja v0.1 (q8_0) — not downloaded yet (2,424 MB); downloaded when the run starts",
+            "Runs on: NVIDIA GPU"]}
+
+    def test_a_downloaded_model_on_the_processor(self, api, stubbed):
+        stubbed["downloaded"] = True
+        stubbed["runtime"] = {"device": "cpu", "reason": "no NVIDIA GPU was found"}
+        result = api.get_crispasr_status("parakeet-crispasr", "parakeet-tdt-0.6b-ja")
+        assert result["lines"] == ["Model: Parakeet TDT 0.6B ja (q8_0) — downloaded",
+                                   "Runs on: processor (slower): no NVIDIA GPU was found"]
+
+    def test_apple_metal(self, api, stubbed):
+        stubbed["runtime"] = {"device": "metal", "reason": None}
+        assert api.get_crispasr_status("parakeet-crispasr")["lines"][1] == \
+            "Runs on: Apple GPU (Metal), not yet tested on a Mac"
+
+    def test_crispasr_that_cannot_run(self, api, stubbed):
+        stubbed["runtime"] = {"problem": "CrispASR is not installed in this WhisperJAV. Run the WhisperJAV installer again."}
+        result = api.get_crispasr_status("parakeet-crispasr")
+        assert result["can_run"] is False
+        assert result["lines"][1] == ("CrispASR cannot run here: CrispASR is not installed in this WhisperJAV. "
+                                      "Run the WhisperJAV installer again.")
+
+    def test_an_unknown_model_is_an_answer_not_a_crash(self, api, stubbed):
+        assert api.get_crispasr_status("parakeet-crispasr", "nope")["success"] is False
+
+    def test_the_device_is_asked_in_a_child_process_once(self, api, monkeypatch):
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(args)
+            return subprocess.CompletedProcess(args, 0, stdout='RESULT={"device": "cpu", "reason": "x"}\n', stderr="")
+
+        monkeypatch.setattr("whisperjav.webview_gui.api.subprocess.run", run)
+        assert api._crispasr_runtime() == {"device": "cpu", "reason": "x"}
+        assert api._crispasr_runtime() == {"device": "cpu", "reason": "x"}
+        assert len(calls) == 1 and calls[0][0] == sys.executable
+
