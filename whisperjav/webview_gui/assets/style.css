@@ -3701,3 +3701,21 @@ details.translation-advanced-section[open] .collapse-icon {
 .update-check-loading .spinner {
     display: block;
 }
+
+/* The CrispASR status panel under a pass row (1.10.0; route B design 12, T16) */
+.crispasr-status-panel {
+    background: var(--background-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    margin: 4px 0 8px 0;
+    padding: 6px 12px;
+    font-size: 0.85em;
+}
+
+.crispasr-status-panel.cannot-run {
+    border-color: var(--danger-color, #c0392b);
+}
+
+.crispasr-status-line + .crispasr-status-line {
+    margin-top: 2px;
+}
