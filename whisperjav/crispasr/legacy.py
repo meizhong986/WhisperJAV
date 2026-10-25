@@ -2,9 +2,8 @@
 
 WhisperJAV 1.9.x ran a crispasr.exe the user supplied: ``--mode crispasr``, the pass value
 ``crispasr`` and the flags ``--crispasr-exe``, ``--crispasr-backend`` and ``--crispasr-args``.
-1.10.0 removed that mode completely (owner, W118 3; master plan 2.5). CrispASR now runs as the
-Ensemble pipelines parakeet-crispasr and cohere-crispasr, with a copy of the program that
-WhisperJAV downloads itself.
+1.10.0 removed that mode completely (owner, W118 3). CrispASR now runs as the Ensemble pipelines
+parakeet-crispasr and cohere-crispasr, through CrispASR's Python package, which WhisperJAV installs.
 
 The old usage stops the run with exit status 2 and a message that names what the user typed and
 points to Ensemble Mode. ``whisperjav/main.py`` looks for it in the raw command line when it is
@@ -24,14 +23,15 @@ LEGACY_FLAG_PREFIX = "--crispasr"
 # The flags whose value "crispasr" chose the old mode (--mode) or the old pass pipeline.
 VALUE_FLAGS = ("--mode", "--pass1-pipeline", "--pass2-pipeline")
 
-# DRAFT, not yet approved by the owner (master plan 2.5: drafted in step 1, shown to him before it
-# ships). {flag} is what the user typed: a flag, or a flag and its value.
+# Route B design 12, T14 (W193 5, W203 I2). {flag} is what the user typed: a flag, or a flag and its value.
 LEGACY_CRISPASR_MESSAGE = (
     "{flag} is no longer available: WhisperJAV 1.10 removed the \"bring your own CrispASR\" mode.\n"
-    "CrispASR now runs in Ensemble Mode, with a copy of the program that WhisperJAV downloads itself.\n"
+    "CrispASR now runs in Ensemble Mode as two pipelines, Parakeet-CrispASR and Cohere-CrispASR, and "
+    "WhisperJAV installs it itself.\n"
     "Example:\n"
     "    whisperjav --ensemble --pass1-pipeline parakeet-crispasr <your video>\n"
-    "In the GUI: open the Ensemble Mode tab and choose Parakeet-CrispASR or Cohere-CrispASR as a pipeline."
+    "In the GUI: open the Ensemble Mode tab and choose Parakeet-CrispASR or Cohere-CrispASR under GGUF in "
+    "the Pass 1 or Pass 2 menu."
 )
 
 
