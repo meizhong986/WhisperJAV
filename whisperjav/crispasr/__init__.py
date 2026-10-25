@@ -1,25 +1,18 @@
-"""The parts every CrispASR pipeline shares (1.10.0, item 4; master plan 3.7, owner decision Q20 = A, W118 1).
+"""The parts every CrispASR pipeline shares (1.10.0; route B, owner W176; code structure S2, W175).
 
-WhisperJAV runs CrispASR's own program (``crispasr.exe``) and reads its ``-ojf`` JSON. Four pipelines
-use it, one per engine: Parakeet-CrispASR and Cohere-CrispASR in 1.10.0, VibeVoice-CrispASR in 1.10.1,
-MOSS-CrispASR in 1.10.2. They share only what the program's own formats make the same for every engine:
+WhisperJAV runs CrispASR through its Python package, ``crispasr``, one call per VAD group. Two
+pipelines use it in 1.10.0, Parakeet-CrispASR and Cohere-CrispASR (Ensemble passes only); VibeVoice
+and MOSS are planned for 1.10.1 and 1.10.2 (W114). Their one chain is
+whisperjav/pipelines/crispasr_pipeline.py; this package holds what it calls:
 
-    manifest.py   the pinned program builds and the pinned model files
-    install.py    downloading, checking and unpacking them; the network-free status for --check
-    runner.py     starting the program for one film and judging its result
-    ojf.py        reading its JSON, placing segments in their slices, writing its cut-point file
-
-Everything that differs per engine -- the slice rule, the parser, line building and post-processing --
-lives in that engine's own pipeline class (whisperjav/pipelines/*_crispasr_pipeline.py). One rule of
-line building is the same for every engine by decision, not by format, and lives here too:
-
-    line_length.py  the line-length rule: a long line is split only after a punctuation mark
-                    (master plan 3.8 item 3; off until phase D picks its values, W138 3)
-
-Two small modules serve WhisperJAV's command line and Ensemble pass worker:
-
+    errors.py         the two failures and the prefix the run summary looks for
+    manifest.py       the pinned model files and the models each pipeline offers
+    install.py        whether CrispASR can run here and on which device; downloading, checking and
+                      staging the model files; the network-free status for --check
+    engine.py         the ASR call behind one contract, and WhisperJAV's own result types
+    lines.py          taking one VAD group's result apart and building its subtitles, per model
+    pass_settings.py  what a CrispASR pass accepts, refuses and uses, and its speech segmenter settings
     legacy.py         the removed 1.9.x "bring your own CrispASR" mode: what stops the run (exit 2)
-    pass_settings.py  what a CrispASR pass accepts, refuses and does not use
 
-Nothing in this package imports torch or an ASR module at import time.
+Nothing in this package imports torch, crispasr or an ASR module at import time.
 """
