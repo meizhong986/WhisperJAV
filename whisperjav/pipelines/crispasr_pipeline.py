@@ -8,8 +8,8 @@ per-model table (ENGINE); everything else is here (route B design, sections 3-4)
   1. readiness, once per pass: CrispASR, the device (--device, W194 1), the model file (downloaded by
      WhisperJAV, SHA-256 checked, staged under a plain-ASCII name when needed);
   2. a 16 kHz mono WAV of the film;
-  3. semantic scenes of 12-48 s, ChronosJAV's (W202 5d); Cohere-CrispASR also prints the audio
-     analytics, as the qwen pipeline does (W202 5b);
+  3. semantic scenes of 12-48 s, ChronosJAV's (W202 5d), and the audio analytics, as the qwen and
+     fidelity pipelines print them (W202 5b, W211 C2);
   4. the speech segmenter, scene by scene, through ChronosJAV's VadGroupedFramer, with the settings of
      the pipeline the owner named (W199 DIR1, W202): fidelity's for Parakeet, the qwen pipeline's for
      Cohere (whisperjav/crispasr/pass_settings.py); it is released before the model runs;
@@ -46,7 +46,7 @@ from whisperjav.utils.logger import logger
 class EngineRow:
     """A pipeline's row of the per-model table (route B design 6)."""
     line_rule: str          # lines.LINE_RULES: "tokens" (Parakeet, P2) or "group" (Cohere, C1)
-    audio_analytics: bool   # as the qwen pipeline (Cohere, W202 5b) or not, as fidelity (Parakeet)
+    audio_analytics: bool   # both pipelines today (Cohere W202 5b, Parakeet W211 C2)
 
 
 @dataclass
