@@ -399,6 +399,7 @@ def parse_arguments():
                                     "cohere-crispasr run through CrispASR, installed with WhisperJAV; "
                                     "their model is downloaded the first time it is needed; Japanese "
                                     "only. --pass1-model picks their model. "
+                                    "Experimental in 1.10.0 (early release). "
                                     "The GGUF (CrispASR) pipelines do not support CJK (Chinese, Japanese, Korean) characters in folder names.")
     twopass_group.add_argument("--pass1-sensitivity", default=None,
                                choices=["conservative", "balanced", "aggressive"],
@@ -457,6 +458,7 @@ def parse_arguments():
                                     "through CrispASR, installed with WhisperJAV; their model is "
                                     "downloaded the first time it is needed; Japanese only. "
                                     "--pass2-model picks their model. "
+                                    "Experimental in 1.10.0 (early release). "
                                     "The GGUF (CrispASR) pipelines do not support CJK (Chinese, Japanese, Korean) characters in folder names.")
     twopass_group.add_argument("--pass2-sensitivity", default=None,
                                choices=["conservative", "balanced", "aggressive"],
