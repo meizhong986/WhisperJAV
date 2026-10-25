@@ -569,6 +569,49 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/6b/b0/e595ce2a2527e169c3bcd6c33d2473c1918e0b7f6826a043ca1245dd4e5b/crcmod-1.7.tar.gz", hash = "sha256:dc7051a0db5f2bd48665a990d3ec1cc305a466a77358ca4492826f41f283601e", size = 89670, upload-time = "2010-06-27T14:35:29.538Z" }
 
 [[package]]
+name = "crispasr"
+version = "0.8.44+cuda"
+source = { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-manylinux_2_35_x86_64.whl" }
+resolution-markers = [
+    "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra != 'extra-10-whisperjav-cpu' and extra != 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and sys_platform != 'linux' and sys_platform != 'win32' and extra != 'extra-10-whisperjav-cpu' and extra != 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130')",
+    "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128' and extra != 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128' and extra != 'extra-10-whisperjav-cu130')",
+]
+dependencies = [
+    { name = "numpy", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-whisperjav-cu128') or (platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra == 'extra-10-whisperjav-cu128') or (sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32' and extra == 'extra-10-whisperjav-cu130') or (sys_platform == 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (sys_platform == 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (sys_platform == 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform == 'win32' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (sys_platform == 'win32' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (sys_platform == 'win32' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform == 'emscripten' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (sys_platform == 'emscripten' and extra != 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform == 'emscripten' and extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (sys_platform == 'linux' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (sys_platform == 'linux' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (sys_platform == 'linux' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130')" },
+]
+wheels = [
+    { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-manylinux_2_35_x86_64.whl", hash = "sha256:1da4ce56f957da29b2d931163fbcddd27eb24e19e8cf2cc9ee3bb0a049ba2c7f" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "numpy", specifier = ">=1.20" },
+    { name = "pytest", marker = "extra == 'test'", specifier = ">=7" },
+]
+provides-extras = ["test"]
+
+[[package]]
+name = "crispasr"
+version = "0.8.44+cuda"
+source = { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-win_amd64.whl" }
+resolution-markers = [
+    "sys_platform == 'win32'",
+]
+dependencies = [
+    { name = "numpy", marker = "sys_platform == 'win32'" },
+]
+wheels = [
+    { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-win_amd64.whl", hash = "sha256:9be6897bdce3276d8d98253ec2cfd474963fd8b695431fbce988498e97f95e39" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "numpy", specifier = ">=1.20" },
+    { name = "pytest", marker = "extra == 'test'", specifier = ">=7" },
+]
+provides-extras = ["test"]
+
+[[package]]
 name = "cryptography"
 version = "50.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -4026,10 +4069,14 @@ cpu = [
     { name = "torchaudio", version = "2.11.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'x86_64' and extra == 'extra-10-whisperjav-cpu') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130')" },
 ]
 cu128 = [
+    { name = "crispasr", version = "0.8.44+cuda", source = { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-manylinux_2_35_x86_64.whl" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-10-whisperjav-cu128') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'linux' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130')" },
+    { name = "crispasr", version = "0.8.44+cuda", source = { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-win_amd64.whl" }, marker = "(platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'extra-10-whisperjav-cu128') or (platform_machine != 'AMD64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'win32' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130')" },
     { name = "torch", version = "2.11.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" } },
     { name = "torchaudio", version = "2.11.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" } },
 ]
 cu130 = [
+    { name = "crispasr", version = "0.8.44+cuda", source = { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-manylinux_2_35_x86_64.whl" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'linux' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130')" },
+    { name = "crispasr", version = "0.8.44+cuda", source = { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-win_amd64.whl" }, marker = "(platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'AMD64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'win32' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130')" },
     { name = "torch", version = "2.11.0+cu130", source = { registry = "https://download.pytorch.org/whl/cu130" } },
     { name = "torchaudio", version = "2.11.0+cu130", source = { registry = "https://download.pytorch.org/whl/cu130" } },
 ]
@@ -4281,6 +4328,10 @@ requires-dist = [
     { name = "bs-roformer-infer", marker = "extra == 'enhance'" },
     { name = "build", marker = "extra == 'dev'" },
     { name = "colorama" },
+    { name = "crispasr", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'cu128'", url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-manylinux_2_35_x86_64.whl" },
+    { name = "crispasr", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'cu130'", url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-manylinux_2_35_x86_64.whl" },
+    { name = "crispasr", marker = "platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'cu128'", url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-win_amd64.whl" },
+    { name = "crispasr", marker = "platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'cu130'", url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-win_amd64.whl" },
     { name = "ctranslate2", specifier = "==4.8.3" },
     { name = "datasets", marker = "extra == 'enhance'", specifier = ">=4.0.0,<=4.8.4" },
     { name = "demucs", marker = "extra == 'enhance'" },
