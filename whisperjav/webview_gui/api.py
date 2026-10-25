@@ -2857,12 +2857,67 @@ class WhisperJAVAPI:
                 "message": f"Failed to start two-pass ensemble: {e}"
             }
 
+    # The CrispASR status panel under a pass row (owner W133 2; route B design 12, T16).
+    CRISPASR_MODEL_DOWNLOADED = "Model: {label} — downloaded"
+    CRISPASR_MODEL_MISSING = "Model: {label} — not downloaded yet ({size}); downloaded when the run starts"
+    CRISPASR_RUNS_ON = {"cuda": "Runs on: NVIDIA GPU", "metal": "Runs on: Apple GPU (Metal), not yet tested on a Mac"}
+    CRISPASR_RUNS_ON_CPU = "Runs on: processor (slower): {reason}"
+    CRISPASR_CANNOT_RUN = "CrispASR cannot run here: {reason}"
+    # Asked in a child process: the device check loads PyTorch, which the GUI process never loads.
+    _CRISPASR_RUNTIME_PROBE = (
+        "import json\n"
+        "from whisperjav.crispasr import install\n"
+        "try:\n"
+        "    c = install.runtime_status(None)\n"
+        "    out = {'device': c.device, 'reason': c.reason}\n"
+        "except install.CrispASRSetupError as e:\n"
+        "    out = {'problem': str(e)}\n"
+        "print('RESULT=' + json.dumps(out))\n"
+    )
+
+    def _crispasr_runtime(self) -> Dict[str, Any]:
+        """Where CrispASR would run with --device auto, or why it cannot run; asked once per GUI session."""
+        cached = getattr(self, "_crispasr_runtime_cache", None)
+        if cached is not None:
+            return cached
+        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
+        done = subprocess.run([sys.executable, "-c", self._CRISPASR_RUNTIME_PROBE], capture_output=True,
+                              text=True, encoding="utf-8", errors="replace", timeout=180,
+                              creationflags=creationflags)
+        line = next((l for l in done.stdout.splitlines() if l.startswith("RESULT=")), None)
+        if line is None:
+            raise RuntimeError((done.stderr or "no answer").strip().splitlines()[-1])
+        self._crispasr_runtime_cache = json.loads(line[len("RESULT="):])
+        return self._crispasr_runtime_cache
+
+    def get_crispasr_status(self, pipeline: str, model: Optional[str] = None) -> Dict[str, Any]:
+        """The lines of the CrispASR status panel for a pass: the model, downloaded or not, and where
+        CrispASR runs, or why it cannot run here. Reads files only; never downloads."""
+        try:
+            from whisperjav.crispasr import install, manifest
+
+            m = manifest.model_for(pipeline, model or None)
+            if install.model_status(m).downloaded:
+                lines = [self.CRISPASR_MODEL_DOWNLOADED.format(label=m.label)]
+            else:
+                lines = [self.CRISPASR_MODEL_MISSING.format(label=m.label, size=install.mb(m.size))]
+            runtime = self._crispasr_runtime()
+            if runtime.get("problem"):
+                lines.append(self.CRISPASR_CANNOT_RUN.format(reason=runtime["problem"]))
+                return {"success": True, "lines": lines, "can_run": False}
+            device = runtime.get("device")
+            lines.append(self.CRISPASR_RUNS_ON.get(device)
+                         or self.CRISPASR_RUNS_ON_CPU.format(reason=runtime.get("reason")))
+            return {"success": True, "lines": lines, "can_run": True}
+        except Exception as e:  # noqa: BLE001 -- a status panel must not break the GUI
+            return {"success": False, "error": str(e)}
+
     @staticmethod
     def _crispasr_pass_args(n: int, pass_config: Dict[str, Any]) -> List[str]:
         """--passN-sensitivity, --passN-speech-segmenter and --passN-model for a CrispASR pass.
 
         A value left out is not sent: main.py and the pass worker then use the pipeline's own
-        default (balanced; whisperseg; the pipeline's default model). "none" is never sent as the
+        default (balanced; its default speech segmenter; its default model). "none" is never sent as the
         segmenter: the CrispASR pipelines need one, and main.py would stop the run (exit 2).
         """
         args: List[str] = []
