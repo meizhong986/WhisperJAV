@@ -1701,7 +1701,7 @@ const EnsembleManager = {
         return pipeline === 'parakeet-crispasr' || pipeline === 'cohere-crispasr';
     },
 
-    CRISPASR_CJK_NOTE: 'The GGUF (CrispASR) pipelines do not support CJK (Chinese, Japanese, Korean) characters in folder names.',
+    CRISPASR_CJK_NOTE: 'Experimental in 1.10.0 (early release). The GGUF (CrispASR) pipelines do not support CJK (Chinese, Japanese, Korean) characters in folder names.',
 
     // Each CrispASR pipeline's speech segmenter when a pass names none (CRISPASR_DEFAULT_SEGMENTERS,
     // config/segmenter_presets.py; owner W202 2-3); tests/test_gui_crispasr_pipelines.py compares them.
@@ -2136,7 +2136,7 @@ const EnsembleManager = {
         }
 
         // A CrispASR pipeline (1.10.0) uses four pass settings: the model, the speech segmenter,
-        // the sensitivity (which sets only the segmenter's detection threshold, owner W133 1, W134 2)
+        // the sensitivity (which picks the segmenter's preset: its threshold and related settings, design 4.5)
         // and the source language (crispasr/pass_settings.py). Those stay active; the scene detector
         // (always semantic), the speech enhancer and Customize are greyed. "None" is not offered as
         // a segmenter: the pipelines need one (main.py refuses it).
@@ -2145,7 +2145,7 @@ const EnsembleManager = {
         if (passState.isCrispasr) {
             const notUsed = `Not used by ${this.pipelineLabel(passKey)}`;
             sensitivitySelect.disabled = isPass2Disabled;
-            sensitivitySelect.title = 'Sets the speech segmenter\'s detection threshold';
+            sensitivitySelect.title = 'Picks the speech segmenter\'s preset: the detection threshold and related settings';
             segmenterSelect.disabled = isPass2Disabled;
             segmenterSelect.title = '';
             if (segmenterSelect.value === 'none') {
