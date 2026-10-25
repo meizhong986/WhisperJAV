@@ -141,12 +141,12 @@ from whisperjav.config.segmenter_presets import (
     effective_segmenter_for_pass,
     resolve_segmenter_sensitivity,
     segmenter_accepts,
-    segmenter_detection_settings,
 )
 # The CrispASR Ensemble passes (1.10.0): their names, model list and usage checks. Light modules.
 from whisperjav.crispasr.manifest import CRISPASR_PIPELINES, model_for as crispasr_model_for
-from whisperjav.crispasr.pass_settings import models_help as crispasr_models_help, validate_crispasr_passes
-from whisperjav.crispasr.runner import FAILURE_PREFIX as CRISPASR_FAILURE_PREFIX
+from whisperjav.crispasr.pass_settings import (models_help as crispasr_models_help, segmenter_settings as
+                                               crispasr_segmenter_settings, validate_crispasr_passes)
+from whisperjav.crispasr.errors import FAILURE_PREFIX as CRISPASR_FAILURE_PREFIX
 from whisperjav.__version__ import __version__, __version_display__
 
 
@@ -396,9 +396,10 @@ def parse_arguments():
                                choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen",
                                         *CRISPASR_PIPELINES],
                                help="Pipeline for pass 1 (default: balanced). parakeet-crispasr and "
-                                    "cohere-crispasr run CrispASR's own program, which WhisperJAV "
-                                    "downloads the first time it is needed; Japanese only. "
-                                    "--pass1-model picks their model.")
+                                    "cohere-crispasr run through CrispASR, installed with WhisperJAV; "
+                                    "their model is downloaded the first time it is needed; Japanese "
+                                    "only. --pass1-model picks their model. "
+                                    "The GGUF (CrispASR) pipelines do not support CJK (Chinese, Japanese, Korean) characters in folder names.")
     twopass_group.add_argument("--pass1-sensitivity", default=None,
                                choices=["conservative", "balanced", "aggressive"],
                                help="Sensitivity for pass 1 (default: aggressive when pass 1 is "
@@ -415,7 +416,7 @@ def parse_arguments():
                                choices=["auditok", "silero", "semantic", "none"],
                                help="Scene detection method for pass 1 (default: semantic since v1.9.2)")
     twopass_group.add_argument("--pass1-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none). Default: firered-vad when pass 1 is Qwen3-ASR; whisperseg for parakeet-crispasr and cohere-crispasr, which do not accept none. Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
+                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none). Default: firered-vad when pass 1 is Qwen3-ASR; whisperseg for parakeet-crispasr and firered-vad for cohere-crispasr, which do not accept none. Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
     twopass_group.add_argument("--pass1-vad-version", default=None,
                                choices=list(VAD_VERSIONS),
                                help="Silero VAD build for pass 1 when --pass1-pipeline is balanced "
@@ -453,8 +454,10 @@ def parse_arguments():
                                         *CRISPASR_PIPELINES],
                                help="Pipeline for pass 2 (enables pass 2). 'xxl' = BYOP XXL Faster Whisper "
                                     "(requires --xxl-exe). parakeet-crispasr and cohere-crispasr run "
-                                    "CrispASR's own program, which WhisperJAV downloads the first time it "
-                                    "is needed; Japanese only. --pass2-model picks their model.")
+                                    "through CrispASR, installed with WhisperJAV; their model is "
+                                    "downloaded the first time it is needed; Japanese only. "
+                                    "--pass2-model picks their model. "
+                                    "The GGUF (CrispASR) pipelines do not support CJK (Chinese, Japanese, Korean) characters in folder names.")
     twopass_group.add_argument("--pass2-sensitivity", default=None,
                                choices=["conservative", "balanced", "aggressive"],
                                help="Sensitivity for pass 2 (default: aggressive when pass 2 is "
@@ -471,7 +474,7 @@ def parse_arguments():
                                choices=["auditok", "silero", "semantic", "none"],
                                help="Scene detection method for pass 2 (default: semantic since v1.9.2)")
     twopass_group.add_argument("--pass2-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Default: ten when pass 2 is anime-whisper; whisperseg for parakeet-crispasr and cohere-crispasr, which do not accept none. Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
+                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Default: ten when pass 2 is anime-whisper; whisperseg for parakeet-crispasr and firered-vad for cohere-crispasr, which do not accept none. Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
     twopass_group.add_argument("--pass2-vad-version", default=None,
                                choices=list(VAD_VERSIONS),
                                help="Silero VAD build for pass 2 when --pass2-pipeline is balanced "
@@ -546,7 +549,10 @@ def parse_arguments():
                                choices=["auto", "cuda", "cpu"],
                                help="Device to use for ASR processing (default: auto-detect). "
                                     "Note: MPS (Apple Silicon) is auto-detected but CTranslate2 backends "
-                                    "will fall back to CPU with Accelerate optimization.")
+                                    "will fall back to CPU with Accelerate optimization. For parakeet-crispasr and "
+                                    "cohere-crispasr: auto uses the NVIDIA GPU, or the Apple GPU (Metal) on "
+                                    "Apple silicon, when WhisperJAV finds one, else the processor; cuda "
+                                    "requires an NVIDIA GPU.")
     hardware_group.add_argument("--compute-type", type=str, default=None,
                                choices=["auto", "float16", "float32", "int8", "int8_float16", "int8_float32"],
                                help="Compute type for ASR processing (default: auto). "
@@ -3175,9 +3181,9 @@ def main():
                 # Don't let cap surfacing fail the dump; record the error
                 ensemble_dump["_safety_cap_error"] = str(cap_err)
             # A CrispASR pass resolves its values in the pass worker and the pipeline (model, speech
-            # segmenter, the segmenter's detection setting); show what the run will use beside the
-            # values as typed, which keep their usual keys. Sensitivity sets only that detection
-            # setting (CrispASR master plan 3.8 item 4; W134 2, W136).
+            # segmenter settings as the fidelity or the qwen pipeline resolves them, W199 DIR1, W202);
+            # show what the run will use beside the values as typed, which keep their usual keys.
+            # The device is decided in the pass (it needs the GPU): --device is shown as given.
             for _key in ("pass1", "pass2"):
                 _p = ensemble_dump.get(_key)
                 if not _p or _p.get("pipeline") not in CRISPASR_PIPELINES:
@@ -3192,11 +3198,14 @@ def main():
                     "model": _model,
                     "speech_segmenter": _segmenter,
                     "sensitivity": _sensitivity,
-                    "speech_segmenter_detection": segmenter_detection_settings(_segmenter, _sensitivity),
+                    # --passN-vad-threshold and --passN-speech-pad-ms are used (W208).
+                    "speech_segmenter_settings": crispasr_segmenter_settings(
+                        _p["pipeline"], _segmenter, _sensitivity, vad_threshold=_p.get("vad_threshold"),
+                        speech_pad_ms=_p.get("speech_pad_ms")).as_dict(),
+                    "device": _p.get("device"),
                     "scene_detector": "semantic",
                     "not_used": ["scene_detector", "speech_enhancer", "enhance_for_vad",
-                                 "vad_threshold", "speech_pad_ms", "params", "hf_params", "qwen_params",
-                                 "device", "compute_type"],
+                                 "params", "hf_params", "qwen_params", "compute_type"],
                 }
             dump_data["ensemble_config"] = ensemble_dump
         try:
@@ -3228,17 +3237,18 @@ def main():
             # wrong way (owner, 2026-09-17).
             ensure_segmenter_backend_available(_seg)
             ensure_segmenter_model_available(_seg)
-        # CrispASR passes (CrispASR master plan 1.5, 2.6): the program and the models are made ready
-        # here, downloaded if missing, before any audio is read and before either pass starts. A missing
-        # file under --offline, a processor without AVX2 or a failed download then costs nothing; checked
-        # only inside the pass, a two-pass run would first run the other pass in full, for nothing.
+        # CrispASR passes (route B design 4.2): CrispASR, the device and the models are made ready
+        # here, models downloaded if missing, before any audio is read and before either pass starts. A
+        # missing package, a processor without AVX2, --device cuda without an NVIDIA GPU, a missing file
+        # under --offline or a failed download then costs nothing; checked only inside the pass, a
+        # two-pass run would first run the other pass in full, for nothing.
         _crispasr_passes = [
             (_n, getattr(args, f"pass{_n}_pipeline"), getattr(args, f"pass{_n}_model", None))
             for _n in (1, 2)
             if getattr(args, f"pass{_n}_pipeline", None) in CRISPASR_PIPELINES
         ]
         if _crispasr_passes:
-            ensure_crispasr_ready(_crispasr_passes)
+            ensure_crispasr_ready(_crispasr_passes, device=args.device, temp_dir=args.temp_dir)
     elif resolved_config:
         _seg_cfg = resolved_config.get("params", {}).get("speech_segmenter") or {}
         ensure_segmenter_backend_available(_seg_cfg.get("backend"))
