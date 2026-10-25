@@ -202,7 +202,7 @@ class TestTheTwoPipelines:
             ("parakeet-crispasr", "Parakeet-CrispASR")
         assert (CohereCrispASRPipeline.PIPELINE_NAME, CohereCrispASRPipeline.LABEL) == \
             ("cohere-crispasr", "Cohere-CrispASR")
-        assert ParakeetCrispASRPipeline.ENGINE == chain.EngineRow("tokens", audio_analytics=False)
+        assert ParakeetCrispASRPipeline.ENGINE == chain.EngineRow("tokens", audio_analytics=True)
         assert CohereCrispASRPipeline.ENGINE == chain.EngineRow("group", audio_analytics=True)
 
     def test_both_share_one_chain(self):
@@ -381,7 +381,7 @@ class TestParakeetEndToEnd:
         assert s["degradations"] == [] and s["notes"] == []
         assert md["stages"]["groups"] == {"count": 3, "seconds": 3.5, "failed_scenes": 0}
         assert md["stages"]["asr"]["groups"] == 3 and md["stages"]["asr"]["failed"] == 0
-        assert stage.calls["analytics"] == 0  # as fidelity
+        assert stage.calls["analytics"] == 1  # as fidelity and Cohere-CrispASR (W211 C2)
 
     def test_each_group_is_one_call_with_its_own_audio(self, stage, tmp_path):
         make(ParakeetCrispASRPipeline, tmp_path).process(stage.media())
