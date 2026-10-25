@@ -130,13 +130,22 @@ torch = [
 # Windows: cu130 (default) or cu128 (the per-PC fallback). Linux: cu128 (owner,
 # W45). CPU: old-card choice 2, no NVIDIA GPU, and macOS.
 # v1.10.0 (item 3, owner W78 C2): torchvision left with ClearVoice, its only user.
+# v1.10.0 (route B, owner W176-W178): CrispASR's Python package for Parakeet-CrispASR and
+# Cohere-CrispASR. The CUDA build (+cuda, its own CUDA 12.8 libraries inside) for Windows and Linux
+# x86-64, each wheel pinned by its release URL and SHA-256 (decision record D10; the hashes equal the
+# v0.8.44 release's own digests). CrispASR's wheel index publishes no hashes, so it is not used. The
+# cpu extra has none until CrispASR publishes 0.8.44's CPU wheel on PyPI (CrispASR #556; owner O16).
 cu130 = [
     "torch==2.11.0",
     "torchaudio==2.11.0",
+    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-win_amd64.whl#sha256=9be6897bdce3276d8d98253ec2cfd474963fd8b695431fbce988498e97f95e39 ; sys_platform == 'win32' and platform_machine == 'AMD64'",
+    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-manylinux_2_35_x86_64.whl#sha256=1da4ce56f957da29b2d931163fbcddd27eb24e19e8cf2cc9ee3bb0a049ba2c7f ; sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
 cu128 = [
     "torch==2.11.0",
     "torchaudio==2.11.0",
+    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-win_amd64.whl#sha256=9be6897bdce3276d8d98253ec2cfd474963fd8b695431fbce988498e97f95e39 ; sys_platform == 'win32' and platform_machine == 'AMD64'",
+    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-manylinux_2_35_x86_64.whl#sha256=1da4ce56f957da29b2d931163fbcddd27eb24e19e8cf2cc9ee3bb0a049ba2c7f ; sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
 cpu = [
     "torch==2.11.0",
