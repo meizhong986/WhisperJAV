@@ -12,9 +12,11 @@ Usage:
     python build_release.py --validate # Validate only
     python build_release.py --check-tree          # Only: no uncommitted/untracked files?
     python build_release.py --check-wheel <wheel> # Only: every package file tracked by git?
+    python build_release.py --check-settings      # Only: shipped settings hold no path from this PC?
 
-A full build stops if the working tree is not committed (checked after phase 1)
-or if the wheel holds a package file that git does not track.
+A full build stops if the working tree is not committed (checked after phase 1),
+if the shipped settings file holds a path from this computer, or if the wheel holds
+a package file that git does not track.
 
 v1.10.0 (item 2f; design section 22): the dependency lists come from uv.lock, one per
 lock extra (cu130, cu128, vulkan, cpu), exported into whisperjav/installer/locked/ (tracked by git, so a
@@ -56,6 +58,39 @@ RESET = '\033[0m'
 # accelerator table (standard library only, so this import needs nothing installed).
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from whisperjav.installer.core.accelerators import LOCK_EXTRAS as LOCKED_VARIANTS  # noqa: E402
+
+# v1.10.0 (item 5, owner W275): the settings file every install starts with. A developer
+# whose WhisperJAV runs from this folder writes GUI choices into it (ConfigManager keeps it
+# inside the package), so a path from the developer's computer can end up in a release --
+# 1.9.5 shipped an XXL path that way.
+SHIPPED_SETTINGS = Path(__file__).resolve().parent.parent / "whisperjav" / "config" / "asr_config.json"
+
+
+def shipped_settings_problems(config):
+    """The settings in ui_preferences that hold a path from this computer: an XXL program path
+    (xxl_exe_path) or any absolute path (C:\\..., \\\\server\\..., /home/...). Returns
+    "ui_preferences.key.key: value" lines; empty when the file may ship."""
+    import re
+
+    problems = []
+
+    def walk(node, where):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                here = f"{where}.{key}"
+                if key == "xxl_exe_path":
+                    problems.append(f"{here}: {value!r}")
+                else:
+                    walk(value, here)
+        elif isinstance(node, list):
+            for i, value in enumerate(node):
+                walk(value, f"{where}[{i}]")
+        elif isinstance(node, str) and re.match(r"^([A-Za-z]:[\\/]|\\\\|/[^\s/])", node):
+            problems.append(f"{where}: {node!r}")
+
+    walk(config.get("ui_preferences", {}), "ui_preferences")
+    return problems
+
 
 class ReleaseBuilder:
     def __init__(self, dry_run=False):
@@ -440,6 +475,30 @@ __version_info__ = {{
         print("  Commit, move or delete them, then build again.")
         return False
 
+    def check_shipped_settings(self):
+        """v1.10.0 (item 5, owner W275): stop if the shipped settings file holds a path from
+        this computer (see shipped_settings_problems)."""
+        import json
+
+        self.print_header("Check: Shipped Settings Hold No Path From This Computer")
+        try:
+            config = json.loads(SHIPPED_SETTINGS.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            print(f"  {RED}✗{RESET} Cannot read {SHIPPED_SETTINGS}: {e}")
+            return False
+        problems = shipped_settings_problems(config)
+        if not problems:
+            print(f"  {GREEN}✓{RESET} {SHIPPED_SETTINGS.name} holds no path from this computer")
+            return True
+        print(f"  {RED}✗{RESET} {SHIPPED_SETTINGS} holds {len(problems)} path(s) from this computer:")
+        for line in problems:
+            print(f"      {line}")
+        if self.dry_run:
+            print(f"  [DRY-RUN] A real build would stop here")
+            return True
+        print("  Remove them from the file (every install starts with it), commit, then build again.")
+        return False
+
     def check_wheel(self, wheel_path):
         """v1.10.0 (N1): stop if the wheel holds a package file that git does not track.
 
@@ -557,6 +616,7 @@ __version_info__ = {{
             ("Export locked requirements", self.export_locked_requirements),
             ("Generate from templates", self.generate_from_templates),
             ("Check working tree", self.check_tree),
+            ("Check shipped settings", self.check_shipped_settings),
             ("Build wheel package", self.build_wheel),
             ("Check wheel contents", lambda: self.check_wheel(
                 self.project_root / "dist" / f"whisperjav-{self.version}-py3-none-any.whl")),
@@ -589,12 +649,17 @@ def main():
                         help='Only check that the working tree has no uncommitted or untracked files')
     parser.add_argument('--check-wheel', metavar='WHEEL',
                         help='Only check that every package file in WHEEL is tracked by git')
+    parser.add_argument('--check-settings', action='store_true',
+                        help='Only check that the shipped settings file holds no path from this computer')
     args = parser.parse_args()
 
     builder = ReleaseBuilder(dry_run=args.dry_run)
 
     if args.check_tree:
         return 0 if builder.check_tree() else 1
+
+    if args.check_settings:
+        return 0 if builder.check_shipped_settings() else 1
 
     if args.check_wheel:
         return 0 if builder.check_wheel(args.check_wheel) else 1
