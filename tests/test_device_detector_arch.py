@@ -171,6 +171,8 @@ class TestCheckSuite:
         pf, _, results = self._checker(monkeypatch, _no_gpu_torch(), "cpu", smi="NVIDIA GeForce RTX 4070")
         warn = [r for r in results if r.status == pf.CheckStatus.WARN]
         assert len(warn) == 1 and "RTX 4070" in warn[0].message and "made for the CPU only" in warn[0].message
+        # owner W242 2: a source install keeps its record, so it needs --accelerator nvidia
+        assert "(for a source install: python install.py --accelerator nvidia)" in warn[0].message
 
     def test_no_pip_command_for_pytorch_anywhere_in_the_checks(self):
         from pathlib import Path
