@@ -18,6 +18,7 @@ from enum import Enum
 
 # Import after UTF-8 fix to avoid encoding issues
 from whisperjav.utils.device_detector import get_best_device, is_gpu_available
+from whisperjav.installer.core import accelerators as _ACC  # standard library only
 
 # Fix stdout/stderr encoding for Windows before any print statements
 # This is critical for unicode characters (⚠️, ✓, •, etc.) in console output
@@ -77,11 +78,8 @@ CU128_STACK_TEXT = ("This PC runs the CUDA 12.8 build of WhisperJAV: when it was
 CRISPASR_NAME = "CrispASR"
 CRISPASR_TEXT = "{version} ({build}), GGUF pipelines: {device}{why}"
 CRISPASR_BUILD_NAMES = {"cuda": "CUDA build", "cpu": "CPU build", "vulkan": "Vulkan build"}
-# T46 (design 22.10).
-CRISPASR_DEVICE_NAMES = {"cuda": "asks for the NVIDIA GPU (CUDA)",
-                         "vulkan": "asks for the GPU through Vulkan (experimental, not tested)",
-                         "metal": "asks for the Apple GPU (Metal) (not yet tested on a Mac)",
-                         "cpu": "CPU (not accelerated)"}
+# T46 (design 22.10), from the accelerator table (W241 Q1).
+CRISPASR_DEVICE_NAMES = _ACC.CHECK_CRISPASR_DEVICE
 CRISPASR_NOT_INSTALLED_TEXT = ("not installed; the CrispASR pipelines cannot run here. Run the WhisperJAV "
                                "installer again.")
 CRISPASR_NO_BUILD_TEXT = ("no CrispASR build for this computer ({platform}, {machine}); the CrispASR "
@@ -1044,19 +1042,19 @@ def _print_box(lines, colour):
 # (design 22.5.4; 22.13 detail 2). The GUI offers "Run on the CPU this time" for it.
 EXIT_NVIDIA_UNUSABLE = 3
 
-NOTICE_MADE_FOR = "This install of WhisperJAV is made for: {name}. On this computer:"
-NOTICE_NO_RECORD = "No GPU that WhisperJAV can use was found. On this computer:"
-NOTICE_GGUF = "• GGUF pipelines (Parakeet-CrispASR, Cohere-CrispASR): {where}"
-NOTICE_OTHERS = "• Other pipelines: {where}"
-NOTICE_DEVICE_CPU = "• Every pipeline: the CPU (not accelerated), as asked with --device cpu."
-CPU_WHERE = "the CPU (not accelerated), several times slower than on a GPU"
-GGUF_VULKAN_WHERE = "ask for the GPU through Vulkan — experimental, not tested"
-GGUF_METAL_WHERE = "ask for the Apple GPU (Metal) — not yet tested on a Mac"
-GGUF_CUDA_WHERE = "the NVIDIA GPU (CUDA)"
-GGUF_CPU_WHERE = "the CPU (not accelerated)"
-GGUF_MISSING_WHERE = "cannot run here: CrispASR is not installed (run the WhisperJAV installer again)"
-OWN_PYTORCH_WHERE = ("with your PyTorch, fidelity, transformers, ChronosJAV and the speech enhancers ask for "
-                     "{gpu} — not tested; balanced, fast and faster on {ct2}")
+# Where the parts run: the accelerator table holds these lines (design 22.6.8; W241 Q1).
+NOTICE_MADE_FOR = _ACC.NOTICE_MADE_FOR
+NOTICE_NO_RECORD = _ACC.NOTICE_NO_RECORD
+NOTICE_GGUF = _ACC.NOTICE_GGUF
+NOTICE_OTHERS = _ACC.NOTICE_OTHERS
+NOTICE_DEVICE_CPU = _ACC.NOTICE_DEVICE_CPU
+CPU_WHERE = _ACC.CPU_WHERE
+GGUF_VULKAN_WHERE = _ACC.GGUF_VULKAN_WHERE
+GGUF_METAL_WHERE = _ACC.GGUF_METAL_WHERE
+GGUF_CUDA_WHERE = _ACC.GGUF_CUDA_WHERE
+GGUF_CPU_WHERE = _ACC.GGUF_CPU_WHERE
+GGUF_MISSING_WHERE = _ACC.GGUF_MISSING_WHERE
+OWN_PYTORCH_WHERE = _ACC.OWN_PYTORCH_WHERE
 
 NVIDIA_STOP_TEXT = ("This install is made for an NVIDIA GPU, but the GPU cannot be used now: {reason}. "
                     "Nothing was processed. To fix it: {fix}. To run on the CPU (not accelerated) this "
