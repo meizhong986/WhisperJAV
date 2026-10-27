@@ -23,12 +23,15 @@ from .components import (
     get_vad_registry,
     get_feature_registry,
 )
-from whisperjav.utils.device_detector import get_best_device
+from whisperjav.utils.device_detector import ctranslate2_device, get_best_device
 
 logger = logging.getLogger("whisperjav")
 
 # CTranslate2-based providers support "auto" compute_type selection
 CTRANSLATE2_PROVIDERS = {"faster_whisper"}
+# Providers whose ASR runs on CTranslate2: balanced (faster_whisper), and fast and faster
+# (stable_ts with turbo_mode=True, fast_pipeline.py / faster_pipeline.py).
+CTRANSLATE2_DEVICE_PROVIDERS = {"faster_whisper", "stable_ts"}
 
 
 
@@ -339,6 +342,11 @@ def resolve_config_v3(
     if device and device != "auto":
         selected_device = device
         logger.debug(f"v3.0 resolver: Using user-specified device='{selected_device}'")
+    elif asr_component.provider in CTRANSLATE2_DEVICE_PROVIDERS:
+        # balanced, fast and faster run on CTranslate2: "cuda" only when CTranslate2 itself sees
+        # a CUDA device, not when a ROCm PyTorch says so (design 22.3.3).
+        selected_device = ctranslate2_device("auto", best=get_best_device())
+        logger.debug(f"v3.0 resolver: Auto-detected CTranslate2 device='{selected_device}'")
     else:
         selected_device = get_best_device()
         logger.debug(f"v3.0 resolver: Auto-detected device='{selected_device}'")
