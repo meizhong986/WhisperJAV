@@ -5,6 +5,7 @@ input(), detection and the environment are stand-ins.
 """
 
 import importlib.util
+import os
 import sys
 import types
 from pathlib import Path
@@ -207,8 +208,9 @@ def test_unsupported_computers_are_refused_before_preflight():
 
 def test_help_shows_accelerator_and_hides_the_old_options():
     import subprocess
+    # The child writes UTF-8 whatever the console (Git Bash gives cp1252; review P7 finding 16).
     r = subprocess.run([sys.executable, str(REPO / "install.py"), "--help"], capture_output=True, text=True,
-                       encoding="utf-8", timeout=120)
+                       encoding="utf-8", timeout=120, env={**os.environ, "PYTHONIOENCODING": "utf-8"})
     assert r.returncode == 0
     usage = r.stdout.split("WhisperJAV Source Installation Script —")[0]
     assert "--accelerator {nvidia,vulkan,own-pytorch,cpu}" in usage
