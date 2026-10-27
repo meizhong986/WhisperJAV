@@ -24,7 +24,7 @@ except ImportError:  # Python 3.10 without tomli
 
 PROJECT_ROOT = Path(__file__).parent.parent
 LOCKED_DIR = PROJECT_ROOT / "whisperjav" / "installer" / "locked"
-VARIANTS = ("cu130", "cu128", "cpu")
+VARIANTS = ("cu130", "cu128", "vulkan", "cpu")
 
 
 def _pyproject_specs() -> dict:
@@ -131,7 +131,9 @@ class TestLockedRequirements:
     @pytest.mark.parametrize("variant", VARIANTS)
     def test_every_line_is_an_exact_version_or_a_git_commit(self, variant):
         loose = [l for l in _locked_lines(variant)
-                 if "==" not in l.split(";")[0] and not re.search(r" @ git\+\S+@[0-9a-f]{40}", l)]
+                 if "==" not in l.split(";")[0] and not re.search(r" @ git\+\S+@[0-9a-f]{40}", l)
+                 # a direct URL to one wheel file (CrispASR's +cuda / +vulkan builds, D10) is exact too
+                 and not re.search(r" @ https://\S+\.whl", l)]
         assert not loose, f"requirements_{variant}.txt has lines without an exact version: {loose}"
 
     @pytest.mark.parametrize("variant", VARIANTS)
@@ -154,7 +156,8 @@ class TestLockedRequirements:
     @pytest.mark.parametrize("variant", VARIANTS)
     def test_torch_is_the_build_of_the_file(self, variant):
         torch = [l for l in _locked_lines(variant) if _name(l) == "torch"]
-        assert any(l.startswith(f"torch==2.11.0+{variant}") for l in torch), torch
+        build = {"vulkan": "cpu"}.get(variant, variant)   # the vulkan extra takes PyTorch's CPU build
+        assert any(l.startswith(f"torch==2.11.0+{build}") for l in torch), torch
 
     def test_the_files_equal_a_fresh_export_of_uv_lock(self):
         """A pyproject.toml or uv.lock change without a new export is caught here."""
