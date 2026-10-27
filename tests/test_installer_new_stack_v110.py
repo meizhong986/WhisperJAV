@@ -293,9 +293,15 @@ class _GPU:
 def test_install_py_default_build_and_driver_floor_per_platform(monkeypatch, platform_name, default, floor):
     ins = _load_install_py(monkeypatch, platform_name)
     assert ins.DEFAULT_CUDA == default and ins.MIN_DRIVER[0] == floor
-    monkeypatch.setattr("builtins.input", lambda *a: "")
+    monkeypatch.setattr("builtins.input", lambda *a: pytest.fail("no question for a driver at the floor"))
     assert ins.gpu_support_gate(_GPU((floor, 0, 0))) == "gpu"
+    # Below the floor (design 22.6.4): the driver line first, then the one question; "stop" stops,
+    # "CPU only" installs for the CPU.
+    stop, cpu = ("6", "5") if platform_name == "win32" else ("3", "2")
+    monkeypatch.setattr("builtins.input", lambda *a: stop)
     assert ins.gpu_support_gate(_GPU((floor - 1, 99, 0))) == "stop"
+    monkeypatch.setattr("builtins.input", lambda *a: cpu)
+    assert ins.gpu_support_gate(_GPU((floor - 1, 99, 0))) == "cpu"
 
 
 def test_install_py_linux_driver_575_installs_cuda_12_8(monkeypatch):
@@ -306,8 +312,9 @@ def test_install_py_linux_driver_575_installs_cuda_12_8(monkeypatch):
                              cuda_version=None, compute_capability=(8, 6), message="")
     monkeypatch.setattr(ins, "detect_gpu", lambda: gpu)
     monkeypatch.setattr(ins, "_INSTALLER_AVAILABLE", True)
-    args = _t.SimpleNamespace(cpu_only=False, cuda=None, force_cuda=None)
-    assert ins.detect_cuda_version(args) == "cu128"
+    monkeypatch.setattr(ins.ACC, "read_record", lambda prefix=None: (False, None))
+    args = _t.SimpleNamespace(accelerator=None, cpu_only=False, cuda=None, force_cuda=None)
+    assert ins.choose_accelerator(args) == "cu128"
 
 
 # --- D1 (owner W46 (1)): a deliberate stop is not a failure ------------------------------
