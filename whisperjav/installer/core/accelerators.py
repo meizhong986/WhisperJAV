@@ -44,12 +44,16 @@ ACCELERATORS: Tuple[Accelerator, ...] = (
                 "Every pipeline runs on the NVIDIA GPU (CUDA); the WhisperSeg speech segmenter on the CPU."),
     Accelerator("cu128", "NVIDIA GPU (CUDA 12.8)", "cu128", "cu128", CU128_INDEX, True,
                 "Every pipeline runs on the NVIDIA GPU (CUDA); the WhisperSeg speech segmenter on the CPU."),
+    # The Vulkan and Apple texts name ChronosJAV's aligner and timing model (item 12): texts
+    # approved by the owner as drafted (W268); design note 2026-10-28 section 9, Q11.
     Accelerator("vulkan", "GPU through Vulkan (AMD, Intel or older NVIDIA card)", "vulkan", "vulkan", CPU_INDEX, False,
-                "The GGUF pipelines (Parakeet-CrispASR, Cohere-CrispASR) ask for your graphics card through "
-                "Vulkan (experimental, not tested); all other pipelines run on the CPU (not accelerated)."),
+                "The GGUF pipelines (Parakeet-CrispASR, Cohere-CrispASR) and ChronosJAV's aligner and timing "
+                "model ask for your graphics card through Vulkan (experimental, not tested); all other "
+                "pipelines, and ChronosJAV's ASR model, run on the CPU (not accelerated)."),
     Accelerator("metal", "Apple GPU (Metal)", "cpu", "cpu", CPU_INDEX, False,
                 "The transformers pipeline asks for the Apple GPU (Metal); the GGUF pipelines and fidelity ask "
-                "for it too (not yet tested on a Mac); balanced, fast, faster and ChronosJAV run on the CPU "
+                "for it too (not yet tested on a Mac); ChronosJAV's aligner and timing model ask for it too "
+                "(not yet tested on a Mac); balanced, fast, faster and ChronosJAV's ASR model run on the CPU "
                 "(not accelerated)."),
     Accelerator("own-pytorch", "Own PyTorch", "cpu", "vulkan", "", False,
                 "fidelity, transformers, ChronosJAV and the speech enhancers ask for the GPU your PyTorch "
@@ -215,9 +219,19 @@ MADE_FOR_TEXT = "Made for: {name}."                                             
 # The box at the start of a run (design 22.5.3).
 NOTICE_MADE_FOR = "This install of WhisperJAV is made for: {name}. On this computer:"
 NOTICE_NO_RECORD = "No GPU that WhisperJAV can use was found. On this computer:"
-NOTICE_GGUF = "• GGUF pipelines (Parakeet-CrispASR, Cohere-CrispASR): {where}"
-NOTICE_OTHERS = "• Other pipelines: {where}"
+# NOTICE_GGUF, NOTICE_OTHERS and NOTICE_DEVICE_CPU_CRISPASR name ChronosJAV's parts (item 12): texts
+# approved by the owner as drafted (W268); design note 2026-10-28 section 9, Q9, Q11. The CrispASR line under
+# --device cpu also names Cohere-CrispASR's aligner, which the section 9 draft does not.
+NOTICE_GGUF = ("• GGUF models (Parakeet-CrispASR, Cohere-CrispASR, and ChronosJAV's aligner and timing "
+               "model): {where}")
+NOTICE_OTHERS = "• Other pipelines, and ChronosJAV's ASR model: {where}"
 NOTICE_DEVICE_CPU = "• Every pipeline: the CPU (not accelerated), as asked with --device cpu."
+# Where the CrispASR build would use a GPU, these two lines replace NOTICE_DEVICE_CPU, so the box does not
+# say "every pipeline" and then name the exception (item 12 review).
+NOTICE_DEVICE_CPU_ASR_MODELS = ("• Every pipeline's ASR model: the CPU (not accelerated), as asked with "
+                                "--device cpu.")
+NOTICE_DEVICE_CPU_CRISPASR = ("• ChronosJAV's aligner and timing model, and Cohere-CrispASR's aligner, still ask "
+                              "for the GPU: CrispASR cannot hold them on the CPU.")
 CPU_WHERE = "the CPU (not accelerated), several times slower than on a GPU"
 GGUF_VULKAN_WHERE = "ask for the GPU through Vulkan — experimental, not tested"
 GGUF_METAL_WHERE = "ask for the Apple GPU (Metal) — not yet tested on a Mac"
