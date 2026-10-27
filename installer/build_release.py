@@ -335,6 +335,17 @@ __version_info__ = {{
                 print(f"  {GREEN}✓{RESET} Copied {output_name}")
             generated_count += 1
 
+        # design 22.6.8: the one accelerator table, shipped next to post_install (which cannot
+        # import WhisperJAV before its phase 5) -- the file itself, so there is no second copy.
+        table = self.project_root / "whisperjav" / "installer" / "core" / "accelerators.py"
+        output_name = f"whisperjav_accelerators_v{self.version}.py"
+        if self.dry_run:
+            print(f"  [DRY-RUN] Would copy {table.name} to {output_name}")
+        else:
+            shutil.copy(table, self.generated_dir / output_name)
+            print(f"  {GREEN}✓{RESET} Copied {output_name}")
+        generated_count += 1
+
         print(f"\n  Generated {generated_count} files")
         return True
 
