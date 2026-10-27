@@ -79,7 +79,7 @@ whisperjav-gui
 |------|------|
 | **多处理管线** | Balanced、Fast、Faster、Fidelity、Transformers——在速度与精度间权衡 |
 | **集成模式** | 使用两个不同后端进行双重处理，合并获得最佳结果 |
-| **BYOP XXL** | 自带管线——在集成模式 Pass 2 中使用 Faster Whisper XXL |
+| **BYOP XXL** | 自带管线——在集成模式的 Pass 1、Pass 2 或两者中使用 Faster Whisper XXL |
 | **ChronosJAV** | 专用管线，搭配 anime-whisper 和 Kotoba 模型，适合动漫/JAV 内容 |
 | **Qwen3-ASR** | 替代语音识别引擎，日语表现出色 |
 | **AI 翻译** | 使用 Ollama（本地）、DeepSeek、Gemini、Claude、GPT 等提供商翻译字幕 |
