@@ -626,6 +626,28 @@ class TestStageModel:
         with pytest.raises(CrispASRSetupError):
             install.stage_model(model, temp.temp, TEST_MODEL.sha256)
 
+    def test_keep_name_stages_the_file_under_its_own_name(self, model, temp, monkeypatch):
+        """CrispASR's align_words picks the aligner family from the file's name (design note 2026-10-28, 4.1)."""
+        monkeypatch.delenv("PUBLIC")
+        monkeypatch.delenv("ProgramData")
+        staged = install.stage_model(model, temp.temp, TEST_MODEL.sha256, keep_name=True)
+        assert staged == temp.temp / install.STAGE_FOLDER / TEST_MODEL.sha256[:16] / TEST_MODEL.filename
+        assert str(staged).isascii() and os.path.samefile(staged, model)
+
+    def test_keep_name_never_uses_the_short_path(self, model, temp, monkeypatch):
+        short = model.parent.parent.parent / "YAMADA~1.GGU"
+        short.write_bytes(MODEL_BYTES)
+        monkeypatch.setattr(install, "_short_path", lambda path: str(short))
+        staged = install.stage_model(model, temp.temp, TEST_MODEL.sha256, keep_name=True)
+        assert staged != short and staged.name == TEST_MODEL.filename
+
+    def test_keep_name_copies_under_its_own_name_where_no_link_can_be_made(self, model, temp, monkeypatch):
+        monkeypatch.setattr(install.os, "link", _no_link)
+        staged = install.stage_model(model, temp.temp, TEST_MODEL.sha256, keep_name=True)
+        assert staged.name == TEST_MODEL.filename and staged.read_bytes() == MODEL_BYTES
+        assert not list(staged.parent.glob("*.part"))
+        assert install.stage_model(model, temp.temp, TEST_MODEL.sha256, keep_name=True) == staged
+
     def test_a_folder_whose_own_path_is_not_ascii_is_not_a_candidate(self, tmp_path, monkeypatch):
         monkeypatch.setenv("PUBLIC", str(tmp_path / "公開"))
         monkeypatch.delenv("ProgramData", raising=False)
