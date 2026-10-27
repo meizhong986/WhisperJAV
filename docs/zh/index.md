@@ -82,8 +82,10 @@ whisperjav-gui
 | **BYOP XXL** | 自带管线——在集成模式 Pass 2 中使用 Faster Whisper XXL |
 | **ChronosJAV** | 专用管线，搭配 anime-whisper 和 Kotoba 模型，适合动漫/JAV 内容 |
 | **Qwen3-ASR** | 替代语音识别引擎，日语表现出色 |
-| **AI 翻译** | 使用 Ollama、DeepSeek、Gemini、Claude、GPT 或本地大语言模型翻译字幕 |
-| **语音增强** | ClearVoice 降噪、BS-RoFormer 人声分离、FFmpeg DSP 链 |
+| **AI 翻译** | 使用 Ollama（本地）、DeepSeek、Gemini、Claude、GPT 等提供商翻译字幕 |
+| **GGUF 处理管线** | Parakeet-CrispASR 和 Cohere-CrispASR，通过 CrispASR 在集成模式中运行（日语，1.10.0 中为实验性） |
+| **每个安装一种加速器** | NVIDIA GPU（CUDA）、通过 Vulkan 使用 GPU（Windows）、Apple GPU（Metal）、你自己的 PyTorch 或仅 CPU——在安装时选择（[是否加速](getting-started/index.md#accelerated-or-not)） |
+| **语音增强** | ZipEnhancer 降噪、htdemucs 人声分离、FFmpeg DSP 链 |
 | **场景检测** | Auditok、Silero、Semantic——分割长音频以提高准确度 |
 | **GUI + CLI** | 功能完整的 GUI 用于交互操作，CLI 用于自动化和脚本 |
 
