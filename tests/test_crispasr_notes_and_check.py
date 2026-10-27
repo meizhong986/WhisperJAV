@@ -754,36 +754,39 @@ def _crispasr(results):
 class TestCheckReportsCrispASR:
     """T3 (route B design 12)."""
 
+    # T46 (design 22.10).
     def test_the_cuda_build_on_the_nvidia_gpu_is_pass(self, crispasr_pc):
         line = _crispasr(_crispasr_results())
         assert line.status == CheckStatus.PASS and not line.fatal
-        assert line.message == "0.8.44+cuda (CUDA build), runs on the NVIDIA GPU"
+        assert line.message == "0.8.44+cuda (CUDA build), GGUF pipelines: asks for the NVIDIA GPU (CUDA)"
 
     def test_the_processor_with_its_reason(self, crispasr_pc):
         crispasr_pc["best"] = ("cpu", None)
         line = _crispasr(_crispasr_results())
         assert line.status == CheckStatus.PASS
-        assert line.message == "0.8.44+cuda (CUDA build), runs on the processor (no NVIDIA GPU was found)"
+        assert line.message == ("0.8.44+cuda (CUDA build), GGUF pipelines: CPU (not accelerated): "
+                                "no NVIDIA GPU was found")
 
     def test_the_cpu_build(self, crispasr_pc, monkeypatch):
         crispasr_pc["build"] = ("0.8.44", "cpu")
         monkeypatch.setattr(install.sys, "platform", "win32")
         line = _crispasr(_crispasr_results())
-        assert line.message == "0.8.44 (CPU build), runs on the processor (this install has CrispASR's CPU build)"
+        assert line.message == ("0.8.44 (CPU build), GGUF pipelines: CPU (not accelerated): "
+                                "this install has CrispASR's CPU build")
+
+    def test_the_vulkan_build(self, crispasr_pc, monkeypatch):
+        crispasr_pc["build"] = ("0.8.44+vulkan", "vulkan")
+        monkeypatch.setattr(install.sys, "platform", "win32")
+        line = _crispasr(_crispasr_results())
+        assert line.message == ("0.8.44+vulkan (Vulkan build), GGUF pipelines: asks for the GPU through Vulkan "
+                                "(experimental, not tested)")
 
     def test_not_installed_is_a_warning(self, crispasr_pc, monkeypatch):
         crispasr_pc["installed"] = False
-        monkeypatch.setattr(install, "is_cpu_variant", lambda: False)
         line = _crispasr(_crispasr_results())
         assert line.status == CheckStatus.WARN and not line.fatal
         assert line.message == ("not installed; the CrispASR pipelines cannot run here. Run the WhisperJAV "
                                 "installer again.")
-
-    def test_not_installed_on_the_cpu_variant_says_why(self, crispasr_pc, monkeypatch):
-        crispasr_pc["installed"] = False
-        monkeypatch.setattr(install, "is_cpu_variant", lambda: True)
-        line = _crispasr(_crispasr_results())
-        assert line.status == CheckStatus.WARN and line.message == install.CPU_VARIANT_TEXT
 
     def test_a_processor_without_avx2_is_a_warning(self, crispasr_pc):
         crispasr_pc["avx2"] = False
