@@ -218,7 +218,27 @@ class TestTheStatusPanel:
         result = api.get_crispasr_status("cohere-crispasr", "")
         assert result == {"success": True, "can_run": True, "lines": [
             "Model: Cohere Transcribe ja v0.1 (q8_0) — not downloaded yet (2,424 MB); downloaded when the run starts",
+            # Cohere-CrispASR aligns its text with wav2vec2-ja (item 12)
+            "Aligner: wav2vec2 large XLSR-53 ja (q4_k) — not downloaded yet (232 MB); downloaded the first time "
+            "it is used",
             "GPU: asks for the NVIDIA GPU (CUDA)"]}
+
+    def test_a_chronosjav_pass_shows_its_aligner_and_timing_model(self, api, stubbed):
+        stubbed["downloaded"] = True
+        result = api.get_chronosjav_crispasr_status("crispasr", "qwen3-fa-gguf", "whisper-small",
+                                                    "aligner_vad_fallback")
+        assert result == {"success": True, "can_run": True, "lines": [
+            "Aligner and timing model:",
+            "Aligner: Qwen3-ForcedAligner 0.6B (q4_k) — downloaded",
+            "Timing model: Whisper small — downloaded",
+            "GPU: asks for the NVIDIA GPU (CUDA)"]}
+
+    def test_a_chronosjav_pass_without_crispasr_parts_shows_nothing(self, api, stubbed):
+        assert api.get_chronosjav_crispasr_status("qwen3", "Qwen/Qwen3-ForcedAligner-0.6B", "none",
+                                                  "aligner_vad_fallback")["lines"] == []
+        # vad_only loads no aligner; the timing model still runs
+        lines = api.get_chronosjav_crispasr_status("crispasr", "wav2vec2-ja", "whisper-small", "vad_only")["lines"]
+        assert [line.split(":")[0] for line in lines] == ["Aligner and timing model", "Timing model", "GPU"]
 
     def test_a_downloaded_model_on_the_processor(self, api, stubbed):
         stubbed["downloaded"] = True
@@ -230,7 +250,7 @@ class TestTheStatusPanel:
     def test_apple_metal(self, api, stubbed):
         stubbed["runtime"] = {"device": "metal", "reason": None}
         assert api.get_crispasr_status("parakeet-crispasr")["lines"][1] == \
-            "GPU: asks for the Apple GPU (Metal), not yet tested on a Mac"
+            "GPU: asks for the Apple GPU (Metal), not yet tested on a Mac"   # Parakeet-CrispASR: no aligner
 
     def test_crispasr_that_cannot_run(self, api, stubbed):
         stubbed["runtime"] = {"problem": "CrispASR is not installed in this WhisperJAV. Run the WhisperJAV installer again."}
