@@ -567,12 +567,12 @@ def unsupported_build_message(accelerator: str) -> str:
     if IS_LINUX and accelerator == "cu130":
         return (f"CUDA 13.0 is not offered on Linux in WhisperJAV {version}. "
                 f"Use --accelerator nvidia (CUDA 12.8 on Linux) or --accelerator cpu.")
-    if sys.platform == "darwin" and accelerator in ("cu130", "cu128"):
+    if sys.platform == "darwin" and ACC.get(accelerator).nvidia:
         return "macOS has no CUDA builds. Run without --accelerator; WhisperJAV installs for the Apple GPU."
     if not ACC.installs_pytorch(accelerator):
         return ""  # Own PyTorch: the user's PyTorch, not the lock's
     if not lock_has_pytorch_for_this_pc(accelerator):
-        label = {"cu130": "CUDA 13.0", "cu128": "CUDA 12.8"}.get(accelerator, "CPU")
+        label = ACC.pytorch_build_label(accelerator)
         return (f"PyTorch has no {label} build for this computer ({sys.platform}, "
                 f"{platform_module.machine()}) in WhisperJAV {version}, so it cannot be installed here. "
                 f"Nothing was installed.")
@@ -1062,7 +1062,8 @@ def main():
     log_section("Accelerator")
     cuda_version = choose_accelerator(args, target_env)
     if cuda_version == "stop":
-        log("The installer will now stop. Nothing was installed.")
+        # As the Windows installer says it; T35b and T42c already end with "Nothing was installed."
+        log("The installer will now stop.")
         create_failure_file("Stopped before installing, as chosen")
         sys.exit(1)
     # D3 (owner W57): a build 1.10 does not offer on this PC stops here, before anything
