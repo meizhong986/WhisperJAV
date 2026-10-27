@@ -356,14 +356,9 @@
                                 </div>
                             </div>
 
-                            <!-- Row 3: Accept CPU mode -->
+                            <!-- Row 3: offline mode (1.10.0: the "Accept CPU-only mode" box is gone,
+                                 design 22.5.1 -- each install is made for one accelerator; nothing asks) -->
                             <div class="form-row" id="adv-row-3">
-                                <div class="form-group">
-                                    <label class="checkbox-label" title="The answer to the start-up check: when no usable GPU is found (none present, or the card is not supported by this PyTorch build) a run stops and asks whether to continue on the CPU. The GUI cannot ask, so without this box such a run aborts. Applies to Transcription and Ensemble runs (same as --accept-cpu-mode).">
-                                        <input type="checkbox" id="acceptCpuMode">
-                                        <span>Accept CPU-only mode (proceed on the CPU when the GPU is missing or unsupported)</span>
-                                    </label>
-                                </div>
                                 <div class="form-group">
                                     <label class="checkbox-label" title="Use only the Hugging Face models already downloaded and make no requests to huggingface.co (same as --offline). A model that has not been downloaded fails immediately instead of retrying for minutes. Silero via torch.hub, openai-whisper weights, ModelScope enhancers and NeMo configs are not covered.">
                                         <input type="checkbox" id="offlineMode">
@@ -476,7 +471,7 @@
                                                 <option value="ffmpeg-dsp">Audio Filters...</option>
                                             </optgroup>
                                             <optgroup label="ZipEnhancer (Recommended)">
-                                                <option value="zipenhancer">Torch (GPU)</option>
+                                                <option value="zipenhancer">PyTorch (GPU when available)</option>
                                                 <option value="zipenhancer:onnx" disabled class="coming-soon">ONNX (Coming Soon)</option>
                                             </optgroup>
                                             <optgroup label="BS-RoFormer">
@@ -645,7 +640,7 @@
                                                 <option value="ffmpeg-dsp">Audio Filters...</option>
                                             </optgroup>
                                             <optgroup label="ZipEnhancer (Recommended)">
-                                                <option value="zipenhancer">Torch (GPU)</option>
+                                                <option value="zipenhancer">PyTorch (GPU when available)</option>
                                                 <option value="zipenhancer:onnx" disabled class="coming-soon">ONNX (Coming Soon)</option>
                                             </optgroup>
                                             <optgroup label="BS-RoFormer">
@@ -1182,6 +1177,23 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-primary" onclick="closeAbout()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- A run that did not start, or ended without a run summary (design 22.9.2; owner D-G) -->
+    <div class="modal-overlay" id="runStopModal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h2 id="runStopTitle">The run did not start</h2>
+                <button class="modal-close" onclick="RunStopDialog.close()" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="runStopText"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="runStopCpuBtn" onclick="RunStopDialog.runOnCpu()" style="display: none;">Run on the CPU this time</button>
+                <button class="btn btn-primary" onclick="RunStopDialog.close()">Close</button>
             </div>
         </div>
     </div>
