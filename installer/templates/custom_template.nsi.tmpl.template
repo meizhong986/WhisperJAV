@@ -661,17 +661,25 @@ Function .onInit
     SetRegView {{ BITS }}
 {%- if win64 %}
     ${If} ${IsNativeARM64}
-        # Warn if not running on AMD64, but do not abort since ARM64 can still run
-        # AMD64 programs with emulation.
-        ${Print} "This installer is for the 64-bit AMD (x86_64) version of ${NAME} \
-                  but your system is ARM64. It is recommended to use an installer \
-                  that matches your system's architecture."
-        MessageBox MB_OKCANCEL|MB_ICONEXCLAMATION \
-            "This installer is for the 64-bit AMD (x86_64) version of ${NAME} \
-            but your system is ARM64. It is recommended to use an installer \
-            that matches your system's architecture." \
-            /SD IDOK IDOK +2
-            Abort
+        # WhisperJAV v{{VERSION}} (design 22.1.2, owner W233 R6, W234 D-F): Windows on ARM is not
+        # supported, and is refused here, before anything is unpacked. The owner's form (T65).
+        ${Print} "::error:: WhisperJAV 1.10.0 does not support Windows on ARM. This is due to its \
+                  packages being made for x86-64 Windows only. Nothing was installed."
+        MessageBox MB_OK|MB_ICONSTOP \
+            "WhisperJAV 1.10.0 does not support Windows on ARM. This is due to its packages being \
+            made for x86-64 Windows only. Nothing was installed." \
+            /SD IDOK
+        Abort
+    ${ElseIfNot} ${AtLeastWin10}
+        # WhisperJAV v{{VERSION}} (design 22.1.2; T66): Windows 10 or newer.
+        ${Print} "::error:: WhisperJAV 1.10.0 does not support this version of Windows. This is due \
+                  to Python 3.13, which WhisperJAV 1.10.0 needs: it requires Windows 10 or newer. \
+                  Nothing was installed."
+        MessageBox MB_OK|MB_ICONSTOP \
+            "WhisperJAV 1.10.0 does not support this version of Windows. This is due to Python 3.13, \
+            which WhisperJAV 1.10.0 needs: it requires Windows 10 or newer. Nothing was installed." \
+            /SD IDOK
+        Abort
     ${ElseIfNot} ${RunningX64}
         # If we're a 64-bit installer, make sure it's 64-bit Windows
         ${Print} "::error:: This installer is for a 64-bit version for ${NAME} \
