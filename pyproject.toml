@@ -124,32 +124,43 @@ torch = [
     "torchaudio==2.11.0",
 ]
 
-# v1.10.0 (item 2f): the PyTorch build, exactly one per install. uv.lock holds all
-# three side by side, never mixed ([tool.uv] conflicts); each takes torch and
-# torchaudio from its own index ([tool.uv.sources]).
-# Windows: cu130 (default) or cu128 (the per-PC fallback). Linux: cu128 (owner,
-# W45). CPU: old-card choice 2, no NVIDIA GPU, and macOS.
+# v1.10.0 (item 2f; design section 22, owner W234/W238): one extra per install, never mixed
+# ([tool.uv] conflicts); each takes torch and torchaudio from its own index ([tool.uv.sources]).
+#   cu130   NVIDIA GPU (CUDA 13.0), Windows default
+#   cu128   NVIDIA GPU (CUDA 12.8): the Windows per-PC fallback; Linux (owner, W45)
+#   vulkan  GPU through Vulkan (AMD, Intel or older NVIDIA card), Windows only; also Own PyTorch on
+#           Windows, installed without torch and torchaudio
+#   cpu     CPU only; the Apple GPU (Metal) install on Apple silicon (that index carries the Apple
+#           wheels); Own PyTorch on Linux and Mac, installed without torch and torchaudio
 # v1.10.0 (item 3, owner W78 C2): torchvision left with ClearVoice, its only user.
-# v1.10.0 (route B, owner W176-W178): CrispASR's Python package for Parakeet-CrispASR and
-# Cohere-CrispASR. The CUDA build (+cuda, its own CUDA 12.8 libraries inside) for Windows and Linux
-# x86-64, each wheel pinned by its release URL and SHA-256 (decision record D10; the hashes equal the
-# v0.8.44 release's own digests). CrispASR's wheel index publishes no hashes, so it is not used. The
-# cpu extra has none until CrispASR publishes 0.8.44's CPU wheel on PyPI (CrispASR #556; owner O16).
+# CrispASR's Python package (route B, owner W176-W178), one line per platform in each extra: the
+# CUDA build (+cuda, its own CUDA 12.8 libraries inside) and the Vulkan build (+vulkan) from the
+# v0.8.44 GitHub release, each pinned by URL and SHA-256 (decision record D10; the hashes equal the
+# release's own digests); everywhere else PyPI's build (CPU on Windows and Linux, Metal inside on
+# Apple silicon; owner W217 13, W217 15, W225).
 cu130 = [
     "torch==2.11.0",
     "torchaudio==2.11.0",
     "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-win_amd64.whl#sha256=9be6897bdce3276d8d98253ec2cfd474963fd8b695431fbce988498e97f95e39 ; sys_platform == 'win32' and platform_machine == 'AMD64'",
     "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-manylinux_2_35_x86_64.whl#sha256=1da4ce56f957da29b2d931163fbcddd27eb24e19e8cf2cc9ee3bb0a049ba2c7f ; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "crispasr==0.8.44 ; sys_platform == 'linux' and platform_machine == 'aarch64'",
 ]
 cu128 = [
     "torch==2.11.0",
     "torchaudio==2.11.0",
     "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-win_amd64.whl#sha256=9be6897bdce3276d8d98253ec2cfd474963fd8b695431fbce988498e97f95e39 ; sys_platform == 'win32' and platform_machine == 'AMD64'",
     "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-manylinux_2_35_x86_64.whl#sha256=1da4ce56f957da29b2d931163fbcddd27eb24e19e8cf2cc9ee3bb0a049ba2c7f ; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "crispasr==0.8.44 ; sys_platform == 'linux' and platform_machine == 'aarch64'",
+]
+vulkan = [
+    "torch==2.11.0",
+    "torchaudio==2.11.0",
+    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bvulkan-py3-none-win_amd64.whl#sha256=f6f71430ee379ac728ff6721d9394c54fd2cf67e0d9973e3e11cb63ba4366522 ; sys_platform == 'win32' and platform_machine == 'AMD64'",
 ]
 cpu = [
     "torch==2.11.0",
     "torchaudio==2.11.0",
+    "crispasr==0.8.44 ; (sys_platform == 'win32' and platform_machine == 'AMD64') or (sys_platform == 'linux' and platform_machine == 'x86_64') or (sys_platform == 'linux' and platform_machine == 'aarch64') or (sys_platform == 'darwin' and platform_machine == 'arm64')",
 ]
 
 # CLI audio processing features
@@ -532,7 +543,10 @@ exclude_lines = [
 # extra; never override an index (that re-resolves and rewrites uv.lock):
 #   uv sync --frozen --extra all --extra cu130     (Windows default)
 #   uv sync --frozen --extra all --extra cu128     (Windows fallback; Linux)
+#   uv sync --frozen --extra all --extra vulkan    (Windows, GPU through Vulkan)
 #   uv sync --frozen --extra all --extra cpu
+# Own PyTorch: the platform's extra (Windows vulkan, else cpu) with
+#   --inexact --no-install-package torch --no-install-package torchaudio
 # installer/build_release.py exports the lock once per build to
 # whisperjav/installer/locked/requirements_<variant>.txt (exact versions, no hashes).
 
@@ -540,7 +554,7 @@ exclude_lines = [
 # uv 0.9.26 made this lock and ships in the installer (installer/build_env.yml).
 required-version = ">=0.9.26"
 conflicts = [
-    [{ extra = "cu130" }, { extra = "cu128" }, { extra = "cpu" }],
+    [{ extra = "cu130" }, { extra = "cu128" }, { extra = "vulkan" }, { extra = "cpu" }],
 ]
 
 [[tool.uv.index]]
@@ -564,14 +578,16 @@ explicit = true
 # exports still carried +cu130 for Linux and macOS). Which extra a platform uses
 # is the installers' choice: Windows cu130, or cu128 as the fallback; Linux
 # cu128 (owner, W45); no NVIDIA GPU and macOS cpu (that index carries the Apple
-# Silicon wheels).
+# Silicon wheels); vulkan takes PyTorch's CPU build, as cpu does.
 torch = [
     { index = "pytorch-cu130", extra = "cu130" },
     { index = "pytorch-cu128", extra = "cu128" },
+    { index = "pytorch-cpu", extra = "vulkan" },
     { index = "pytorch-cpu", extra = "cpu" },
 ]
 torchaudio = [
     { index = "pytorch-cu130", extra = "cu130" },
     { index = "pytorch-cu128", extra = "cu128" },
+    { index = "pytorch-cpu", extra = "vulkan" },
     { index = "pytorch-cpu", extra = "cpu" },
 ]
