@@ -13,6 +13,7 @@ from whisperjav.modules.subtitle_pipeline.protocols import TextAligner
 # Registry: name → "module.path.ClassName"
 _REGISTRY: dict[str, str] = {
     "qwen3": "whisperjav.modules.subtitle_pipeline.aligners.qwen3.Qwen3ForcedAlignerAdapter",
+    "crispasr": "whisperjav.modules.subtitle_pipeline.aligners.crispasr.CrispASRAligner",
     "none": "whisperjav.modules.subtitle_pipeline.aligners.none.NoneAligner",
 }
 
