@@ -259,12 +259,10 @@ def resolve_torch_device(requested: Optional[str] = None) -> str:
         # Unknown device string — fall through to auto-detect
         logger.debug(f"Unknown device '{requested}', auto-detecting")
 
-    # Auto-detect: CUDA > MPS > CPU
-    if torch.cuda.is_available():
-        return "cuda"
-    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        return "mps"
-    return "cpu"
+    # Auto-detect: CUDA > MPS > CPU, through the device detector as every other PyTorch part
+    # (design 22.3.1): a card this PyTorch has no code for (#411) is not used (review P7 finding 3).
+    from whisperjav.utils.device_detector import get_best_device
+    return get_best_device()
 
 
 def load_audio_to_array(
