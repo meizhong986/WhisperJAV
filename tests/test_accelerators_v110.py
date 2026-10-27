@@ -138,3 +138,17 @@ def test_the_module_does_not_need_the_package():
     spec.loader.exec_module(module)
     assert module.refusal(system="win32", machine="AMD64", windows_major=10, windows_arm=False,
                           notebook=False) == ""
+
+
+def test_where_the_parts_run_is_written_once_in_the_table():
+    # Design 22.6.8; owner W241 Q1: the run's box, --check and the GUI panel read the table's lines.
+    from whisperjav.installer.core import accelerators as acc
+    from whisperjav.utils import preflight_check as pf
+    from whisperjav.webview_gui.api import WhisperJAVAPI
+    for name in ("NOTICE_MADE_FOR", "NOTICE_NO_RECORD", "NOTICE_GGUF", "NOTICE_OTHERS", "NOTICE_DEVICE_CPU",
+                 "CPU_WHERE", "GGUF_VULKAN_WHERE", "GGUF_METAL_WHERE", "GGUF_CUDA_WHERE", "GGUF_CPU_WHERE",
+                 "GGUF_MISSING_WHERE", "OWN_PYTORCH_WHERE"):
+        assert getattr(pf, name) is getattr(acc, name), name
+    assert pf.CRISPASR_DEVICE_NAMES is acc.CHECK_CRISPASR_DEVICE
+    assert WhisperJAVAPI.CRISPASR_RUNS_ON is acc.GUI_CRISPASR_RUNS_ON
+    assert WhisperJAVAPI.CRISPASR_RUNS_ON_CPU is acc.GUI_CRISPASR_RUNS_ON_CPU
