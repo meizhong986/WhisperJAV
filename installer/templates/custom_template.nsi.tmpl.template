@@ -151,6 +151,9 @@ var /global ARGV
 var /global ARGV_Help
 var /global ARGV_InstallationType
 var /global ARGV_AddToPath
+# WhisperJAV 1.10.0 (design 22.6.6, owner W242 1): "1" when the install record of a replaced
+# installation was kept aside, to be put back before post_install reads it.
+var /global WJ_KeptStack
 var /global ARGV_KeepPkgCache
 {%- if has_python %}
 var /global ARGV_RegisterPython
@@ -1186,6 +1189,18 @@ Function RemoveExistingWhisperJAV
     Push $0
     Push $1
 
+    # Step 0 (1.10.0, design 22.6.6, owner W242 1): keep the install record aside. The folder is
+    # removed below, and without the record post_install would treat this run as a first install:
+    # no second-run window, and on a PC with a supported NVIDIA GPU no choice at all.
+    StrCpy $WJ_KeptStack "0"
+    ${If} ${FileExists} "$INSTDIR\whisperjav_stack.txt"
+        CopyFiles /SILENT "$INSTDIR\whisperjav_stack.txt" "$PLUGINSDIR\whisperjav_stack_kept.txt"
+        ${If} ${FileExists} "$PLUGINSDIR\whisperjav_stack_kept.txt"
+            StrCpy $WJ_KeptStack "1"
+            ${Print} "Install record kept aside for the new installation"
+        ${EndIf}
+    ${EndIf}
+
     # Step 1: Run uninstaller if it exists (use Windows API for reliable check)
     StrCpy $1 "$INSTDIR\Uninstall-WhisperJAV.exe"
     System::Call 'kernel32::GetFileAttributesW(t r1)i.r0'
@@ -1913,6 +1928,13 @@ Section "Install"
         CreateDirectory "$R0"
     ${EndIf}
 {%- endif %}
+
+    # 1.10.0 (design 22.6.6, owner W242 1): the record of a replaced installation goes back before
+    # post_install reads it, so its second-run window offers the recorded accelerator.
+    ${If} $WJ_KeptStack == "1"
+        CopyFiles /SILENT "$PLUGINSDIR\whisperjav_stack_kept.txt" "$INSTDIR\whisperjav_stack.txt"
+        ${Print} "Install record of the replaced installation put back"
+    ${EndIf}
 
     ${If} ${FileExists} "$INSTDIR\pkgs\post_install.bat"
         ${If} $Ana_PostInstall_State = ${BST_CHECKED}
