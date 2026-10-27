@@ -1527,12 +1527,19 @@ def _build_pipeline(
             pass_number, _scene_method,
         )
 
+    # --device governs this pass as every other (design 22.3.1, 22.13 detail 15): --device cpu
+    # is absolute; otherwise the pass's Customize Device stands. Taken out of the Customize
+    # values here so apply_custom_params cannot put it back over --device cpu (review P7 finding 2),
+    # and given to the resolver so the CTranslate2 rule and the compute type follow it.
+    custom_params = dict(pass_config.get("params") or {})
+    legacy_device = pass_device(pass_config.get("device"), custom_params.pop("device", None))
+
     resolved_config = resolve_legacy_pipeline(
         pipeline_name=pipeline_name,
         sensitivity=pass_config.get("sensitivity", "balanced"),
         task=asr_task,  # Derived from subs_language above
         overrides=pass_config.get("overrides"),
-        device=pass_config.get("device"),  # None = auto-detect
+        device=legacy_device,  # "auto" = auto-detect
         compute_type=pass_config.get("compute_type"),  # None = auto
         scene_method=_scene_method,
     )
@@ -1549,10 +1556,10 @@ def _build_pipeline(
     # Apply GUI-specified overrides for legacy pipelines
     _apply_gui_overrides(resolved_config, pass_config, pass_number)
 
-    if pass_config.get("params"):
+    if custom_params:
         unknown_params = apply_custom_params(
             resolved_config=resolved_config,
-            custom_params=pass_config["params"],
+            custom_params=custom_params,
             pass_number=pass_number,
             pipeline_name=pipeline_name,
         )
