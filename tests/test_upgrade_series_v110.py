@@ -68,13 +68,30 @@ def test_default_source_is_no_longer_main(monkeypatch):
     assert "@main" not in upgrade.GITHUB_GIT_URL
 
 
-@pytest.mark.parametrize("recorded", ["cu130", "cu128", "cpu"])
+@pytest.mark.parametrize("recorded", ["cu130", "cu128", "vulkan", "own-pytorch", "cpu"])
 def test_source_install_keeps_the_recorded_stack(monkeypatch, recorded):
-    monkeypatch.setattr(upgrade, "read_installed_stack", lambda install_dir=None: recorded)
+    monkeypatch.setattr(upgrade._acc, "read_record", lambda prefix=None: (True, recorded))
     monkeypatch.setattr(upgrade.sys, "platform", "win32")
     monkeypatch.setattr(upgrade.subprocess, "run",
                         lambda *a, **k: pytest.fail("the recorded stack is used, nothing is detected"))
     assert upgrade._detect_cuda_for_source() == recorded
+
+
+def test_on_a_mac_the_record_comes_first(monkeypatch):
+    # design 22.6.7: an Own PyTorch install on a Mac stays one (review finding of version 1).
+    monkeypatch.setattr(upgrade._acc, "read_record", lambda prefix=None: (True, "own-pytorch"))
+    monkeypatch.setattr(upgrade.sys, "platform", "darwin")
+    monkeypatch.setattr(upgrade.platform, "machine", lambda: "arm64")
+    assert upgrade._detect_cuda_for_source() == "own-pytorch"
+
+
+def test_a_record_this_release_does_not_know_stops_the_upgrade(monkeypatch, tmp_path):
+    monkeypatch.setattr(upgrade._acc, "read_record", lambda prefix=None: (True, None))
+    monkeypatch.setattr(upgrade.subprocess, "run",
+                        lambda *a, **k: pytest.fail("an unknown record must not fall back to detection"))
+    assert upgrade._detect_cuda_for_source() == "unknown"
+    message = upgrade.unsupported_source_build_message(tmp_path, "unknown")
+    assert "not one WhisperJAV" in message and "Nothing was changed." in message
 
 
 def test_stack_file_round_trip(tmp_path):
@@ -131,7 +148,7 @@ def test_a_removed_cublas12_package_is_installed_again_before_placing(monkeypatc
 @pytest.mark.parametrize("platform_name, expected", [("linux", "cu128"), ("win32", "cu130")])
 def test_without_a_record_linux_gets_cuda_12_8(monkeypatch, platform_name, expected):
     """Owner, W45: Linux stays on CUDA 12.8 for 1.10.0."""
-    monkeypatch.setattr(upgrade, "read_installed_stack", lambda install_dir=None: None)
+    monkeypatch.setattr(upgrade._acc, "read_record", lambda prefix=None: (False, None))
     monkeypatch.setattr(upgrade.sys, "platform", platform_name)
 
     class R:
