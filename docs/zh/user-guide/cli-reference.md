@@ -40,6 +40,17 @@ whisperjav [OPTIONS] INPUT [INPUT...]
 | `--pass2-pipeline` | （无） | 第二通道的处理管线；指定它即启用第二通道 |
 | `--merge-strategy` | `pass1_primary` | 合并策略：`pass1_primary`、`pass2_primary`、`smart_merge`、`full_merge`、`pass1_overlap`、`pass2_overlap`、`longest` |
 
+### ChronosJAV 时间选项（`--mode qwen`）
+
+| 选项 | 默认值 | 说明 |
+|------|--------|------|
+| `--qwen-aligner` | `wav2vec2-ja` | 为 ASR 模型的文字标出时间的对齐器：`wav2vec2-ja`（232 MB）、`qwen3-fa-gguf`（529 MB）、`parakeet-ctc-ja`（不推荐：在我们的测试中它给出的时间是均匀分布的），均由 CrispASR 运行；或 PyTorch 模型 ID，例如 `Qwen/Qwen3-ForcedAligner-0.6B` |
+| `--qwen-timestamp-mode` | `aligner_vad_fallback` | 默认：对齐器为文字标出时间；它无法标出时间的 VAD 组保留语音分割器给出的时间。`vad_only` 不加载对齐器：每条字幕采用其 VAD 组的时间（时间模型仍可能移动开始时间） |
+| `--qwen-timing-model` | `whisper-small` | Whisper small（488 MB；不使用它写出的文字）把每条字幕的开始时间往后移到语音开始处，并在新句子开始处附近的标点或空格处切分 VAD 组。`none` 关闭它 |
+| `--qwen-stepdown` | 关闭 | 用最长 6 秒的 VAD 组重新处理对齐坍塌的场景。关闭时（默认），这样的场景采用其 VAD 组的时间 |
+
+对齐器和时间模型是 1.10.0 新增的，第一次使用时下载，在本安装的 CrispASR 运行的地方运行；`--device cpu` 不能把它们限制在 CPU 上。见[字幕时间](../pipelines/chronosjav.md#subtitle-timing-1100)。在集成模式的通道中，把它们写在 `--pass1-qwen-params` 里，例如 `'{"aligner_id": "qwen3-fa-gguf", "timing_model": "none"}'`。
+
 ### 处理选项
 
 | 选项 | 默认值 | 描述 |
@@ -70,6 +81,9 @@ whisperjav video.mp4 --output-dir ./subtitles/
 
 # 这次在 CPU 上运行（不加速）
 whisperjav video.mp4 --mode faster --device cpu
+
+# 不使用时间模型的 ChronosJAV
+whisperjav video.mp4 --mode qwen --qwen-timing-model none
 
 # Parakeet-CrispASR 作为一个集成模式通道
 whisperjav video.mp4 --ensemble --pass1-pipeline parakeet-crispasr
