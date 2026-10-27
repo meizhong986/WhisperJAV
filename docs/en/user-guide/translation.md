@@ -9,7 +9,6 @@ WhisperJAV can translate Japanese subtitles to other languages using AI language
 | Provider | Type | API Key Required | Best For |
 |----------|------|-----------------|----------|
 | **Ollama** | Local | No | Privacy, no cost, easy setup. Recommended for local use. |
-| **Local LLM** | Local | No | Legacy local option (llama-cpp). Consider Ollama instead. |
 | **DeepSeek** | Cloud | Yes | Cost-effective, good CJK quality |
 | **Gemini** | Cloud | Yes | Good multilingual support |
 | **Claude** | Cloud | Yes | High quality |
@@ -57,16 +56,9 @@ OllamaManager auto-starts the server, detects your GPU, and recommends a model:
 | 12 GB | gemma3:12b |
 | 16 GB+ | qwen2.5:14b |
 
-### Local LLM (Legacy)
+### Local translation with llama-cpp: removed in 1.10
 
-The Local provider runs a llama-cpp server on your machine. No API key needed, but requires:
-
-- A GPU with ~8GB VRAM
-- The `[llm]` extra installed (`pip install whisperjav[llm]`)
-- A GGUF model file (downloaded automatically on first use)
-
-!!! note
-    Consider switching to Ollama — it's easier to set up, more reliable, and supports more models.
+The `local` (llama-cpp) provider was removed in WhisperJAV 1.10. Ollama is the local translator. A saved llama-cpp choice opens as Ollama; `--provider local` stops with a message pointing to `--provider ollama`.
 
 ---
 
@@ -125,7 +117,7 @@ WhisperJAV auto-adjusts the batch size based on context window size, but you can
 
 ```bash
 # CLI: set batch size explicitly
-whisperjav-translate -i subtitles.srt --provider local --max-batch-size 10
+whisperjav-translate -i subtitles.srt --provider ollama --max-batch-size 10
 
 # Or configure it persistently
 whisperjav-translate --configure
@@ -163,6 +155,6 @@ whisperjav-translate -i subtitles.srt --target-language portuguese
 # Translate to Chinese
 whisperjav-translate -i subtitles.srt --target-language Chinese
 
-# Local LLM with reduced batch size (for 8K context models)
-whisperjav-translate -i subtitles.srt --provider local --max-batch-size 10
+# Ollama with reduced batch size (for 8K context models)
+whisperjav-translate -i subtitles.srt --provider ollama --max-batch-size 10
 ```
