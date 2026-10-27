@@ -155,6 +155,20 @@ def test_an_old_card_offers_the_accelerators_and_stops_without_a_console(monkeyp
     assert ins.gpu_support_gate(old) == "stop"
 
 
+def test_a_chosen_stop_is_a_stop_on_purpose_and_a_stop_without_a_console_is_not(monkeypatch):
+    # W241 Q3: Stop typed -> exit 0, no failure file (as the Windows installer); no console -> exit 1.
+    ins = _load(monkeypatch, "win32")
+    _no_gpu(ins, monkeypatch)
+    _answers(monkeypatch, "6")
+    assert ins.choose_accelerator(_args()) == "stop" and ins._ANSWER_TYPED is True
+    old = types.SimpleNamespace(name="NVIDIA GeForce GTX 1060", compute_capability=(6, 1), driver_version=(580, 0, 0))
+    monkeypatch.setattr("builtins.input", lambda *a: (_ for _ in ()).throw(EOFError()))
+    assert ins.gpu_support_gate(old) == "stop" and ins._ANSWER_TYPED is False
+    src = (REPO / "install.py").read_text(encoding="utf-8")
+    stop = src[src.index('if cuda_version == "stop":'):src.index("unsupported = unsupported_build_message(")]
+    assert stop.index("if _ANSWER_TYPED:") < stop.index("sys.exit(0)") < stop.index("create_failure_file(")
+
+
 # --- the lock extra and Own PyTorch's uv sync ------------------------------------------------
 
 def _sync_cmd(ins, monkeypatch, accelerator, target_env=None, is_external=False):
