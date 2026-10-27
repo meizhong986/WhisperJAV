@@ -17,9 +17,9 @@ whisperjav [OPTIONS] INPUT [INPUT...]
 | Option | Default | Description |
 |--------|---------|-------------|
 | `INPUT` | (required) | One or more video/audio file paths |
-| `--mode` | `balanced` | Pipeline: `balanced`, `fast`, `faster`, `fidelity`, `transformers` |
+| `--mode` | `balanced` | Pipeline: `balanced`, `fast`, `faster`, `fidelity`, `transformers`, `qwen` |
 | `--sensitivity` | `aggressive` | Detection sensitivity: `aggressive`, `balanced`, `conservative` |
-| `--language` | `ja` | Source language code (`ja`, `ko`, `zh`, `en`) |
+| `--language` | `japanese` | Source audio language: `japanese`, `korean`, `chinese`, `english` |
 | `--output-dir` | Same as source | Directory for output SRT files |
 | `--output-format` | `srt` | Output format: `srt`, `vtt`, `both` |
 
@@ -36,16 +36,16 @@ whisperjav [OPTIONS] INPUT [INPUT...]
 |--------|---------|-------------|
 | `--ensemble` | Off | Enable ensemble mode |
 | `--ensemble-serial` | Off | Complete each file fully before starting the next |
-| `--pass1-pipeline` | `balanced` | Pipeline for first pass |
-| `--pass2-pipeline` | `qwen` | Pipeline for second pass |
-| `--merge-strategy` | `smart` | Merge strategy: `pass1_primary`, `smart`, `full`, `pass2_primary`, `longest` |
+| `--pass1-pipeline` | `balanced` | Pipeline for first pass; also `parakeet-crispasr`, `cohere-crispasr` (GGUF, see [Parakeet-CrispASR and Cohere-CrispASR](../pipelines/crispasr.md)) |
+| `--pass2-pipeline` | (none) | Pipeline for second pass; giving it turns pass 2 on |
+| `--merge-strategy` | `pass1_primary` | Merge strategy: `pass1_primary`, `pass2_primary`, `smart_merge`, `full_merge`, `pass1_overlap`, `pass2_overlap`, `longest` |
 
 ### Processing Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--accept-cpu-mode` | Off | Continue on the CPU when no usable GPU is found. Without it, the start-up check stops and asks (and aborts where nobody can answer). `--device cpu` counts as the same answer. |
-| `--async` | Off | Enable async processing |
+| `--device` | `auto` | Where this run's ASR and other models run, for every pipeline. `auto` = as the install is made for: its GPU when it can be used, else the CPU (not accelerated); `cpu` = this run on the CPU; `cuda` = an NVIDIA GPU is required. See [Accelerated or not](../getting-started/index.md#accelerated-or-not). |
+| `--async-processing` | Off | Enable async processing |
 | `--temp-dir` | System temp | Custom directory for temporary files |
 | `--keep-temp` | Off | Keep intermediate files |
 | `--debug` | Off | Enable debug logging |
@@ -60,7 +60,7 @@ whisperjav video.mp4
 whisperjav video.mp4 --mode faster --sensitivity conservative
 
 # Ensemble with serial mode
-whisperjav *.mp4 --ensemble --ensemble-serial --merge-strategy smart
+whisperjav *.mp4 --ensemble --ensemble-serial --merge-strategy smart_merge
 
 # VTT output
 whisperjav video.mp4 --output-format vtt
@@ -68,9 +68,27 @@ whisperjav video.mp4 --output-format vtt
 # Custom output directory
 whisperjav video.mp4 --output-dir ./subtitles/
 
-# CPU-only mode
-whisperjav video.mp4 --mode faster --cpu-only
+# This run on the CPU (not accelerated)
+whisperjav video.mp4 --mode faster --device cpu
+
+# Parakeet-CrispASR as one Ensemble pass
+whisperjav video.mp4 --ensemble --pass1-pipeline parakeet-crispasr
+
+# Check the install: accelerator, where each part runs, models
+whisperjav --check
 ```
+
+### When a run does not start
+
+| Exit status | Meaning |
+|---|---|
+| 0 | the run finished |
+| 1 | the run finished, and at least one file failed (or is in a state named by `--fail-on`) |
+| 2 | the run did not start: a setting it cannot use (the message says which) |
+| 3 | the run did not start: the install is made for the NVIDIA GPU, and the GPU cannot be used now. The box names the reason and the fix; `--device cpu` runs the job on the CPU this time |
+| 4 | the run did not start: PyTorch is missing or damaged (on an Own PyTorch install: not yet added). The message gives the command that fixes it |
+
+When the install's GPU can be used (an NVIDIA GPU or Apple GPU install), nothing is shown at the start of a run. On every other install, a box says where each part runs on this computer; the run then goes on. `--hf-device` and `--qwen-device` from earlier releases still work as other names for `--device`.
 
 ---
 
