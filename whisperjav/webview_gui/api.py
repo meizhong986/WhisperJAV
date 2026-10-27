@@ -7,6 +7,7 @@ Completely decoupled from UI - can be tested standalone.
 """
 
 import json
+import collections
 import os
 import sys
 import time
@@ -15,7 +16,7 @@ import threading
 import subprocess
 import webbrowser
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 import webview
 from webview import FileDialog
 
@@ -63,6 +64,29 @@ def _compute_default_output_dir() -> Path:
 DEFAULT_OUTPUT = _compute_default_output_dir()
 
 
+# Exit statuses of a run that did not start, so nothing was processed (design 22.5.4, 22.9.2):
+# 2 an argument error, 3 this install's NVIDIA GPU cannot be used (the GUI offers "Run on the
+# CPU this time"), 4 PyTorch missing.
+EXIT_NVIDIA_UNUSABLE = 3
+RUN_DID_NOT_START_STATUSES = (2, 3, 4)
+
+
+def _with_device_cpu(args: List[str]) -> List[str]:
+    """The same command with --device cpu (and no other --device): every part on the CPU."""
+    out, skip = [], False
+    for a in args:
+        if skip:
+            skip = False
+            continue
+        if a == "--device":
+            skip = True
+            continue
+        if a.startswith("--device="):
+            continue
+        out.append(a)
+    return out + ["--device", "cpu"]
+
+
 class WhisperJAVAPI:
     """
     API class exposed to JavaScript via PyWebView.
@@ -98,6 +122,9 @@ class WhisperJAVAPI:
         self._run_options: Dict[str, Any] = {}
         self._process_started_at: float = 0.0
         self._run_summary: Optional[Dict[str, Any]] = None
+        # The last run started (which start method, with which options), for "Run on the CPU
+        # this time" (design 22.9.2, D-G).
+        self._last_start: Optional[Tuple[str, Dict[str, Any]]] = None
 
     def _output_dir(self, options: Dict[str, Any]) -> Any:
         """
@@ -208,10 +235,6 @@ class WhisperJAVAPI:
         if options.get('offline_mode', False):
             args += ["--offline"]
 
-        # #411: the answer to the start-up check's proceed-or-abort question (shared box).
-        if options.get('accept_cpu_mode', False) and "--accept-cpu-mode" not in args:
-            args += ["--accept-cpu-mode"]
-
         # v1.9.2 (CFF1): recogniser refresh budget in minutes of scene audio (0 = never).
         _mr = options.get('model_refresh_audio_minutes')
         if _mr not in (None, ''):
@@ -265,10 +288,6 @@ class WhisperJAVAPI:
         if credit:
             args += ["--credit", credit]
 
-        # Accept CPU mode (skip GPU warning)
-        if options.get('accept_cpu_mode', False):
-            args += ["--accept-cpu-mode"]
-
         return args
 
     def _build_transformers_args(self, args: List[str], options: Dict[str, Any]) -> List[str]:
@@ -294,9 +313,11 @@ class WhisperJAVAPI:
         output_dir = self._output_dir(options)
         args += ["--output-dir", output_dir]
 
-        # Device is always passed (essential arg)
+        # --device governs every pipeline (design 22.3.1, owner W237 1); auto is the default,
+        # so only another choice is passed.
         hf_device = options.get('hf_device', 'auto')
-        args += ["--hf-device", str(hf_device)]
+        if hf_device and hf_device != 'auto':
+            args += ["--device", str(hf_device)]
 
         # Check if user explicitly customized parameters
         is_customized = options.get('hf_customized', False)
@@ -362,9 +383,6 @@ class WhisperJAVAPI:
         if output_format and output_format != 'srt':
             args += ["--output-format", output_format]
 
-        if options.get('accept_cpu_mode', False):
-            args += ["--accept-cpu-mode"]
-
         return args
 
     def _compute_expected_outputs(self, options: Dict[str, Any], is_ensemble: bool = False) -> List[str]:
@@ -422,6 +440,14 @@ class WhisperJAVAPI:
 
         return expected_files
 
+    def rerun_on_cpu(self) -> Dict[str, Any]:
+        """ "Run on the CPU this time" (design 22.9.2, D-G): the last run again, with --device cpu,
+        after it stopped because this install's NVIDIA GPU cannot be used (exit status 3)."""
+        if not self._last_start:
+            return {"success": False, "message": "There is no run to start again."}
+        method, options = self._last_start
+        return getattr(self, method)({**options, "run_on_cpu": True})
+
     def start_process(self, options: Dict[str, Any]) -> Dict[str, Any]:
         """
         Start WhisperJAV subprocess with given options.
@@ -448,6 +474,9 @@ class WhisperJAVAPI:
             # Build arguments
             self._run_options = dict(options)
             args = self.build_args(options)
+            if options.get('run_on_cpu'):  # "Run on the CPU this time" (design 22.9.2, D-G)
+                args = _with_device_cpu(args)
+            self._last_start = ("start_process", dict(options))
 
             # Compute expected output files for post-completion use (e.g., translation)
             self._expected_output_files = self._compute_expected_outputs(options)
@@ -458,9 +487,6 @@ class WhisperJAVAPI:
             # Force UTF-8 stdio in the child so logging can print ✓ and JP chars
             env = os.environ.copy()
             env["PYTHONUTF8"] = "1"
-            # The child has no console a person can answer on; the start-up check
-            # must abort and say how to answer instead of waiting for input (#411).
-            env["WHISPERJAV_NO_CONSOLE"] = "1"
             env["PYTHONIOENCODING"] = "utf-8:replace"
 
             # Log command for debugging
@@ -618,6 +644,9 @@ class WhisperJAVAPI:
             "has_logs": not self.log_queue.empty(),
             "run_summary": self._run_summary if self.status in ("completed", "error") else None,
         }
+        # A run that ended without a run summary: the reason it printed, for the dialog (22.9.2).
+        if self.status == "error" and self._run_summary is None:
+            result["reason"] = self._stop_reason()
 
         # Include output files when completed (for post-processing like translation)
         if self.status == "completed" and self._expected_output_files:
@@ -695,7 +724,9 @@ class WhisperJAVAPI:
         if s is None:
             if code == 0:
                 return f"[FINISHED] exit status {code} (no run summary was written)"
-            return f"[FINISHED WITH FAILURES] exit status {code} (no run summary was written)"
+            if code in RUN_DID_NOT_START_STATUSES:
+                return f"[DID NOT START] exit status {code}"
+            return f"[ENDED WITHOUT RUN SUMMARY] exit status {code}"
         if s.get("note"):
             return f"[STOPPED] {s['note']} — {s['tally']} (exit status {code})"
         if code == 0:
@@ -709,16 +740,36 @@ class WhisperJAVAPI:
 
         This runs in a separate thread to avoid blocking the main thread.
         """
+        self._output_tail = collections.deque(maxlen=80)
         try:
             if self.process and self.process.stdout:
                 for line in self.process.stdout:
                     self.log_queue.put(line)
+                    self._output_tail.append(line)
         except Exception as e:
             self.log_queue.put(f"\n[ERROR] Log streaming error: {e}\n")
         finally:
             # Process has finished
             if self.process:
                 self.process.wait()
+
+    def _stop_reason(self) -> str:
+        """What a run that ended without a run summary printed last: the text of its last box
+        (the start-up stop, T41), the text between its last two rules of '=' (PyTorch missing,
+        T42), or its last lines. For the GUI's dialog (design 22.9.2)."""
+        lines = [l.rstrip("\n") for l in getattr(self, "_output_tail", [])]
+        tops = [i for i, l in enumerate(lines) if "╔" in l]
+        if tops:
+            box = []
+            for l in lines[tops[-1] + 1:]:
+                if "╚" in l:
+                    break
+                box.append(l.replace("║", " ").strip())
+            return " ".join(" ".join(box).split())
+        rules = [i for i, l in enumerate(lines) if l.strip() and set(l.strip()) == {"="} and len(l.strip()) >= 40]
+        if len(rules) >= 2:
+            return " ".join(l.strip() for l in lines[rules[-2] + 1:rules[-1]] if l.strip())
+        return " ".join(l.strip() for l in lines[-5:] if l.strip())
 
     def get_logs(self) -> List[str]:
         """
@@ -1412,9 +1463,9 @@ class WhisperJAVAPI:
                         "type": "dropdown",
                         "label": "Device",
                         "options": [
-                            {"value": "auto", "label": "Auto"},
-                            {"value": "cuda", "label": "CUDA"},
-                            {"value": "cpu", "label": "CPU"},
+                            {"value": "auto", "label": "Auto (the GPU when one can be used, else the CPU)"},
+                            {"value": "cuda", "label": "NVIDIA GPU (CUDA)"},
+                            {"value": "cpu", "label": "CPU (not accelerated)"},
                         ],
                         "default": "auto",
                     },
@@ -1444,9 +1495,9 @@ class WhisperJAVAPI:
                         "type": "dropdown",
                         "label": "Device",
                         "options": [
-                            {"value": "auto", "label": "Auto"},
-                            {"value": "cuda", "label": "CUDA"},
-                            {"value": "cpu", "label": "CPU"},
+                            {"value": "auto", "label": "Auto (the GPU when one can be used, else the CPU)"},
+                            {"value": "cuda", "label": "NVIDIA GPU (CUDA)"},
+                            {"value": "cpu", "label": "CPU (not accelerated)"},
                         ],
                         "default": "auto",
                     },
@@ -1730,6 +1781,9 @@ class WhisperJAVAPI:
             # Build ensemble-specific arguments
             self._run_options = dict(options)
             args = self._build_ensemble_args(options)
+            if options.get('run_on_cpu'):  # "Run on the CPU this time" (design 22.9.2, D-G)
+                args = _with_device_cpu(args)
+            self._last_start = ("start_ensemble_process", dict(options))
 
             # Construct command
             cmd = [sys.executable, "-X", "utf8", "-m", "whisperjav.main", *args]
@@ -1737,9 +1791,6 @@ class WhisperJAVAPI:
             # Force UTF-8 stdio
             env = os.environ.copy()
             env["PYTHONUTF8"] = "1"
-            # The child has no console a person can answer on; the start-up check
-            # must abort and say how to answer instead of waiting for input (#411).
-            env["WHISPERJAV_NO_CONSOLE"] = "1"
             env["PYTHONIOENCODING"] = "utf-8:replace"
 
             # Log command
@@ -1865,10 +1916,6 @@ class WhisperJAVAPI:
         if options.get('offline_mode', False):
             args += ["--offline"]
 
-        # #411: the answer to the start-up check's proceed-or-abort question (shared box).
-        if options.get('accept_cpu_mode', False) and "--accept-cpu-mode" not in args:
-            args += ["--accept-cpu-mode"]
-
         # v1.9.2 (CFF1): recogniser refresh budget in minutes of scene audio (0 = never).
         _mr = options.get('model_refresh_audio_minutes')
         if _mr not in (None, ''):
@@ -1972,9 +2019,9 @@ class WhisperJAVAPI:
                         "type": "dropdown",
                         "label": "Device",
                         "options": [
-                            {"value": "auto", "label": "Auto (detect GPU)"},
-                            {"value": "cuda", "label": "CUDA (GPU)"},
-                            {"value": "cpu", "label": "CPU"},
+                            {"value": "auto", "label": "Auto (the GPU when one can be used, else the CPU)"},
+                            {"value": "cuda", "label": "NVIDIA GPU (CUDA)"},
+                            {"value": "cpu", "label": "CPU (not accelerated)"},
                         ],
                         "default": "auto"
                     },
@@ -2220,9 +2267,9 @@ class WhisperJAVAPI:
                         "label": "Device",
                         "group": "hardware",
                         "options": [
-                            {"value": "auto", "label": "Auto (detect GPU)"},
-                            {"value": "cuda", "label": "CUDA (GPU)"},
-                            {"value": "cpu", "label": "CPU"},
+                            {"value": "auto", "label": "Auto (the GPU when one can be used, else the CPU)"},
+                            {"value": "cuda", "label": "NVIDIA GPU (CUDA)"},
+                            {"value": "cpu", "label": "CPU (not accelerated)"},
                         ],
                         "default": "auto",
                     },
@@ -2559,9 +2606,9 @@ class WhisperJAVAPI:
                         "label": "Device",
                         "group": "hardware",
                         "options": [
-                            {"value": "auto", "label": "Auto (detect GPU)"},
-                            {"value": "cuda", "label": "CUDA (GPU)"},
-                            {"value": "cpu", "label": "CPU"},
+                            {"value": "auto", "label": "Auto (the GPU when one can be used, else the CPU)"},
+                            {"value": "cuda", "label": "NVIDIA GPU (CUDA)"},
+                            {"value": "cpu", "label": "CPU (not accelerated)"},
                         ],
                         "default": "auto",
                     },
@@ -2736,6 +2783,31 @@ class WhisperJAVAPI:
                 "error": str(e)
             }
 
+    def get_crispasr_customize_defaults(self, pipeline: str, sensitivity: str, segmenter: str = None,
+                                        scene_detector: str = None) -> Dict[str, Any]:
+        """The values a CrispASR pass runs with, for its Customize window (design 22.9.1; owner W214 2,
+        W232 8): the Segmenter tab as segmenter_settings() resolves them, the Scene tab as the pipeline
+        sets its scene detector (semantic 12-48 s; auditok and silero their own minimum and 48 s).
+        Light: no PyTorch, no CrispASR."""
+        try:
+            from whisperjav.crispasr.pass_settings import segmenter_settings
+            settings = segmenter_settings(pipeline, (segmenter or None), sensitivity or None)
+            seg = dict(settings.config)
+            if settings.max_group_duration_s is not None:
+                seg["max_group_duration_s"] = settings.max_group_duration_s
+            if settings.chunk_threshold_s is not None:
+                seg["chunk_threshold_s"] = settings.chunk_threshold_s
+            method = (scene_detector or "semantic").strip().lower()
+            scene: Dict[str, Any] = {}
+            if method == "semantic":
+                scene = {"min_duration": 12, "max_duration": 48}
+            elif method in ("auditok", "silero"):
+                scene = {"max_duration_s": 48}
+            return {"success": True, "segmenter_backend": settings.backend, "segmenter": seg,
+                    "scene_detection_method": method, "scene": scene}
+        except Exception as e:  # noqa: BLE001 -- the window says what failed
+            return {"success": False, "error": str(e)}
+
     def get_merge_strategies(self) -> Dict[str, Any]:
         """
         Get available merge strategies for two-pass ensemble.
@@ -2791,6 +2863,9 @@ class WhisperJAVAPI:
             # Build CLI arguments for two-pass ensemble
             self._run_options = dict(config)
             args = self._build_twopass_args(config)
+            if config.get('run_on_cpu'):  # "Run on the CPU this time" (design 22.9.2, D-G)
+                args = _with_device_cpu(args)
+            self._last_start = ("start_ensemble_twopass", dict(config))
 
             # Compute expected output files for post-completion use (e.g., translation)
             self._expected_output_files = self._compute_expected_outputs(config, is_ensemble=True)
@@ -2801,9 +2876,6 @@ class WhisperJAVAPI:
             # Force UTF-8 stdio
             env = os.environ.copy()
             env["PYTHONUTF8"] = "1"
-            # The child has no console a person can answer on; the start-up check
-            # must abort and say how to answer instead of waiting for input (#411).
-            env["WHISPERJAV_NO_CONSOLE"] = "1"
             env["PYTHONIOENCODING"] = "utf-8:replace"
 
             # Log command
@@ -2860,8 +2932,12 @@ class WhisperJAVAPI:
     # The CrispASR status panel under a pass row (owner W133 2; route B design 12, T16).
     CRISPASR_MODEL_DOWNLOADED = "Model: {label} — downloaded"
     CRISPASR_MODEL_MISSING = "Model: {label} — not downloaded yet ({size}); downloaded when the run starts"
-    CRISPASR_RUNS_ON = {"cuda": "Runs on: NVIDIA GPU", "metal": "Runs on: Apple GPU (Metal), not yet tested on a Mac"}
-    CRISPASR_RUNS_ON_CPU = "Runs on: processor (slower): {reason}"
+    # T16 (design 22.10).
+    CRISPASR_RUNS_ON = {"cuda": "GPU: asks for the NVIDIA GPU (CUDA)",
+                        "metal": "GPU: asks for the Apple GPU (Metal), not yet tested on a Mac",
+                        "vulkan": ("GPU: asks for this PC's GPU through Vulkan (AMD, Intel or older NVIDIA card; "
+                                   "experimental, not tested)")}
+    CRISPASR_RUNS_ON_CPU = "CPU (not accelerated), several times slower: {reason}"
     CRISPASR_CANNOT_RUN = "CrispASR cannot run here: {reason}"
     # Asked in a child process: the device check loads PyTorch, which the GUI process never loads.
     _CRISPASR_RUNTIME_PROBE = (
@@ -2914,12 +2990,16 @@ class WhisperJAVAPI:
 
     @staticmethod
     def _crispasr_pass_args(n: int, pass_config: Dict[str, Any]) -> List[str]:
-        """--passN-sensitivity, --passN-speech-segmenter and --passN-model for a CrispASR pass.
+        """The pass settings of a CrispASR pass: sensitivity, speech segmenter, model, and since design
+        22.9.1 (owner W212 D3, W214 2, W232 8) the scene detector, the speech enhancer, Enhance for VAD
+        only and the Customize values (Segmenter, Enhancer and Scene tabs).
 
         A value left out is not sent: main.py and the pass worker then use the pipeline's own
-        default (balanced; its default speech segmenter; its default model). "none" is never sent as the
-        segmenter: the CrispASR pipelines need one, and main.py would stop the run (exit 2).
+        default (balanced; its default speech segmenter; its default model; semantic scenes; no
+        enhancer). "none" is never sent as the segmenter: the CrispASR pipelines need one, and
+        main.py would stop the run (exit 2). The scene detector "none" is sent: one scene per file.
         """
+        import json
         args: List[str] = []
         sensitivity = pass_config.get('sensitivity')
         if sensitivity:
@@ -2930,6 +3010,19 @@ class WhisperJAVAPI:
         model = pass_config.get('model')
         if model:
             args += [f"--pass{n}-model", model]
+        scene = pass_config.get('sceneDetector')
+        if scene:
+            args += [f"--pass{n}-scene-detector", scene]
+        enhancer = pass_config.get('speechEnhancer')
+        if enhancer and enhancer != 'none':
+            if enhancer == 'ffmpeg-dsp':
+                effects = pass_config.get('dspEffects', ['loudnorm']) or ['loudnorm']
+                enhancer = f"ffmpeg-dsp:{','.join(effects)}"
+            args += [f"--pass{n}-speech-enhancer", enhancer]
+            if pass_config.get('enhanceForVad'):
+                args += [f"--pass{n}-enhance-for-vad"]
+        if pass_config.get('customized') and pass_config.get('params'):
+            args += [f"--pass{n}-params", json.dumps(pass_config['params'])]
         return args
 
     def _build_twopass_args(self, config: Dict[str, Any]) -> List[str]:
@@ -2983,11 +3076,9 @@ class WhisperJAVAPI:
             p1_pipeline = 'qwen'
         args += ["--pass1-pipeline", p1_pipeline]
 
-        # The CrispASR pipelines (1.10.0, Ensemble passes only, owner W118): they use four pass
-        # settings -- model, speech segmenter, sensitivity (the segmenter's detection threshold
-        # only, W133 1, W134 2) and the source language, sent below like every pass's
-        # (crispasr/pass_settings.py). The scene detector is always semantic, and there is no
-        # speech enhancer or custom parameters, so none of those is sent.
+        # The CrispASR pipelines (1.10.0, Ensemble passes only, owner W118): model, speech segmenter,
+        # sensitivity, scene detector, speech enhancer, Enhance for VAD only and the Customize values
+        # (design 22.9.1), all sent by _crispasr_pass_args; the source language like every pass's.
         from whisperjav.crispasr.manifest import CRISPASR_PIPELINES
 
         crispasr_p1 = p1_pipeline in CRISPASR_PIPELINES
@@ -3094,7 +3185,8 @@ class WhisperJAVAPI:
             #     changing what the balanced pipeline is. Owner's to decide.
             #   fast, faster, transformers -- never read: silently ignored,
             #     which the owner accepted on 2026-09-17; documented in --help.
-            #   parakeet-crispasr, cohere-crispasr -- never sent (they run no audio clean-up).
+            #   parakeet-crispasr, cohere-crispasr -- dual-track since design 22.9.1 (sent by
+            #     _crispasr_pass_args).
             if (pass1.get('enhanceForVad') and enhancer1 and enhancer1 not in ('none', '')
                     and pass1.get('pipeline') != 'balanced'):
                 args += ["--pass1-enhance-for-vad"]
@@ -3125,7 +3217,7 @@ class WhisperJAVAPI:
                     args += ["--xxl-exe", xxl_exe]
                 # Skip all pipeline-specific args — XXL handles everything internally
             elif p2_pipeline in CRISPASR_PIPELINES:
-                # As pass 1: model, speech segmenter and sensitivity only.
+                # As pass 1.
                 args += self._crispasr_pass_args(2, pass2)
             elif pass2.get('isTransformers'):
                 # Transformers pass: no sensitivity, handle HF params
@@ -3267,10 +3359,6 @@ class WhisperJAVAPI:
         # #415: downloaded Hugging Face models only (HF_HUB_OFFLINE=1 in the child and its workers).
         if config.get('offline_mode', False):
             args += ["--offline"]
-
-        # #411: the answer to the start-up check's proceed-or-abort question (shared box).
-        if config.get('accept_cpu_mode', False):
-            args += ["--accept-cpu-mode"]
 
         # v1.9.2 (CFF1): recogniser refresh budget in minutes of scene audio (0 = never).
         _mr = config.get('model_refresh_audio_minutes')
@@ -3817,7 +3905,6 @@ class WhisperJAVAPI:
         "asr_telemetry":             "asrTelemetry",
         "model_refresh_audio_minutes": "modelRefreshAudioMinutes",
         "temp_dir":                  "tempDir",
-        "accept_cpu_mode":           "acceptCpuMode",
         "offline_mode":              "offlineMode",
         "async_processing":          "asyncProcessing",
         "pass1_pipeline":            "pass1Pipeline",
@@ -4317,9 +4404,6 @@ class WhisperJAVAPI:
             env = os.environ.copy()
             env["PYTHONUNBUFFERED"] = "1"
             env["PYTHONUTF8"] = "1"
-            # The child has no console a person can answer on; the start-up check
-            # must abort and say how to answer instead of waiting for input (#411).
-            env["WHISPERJAV_NO_CONSOLE"] = "1"
             env["PYTHONIOENCODING"] = "utf-8:replace"
 
             self._translate_process = subprocess.Popen(
