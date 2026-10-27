@@ -118,6 +118,10 @@ def create_enhancer_from_config(
     # Merge overrides
     if overrides:
         enhancer_config = {**enhancer_config, **overrides}
+    # The run's --device (design 22.3.1, 22.13 detail 15: --device cpu reaches every part).
+    if not enhancer_config.get("device"):
+        from whisperjav.utils.device_detector import pass_device
+        enhancer_config = {**enhancer_config, "device": pass_device(resolved_config.get("run_device"))}
 
     # Get backend name (default: none = passthrough with resampling)
     backend = enhancer_config.get("backend", "none")
