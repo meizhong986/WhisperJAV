@@ -60,6 +60,7 @@ import platform
 from typing import Optional, Tuple, NamedTuple, List
 from enum import Enum, auto
 
+from .accelerators import FORCE_NVIDIA_HINT  # T36, one text (design 22.6.8)
 from .config import (
     CUDA_DRIVER_MATRIX,
     CPU_TORCH_INDEX,
@@ -251,9 +252,7 @@ def detect_gpu() -> GPUInfo:
         torch_index=CPU_TORCH_INDEX,
         detection_method="none",
         # T36 (design 22.10): install.py then asks what the install is made for.
-        message="No supported NVIDIA GPU found.\n"
-                "  If this PC has an NVIDIA GPU that was not found (for example a laptop with two GPUs),\n"
-                "  run again with --accelerator nvidia.",
+        message="No supported NVIDIA GPU found.\n  " + FORCE_NVIDIA_HINT,
     )
 
 
