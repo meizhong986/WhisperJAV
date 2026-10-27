@@ -487,7 +487,7 @@ def _same_file(a: Path, b: Path) -> bool:
         return False
 
 
-def stage_model(model_path: Path, temp_dir: Path, sha256: str) -> Path:
+def stage_model(model_path: Path, temp_dir: Path, sha256: str, keep_name: bool = False) -> Path:
     """The model's path as CrispASR can open it: itself when all ASCII, else a plain-ASCII name.
 
     1. An all-ASCII path is used as it is; on Windows the file's 8.3 short path is tried next.
@@ -497,22 +497,26 @@ def stage_model(model_path: Path, temp_dir: Path, sha256: str) -> Path:
        never share it. A link is reused only if it is the same file as the model; a copy only if its
        own SHA-256 check is on record. The file the path leads to is staged (os.path.realpath: the
        Hugging Face cache holds its files as symbolic links with Windows Developer Mode on).
+    ``keep_name``: for files CrispASR reads by their name (the aligners: align_words picks the aligner
+    family from the file name), the 8.3 short path is never used and the staged file keeps its own name,
+    in a folder named after the SHA-256 (design note 2026-10-28, section 4.1).
     Raises CrispASRSetupError when neither works.
     """
     model_path = Path(model_path).absolute()
     if str(model_path).isascii():
         return model_path
     real = Path(os.path.realpath(model_path))
-    short = _short_path(str(real))
-    if short and short.isascii() and Path(short).is_file():
-        return Path(short)
+    if not keep_name:
+        short = _short_path(str(real))
+        if short and short.isascii() and Path(short).is_file():
+            return Path(short)
 
-    name = f"{sha256[:16]}.gguf"
+    name = (Path(sha256[:16]) / model_path.name) if keep_name else Path(f"{sha256[:16]}.gguf")
     candidates = stage_candidates(temp_dir)
     usable: List[Tuple[Path, bool]] = []
     for folder, keeps in candidates:
         try:
-            folder.mkdir(parents=True, exist_ok=True)
+            (folder / name).parent.mkdir(parents=True, exist_ok=True)
         except OSError:
             continue
         usable.append((folder, keeps))
@@ -534,7 +538,7 @@ def stage_model(model_path: Path, temp_dir: Path, sha256: str) -> Path:
     size = real.stat().st_size
     for folder, keeps in usable:
         dst = folder / name
-        part = folder / (name + ".part")
+        part = dst.with_name(dst.name + ".part")
         try:
             _check_free_space(folder, int(size * _MODEL_SPACE_FACTOR), "a copy of the model")
             shutil.copy2(real, part)
