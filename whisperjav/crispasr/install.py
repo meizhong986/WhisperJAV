@@ -52,17 +52,21 @@ CRISPASR_PLATFORMS = frozenset({
 
 # --- Texts (owner-approved wording, W193 5 / W203 I2; route B design 12) -------------------------
 NOT_INSTALLED_TEXT = "CrispASR is not installed in this WhisperJAV. Run the WhisperJAV installer again."
-# T10i: the cpu variant carries no CrispASR until CrispASR publishes 0.8.44's CPU wheel (#556; owner O16).
-CPU_VARIANT_TEXT = ("This install of WhisperJAV has no GPU support and comes without CrispASR in 1.10.0; "
-                    "the CrispASR pipelines cannot run here.")
 NO_BUILD_TEXT = ("CrispASR has no build for this computer ({platform}, {machine}); "
                  "the CrispASR pipelines cannot run here.")
 NO_AVX2_TEXT = ("This processor lacks AVX2, which CrispASR needs (Intel since 2013, AMD since 2015). "
                 "The CrispASR pipelines cannot run here.")
 NO_BACKEND_TEXT = "This CrispASR build ({version}) cannot run {model}: it was built without '{backend}'."
 NOT_LOADED_TEXT = "CrispASR could not be loaded on this computer: {reason}"
+# T10j, the Vulkan build (design 22.10) [inferred cause].
+NOT_LOADED_VULKAN_HINT = (" With the GPU-through-Vulkan or Own PyTorch install on Windows this usually means the "
+                          "Vulkan runtime (vulkan-1.dll) is missing: update the graphics driver, or run the "
+                          "WhisperJAV installer again and choose CPU only.")
 DEVICE_CUDA_TEXT = ("--device cuda: CrispASR cannot use an NVIDIA GPU here: {reason}. "
                     "Use --device auto or --device cpu.")
+# T10g, the Vulkan build (design 22.3.2).
+DEVICE_CUDA_VULKAN_TEXT = ("--device cuda needs CrispASR's CUDA build; this install has its Vulkan build. "
+                           "Use --device auto to let the Vulkan build use this PC's GPU.")
 NO_STAGE_TEXT = ("CrispASR cannot open the model's folder (its name has non-ASCII characters) and no "
                  "plain-named folder was found for a link or copy. Put {filename} in a plain-named "
                  "folder and set " + MODEL_DIR_ENV + " to it.")
@@ -70,15 +74,16 @@ STAGED_LINK_TEXT = "CrispASR: the model was linked to {folder}, because CrispASR
 STAGED_COPY_TEXT = ("CrispASR: the model was copied to {folder} ({size}), because CrispASR cannot open "
                     "its folder's name{kept}")
 STAGED_COPY_KEPT = "; the copy is kept for later runs"
-# The device line, once per pass (T6).
-DEVICE_LINE_NVIDIA = "{label} asks CrispASR to use the NVIDIA GPU (CrispASR {version})."
+# The device line, once per pass (T6, revised in design 22.10).
+DEVICE_LINE_NVIDIA = "{label} asks CrispASR to use the NVIDIA GPU (CUDA) (CrispASR {version})."
 DEVICE_LINE_METAL = ("{label} asks CrispASR to use the Apple GPU (Metal) (CrispASR {version}); "
-                     "this has not been tested on a Mac yet.")
-DEVICE_LINE_CPU = "{label} runs on the processor, which is slower: {reason}."
+                     "not yet tested on a Mac.")
+DEVICE_LINE_VULKAN = ("{label} asks CrispASR's Vulkan build to use this PC's GPU (CrispASR {version}). "
+                      "GPUs through Vulkan are experimental in 1.10.0 and have not been tested.")
+DEVICE_LINE_CPU = "{label} runs on the CPU (not accelerated), several times slower than on a GPU: {reason}."
 REASON_NO_NVIDIA = "no NVIDIA GPU was found"
 REASON_NO_GPU = "no GPU was found"
 REASON_CPU_BUILD = "this install has CrispASR's CPU build"
-REASON_VULKAN_BUILD = "this install has CrispASR's Vulkan build, which WhisperJAV 1.10.0 does not use"
 REASON_DEVICE_CPU = "--device cpu was given"
 
 
@@ -175,20 +180,10 @@ def crispasr_installed() -> bool:
         return False
 
 
-def is_cpu_variant() -> bool:
-    """Whether this is the cpu variant of WhisperJAV: a PyTorch without a CUDA build label (+cu130, +cu128).
-    Read from the package metadata, so PyTorch is not imported."""
-    from importlib import metadata
-
-    try:
-        return "+cu" not in metadata.version("torch")
-    except metadata.PackageNotFoundError:
-        return False
-
-
 def not_installed_text() -> str:
-    """Why CrispASR is missing, in the words that fit this install (T10a, or T10i on the cpu variant)."""
-    return CPU_VARIANT_TEXT if is_cpu_variant() else NOT_INSTALLED_TEXT
+    """Why CrispASR is missing (T10a). Every 1.10 install of a supported computer has CrispASR
+    (design 22.3.2), so a missing one means a damaged install."""
+    return NOT_INSTALLED_TEXT
 
 
 def installed_build() -> Tuple[str, str]:
@@ -217,13 +212,18 @@ def available_backends() -> List[str]:
         import crispasr
         return list(crispasr.Session.available_backends())
     except (ImportError, OSError) as e:
-        raise CrispASRSetupError(NOT_LOADED_TEXT.format(reason=e)) from e
+        hint = ""
+        try:
+            hint = NOT_LOADED_VULKAN_HINT if installed_build()[1] == "vulkan" else ""
+        except CrispASRSetupError:
+            pass
+        raise CrispASRSetupError(NOT_LOADED_TEXT.format(reason=e) + hint) from e
 
 
 @dataclass(frozen=True)
 class RuntimeChoice:
     use_gpu: bool
-    device: str              # "cuda", "metal" or "cpu"
+    device: str              # "cuda", "metal", "vulkan" or "cpu"
     reason: Optional[str]    # why the processor, in plain words; None on a GPU
     note_in_summary: bool    # the processor was not expected: say so in each file's summary too
     version: str             # the installed crispasr, e.g. "0.8.44+cuda"
@@ -234,6 +234,8 @@ class RuntimeChoice:
             return DEVICE_LINE_NVIDIA.format(label=label, version=self.version)
         if self.device == "metal":
             return DEVICE_LINE_METAL.format(label=label, version=self.version)
+        if self.device == "vulkan":
+            return DEVICE_LINE_VULKAN.format(label=label, version=self.version)
         return DEVICE_LINE_CPU.format(label=label, reason=self.reason)
 
 
@@ -265,7 +267,13 @@ def choose_device(device: Optional[str], build: str, version: str,
             raise CrispASRSetupError(DEVICE_CUDA_TEXT.format(reason=reason))
         # A card PyTorch sees but cannot use is not the normal set-up: the note also goes in the summary.
         return RuntimeChoice(False, "cpu", reason, unusable is not None, version, build)
-    reason = REASON_VULKAN_BUILD if build == "vulkan" else REASON_CPU_BUILD
+    if build == "vulkan":
+        # The GPU-through-Vulkan install (design 22.3.2, owner W234 D-A): WhisperJAV cannot see which
+        # GPU Vulkan takes, so auto asks the build for its GPU (text rule 2, W217 3).
+        if device == "cuda":
+            raise CrispASRSetupError(DEVICE_CUDA_VULKAN_TEXT)
+        return RuntimeChoice(True, "vulkan", None, False, version, build)
+    reason = REASON_CPU_BUILD
     if device == "cuda":
         raise CrispASRSetupError(DEVICE_CUDA_TEXT.format(reason=reason))
     if build == "cpu" and sys_platform == "darwin":
