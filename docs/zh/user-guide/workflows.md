@@ -97,19 +97,15 @@
 
 ---
 
-## 纯 CPU 模式（无 GPU）
+## 没有 GPU 时
 
-WhisperJAV 没有 GPU 也能工作，只是速度较慢。
+WhisperJAV 没有 GPU 也能工作，只是速度较慢。安装时选择 **仅 CPU**；之后每次运行都使用 CPU，不需要勾选任何选项。在 GPU 安装中，`--device cpu` 让某一次运行使用 CPU。
 
-找不到可用 GPU 时，启动检查会停下来询问是否改用 CPU 继续；GUI 无法提问，因此下面的选项是必须的（命令行请加 `--accept-cpu-mode` 或 `--device cpu`）。
-
-1. 进入 **Advanced** 标签页
-2. 勾选 **"Accept CPU-only mode"**
-3. 使用 **Faster** 模式以获得无 GPU 时的最佳速度
-4. 点击 **Start**
+1. 使用 **Faster** 模式以获得无 GPU 时的最佳速度
+2. 点击 **Start**
 
 !!! warning "警告"
-    CPU 模式比 GPU 模式慢 5-10 倍。2 小时的视频可能需要 30-60 分钟。
+    在 CPU 上，转写比在 GPU 上慢好几倍。
 
 ---
 
