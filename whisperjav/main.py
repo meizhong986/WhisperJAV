@@ -45,6 +45,12 @@ if _legacy_crispasr:
     print(legacy_crispasr_message(_legacy_crispasr), file=_sys.stderr)
     _sys.exit(2)
 
+# Is PyTorch there? Asked before the pipeline imports below, which load it at once: without it
+# every command ended in a ModuleNotFoundError trace. An Own PyTorch install is in that state
+# until the user adds their PyTorch, and is told the command (design 22.5.4). Exit status 4.
+from whisperjav.utils.pytorch_probe import stop_if_pytorch_missing as _stop_if_pytorch_missing
+_stop_if_pytorch_missing()
+
 # ===========================================================================
 # EARLY WARNING SUPPRESSION - Must be before any library imports
 # ===========================================================================
@@ -151,14 +157,14 @@ from whisperjav.__version__ import __version__, __version_display__
 
 
 from whisperjav.utils.preflight_check import (
-    enforce_gpu_requirement,
+    start_of_run_check,
     ensure_crispasr_ready,
     ensure_segmenter_backend_available,
     ensure_segmenter_model_available,
     ensure_speech_enhancer_available,
     run_preflight_checks,
-    cpu_consent_in_argv,
 )
+from whisperjav.utils.device_detector import pass_device, resolve_run_device
 from whisperjav.utils.progress_aggregator import VerbosityLevel, create_progress_handler
 from whisperjav.utils.async_processor import AsyncPipelineManager, ProcessingStatus
 from whisperjav.utils.parameter_tracer import create_tracer
@@ -317,16 +323,9 @@ def build_translation_context(args) -> str:
     return '\n'.join(context_parts) if context_parts else None
 
 
-# --- UNCONDITIONAL CUDA CHECK ---
-# This code runs the moment the module is loaded,
-# ensuring the check is never bypassed.
-# Bypass for help/version/check and accept-cpu-mode
-args = sys.argv[1:]
-bypass_flags = ['--check', '--check-verbose', '--help', '-h', '--version', '--dump-params']
-accept_cpu = cpu_consent_in_argv(args)   # --accept-cpu-mode, or an explicit --device cpu (#411)
-if not any(flag in args for flag in bypass_flags):
-    enforce_gpu_requirement(accept_cpu_mode=accept_cpu)
-# --- END OF CHECK ---
+# The start-up check of each run used to run here, when the module loaded, and asked a question
+# on every run without a GPU. 1.10.0 (design 22.5, owner W234 D-A): each install is made for one
+# accelerator and nothing is asked; the check runs once, in main(), after logging starts.
 
 
 def safe_print(message: str):
@@ -524,10 +523,10 @@ def parse_arguments():
     # Environment check
     parser.add_argument("--check", action="store_true", help="Run environment checks and exit")
     parser.add_argument("--check-verbose", action="store_true", help="Run verbose environment checks")
-    parser.add_argument("--accept-cpu-mode", action="store_true",
-                       help="Answer the start-up check in advance: when no usable GPU is found (none present, "
-                            "or the card is not supported by this PyTorch build) the run stops and asks "
-                            "whether to continue on the CPU; this flag says yes, so nothing is asked")
+    # 1.10.0 (design 22.5.1, owner W232 1, W234 D-A): no run asks any more whether to go on
+    # without a GPU, so this flag does nothing. Still accepted (hidden) so scripts, notebooks and
+    # replies that name it keep working.
+    parser.add_argument("--accept-cpu-mode", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--hf-endpoint", type=str, default=None, metavar="URL",
                         help="Fetch Hugging Face models from this address instead of "
                              "huggingface.co, for machines that cannot reach it. Takes "
@@ -549,12 +548,15 @@ def parse_arguments():
     hardware_group = parser.add_argument_group("Hardware Configuration")
     hardware_group.add_argument("--device", type=str, default=None,
                                choices=["auto", "cuda", "cpu"],
-                               help="Device to use for ASR processing (default: auto-detect). "
-                                    "Note: MPS (Apple Silicon) is auto-detected but CTranslate2 backends "
-                                    "will fall back to CPU with Accelerate optimization. For parakeet-crispasr and "
-                                    "cohere-crispasr: auto uses the NVIDIA GPU, or the Apple GPU (Metal) on "
-                                    "Apple silicon, when WhisperJAV finds one, else the processor; cuda "
-                                    "requires an NVIDIA GPU.")
+                               help="Where this run's ASR and other models run, for every pipeline. "
+                                    "auto (default) = as this install is made for: its GPU when it can be "
+                                    "used, else the CPU (not accelerated); cpu = this run on the CPU (not "
+                                    "accelerated); cuda = an NVIDIA GPU is required. balanced, fast and "
+                                    "faster use only NVIDIA GPUs (their engine is CTranslate2). For the GGUF "
+                                    "pipelines (parakeet-crispasr, cohere-crispasr), auto asks the installed "
+                                    "CrispASR build for its GPU: the NVIDIA GPU (CUDA build), the GPU through "
+                                    "Vulkan on Windows (Vulkan build, experimental) or the Apple GPU (Metal) "
+                                    "on an Apple silicon Mac.")
     hardware_group.add_argument("--compute-type", type=str, default=None,
                                choices=["auto", "float16", "float32", "int8", "int8_float16", "int8_float32"],
                                help="Compute type for ASR processing (default: auto). "
@@ -872,9 +874,9 @@ def parse_arguments():
                          help="Timestamp granularity (default: segment)")
     hf_group.add_argument("--hf-language", type=str, default="ja",
                          help="Language code for transcription (default: ja)")
-    hf_group.add_argument("--hf-device", type=str, default="auto",
-                         choices=["auto", "cuda", "cpu"],
-                         help="Device to use (default: auto)")
+    # A hidden name for --device (design 22.3.1, owner W237 1: --device governs every pipeline).
+    hf_group.add_argument("--hf-device", type=str, default=None,
+                         choices=["auto", "cuda", "cpu"], help=argparse.SUPPRESS)
     hf_group.add_argument("--hf-dtype", type=str, default="auto",
                          choices=["auto", "float16", "bfloat16", "float32"],
                          help="Data type (default: auto)")
@@ -888,9 +890,9 @@ def parse_arguments():
     qwen_model_group.add_argument("--qwen-model-id", type=str,
                            default="Qwen/Qwen3-ASR-1.7B",
                            help="Qwen3-ASR model ID (default: Qwen/Qwen3-ASR-1.7B)")
-    qwen_model_group.add_argument("--qwen-device", type=str, default="auto",
-                           choices=["auto", "cuda", "cpu"],
-                           help="Device to use (default: auto)")
+    # A hidden name for --device (design 22.3.1, owner W237 1: --device governs every pipeline).
+    qwen_model_group.add_argument("--qwen-device", type=str, default=None,
+                           choices=["auto", "cuda", "cpu"], help=argparse.SUPPRESS)
     qwen_model_group.add_argument("--qwen-dtype", type=str, default="auto",
                            choices=["auto", "float16", "bfloat16", "float32"],
                            help="Data type (default: auto)")
@@ -1135,7 +1137,21 @@ def parse_arguments():
         sys.exit(1)
     # v1.10.0 (item 3, owner W75): a removed speech enhancer (ClearVoice).
     _stop_on_removed_enhancer(args)
+    apply_run_device(args)
     return args
+
+
+def apply_run_device(args) -> None:
+    """--device governs every pipeline (design 22.3.1, owner W237 1).
+
+    --hf-device and --qwen-device are hidden names for it, so old commands keep working; when one
+    of them and --device are both given and differ, --device holds and one line says so. The
+    transformers and ChronosJAV settings then carry the run's device.
+    """
+    args.device, notes = resolve_run_device(args.device, args.hf_device, args.qwen_device)
+    for note in notes:
+        print(note, file=sys.stderr)
+    args.hf_device = args.qwen_device = pass_device(args.device)
 
 
 def add_signatures_to_srt(srt_path: str, producer_credit: str = None,
@@ -2538,15 +2554,17 @@ def main():
         run_preflight_checks(verbose=args.check_verbose)
         sys.exit(0)
 
-    # The start-up check (stop and ask when no usable GPU). --dump-params never
-    # transcribes, so it is not asked here either (it is in bypass_flags above).
-    if not args.dump_params:
-        enforce_gpu_requirement(accept_cpu_mode=args.accept_cpu_mode or args.device == "cpu")
-
     # Setup logging
     global logger
     log_level = "DEBUG" if args.debug else args.log_level
     logger = setup_logger("whisperjav", log_level, args.log_file)
+
+    # The start of each run, by the install record (design 22.5, owner W234 D-A): silent, a notice
+    # of where each part runs, or the one stop (an NVIDIA install whose GPU cannot be used now,
+    # exit status 3). Nothing is asked. After the logger, so its lines reach --log-file.
+    # --dump-params never transcribes.
+    if not args.dump_params:
+        start_of_run_check(device=args.device)
 
     if args.debug:
         logger.info("=" * 70)
