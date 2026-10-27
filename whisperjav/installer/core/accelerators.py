@@ -108,3 +108,84 @@ def write_record(value: str, prefix: Optional[str] = None) -> None:
     if value not in _BY_VALUE:
         raise ValueError(f"unknown accelerator {value!r}; expected one of {VALUES}")
     record_path(prefix).write_text(value + "\n", encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------------------------
+# The installers' texts (design 22.10; agreed W234 D-H, corrected W238): the same question in
+# the same words in the Windows installer's window and in install.py's console.
+# ---------------------------------------------------------------------------------------------
+
+ISSUES_URL = "https://github.com/meizhong986/WhisperJAV/issues"
+RELEASE_195_URL = "https://github.com/meizhong986/WhisperJAV/releases/tag/v1.9.5"
+NVIDIA_DRIVER_URL = "https://www.nvidia.com/drivers"
+
+WINDOW_TITLE = "WhisperJAV — no supported NVIDIA GPU found"                                   # T25
+WINDOW_INTRO = ("WhisperJAV found no NVIDIA graphics card that version 1.10 supports{found}. "
+                "What should this install be made for?")
+WINDOW_FOUND = " (graphics found: {names})"
+# (answer, label, accelerator); the first three give the GPU-through-Vulkan install (22.6.2).
+WINDOW_CHOICES = (
+    ("1", "AMD graphics card", "vulkan"),
+    ("2", "Intel graphics card", "vulkan"),
+    ("3", "NVIDIA graphics card older than WhisperJAV 1.10 supports", "vulkan"),
+    ("4", "I have my own PyTorch for my GPU (advanced)", "own-pytorch"),
+    ("5", "None, or use the CPU only", "cpu"),
+)
+WINDOW_EXPLANATION = (
+    "With an AMD, Intel or older NVIDIA card, the GGUF pipelines (Parakeet-CrispASR and Cohere-CrispASR) "
+    "use your graphics card through Vulkan. This is experimental in 1.10.0: it has not been tested, and "
+    "we would like to hear how it works for you. All other pipelines run on the CPU (not accelerated), "
+    "several times slower than on a supported NVIDIA GPU. With your own PyTorch, WhisperJAV installs "
+    "everything except PyTorch, and you add your PyTorch build afterwards (the command is shown at the "
+    "end). With the CPU only, every pipeline runs on the CPU.")
+WINDOW_FOOTER = "Without an answer, the CPU-only version is installed in 20 seconds."
+WINDOW_TIMEOUT_SECONDS = 20
+NOT_REACHABLE_TEXT = (                                                                        # T25b
+    "Windows lists an NVIDIA graphics card ({name}), but WhisperJAV cannot reach it: its driver may be "
+    "missing or not working, or, on a laptop with two graphics chips, the NVIDIA chip may be switched off. "
+    "Install or repair the NVIDIA driver (580 or newer, " + NVIDIA_DRIVER_URL + "), restart the PC, and "
+    "run this installer again to get the NVIDIA GPU version. If the driver is fine, please tell us: "
+    + ISSUES_URL + ". Or choose below.")
+OLD_CARD_TEXT = ("Your graphics card, {name} (compute capability {cc}), is older than WhisperJAV 1.10 "   # T29, W43
+                 "supports. 1.10 needs a GTX 16-series, RTX 20-series or newer card.")
+OLD_CARD_195_TEXT = "WhisperJAV 1.9.5 still supports this card: " + RELEASE_195_URL + "."
+IDENTIFIED_WRONGLY = "My card is identified wrongly"
+REPORT_IT_TEXT = "Please report it here: " + ISSUES_URL + " (attach the install log)."
+OLD_DRIVER_TEXT = ("Your NVIDIA driver ({version}) is older than WhisperJAV 1.10 needs ({minimum} or newer). "  # T47w
+                   "Update it from " + NVIDIA_DRIVER_URL + ", restart the PC, and run this installer again "
+                   "to get the NVIDIA GPU version. Or choose below.")
+SECOND_RUN_TITLE = "WhisperJAV — this install's accelerator"                                  # T25r
+SECOND_RUN_TEXT = "This install is made for: {name}. Keep it, or choose another."
+SECOND_RUN_FOOTER = "Without an answer, the install is kept as it is ({name}) in 20 seconds."
+NO_VULKAN_TEXT = (                                                                            # T26
+    "Vulkan (vulkan-1.dll) was not found on this PC, so WhisperJAV is installed as the CPU-only version: "
+    "every pipeline runs on the CPU (not accelerated). To use your graphics card with the GGUF pipelines, "
+    "update its driver and run the WhisperJAV installer again.")
+CONSOLE_PROMPT_WINDOWS = ("Type 1 = AMD, 2 = Intel, 3 = older NVIDIA card, 4 = my own PyTorch, 5 = CPU only, "  # T28
+                          "6 = stop{extra}, then Enter: ")
+CONSOLE_PROMPT_LINUX = ("No supported NVIDIA GPU found. What should this install be made for? 1 = my own "    # T28L
+                        "PyTorch (already installed in this Python environment, for example ROCm for an AMD "
+                        "GPU); 2 = CPU only (not accelerated); 3 = stop{extra}. Type 1, 2 or 3{more} and press "
+                        "Enter: ")
+CONSOLE_WRONGLY_EXTRA = ", {n} = my card is identified wrongly (show where to report it, then stop)"
+MAC_CPU_TEXT = ("On an Apple silicon Mac, WhisperJAV is installed for the Apple GPU (Metal), which includes "   # T35c
+                "the CPU. To run one job on the CPU, add --device cpu to that run.")
+VULKAN_NOT_HERE_TEXT = ("--accelerator vulkan is for Windows PCs only: CrispASR has no Vulkan package for "    # T35b
+                        "{system}. Nothing was installed.")
+FORCE_NVIDIA_HINT = ("If this PC has an NVIDIA GPU that was not found (for example a laptop with two GPUs), "  # T36
+                     "run again with --accelerator nvidia.")
+APPLE_INSTALL_TEXT = ("Apple silicon Mac: installing for the Apple GPU (Metal) — PyTorch with Apple GPU "      # T30
+                      "support, and CrispASR's macOS build.")
+OWN_PYTORCH_NEXT_STEP = (                                                                     # T42a
+    "WhisperJAV is installed without PyTorch, as you chose. Before it can run, install your PyTorch build "
+    "(2.11 recommended) into WhisperJAV's Python: \"{python}\" -m pip install torch torchaudio --index-url "
+    "{{the address of your PyTorch build}}. WhisperJAV will never replace it. This command is also saved "
+    "in {file}.")
+OWN_PYTORCH_NEXT_STEP_FILE = "OWN_PYTORCH_NEXT_STEP.txt"
+OWN_PYTORCH_NONE_TEXT = ("--accelerator own-pytorch needs your PyTorch and torchaudio already installed in "  # T42c
+                         "this Python environment; none was found. Nothing was installed.")
+OWN_PYTORCH_OTHER_VERSION = ("This environment has PyTorch {version}. WhisperJAV 1.10.0 is built for "
+                             "PyTorch 2.11; other versions have not been tested.")
+OWN_PYTORCH_DONE = ("Installed without PyTorch: WhisperJAV uses your PyTorch {version} ({where}). "
+                    "whisperjav-upgrade will keep it.")
+MADE_FOR_TEXT = "Made for: {name}."                                                           # T29b
