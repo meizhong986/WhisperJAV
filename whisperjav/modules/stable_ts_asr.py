@@ -21,7 +21,7 @@ except Exception:  # pragma: no cover - optional dependency guard
     snapshot_download = None
 
 from whisperjav.utils.logger import logger
-from whisperjav.utils.device_detector import get_best_device
+from whisperjav.utils.device_detector import ctranslate2_device, get_best_device
 from whisperjav.modules.japanese_postprocessor import JapanesePostProcessor
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
 
@@ -150,9 +150,11 @@ class StableTSASR:
         # Use smart device detection: CUDA -> MPS -> CPU
         # Standard mode wraps OpenAI Whisper which does NOT accept "auto" —
         # it passes device to torch.load(map_location=device). Resolve here.
-        self.device = model_config.get("device") or get_best_device()
+        self.device = model_config.get("device") or "auto"
         if self.device == "auto":
-            self.device = get_best_device()
+            # turbo_mode runs on CTranslate2, which decides whether it can use the GPU
+            # (design 22.3.3); standard mode is PyTorch.
+            self.device = ctranslate2_device("auto") if turbo_mode else get_best_device()
         self.turbo_mode = turbo_mode
 
         # CTRANSLATE2 COMPATIBILITY: MPS is not supported by ctranslate2/faster-whisper
