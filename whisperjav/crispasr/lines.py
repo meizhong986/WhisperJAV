@@ -18,7 +18,10 @@ Two line rules, chosen by the pipeline's row of the per-model table:
       starts at its first spoken token and ends where its last spoken token ends, not where the mark
       after it ends (a mark's time is the frames after the last syllable).
   "group" (Cohere-CrispASR, option C1, owner W175): the group's text becomes one subtitle with the
-      VAD group's start and end, which is where the speech segmenter found the speech.
+      VAD group's start and end, which is where the speech segmenter found the speech. Since 1.10.0
+      (owner W248 3, W249) Cohere-CrispASR's text is first aligned to its audio (whisperjav/crispasr/aligner.py)
+      and goes through "tokens" with ``onsets``: cue 1 only, chained ends (W259); "group" is kept for a group the
+      aligner gives nothing for.
 
 Pure: no ASR import, no stable-ts.
 """
@@ -36,6 +39,9 @@ LINE_RULES = ("tokens", "group")
 
 # JapanesePostProcessor's Level 0 sentence-end marks (japanese_postprocessor.py:727), the space left out.
 SENTENCE_END_MARKS = frozenset("。？！…．.?!")
+# With onset times (Cohere-CrispASR aligned, owner W259, W266 3): the marks that cut. The full stops "." and "．"
+# are left out, so a number such as 3.5 is never cut.
+ONSET_SENTENCE_END_MARKS = frozenset("。？！…?!")
 # Cue 2: a cut at a silence of at least this (W204; Watanabe et al. 2015; japanese_postprocessor.py:220, 247).
 PAUSE_CUT_S = 0.6
 # Cue 3: a cut at a weak mark followed by a silence of at least this (W203, W208; Watanabe et al. 2015).
@@ -244,8 +250,10 @@ def _clean_times(units: List[_Unit], duration: float, stats: LineStats) -> None:
         a.end = min(a.end, b.start)
 
 
-def _is_cut(between: List[_Unit], gap: float, cues: CueSettings) -> bool:
-    """Step B: the three cues."""
+def _is_cut(between: List[_Unit], gap: float, cues: CueSettings, marks_only: bool = False) -> bool:
+    """Step B: the three cues; with ``marks_only`` (onset times, W259) cue 1 alone, at 。？！…?! (W266 3)."""
+    if marks_only:
+        return any(u.kind == END_MARK and any(c in ONSET_SENTENCE_END_MARKS for c in u.text) for u in between)
     if any(u.kind == END_MARK for u in between):
         return True
     if gap >= cues.pause_cut_s:
@@ -253,7 +261,7 @@ def _is_cut(between: List[_Unit], gap: float, cues: CueSettings) -> bool:
     return gap >= cues.weak_mark_pause_s and any(u.kind == WEAK_MARK for u in between)
 
 
-def _pieces(units: List[_Unit], cues: CueSettings) -> List[List[_Unit]]:
+def _pieces(units: List[_Unit], cues: CueSettings, marks_only: bool = False) -> List[List[_Unit]]:
     """Step B-C: the units split into stretches at the cuts. Marks before a cut close the stretch before
     it; opening marks go with the stretch after it."""
     spoken_idx = [i for i, u in enumerate(units) if u.kind == SPOKEN]
@@ -263,7 +271,7 @@ def _pieces(units: List[_Unit], cues: CueSettings) -> List[List[_Unit]]:
     current: List[_Unit] = list(units[:spoken_idx[0] + 1])
     for i, j in zip(spoken_idx, spoken_idx[1:]):
         between = units[i + 1:j]
-        if _is_cut(between, units[j].start - units[i].end, cues):
+        if _is_cut(between, units[j].start - units[i].end, cues, marks_only):
             closing = [u for u in between if u.kind != OPEN_MARK]
             opening = [u for u in between if u.kind == OPEN_MARK]
             pieces.append(current + closing)
@@ -279,8 +287,15 @@ def _join(piece: List[_Unit]) -> str:
 
 
 def tokens_rule(group_start: float, group_end: float, segments: Sequence[CrispSegment],
-                stats: Optional[LineStats] = None, cues: CueSettings = DEFAULT_CUES) -> List[Subtitle]:
-    """Parakeet option P2: one group's tokens → one or more subtitles, in media-file time."""
+                stats: Optional[LineStats] = None, cues: CueSettings = DEFAULT_CUES,
+                onsets: bool = False) -> List[Subtitle]:
+    """Parakeet option P2: one group's tokens → one or more subtitles, in media-file time.
+
+    ``onsets``: the tokens' times are onsets only (a CTC aligner's characters: Cohere-CrispASR aligned, owner
+    W259; design note 2026-10-28, section 6). A gap between two onsets is not a silence (a held sound looks like
+    one), so only cue 1, a sentence-end mark, cuts; and each subtitle of the group but the last ends where the
+    next starts (rule T6), since its last character's end is not known.
+    """
     stats = stats if stats is not None else LineStats()
     duration = max(0.0, group_end - group_start)
     units: List[_Unit] = []
@@ -288,7 +303,7 @@ def tokens_rule(group_start: float, group_end: float, segments: Sequence[CrispSe
         units.extend(_segment_units(seg, stats))
     stats.units += len(units)
     _clean_times(units, duration, stats)
-    pieces = _pieces(units, cues)
+    pieces = _pieces(units, cues, marks_only=onsets)
     if pieces:
         # Closing marks before the group's first spoken word close nothing in this group.
         first = pieces[0]
@@ -313,7 +328,7 @@ def tokens_rule(group_start: float, group_end: float, segments: Sequence[CrispSe
     for i in range(len(subtitles) - 1):
         text, start, end = subtitles[i]
         next_start = subtitles[i + 1][1]
-        if end > next_start:
+        if end > next_start or (onsets and next_start > start):
             subtitles[i] = (text, start, max(start, next_start))
     return subtitles
 
@@ -325,10 +340,11 @@ def group_rule(group_start: float, group_end: float, segments: Sequence[CrispSeg
 
 
 def build(line_rule: str, group_start: float, group_end: float, segments: Sequence[CrispSegment],
-          stats: Optional[LineStats] = None, cues: CueSettings = DEFAULT_CUES) -> List[Subtitle]:
-    """The subtitles of one VAD group, by the pipeline's line rule; ``cues`` is used by "tokens" only."""
+          stats: Optional[LineStats] = None, cues: CueSettings = DEFAULT_CUES, onsets: bool = False) -> List[Subtitle]:
+    """The subtitles of one VAD group, by the pipeline's line rule; ``cues`` and ``onsets`` are used by "tokens"
+    only."""
     if line_rule == "tokens":
-        return tokens_rule(group_start, group_end, segments, stats, cues)
+        return tokens_rule(group_start, group_end, segments, stats, cues, onsets)
     if line_rule == "group":
         return group_rule(group_start, group_end, segments)
     raise ValueError(f"unknown line rule '{line_rule}' ({', '.join(LINE_RULES)})")
