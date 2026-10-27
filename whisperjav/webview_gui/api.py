@@ -2942,12 +2942,11 @@ class WhisperJAVAPI:
     # The CrispASR status panel under a pass row (owner W133 2; route B design 12, T16).
     CRISPASR_MODEL_DOWNLOADED = "Model: {label} — downloaded"
     CRISPASR_MODEL_MISSING = "Model: {label} — not downloaded yet ({size}); downloaded when the run starts"
-    # T16 (design 22.10).
-    CRISPASR_RUNS_ON = {"cuda": "GPU: asks for the NVIDIA GPU (CUDA)",
-                        "metal": "GPU: asks for the Apple GPU (Metal), not yet tested on a Mac",
-                        "vulkan": ("GPU: asks for this PC's GPU through Vulkan (AMD, Intel or older NVIDIA card; "
-                                   "experimental, not tested)")}
-    CRISPASR_RUNS_ON_CPU = "CPU (not accelerated), several times slower: {reason}"
+    # T16 (design 22.10), from the accelerator table (design 22.6.8; W241 Q1).
+    from whisperjav.installer.core import accelerators as _ACC
+    CRISPASR_RUNS_ON = _ACC.GUI_CRISPASR_RUNS_ON
+    CRISPASR_RUNS_ON_CPU = _ACC.GUI_CRISPASR_RUNS_ON_CPU
+    del _ACC
     CRISPASR_CANNOT_RUN = "CrispASR cannot run here: {reason}"
     # Asked in a child process: the device check loads PyTorch, which the GUI process never loads.
     _CRISPASR_RUNTIME_PROBE = (
