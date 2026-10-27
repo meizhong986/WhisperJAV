@@ -441,6 +441,10 @@
                                                 <option value="anime-whisper">Anime-Whisper</option>
                                                 <option value="cohere" disabled>Cohere-Transcribe (not available yet)</option>
                                             </optgroup>
+                                            <!-- 1.10.0 (item 5, REQ5): XXL as pass 1, as in the pass 2 menu -->
+                                            <optgroup label="External (BYOP)">
+                                                <option value="xxl">XXL Faster Whisper</option>
+                                            </optgroup>
                                             <optgroup label="GGUF">
                                                 <option value="parakeet-crispasr" title="Experimental in 1.10.0 (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">Parakeet-CrispASR</option>
                                                 <option value="cohere-crispasr" title="Experimental in 1.10.0 (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">Cohere-CrispASR</option>
@@ -752,7 +756,7 @@
                                     </div>
                                 </div>
 
-                                <!-- BYOP Settings Row (shown when XXL Faster Whisper selected as Pass 2) -->
+                                <!-- BYOP Settings Row (shown when XXL Faster Whisper is selected in either pass; one panel for both) -->
                                 <div class="byop-settings-panel" id="byop-settings-panel" style="display: none;">
                                     <div class="byop-settings-header">
                                         <span class="byop-title">XXL Faster Whisper</span>
@@ -768,10 +772,12 @@
                                     </div>
                                     <div class="byop-settings-row">
                                         <label class="byop-label" for="xxl-extra-args">Extra Args</label>
+                                        <!-- 1.10.0 (item 5, owner W271 4): no model here; the Model column picks it.
+                                             Texts G2 (placeholder) and G3 (title), approved by the owner as drafted (W275). -->
                                         <input type="text" id="xxl-extra-args" class="form-input byop-args-input"
-                                               value="--model large-v3 --verbose True --standard_asia"
-                                               placeholder="e.g. --model large-v3 --verbose --standard_asia"
-                                               title="Additional command-line arguments passed directly to XXL">
+                                               value="--verbose True --standard_asia"
+                                               placeholder="e.g. --verbose True --standard_asia (choose the model in the Model column)"
+                                               title="Additional command-line arguments passed directly to XXL. The model is chosen in the Model column; a --model here is not used.">
                                     </div>
                                 </div>
 
