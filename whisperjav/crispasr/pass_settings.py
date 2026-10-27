@@ -3,9 +3,11 @@
 The CrispASR pipelines (parakeet-crispasr, cohere-crispasr) are Ensemble passes only, with no --mode
 value (owner W118 2). Of a pass's settings they use: the model (--passN-model, a short name from the
 manifest), the speech segmenter (--passN-speech-segmenter), the sensitivity (--passN-sensitivity),
---passN-vad-threshold and --passN-speech-pad-ms (owner W208), the source language (--language) and
---device. Everything else about the run is fixed by the
-pipeline: semantic scenes, no speech enhancer, no custom parameters.
+--passN-vad-threshold and --passN-speech-pad-ms (owner W208), the source language (--language),
+--device, and since design 22.9.1 (owner W212 D3, W214 2, W232 8) the scene detector
+(--passN-scene-detector, semantic by default), the speech enhancer (--passN-speech-enhancer),
+--passN-enhance-for-vad and the Customize values of the Segmenter and Scene tabs (--passN-params).
+Only --passN-hf-params and --passN-qwen-params, the transformers and ChronosJAV settings, are not used.
 
 The speech segmenter settings follow the pipelines the owner named (W199 DIR1: "For cohere, uses
 similar presets and settings as qwenasr. And for prakeet use similar settings and presets as fidelity
@@ -28,7 +30,7 @@ from whisperjav.config.segmenter_presets import CRISPASR_DEFAULT_SEGMENTERS, ENS
 from whisperjav.crispasr import manifest
 from whisperjav.crispasr.manifest import CRISPASR_PIPELINES, JAPANESE_NAMES
 
-# The scene detector both CrispASR pipelines run, always.
+# The scene detector the CrispASR pipelines run when the pass names none (owner W214 2).
 CRISPASR_SCENE_DETECTOR = "semantic"
 
 # --- Texts (route B design 12, T11 and T12; W193 5, W203 I2) --------------------------------------
@@ -192,23 +194,14 @@ def validate_crispasr_passes(args: Any) -> None:
 def unused_pass_settings(pass_config: Mapping[str, Any], pass_number: int) -> List[str]:
     """The flags of the pass settings the user set that a CrispASR pipeline does not use.
 
-    ``pass_config`` is the pass configuration main.py (or the GUI, through main.py) builds. A
-    setting equal to what the pipeline does anyway -- the semantic scene detector, the speech
-    enhancer "none" -- is not listed. Sensitivity is used, so it is never listed. The
-    enhance-for-vad flag is named in its per-pass form even when it came from --enhance-for-vad,
-    which main.py folds into every pass. --compute-type is ignored_hardware_settings'.
+    ``pass_config`` is the pass configuration main.py (or the GUI, through main.py) builds. Since
+    design 22.9.1 the scene detector, the speech enhancer, enhance-for-vad and --passN-params are
+    used, so only the transformers and ChronosJAV settings (--passN-hf-params, --passN-qwen-params)
+    can be listed. --compute-type is ignored_hardware_settings'.
     """
     n = pass_number
     unused = []
-    scene_detector = pass_config.get("scene_detector")
-    if scene_detector and str(scene_detector).strip().lower() != CRISPASR_SCENE_DETECTOR:
-        unused.append(f"--pass{n}-scene-detector")
-    enhancer = pass_config.get("speech_enhancer")
-    if enhancer and str(enhancer).split(":", 1)[0].strip().lower() != "none":
-        unused.append(f"--pass{n}-speech-enhancer")
-    if pass_config.get("enhance_for_vad"):
-        unused.append(f"--pass{n}-enhance-for-vad")
-    for key, flag in (("params", "params"), ("hf_params", "hf-params"), ("qwen_params", "qwen-params")):
+    for key, flag in (("hf_params", "hf-params"), ("qwen_params", "qwen-params")):
         if pass_config.get(key):
             unused.append(f"--pass{n}-{flag}")
     return unused
