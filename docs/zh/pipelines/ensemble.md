@@ -63,24 +63,31 @@ Video → Pass 2 (Pipeline B) → SRT₂ ─┘
 
 ---
 
-## BYOP：XXL Faster Whisper（v1.8.9+）
+## BYOP：XXL Faster Whisper（v1.8.9+；1.10.0 起也可用于 Pass 1）
 
-选择 **XXL Faster Whisper** 作为 Pass 2 处理管线，即可将 [PurfView 的 Faster Whisper XXL](https://github.com/Purfview/whisper-standalone-win) 作为外部子进程使用。这是"自带处理管线"（Bring Your Own Pipeline）— 由你提供可执行文件。
+选择 **XXL Faster Whisper** 作为 Pass 1、Pass 2 或两者的处理管线，即可将 [PurfView 的 Faster Whisper XXL](https://github.com/Purfview/whisper-standalone-win) 作为外部程序使用。这是"自带处理管线"（Bring Your Own Pipeline）— 由你提供可执行文件。
 
 ### 设置方法
 
 1. 从上方链接下载 Faster Whisper XXL
-2. 在 Ensemble 选项卡中，为 Pass 2 选择 **XXL Faster Whisper**
-3. 点击 **Browse** 指向你的 `faster-whisper-xxl.exe`
-4. 添加任意额外参数（例如 `--verbose True --standard_asia`）
+2. 在 Ensemble 选项卡中，为 Pass 1、Pass 2 或两者选择 **XXL Faster Whisper**
+3. 在该通道的 **Model** 列中选择 XXL 运行的模型：Large V2（默认）、Large V3、Large V3 Turbo 或 Medium
+4. 点击 **Browse** 指向你的 `faster-whisper-xxl.exe`
+5. 添加任意额外参数（默认 `--verbose True --standard_asia`）。模型请在 Model 列中选择，不要写在这里：额外参数中的 `--model` 不会被使用，控制台会给出提示。
 
-WhisperJAV 只发送 4 个必需参数（输入文件、输出目录、模型、语言）。其他所有选项由你的额外参数字段控制。
+WhisperJAV 向 XXL 发送输入文件、输出目录、模型、语言和 SRT 输出格式（字幕要译成英文时还有 `--task translate`）；其他 XXL 参数请在额外参数字段中添加。如果 XXL 处理某个文件失败，控制台会说明是哪个通道失败以及原因；Pass 1 失败时该文件标记为失败，Pass 2 失败时，如果 Pass 1 生成了字幕，该文件保留 Pass 1 的字幕。
 
 ### CLI
 
 ```bash
-whisperjav video.mp4 --pass2-pipeline xxl --xxl-exe /path/to/faster-whisper-xxl.exe
+# XXL 作为 Pass 1，Qwen3-ASR 作为 Pass 2
+whisperjav video.mp4 --ensemble --pass1-pipeline xxl --pass1-model large-v2 --pass2-pipeline qwen --xxl-exe /path/to/faster-whisper-xxl.exe
+
+# XXL 作为 Pass 2
+whisperjav video.mp4 --ensemble --pass1-pipeline fidelity --pass2-pipeline xxl --pass2-model large-v2 --xxl-exe /path/to/faster-whisper-xxl.exe
 ```
+
+`--pass1-model` / `--pass2-model` 选择 XXL 运行的模型（默认 `large-v2`）。额外参数使用 GUI 中 Extra Args 字段保存的内容；命令行没有对应的选项。
 
 ---
 
