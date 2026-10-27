@@ -29,8 +29,8 @@
 #   - whisperjav/installer/ - Unified installer module
 #
 # Options (forwarded to install.py):
-#   --cpu-only              Install CPU-only PyTorch
-#   --cuda VERSION          Install PyTorch for a CUDA build: cu130 (default) or cu128
+#   --accelerator NAME      What this install is made for: nvidia, own-pytorch or cpu
+#                           (without it: a supported NVIDIA GPU is used, otherwise it asks)
 #   --no-speech-enhancement Skip speech enhancement packages
 #   --minimal               Minimal install (transcription only)
 #   --dev                   Install in development/editable mode
@@ -119,6 +119,14 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
     echo "Or run install.py directly:"
     echo "  python3 install.py $@"
     exit 1
+fi
+
+# Is this computer supported by WhisperJAV 1.10? First, before asking for anything else
+# (design 22.1.2, owner W233 R6): the same check install.py makes, run with this system's python3.
+if command -v python3 &>/dev/null; then
+    if ! python3 -I "$REPO_ROOT/whisperjav/installer/core/supported.py"; then
+        exit 1
+    fi
 fi
 
 echo "============================================================"
