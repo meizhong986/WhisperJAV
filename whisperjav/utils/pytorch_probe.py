@@ -33,7 +33,7 @@ OWN_PYTORCH_DAMAGED_TEXT = (
 )
 PYTORCH_MISSING_TEXT = (
     "PyTorch, which WhisperJAV needs, is missing or damaged in this install{detail}. "
-    "Run the WhisperJAV installer again (or whisperjav-upgrade for a source install)."
+    "Run the WhisperJAV installer again (for a source install: python install.py, in the same environment)."
 )
 
 
