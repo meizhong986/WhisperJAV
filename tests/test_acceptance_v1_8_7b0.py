@@ -203,12 +203,17 @@ class TestIssue198MPSDevice:
         assert "mps" in src
 
     def test_detect_device_auto_checks_mps_after_cuda(self):
-        """In 'auto' path: cuda is checked first, then mps, then cpu."""
+        """In 'auto' path: cuda is checked first, then mps, then cpu.
+
+        1.10.0 (design 22.3.1, owner W237 1): the auto path goes through device_detector's
+        get_best_device(), which probes cuda, then mps, then cpu.
+        """
         src = inspect.getsource(self.TransformersASR._detect_device)
-        cuda_pos = src.find("cuda")
-        mps_pos = src.find("mps")
-        cpu_pos = src.find('"cpu"')
-        assert cuda_pos < mps_pos < cpu_pos, \
+        auto = src[:src.index('elif self.device_request == "cuda"')]
+        assert "get_best_device()" in auto
+        from whisperjav.utils import device_detector
+        best = inspect.getsource(device_detector.get_best_device)
+        assert best.index("_check_cuda_available()") < best.index("_check_mps_available()") < best.rindex('return "cpu"'), \
             "auto path must probe cuda → mps → cpu in that order"
 
     def test_detect_device_mps_fallback_to_cpu(self):
