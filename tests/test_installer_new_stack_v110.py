@@ -432,3 +432,17 @@ def test_nsis_shows_the_stop_dialog_before_the_failure_dialog():
     fail_at = nsis.index(r'FileExists} "$INSTDIR\INSTALLATION_FAILED_v{{VERSION}}.txt"')
     post_at = nsis.index(r'start "" /wait "$CMD_EXE" /D /C ""$INSTDIR\pkgs\post_install.bat""')
     assert post_at < stop_at < fail_at
+
+
+def test_replacing_an_install_keeps_its_record_for_the_second_run_window():
+    # Owner W242 1 (design 22.6.6): the NSIS replace removes the whole folder; the record is kept
+    # aside before that and put back before post_install reads it.
+    nsi = (Path(__file__).resolve().parents[1] / "installer" / "templates" /
+           "custom_template.nsi.tmpl.template").read_text(encoding="utf-8")
+    remove = nsi[nsi.index("Function RemoveExistingWhisperJAV"):]
+    remove = remove[:remove.index("FunctionEnd")]
+    keep = remove.index('CopyFiles /SILENT "$INSTDIR\\whisperjav_stack.txt" "$PLUGINSDIR\\whisperjav_stack_kept.txt"')
+    assert keep < remove.index("Uninstall-WhisperJAV.exe\" /S") < remove.index('RMDir /r "$INSTDIR"')
+    put_back = nsi.index('CopyFiles /SILENT "$PLUGINSDIR\\whisperjav_stack_kept.txt" "$INSTDIR\\whisperjav_stack.txt"')
+    assert put_back < nsi.index('${If} ${FileExists} "$INSTDIR\\pkgs\\post_install.bat"')
+    assert nsi.index("InitPluginsDir") < nsi.index("Function RemoveExistingWhisperJAV")
