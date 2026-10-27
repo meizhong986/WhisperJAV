@@ -23,7 +23,7 @@ import traceback
 import logging
 
 from whisperjav.utils.logger import logger
-from whisperjav.utils.device_detector import get_best_device
+from whisperjav.utils.device_detector import ctranslate2_device
 from whisperjav.utils.parameter_tracer import NullTracer
 from whisperjav.utils.crash_tracer import get_tracer
 from whisperjav.modules.segment_filters import SegmentFilterConfig, SegmentFilterHelper
@@ -80,7 +80,9 @@ class FasterWhisperProASR:
         # --- V3 PARAMETER UNPACKING ---
         self.model_name = model_config.get("model_name", "large-v2")
         # Use smart device detection: CUDA -> MPS -> CPU
-        self.device = model_config.get("device", get_best_device())
+        # CTranslate2 decides whether it can use the GPU (design 22.3.3): a ROCm PyTorch says
+        # "cuda" for an AMD GPU that CTranslate2 cannot use.
+        self.device = ctranslate2_device(model_config.get("device"))
 
         # CTRANSLATE2 COMPATIBILITY: MPS is not supported by ctranslate2/faster-whisper
         # CTranslate2 only supports "cuda" or "cpu" devices.
