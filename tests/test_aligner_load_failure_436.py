@@ -50,8 +50,8 @@ def test_failed_aligner_load_keeps_the_text_and_says_why(tmp_path):
 
     assert alignments is None and aligner.unloaded
     note = orch.alignment_unavailable
-    assert note.startswith("ForcedAligner could not be loaded (OSError: Connection broken")
-    assert "second line" not in note and note.endswith("the text is kept")
+    assert note.startswith("ChronosJAV's aligner (aligner) could not be loaded (OSError: Connection broken")
+    assert "second line" not in note and note.endswith("the text is kept.")
 
     results = orch._step9_reconstruct_and_harden(frames, texts, alignments, [wav], [2.0], [None], None)
     kept = "".join(seg.text for seg in results[0][0].segments).replace(" ", "")
@@ -62,6 +62,41 @@ def test_note_is_cleared_for_the_next_file():
     import inspect
     src = inspect.getsource(DecoupledSubtitlePipeline.process_scenes)
     assert "self.alignment_unavailable = None" in src
+    assert "self.alignment_partial = None" in src
+
+
+def test_groups_the_aligner_gave_no_times_are_counted(tmp_path):
+    """Item 12 review: CrispASR opens the aligner model at the first call and returns nothing when that
+    fails, so load() succeeds and every VAD group comes back empty. The text is kept, and the count is noted."""
+    import soundfile as sf
+    from whisperjav.modules.subtitle_pipeline.types import AlignmentResult, WordTimestamp
+
+    class _AlignerThatTimesOnlyTheFirst:
+        display_name = "wav2vec2-ja"
+
+        def load(self):
+            pass
+
+        def unload(self):
+            pass
+
+        def align_batch(self, audio_paths, texts, **k):
+            return [AlignmentResult(words=[WordTimestamp(word=t, start=0.0, end=0.5)] if i == 0 else [])
+                    for i, t in enumerate(texts)]
+
+    wav = tmp_path / "scene_0000.wav"
+    sf.write(str(wav), (0.1 * np.sin(np.linspace(0, 2000, 32000))).astype(np.float32), 16000)
+    frames = [[TemporalFrame(0.0, 0.9), TemporalFrame(1.0, 1.9), TemporalFrame(1.9, 2.0)]]
+    orch = _orchestrator(_AlignerThatTimesOnlyTheFirst())
+    orch._step5_7_align(frames, [[wav, wav, wav]], [["出身", "どうして?", ""]], [2.0])
+    assert orch._last_align_counts == (2, 1)        # the empty-text frame is not counted
+
+    from whisperjav.modules.subtitle_pipeline.orchestrator import GROUPS_NOT_ALIGNED_TEXT
+    assert GROUPS_NOT_ALIGNED_TEXT.format(name="wav2vec2-ja", n=1, m=2).startswith(
+        "ChronosJAV's aligner (wav2vec2-ja) gave no times for 1 of 2 VAD group(s)")
+    src = (Path(__file__).resolve().parents[1] / "whisperjav" / "pipelines" / "qwen_pipeline.py").read_text(
+        encoding="utf-8")
+    assert "self.degradations.append(self._subtitle_pipeline.alignment_partial)" in src
 
 
 def test_both_pipelines_report_it():
@@ -69,6 +104,9 @@ def test_both_pipelines_report_it():
     for name in ("qwen_pipeline.py", "decoupled_pipeline.py"):
         src = (root / name).read_text(encoding="utf-8")
         assert "self.degradations.append(self._subtitle_pipeline.alignment_unavailable)" in src, name
+    # The timing model (1.10.0, item 12) is ChronosJAV's only: its note reaches the summary the same way.
+    src = (root / "qwen_pipeline.py").read_text(encoding="utf-8")
+    assert "self.degradations.append(self._subtitle_pipeline.timing_unavailable)" in src
 
 
 def test_aligner_failing_only_for_the_step_down_retry_keeps_the_first_pass(tmp_path):
@@ -87,15 +125,17 @@ def test_aligner_failing_only_for_the_step_down_retry_keeps_the_first_pass(tmp_p
     )
     pass1 = [("pass1-result", {"sentinel_status": "COLLAPSED"})]
 
+    from whisperjav.modules.subtitle_pipeline.orchestrator import ALIGNER_NOT_LOADED_TEXT
+
     def _retry(*a, **k):
-        orch.alignment_unavailable = ("ForcedAligner could not be loaded (RuntimeError: CUDA out of memory); "
-                                      "subtitle times come from the speech segments instead; the text is kept")
+        orch.alignment_unavailable = ALIGNER_NOT_LOADED_TEXT.format(
+            name="wav2vec2-ja", error="RuntimeError: CUDA out of memory")
         return [("retry-result", {"sentinel_status": "N/A"})]
 
     orch._run_pass = lambda *a, **k: pass1
     orch._run_stepdown_pass = _retry
     results = orch.process_scenes([tmp_path / "s.wav"], [10.0])
     assert results[0][0] == "pass1-result"
-    assert orch.alignment_unavailable == ("ForcedAligner could not be reloaded for the step-down retry "
-                                          "(RuntimeError: CUDA out of memory); 1 collapsed scene(s) keep their "
-                                          "first-pass timing")
+    assert orch.alignment_unavailable == ("ChronosJAV's aligner (wav2vec2-ja) could not be reloaded for the "
+                                          "step-down retry (RuntimeError: CUDA out of memory): 1 collapsed "
+                                          "scene(s) keep their first-pass timing.")
