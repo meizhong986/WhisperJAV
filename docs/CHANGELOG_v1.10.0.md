@@ -6,6 +6,11 @@
 > what the user sees, the commits, the owner's decisions (W-numbers in `docs/plans/OWNER_WORDS_V110_CYCLE.md`), how it was checked, and
 > what was found and left open. Specs: `docs/requirements/v1.10.x/specs/`. Both folders are git-ignored.
 >
+> **State, 2026-10-27:** items 1, 2a–2f, 3 and 4 (CrispASR, as the GGUF pipelines) done, and the accelerator
+> redesign (one accelerator per install, owner W234, design section 22 v2 approved W238); branch at `f9950dd`, 349
+> commits ahead of `main`, nothing pushed. No installer has been built since 2026-10-17. The branch has no commits yet for items 12, 5, 10, 11a–c
+> and 6 (their place in 1.10.0 is the owner's decision).
+>
 > **State, 2026-10-17:** items 1, 2a–2f and 3 done; branch at `69c1308`, 128 commits ahead of `origin/main`, nothing pushed.
 > Installer built from `69c1308`: `WhisperJAV-1.10.0-Windows-x86_64.exe`, 350,890,544 bytes, SHA-256
 > `7B87D977F28C64478FC52C4442E976503CF7AA3654003345C15CB9FBA2245CB7`. Remaining 1.10.0 work in the owner's order (W91): CrispASR
@@ -192,6 +197,73 @@ file): the owner, "Both G5 and G6 passed." (W90). One `assessment-adversary` rev
 
 ---
 
+## Item 4 — CrispASR: the GGUF pipelines Parakeet-CrispASR and Cohere-CrispASR (owner W118, W176 route B)
+
+**What the user sees.**
+- Two Ensemble pass pipelines for Japanese, under **GGUF** in the Pass 1 / Pass 2 menus: **Parakeet-CrispASR**
+  (`parakeet-tdt-0.6b-ja`, 674 MB) and **Cohere-CrispASR** (`cohere-asr-ja-v0.1` by default, or `cohere-asr-ja`, 2,424 MB
+  each). Experimental in 1.10.0 (early release) — tooltip and `--help` say so (W212 D4 1).
+- CrispASR comes with WhisperJAV as a Python package (`crispasr 0.8.44`), in the build of the install's accelerator: the CUDA
+  build (NVIDIA), the Vulkan build (GPU through Vulkan and Own PyTorch on Windows), the macOS build (Apple GPU), the CPU build
+  otherwise. WhisperJAV downloads the model on first use, pinned by commit and SHA-256 (`crispasr/manifest.py`).
+- Parakeet-CrispASR cuts subtitles only at natural cues — sentence-end marks, a pause of 0.6 s, or 、/space followed by
+  0.4 s — never by characters or duration, with times from the model's tokens (W203, W204). Cohere-CrispASR makes one
+  subtitle per VAD group. Parakeet uses fidelity's speech segmenter settings with 6 s groups, Cohere the qwen pipeline's
+  (W199 DIR1, W202). Both print the audio analytics with semantic scenes (W211 C2).
+- The pass's scene detector (semantic, 12–48 s, by default), speech enhancer, Enhance for VAD only and Customize (Segmenter,
+  Enhancer, Scene tabs) work as for the other passes (W212 D3, W214 2, W232 8). With an enhancer, the model is opened per
+  file and closed after it, so the two never hold GPU memory together (W217 19).
+- A status panel under a GGUF pass: the model (downloaded or not) and where CrispASR runs. `whisperjav --check` lists
+  CrispASR's version, build and device and the three models.
+- The folder-name note (T24, agreed wording, D-H): "The GGUF (CrispASR) pipelines need folder names in plain Western letters
+  (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a
+  plain-named folder (the original stays where it is)." The clause about installing WhisperJAV itself in such a folder was
+  dropped after the check of plan step 3 (CrispASR loads and transcribes from a folder with Japanese characters).
+- The 1.9.x bring-your-own CrispASR mode is removed: `--mode crispasr`, the pass value `crispasr`, `--crispasr-exe`,
+  `--crispasr-backend`, `--crispasr-args` stop with exit 2 and a message naming the new pipelines (W118 3).
+
+**Checked.** End-to-end runs on WJ110 (NVIDIA GPU): Parakeet GGUF on the GPU, 57 subtitles; Parakeet with auditok,
+ffmpeg-dsp and Enhance for VAD only, 62; Cohere with `--device cpu`, 76; a GGUF pass with ZipEnhancer and `--device cpu`
+loaded the enhancer on the CPU (`D:\WJ110_measure\step3_2026-10-27\e2e\`). The Vulkan build loaded and transcribed on this
+PC's NVIDIA card through Vulkan; no AMD or Intel GPU has been tried. Design and decisions:
+`docs/plans/design/2026-10-25-crispasr-route-b-design.md` (v3 and section 22 v2), decision record `…-decision-record.md`.
+
+---
+
+## The accelerators — one accelerator per install (owner W212 D1, W217, W232–W234; design section 22 v2, W238)
+
+**What the user sees.**
+- Every install is made for one accelerator, chosen once at install and recorded in `whisperjav_stack.txt`: NVIDIA GPU
+  (CUDA), GPU through Vulkan (AMD, Intel or older NVIDIA card; Windows), Apple GPU (Metal), Own PyTorch, CPU only (not
+  accelerated). Every run and `whisperjav-upgrade` follow the record; a second run of an installer offers it as the default.
+- **No run-time question any more.** The GUI box "Accept CPU-only mode" is removed; `--accept-cpu-mode`, `--hf-device` and
+  `--qwen-device` are still accepted but hidden (the last two as names for `--device`). `--device auto|cuda|cpu` governs every
+  pipeline, the speech enhancers included; `--device cpu` is absolute.
+- At the start of a run: an NVIDIA install whose GPU is usable is silent; one whose GPU cannot be used now is the one stop
+  (exit 3; the GUI offers "Run on the CPU this time"); every other install shows a box of where each part runs and goes on.
+  PyTorch missing or damaged: exit 4 with the command that fixes it. The GUI shows "The run did not start" (exit 2, 4) and
+  "The run ended without a run summary" instead of "Finished with failures".
+- Windows installer: with no supported NVIDIA GPU, a window asks what the install is made for (CPU only after 20 s without an
+  answer; Stop pre-selected with no time limit when an NVIDIA GPU 1.10 cannot use is found, with the reason first). Own
+  PyTorch installs everything except PyTorch and shows the one command to add it (also saved in `OWN_PYTORCH_NEXT_STEP.txt`).
+- Source installs: `install.py --accelerator nvidia|vulkan|own-pytorch|cpu`; without it, a supported NVIDIA GPU or an Apple
+  silicon Mac is chosen by itself, otherwise the same question in the console. `--cpu-only`, `--cuda`, `--force-cuda` still work
+  (hidden). A chosen Stop exits 0 (W241 Q3).
+- Unsupported computers are refused before anything is installed, in the owner's form: Windows on ARM and before Windows 10;
+  Linux with glibc below 2.35; Intel Macs and macOS before 14; Python under Rosetta; Colab and Kaggle (W233 R6, D-F).
+- balanced, fast and faster use the GPU only when CTranslate2 itself sees an NVIDIA GPU (a ROCm PyTorch no longer sends them
+  to a GPU they cannot use). On an Apple silicon Mac each pipeline says where it runs (T51–T53).
+- Lock: a fourth extra `vulkan`; CrispASR on every platform of each extra (PyPI CPU builds, the `+cuda` and `+vulkan` wheels
+  by URL and SHA-256). Only two packages were added to `uv.lock` (253 → 255); no other version changed.
+
+**Checked.** Plan step 3 P8 (`D:\WJ110_measure\step3_2026-10-27\`): WJ110 runs above; a CPU-only source install into a scratch
+environment (exit 0, record `cpu`, `--check` exit 0); the Vulkan load check; the Japanese install folder. One
+`assessment-adversary` review of P2–P6, 17 findings, each checked; fixed with tests or answered (decision record §14.12);
+20 test files after the fixes, all passed (`p7_fix_tests.log`). Not checked: any AMD or Intel GPU; a real Own PyTorch install
+over another torch; the Windows installer window in a real install (plan step 5); anything on a Mac or a Linux PC.
+
+---
+
 ## Found during the work, not fixed in 1.10.0 (requirements §5; places as decided or proposed)
 
 | | Finding | Place |
@@ -216,7 +288,9 @@ constructor 3.17.3 removes the Users group's write permission on the install fol
   approved (c1); the closing dialog of a deliberate installer stop reworded, pre-approved (c2): "WhisperJAV was not installed. / The
   installer stopped for the reason shown in its console window. / That reason is saved in this file: / <path>" (template change not
   yet committed; the installer built 2026-10-17 has the earlier wording).
-- Public docs not yet changed: llama-cpp pages (translation, GUI, install guides, en and zh); ClearVoice mentions in `README.md` and
+- Public docs: rewritten for 1.10.0 in plan step 4 (2026-10-27) in English — getting started, the four install guides, the
+  GGUF page, GUI guide, CLI reference, FAQ, translation, workflows, upgrade pages, `README.md`; Chinese pages to follow.
+  Earlier list, for the record: llama-cpp pages (translation, GUI, install guides, en and zh); ClearVoice mentions in `README.md` and
   `docs/en`; `docs/en/guides/installation_windows_standalone.md:177` ("Phase 3.5"); the installer readme template's Local LLM step and
   driver table (listed 2026-10-14, not re-checked since).
 - Issues the release touches: #459 (CTranslate2 4.8.3). Whether any reporter is told "fixed" is the owner's decision.
