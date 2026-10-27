@@ -24,6 +24,13 @@ OWN_PYTORCH_MISSING_TEXT = (
     "Install it with: \"{python}\" -m pip install torch torchaudio --index-url "
     "{{the address of your PyTorch build}}"
 )
+# New (review P7 finding 10; no draft in design 22.10): neither the installer nor whisperjav-upgrade
+# touches PyTorch on an Own PyTorch install, so T42's advice would lead nowhere there.
+OWN_PYTORCH_DAMAGED_TEXT = (
+    "This install uses your own PyTorch, and the one in WhisperJAV's Python ({prefix}) does not load{detail}. "
+    "Reinstall it with: \"{python}\" -m pip install --force-reinstall torch torchaudio --index-url "
+    "{{the address of your PyTorch build}}"
+)
 PYTORCH_MISSING_TEXT = (
     "PyTorch, which WhisperJAV needs, is missing or damaged in this install{detail}. "
     "Run the WhisperJAV installer again (or whisperjav-upgrade for a source install)."
@@ -42,8 +49,9 @@ def pytorch_problem() -> str:
         except Exception as exc:  # noqa: BLE001 -- any failure means PyTorch cannot be used
             missing = False
             detail = f" ({type(exc).__name__}: {str(exc).splitlines()[0] if str(exc) else ''})"
-    if missing and accelerators.read_record()[1] == "own-pytorch":
-        return OWN_PYTORCH_MISSING_TEXT.format(prefix=sys.prefix, python=sys.executable)
+    if accelerators.read_record()[1] == "own-pytorch":
+        text = OWN_PYTORCH_MISSING_TEXT if missing else OWN_PYTORCH_DAMAGED_TEXT
+        return text.format(prefix=sys.prefix, python=sys.executable, detail=detail)
     return PYTORCH_MISSING_TEXT.format(detail=detail)
 
 
