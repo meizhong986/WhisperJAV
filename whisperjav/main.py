@@ -392,9 +392,11 @@ def parse_arguments():
     twopass_group.add_argument("--ensemble", action="store_true",
                                help="Enable two-pass ensemble mode")
     twopass_group.add_argument("--pass1-pipeline", default="balanced",
-                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen",
+                               choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen", "xxl",
                                         *CRISPASR_PIPELINES],
-                               help="Pipeline for pass 1 (default: balanced). parakeet-crispasr and "
+                               # 1.10.0 (item 5, REQ5): xxl as pass 1. Text H1, approved by the owner as drafted (W275).
+                               help="Pipeline for pass 1 (default: balanced). 'xxl' = BYOP XXL Faster Whisper "
+                                    "(requires --xxl-exe). parakeet-crispasr and "
                                     "cohere-crispasr run through CrispASR, installed with WhisperJAV; "
                                     "their model is downloaded the first time it is needed; Japanese "
                                     "only. --pass1-model picks their model. "
@@ -440,10 +442,12 @@ def parse_arguments():
                                     "speech inside faster-whisper itself, on the same audio it "
                                     "transcribes, so there is nothing to split. fast, faster and "
                                     "transformers ignore it: they run no separate speech segmenter to feed.")
+    # 1.10.0 (item 5): the XXL sentence is text H2, approved by the owner as drafted (W275).
     twopass_group.add_argument("--pass1-model", default=None,
                                help="Model name for pass 1 (e.g., large-v2, kotoba-whisper-v2.0). "
                                     "The CrispASR pipelines take a model short name: "
-                                    + crispasr_models_help() + ".")
+                                    + crispasr_models_help() + ". "
+                                    "For xxl: the Whisper model XXL runs (default large-v2).")
     twopass_group.add_argument("--pass1-vad-threshold", type=float, default=None,
                                help="VAD threshold for pass 1 (0.0-1.0)")
     twopass_group.add_argument("--pass1-speech-pad-ms", type=int, default=None,
@@ -498,10 +502,12 @@ def parse_arguments():
                                     "speech inside faster-whisper itself, on the same audio it "
                                     "transcribes, so there is nothing to split. fast, faster and "
                                     "transformers ignore it: they run no separate speech segmenter to feed.")
+    # 1.10.0 (item 5): the XXL sentence is text H2, approved by the owner as drafted (W275).
     twopass_group.add_argument("--pass2-model", default=None,
                                help="Model name for pass 2 (e.g., large-v2, kotoba-whisper-v2.0). "
                                     "The CrispASR pipelines take a model short name: "
-                                    + crispasr_models_help() + ".")
+                                    + crispasr_models_help() + ". "
+                                    "For xxl: the Whisper model XXL runs (default large-v2).")
     twopass_group.add_argument("--pass2-vad-threshold", type=float, default=None,
                                help="VAD threshold for pass 2 (0.0-1.0)")
     twopass_group.add_argument("--pass2-speech-pad-ms", type=int, default=None,
@@ -515,8 +521,10 @@ def parse_arguments():
 
     # BYOP (Bring Your Own Provider) — external ASR tool integration
     byop_group = parser.add_argument_group("BYOP — Bring Your Own Provider")
+    # 1.10.0 (item 5): Text H3, approved by the owner as drafted (W275).
     byop_group.add_argument("--xxl-exe", default=None,
-                            help="Path to faster-whisper-xxl executable (required for --pass2-pipeline xxl)")
+                            help="Path to faster-whisper-xxl executable (required when --pass1-pipeline or "
+                                 "--pass2-pipeline is xxl)")
 
     # Environment check
     parser.add_argument("--check", action="store_true", help="Run environment checks and exit")
@@ -2658,13 +2666,15 @@ def main():
         if args.ensemble:
             logger.info("Two-pass ensemble mode enabled")
 
-            # BYOP XXL validation: --xxl-exe is required when pass2-pipeline=xxl
-            if getattr(args, 'pass2_pipeline', None) == 'xxl':
+            # BYOP XXL validation: --xxl-exe is required when either pass is xxl
+            # (1.10.0, item 5: xxl as pass 1 too). Text E1, approved by the owner as drafted (W275).
+            xxl_passes = [n for n in ("1", "2") if getattr(args, f"pass{n}_pipeline", None) == 'xxl']
+            if xxl_passes:
                 xxl_exe = getattr(args, 'xxl_exe', None)
                 if not xxl_exe:
                     logger.error(
-                        "--xxl-exe is required when using --pass2-pipeline xxl. "
-                        "Provide the path to your faster-whisper-xxl executable."
+                        "--xxl-exe is required when --pass%s-pipeline is xxl. "
+                        "Provide the path to your faster-whisper-xxl executable.", xxl_passes[0]
                     )
                     sys.exit(1)
                 xxl_path = Path(xxl_exe)
@@ -3163,6 +3173,7 @@ def main():
                     "language": language_code,
                     "device": args.device,
                     "compute_type": args.compute_type,
+                    "xxl_exe": getattr(args, 'xxl_exe', None),
                 },
                 "pass2": None,
             }
@@ -3497,6 +3508,10 @@ def main():
                 # pipelines that record it (Balanced).
                 'asr_telemetry': getattr(args, 'asr_telemetry', None),
                 'asr_telemetry_enabled': not getattr(args, 'no_asr_telemetry', False),
+                # BYOP XXL fields (only used when pipeline='xxl'; xxl as pass 1 since
+                # 1.10.0, item 5) -- as pass 2's below.
+                'xxl_exe': getattr(args, 'xxl_exe', None),
+                'xxl_args': _get_xxl_extra_args_from_config(),
             }
 
             pass2_config = None
