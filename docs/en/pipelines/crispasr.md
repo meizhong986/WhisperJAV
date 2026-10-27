@@ -49,8 +49,8 @@ With the Vulkan build: "Parakeet-CrispASR asks CrispASR's Vulkan build to use th
 | **Default speech segmenter** | WhisperSeg | FireRedVAD |
 | **Default sensitivity** | Balanced | Balanced |
 | **Longest VAD group** | 6 s, at every sensitivity | 3 s |
-| **Where a subtitle ends** | only at a natural break in the speech (see below) | one subtitle per VAD group |
-| **Subtitle times** | from the model's own timing of what it wrote | where the speech segmenter found the speech start and end |
+| **Where a subtitle ends** | only at a natural break in the speech (see below) | only at a sentence end (see below) |
+| **Subtitle times** | from the model's own timing of what it wrote | from the aligner `wav2vec2-ja`, which times the model's text |
 | **Audio analytics report** | yes | yes |
 
 A **VAD group** is a stretch of speech, a few seconds long, that the speech segmenter finds and hands to the model in one piece.
@@ -80,7 +80,7 @@ When a pass uses one of these pipelines:
   GPU: asks for the NVIDIA GPU (CUDA)
   ```
 
-  It can also show "CPU (not accelerated), several times slower: <reason>" or "CrispASR cannot run here: <reason>".
+  It can also show "CPU (not accelerated), several times slower: <reason>" or "CrispASR cannot run here: <reason>". For Cohere-CrispASR it also lists its aligner, for example "Aligner: wav2vec2 large XLSR-53 ja (q4_k) — not downloaded yet (232 MB); downloaded the first time it is used".
 
 ### Command line
 
@@ -144,7 +144,7 @@ and look under `crispasr_effective` in `settings.json`.
 
 - `--device auto` (the default, and what the GUI uses): the GPU the install's CrispASR build can use (see [Where they run](#where-they-run)), otherwise the CPU. The log says which, and why.
 - `--device cuda`: requires the CUDA build and an NVIDIA GPU it can use; otherwise the run stops before any audio is read.
-- `--device cpu`: always the CPU. In the GUI, "Run on the CPU this time" does the same for one run.
+- `--device cpu`: always the CPU for the ASR model. In the GUI, "Run on the CPU this time" does the same for one run. Cohere-CrispASR's aligner cannot be held on the CPU: where CrispASR's build uses a GPU it still asks for it, and the box at the start of the run says so.
 
 `--device` governs every pipeline of the run, the speech enhancer included.
 
@@ -177,7 +177,9 @@ For each video, both pipelines:
 
 It never cuts by number of characters or by length in seconds, so speech with no such break stays one subtitle, as long as its VAD group (up to about 6 seconds). Each subtitle starts where its first word starts and ends where its last spoken word ends, from the times the model gives.
 
-**Cohere-CrispASR: one subtitle per VAD group.** Each VAD group's text becomes one subtitle, from where the speech segmenter found the speech start to where it found it end (with 0.1 s of padding on each side by default). VAD groups are at most 3 seconds, or about 4.2 seconds when one stretch of speech runs on without a break. The text is not split further.
+**Cohere-CrispASR: a subtitle ends at a sentence end.** After Cohere writes a VAD group's text, the aligner `wav2vec2-ja` (run by CrispASR) finds when each character of that text is spoken. Within the VAD group, a new subtitle starts only after a sentence-end mark of the text (。 ？ ！ … ? !); a number such as 3.5 is never cut. Each subtitle starts at its first spoken character and ends where the next one starts; the last ends at the end of the VAD group. Pauses do not cut here: the aligner gives the moment each character starts, not where a sound ends, so a held sound would look like a pause. VAD groups are at most 3 seconds, or about 4.2 seconds when one stretch of speech runs on without a break.
+
+If the aligner gives no times for a VAD group, that group stays one subtitle from where the speech segmenter found the speech start to where it found it end, and the run summary counts such groups. If the aligner cannot be loaded at all (for example on the first run without internet), every group is made that way and the run summary says so; the text is kept in both cases. New in 1.10.0; not yet measured against reference subtitles.
 
 **Audio analytics.** As the Qwen3-ASR pipeline does, both pipelines print a short report for each video: which parts may lose speech and which are acoustically hard, with their times, so you can check those places. The report needs the Semantic scene detector; with another one, a log line says so and no report is made.
 
@@ -193,6 +195,9 @@ It never cuts by number of characters or by length in seconds, so speech with no
 | `parakeet-tdt-0.6b-ja` | `cstr/parakeet-tdt-0.6b-ja-GGUF` | `parakeet-tdt-0.6b-ja-q8_0.gguf` |
 | `cohere-asr-ja-v0.1` | `TransWithAI/cohere-transcribe-ja-v0.1-GGUF` | `cohere-asr-ja-v0.1-q8_0.gguf` |
 | `cohere-asr-ja` | `CKHO/cohere-asr-ja-GGUF` | `cohere-asr-ja-q8_0.gguf` |
+| aligner `wav2vec2-ja` (Cohere-CrispASR, and ChronosJAV by default) | `cstr/wav2vec2-large-xlsr-53-japanese-GGUF` | `wav2vec2-large-xlsr-53-japanese-q4_k.gguf` |
+
+Cohere-CrispASR's aligner (232 MB) is downloaded the first time the pass uses it, inside the pass, not before the run. If that download fails, the pass goes on without it: each VAD group becomes one subtitle at the group's edges (see [How the subtitles are made](#how-the-subtitles-are-made)). ChronosJAV's other aligners and its timing model are listed in `whisperjav --check` and on the [ChronosJAV page](chronosjav.md#subtitle-timing-1100).
 
 - The file is kept in your Hugging Face cache folder (by default `C:\Users\<you>\.cache\huggingface\` on Windows, `~/.cache/huggingface/` on macOS and Linux) and reused by later runs.
 - Before first use, WhisperJAV checks the file against the version it expects. A damaged download is deleted and downloaded once more.
@@ -213,6 +218,10 @@ It never cuts by number of characters or by length in seconds, so speech with no
 ✓ CrispASR model parakeet-tdt-0.6b-ja: Parakeet TDT 0.6B ja (q8_0), for parakeet-crispasr: downloaded
 ✓ CrispASR model cohere-asr-ja-v0.1: Cohere Transcribe ja v0.1 (q8_0), for cohere-crispasr: downloaded
 ✓ CrispASR model cohere-asr-ja: Cohere ASR ja (q8_0), for cohere-crispasr: downloaded
+✓ CrispASR model wav2vec2-ja: wav2vec2 large XLSR-53 ja (q4_k), for ChronosJAV and Cohere-CrispASR (aligner): downloaded
+✓ CrispASR model parakeet-ctc-ja: Parakeet CTC 1.1B ja (q8_0), for ChronosJAV (aligner): downloaded
+✓ CrispASR model qwen3-fa-gguf: Qwen3-ForcedAligner 0.6B (q4_k), for ChronosJAV (aligner): downloaded
+✓ CrispASR model whisper-small: Whisper small, for ChronosJAV (timing model): downloaded
 ```
 
 A model that is not downloaded yet shows "not downloaded" with its size. The first run that needs it downloads it.
