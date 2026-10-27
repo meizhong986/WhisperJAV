@@ -16,8 +16,8 @@ Usage:
 A full build stops if the working tree is not committed (checked after phase 1)
 or if the wheel holds a package file that git does not track.
 
-v1.10.0 (item 2f): the dependency lists come from uv.lock, one per PyTorch build
-(cu130, cu128, cpu), exported into whisperjav/installer/locked/ (tracked by git, so a
+v1.10.0 (item 2f; design section 22): the dependency lists come from uv.lock, one per
+lock extra (cu130, cu128, vulkan, cpu), exported into whisperjav/installer/locked/ (tracked by git, so a
 lock change shows up as uncommitted files and stops the build until committed).
 Needs uv on PATH (uv.lock's required-version names the lowest).
 """
@@ -52,8 +52,10 @@ YELLOW = '\033[93m'
 BLUE = '\033[94m'
 RESET = '\033[0m'
 
-# v1.10.0 (item 2f): the PyTorch builds uv.lock holds; one locked file each.
-LOCKED_VARIANTS = ("cu130", "cu128", "cpu")
+# v1.10.0 (item 2f; design 22.6.8): the uv.lock extras, one locked file each, from the one
+# accelerator table (standard library only, so this import needs nothing installed).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from whisperjav.installer.core.accelerators import LOCK_EXTRAS as LOCKED_VARIANTS  # noqa: E402
 
 class ReleaseBuilder:
     def __init__(self, dry_run=False):
