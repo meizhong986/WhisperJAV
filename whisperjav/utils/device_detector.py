@@ -276,6 +276,18 @@ def ctranslate2_device(requested: Optional[str], best: Optional[str] = None) -> 
     return "cpu"
 
 
+# The Apple silicon lines (design 22.8, owner W225 option 1, W219): each pipeline says where it runs.
+APPLE_SILICON_CTRANSLATE2_TEXT = (  # T53
+    "On an Apple silicon Mac, balanced, fast and faster run on the CPU (not accelerated), several times "
+    "slower: their engine (CTranslate2) cannot use the Apple GPU. The transformers pipeline uses the Apple "
+    "GPU (Metal).")
+APPLE_SILICON_FIDELITY_TEXT = (  # T52
+    "Fidelity asks PyTorch for the Apple GPU (Metal, through MPS); this has not been tested on a Mac. If it "
+    "fails, use the transformers pipeline.")
+APPLE_SILICON_CHRONOSJAV_TEXT = (  # T51
+    "ChronosJAV does not use the Apple GPU (Metal) in 1.10.0: its ASR model runs on the CPU (not "
+    "accelerated), several times slower than on a GPU.")
+
 # T67 (design 22.10), only on an Own PyTorch install.
 OWN_PYTORCH_CTRANSLATE2_TEXT = (
     "balanced, fast and faster run on the CPU (not accelerated): their engine (CTranslate2) can use "
