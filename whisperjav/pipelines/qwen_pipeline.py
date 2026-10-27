@@ -51,6 +51,7 @@ from whisperjav.modules.srt_postprocessing import SRTPostProcessor, normalize_la
 from whisperjav.modules.srt_stitching import SRTStitcher
 from whisperjav.modules.subtitle_pipeline.types import TimestampMode
 from whisperjav.pipelines.base_pipeline import BasePipeline
+from whisperjav.utils.device_detector import pass_device
 from whisperjav.utils.logger import logger
 
 # Lazy imports to avoid loading heavy modules until needed:
@@ -784,6 +785,7 @@ class QwenPipeline(BasePipeline):
             enhancer = create_enhancer_direct(
                 backend=self.enhancer_backend,
                 model=self.enhancer_model,
+                device=pass_device(self._asr_config.get("device")),  # --device, as every part (22.3.1)
             )
 
             def _enhancement_progress(scene_num, total, scene_name):
@@ -811,6 +813,7 @@ class QwenPipeline(BasePipeline):
             enhancer = create_enhancer_direct(
                 backend=self.enhancer_backend,
                 model=self.enhancer_model,
+                device=pass_device(self._asr_config.get("device")),  # --device, as every part (22.3.1)
             )
 
             def _enhancement_progress(scene_num, total, scene_name):
