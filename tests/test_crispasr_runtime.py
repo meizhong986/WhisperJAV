@@ -84,12 +84,14 @@ class TestPrepareRuntime:
         assert str(e.value) == install.NOT_INSTALLED_TEXT
 
     @pytest.mark.parametrize("torch", ["2.11.0+cpu", "2.11.0"])
-    def test_the_cpu_variant_without_crispasr_says_so_instead(self, machine, torch):
-        # T10i: re-running the installer cannot help there (CrispASR #556; owner O16).
+    def test_a_cpu_only_install_without_crispasr_also_says_run_the_installer_again(self, machine, torch):
+        # 1.10.0 (design 22.3.2): every install of a supported computer has CrispASR, the CPU-only
+        # one included, so a missing CrispASR is a damaged install there too (T10i is gone).
         machine.installed, machine.torch = False, torch
         with pytest.raises(CrispASRSetupError) as e:
             install.prepare_runtime(None, PARAKEET)
-        assert str(e.value) == install.CPU_VARIANT_TEXT
+        assert str(e.value) == install.NOT_INSTALLED_TEXT
+        assert not hasattr(install, "CPU_VARIANT_TEXT") and not hasattr(install, "is_cpu_variant")
 
     def test_a_processor_without_avx2_stops_before_the_libraries_load(self, machine):
         machine.avx2 = False
@@ -150,7 +152,7 @@ class TestTheDeviceRule:
         machine.best = "mps"
         choice = install.choose_device(None, "cpu", "0.8.44", sys_platform="darwin")
         assert (choice.use_gpu, choice.device) == (True, "metal")
-        assert "not been tested on a Mac" in choice.device_line("Parakeet-CrispASR")
+        assert "not yet tested on a Mac" in choice.device_line("Parakeet-CrispASR")
 
     def test_cpu_build_on_a_mac_without_a_gpu(self, machine):
         machine.best = "cpu"
@@ -166,18 +168,32 @@ class TestTheDeviceRule:
         with pytest.raises(CrispASRSetupError, match="--device cuda"):
             install.choose_device("cuda", build, "v", sys_platform=platform)
 
-    def test_the_vulkan_build_is_not_used_on_the_gpu_in_1_10_0(self, machine):
+    def test_the_vulkan_build_asks_for_the_gpu(self, machine):
+        # The GPU-through-Vulkan install (design 22.3.2, owner W234 D-A): auto asks the build for its GPU.
         choice = install.choose_device(None, "vulkan", "0.8.44+vulkan", sys_platform="win32")
-        assert (choice.use_gpu, choice.reason) == (False, install.REASON_VULKAN_BUILD)
+        assert (choice.use_gpu, choice.device, choice.reason) == (True, "vulkan", None)
+        assert choice.device_line("Parakeet-CrispASR") == (
+            "Parakeet-CrispASR asks CrispASR's Vulkan build to use this PC's GPU (CrispASR 0.8.44+vulkan). "
+            "GPUs through Vulkan are experimental in 1.10.0 and have not been tested.")
+
+    def test_the_vulkan_build_with_device_cuda_says_what_to_use(self, machine):
+        with pytest.raises(CrispASRSetupError) as e:
+            install.choose_device("cuda", "vulkan", "0.8.44+vulkan", sys_platform="win32")
+        assert str(e.value) == install.DEVICE_CUDA_VULKAN_TEXT
+
+    def test_the_vulkan_build_with_device_cpu_runs_on_the_cpu(self, machine):
+        choice = install.choose_device("cpu", "vulkan", "0.8.44+vulkan", sys_platform="win32")
+        assert (choice.use_gpu, choice.device) == (False, "cpu")
 
 
 class TestTheDeviceLine:
     def test_the_nvidia_gpu_is_worded_as_a_request(self):
         choice = install.RuntimeChoice(True, "cuda", None, False, "0.8.44+cuda", "cuda")
         assert choice.device_line("Parakeet-CrispASR") == \
-            "Parakeet-CrispASR asks CrispASR to use the NVIDIA GPU (CrispASR 0.8.44+cuda)."
+            "Parakeet-CrispASR asks CrispASR to use the NVIDIA GPU (CUDA) (CrispASR 0.8.44+cuda)."
 
     def test_the_processor_with_its_reason(self):
         choice = install.RuntimeChoice(False, "cpu", "no NVIDIA GPU was found", False, "0.8.44+cuda", "cuda")
         assert choice.device_line("Cohere-CrispASR") == \
-            "Cohere-CrispASR runs on the processor, which is slower: no NVIDIA GPU was found."
+            ("Cohere-CrispASR runs on the CPU (not accelerated), several times slower than on a GPU: "
+             "no NVIDIA GPU was found.")
