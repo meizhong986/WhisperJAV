@@ -307,7 +307,7 @@ class TestUpgradePackage:
         assert not any("-U" in cmd and "--no-deps" not in cmd for cmd in commands)
 
         captured = capsys.readouterr()
-        assert "Upgrading with release-pinned dependencies (CUDA 13.0)..." in captured.out
+        assert "Upgrading with release-pinned dependencies (NVIDIA GPU (CUDA 13.0))..." in captured.out
         assert "successfully" in captured.out.lower()
 
     def test_upgrade_failure(self, recorded_cu130, capsys):
