@@ -225,14 +225,17 @@ class CrispASRPipeline(BasePipeline):
 
         self.progress.set_current_step("Transcribing with CrispASR", 5, 6)
         results: List[Tuple[_Group, List[CrispSegment]]] = []
-        if groups:
-            results = self._transcribe(scenes, groups, md)
-        else:
-            logger.info(f"{self.LABEL}: no speech was found in {basename}")
-        if self.enhancer_backend not in ("", "none") and self.asr is not None and self.asr.is_open:
-            # With a speech enhancer the model is opened for each file's ASR step and closed after it,
-            # so the enhancer and the CrispASR model never hold GPU memory together (W217 19).
-            self.asr.close()
+        try:
+            if groups:
+                results = self._transcribe(scenes, groups, md)
+            else:
+                logger.info(f"{self.LABEL}: no speech was found in {basename}")
+        finally:
+            if self.enhancer_backend not in ("", "none") and self.asr is not None and self.asr.is_open:
+                # With a speech enhancer the model is opened for each file's ASR step and closed after
+                # it, also when the step fails, so the enhancer and the CrispASR model never hold GPU
+                # memory together (W217 19; review P7 finding 15).
+                self.asr.close()
 
         self.progress.set_current_step("Building subtitles", 6, 6)
         stitched, count_raw = self._build_subtitles(scenes, results, basename, md)
@@ -404,7 +407,10 @@ class CrispASRPipeline(BasePipeline):
             return scenes, scenes
         started = time.time()
         tuples = [(sc.path, sc.start, sc.end, sc.end - sc.start) for sc in scenes]
-        enhancer = create_enhancer_direct(backend=self.enhancer_backend, model=self.enhancer_model)
+        from whisperjav.utils.device_detector import pass_device
+        # The enhancer runs on PyTorch and follows --device as every part does (22.3.1; P7 finding 3).
+        enhancer = create_enhancer_direct(backend=self.enhancer_backend, model=self.enhancer_model,
+                                          device=pass_device(self.device))
         try:
             enhanced = enhance_scenes(tuples, enhancer, self.temp_dir, degradations=self.degradations)
         finally:
