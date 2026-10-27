@@ -28,7 +28,7 @@ Depends on the mode, GPU tier, and how challenging the audio is. The numbers bel
 
 ### Can I use WhisperJAV without a GPU?
 
-Yes. Go to **Advanced** → check **"Accept CPU-only mode"**. This box is required: when no usable GPU is found, the start-up check stops and asks whether to continue on the CPU, and the GUI cannot ask, so without the box the run aborts with a message telling you to tick it. On the command line, pass `--accept-cpu-mode` (or `--device cpu`). Use **Faster** mode for best CPU speed. It works, just significantly slower.
+Yes. Choose **CPU only** when you install (the Windows installer's window, or `--accelerator cpu` for a source install); every run then uses the CPU, with nothing to tick. On a GPU install, `--device cpu` runs one job on the CPU. Use **Faster** mode for the best CPU speed. It works, but several times slower than on a GPU. See [Accelerated or not](getting-started/index.md#accelerated-or-not).
 
 ---
 
@@ -51,7 +51,7 @@ This is a known Whisper behavior on silent or very quiet sections. WhisperJAV in
 
 1. Try a different **sensitivity** setting - in some content profiles **Aggressive** captures real speech that **Conservative** drops as silence (which Whisper then fills with hallucinations); on other content the reverse is true. Run a representative clip on each setting to find the sweet spot for your library.
 2. Use **Ensemble** mode - two model outputs typically disagree on different hallucinations, so the merge step removes more than either pass alone.
-3. Enable a **Speech Enhancer** (ClearVoice or BS-RoFormer) to clean the audio first
+3. Enable a **Speech Enhancer** (ZipEnhancer or htdemucs) to clean the audio first
 
 ### The timing is off / subtitles appear too early or late
 
@@ -132,7 +132,7 @@ The standalone installer respects standard proxy environment variables. Set them
 ```cmd
 set HTTPS_PROXY=http://user:pass@proxy.example.com:8080
 set HTTP_PROXY=http://user:pass@proxy.example.com:8080
-WhisperJAV-1.8.x-Windows-x86_64.exe
+WhisperJAV-1.10.0-Windows-x86_64.exe
 ```
 
 **Windows (persistent, all sessions):**
@@ -162,41 +162,35 @@ On macOS, the bundled Python may not trust the system certificate store by defau
 **Fix**: run the official Python "Install Certificates" script that ships in your Python install:
 
 ```bash
-/Applications/Python\ 3.12/Install\ Certificates.command
+/Applications/Python\ 3.13/Install\ Certificates.command
 ```
 
-(Replace `3.12` with your installed Python minor version.) This installs the `certifi` CA bundle into the Python you are running. Re-run `python install.py` after.
+(This is for Python from python.org; Homebrew's Python uses the system certificates.) This installs the `certifi` CA bundle into the Python you are running. Re-run `python install.py` after.
 
-**Note**: avoid alpha or pre-release Python builds (e.g. 3.12.0a3) for production installs. WhisperJAV supports stable Python 3.10-3.12.
+**Note**: avoid alpha or pre-release Python builds for production installs. WhisperJAV 1.10.0 needs a stable Python 3.13.
 
 ### Qwen3-ASR fails with `TypeError: check_model_inputs() missing 1 required positional argument`
 
-The bundled Qwen3-ASR fork is incompatible with `transformers` 5.x (the decorator API changed at `modeling_qwen3_asr.py:986`). WhisperJAV v1.8.14 pins `transformers>=4.40.0,<5.0` in `pyproject.toml` and the installer registry, so fresh installs are protected.
-
-**If you hit this error**, your environment has `transformers >=5.0`. Either:
-
-1. Downgrade transformers in your active env:
-   ```bash
-   <env-pip> install --no-deps "transformers>=4.40.0,<5.0"
-   ```
-   Replace `<env-pip>` with the exact pip path for your install (e.g. `Scripts\pip.exe` for the Windows standalone installer, or your venv pip for source installs).
-
-2. Or wait for a WhisperJAV release that supports transformers 5.x. None is scheduled yet, so option 1 is the fix for now. Tracking: <https://github.com/QwenLM/Qwen3-ASR/issues/138>.
+This error came from running the original `qwen-asr` package on `transformers` 5. WhisperJAV 1.10.0 installs `transformers` 5.20 together with its own build of `qwen-asr` made for it ([meizhong986/Qwen3-ASR](https://github.com/meizhong986/Qwen3-ASR)). If you see this error on 1.10.0, your environment holds a different `qwen-asr`: run the installer again, which puts back the tested versions.
 
 ### "CUDA not available" but I have an NVIDIA GPU
 
-1. Verify your NVIDIA driver version: `nvidia-smi`
-2. Driver 450+ required for CUDA 11.8, 570+ for CUDA 12.8
-3. You do NOT need to install the CUDA Toolkit — PyTorch bundles its own
-4. Try reinstalling PyTorch with the correct CUDA version
+1. Run `whisperjav --check`: it names the accelerator of the install and whether PyTorch can use the GPU.
+2. Verify your NVIDIA driver version with `nvidia-smi`: 1.10.0 needs 580 or newer on Windows, 570 or newer on Linux, and a GTX 16 / RTX 20 series or newer card.
+3. You do NOT need to install the CUDA Toolkit — PyTorch brings its own.
+4. If the install was made for the CPU only: with the Windows installer, run it again; with a supported NVIDIA GPU it makes the NVIDIA GPU install. With a source install, run `python install.py --accelerator nvidia`.
 
 ### How do I upgrade?
+
+Within 1.10:
 
 ```bash
 whisperjav-upgrade
 ```
 
-Or for code-only (faster): `whisperjav-upgrade --wheel-only`
+Or for code-only (faster): `whisperjav-upgrade --wheel-only`. It keeps the accelerator of your install. This is for installs made with the Windows installer. A source install: `git fetch --tags`, `git checkout` the new release tag, and run the installer again with the same Python environment active.
+
+From 1.9.x, install 1.10.0 fresh: 1.10.0 needs Python 3.13, so `whisperjav-upgrade` cannot take a 1.9.x install to it.
 
 See the [Upgrade Guide](UPGRADE.md) for details.
 
@@ -214,7 +208,7 @@ WhisperJAV downloads models on first use and caches them on disk. The cache loca
 | OpenAI Whisper | `~/.cache/whisper/` | `%USERPROFILE%\.cache\whisper\` | Standard `large-v2` / `large-v3` / `turbo` models |
 | Faster-Whisper | (uses HuggingFace cache above) | (uses HuggingFace cache above) | `fidelity` / `balanced` / `fast` modes via faster-whisper |
 | PyTorch Hub | `~/.cache/torch/hub/` | `%USERPROFILE%\.cache\torch\hub\` | Silero VAD weights |
-| ModelScope | `~/.cache/modelscope/` | `%USERPROFILE%\.cache\modelscope\` | ZipEnhancer / ClearVoice (when used) |
+| ModelScope | `~/.cache/modelscope/` | `%USERPROFILE%\.cache\modelscope\` | ZipEnhancer (when used) |
 | WhisperJAV-internal | `~/.whisperjav_cache/` | `%LOCALAPPDATA%\.whisperjav_cache\` | Update checker cache, numba JIT cache redirect |
 
 A typical WhisperJAV install ends up with **5-15 GB** in HuggingFace + Whisper caches after a few sessions, depending on which models you've used.
@@ -262,15 +256,15 @@ On a 4 GB GPU, **Fast** is the only mode that reliably fits. There is no automat
 
 Tips:- Avoid running other GPU-heavy applications simultaneously (Chrome, games, video encoding)
 - Translation with local LLMs needs separate VRAM (3-8 GB depending on model). On a 4 GB GPU, prefer cloud translation providers (DeepSeek, OpenRouter) for the translation step.
-- Speech enhancers (`clearvoice`, `bs-roformer`, `zipenhancer`) each need 1-3 GB extra. Use `none` or `ffmpeg-dsp` (CPU-only) if VRAM is tight.
+- Speech enhancers (`zipenhancer`, `htdemucs`) each need 1-3 GB extra. Use `none` or `ffmpeg-dsp` (CPU-only) if VRAM is tight.
 
 ---
 
 ## Cohere-Transcribe (not available yet)
 
-> **Status:** Cohere-Transcribe is not available in WhisperJAV yet. It needs transformers 5.x, which WhisperJAV does not support yet. No release date is set. The dropdown entry is greyed out.
+> **Status:** Cohere-Transcribe is not available in WhisperJAV yet. No release date is set. The dropdown entry is greyed out. (Not to be confused with Cohere-CrispASR, the GGUF pipeline in Ensemble Mode: see [Parakeet-CrispASR and Cohere-CrispASR](pipelines/crispasr.md).)
 
-> **Migration note for users who already upgraded transformers:** If you ran a recent `pip install transformers --upgrade` (or otherwise pulled transformers 5.x into your WhisperJAV env), Qwen3-ASR will fail to load. Restore stability with `pip install "transformers>=4.40.0,<5.0"` and then verify Qwen3-ASR loads via `python -c "from qwen_asr import Qwen3ASRModel; print('OK')"`.
+> **About transformers:** WhisperJAV 1.10.0 installs transformers 5.20 together with its own build of `qwen-asr` made for it ([meizhong986/Qwen3-ASR](https://github.com/meizhong986/Qwen3-ASR)). Do not downgrade transformers below 5.0. If Qwen3-ASR does not load, run the installer again; it puts back the tested versions.
 
 The setup notes below are for when it becomes available.
 
