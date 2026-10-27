@@ -204,7 +204,19 @@ The modal has tabs for **Model**, **Quality**, **Segmenter**, **Enhancer**, and 
 
 The **Model** tab has a **Device** menu: **Auto (the GPU when one can be used, else the CPU)** (the default), **NVIDIA GPU (CUDA)** or **CPU (not accelerated)**.
 
-For a GGUF pass (Parakeet-CrispASR, Cohere-CrispASR), the modal has three tabs: **Segmenter**, **Enhancer** and **Scene**. They start from the values the pass runs with. A status panel under the pass row shows the model (downloaded or not) and where CrispASR will run, for example "GPU: asks for the NVIDIA GPU (CUDA)".
+For a GGUF pass (Parakeet-CrispASR, Cohere-CrispASR), the modal has three tabs: **Segmenter**, **Enhancer** and **Scene**. They start from the values the pass runs with. A status panel under the pass row shows the model (downloaded or not) and where CrispASR will run, for example "GPU: asks for the NVIDIA GPU (CUDA)". For Cohere-CrispASR it also lists the aligner that times its text.
+
+For a ChronosJAV pass (Qwen3-ASR, Anime-Whisper), the **Alignment** tab sets the subtitle timing (see [Subtitle timing](../pipelines/chronosjav.md#subtitle-timing-1100)):
+
+| Control | Options | Default |
+|---|---|---|
+| **Aligner Backend** | CrispASR (GGUF, recommended), Qwen3 ForcedAligner (PyTorch), None (no aligner) | CrispASR |
+| **Aligner Model** | the models of the chosen backend: `wav2vec2-ja` (recommended), `parakeet-ctc-ja` (not recommended), `qwen3-fa-gguf`; or Qwen3-ForcedAligner-0.6B (PyTorch) | `wav2vec2-ja` |
+| **Timestamp Mode** | Aligner + VAD Fallback (recommended), Aligner + Interpolation, Aligner Only (no recovery on collapse), VAD Only (no aligner loaded) | Aligner + VAD Fallback |
+| **Timing Model (Whisper)** | Whisper small (recommended), None (no timing model) | Whisper small |
+| **Adaptive Step-Down** | a tick box | not ticked |
+
+With Aligner Backend **None**, the run uses VAD Only with Step-Down off, whatever those two controls show. A status panel under a ChronosJAV pass row shows the aligner and the timing model (downloaded or not) and where CrispASR runs them. Since 1.10.0 the Alignment tab's values, and a preset saved from it, reach the run; from 1.8.10.post3 to 1.9.5 they were ignored.
 
 Use **Save Preset** to save your configuration for reuse, or **Load Preset** to restore a saved configuration. Presets persist across sessions.
 
