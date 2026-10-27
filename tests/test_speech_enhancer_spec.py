@@ -135,12 +135,12 @@ class TestTheFlagsThemselves:
 
 class TestEnhanceForVadIsIgnoredWhereWeSayItIs:
     """
-    The owner accepted on 2026-09-17 that fast, faster, transformers and crispasr
-    ignore --passN-enhance-for-vad, on condition it is documented. 1.10.0 removed
-    the crispasr pipeline; its successors parakeet-crispasr and cohere-crispasr run
-    no audio clean-up at all, so they ignore it too. The list that documents it
-    must not drift from the pipelines themselves, so this reads their source rather
-    than their docstrings.
+    The owner accepted on 2026-09-17 that fast, faster and transformers ignore
+    --passN-enhance-for-vad, on condition it is documented. parakeet-crispasr and
+    cohere-crispasr read it since design 22.9.1 (owner W232 8). The list that
+    documents it must not drift from the pipelines themselves, so this reads their
+    source -- each class and the pipeline classes it inherits from, short of
+    BasePipeline -- rather than their docstrings.
     """
 
     def test_the_list_matches_the_pipeline_sources(self):
@@ -148,7 +148,8 @@ class TestEnhanceForVadIsIgnoredWhereWeSayItIs:
             "import inspect, json;"
             "from whisperjav.ensemble.pass_worker import PIPELINE_CLASSES, ENHANCE_FOR_VAD_IGNORED_BY;"
             "ignores = sorted(n for n, c in PIPELINE_CLASSES.items()"
-            " if 'enhance_for_vad' not in inspect.getsource(c));"
+            " if not any('enhance_for_vad' in inspect.getsource(k) for k in c.__mro__"
+            " if k.__module__.startswith('whisperjav.pipelines') and k.__name__ != 'BasePipeline'));"
             "print('IGNORES=' + json.dumps(ignores));"
             "print('DECLARED=' + json.dumps(sorted(ENHANCE_FOR_VAD_IGNORED_BY)))"
         )
@@ -171,6 +172,6 @@ class TestEnhanceForVadIsIgnoredWhereWeSayItIs:
                                 env={**os.environ, "COLUMNS": "1000"})
         assert result.returncode == 0
         help_text = " ".join(result.stdout.split())
-        assert "fast, faster, transformers, parakeet-crispasr and cohere-crispasr ignore it" in help_text
-        assert ("Accepted but ignored by fast, faster, transformers, parakeet-crispasr and "
-                "cohere-crispasr.") in help_text
+        assert "fast, faster and transformers ignore it" in help_text
+        assert "Accepted but ignored by fast, faster and transformers." in help_text
+        assert "Available with qwen, fidelity, parakeet-crispasr and cohere-crispasr." in help_text
