@@ -911,7 +911,8 @@ def _run_xxl_pass(
     """
     import time as _time
 
-    from whisperjav.byop.xxl_runner import run_xxl
+    from whisperjav.byop.xxl_runner import (DEFAULT_XXL_MODEL, failure_note, failure_reason,
+                                            model_override_note, run_xxl)
 
     pass_config = payload.pass_config
     xxl_exe = pass_config.get("xxl_exe") if pass_config else None
@@ -936,13 +937,19 @@ def _run_xxl_pass(
 
     pass_temp_dir.mkdir(parents=True, exist_ok=True)
     xxl_extra_args = pass_config.get("xxl_args", "")
-    xxl_model = pass_config.get("model") or "large-v3"
+    xxl_model = pass_config.get("model") or DEFAULT_XXL_MODEL
     asr_task = "translate" if payload.subs_language == "direct-to-english" else "transcribe"
 
     logger.info(
         "[Worker %s] Pass %s: BYOP XXL (exe=%s, model=%s)",
         os.getpid(), pass_number, xxl_exe, xxl_model,
     )
+
+    # A model named in the extra arguments is not used (#272); say so once per pass worker --
+    # once per pass, or once per file and pass with --ensemble-serial (owner W271 4).
+    override_note = model_override_note(pass_number, xxl_model, xxl_extra_args, xxl_exe)
+    if override_note:
+        logger.warning(override_note)
 
     for media_info in media_files:
         basename = media_info["basename"]
@@ -998,8 +1005,11 @@ def _run_xxl_pass(
                 "[Worker %s] Pass %s [XXL] %s -> %d subtitles in %.1fs",
                 os.getpid(), pass_number, basename, subtitle_count, elapsed,
             )
-        except Exception:
+        except Exception as xxl_error:
             elapsed = _time.monotonic() - file_start
+            # An XXL failure is never silent (owner W92); see failure_note.
+            failure_line = failure_note(pass_number, basename, xxl_error)
+            logger.error(failure_line)
             logger.exception(
                 "[Worker %s] Pass %s [XXL] failed for %s (%.1fs)",
                 os.getpid(), pass_number, basename, elapsed,
@@ -1008,7 +1018,8 @@ def _run_xxl_pass(
                 FileResult(
                     basename=basename,
                     status="failed",
-                    error=traceback.format_exc(),
+                    # The plain reason first: the Ensemble summary shows the start of the first line.
+                    error=f"{failure_reason(xxl_error)}\n{traceback.format_exc()}",
                 )
             )
 
