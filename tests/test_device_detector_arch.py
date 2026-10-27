@@ -221,6 +221,29 @@ class TestStartOfRun:
         out = _flat(capsys.readouterr().out)
         assert "made for: NVIDIA GPU (CUDA 13.0)" in out and "as asked with --device cpu" in out
 
+    @pytest.mark.parametrize("gpu_where", [True, False])
+    def test_device_cpu_names_the_crispasr_parts_only_where_they_use_a_gpu(self, monkeypatch, capsys, gpu_where):
+        """Item 12: CrispASR's aligner and timing model cannot be held on the CPU. The box says so only where the
+        CrispASR build would ask for a GPU, and then does not also say 'every pipeline'."""
+        from whisperjav.utils import preflight_check as pf
+        real_run = pf.start_of_run_check
+
+        def run_with_gguf(device=None):
+            monkeypatch.setattr(pf, "_gguf_where",
+                                lambda best: pf.GGUF_CUDA_WHERE if gpu_where else pf.GGUF_CPU_WHERE)
+            return real_run(device=device)
+
+        monkeypatch.setattr(pf, "start_of_run_check", run_with_gguf)
+        assert self._run(monkeypatch, _fake_torch((8, 6), CU128_LIST, "RTX 3060"), "cu130", device="cpu") == "notice"
+        out = _flat(capsys.readouterr().out)
+        if gpu_where:
+            assert "Every pipeline's ASR model: the CPU (not accelerated)" in out
+            assert "still ask for the GPU: CrispASR cannot hold them on the CPU" in out
+            assert "Every pipeline: the CPU" not in out
+        else:
+            assert "Every pipeline: the CPU (not accelerated), as asked with --device cpu." in out
+            assert "CrispASR cannot hold" not in out
+
     def test_nvidia_install_with_a_working_gpu_is_silent(self, monkeypatch, capsys):
         assert self._run(monkeypatch, _fake_torch((8, 6), CU128_LIST, "RTX 3060"), "cu128") == "silent"
         assert capsys.readouterr().out == ""
@@ -233,7 +256,7 @@ class TestStartOfRun:
         assert self._run(monkeypatch, _no_gpu_torch(), record) == "notice"
         out = _flat(capsys.readouterr().out)
         assert f"This install of WhisperJAV is made for: {name}. On this computer:" in out
-        assert "GGUF[cpu]" in out and "Other pipelines: the CPU (not accelerated)" in out
+        assert "GGUF[cpu]" in out and "Other pipelines, and ChronosJAV's ASR model: the CPU (not accelerated)" in out
         assert "?" not in out  # no question
 
     def test_apple_install_is_silent_with_the_apple_gpu_and_a_notice_without(self, monkeypatch, capsys):
