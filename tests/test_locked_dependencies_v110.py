@@ -220,9 +220,9 @@ def test_install_py_knows_which_builds_the_lock_holds(monkeypatch, system, machi
 
 @pytest.mark.parametrize("system, machine, build, text", [
     ("linux", "x86_64", "cu130",
-     "CUDA 13.0 is not offered on Linux in WhisperJAV 1.10.0. Use --cuda cu128 (the Linux default) or --cpu-only."),
+     "CUDA 13.0 is not offered on Linux in WhisperJAV 1.10.0. Use --accelerator nvidia (CUDA 12.8 on Linux) or --accelerator cpu."),
     ("darwin", "arm64", "cu128",
-     "macOS has no CUDA builds. Run without --cuda; WhisperJAV installs the Apple build."),
+     "macOS has no CUDA builds. Run without --accelerator; WhisperJAV installs for the Apple GPU."),
     ("darwin", "x86_64", "cpu",
      "PyTorch has no CPU build for this computer (darwin, x86_64) in WhisperJAV 1.10.0, so it cannot be "
      "installed here. Nothing was installed."),
@@ -244,7 +244,7 @@ def test_install_py_stops_before_uv_sync_and_names_the_build_in_its_hint():
         "success = run_uv_sync(extras, cuda_version")
     # W58 text 9: the build actually chosen
     assert ('log(f"    You can install it later: uv sync --frozen --extra all "\n'
-            '                    f"--extra {LOCKED_EXTRAS[cuda_version]}")') in source
+            '                    f"--extra {ACC.lock_extra(cuda_version)}{own}")') in source
     assert "uv sync --extra enhance" not in source
 
 
@@ -272,13 +272,13 @@ def test_source_upgrade_syncs_frozen_with_the_recorded_build(upgrade, monkeypatc
     assert upgrade._run_uv_sync_upgrade(tmp_path, extras="all") is True
     sync = next(c for c in seen if c[:2] == ["uv", "sync"])
     assert sync == ["uv", "sync", "--frozen", "--extra", "all", "--extra", "cu128"]
-    assert "Upgrading with release-pinned dependencies (CUDA 12.8)..." in capsys.readouterr().out
+    assert "Upgrading with release-pinned dependencies (NVIDIA GPU (CUDA 12.8))..." in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("system, machine, build, text", [
     ("linux", "x86_64", "cu130",
      "This installation uses CUDA 13.0, which WhisperJAV 1.10.0 does not offer on Linux. Nothing was changed. "
-     "Run install.py again with --cuda cu128 (the Linux default) or --cpu-only."),
+     "Run install.py again with --accelerator nvidia (CUDA 12.8 on Linux)."),
     ("darwin", "x86_64", "cpu",
      "PyTorch has no CPU build for this computer (darwin, x86_64) in WhisperJAV 1.10.0, so it cannot be "
      "upgraded here. Nothing was changed."),
@@ -336,7 +336,7 @@ def test_installer_upgrade_installs_the_locked_file_without_conda_packages(upgra
     assert "--no-deps" in torch_cmd and torch_cmd[-2:] == ["--index-url", "https://download.pytorch.org/whl/cpu"]
     assert not (install / "requirements_upgrade_cpu.txt").exists()
     out = capsys.readouterr().out
-    assert "Upgrading with release-pinned dependencies (CPU)..." in out
+    assert "Upgrading with release-pinned dependencies (CPU only (not accelerated))..." in out
     assert f"Installed the release's pinned packages ({len(lines)})." in out  # W58 text 6
 
 
@@ -376,7 +376,7 @@ def test_the_pre_check_runs_the_install_commands_as_a_dry_run(upgrade, monkeypat
     assert [[a for a in c if a != "--dry-run"] for c in dry] == real
     assert all("--dry-run" in c for c in dry)
     out = capsys.readouterr().out
-    assert "Checking that this release's pinned packages are available for this PC (CUDA 13.0)..." in out
+    assert "Checking that this release's pinned packages are available for this PC (NVIDIA GPU (CUDA 13.0))..." in out
     assert f"All {len(lines)} pinned packages are available." in out  # W58 text 4
     assert "Checked 1 package that conda installed against the pinned list: all match." in out
 
@@ -408,8 +408,8 @@ def test_a_conda_package_at_another_version_stops_the_upgrade_before_any_change(
 def test_a_missing_pinned_list_stops_before_any_change(upgrade, monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(upgrade, "fetch_release_locked_file", lambda source, stack: None)
     assert upgrade.prepare_release_pins(_installer_install(tmp_path), "cu128") is None
-    assert "Upgrade stopped before any change: the new release's pinned package list for CUDA 12.8 could not " \
-           "be read" in capsys.readouterr().out
+    assert "Upgrade stopped before any change: the new release's pinned package list for NVIDIA GPU (CUDA 12.8) " \
+           "could not be read" in capsys.readouterr().out
 
 
 def test_the_pinned_list_is_read_from_the_release_tag_a_wheel_or_a_folder(upgrade, monkeypatch, tmp_path):
