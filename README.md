@@ -262,7 +262,7 @@ whisperjav video.mp4 --ensemble \
 - **Merge strategies:** `pass1_primary` / `pass2_primary` (one pass leads, the other fills gaps), `smart_merge`, `full_merge`, `pass1_overlap` / `pass2_overlap`, `longest`
 - **Presets:** save and reload named ensemble configurations from the GUI
 - **Serial mode** (`--ensemble-serial`): finish each file completely before starting the next, so results appear as they're done
-- **Bring your own pass 2:** [PurfView's Faster-Whisper XXL](https://github.com/Purfview/whisper-standalone-win) (`--pass2-pipeline xxl --xxl-exe ...`)
+- **Bring your own pass 1, pass 2 or both:** [PurfView's Faster-Whisper XXL](https://github.com/Purfview/whisper-standalone-win) (`--pass1-pipeline xxl` and/or `--pass2-pipeline xxl`, with `--xxl-exe ...`; the model with `--pass1-model` / `--pass2-model`, default `large-v2`)
 
 ---
 
