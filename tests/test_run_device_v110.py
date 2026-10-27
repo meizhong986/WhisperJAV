@@ -73,6 +73,13 @@ def test_a_damaged_pytorch_is_named_with_its_error(monkeypatch):
     monkeypatch.setattr(builtins, "__import__", failing)
     text = pytorch_probe.pytorch_problem()
     assert "missing or damaged in this install (OSError: [WinError 126] fbgemm.dll" in text
+    # Review P7 finding 10: on an Own PyTorch install the installer is no help; the pip command is.
+    from whisperjav.installer.core import accelerators
+    monkeypatch.setattr(accelerators, "read_record", lambda prefix=None: (True, "own-pytorch"))
+    text = pytorch_probe.pytorch_problem()
+    assert text.startswith("This install uses your own PyTorch, and the one in WhisperJAV's Python")
+    assert "does not load (OSError: [WinError 126] fbgemm.dll" in text and "installer" not in text
+    assert f'"{sys.executable}" -m pip install --force-reinstall torch torchaudio' in text
 
 
 def test_with_pytorch_the_probe_is_silent():
@@ -135,6 +142,84 @@ def test_ensemble_passes_take_the_runs_device():
     src = (REPO / "whisperjav" / "ensemble" / "pass_worker.py").read_text(encoding="utf-8")
     assert 'hf_defaults["hf_device"] = pass_device(pass_config.get("device"), hf_defaults.get("hf_device"))' in src
     assert '"device": pass_device(pass_config.get("device"), qwen_defaults.get("qwen_device")),' in src
+
+
+# A child process builds legacy passes with the pipeline class replaced by a recorder: the
+# resolver and apply_custom_params run for real, no ASR model is loaded.
+LEGACY_PROBE = r"""
+import json, sys
+from pathlib import Path
+import whisperjav.ensemble.pass_worker as pw
+seen = {}
+class Recorder:
+    def __init__(self, **kwargs):
+        seen.update(kwargs)
+pw.PIPELINE_CLASSES["balanced"] = Recorder
+root = Path(sys.argv[1])
+out = []
+for i, config in enumerate(json.loads(sys.argv[2])):
+    seen.clear()
+    pw._build_pipeline(pass_config=config, pass_number=1, output_dir=str(root / "out"), keep_temp_files=False,
+                       subs_language="native", extra_kwargs={}, pass_temp_dir=root / f"p{i}")
+    out.append(seen["resolved_config"]["model"]["device"])
+print("RESULT=" + json.dumps(out))
+"""
+
+
+@pytest.mark.slow
+def test_device_cpu_beats_a_legacy_pass_customize_device(tmp_path):
+    # Review P7 finding 2: --device cpu is absolute (22.13 detail 15), also over a saved Customize Device.
+    import json
+    base = {"pipeline": "balanced", "sensitivity": "balanced", "language": "ja"}
+    configs = [
+        {**base, "device": "cpu", "params": {"device": "cuda", "beam_size": 5}},
+        {**base, "device": "cpu", "params": {"device": "auto"}},
+        {**base, "device": None, "params": {"device": "cuda"}},   # no --device: Customize stands
+    ]
+    result = subprocess.run([sys.executable, "-c", LEGACY_PROBE, str(tmp_path), json.dumps(configs)],
+                            capture_output=True, text=True, encoding="utf-8", errors="replace",
+                            timeout=300, cwd=str(REPO))
+    assert result.returncode == 0, result.stderr[-1500:]
+    line = [l for l in result.stdout.splitlines() if l.startswith("RESULT=")][0]
+    assert json.loads(line[len("RESULT="):]) == ["cpu", "cpu", "cuda"]
+
+
+# --- The speech enhancers follow --device and the device detector (review P7 finding 3) ------
+
+def test_an_enhancer_on_auto_asks_the_device_detector(monkeypatch):
+    # A card this PyTorch has no code for (#411): torch says CUDA, the detector says CPU.
+    torch = pytest.importorskip("torch")
+    from whisperjav.modules.speech_enhancement.base import resolve_torch_device
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(dd, "get_best_device", lambda prefer_cpu=False: "cpu")
+    assert resolve_torch_device(None) == "cpu" and resolve_torch_device("auto") == "cpu"
+    assert resolve_torch_device("cpu") == "cpu"
+
+
+def test_device_cpu_reaches_the_enhancer_of_balanced_and_fidelity(monkeypatch):
+    from whisperjav.modules.speech_enhancement import pipeline_helper
+    seen = {}
+    monkeypatch.setattr(pipeline_helper.SpeechEnhancerFactory, "create",
+                        staticmethod(lambda name, config=None, **kw: seen.update(config or {}) or object()))
+    config = {"run_device": "cpu", "params": {"speech_enhancer": {"backend": "none"}}}
+    pipeline_helper.create_enhancer_from_config(config)
+    assert seen["device"] == "cpu"
+    seen.clear()
+    pipeline_helper.create_enhancer_from_config({"run_device": None, "params": {}})
+    assert seen["device"] == "auto"
+
+
+def test_the_resolver_keeps_the_device_asked_for():
+    from whisperjav.config.legacy import resolve_legacy_pipeline
+    for name in ("balanced", "fidelity"):
+        assert resolve_legacy_pipeline(name, "balanced", device="cpu")["run_device"] == "cpu"
+
+
+def test_every_enhancer_is_made_with_the_runs_device():
+    for name in ("crispasr_pipeline.py", "qwen_pipeline.py", "decoupled_pipeline.py", "transformers_pipeline.py"):
+        src = (REPO / "whisperjav" / "pipelines" / name).read_text(encoding="utf-8")
+        calls = src.count("create_enhancer_direct(")
+        assert calls and src.count("pass_device(") >= calls - (1 if name == "transformers_pipeline.py" else 0), name
 
 
 # --- CTranslate2 decides whether it can use the GPU (design 22.3.3) --------------------------
