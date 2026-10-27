@@ -28,7 +28,7 @@
 
 ### 没有 GPU 也能使用 WhisperJAV 吗？
 
-可以。进入 **Advanced**（高级）→ 勾选 **"Accept CPU-only mode"**（接受仅 CPU 模式）。这个选项是必须的：找不到可用 GPU 时，启动检查会停下来询问是否改用 CPU 继续，而 GUI 无法提问，不勾选则运行会中止并提示您勾选。命令行请加 `--accept-cpu-mode`（或 `--device cpu`）。使用 **Faster** 模式可获得最佳 CPU 速度。功能正常，只是明显较慢。
+可以。安装时选择 **仅 CPU**（Windows 安装程序的窗口中，或源码安装时用 `--accelerator cpu`）；之后每次运行都使用 CPU，不需要勾选任何选项。在 GPU 安装中，`--device cpu` 让某一次运行使用 CPU。使用 **Faster** 模式可获得最佳 CPU 速度。功能正常，只是比在 GPU 上慢好几倍。见[是否加速](getting-started/index.md#accelerated-or-not)。
 
 ---
 
@@ -51,7 +51,7 @@
 
 1. 尝试不同的**灵敏度**设置——某些内容下 **激进** 模式能捕获 **保守** 模式作为静音丢弃的真实语音（Whisper 随后会用幻觉填充这些"静音"）；其他内容则相反。请用代表性片段在每种设置下试运行，找到最适合您内容库的设置。
 2. 使用 **集成模式**——两个模型输出通常会对不同的幻觉产生分歧，因此合并步骤能去除比单次处理更多的幻觉。
-3. 启用 **语音增强**（ClearVoice 或 BS-RoFormer）预先清理音频
+3. 启用 **语音增强**（ZipEnhancer 或 htdemucs）预先清理音频
 
 ### 时间轴偏移 / 字幕出现过早或过晚
 
@@ -102,9 +102,9 @@
 ### 提示 "CUDA not available"，但我有 NVIDIA GPU
 
 1. 验证 NVIDIA 驱动版本：`nvidia-smi`
-2. CUDA 11.8 需要驱动 450+，CUDA 12.8 需要驱动 570+
+2. 1.10.0 需要 Windows 驱动 580 或更新、Linux 驱动 570 或更新，以及 GTX 16 / RTX 20 系列或更新的显卡；可以先运行 `whisperjav --check`，它会说明安装的加速器以及 PyTorch 能否使用 GPU
 3. 你**不需要**安装 CUDA Toolkit —— PyTorch 自带 CUDA 运行时
-4. 尝试重新安装对应 CUDA 版本的 PyTorch
+4. 如果安装是为仅 CPU 制作的：使用 Windows 安装程序时，再次运行它；有受支持的 NVIDIA GPU 时，它会制作 NVIDIA GPU 安装。源码安装时，运行 `python install.py --accelerator nvidia`
 
 ### 如何升级？
 
@@ -112,7 +112,9 @@
 whisperjav-upgrade
 ```
 
-或仅更新代码（更快）：`whisperjav-upgrade --wheel-only`
+或仅更新代码（更快）：`whisperjav-upgrade --wheel-only`。它会保留安装的加速器。这适用于用 Windows 安装程序制作的安装。源码安装：运行 `git fetch --tags`，`git checkout` 新版本的标签，然后激活相同的 Python 环境再次运行安装程序。
+
+从 1.9.x 升级时，请全新安装 1.10.0：1.10.0 需要 Python 3.13，`whisperjav-upgrade` 无法把 1.9.x 安装升级到它。
 
 详情请参阅[升级指南](UPGRADE.md)。
 
@@ -120,9 +122,9 @@ whisperjav-upgrade
 
 ## Cohere-Transcribe（尚未提供）
 
-> **状态：** WhisperJAV 尚未提供 Cohere-Transcribe。它需要 transformers 5.x，而 WhisperJAV 目前还不支持。暂无发布日期。下拉菜单中的入口已置灰。
+> **状态：** WhisperJAV 尚未提供 Cohere-Transcribe。暂无发布日期。下拉菜单中的入口已置灰。
 
-> **已升级 transformers 用户的迁移说明：** 如果您最近运行过 `pip install transformers --upgrade`（或以其他方式将 transformers 5.x 安装到了 WhisperJAV 环境中），Qwen3-ASR 将无法加载。请使用 `pip install "transformers>=4.40.0,<5.0"` 恢复稳定，然后通过 `python -c "from qwen_asr import Qwen3ASRModel; print('OK')"` 验证 Qwen3-ASR 是否能正常加载。
+> **关于 transformers：** WhisperJAV 1.10.0 安装 transformers 5.20，以及为它制作的 WhisperJAV 自有版 `qwen-asr`（[meizhong986/Qwen3-ASR](https://github.com/meizhong986/Qwen3-ASR)）。不要把 transformers 降级到 5.0 以下。如果 Qwen3-ASR 无法加载，请再次运行安装程序，它会恢复测试过的版本。
 
 下方的设置说明供日后提供时使用。
 
