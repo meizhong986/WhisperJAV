@@ -159,9 +159,14 @@ def test_the_variant_named_is_the_build_actually_installed(pi, build, variant):
 def test_the_console_line_is_the_owners_and_names_the_selected_build(pi):
     """W56: "Installing release-pinned dependencies (CUDA 13.0)..." with the build actually selected."""
     source = TEMPLATE.read_text(encoding="utf-8")
-    assert 'log(f"Installing release-pinned dependencies ({VARIANT_LABELS[variant]})...")' in source
+    assert ('log(f"Installing release-pinned dependencies '
+            '({VARIANT_LABELS[accelerator if not nvidia_install else variant]})...")') in source
     assert "variant = torch_plan.variant if torch_plan else variant_of_cuda_build(" in source
-    assert pi.VARIANT_LABELS == {"cu130": "CUDA 13.0", "cu128": "CUDA 12.8", "cpu": "CPU"}
+    # design 22.6.8: the names come from the one accelerator table (T27)
+    assert pi.VARIANT_LABELS["cu130"] == "NVIDIA GPU (CUDA 13.0)"
+    assert pi.VARIANT_LABELS["cu128"] == "NVIDIA GPU (CUDA 12.8)"
+    assert pi.VARIANT_LABELS["vulkan"] == "GPU through Vulkan (AMD, Intel or older NVIDIA card)"
+    assert pi.VARIANT_LABELS["cpu"] == "CPU only (not accelerated)"
 
 
 def test_no_range_install_is_left_in_the_installer():
