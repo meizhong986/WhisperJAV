@@ -705,6 +705,9 @@ class TestEnsureCrispASRReady:
 # ===========================================================================
 
 MODEL_NAMES = list(dict.fromkeys(n for names in manifest.PIPELINE_MODELS.values() for n in names))
+# Every file --check lists: the CrispASR pipelines' models, then ChronosJAV's aligners and timing model (item 12).
+FILES = {**{n: manifest.MODELS[n] for n in MODEL_NAMES}, **manifest.ALIGNER_MODELS, **manifest.TIMING_MODELS}
+FILE_NAMES = list(FILES)
 
 
 @pytest.fixture
@@ -809,18 +812,25 @@ class TestCheckReportsCrispASR:
         results = _crispasr_results()
         line = _crispasr(results)
         assert line.status == CheckStatus.WARN and "metadata unreadable" in line.message
-        assert len(results) == 1 + len(MODEL_NAMES)          # the models are still listed
+        assert len(results) == 1 + len(FILE_NAMES)           # the models are still listed
 
     def test_one_line_per_model(self, crispasr_pc):
         crispasr_pc["models"] = {MODEL_NAMES[0]}
         models = [r for r in _crispasr_results() if r.name != pf.CRISPASR_NAME]
-        assert [r.name for r in models] == [f"CrispASR model {n}" for n in MODEL_NAMES]
+        assert [r.name for r in models] == [f"CrispASR model {n}" for n in FILE_NAMES]
         assert models[0].status == CheckStatus.PASS and models[0].message.endswith(": downloaded")
-        for line, name in zip(models[1:], MODEL_NAMES[1:]):
-            model = manifest.MODELS[name]
+        for line, name in zip(models[1:], FILE_NAMES[1:]):
+            model = FILES[name]
             assert line.status == CheckStatus.INFO and not line.fatal
             assert line.message.endswith(f": not downloaded ({install.mb(model.size)})")
             assert model.label in line.message
+
+    def test_the_aligner_and_timing_lines_say_what_uses_them(self, crispasr_pc):
+        lines = {r.name: r.message for r in _crispasr_results()}
+        name = pf.CRISPASR_MODEL_NAME.format
+        assert f"for {pf.CRISPASR_DEFAULT_ALIGNER_FOR}:" in lines[name(model=manifest.DEFAULT_ALIGNER)]
+        assert f"for {pf.CRISPASR_ALIGNER_FOR}:" in lines[name(model="parakeet-ctc-ja")]
+        assert f"for {pf.CRISPASR_TIMING_FOR}:" in lines[name(model=manifest.DEFAULT_TIMING_MODEL)]
 
     def test_the_ctc_model_has_no_line(self, crispasr_pc):
         names = [r.name for r in _crispasr_results()]
@@ -829,7 +839,7 @@ class TestCheckReportsCrispASR:
     def test_a_failing_model_check_is_a_warning_on_that_line_only(self, crispasr_pc):
         crispasr_pc["model_error"] = MODEL_NAMES[1]
         models = [r for r in _crispasr_results() if r.name != pf.CRISPASR_NAME]
-        assert [r.name for r in models] == [f"CrispASR model {n}" for n in MODEL_NAMES]
+        assert [r.name for r in models] == [f"CrispASR model {n}" for n in FILE_NAMES]
         assert models[1].status == CheckStatus.WARN and not models[1].fatal
         assert models[1].message == pf.CRISPASR_CHECK_FAILED.format(error="cache unreadable")
         assert all(r.status == CheckStatus.INFO for i, r in enumerate(models) if i != 1)
