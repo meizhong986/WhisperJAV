@@ -313,6 +313,49 @@ manual tests (W266 2). Design: `docs/plans/design/2026-10-28-chronosjav-timing-c
 
 ---
 
+## Item 5 — Faster Whisper XXL as pass 1; the chosen XXL model reaches XXL (REQ5; #449, #451, #452; owner W19 2, W24 2, W92, W271–W273)
+
+**Why.** #449: "已经设置使用v2模型的，但执行的时候还是会下载v3" — with XXL as pass 2, `--model large-v2` typed into Extra Args was
+removed without a word (`byop/xxl_runner.py`, #272) and the GUI sent no model, so XXL ran large-v3. #451 and #452 asked for XXL as
+pass 1; the owner said in #449 he would try to add it in the next release.
+
+**What the user sees.**
+- XXL Faster Whisper can be pass 1, pass 2 or both (W271 3): `--pass1-pipeline xxl`; in the GUI, the pass 1 menu's group
+  External (BYOP). One program (`--xxl-exe`, the Executable field) and one Extra Args box serve both passes; each pass has its model.
+- The model reaches XXL: an XXL pass's Model column is no longer greyed and offers Large V2 (default), Large V3, Large V3 Turbo,
+  Medium (W271 2); the GUI sends it as `--passN-model`. With no model named, XXL runs `large-v2` (W24 2; was `large-v3`;
+  `DEFAULT_XXL_MODEL` in `byop/xxl_runner.py`).
+- Extra Args: the box starts as `--verbose True --standard_asia` (was `--model large-v3 --verbose True --standard_asia`).
+  A model in the extra arguments (`--model X`, `--model=X`, `-m X`, `-mX`, a bare `--model`) is still removed (#272), now
+  argument by argument (a quoted value is never cut; 1.9.5 cut the raw text), also from the undocumented side file
+  `whisperjav_xxl.txt` next to the program (which until now could override the chosen model), and reported in the console once
+  per pass worker — once per pass, or once per file and pass with `--ensemble-serial` (W271 4; DRAFT text).
+- An XXL failure is stated in one console line naming the pass, the file and the reason (XXL's exit code and its last error line)
+  (W92; DRAFT text). A failed pass 1 still fails the file (W271 1; the orchestrator is unchanged); for pass 2 the line says the
+  file keeps pass 1's subtitles "if pass 1 made them" — pass 2 runs even for a file whose pass 1 failed. The Ensemble summary's
+  pass column now begins with XXL's exit code instead of "Traceback" (cut at 37 characters); the RUN SUMMARY still says
+  "ensemble pass failed".
+- **Fixed on the way:** the shipped `whisperjav/config/asr_config.json` held the developer's XXL path and `--model large-v2` in
+  Extra Args (in 1.9.5 too); now only `--verbose True --standard_asia`. The developer's GUI writes into that file (WJ110 runs
+  WhisperJAV from the repo), so `installer/build_release.py` now stops a release build when it holds an XXL path or any
+  absolute path in `ui_preferences` (step "Check shipped settings"; alone: `--check-settings`; owner W275). The GUI's late reload of the XXL settings wrote into
+  `AppState.state`, which does not exist, so it always failed; it now loads into the Ensemble tab's state.
+- Docs: the published example `whisperjav video.mp4 --pass2-pipeline xxl --xxl-exe …` lacked `--ensemble` and ran a single
+  Balanced pass (checked with `--dump-params`); the examples now carry `--ensemble`. `README.md` said "Bring your own pass 2".
+
+**Checked.** New `tests/test_xxl_pass1.py` (27 passed), including two end-to-end runs through `main.py`, the ensemble and the pass
+worker with a stand-in XXL program (a script that records its arguments): XXL as pass 1 gets its model, the extra arguments, and
+the side-file warning; a failing XXL in both passes gives both lines. With pass 1's XXL settings removed from `main.py`, the first
+fails (`s6_mutation_check.py`). 17 related test files, one per process: all passed except one `test_htdemucs_enhancer.py` check of
+the installer build script, which this item does not touch. Real runs on The Naked Director S02E02 Scene 5 with the local XXL
+r245.2 (`D:\WJ110_measure\xxl_pass1_2026-10-27\s3\`): XXL large-v2 → Qwen3-ASR, Qwen3-ASR → XXL large-v2, XXL large-v2 → XXL
+large-v3, XXL with no model (ran large-v2) — all exit 0, XXL's log naming the model it loaded; a failing XXL as pass 1 (d3) and in
+both passes (f) — exit 1 with the plain lines. The owner's GUI click passed (W273). One `assessment-adversary` review; its findings
+fixed or brought to the owner. Not run: Large V3 Turbo and Medium with the real XXL (they would download); the Extra Args warning
+with the real XXL (end-to-end with the stand-in only).
+
+---
+
 ## Found during the work, not fixed in 1.10.0 (requirements §5; places as decided or proposed)
 
 | | Finding | Place |
