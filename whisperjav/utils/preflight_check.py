@@ -277,7 +277,8 @@ class PreflightChecker:
                 self.results.append(CheckResult(
                     name="Accelerator", status=CheckStatus.WARN,
                     message=(f"This PC has a supported NVIDIA GPU ({gpu}), but this install is made for the "
-                             "CPU only. Run the WhisperJAV installer again to use the GPU.")))
+                             "CPU only. Run the WhisperJAV installer again to use the GPU (for a source "
+                             "install: python install.py --accelerator nvidia).")))
 
     def _check_pytorch_cuda(self):
         """Check PyTorch CUDA configuration."""
