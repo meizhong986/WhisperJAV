@@ -1383,6 +1383,7 @@ const EnsembleManager = {
             isAnimeWhisper: false,  // Track if using Anime-Whisper specifically
             isCohere: false,  // Track if using Cohere-Transcribe specifically (v1.8.14)
             isCrispasr: false,  // Track if using a CrispASR pipeline (parakeet-crispasr / cohere-crispasr, 1.10.0)
+            isXxl: false,  // Track if using BYOP Faster Whisper XXL (pass 1 too since 1.10.0, item 5)
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
             dspEffects: ['loudnorm'],  // Default FFmpeg DSP effects
             enhanceForVad: false  // Dual-track: use enhanced audio for VAD only, original for ASR
@@ -1411,9 +1412,14 @@ const EnsembleManager = {
             isXxl: false,  // Track if using BYOP Faster Whisper XXL
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
             dspEffects: ['loudnorm'],  // Default FFmpeg DSP effects
-            enhanceForVad: false,  // Dual-track: use enhanced audio for VAD only, original for ASR
-            xxlExePath: '',  // Persisted path to XXL executable
-            xxlExtraArgs: '--verbose True --standard_asia'  // Default XXL args (model flows via dedicated model field)
+            enhanceForVad: false  // Dual-track: use enhanced audio for VAD only, original for ASR
+        },
+        // BYOP Faster Whisper XXL: one program and one Extra Args box for the install, used by
+        // whichever pass is XXL -- either or both (1.10.0, item 5; owner W271 3). Each pass sends
+        // its own model from its Model column.
+        xxl: {
+            exePath: '',  // Persisted path to XXL executable
+            extraArgs: '--verbose True --standard_asia'  // Default XXL args (model flows via the Model column)
         },
         mergeStrategy: 'pass1_primary',
         serialMode: false,
@@ -1470,6 +1476,15 @@ const EnsembleManager = {
         { value: 'cohere-asr-ja-v0.1', label: 'cohere-asr-ja-v0.1' },
         { value: 'cohere-asr-ja', label: 'cohere-asr-ja' }
     ],
+    // BYOP Faster Whisper XXL (1.10.0, item 5): the model names XXL takes, sent as --passN-model.
+    // large-v2 first, the default (owner W24 2; DEFAULT_XXL_MODEL in byop/xxl_runner.py); the
+    // list is owner W271 2.
+    xxlModels: [
+        { value: 'large-v2', label: 'Large V2' },
+        { value: 'large-v3', label: 'Large V3' },
+        { value: 'large-v3-turbo', label: 'Large V3 Turbo' },
+        { value: 'medium', label: 'Medium' }
+    ],
 
     async init() {
         // SYNC: Initialize state from actual HTML form values
@@ -1514,6 +1529,7 @@ const EnsembleManager = {
         this.state.pass1.isAnimeWhisper = this.state.pass1.pipeline === 'anime-whisper';
         this.state.pass1.isCohere = this.state.pass1.pipeline === 'cohere';
         this.state.pass1.isCrispasr = this.isCrispasrPipeline(this.state.pass1.pipeline);
+        this.state.pass1.isXxl = this.state.pass1.pipeline === 'xxl';
         this.state.pass2.isTransformers = this.state.pass2.pipeline === 'transformers';
         this.state.pass2.isQwen = (this.state.pass2.pipeline === 'qwen' || this.state.pass2.pipeline === 'anime-whisper' || this.state.pass2.pipeline === 'cohere');
         this.state.pass2.isAnimeWhisper = this.state.pass2.pipeline === 'anime-whisper';
@@ -1526,12 +1542,12 @@ const EnsembleManager = {
             const byopPrefs = await pywebview.api.get_byop_preferences();
             if (byopPrefs) {
                 if (byopPrefs.xxl_exe_path) {
-                    this.state.pass2.xxlExePath = byopPrefs.xxl_exe_path;
+                    this.state.xxl.exePath = byopPrefs.xxl_exe_path;
                     const pathInput = document.getElementById('xxl-exe-path');
                     if (pathInput) pathInput.value = byopPrefs.xxl_exe_path;
                 }
                 if (byopPrefs.xxl_extra_args) {
-                    this.state.pass2.xxlExtraArgs = byopPrefs.xxl_extra_args;
+                    this.state.xxl.extraArgs = byopPrefs.xxl_extra_args;
                     const argsInput = document.getElementById('xxl-extra-args');
                     if (argsInput) argsInput.value = byopPrefs.xxl_extra_args;
                 }
@@ -1544,6 +1560,9 @@ const EnsembleManager = {
         // Order matters: more specific ChronosJAV backends (anime-whisper, cohere)
         // must be checked before the isQwen umbrella, because isQwen is true
         // for all of them.
+        ['pass1', 'pass2'].forEach(passKey => {
+            if (this.state[passKey].isXxl) this.swapModelOptions(passKey, 'xxl');
+        });
         if (this.state.pass1.isAnimeWhisper) {
             this.swapModelOptions('pass1', 'anime-whisper');
         } else if (this.state.pass1.isCohere) {
@@ -1665,7 +1684,7 @@ const EnsembleManager = {
                 const result = await pywebview.api.select_xxl_exe();
                 if (result.success && result.path) {
                     document.getElementById('xxl-exe-path').value = result.path;
-                    this.state.pass2.xxlExePath = result.path;
+                    this.state.xxl.exePath = result.path;
                     // Persist for future sessions
                     pywebview.api.save_byop_preferences({ xxl_exe_path: result.path });
                 }
@@ -1676,9 +1695,9 @@ const EnsembleManager = {
 
         // BYOP: Extra args input
         document.getElementById('xxl-extra-args')?.addEventListener('change', (e) => {
-            this.state.pass2.xxlExtraArgs = e.target.value.trim();
+            this.state.xxl.extraArgs = e.target.value.trim();
             // Persist for future sessions
-            pywebview.api.save_byop_preferences({ xxl_extra_args: this.state.pass2.xxlExtraArgs });
+            pywebview.api.save_byop_preferences({ xxl_extra_args: this.state.xxl.extraArgs });
         });
 
         // DSP effects checkbox handlers
@@ -1835,10 +1854,11 @@ const EnsembleManager = {
         // backends (anime-whisper, cohere) take precedence over the qwen umbrella.
         // Each CrispASR pipeline is its own category, named as the pipeline: it has its own models.
         const crispasrType = (pipeline) => this.isCrispasrPipeline(pipeline) ? pipeline : null;
-        const getPipelineType = (isT, isQ, isAW, isC, crispasr) =>
-            isT ? 'transformers' : (isAW ? 'anime-whisper' : (isC ? 'cohere' : (crispasr || (isQ ? 'qwen' : 'legacy'))));
-        const oldType = getPipelineType(wasTransformers, wasQwen, wasAnimeWhisper, wasCohere, crispasrType(passState.pipeline));
-        const newType = getPipelineType(isTransformers, isQwen, isAnimeWhisper, isCohere, crispasrType(newValue));
+        // XXL (1.10.0, item 5) is its own category too: its Model column lists the models XXL runs.
+        const getPipelineType = (isT, isQ, isAW, isC, crispasr, isX) =>
+            isX ? 'xxl' : (isT ? 'transformers' : (isAW ? 'anime-whisper' : (isC ? 'cohere' : (crispasr || (isQ ? 'qwen' : 'legacy')))));
+        const oldType = getPipelineType(wasTransformers, wasQwen, wasAnimeWhisper, wasCohere, crispasrType(passState.pipeline), passState.isXxl);
+        const newType = getPipelineType(isTransformers, isQwen, isAnimeWhisper, isCohere, crispasrType(newValue), isXxl);
 
         if (passState.customized) {
             // Warn user that custom params will be reset
@@ -2068,7 +2088,7 @@ const EnsembleManager = {
 
     // Swap model dropdown options based on pipeline type
     // pipelineType: 'legacy' | 'transformers' | 'qwen' | 'anime-whisper' | 'cohere' |
-    //               'parakeet-crispasr' | 'cohere-crispasr'
+    //               'parakeet-crispasr' | 'cohere-crispasr' | 'xxl'
     swapModelOptions(passKey, pipelineType) {
         const modelSelect = document.getElementById(`${passKey}-model`);
         let models;
@@ -2095,6 +2115,9 @@ const EnsembleManager = {
                 break;
             case 'cohere-crispasr':
                 models = this.cohereCrispasrModels;
+                break;
+            case 'xxl':
+                models = this.xxlModels;
                 break;
             default: {
                 // v1.9.3: the row now honours the same per-pipeline compatibility the
@@ -2166,7 +2189,8 @@ const EnsembleManager = {
     },
 
     // Update row greying based on pipeline type
-    // - XXL (BYOP): Disable ALL controls (external tool, no WhisperJAV config applies)
+    // - XXL (BYOP): Disable every control but the Model column (external tool, no WhisperJAV
+    //   config applies; the model it runs is chosen here since 1.10.0, #449)
     // - Transformers: Disable sensitivity AND segmenter (uses HF internal chunking)
     // - Qwen: Disable sensitivity only, KEEP segmenter (uses post-ASR VAD filter)
     // - Legacy: Enable both
@@ -2192,7 +2216,12 @@ const EnsembleManager = {
             const customizeBtn = document.getElementById(`customize-${passKey}`);
             if (sceneSelect) { sceneSelect.disabled = true; sceneSelect.title = xxlTitle; }
             if (enhancerSelect) { enhancerSelect.disabled = true; enhancerSelect.title = xxlTitle; }
-            if (modelSelect) { modelSelect.disabled = true; modelSelect.title = xxlTitle; }
+            // The model XXL runs reaches XXL as --passN-model (1.10.0, item 5, #449).
+            // Text G1, approved by the owner as drafted (W275).
+            if (modelSelect) {
+                modelSelect.disabled = isPass2Disabled;
+                modelSelect.title = 'The Whisper model XXL runs. XXL downloads it the first time it is used.';
+            }
             if (customizeBtn) { customizeBtn.disabled = true; customizeBtn.title = xxlTitle; }
 
             // Hide guide button and DSP panel
@@ -2413,8 +2442,8 @@ const EnsembleManager = {
 
         if (panel) {
             // Show panel only when FFmpeg DSP is selected and pass is enabled
-            // Also hide when XXL is selected (external tool, no DSP)
-            const isXxl = passId === 'pass2' && this.state.pass2.isXxl;
+            // Also hide when XXL is selected (external tool, no DSP) -- in either pass
+            const isXxl = !!this.state[passId]?.isXxl;
             if (enhancer === 'ffmpeg-dsp' && isEnabled && !isXxl) {
                 panel.style.display = 'block';
             } else {
@@ -2437,7 +2466,7 @@ const EnsembleManager = {
         if (!row) return;
         const enhancer = document.getElementById(`${passId}-enhancer`)?.value || 'none';
         const isEnabled = passId === 'pass1' || this.state.pass2.enabled;
-        const isXxl = passId === 'pass2' && this.state.pass2.isXxl;
+        const isXxl = !!this.state[passId]?.isXxl;
         // Owner, 2026-09-17: "balanced shall not have the VAD only enhancement."
         // Balanced detects speech inside faster-whisper's own call, on the audio
         // it recognises, so there is no second track to feed. Offering the box
@@ -2466,18 +2495,19 @@ const EnsembleManager = {
         const panel = document.getElementById('byop-settings-panel');
         if (!panel) return;
 
-        const showByop = this.state.pass2.enabled && this.state.pass2.isXxl;
+        // Shown when either pass is XXL (pass 1 since 1.10.0, item 5); one panel for both.
+        const showByop = this.state.pass1.isXxl || (this.state.pass2.enabled && this.state.pass2.isXxl);
         panel.style.display = showByop ? 'block' : 'none';
 
         // Sync input fields from state
         if (showByop) {
             const pathInput = document.getElementById('xxl-exe-path');
             const argsInput = document.getElementById('xxl-extra-args');
-            if (pathInput && !pathInput.value && this.state.pass2.xxlExePath) {
-                pathInput.value = this.state.pass2.xxlExePath;
+            if (pathInput && !pathInput.value && this.state.xxl.exePath) {
+                pathInput.value = this.state.xxl.exePath;
             }
-            if (argsInput && !argsInput.value && this.state.pass2.xxlExtraArgs) {
-                argsInput.value = this.state.pass2.xxlExtraArgs;
+            if (argsInput && !argsInput.value && this.state.xxl.extraArgs) {
+                argsInput.value = this.state.xxl.extraArgs;
             }
         }
     },
@@ -6045,8 +6075,12 @@ const EnsembleManager = {
                 isAnimeWhisper: this.state.pass1.isAnimeWhisper,
                 isCohere: this.state.pass1.isCohere || false,
                 isCrispasr: this.state.pass1.isCrispasr || false,
+                isXxl: this.state.pass1.isXxl || false,
                 framer: this.state.pass1.isQwen ? this.state.pass1.framer : null,
-                enhanceForVad: this.state.pass1.enhanceForVad || false
+                enhanceForVad: this.state.pass1.enhanceForVad || false,
+                // BYOP fields (only meaningful when pipeline is 'xxl'; pass 1 since 1.10.0, item 5)
+                xxlExe: this.state.pass1.isXxl ? this.state.xxl.exePath : null,
+                xxlArgs: this.state.pass1.isXxl ? this.state.xxl.extraArgs : null
             },
             pass2: {
                 enabled: this.state.pass2.enabled,
@@ -6071,8 +6105,8 @@ const EnsembleManager = {
                 framer: this.state.pass2.isQwen ? this.state.pass2.framer : null,
                 enhanceForVad: this.state.pass2.enhanceForVad || false,
                 // BYOP fields (only meaningful when pipeline is 'xxl')
-                xxlExe: this.state.pass2.isXxl ? this.state.pass2.xxlExePath : null,
-                xxlArgs: this.state.pass2.isXxl ? this.state.pass2.xxlExtraArgs : null
+                xxlExe: this.state.pass2.isXxl ? this.state.xxl.exePath : null,
+                xxlArgs: this.state.pass2.isXxl ? this.state.xxl.extraArgs : null
             },
             merge_strategy: this.state.mergeStrategy,
             serial_mode: this.state.serialMode,
@@ -6138,10 +6172,12 @@ const EnsembleManager = {
             const config = this.collectConfig();
 
             // Persist BYOP preferences so the XXL path is remembered across sessions
-            if (this.state.pass2.isXxl && this.state.pass2.xxlExePath) {
+            // (either pass may be XXL since 1.10.0, item 5)
+            const xxlUsed = this.state.pass1.isXxl || (this.state.pass2.enabled && this.state.pass2.isXxl);
+            if (xxlUsed && this.state.xxl.exePath) {
                 pywebview.api.save_byop_preferences({
-                    xxl_exe_path: this.state.pass2.xxlExePath,
-                    xxl_extra_args: this.state.pass2.xxlExtraArgs || ''
+                    xxl_exe_path: this.state.xxl.exePath,
+                    xxl_extra_args: this.state.xxl.extraArgs || ''
                 });
             }
 
@@ -8706,16 +8742,18 @@ window.addEventListener('pywebviewready', async () => {
 
     // Reload BYOP preferences now that API is available
     // (DOMContentLoaded init may have run before pywebview was ready)
+    // 1.10.0 (item 5): written into EnsembleManager's state, which collectConfig sends. Before,
+    // this wrote to AppState.state.pass2, which no run reads.
     try {
         const byopPrefs = await pywebview.api.get_byop_preferences();
         if (byopPrefs) {
             if (byopPrefs.xxl_exe_path) {
-                AppState.state.pass2.xxlExePath = byopPrefs.xxl_exe_path;
+                EnsembleManager.state.xxl.exePath = byopPrefs.xxl_exe_path;
                 const pathInput = document.getElementById('xxl-exe-path');
                 if (pathInput) pathInput.value = byopPrefs.xxl_exe_path;
             }
             if (byopPrefs.xxl_extra_args) {
-                AppState.state.pass2.xxlExtraArgs = byopPrefs.xxl_extra_args;
+                EnsembleManager.state.xxl.extraArgs = byopPrefs.xxl_extra_args;
                 const argsInput = document.getElementById('xxl-extra-args');
                 if (argsInput) argsInput.value = byopPrefs.xxl_extra_args;
             }
