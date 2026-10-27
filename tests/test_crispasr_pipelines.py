@@ -440,7 +440,7 @@ class TestOncePerPass:
             pipe.process(stage.media("a"))
             pipe.process(stage.media("b"))
         lines = [r.getMessage() for r in caplog.records if "asks CrispASR to use" in r.getMessage()]
-        assert lines == ["Parakeet-CrispASR asks CrispASR to use the NVIDIA GPU (CrispASR 0.8.44+cuda)."]
+        assert lines == ["Parakeet-CrispASR asks CrispASR to use the NVIDIA GPU (CUDA) (CrispASR 0.8.44+cuda)."]
 
     def test_an_unexpected_processor_run_is_also_a_note_in_every_files_summary(self, stage, tmp_path):
         stage.runtime = install.RuntimeChoice(False, "cpu", "the card is too old", True, "0.8.44+cuda", "cuda")
@@ -449,7 +449,7 @@ class TestOncePerPass:
             stage.answers = [[parakeet_segment(("監督", 0.0, 0.3))]] * 3
             md = pipe.process(stage.media(name))
             assert md["summary"]["notes"] == [
-                "Parakeet-CrispASR runs on the processor, which is slower: the card is too old."]
+                "Parakeet-CrispASR runs on the CPU (not accelerated), several times slower than on a GPU: the card is too old."]
 
 
 class TestFailures:
