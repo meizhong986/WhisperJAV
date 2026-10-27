@@ -73,6 +73,7 @@ def test_a_damaged_pytorch_is_named_with_its_error(monkeypatch):
     monkeypatch.setattr(builtins, "__import__", failing)
     text = pytorch_probe.pytorch_problem()
     assert "missing or damaged in this install (OSError: [WinError 126] fbgemm.dll" in text
+    assert "(for a source install: python install.py, in the same environment)" in text   # owner W242 2
     # Review P7 finding 10: on an Own PyTorch install the installer is no help; the pip command is.
     from whisperjav.installer.core import accelerators
     monkeypatch.setattr(accelerators, "read_record", lambda prefix=None: (True, "own-pytorch"))
