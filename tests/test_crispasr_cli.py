@@ -220,11 +220,9 @@ class TestTheSettingsAPassDoesNotUse:
         config = {"scene_detector": "auditok", "speech_enhancer": "ffmpeg-dsp:loudnorm",
                   "enhance_for_vad": True, "vad_threshold": 0.4, "speech_pad_ms": 0,
                   "params": {"x": 1}, "hf_params": {"y": 2}, "qwen_params": {"z": 3}}
-        # --pass2-vad-threshold and --pass2-speech-pad-ms are used (W208), so not named.
-        assert unused_pass_settings(config, 2) == [
-            "--pass2-scene-detector", "--pass2-speech-enhancer", "--pass2-enhance-for-vad",
-            "--pass2-params", "--pass2-hf-params", "--pass2-qwen-params",
-        ]
+        # --pass2-vad-threshold and --pass2-speech-pad-ms are used (W208), and since design 22.9.1
+        # (owner W232 8) the scene detector, the speech enhancer, enhance-for-vad and --pass2-params.
+        assert unused_pass_settings(config, 2) == ["--pass2-hf-params", "--pass2-qwen-params"]
 
     def test_the_line(self):
         assert unused_settings_message("Parakeet-CrispASR", ["--pass1-scene-detector", "--pass1-speech-enhancer"]) \
@@ -362,8 +360,7 @@ class TestTheCommandLine:
 
     def test_the_dump_shows_what_each_crispasr_pass_will_use(self, dumped):
         # T17: the resolved speech segmenter settings, as the fidelity or the qwen pipeline resolves them
-        not_used = ["scene_detector", "speech_enhancer", "enhance_for_vad",
-                    "params", "hf_params", "qwen_params", "compute_type"]
+        not_used = ["hf_params", "qwen_params", "compute_type"]   # design 22.9.1
         p1 = dumped["pass1"]["crispasr_effective"]
         assert p1 == {
             "model": manifest.PIPELINE_DEFAULT_MODEL["parakeet-crispasr"],  # none named: the default
@@ -371,7 +368,9 @@ class TestTheCommandLine:
             "sensitivity": "balanced",                                        # none named: balanced
             "speech_segmenter_settings": segmenter_settings("parakeet-crispasr", "whisperseg", "balanced").as_dict(),
             "device": "cpu",                                                  # --device as given
-            "scene_detector": "semantic",
+            "scene_detector": "semantic",                                     # none named: semantic (W214 2)
+            "speech_enhancer": "none",
+            "enhance_for_vad": False,
             "not_used": not_used,
         }
         s1 = p1["speech_segmenter_settings"]
@@ -379,7 +378,7 @@ class TestTheCommandLine:
             == (0.35, 6.0, 6.0, 1.0)                                          # fidelity's WhisperSeg; 6 s (W202 1)
         p2 = dumped["pass2"]["crispasr_effective"]
         assert (p2["model"], p2["speech_segmenter"], p2["sensitivity"], p2["scene_detector"]) == \
-            ("cohere-asr-ja", "ten", "conservative", "semantic")              # --pass2-scene-detector is not used
+            ("cohere-asr-ja", "ten", "conservative", "auditok")               # --pass2-scene-detector is used (22.9.1)
         s2 = p2["speech_segmenter_settings"]
         assert (s2["max_group_duration_s"], s2["chunk_threshold_s"], s2["max_speech_duration_s"],
                 s2["start_pad_ms"], s2["end_pad_ms"]) == (3.0, 0.3, 4.0, 100, 100)  # the qwen pipeline's
@@ -490,7 +489,7 @@ class TestThePassWorkerBuildsThem:
         assert out["real"] == {"parakeet-crispasr": "ParakeetCrispASRPipeline",
                                "cohere-crispasr": "CohereCrispASRPipeline"}
         assert "crispasr" not in out["names"]
-        assert {"parakeet-crispasr", "cohere-crispasr"} <= set(out["ignored"])
+        assert not {"parakeet-crispasr", "cohere-crispasr"} & set(out["ignored"])   # they read it (22.9.1)
         assert "crispasr" not in out["ignored"]
 
     def test_the_pipeline_gets_the_settings_it_uses(self, probe):
@@ -511,6 +510,13 @@ class TestThePassWorkerBuildsThem:
             "device": None,                      # --device left out (the GUI sends none)
             "vad_threshold": 0.4,                # used since W208
             "speech_pad_ms": 100,                # used since W208 (WhisperSeg has the setting)
+            # design 22.9.1 (owner W212 D3, W232 8): scene detector, enhancer, enhance-for-vad, Customize
+            "scene_detector": "auditok",
+            "enhance_for_vad": True,
+            "speech_enhancer": "ffmpeg-dsp",
+            "speech_enhancer_model": None,
+            "segmenter_overrides": {},           # beam_size is neither a segmenter nor a scene setting
+            "scene_params": {},
         }
         assert not [l for l in built["log"] if "ignores --" in l], built["log"]
         assert not [l for l in built["log"] if "speech pad of" in l], built["log"]
@@ -535,9 +541,7 @@ class TestThePassWorkerBuildsThem:
     def test_one_line_names_what_it_does_not_use(self, probe):
         _root, out = probe
         log = out["builds"][0]["log"]
-        assert ("Parakeet-CrispASR does not use: --pass1-scene-detector, --pass1-speech-enhancer, "
-                "--pass1-enhance-for-vad, --pass1-params, "
-                "--pass1-hf-params, --pass1-qwen-params") in log
+        assert "Parakeet-CrispASR does not use: --pass1-hf-params, --pass1-qwen-params" in log
         # The generic enhance-for-vad line would give a wrong reason for these pipelines.
         assert not [l for l in log if "has no effect on the" in l], log
 
