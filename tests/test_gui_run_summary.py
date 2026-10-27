@@ -70,18 +70,45 @@ class TestFailOnIsForwarded:
         assert WhisperJAVAPI._GUI_SETTINGS_MAP["fail_on_suspect"] == "failOnSuspect"
         assert WhisperJAVAPI._GUI_SETTINGS_MAP["asr_telemetry"] == "asrTelemetry"
 
-    def test_accept_cpu_mode_reaches_the_ensemble_builders(self, api, tmp_path):
-        """#411: the start-up check stops on an unsupported GPU; the shared box is the
-        GUI's only way to answer, so the Ensemble tab's builders must carry it too."""
+    def test_no_builder_sends_accept_cpu_mode_any_more(self, api, tmp_path):
+        """1.10.0 (design 22.5.1, owner W234 D-A): no run asks whether to go on without a GPU,
+        so the "Accept CPU-only mode" box and its flag are gone from the GUI, even for an old
+        saved setting that still has it ticked."""
         cfg = _base_options(tmp_path, accept_cpu_mode=True)
         cfg.update({"pass1_pipeline": "balanced", "pass1_sensitivity": "balanced"})
-        assert "--accept-cpu-mode" in api._build_twopass_args(cfg)
-        assert "--accept-cpu-mode" in api._build_ensemble_args(_base_options(tmp_path, accept_cpu_mode=True))
-        assert "--accept-cpu-mode" not in api._build_twopass_args(
-            dict(_base_options(tmp_path), pass1_pipeline="balanced", pass1_sensitivity="balanced"))
-        js = (__import__("pathlib").Path(__file__).resolve().parent.parent / "whisperjav" / "webview_gui" /
-              "assets" / "app.js").read_text(encoding="utf-8")
-        assert js.count("accept_cpu_mode: document.getElementById('acceptCpuMode').checked") == 2
+        assert "--accept-cpu-mode" not in api._build_twopass_args(cfg)
+        assert "--accept-cpu-mode" not in api._build_ensemble_args(_base_options(tmp_path, accept_cpu_mode=True))
+        assert "--accept-cpu-mode" not in api.build_args(_base_options(tmp_path, accept_cpu_mode=True))
+        assets = __import__("pathlib").Path(__file__).resolve().parent.parent / "whisperjav" / "webview_gui" / "assets"
+        assert "acceptCpuMode" not in (assets / "app.js").read_text(encoding="utf-8")
+        assert "acceptCpuMode" not in (assets / "index.html").read_text(encoding="utf-8")
+
+    def test_run_on_the_cpu_this_time_adds_device_cpu_for_every_part(self, api):
+        """D-G (design 22.9.2): the last run again, with --device cpu and no other --device."""
+        from whisperjav.webview_gui.api import _with_device_cpu
+        assert _with_device_cpu(["a.mp4", "--device", "cuda", "--mode", "balanced"]) == \
+            ["a.mp4", "--mode", "balanced", "--device", "cpu"]
+        assert _with_device_cpu(["a.mp4", "--device=auto"]) == ["a.mp4", "--device", "cpu"]
+        started = []
+        api._last_start = ("start_ensemble_twopass", {"inputs": ["a.mp4"]})
+        api.start_ensemble_twopass = lambda config: started.append(config) or {"success": True}
+        assert api.rerun_on_cpu() == {"success": True}
+        assert started == [{"inputs": ["a.mp4"], "run_on_cpu": True}]
+
+    def test_a_run_that_did_not_start_says_so(self, api):
+        """T68, T68x (design 22.9.2): statuses 2, 3, 4 did not start; another without a summary ended."""
+        api._run_summary = None
+        for code in (2, 3, 4):
+            api.exit_code = code
+            assert api._finish_line() == f"[DID NOT START] exit status {code}"
+        api.exit_code = 1
+        assert api._finish_line() == "[ENDED WITHOUT RUN SUMMARY] exit status 1"
+        api._output_tail = ["x\n", "╔════╗\n", "║  This install is made for an NVIDIA GPU, but  ║\n",
+                            "║    the GPU cannot be used now.  ║\n", "╚════╝\n"]
+        assert api._stop_reason() == "This install is made for an NVIDIA GPU, but the GPU cannot be used now."
+        api._output_tail = ["=" * 72 + "\n", "PyTorch, which WhisperJAV needs, is missing.\n",
+                            "Nothing was processed.\n", "=" * 72 + "\n"]
+        assert api._stop_reason() == "PyTorch, which WhisperJAV needs, is missing. Nothing was processed."
 
     def test_telemetry_opt_out_reaches_every_builder(self, api, tmp_path):
         """On by default: nothing is emitted unless the checkbox is unticked."""
