@@ -2203,6 +2203,63 @@ class WhisperJAVAPI:
             audio["max_speech_duration"]["default"] = float(max_speech)
         return result
 
+    # The pass's aligner choices: the CrispASR aligners from the manifest (so the GUI and the run cannot
+    # drift), then the PyTorch Qwen3-ForcedAligner. Each option names its backend; the Alignment tab
+    # lists the options of the chosen backend. Labels and descriptions
+    # approved by the owner as drafted (W268); design note 2026-10-28 sections 8-9, Q3, Q10.
+    QWEN3_PYTORCH_ALIGNER = "Qwen/Qwen3-ForcedAligner-0.6B"
+    ALIGNER_NOT_MEASURED = "new in 1.10.0; not yet measured against reference subtitles"
+
+    def _aligner_and_timing_schema(self) -> Dict[str, Any]:
+        """The aligner backend, aligner model and timing model dropdowns of the Alignment tab."""
+        from whisperjav.crispasr import install, manifest
+
+        crisp_options = []
+        for name, model in manifest.ALIGNER_MODELS.items():
+            label = f"{name} — {model.label}, {install.mb(model.size)}"
+            if name == manifest.DEFAULT_ALIGNER:
+                label += " (recommended)"
+            if name == "parakeet-ctc-ja":
+                label += " — its times came back evenly spread in WhisperJAV's tests; not recommended"
+            crisp_options.append({"value": name, "label": label, "backend": "crispasr"})
+        timing = manifest.timing_model_for(None)
+        return {
+            "aligner_backend": {
+                "type": "dropdown",
+                "label": "Aligner Backend",
+                "description": ("Times each character of the text the ASR model wrote. CrispASR aligners are "
+                                f"{self.ALIGNER_NOT_MEASURED}; they run where this install's CrispASR runs."),
+                "options": [
+                    {"value": "crispasr", "label": "CrispASR (GGUF, recommended)"},
+                    {"value": "qwen3", "label": "Qwen3 ForcedAligner (PyTorch)"},
+                    {"value": "none", "label": "None (no aligner)"},
+                ],
+                "default": "crispasr",
+            },
+            "aligner_id": {
+                "type": "dropdown",
+                "label": "Aligner Model",
+                "options": crisp_options + [
+                    {"value": self.QWEN3_PYTORCH_ALIGNER, "label": "Qwen3-ForcedAligner-0.6B (PyTorch)",
+                     "backend": "qwen3"},
+                ],
+                "default": manifest.DEFAULT_ALIGNER,
+            },
+            "timing_model": {
+                "type": "dropdown",
+                "label": "Timing Model (Whisper)",
+                "description": ("Finds where speech starts and where a new sentence starts inside each VAD "
+                                "group; its text is not used. "
+                                f"{timing.label}, {install.mb(timing.size)}, downloaded on first use; "
+                                f"{self.ALIGNER_NOT_MEASURED}."),
+                "options": [
+                    {"value": timing.name, "label": f"{timing.label} (recommended)"},
+                    {"value": "none", "label": "None (no timing model)"},
+                ],
+                "default": manifest.DEFAULT_TIMING_MODEL,
+            },
+        }
+
     def _get_qwen_schema_base(self) -> Dict[str, Any]:
         """
         Build the static Qwen customize-modal schema (backend-agnostic).
@@ -2452,25 +2509,11 @@ class WhisperJAVAPI:
                     },
                 },
                 # ── Tab 4: Alignment ──────────────────────────────────
+                # 1.10.0 (item 12): the CrispASR aligner and the timing model are the default
+                # (design note 2026-10-28 sections 7-8). Labels and descriptions
+                # approved by the owner as drafted (W268) (section 9, Q3, Q10).
                 "alignment": {
-                    "aligner_backend": {
-                        "type": "dropdown",
-                        "label": "Aligner Backend",
-                        "description": "Provides precise word timestamps for subtitle timing",
-                        "options": [
-                            {"value": "qwen3", "label": "Qwen3 ForcedAligner (recommended)"},
-                            {"value": "none", "label": "None (no word timestamps)"},
-                        ],
-                        "default": "qwen3",
-                    },
-                    "aligner_id": {
-                        "type": "dropdown",
-                        "label": "Aligner Model",
-                        "options": [
-                            {"value": "Qwen/Qwen3-ForcedAligner-0.6B", "label": "Qwen3-ForcedAligner-0.6B"},
-                        ],
-                        "default": "Qwen/Qwen3-ForcedAligner-0.6B",
-                    },
+                    **self._aligner_and_timing_schema(),
                     "assembly_cleaner": {
                         "type": "dropdown",
                         "label": "Text Cleaner",
@@ -2484,20 +2527,23 @@ class WhisperJAVAPI:
                     "timestamp_mode": {
                         "type": "dropdown",
                         "label": "Timestamp Mode",
-                        "description": "How subtitle timestamps are resolved (VAD frames or ForcedAligner)",
+                        "description": "How subtitle timestamps are resolved (VAD frames or the aligner)",
                         "options": [
-                            {"value": "vad_only", "label": "VAD Only (Recommended — no aligner loaded)"},
-                            {"value": "aligner_vad_fallback", "label": "Aligner + VAD Fallback"},
+                            {"value": "aligner_vad_fallback", "label": "Aligner + VAD Fallback (recommended)"},
                             {"value": "aligner_interpolation", "label": "Aligner + Interpolation"},
                             {"value": "aligner_only", "label": "Aligner Only (no recovery on collapse)"},
+                            {"value": "vad_only", "label": "VAD Only (no aligner loaded)"},
                         ],
-                        "default": "vad_only",
+                        "default": "aligner_vad_fallback",
                     },
                     "stepdown": {
                         "type": "checkbox",
                         "label": "Adaptive Step-Down",
-                        "description": "Retry collapsed scenes with tighter framing",
-                        "default": True,
+                        # Description approved by the owner as drafted (W268) (W266 1; the old one said
+                        # "tighter framing", but the retry uses the Tier 2 duration, 6 s by default).
+                        "description": ("Retry a collapsed scene with VAD groups up to the Tier 2 duration. Off by "
+                                        "default: a collapsed scene then takes its VAD groups' times"),
+                        "default": False,
                     },
                     "stepdown_initial_group": {
                         "type": "slider",
@@ -2636,23 +2682,11 @@ class WhisperJAVAPI:
                         "default": 512,
                     },
                 },
-                "alignment": {
-                    "aligner_backend": {
-                        "type": "dropdown",
-                        "label": "Aligner Backend",
-                        "description": (
-                            "Cohere has no native word-level timestamps (HF discussion #19). "
-                            "Qwen3 ForcedAligner produces them downstream. Selecting 'none' "
-                            "falls back to VAD-derived segment timing only and must flip "
-                            "timestamp_mode and stepdown together (handled at pack time)."
-                        ),
-                        "options": [
-                            {"value": "qwen3", "label": "Qwen3 ForcedAligner (recommended, D7 default)"},
-                            {"value": "none", "label": "None (VAD timestamps only)"},
-                        ],
-                        "default": "qwen3",
-                    },
-                },
+                # Cohere has no native word-level timestamps (HF discussion #19); the aligner
+                # produces them downstream, as for every ChronosJAV model (1.10.0). Selecting
+                # 'none' falls back to VAD-derived timing and flips timestamp_mode and stepdown
+                # together (handled at pack time).
+                "alignment": self._aligner_and_timing_schema(),
             },
             "metadata": {
                 "preview": True,
@@ -2986,14 +3020,61 @@ class WhisperJAVAPI:
                 lines = [self.CRISPASR_MODEL_DOWNLOADED.format(label=m.label)]
             else:
                 lines = [self.CRISPASR_MODEL_MISSING.format(label=m.label, size=install.mb(m.size))]
-            runtime = self._crispasr_runtime()
-            if runtime.get("problem"):
-                lines.append(self.CRISPASR_CANNOT_RUN.format(reason=runtime["problem"]))
-                return {"success": True, "lines": lines, "can_run": False}
-            device = runtime.get("device")
-            lines.append(self.CRISPASR_RUNS_ON.get(device)
-                         or self.CRISPASR_RUNS_ON_CPU.format(reason=runtime.get("reason")))
-            return {"success": True, "lines": lines, "can_run": True}
+            # Cohere-CrispASR aligns its text with the default aligner, always (item 12; W248 3, Q7).
+            if pipeline == "cohere-crispasr":
+                lines.append(self._crispasr_part_line(
+                    install, self.CRISPASR_PART_ALIGNER, manifest.aligner_model_for(None)))
+            return self._with_crispasr_runtime(lines)
+        except Exception as e:  # noqa: BLE001 -- a status panel must not break the GUI
+            return {"success": False, "error": str(e)}
+
+    # The same panel under a ChronosJAV pass (item 12): its aligner and timing model run in CrispASR.
+    # Texts approved by the owner as drafted (W268); design note 2026-10-28 section 9.
+    CRISPASR_CHRONOSJAV_HEADING = "Aligner and timing model:"
+    CRISPASR_PART_ALIGNER = "Aligner"
+    CRISPASR_PART_TIMING = "Timing model"
+    CRISPASR_PART_DOWNLOADED = "{part}: {label} — downloaded"
+    CRISPASR_PART_MISSING = "{part}: {label} — not downloaded yet ({size}); downloaded the first time it is used"
+
+    @classmethod
+    def _crispasr_part_line(cls, install, part: str, model) -> str:
+        if install.model_status(model).downloaded:
+            return cls.CRISPASR_PART_DOWNLOADED.format(part=part, label=model.label)
+        return cls.CRISPASR_PART_MISSING.format(part=part, label=model.label, size=install.mb(model.size))
+
+    def _with_crispasr_runtime(self, lines: List[str]) -> Dict[str, Any]:
+        """The panel's lines plus where CrispASR runs, or why it cannot run here."""
+        runtime = self._crispasr_runtime()
+        if runtime.get("problem"):
+            lines.append(self.CRISPASR_CANNOT_RUN.format(reason=runtime["problem"]))
+            return {"success": True, "lines": lines, "can_run": False}
+        device = runtime.get("device")
+        lines.append(self.CRISPASR_RUNS_ON.get(device)
+                     or self.CRISPASR_RUNS_ON_CPU.format(reason=runtime.get("reason")))
+        return {"success": True, "lines": lines, "can_run": True}
+
+    def get_chronosjav_crispasr_status(self, aligner_backend: Optional[str] = None, aligner: Optional[str] = None,
+                                       timing_model: Optional[str] = None,
+                                       timestamp_mode: Optional[str] = None) -> Dict[str, Any]:
+        """The CrispASR status panel of a ChronosJAV pass: its CrispASR aligner and timing model, downloaded
+        or not, and where CrispASR runs. No lines when the pass uses neither (another aligner or none, and no
+        timing model). Reads files only; never downloads."""
+        try:
+            from whisperjav.crispasr import install, manifest
+
+            lines = []
+            uses_aligner = (timestamp_mode or "aligner_vad_fallback") != "vad_only"
+            backend = aligner_backend or "crispasr"
+            if uses_aligner and backend == "crispasr":
+                name = aligner if aligner in manifest.ALIGNER_MODELS else None
+                lines.append(self._crispasr_part_line(install, self.CRISPASR_PART_ALIGNER,
+                                                      manifest.aligner_model_for(name)))
+            if (timing_model or manifest.DEFAULT_TIMING_MODEL) != "none":
+                lines.append(self._crispasr_part_line(install, self.CRISPASR_PART_TIMING,
+                                                      manifest.timing_model_for(timing_model or None)))
+            if not lines:
+                return {"success": True, "lines": [], "can_run": True}
+            return self._with_crispasr_runtime([self.CRISPASR_CHRONOSJAV_HEADING] + lines)
         except Exception as e:  # noqa: BLE001 -- a status panel must not break the GUI
             return {"success": False, "error": str(e)}
 
@@ -3111,24 +3192,23 @@ class WhisperJAVAPI:
             if pass1.get('framer'):
                 qwen1_params['framer'] = pass1['framer']
             if pass1.get('isAnimeWhisper'):
+                # 1.10.0: anime-whisper takes the aligner and timing model like Qwen3-ASR
+                # (no longer vad_only with step-down off; design note 2026-10-28 section 7).
                 qwen1_params['generator_backend'] = 'anime-whisper'
-                qwen1_params.setdefault('timestamp_mode', 'vad_only')
                 qwen1_params.setdefault('assembly_cleaner', 'passthrough')
-                qwen1_params.setdefault('stepdown', False)
             elif pass1.get('isCohere'):
                 qwen1_params['generator_backend'] = 'cohere'
                 qwen1_params.setdefault('timestamp_mode', 'aligner_vad_fallback')  # D7
                 qwen1_params.setdefault('assembly_cleaner', 'passthrough')         # D3
-                # stepdown defaults to True for Cohere (aligner ON by D7)
-                # Triple-flip enforcement (plan §4.6): when the user disables the
-                # aligner via Customize Parameters → aligner_backend='none', three
-                # downstream fields must flip together to keep the orchestrator
-                # consistent: timestamp_mode → vad_only, stepdown → False, and
-                # the aligner choice stays 'none'. We enforce here at pack time
-                # so a manually-edited preset cannot leave the trio in conflict.
-                if qwen1_params.get('aligner_backend') == 'none':
-                    qwen1_params['timestamp_mode'] = 'vad_only'
-                    qwen1_params['stepdown'] = False
+            # Triple-flip enforcement (plan §4.6), for every ChronosJAV model since 1.10.0:
+            # when the user disables the aligner via Customize Parameters →
+            # aligner_backend='none', three downstream fields must flip together to keep
+            # the orchestrator consistent: timestamp_mode → vad_only, stepdown → False, and
+            # the aligner choice stays 'none'. We enforce here at pack time so a
+            # manually-edited preset cannot leave the trio in conflict.
+            if qwen1_params.get('aligner_backend') == 'none':
+                qwen1_params['timestamp_mode'] = 'vad_only'
+                qwen1_params['stepdown'] = False
             if qwen1_params:
                 args += ["--pass1-qwen-params", json.dumps(qwen1_params)]
         else:
@@ -3246,17 +3326,15 @@ class WhisperJAVAPI:
                     qwen2_params['framer'] = pass2['framer']
                 if pass2.get('isAnimeWhisper'):
                     qwen2_params['generator_backend'] = 'anime-whisper'
-                    qwen2_params.setdefault('timestamp_mode', 'vad_only')
                     qwen2_params.setdefault('assembly_cleaner', 'passthrough')
-                    qwen2_params.setdefault('stepdown', False)
                 elif pass2.get('isCohere'):
                     qwen2_params['generator_backend'] = 'cohere'
                     qwen2_params.setdefault('timestamp_mode', 'aligner_vad_fallback')  # D7
                     qwen2_params.setdefault('assembly_cleaner', 'passthrough')         # D3
-                    # Triple-flip enforcement (mirror of pass 1).
-                    if qwen2_params.get('aligner_backend') == 'none':
-                        qwen2_params['timestamp_mode'] = 'vad_only'
-                        qwen2_params['stepdown'] = False
+                # Triple-flip enforcement (mirror of pass 1), for every ChronosJAV model.
+                if qwen2_params.get('aligner_backend') == 'none':
+                    qwen2_params['timestamp_mode'] = 'vad_only'
+                    qwen2_params['stepdown'] = False
                 if qwen2_params:
                     args += ["--pass2-qwen-params", json.dumps(qwen2_params)]
             else:
