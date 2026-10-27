@@ -232,5 +232,8 @@ class SceneDiagnostics:
     # internal_breaks}. vad_start/vad_end are the RAW boundaries fed to the ASR;
     # speech_start is the refined display start actually used for the subtitle.
     frame_timing: Optional[list] = None
+    # Timing model (step 8, 1.10.0 item 12 C3): {"frames_timed", "starts_moved",
+    # "splits", "split_times"}; None when no timing model ran for the scene.
+    timing_model: Optional[dict] = None
     group_details: Optional[list] = None
     error: Optional[str] = None
