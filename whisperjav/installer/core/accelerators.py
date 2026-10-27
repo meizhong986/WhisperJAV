@@ -82,6 +82,14 @@ def requirements_file(value: str, platform: str = sys.platform) -> str:
     return f"requirements_{lock_extra(value, platform)}.txt"
 
 
+_INDEX_LABELS = {CU130_INDEX: "CUDA 13.0", CU128_INDEX: "CUDA 12.8", CPU_INDEX: "CPU"}
+
+
+def pytorch_build_label(value: str) -> str:
+    """The PyTorch build an install of this accelerator gets, in words: "CUDA 13.0", "CUDA 12.8", "CPU"."""
+    return _INDEX_LABELS.get(_BY_VALUE[value].pytorch_index, "CPU")
+
+
 def installs_pytorch(value: str) -> bool:
     """False for Own PyTorch: WhisperJAV never installs, replaces or removes PyTorch there (D-B)."""
     return bool(_BY_VALUE[value].pytorch_index)
@@ -123,6 +131,8 @@ WINDOW_TITLE = "WhisperJAV — no supported NVIDIA GPU found"                   
 WINDOW_INTRO = ("WhisperJAV found no NVIDIA graphics card that version 1.10 supports{found}. "
                 "What should this install be made for?")
 WINDOW_FOUND = " (graphics found: {names})"
+# After T47w or T25b the card itself may be supported, so only T25's question follows them.
+WINDOW_QUESTION = "What should this install be made for?"
 # (answer, label, accelerator); the first three give the GPU-through-Vulkan install (22.6.2).
 WINDOW_CHOICES = (
     ("1", "AMD graphics card", "vulkan"),
@@ -157,6 +167,10 @@ OLD_DRIVER_TEXT = ("Your NVIDIA driver ({version}) is older than WhisperJAV 1.10
 SECOND_RUN_TITLE = "WhisperJAV — this install's accelerator"                                  # T25r
 SECOND_RUN_TEXT = "This install is made for: {name}. Keep it, or choose another."
 SECOND_RUN_FOOTER = "Without an answer, the install is kept as it is ({name}) in 20 seconds."
+NVIDIA_RECORD_NO_GPU_TEXT = (                                                                 # new, P7 finding 9
+    "This install is made for the NVIDIA GPU, but this time WhisperJAV found no NVIDIA GPU it can use. "
+    "Nothing was changed. Check the NVIDIA driver and run this installer again, or run it again and "
+    "choose another accelerator.")
 NO_VULKAN_TEXT = (                                                                            # T26
     "Vulkan (vulkan-1.dll) was not found on this PC, so WhisperJAV is installed as the CPU-only version: "
     "every pipeline runs on the CPU (not accelerated). To use your graphics card with the GGUF pipelines, "
