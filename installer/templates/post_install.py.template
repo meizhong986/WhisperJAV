@@ -4,8 +4,9 @@ WhisperJAV v{{VERSION}} Post-Install Script
 
 This script runs after the conda environment is created and:
 1. Performs comprehensive preflight checks (disk space, network, WebView2)
-2. Detects NVIDIA GPU and chooses the PyTorch build (CUDA 13.0, or CPU)
-3. Offers CPU-only fallback for systems without NVIDIA GPU
+2. Detects the NVIDIA GPU; with a supported one the install is made for it (CUDA 13.0)
+3. Otherwise asks, in a window, what the install is made for: GPU through Vulkan, Own
+   PyTorch or CPU only (design section 22.6.2), and records the answer
 4. Installs the release-pinned dependencies of that build from
    requirements_v{{VERSION}}_<build>.txt (uv.lock exported by build_release.py), then PyTorch
 5. Installs WhisperJAV from the bundled wheel
@@ -133,11 +134,34 @@ if USE_UV:
 # wheel, and is the version 1.9.5 installs got (D:\195, 2026-10-13).
 NVIDIA_ML_PY_REQUIREMENT = "nvidia-ml-py==13.615.71"
 LIEF_REQUIREMENT = "lief==1.0.0"
-CU130_INDEX = "https://download.pytorch.org/whl/cu130"
-CU128_INDEX = "https://download.pytorch.org/whl/cu128"
-CPU_INDEX = "https://download.pytorch.org/whl/cpu"
-PYTORCH_INDEXES = {"cu130": CU130_INDEX, "cu128": CU128_INDEX, "cpu": CPU_INDEX}
-VARIANT_LABELS = {"cu130": "CUDA 13.0", "cu128": "CUDA 12.8", "cpu": "CPU"}
+def _load_accelerators():
+    """The one accelerator table (whisperjav/installer/core/accelerators.py; design 22.6.8).
+
+    This script cannot import WhisperJAV before phase 5, so installer/build_release.py ships
+    the table's file next to it as whisperjav_accelerators_v{{VERSION}}.py; in the source tree
+    (the tests) it is the file itself. Standard library only.
+    """
+    import importlib.util
+    here = os.path.dirname(os.path.abspath(__file__))
+    for path in (os.path.join(sys.prefix, "whisperjav_accelerators_v{{VERSION}}.py"),
+                 os.path.join(here, "whisperjav_accelerators_v{{VERSION}}.py"),
+                 os.path.join(here, "..", "..", "whisperjav", "installer", "core", "accelerators.py")):
+        if os.path.isfile(path):
+            spec = importlib.util.spec_from_file_location("whisperjav_accelerators", path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return module
+    raise RuntimeError("the installer's accelerator table (whisperjav_accelerators_v{{VERSION}}.py) is missing")
+
+
+ACC = _load_accelerators()
+CU130_INDEX = ACC.CU130_INDEX
+CU128_INDEX = ACC.CU128_INDEX
+CPU_INDEX = ACC.CPU_INDEX
+# Per accelerator (record value): its PyTorch index ("" = Own PyTorch, none) and its name (T27).
+# The lock extras (cu130, cu128, vulkan, cpu) are record values too, so the locked files use them.
+PYTORCH_INDEXES = {a.value: a.pytorch_index for a in ACC.ACCELERATORS}
+VARIANT_LABELS = {a.value: a.name for a in ACC.ACCELERATORS}
 TORCH_PACKAGE_NAMES = ("torch", "torchaudio", "torchvision")
 MIN_TORCH_CUDA_VERSION: Tuple[int, int, int] = (13, 0, 0)
 MIN_TORCH_CUDA_VERSION_FALLBACK: Tuple[int, int, int] = (12, 8, 0)
@@ -156,9 +180,13 @@ MIN_DRIVER_CUDA13: Tuple[int, int, int] = (580, 0, 0)
 CUBLAS12_PACKAGE = "nvidia-cublas-cu12==12.8.4.1"
 STACK_FILE = os.path.join(sys.prefix, "whisperjav_stack.txt")
 
-ISSUES_URL = "https://github.com/meizhong986/WhisperJAV/issues"
-RELEASE_195_URL = "https://github.com/meizhong986/WhisperJAV/releases/tag/v1.9.5"
-NVIDIA_DRIVER_URL = "https://www.nvidia.com/Download/index.aspx"
+ISSUES_URL = ACC.ISSUES_URL
+RELEASE_195_URL = ACC.RELEASE_195_URL
+NVIDIA_DRIVER_URL = ACC.NVIDIA_DRIVER_URL
+
+# The accelerator this install is made for (design 22.0), set by main(); the checks of
+# phase 6 and the summary read it.
+INSTALL_ACCELERATOR: Optional[str] = None
 
 # Set when the installer stops because of the user's answer or an old driver, so the
 # closing lines do not add "INSTALLATION FAILED" and a 60-second wait to a stop the
@@ -584,20 +612,24 @@ def apply_gpu_test_switches(driver_info: DriverInfo) -> DriverInfo:
 
 
 def read_stack_file() -> Optional[str]:
-    """The stack an earlier run of this installer chose here: cu130, cu128 or cpu."""
+    """The accelerator an earlier run of this installer recorded here (the table's values).
+    Through STACK_FILE, so tests can point it elsewhere."""
     try:
         with open(STACK_FILE, "r", encoding="utf-8") as f:
             value = f.read().strip()
-        return value if value in ("cu130", "cu128", "cpu") else None
     except OSError:
         return None
+    return value if ACC.get(value) is not None else None
 
 
 def write_stack_file(stack: str) -> None:
+    if ACC.get(stack) is None:
+        log(f"WARNING: not recorded: {stack!r} is not one of {ACC.VALUES}")
+        return
     try:
         with open(STACK_FILE, "w", encoding="utf-8") as f:
             f.write(stack + "\n")
-        log(f"Stack recorded in {STACK_FILE}: {stack}")
+        log(f"Accelerator recorded in {STACK_FILE}: {stack} ({VARIANT_LABELS[stack]})")
     except OSError as e:
         log(f"WARNING: could not write {STACK_FILE}: {e}")
 
@@ -618,51 +650,203 @@ def wait_for_answer(prompt: str, valid: Sequence[str], on_no_console: str) -> st
             return answer
 
 
-def gpu_support_gate(driver_info: DriverInfo) -> Tuple[str, Optional[str]]:
-    """Old card or old driver, before anything is installed (item 2 spec E and F).
+def windows_display_adapters() -> List[str]:
+    """The display adapters Windows lists (Win32_VideoController), for the window's
+    "graphics found" line and the driver-missing case (design 22.6.2). [] if unreadable."""
+    try:
+        r = subprocess.run(["powershell", "-NoProfile", "-Command",
+                            "(Get-CimInstance Win32_VideoController).Name"],
+                           capture_output=True, text=True, timeout=30)
+    except Exception:
+        return []
+    return [l.strip() for l in (r.stdout or "").splitlines() if l.strip()]
 
-    Returns ("gpu" | "cpu" | "stop", failure reason or None). Texts: the owner's (W43).
+
+def vulkan_runtime_present() -> bool:
+    """The Vulkan loader, installed with the graphics driver (design 22.6.2) [inferred]."""
+    system_root = os.environ.get("SystemRoot", r"C:\Windows")
+    return os.path.isfile(os.path.join(system_root, "System32", "vulkan-1.dll"))
+
+
+def nvidia_case(driver_info: DriverInfo, adapters: Sequence[str]) -> Tuple[str, List[str]]:
+    """Which case of the window applies (design 22.6.2), and its first lines.
+
+    "supported": a supported NVIDIA card and driver; "old_card"; "old_driver";
+    "not_reachable": Windows lists an NVIDIA card but pynvml finds none; "none".
     """
-    global _stopped_on_purpose
-    if not driver_info.driver_version:
-        return "gpu", None  # no NVIDIA GPU: the CPU path of install_pytorch decides
+    if driver_info.driver_version:
+        cc = driver_info.compute_capability
+        name = driver_info.gpu_name or "Unknown GPU"
+        if cc is not None and cc < MIN_COMPUTE_CAPABILITY:
+            return "old_card", [ACC.OLD_CARD_TEXT.format(name=name, cc=f"{cc[0]}.{cc[1]}"), ACC.OLD_CARD_195_TEXT]
+        if driver_info.driver_version < MIN_DRIVER_CUDA13:
+            version = f"{driver_info.driver_version[0]}.{driver_info.driver_version[1]:02d}"
+            return "old_driver", [ACC.OLD_DRIVER_TEXT.format(version=version, minimum=MIN_DRIVER_CUDA13[0])]
+        return "supported", []
+    nvidia = [a for a in adapters if "nvidia" in a.lower()]
+    if nvidia:
+        return "not_reachable", [ACC.NOT_REACHABLE_TEXT.format(name=nvidia[0])]
+    return "none", []
 
-    cc = driver_info.compute_capability
-    name = driver_info.gpu_name or "Unknown GPU"
-    if cc is not None and cc < MIN_COMPUTE_CAPABILITY:
-        log("\n" + "!" * 80)
-        log(f"Your graphics card, {name} (compute capability {cc[0]}.{cc[1]}), is older than "
-            "WhisperJAV 1.10 supports. 1.10 needs a GTX 16-series, RTX 20-series or newer card.")
-        log("Choose: 1 = my card is identified wrongly (show where to report it, then stop); "
-            "2 = install for the CPU only (much slower); 3 = stop.")
-        log(f"WhisperJAV 1.9.5 still supports this card: {RELEASE_195_URL}.")
-        log("!" * 80)
-        answer = wait_for_answer("Type 1, 2 or 3 and press Enter: ", ("1", "2", "3"), "3")
-        if answer == "2":
-            log("Installing for the CPU only, as chosen.")
-            return "cpu", None
-        if answer == "1":
-            log(f"Please report it here: {ISSUES_URL} (attach install_log_v{{VERSION}}.txt).")
+
+def _card_choice(adapters: Sequence[str]) -> str:
+    """The card answer that fits what Windows lists: AMD 1, Intel 2, NVIDIA 3."""
+    names = " ".join(adapters).lower()
+    if "amd" in names or "radeon" in names:
+        return "1"
+    if "intel" in names:
+        return "2"
+    if "nvidia" in names:
+        return "3"
+    return "1"
+
+
+def window_plan(case: str, reason_lines: List[str], adapters: Sequence[str], recorded: Optional[str]) -> dict:
+    """What the window shows, what is pre-selected and what an unanswered window installs.
+
+    The pre-selection is always what the timeout installs (review finding 8 of W236 I2):
+    a first install without an NVIDIA card -> CPU only after 20 s (owner R3); an NVIDIA GPU
+    that 1.10 cannot use -> Stop, no time limit (W37 (2), 22.13 detail 7); a second run ->
+    the recorded accelerator after 20 s (22.6.6). Returns None when no window is needed.
+    """
+    found = ACC.WINDOW_FOUND.format(names=", ".join(adapters)) if adapters else ""
+    choices = [(key, label) for key, label, _acc in ACC.WINDOW_CHOICES]
+    if case in ("old_card", "old_driver", "not_reachable"):
+        return dict(title=ACC.WINDOW_TITLE, lines=reason_lines + [ACC.WINDOW_INTRO.format(found=found)],
+                    choices=choices, preselected="stop", timeout=None, footer="",
+                    wrongly=(case == "old_card"))
+    if recorded:
+        nvidia_record = recorded in ("cu130", "cu128")
+        if case == "supported" or nvidia_record:
+            choices = [("nvidia", "NVIDIA GPU (CUDA)")] + choices
+        # The recorded accelerator, so nothing changes unless the user picks another (22.6.6).
+        key = {"own-pytorch": "4", "cpu": "5"}.get(recorded) or ("nvidia" if nvidia_record else _card_choice(adapters))
+        name = VARIANT_LABELS[recorded]
+        return dict(title=ACC.SECOND_RUN_TITLE, lines=[ACC.SECOND_RUN_TEXT.format(name=name)],
+                    choices=choices, preselected=key, timeout=ACC.WINDOW_TIMEOUT_SECONDS,
+                    footer=ACC.SECOND_RUN_FOOTER.format(name=name), wrongly=False, keep=recorded)
+    if case == "supported":
+        return None
+    return dict(title=ACC.WINDOW_TITLE, lines=[ACC.WINDOW_INTRO.format(found=found)], choices=choices,
+                preselected="5", timeout=ACC.WINDOW_TIMEOUT_SECONDS, footer=ACC.WINDOW_FOOTER, wrongly=False)
+
+
+def accelerator_for_answer(answer: str, vulkan_present: bool, plan: Optional[dict] = None) -> str:
+    """An answer of the window -> the accelerator (record value), or "stop" / "wrongly"."""
+    if answer in ("stop", "wrongly"):
+        return answer
+    if answer == "nvidia":
+        return (plan or {}).get("keep") if (plan or {}).get("keep") in ("cu130", "cu128") else "cu130"
+    accelerator = {key: acc for key, _label, acc in ACC.WINDOW_CHOICES}[answer]
+    if accelerator == "vulkan" and not vulkan_present:
+        log(ACC.NO_VULKAN_TEXT)
+        return "cpu"
+    return accelerator
+
+
+def _ask_in_window(plan: dict) -> str:
+    """Show the window (Tk, design 22.6.2); returns the answer. Raises if no window can open."""
+    import tkinter as tk
+    root = tk.Tk()
+    root.title(plan["title"])
+    root.attributes("-topmost", True)
+    answer = {"value": plan["preselected"]}
+    choice = tk.StringVar(value=plan["preselected"] if plan["preselected"] != "stop" else "")
+    frame = tk.Frame(root, padx=18, pady=14)
+    frame.pack(fill="both", expand=True)
+    for line in plan["lines"]:
+        tk.Label(frame, text=line, wraplength=560, justify="left", anchor="w").pack(fill="x", pady=(0, 8))
+    for key, label in plan["choices"]:
+        tk.Radiobutton(frame, text=label, variable=choice, value=key, anchor="w").pack(fill="x")
+    tk.Label(frame, text=ACC.WINDOW_EXPLANATION, wraplength=560, justify="left", anchor="w",
+             fg="#444").pack(fill="x", pady=(10, 6))
+    footer = tk.Label(frame, text=plan["footer"], anchor="w", fg="#444")
+    footer.pack(fill="x")
+    buttons = tk.Frame(frame)
+    buttons.pack(fill="x", pady=(10, 0))
+
+    def finish(value):
+        answer["value"] = value
+        root.destroy()
+
+    tk.Button(buttons, text="Install", width=12,
+              command=lambda: finish(choice.get() or "stop")).pack(side="right", padx=(6, 0))
+    tk.Button(buttons, text="Stop", width=12, command=lambda: finish("stop")).pack(side="right")
+    if plan.get("wrongly"):
+        tk.Button(buttons, text=ACC.IDENTIFIED_WRONGLY, command=lambda: finish("wrongly")).pack(side="left")
+    root.protocol("WM_DELETE_WINDOW", lambda: finish("stop"))
+    if plan["timeout"]:
+        remaining = {"s": plan["timeout"]}
+
+        def tick():
+            if remaining["s"] <= 0:
+                finish(plan["preselected"])
+                return
+            footer.config(text=f"{plan['footer']} ({remaining['s']} s)")
+            remaining["s"] -= 1
+            root.after(1000, tick)
+        tick()
+    root.mainloop()
+    return answer["value"]
+
+
+def _ask_in_console(plan: dict) -> str:
+    """The window's console form (T28): when no window can open."""
+    log("\n" + "!" * 80)
+    for line in plan["lines"]:
+        log(line)
+    keys = [key for key, _label in plan["choices"]]
+    for key, label in plan["choices"]:
+        log(f"  {key} = {label}")
+    log(ACC.WINDOW_EXPLANATION)
+    log("!" * 80)
+    extra = ACC.CONSOLE_WRONGLY_EXTRA.format(n=7) if plan.get("wrongly") else ""
+    prompt = ACC.CONSOLE_PROMPT_WINDOWS.format(extra=extra)
+    if "nvidia" in keys:
+        prompt = "Type nvidia = NVIDIA GPU (CUDA), or " + prompt[len("Type "):]
+    valid = keys + ["6"] + (["7"] if plan.get("wrongly") else [])
+    if plan["timeout"]:
+        default = plan["preselected"] if plan["preselected"] != "stop" else "6"
+        log(plan["footer"])
+        answer = timed_input(prompt, plan["timeout"], default).strip()
+        answer = answer if answer in valid else default
+    else:
+        answer = wait_for_answer(prompt, valid, "6")
+    return {"6": "stop", "7": "wrongly"}.get(answer, answer)
+
+
+def ask_accelerator(plan: dict) -> str:
+    """The window, or its console form when Tk cannot open one; the answer is logged too."""
+    try:
+        answer = _ask_in_window(plan)
+        for line in plan["lines"]:
+            log(line)  # the window's reason, also in the console and the log (NSIS's stop dialog points there)
+    except Exception as exc:  # noqa: BLE001 -- no window (no Tk, no desktop): ask in the console
+        log(f"(The window could not open: {exc}; asking here instead.)")
+        answer = _ask_in_console(plan)
+    log(f"Answer: {answer}")
+    return answer
+
+
+def choose_install_accelerator(driver_info: DriverInfo) -> Tuple[str, Optional[str]]:
+    """What this install is made for (design 22.6.1, 22.6.2): (accelerator, None) or ("stop", reason)."""
+    global _stopped_on_purpose
+    adapters = windows_display_adapters()
+    case, reason_lines = nvidia_case(driver_info, adapters)
+    recorded = read_stack_file()
+    plan = window_plan(case, reason_lines, adapters, recorded)
+    if plan is None:
+        return "cu130", None  # a supported NVIDIA GPU, first install: no question (phase 5.1 may fall back)
+    answer = ask_accelerator(plan)
+    if answer == "wrongly":
+        log(ACC.REPORT_IT_TEXT)
+    accelerator = accelerator_for_answer(answer, vulkan_runtime_present(), plan)
+    if accelerator in ("stop", "wrongly"):
         log("The installer will now stop.")
         _stopped_on_purpose = True
-        return "stop", f"Graphics card {name} (compute capability {cc[0]}.{cc[1]}) is older than 1.10 supports; stopped (answer {answer})"
-
-    if driver_info.driver_version < MIN_DRIVER_CUDA13:
-        # As NVIDIA writes it on Windows: 566.03, not 566.3.0.
-        version = f"{driver_info.driver_version[0]}.{driver_info.driver_version[1]:02d}"
-        log("\n" + "!" * 80)
-        log(f"Your NVIDIA driver ({version}) is older than WhisperJAV 1.10 needs (580 or newer). "
-            f"Update it from {NVIDIA_DRIVER_URL}, restart the PC, and run this installer again. "
-            "Nothing has been installed. Press Enter to close.")
-        log("!" * 80)
-        try:
-            input()
-        except (EOFError, KeyboardInterrupt):
-            pass
-        _stopped_on_purpose = True
-        return "stop", f"NVIDIA driver {version} is older than 580"
-
-    return "gpu", None
+        return "stop", f"Stopped before installing, as chosen ({case})"
+    log(ACC.MADE_FOR_TEXT.format(name=VARIANT_LABELS[accelerator]))
+    return accelerator, None
 
 
 # The CUDA build of the installed PyTorch ("13.0", "12.8", or "" for CPU), as read in a
@@ -795,7 +979,7 @@ def select_torch_install_plan(driver_info: DriverInfo, force_cpu: bool = False) 
                 )
 
         min_required = TORCH_DRIVER_MATRIX[-1].min_driver
-        reason = (  # not reached on a normal run: gpu_support_gate stops an older driver
+        reason = (  # not reached on a normal run: the window is shown for an older driver
             f"Detected driver {format_version_tuple(driver_info.driver_version)} "
             f"on {driver_info.gpu_name or 'GPU'} is below minimum "
             f"{format_version_tuple(min_required)} for CUDA wheels."
@@ -1149,15 +1333,31 @@ def check_cuda_driver() -> DriverInfo:
 
 
 def plan_pytorch(driver_info: Optional[DriverInfo] = None,
-                 force_cpu: bool = False) -> Tuple[Optional[TorchInstallPlan], Optional[str]]:
-    """Choose the PyTorch build for this PC, before anything is installed.
+                 force_cpu: bool = False,
+                 accelerator: Optional[str] = None) -> Tuple[Optional[TorchInstallPlan], Optional[str]]:
+    """Choose the PyTorch build for the accelerator chosen (design 22.6.2), before anything is installed.
 
-    Returns (None, None) when a valid PyTorch is already there and is kept, (plan, None)
-    when the plan's build is to be installed, or (None, reason) to stop. v1.10.0 (item
-    2f): split from install_pytorch so the locked file of the chosen build can be
-    installed first -- PyTorch is installed --no-deps and imports only once its
-    dependencies are in place.
+    Returns (None, None) when a valid PyTorch is already there and is kept -- or, on an Own
+    PyTorch install, always: WhisperJAV never installs, replaces or removes PyTorch there
+    (owner W232 3, D-B) --, (plan, None) when the plan's build is to be installed, or (None,
+    reason) to stop. v1.10.0 (item 2f): split from install_pytorch so the locked file of the
+    chosen build can be installed first -- PyTorch is installed --no-deps and imports only
+    once its dependencies are in place. Nothing is asked here: the window asked.
     """
+    if accelerator == "own-pytorch":
+        log("Own PyTorch: PyTorch is not installed, replaced or removed by this installer.")
+        return None, None
+    if accelerator in ("cpu", "vulkan"):
+        try:
+            plan = select_torch_install_plan(driver_info or DriverInfo(None, None, "none"), force_cpu=True)
+            if accelerator == "vulkan":
+                plan = plan._replace(pip_args=torch_pip_args("vulkan"), variant="vulkan",
+                                     pip_command="pip3 " + " ".join(torch_pip_args("vulkan")))
+        except (OSError, RuntimeError) as exc:
+            return None, f"The installer's locked requirements file is missing or damaged: {exc}"
+        log(f"Installing PyTorch without NVIDIA GPU support, for: {VARIANT_LABELS[accelerator]}.")
+        return plan, None
+
     existing_ok, existing_error = verify_existing_torch_stack()
     if existing_ok:
         return None, None
@@ -1178,20 +1378,8 @@ def plan_pytorch(driver_info: Optional[DriverInfo] = None,
             f"for GPU {plan.gpu_name or 'Unknown GPU'} with driver "
             f"{format_version_tuple(plan.driver_detected)}"
         )
-    elif force_cpu:
-        log("Installing CPU-only PyTorch, as chosen.")
     else:
-        log("\n" + "!" * 80)
-        log("  GPU ACCELERATION NOT AVAILABLE")
-        log("!" * 80)
-        if plan.reason:
-            log(plan.reason)
-        log("\nWithout CUDA this installer will configure CPU-only PyTorch.")
-        log("Processing will be significantly slower (6-10x).")
-        response = timed_input("Install CPU-only PyTorch? (Y/n): ", 20, "y").strip().lower()
-        if response != 'y':
-            log("User declined CPU-only PyTorch installation.")
-            return None, "User declined CPU-only PyTorch"
+        log("Installing PyTorch without NVIDIA GPU support" + (f": {plan.reason}" if plan.reason else "."))
     return plan, None
 
 
@@ -1241,9 +1429,9 @@ def install_pytorch(driver_info: Optional[DriverInfo] = None, force_cpu: bool = 
 
         log(f"PyTorch {facts['torch']} installed successfully!")
         if facts.get("cuda_available"):
-            log(f"CUDA acceleration: ENABLED (devices: {facts.get('device_count')})")
+            log(f"PyTorch: NVIDIA GPU (CUDA) usable (devices: {facts.get('device_count')})")
         else:
-            log("CUDA acceleration: DISABLED (CPU-only mode)")
+            log("PyTorch: no NVIDIA GPU support: the PyTorch pipelines run on the CPU (not accelerated)")  # T29b
         _torch_cuda_build = facts.get("cuda") or ""
 
         # Lock GPU packages: pin torch/torchaudio to prevent subsequent pip installs
@@ -2049,6 +2237,10 @@ def fetch_firered_vad_model() -> bool:
     return False
 
 
+class _SkipCheck(Exception):
+    """A check of phase 6 that does not apply to this install (Own PyTorch)."""
+
+
 def run_post_install_verification() -> Tuple[int, int, list, list]:
     """
     Phase 6: Post-install verification.
@@ -2089,17 +2281,22 @@ def run_post_install_verification() -> Tuple[int, int, list, list]:
         fails += 1
         failures.append("import whisperjav")
 
-    # Test the main entry point import
+    # Own PyTorch (design 22.2.3): PyTorch is not installed yet, so every check that loads it
+    # is skipped and says so (T42a); the user adds PyTorch afterwards.
+    own_pytorch = INSTALL_ACCELERATOR == "own-pytorch"
+    if own_pytorch:
+        log("  PyTorch checks skipped: PyTorch is not installed yet (Own PyTorch).")
+        warnings.append("PyTorch checks skipped: PyTorch is not installed yet (Own PyTorch)")
+
+    # Test the main entry point import (1.10.0: importing whisperjav.main asks nothing,
+    # design 22.5.1; it loads PyTorch).
     python_exe = os.path.join(sys.prefix, 'python.exe')
     try:
-        # Importing whisperjav.main runs its start-up GPU check, which on a machine
-        # without a usable GPU stops and asks (v1.9.2). This is an import check, not
-        # a run, so answer for it; otherwise a CPU-only install would report a failure.
-        import_env = dict(os.environ, WHISPERJAV_CPU_ACCEPTED="1")
+        if own_pytorch:
+            raise _SkipCheck()
         result = subprocess.run(
             [python_exe, "-c", "from whisperjav.main import main; print('OK')"],
             capture_output=True, text=True, timeout=120,  # First import loads torch, whisper — slow on cold cache
-            env=import_env,
         )
         if result.returncode == 0:
             log("  ✓ from whisperjav.main import main: OK")
@@ -2109,6 +2306,8 @@ def run_post_install_verification() -> Tuple[int, int, list, list]:
             log(f"  ✗ from whisperjav.main import main FAILED: {error}")
             fails += 1
             failures.append("from whisperjav.main import main")
+    except _SkipCheck:
+        pass
     except subprocess.TimeoutExpired:
         log("  ⚠ from whisperjav.main import main: did not finish within 120s "
             "— not treated as a failure")
@@ -2146,7 +2345,7 @@ def run_post_install_verification() -> Tuple[int, int, list, list]:
 
     # Check --version on whisperjav.exe
     wj_exe = os.path.join(sys.prefix, "Scripts", "whisperjav.exe")
-    if os.path.exists(wj_exe):
+    if os.path.exists(wj_exe) and not own_pytorch:  # --version loads PyTorch (design 22.5.4)
         try:
             result = subprocess.run(
                 [wj_exe, "--version"],
@@ -2178,6 +2377,8 @@ def run_post_install_verification() -> Tuple[int, int, list, list]:
         ("yaml", "PyYAML"),
     ]
 
+    if own_pytorch:  # these three load PyTorch
+        key_packages = [(m, d) for m, d in key_packages if m not in ("torch", "whisper", "stable_whisper")]
     for module, display in key_packages:
         ok, detail, timed_out = verify_import(module, display)
         if ok:
@@ -2268,22 +2469,29 @@ def print_installation_summary(install_start_time: float,
     else:
         log(f"  ✓ Package installer: pip (standard mode)")
 
-    try:
-        import torch
-        if torch.cuda.is_available():
-            log(f"  ✓ PyTorch: {torch.__version__} with CUDA {torch.version.cuda}")
-            gpu_label = torch.cuda.get_device_name(0)
-            vram_info = get_gpu_vram_mb()
-            if vram_info:
-                _, vram_mb = vram_info
-                log(f"  ✓ GPU: {gpu_label} ({vram_mb / 1024:.1f} GB VRAM)")
+    # T29b (design 22.10): what this install is made for, and where the parts run.
+    made_for = ACC.get(read_stack_file() or INSTALL_ACCELERATOR or "")
+    if made_for is not None:
+        log(f"  ✓ {ACC.MADE_FOR_TEXT.format(name=made_for.name)} {made_for.runs}")
+    if INSTALL_ACCELERATOR == "own-pytorch":
+        log("  ✓ PyTorch: not installed (Own PyTorch)")
+    else:
+        try:
+            import torch
+            if torch.cuda.is_available():
+                log(f"  ✓ PyTorch: {torch.__version__} with CUDA {torch.version.cuda}")
+                gpu_label = torch.cuda.get_device_name(0)
+                vram_info = get_gpu_vram_mb()
+                if vram_info:
+                    _, vram_mb = vram_info
+                    log(f"  ✓ GPU: {gpu_label} ({vram_mb / 1024:.1f} GB VRAM)")
+                else:
+                    log(f"  ✓ GPU: {gpu_label}")
             else:
-                log(f"  ✓ GPU: {gpu_label}")
-        else:
-            log(f"  ✓ PyTorch: {torch.__version__} (CPU-only mode)")
-            log(f"  ⚠ GPU acceleration: DISABLED (processing will be slower)")
-    except Exception:
-        log(f"  ? PyTorch: Status unknown")
+                log(f"  ✓ PyTorch: {torch.__version__}, no NVIDIA GPU support: the PyTorch pipelines run "
+                    f"on the CPU (not accelerated)")
+        except Exception:
+            log(f"  ? PyTorch: Status unknown")
 
     if check_webview2_windows():
         log(f"  ✓ WebView2 runtime: Detected")
@@ -2615,23 +2823,34 @@ def main() -> int:
     log_section("Phase 2: GPU and CUDA Detection")
     driver_info = check_cuda_driver()
 
-    # === Phase 2.5: Card and driver supported by 1.10? (item 2 spec E, F) ===
-    gate, gate_reason = gpu_support_gate(driver_info)
-    if gate == "stop":
-        create_stopped_file(gate_reason)
+    # === Phase 2.5: What this install is made for (design 22.6.1, 22.6.2; owner W234 D-A) ===
+    # A supported NVIDIA GPU on a first install: no question. Otherwise the window (or its
+    # console form): an NVIDIA GPU 1.10 cannot use (old card, old driver, not reachable),
+    # no NVIDIA GPU, or a second run with the accelerator recorded.
+    log_section("Phase 2.5: Accelerator")
+    global INSTALL_ACCELERATOR
+    accelerator, stop_reason = choose_install_accelerator(driver_info)
+    if accelerator == "stop":
+        create_stopped_file(stop_reason)
         return 0  # not a failure (D1): NSIS shows the closing dialog for the marker
+    INSTALL_ACCELERATOR = accelerator
+    nvidia_install = ACC.get(accelerator).nvidia
 
     # === Phase 3: PyTorch build for this PC (item 2f) ===
     # Chosen before anything is installed: the locked file of that build is installed
     # next, then PyTorch itself (--no-deps; it needs the packages of phase 4 to import).
     log_section("Phase 3: PyTorch Build Selection")
-    torch_plan, plan_error = plan_pytorch(driver_info, force_cpu=(gate == "cpu"))
+    torch_plan, plan_error = plan_pytorch(driver_info, accelerator=None if nvidia_install else accelerator)
     if plan_error:
         create_failure_file(f"PyTorch installation failed: {plan_error}")
         return 1
-    # The build actually selected: the plan's, or the one already installed and kept
-    # (a repair run). Never a build that was only detected (owner, W56).
-    variant = torch_plan.variant if torch_plan else variant_of_cuda_build(_torch_cuda_build or "")
+    # The locked file: the accelerator's lock extra; for an NVIDIA install the build actually
+    # selected -- the plan's, or the one already installed and kept (a repair run), never a
+    # build that was only detected (owner, W56).
+    if nvidia_install:
+        variant = torch_plan.variant if torch_plan else variant_of_cuda_build(_torch_cuda_build or "")
+    else:
+        variant = ACC.lock_extra(accelerator, "win32")
     if variant is None:
         create_failure_file(f"Installed PyTorch has an unexpected CUDA build: {_torch_cuda_build}")
         return 1
@@ -2660,7 +2879,7 @@ def main() -> int:
     # Chinese users often have proxies at OS level that bundled git can't see.
     detect_and_configure_proxy()
 
-    log(f"Installing release-pinned dependencies ({VARIANT_LABELS[variant]})...")
+    log(f"Installing release-pinned dependencies ({VARIANT_LABELS[accelerator if not nvidia_install else variant]})...")
     log(f"  {len(install_lines)} packages from {locked_requirements_path(variant)}")
     if not run_pip(
         ["install", "--no-deps", "-r", install_file, "--progress-bar", "on"],
@@ -2671,7 +2890,8 @@ def main() -> int:
 
     # === Phase 4.5: PyTorch ===
     log_section("Phase 4.5: PyTorch Installation")
-    pytorch_error = install_pytorch(driver_info, force_cpu=(gate == "cpu"), plan=torch_plan) if torch_plan else None
+    # Skipped on an Own PyTorch install (no plan): the user adds their PyTorch afterwards (T42a).
+    pytorch_error = install_pytorch(driver_info, plan=torch_plan) if torch_plan else None
     if pytorch_error:
         create_failure_file(f"PyTorch installation failed: {pytorch_error}")
         return 1
@@ -2708,8 +2928,12 @@ def main() -> int:
     # Decided by the PyTorch build installed now (_torch_cuda_build, read in a fresh
     # process), not by an older whisperjav_stack.txt: a repair run that had to reinstall
     # PyTorch gets CUDA 13.0 again and must go through the check (review 2026-10-14).
+    # Every other install records the accelerator chosen in phase 2.5 (design 22.6.2): a Vulkan
+    # install's PyTorch has no CUDA, and must still be recorded as vulkan, not cpu.
     build = _torch_cuda_build or ""
-    if build.startswith("13"):
+    if not nvidia_install:
+        write_stack_file(accelerator)
+    elif build.startswith("13"):
         stack_error = cublas12_phase()
         if stack_error:
             create_failure_file(stack_error)
@@ -2719,7 +2943,7 @@ def main() -> int:
     elif build:
         log(f"WARNING: unexpected PyTorch CUDA build {build}; cuBLAS 12 not placed")
     else:
-        write_stack_file("cpu")
+        write_stack_file("cpu")  # an NVIDIA install that got PyTorch without CUDA: recorded as it is
 
     # === Phase 5.5: Copy Launcher to Root ===
     log_section("Phase 5.5: User-Friendly Launcher Setup")
@@ -2806,10 +3030,49 @@ def main() -> int:
     # Working directory is set to the installation folder ($INSTDIR)
     # Icon: whisperjav_icon.ico in installation folder
     print_installation_summary(install_start_time, verification_results)
+    if accelerator == "own-pytorch":
+        show_own_pytorch_next_step()
 
     log("\nInstallation completed successfully!")
     log("You may now close this window.")
     return 0
+
+
+def own_pytorch_next_step_text() -> str:
+    path = os.path.join(sys.prefix, ACC.OWN_PYTORCH_NEXT_STEP_FILE)
+    return ACC.OWN_PYTORCH_NEXT_STEP.format(python=os.path.join(sys.prefix, "python.exe"), file=path)
+
+
+def show_own_pytorch_next_step() -> None:
+    """T42a (design 22.2.3; review finding 14): the one command, in a window that stays until the
+    user closes it, saved to OWN_PYTORCH_NEXT_STEP.txt, and in the log."""
+    text = own_pytorch_next_step_text()
+    log("\n" + "!" * 80)
+    log(text)
+    log("!" * 80)
+    try:
+        with open(os.path.join(sys.prefix, ACC.OWN_PYTORCH_NEXT_STEP_FILE), "w", encoding="utf-8") as f:
+            f.write(text + "\n")
+    except OSError as e:
+        log(f"WARNING: could not save the command: {e}")
+    try:
+        import tkinter as tk
+        root = tk.Tk()
+        root.title("WhisperJAV — one more step: your PyTorch")
+        root.attributes("-topmost", True)
+        frame = tk.Frame(root, padx=18, pady=14)
+        frame.pack(fill="both", expand=True)
+        tk.Label(frame, text=text.split(": \"")[0] + ":", wraplength=560, justify="left", anchor="w").pack(fill="x")
+        command = tk.Text(frame, height=3, width=80, wrap="word")
+        command.insert("1.0", "\"" + text.split(": \"", 1)[1].split(". WhisperJAV will never")[0])
+        command.configure(state="disabled")
+        command.pack(fill="x", pady=8)
+        tk.Label(frame, text="WhisperJAV will never replace it." + text.split("will never replace it.")[1],
+                 wraplength=560, justify="left", anchor="w").pack(fill="x")
+        tk.Button(frame, text="Close", width=12, command=root.destroy).pack(side="right", pady=(10, 0))
+        root.mainloop()
+    except Exception as exc:  # noqa: BLE001 -- no window: the console, the log and the file have it
+        log(f"(The window could not open: {exc}.)")
 
 
 if __name__ == "__main__":
