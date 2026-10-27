@@ -21,7 +21,7 @@ except Exception:  # pragma: no cover - optional dependency guard
     snapshot_download = None
 
 from whisperjav.utils.logger import logger
-from whisperjav.utils.device_detector import ctranslate2_device, get_best_device
+from whisperjav.utils.device_detector import APPLE_SILICON_CTRANSLATE2_TEXT, ctranslate2_device, get_best_device
 from whisperjav.modules.japanese_postprocessor import JapanesePostProcessor
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
 
@@ -162,11 +162,7 @@ class StableTSASR:
         # CTranslate2 only supports "cuda" or "cpu" devices.
         # See: https://github.com/OpenNMT/CTranslate2/issues/1562
         if self.device == "mps" and self.turbo_mode:
-            logger.warning(
-                "Apple Silicon MPS detected, but faster-whisper/ctranslate2 doesn't support MPS. "
-                "Using CPU mode with Apple Accelerate optimization. "
-                "For GPU acceleration on Mac, use --mode transformers instead."
-            )
+            logger.warning(APPLE_SILICON_CTRANSLATE2_TEXT)  # T53 (design 22.8)
             self.device = "cpu"
 
         # Default to int8 for quantized models (faster-whisper uses CTranslate2 quantized models)
