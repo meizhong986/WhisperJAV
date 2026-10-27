@@ -17,8 +17,8 @@ WHAT IS HERE (standard library only; nothing is imported from torch or ctranslat
     load_check()   load cublas64_12.dll from CTranslate2's folder, as CTranslate2 does,
                    and create and destroy a cuBLAS handle -- run it in a fresh process
     missing_files()  the placed files that are not there (for `whisperjav --check`)
-    read_stack() / write_stack()  the stack this PC was installed with: cu130, cu128
-                   or cpu, in <install>/whisperjav_stack.txt
+    read_stack() / write_stack()  the accelerator this install is made for, in
+                   <install>/whisperjav_stack.txt (values: installer/core/accelerators.py)
 
     Command line (the installers call it in a fresh process):
         python -m whisperjav.installer.cublas12 place
@@ -40,12 +40,13 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+from whisperjav.installer.core import accelerators
+
 CUBLAS12_PACKAGE = "nvidia-cublas-cu12==12.8.4.1"
 CUBLAS12_DLLS = ("cublas64_12.dll", "cublasLt64_12.dll")
 UNUSED_CT2_DLLS = ("cudnn64_9.dll",)  # CTranslate2 is built without cuDNN (research F1.3)
 
-STACK_FILE = "whisperjav_stack.txt"
-STACKS = ("cu130", "cu128", "cpu")
+STACK_FILE = accelerators.STACK_FILE
 TEST_FAIL_ENV = "WHISPERJAV_TEST_FORCE_CUBLAS12_FAIL"
 
 
@@ -160,22 +161,16 @@ def load_check() -> Tuple[bool, str]:
 
 
 def stack_file(prefix: Optional[str] = None) -> Path:
-    return Path(prefix or sys.prefix) / STACK_FILE
+    return accelerators.record_path(prefix)
 
 
 def read_stack(prefix: Optional[str] = None) -> Optional[str]:
-    """'cu130', 'cu128' or 'cpu' as the installer wrote it; None if unknown."""
-    try:
-        value = stack_file(prefix).read_text(encoding="utf-8").strip()
-    except OSError:
-        return None
-    return value if value in STACKS else None
+    """The accelerator as the installer recorded it; None if missing or unknown."""
+    return accelerators.read_record(prefix)[1]
 
 
 def write_stack(stack: str, prefix: Optional[str] = None) -> None:
-    if stack not in STACKS:
-        raise ValueError(f"unknown stack {stack!r}; expected one of {STACKS}")
-    stack_file(prefix).write_text(stack + "\n", encoding="utf-8")
+    accelerators.write_record(stack, prefix)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
