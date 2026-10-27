@@ -262,7 +262,11 @@ class PreflightChecker:
             self.results.append(CheckResult(name="PyTorch", status=CheckStatus.INFO,
                                             message=f"PyTorch {version}{own}: CPU (not accelerated)"))
 
-        ct2 = "NVIDIA GPU (CUDA)" if _ctranslate2_sees_cuda() else "CPU (not accelerated)"
+        # The run's own rule (device_detector.ctranslate2_device): the GPU only when PyTorch's GPU is
+        # NVIDIA's and CTranslate2 sees it too. CTranslate2's Windows wheel sees an NVIDIA card even on
+        # a CPU-only install, where the run uses the CPU.
+        ct2 = ("NVIDIA GPU (CUDA)" if best == "cuda" and not getattr(torch.version, "hip", None)
+               and _ctranslate2_sees_cuda() else "CPU (not accelerated)")
         self.results.append(CheckResult(name="CTranslate2", status=CheckStatus.INFO,
                                         message=f"CTranslate2 (balanced, fast, faster): {ct2}"))
         self.results.append(CheckResult(
@@ -329,12 +333,17 @@ class PreflightChecker:
                     message="Basic CUDA operations working"
                 ))
             except Exception as e:
+                # Exit status 1 only where an NVIDIA install does not fit (W232 2): an Own PyTorch
+                # (for example ROCm) or other install gets a warning (review P7 finding 15).
+                from whisperjav.installer.core import accelerators
+                acc = accelerators.get(accelerators.read_record()[1])
+                nvidia_install = acc is not None and acc.nvidia
                 self.results.append(CheckResult(
                     name="CUDA Operations",
-                    status=CheckStatus.FAIL,
+                    status=CheckStatus.FAIL if nvidia_install else CheckStatus.WARN,
                     message="CUDA operations failed",
                     details=[str(e)],
-                    fatal=True
+                    fatal=nvidia_install
                 ))
                 
         except ImportError:
