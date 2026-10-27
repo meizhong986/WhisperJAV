@@ -39,7 +39,7 @@ Video → Pass 2 (Pipeline B) → SRT₂ ─┘
 | **Pipeline** | 语音识别后端（Balanced、Fast、Faster、Qwen3-ASR、ChronosJAV 等） |
 | **Sensitivity** | 检测阈值（激进、均衡、保守） |
 | **Scene Detector** | 音频场景检测方式（Auditok、Silero、Semantic、None） |
-| **Speech Enhancer** | 音频预处理 / 语音增强（None、FFmpeg DSP、ClearVoice、BS-RoFormer） |
+| **Speech Enhancer** | 音频预处理 / 语音增强（None、FFmpeg DSP、ZipEnhancer、htdemucs） |
 | **Speech Segmenter** | 场景内的语音活动检测 / 语音分割器（Silero、TEN、None） |
 | **Model** | 使用的模型（取决于处理管线） |
 
