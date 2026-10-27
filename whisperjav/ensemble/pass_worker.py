@@ -31,6 +31,7 @@ from whisperjav.crispasr.manifest import CRISPASR_PIPELINES
 from whisperjav.crispasr.pass_settings import (ignored_hardware_message, ignored_hardware_settings,
                                                speech_pad_ignored as crispasr_speech_pad_ignored,
                                                unused_pass_settings, unused_settings_message)
+from whisperjav.utils.device_detector import pass_device
 from whisperjav.utils.logger import logger, setup_logger
 from whisperjav.utils.parameter_tracer import create_tracer, NullTracer
 
@@ -1131,6 +1132,8 @@ def _build_pipeline(
             if enhancer_model:
                 hf_defaults["hf_speech_enhancer_model"] = enhancer_model
             logger.debug("Pass %s: Override hf_speech_enhancer = %s, model = %s", pass_number, enhancer_backend, enhancer_model)
+        # --device governs every pipeline (design 22.3.1, owner W237 1); --device cpu is absolute.
+        hf_defaults["hf_device"] = pass_device(pass_config.get("device"), hf_defaults.get("hf_device"))
         logger.debug(
             "[Worker %s] Pass %s: Creating TransformersPipeline with hf_model_id=%s, hf_task=%s, hf_language=%s",
             os.getpid(), pass_number,
@@ -1280,7 +1283,8 @@ def _build_pipeline(
         # Map qwen_* prefixed params to QwenPipeline's parameter names
         qwen_pipeline_params = {
             "model_id": qwen_defaults.get("qwen_model_id", "Qwen/Qwen3-ASR-1.7B"),
-            "device": qwen_defaults.get("qwen_device", "auto"),
+            # --device governs every pipeline (design 22.3.1, owner W237 1); --device cpu is absolute.
+            "device": pass_device(pass_config.get("device"), qwen_defaults.get("qwen_device")),
             "dtype": qwen_defaults.get("qwen_dtype", "auto"),
             "batch_size": qwen_defaults.get("qwen_batch_size", 1),
             "max_new_tokens": qwen_defaults.get("qwen_max_tokens", 4096),
