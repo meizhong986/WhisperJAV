@@ -579,15 +579,23 @@ def unsupported_build_message(accelerator: str) -> str:
     return ""
 
 
+# True once the user typed an answer: a Stop they chose is a stop on purpose (exit 0, as the
+# Windows installer, W46 1, W241 Q3); a stop with no console to answer is not.
+_ANSWER_TYPED = False
+
+
 def wait_for_answer(prompt: str, valid, on_no_console: str) -> str:
     """Ask until one of `valid` is typed. No time limit (owner, W37 (2))."""
+    global _ANSWER_TYPED
     while True:
         try:
             answer = input(prompt).strip()
         except (EOFError, KeyboardInterrupt):
             log(f"  (no answer could be read; using '{on_no_console}')")
+            _ANSWER_TYPED = False
             return on_no_console
         if answer in valid:
+            _ANSWER_TYPED = True
             return answer
 
 
@@ -1064,7 +1072,9 @@ def main():
     if cuda_version == "stop":
         # As the Windows installer says it; T35b and T42c already end with "Nothing was installed."
         log("The installer will now stop.")
-        create_failure_file("Stopped before installing, as chosen")
+        if _ANSWER_TYPED:
+            sys.exit(0)  # Stop chosen: a stop on purpose, not a failure (W241 Q3)
+        create_failure_file("Stopped before installing: no answer could be read, or the choice is not offered here")
         sys.exit(1)
     # D3 (owner W57): a build 1.10 does not offer on this PC stops here, before anything
     # is installed, instead of failing inside uv sync.
