@@ -36,8 +36,9 @@ whisperjav [OPTIONS] INPUT [INPUT...]
 |------|--------|------|
 | `--ensemble` | 关闭 | 启用集成模式 |
 | `--ensemble-serial` | 关闭 | 先完整处理每个文件再处理下一个 |
-| `--pass1-pipeline` | `balanced` | 第一通道的处理管线；也可以是 `parakeet-crispasr`、`cohere-crispasr`（GGUF，见 [Parakeet-CrispASR 与 Cohere-CrispASR](../pipelines/crispasr.md)） |
-| `--pass2-pipeline` | （无） | 第二通道的处理管线；指定它即启用第二通道 |
+| `--pass1-pipeline` | `balanced` | 第一通道的处理管线；也可以是 `parakeet-crispasr`、`cohere-crispasr`（GGUF，见 [Parakeet-CrispASR 与 Cohere-CrispASR](../pipelines/crispasr.md)）和 `xxl`（你自己的 Faster Whisper XXL，见 [集成模式](../pipelines/ensemble.md) 中的 BYOP 一节） |
+| `--pass2-pipeline` | （无） | 第二通道的处理管线，选项相同；指定它即启用第二通道 |
+| `--xxl-exe` | （无） | `faster-whisper-xxl.exe` 的路径；任一通道为 `xxl` 时必需。`--pass1-model` / `--pass2-model` 选择 XXL 运行的模型（默认 `large-v2`） |
 | `--merge-strategy` | `pass1_primary` | 合并策略：`pass1_primary`、`pass2_primary`、`smart_merge`、`full_merge`、`pass1_overlap`、`pass2_overlap`、`longest` |
 
 ### ChronosJAV 时间选项（`--mode qwen`）
