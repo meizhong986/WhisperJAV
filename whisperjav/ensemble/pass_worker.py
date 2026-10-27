@@ -385,7 +385,8 @@ DEFAULT_QWEN_PARAMS = {
     "qwen_max_tokens": 4096,
     "qwen_language": "Japanese",  # WhisperJAV is purpose-built for Japanese
     "qwen_timestamps": "word",
-    "qwen_aligner": "Qwen/Qwen3-ForcedAligner-0.6B",
+    "qwen_aligner": "wav2vec2-ja",  # 1.10.0: the CrispASR aligner (design note 2026-10-28)
+    "qwen_timing_model": "whisper-small",  # 1.10.0: the CrispASR timing model, step 8
     "qwen_scene": "semantic",
     "qwen_context": "",
     "qwen_context_file": None,
@@ -399,11 +400,11 @@ DEFAULT_QWEN_PARAMS = {
     "qwen_input_mode": "assembly",
     "qwen_framer": "vad-grouped",  # Preserve previous VAD_SLICING behavior for ensemble
     "qwen_safe_chunking": True,
-    "qwen_timestamp_mode": "vad_only",  # v1.9.0: no ForcedAligner by default
+    "qwen_timestamp_mode": "aligner_vad_fallback",  # 1.10.0: the aligner times the text (owner W254)
     "qwen_assembly_cleaner": True,
     "qwen_repetition_penalty": 1.1,
     "qwen_max_tokens_per_second": 20.0,
-    "qwen_stepdown": True,
+    "qwen_stepdown": False,  # 1.10.0: off (owner W266 1); a collapsed scene takes the VAD groups' times
     "qwen_generator_backend": "qwen3",
     "qwen_regroup_mode": "off",
     # NOTE: qwen_max_group_duration, qwen_chunk_threshold,
@@ -444,6 +445,7 @@ def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
         "scene_max_duration": "qwen_scene_max_duration",
         "scene_clustering_threshold": "qwen_scene_clustering_threshold",  # v1.9.2 CFF2
         "aligner_backend": "qwen_aligner_backend",
+        "timing_model": "qwen_timing_model",
         "timestamp_mode": "qwen_timestamp_mode",
         "assembly_cleaner": "qwen_assembly_cleaner",
         "repetition_penalty": "qwen_repetition_penalty",
@@ -481,12 +483,27 @@ def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
     if qwen_params.get("use_aligner") is False:
         params["qwen_aligner"] = None
 
-    # Handle aligner_backend: "none" → disable aligner, "qwen3" → keep existing
+    # Handle aligner_backend: "none" → disable aligner; "crispasr" / "qwen3" → that
+    # backend, with its default model when the aligner named is not one of its own
+    # (an older GUI preset may pair "qwen3" with nothing, or "crispasr" with the HF id).
     aligner_backend = qwen_params.get("aligner_backend")
-    if aligner_backend == "none":
+    if aligner_backend == "none" or qwen_params.get("use_aligner") is False:
         params["qwen_aligner"] = None
         params["qwen_timestamps"] = "none"  # Pipeline derives use_aligner from timestamps
-    # ("qwen3" or absent → no change, use existing aligner_id)
+        # The GUI's triple flip, for qwen_params written by hand too: no aligner means
+        # VAD-group times and no step-down, unless the pass names them itself.
+        if "timestamp_mode" not in qwen_params and "qwen_timestamp_mode" not in qwen_params:
+            params["qwen_timestamp_mode"] = "vad_only"
+        if "stepdown" not in qwen_params and "qwen_stepdown" not in qwen_params:
+            params["qwen_stepdown"] = False
+    elif aligner_backend in ("crispasr", "qwen3"):
+        from whisperjav.crispasr.manifest import ALIGNER_MODELS, DEFAULT_ALIGNER
+        is_crispasr_name = params.get("qwen_aligner") in ALIGNER_MODELS
+        if aligner_backend == "crispasr" and not is_crispasr_name:
+            params["qwen_aligner"] = DEFAULT_ALIGNER
+        elif aligner_backend == "qwen3" and (is_crispasr_name or not params.get("qwen_aligner")):
+            params["qwen_aligner"] = "Qwen/Qwen3-ForcedAligner-0.6B"
+    # (absent → the backend follows from qwen_aligner: a CrispASR short name or a PyTorch ID)
 
     # Handle assembly_cleaner string values (GUI sends "qwen3"/"passthrough",
     # CLI sends bool via store_true/store_false)
@@ -1290,7 +1307,11 @@ def _build_pipeline(
             "max_new_tokens": qwen_defaults.get("qwen_max_tokens", 4096),
             "language": (lambda _l: None if _l in (None, "null", "") else _l)(qwen_defaults.get("qwen_language", "Japanese")),
             "timestamps": qwen_defaults.get("qwen_timestamps", "word"),
-            "aligner_id": qwen_defaults.get("qwen_aligner", "Qwen/Qwen3-ForcedAligner-0.6B"),
+            "aligner_id": qwen_defaults.get("qwen_aligner", "wav2vec2-ja"),
+            "aligner_backend": (qwen_defaults.get("qwen_aligner_backend")
+                                if qwen_defaults.get("qwen_aligner_backend") in ("crispasr", "qwen3", "none")
+                                else None),
+            "timing_model": qwen_defaults.get("qwen_timing_model", "whisper-small"),
             "scene_detector": qwen_defaults.get("qwen_scene", "none"),
             "context": qwen_defaults.get("qwen_context", ""),
             "context_file": qwen_defaults.get("qwen_context_file", None),
@@ -1304,11 +1325,11 @@ def _build_pipeline(
             "qwen_input_mode": qwen_defaults.get("qwen_input_mode", "assembly"),
             "qwen_framer": qwen_defaults.get("qwen_framer", "vad-grouped"),
             "qwen_safe_chunking": qwen_defaults.get("qwen_safe_chunking", True),
-            "timestamp_mode": qwen_defaults.get("qwen_timestamp_mode", "vad_only"),
+            "timestamp_mode": qwen_defaults.get("qwen_timestamp_mode", "aligner_vad_fallback"),
             "assembly_cleaner": qwen_defaults.get("qwen_assembly_cleaner", True),
             "repetition_penalty": qwen_defaults.get("qwen_repetition_penalty", 1.1),
             "max_tokens_per_audio_second": qwen_defaults.get("qwen_max_tokens_per_second", 20.0),
-            "stepdown_enabled": qwen_defaults.get("qwen_stepdown", True),
+            "stepdown_enabled": qwen_defaults.get("qwen_stepdown", False),
             "generator_backend": qwen_defaults.get("qwen_generator_backend", "qwen3"),
             "regroup_mode": qwen_defaults.get("qwen_regroup_mode", "standard"),
             "segmenter_config": segmenter_config if segmenter_config else None,
@@ -1325,12 +1346,10 @@ def _build_pipeline(
             _aw_vad = anime_whisperseg_defaults(qwen_sensitivity)
             if "model_id" not in _user_qwen and not pass_config.get("model"):
                 qwen_pipeline_params["model_id"] = "litagin/anime-whisper"
-            if "timestamp_mode" not in _user_qwen:
-                qwen_pipeline_params["timestamp_mode"] = "vad_only"
+            # 1.10.0: no longer vad_only with step-down off; the aligner and timing model
+            # apply as for Qwen3-ASR (design note 2026-10-28 section 7, owner W254 Q6).
             if "assembly_cleaner" not in _user_qwen:
                 qwen_pipeline_params["assembly_cleaner"] = False
-            if "stepdown" not in _user_qwen:
-                qwen_pipeline_params["stepdown_enabled"] = False
             if "chunk_threshold" not in _user_qwen:
                 qwen_pipeline_params["segmenter_chunk_threshold"] = _aw_vad["chunk_threshold_s"]
             if "max_group_duration" not in _user_qwen:
@@ -1347,7 +1366,8 @@ def _build_pipeline(
             if _end_pad_default is not None and "vad_padding" not in _user_qwen and "vad_end_pad" not in _user_qwen:
                 qwen_pipeline_params["segmenter_end_pad_ms"] = _end_pad_default
         elif _gen_backend == "cohere":
-            # Cohere Transcribe defaults (D7: Qwen3 ForcedAligner ON by default).
+            # Cohere Transcribe defaults (D7: aligner ON by default; since 1.10.0 the
+            # CrispASR aligner wav2vec2-ja, as for every ChronosJAV model, owner W254 Q6).
             # User can disable aligner via Customize Parameters; the customize
             # handler must triple-flip aligner+timestamp_mode+stepdown atomically.
             _user_qwen = pass_config.get("qwen_params") or {}
@@ -1357,7 +1377,7 @@ def _build_pipeline(
                 qwen_pipeline_params["timestamp_mode"] = "aligner_vad_fallback"
             if "assembly_cleaner" not in _user_qwen:
                 qwen_pipeline_params["assembly_cleaner"] = False  # D3: passthrough
-            # stepdown defaults to True for Cohere (aligner ON by D7); leave qwen_defaults to drive it
+            # step-down: off by default as for every ChronosJAV model (owner W266 1); qwen_defaults drive it
             if "chunk_threshold" not in _user_qwen:
                 qwen_pipeline_params["segmenter_chunk_threshold"] = 1.0
             if "max_group_duration" not in _user_qwen:
