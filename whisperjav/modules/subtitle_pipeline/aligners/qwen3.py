@@ -70,6 +70,11 @@ class Qwen3ForcedAlignerAdapter:
         """Whether the aligner is currently loaded in memory."""
         return self._loaded
 
+    @property
+    def display_name(self) -> str:
+        """The aligner as the run summary names it."""
+        return f"{self._config['aligner_id']}, PyTorch"
+
     def load(self) -> None:
         """
         Create QwenASR instance and load the standalone aligner into GPU.
