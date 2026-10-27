@@ -1750,7 +1750,7 @@ const EnsembleManager = {
         return pipeline === 'parakeet-crispasr' || pipeline === 'cohere-crispasr';
     },
 
-    CRISPASR_CJK_NOTE: 'Experimental in 1.10.0 (early release). The GGUF (CrispASR) pipelines do not support CJK (Chinese, Japanese, Korean) characters in folder names.',
+    CRISPASR_CJK_NOTE: 'Experimental in 1.10.0 (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).',
 
     // Each CrispASR pipeline's speech segmenter when a pass names none (CRISPASR_DEFAULT_SEGMENTERS,
     // config/segmenter_presets.py; owner W202 2-3); tests/test_gui_crispasr_pipelines.py compares them.
