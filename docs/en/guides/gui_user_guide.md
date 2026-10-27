@@ -192,7 +192,7 @@ The pipeline dropdown groups options by backend:
 - **HuggingFace**: Transformers
 - **ChronosJAV**: Qwen3-ASR, Anime-Whisper
 - **GGUF**: Parakeet-CrispASR, Cohere-CrispASR — Japanese, experimental in 1.10.0 (see [Parakeet-CrispASR and Cohere-CrispASR](../pipelines/crispasr.md))
-- **External (BYOP)**: XXL Faster Whisper (Pass 2 only)
+- **External (BYOP)**: XXL Faster Whisper (Pass 1, Pass 2 or both)
 
 ### Customize Parameters
 
@@ -226,20 +226,25 @@ Check the **Pass 2** checkbox to enable the second pass. Controls are identical 
 
 When disabled, the row is greyed out and all controls are inactive.
 
-### BYOP: XXL Faster Whisper (v1.8.9+)
+### BYOP: XXL Faster Whisper (v1.8.9+; Pass 1 since 1.10.0)
 
-Select **XXL Faster Whisper** as the Pass 2 pipeline to use [PurfView's Faster Whisper XXL](https://github.com/Purfview/whisper-standalone-win) as an external subprocess. This is a "Bring Your Own Pipeline" (BYOP) feature — you supply the executable, WhisperJAV handles integration.
+Select **XXL Faster Whisper** as the pipeline of Pass 1, Pass 2 or both to use [PurfView's Faster Whisper XXL](https://github.com/Purfview/whisper-standalone-win) as an external program. This is a "Bring Your Own Pipeline" (BYOP) feature — you supply the executable, WhisperJAV handles integration.
 
 ![Ensemble Mode with XXL Faster Whisper as Pass 2](images/gui-tab3-ensemble-xxl.png){ loading=lazy }
 
+When a pass is XXL, its **Model** column picks the Whisper model XXL runs, and a settings panel appears below the Pass 2 row:
+
 | Field | Description |
 |-------|-------------|
-| **Executable** | Path to your `faster-whisper-xxl.exe`. Click **Browse** to select it. |
-| **Extra Args** | Any additional flags to pass to XXL (e.g., `--verbose True --standard_asia`). |
+| **Model** (in the pass row) | Large V2 (default), Large V3, Large V3 Turbo or Medium. XXL downloads the model the first time it is used. When both passes are XXL, each has its own model. |
+| **Executable** | Path to your `faster-whisper-xxl.exe`. Click **Browse** to select it. Both passes use the same one. |
+| **Extra Args** | Any additional flags to pass to XXL (default `--verbose True --standard_asia`). Choose the model in the Model column: a `--model` here is not used, and the console says so. |
 
-WhisperJAV sends only 4 required args to XXL (input file, output dir, model, language). Everything else is controlled by your Extra Args field. XXL's real-time console output is streamed to the GUI console.
+The other controls of an XXL pass (Sensitivity, Scene Detector, Speech Enhancer, Speech Segmenter, Customize) are greyed out: XXL uses its own settings. WhisperJAV sends XXL the input file, the output folder, the model, the language and the SRT output format (and `--task translate` when the subtitles are to be in English); you add any other XXL flags in the Extra Args field. XXL's real-time console output is streamed to the GUI console.
 
-If XXL crashes during shutdown (a known ctranslate2 behavior) but the SRT was already written, WhisperJAV keeps the valid output instead of discarding it.
+Before 1.10.0 the GUI sent no model to XXL, so XXL ran large-v3 even when Extra Args said `--model large-v2` (#449).
+
+If XXL fails for a file, the console says which pass failed and why. A failed Pass 1 marks the file failed; a failed Pass 2 leaves the file with Pass 1's subtitles, if Pass 1 made them. If XXL crashes during shutdown (a known ctranslate2 behavior) but the SRT was already written, WhisperJAV keeps the valid output instead of discarding it.
 
 ### Speech Enhancement: FFmpeg DSP
 
