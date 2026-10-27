@@ -36,8 +36,9 @@ whisperjav [OPTIONS] INPUT [INPUT...]
 |--------|---------|-------------|
 | `--ensemble` | Off | Enable ensemble mode |
 | `--ensemble-serial` | Off | Complete each file fully before starting the next |
-| `--pass1-pipeline` | `balanced` | Pipeline for first pass; also `parakeet-crispasr`, `cohere-crispasr` (GGUF, see [Parakeet-CrispASR and Cohere-CrispASR](../pipelines/crispasr.md)) |
-| `--pass2-pipeline` | (none) | Pipeline for second pass; giving it turns pass 2 on |
+| `--pass1-pipeline` | `balanced` | Pipeline for first pass; also `parakeet-crispasr`, `cohere-crispasr` (GGUF, see [Parakeet-CrispASR and Cohere-CrispASR](../pipelines/crispasr.md)) and `xxl` (your own Faster Whisper XXL, see [BYOP: XXL Faster Whisper](../pipelines/ensemble.md#byop-xxl-faster-whisper-v189-pass-1-since-1100)) |
+| `--pass2-pipeline` | (none) | Pipeline for second pass, the same choices; giving it turns pass 2 on |
+| `--xxl-exe` | (none) | Path to `faster-whisper-xxl.exe`; required when either pass is `xxl`. `--pass1-model` / `--pass2-model` pick the model XXL runs (default `large-v2`) |
 | `--merge-strategy` | `pass1_primary` | Merge strategy: `pass1_primary`, `pass2_primary`, `smart_merge`, `full_merge`, `pass1_overlap`, `pass2_overlap`, `longest` |
 
 ### ChronosJAV Timing Options (`--mode qwen`)
