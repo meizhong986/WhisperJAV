@@ -88,6 +88,11 @@ CRISPASR_NO_AVX2_TEXT = "this processor lacks AVX2, which CrispASR needs; the Cr
 CRISPASR_DEVICE_PROBLEM = "{version} ({build}): {reason}"
 CRISPASR_MODEL_NAME = "CrispASR model {model}"
 CRISPASR_MODEL_TEXT = "{label}, for {pipeline}: {state}"
+# What uses an aligner or timing-model file (item 12). Texts approved by the owner as drafted (W268);
+# design note 2026-10-28 section 9, Q11.
+CRISPASR_DEFAULT_ALIGNER_FOR = "ChronosJAV and Cohere-CrispASR (aligner)"
+CRISPASR_ALIGNER_FOR = "ChronosJAV (aligner)"
+CRISPASR_TIMING_FOR = "ChronosJAV (timing model)"
 CRISPASR_DOWNLOADED = "downloaded"
 CRISPASR_MODEL_NOT_DOWNLOADED = "not downloaded ({size})"
 CRISPASR_CHECK_FAILED = "could not be checked: {error}"
@@ -575,7 +580,17 @@ class PreflightChecker:
                 listed.add(name)
                 self.results.append(self._crispasr_line(
                     CRISPASR_MODEL_NAME.format(model=name), self._crispasr_model_result,
-                    install, manifest, pipeline, name))
+                    install, manifest.MODELS[name], pipeline))
+        # ChronosJAV's aligners and timing model, and Cohere-CrispASR's aligner (item 12).
+        for name, model in manifest.ALIGNER_MODELS.items():
+            used_by = (CRISPASR_DEFAULT_ALIGNER_FOR if name == manifest.DEFAULT_ALIGNER
+                       else CRISPASR_ALIGNER_FOR)
+            self.results.append(self._crispasr_line(
+                CRISPASR_MODEL_NAME.format(model=name), self._crispasr_model_result, install, model, used_by))
+        for name, model in manifest.TIMING_MODELS.items():
+            self.results.append(self._crispasr_line(
+                CRISPASR_MODEL_NAME.format(model=name), self._crispasr_model_result,
+                install, model, CRISPASR_TIMING_FOR))
 
     @staticmethod
     def _crispasr_line(name: str, make, *args) -> "CheckResult":
@@ -587,14 +602,13 @@ class PreflightChecker:
                                message=CRISPASR_CHECK_FAILED.format(error=e))
 
     @staticmethod
-    def _crispasr_model_result(install, manifest, pipeline: str, name: str) -> "CheckResult":
-        """The line for one model a CrispASR pipeline offers (master plan 1.5, 3.3)."""
-        model = manifest.MODELS[name]
+    def _crispasr_model_result(install, model, pipeline: str) -> "CheckResult":
+        """The line for one CrispASR model file and what uses it (master plan 1.5, 3.3; item 12)."""
         downloaded = install.model_status(model).downloaded
         state = (CRISPASR_DOWNLOADED if downloaded
                  else CRISPASR_MODEL_NOT_DOWNLOADED.format(size=install.mb(model.size)))
         return CheckResult(
-            name=CRISPASR_MODEL_NAME.format(model=name),
+            name=CRISPASR_MODEL_NAME.format(model=model.name),
             status=CheckStatus.PASS if downloaded else CheckStatus.INFO,
             message=CRISPASR_MODEL_TEXT.format(label=model.label, pipeline=pipeline, state=state),
         )
@@ -1049,6 +1063,8 @@ NOTICE_NO_RECORD = _ACC.NOTICE_NO_RECORD
 NOTICE_GGUF = _ACC.NOTICE_GGUF
 NOTICE_OTHERS = _ACC.NOTICE_OTHERS
 NOTICE_DEVICE_CPU = _ACC.NOTICE_DEVICE_CPU
+NOTICE_DEVICE_CPU_ASR_MODELS = _ACC.NOTICE_DEVICE_CPU_ASR_MODELS
+NOTICE_DEVICE_CPU_CRISPASR = _ACC.NOTICE_DEVICE_CPU_CRISPASR
 CPU_WHERE = _ACC.CPU_WHERE
 GGUF_VULKAN_WHERE = _ACC.GGUF_VULKAN_WHERE
 GGUF_METAL_WHERE = _ACC.GGUF_METAL_WHERE
@@ -1168,7 +1184,12 @@ def start_of_run_check(device: Optional[str] = None) -> str:
 
     lines = [NOTICE_MADE_FOR.format(name=acc.name) if acc is not None else NOTICE_NO_RECORD]
     if device == "cpu":
-        lines.append(NOTICE_DEVICE_CPU)
+        # CrispASR's aligner and timing model cannot be held on the CPU (item 12, probe P1): said only
+        # where this install's CrispASR build would ask for a GPU; then "every pipeline" is not said.
+        if _gguf_where(best) in (GGUF_CUDA_WHERE, GGUF_VULKAN_WHERE, GGUF_METAL_WHERE):
+            lines += [NOTICE_DEVICE_CPU_ASR_MODELS, NOTICE_DEVICE_CPU_CRISPASR]
+        else:
+            lines.append(NOTICE_DEVICE_CPU)
     else:
         lines.append(NOTICE_GGUF.format(where=_gguf_where(best)))
         if value == "own-pytorch" and best in ("cuda", "mps"):
