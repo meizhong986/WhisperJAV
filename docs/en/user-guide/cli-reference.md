@@ -40,6 +40,17 @@ whisperjav [OPTIONS] INPUT [INPUT...]
 | `--pass2-pipeline` | (none) | Pipeline for second pass; giving it turns pass 2 on |
 | `--merge-strategy` | `pass1_primary` | Merge strategy: `pass1_primary`, `pass2_primary`, `smart_merge`, `full_merge`, `pass1_overlap`, `pass2_overlap`, `longest` |
 
+### ChronosJAV Timing Options (`--mode qwen`)
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--qwen-aligner` | `wav2vec2-ja` | The aligner that times the ASR model's text: `wav2vec2-ja` (232 MB), `qwen3-fa-gguf` (529 MB), `parakeet-ctc-ja` (not recommended: its times came back evenly spread in our tests), all run by CrispASR; or a PyTorch model ID such as `Qwen/Qwen3-ForcedAligner-0.6B` |
+| `--qwen-timestamp-mode` | `aligner_vad_fallback` | Default: the aligner times the text; a piece of speech it cannot time keeps the speech segmenter's times. `vad_only` loads no aligner: each subtitle takes its piece of speech's times (the timing model can still move the start) |
+| `--qwen-timing-model` | `whisper-small` | Whisper small (488 MB; its text is not used) moves each subtitle's start later to where speech starts, and splits a piece of speech at a punctuation mark or space near where a new sentence starts. `none` turns it off |
+| `--qwen-stepdown` | Off | Retry a scene whose alignment collapses, with pieces of speech up to 6 s. When off (the default), such a scene takes the times of its pieces of speech |
+
+The aligner and the timing model are new in 1.10.0, are downloaded on first use, and run where the install's CrispASR runs; `--device cpu` does not hold them on the CPU. See [Subtitle timing](../pipelines/chronosjav.md#subtitle-timing-1100). In an Ensemble pass, give them in `--pass1-qwen-params`, for example `'{"aligner_id": "qwen3-fa-gguf", "timing_model": "none"}'`.
+
 ### Processing Options
 
 | Option | Default | Description |
@@ -70,6 +81,9 @@ whisperjav video.mp4 --output-dir ./subtitles/
 
 # This run on the CPU (not accelerated)
 whisperjav video.mp4 --mode faster --device cpu
+
+# ChronosJAV without the timing model
+whisperjav video.mp4 --mode qwen --qwen-timing-model none
 
 # Parakeet-CrispASR as one Ensemble pass
 whisperjav video.mp4 --ensemble --pass1-pipeline parakeet-crispasr
