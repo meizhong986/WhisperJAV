@@ -2802,7 +2802,17 @@ class WhisperJAVAPI:
             if method == "semantic":
                 scene = {"min_duration": 12, "max_duration": 48}
             elif method in ("auditok", "silero"):
-                scene = {"max_duration_s": 48}
+                # The detector's own values with the pass's 48 s, as the pipeline builds it, not the
+                # YAML spec's: Apply without a change must not change the run (review P7 finding 14).
+                import dataclasses
+                from whisperjav.modules.scene_detection_backends.auditok_backend import AuditokSceneDetector
+                from whisperjav.modules.scene_detection_backends.silero_backend import SileroSceneDetector
+                build = (SileroSceneDetector._build_silero_config if method == "silero"
+                         else AuditokSceneDetector._build_config_from_kwargs)
+                for key, value in dataclasses.asdict(build({"max_duration": 48})).items():
+                    scene[key] = value
+                    if not key.endswith("_s"):
+                        scene[key + "_s"] = value  # the spelling the Scene tab's controls use
             return {"success": True, "segmenter_backend": settings.backend, "segmenter": seg,
                     "scene_detection_method": method, "scene": scene}
         except Exception as e:  # noqa: BLE001 -- the window says what failed
