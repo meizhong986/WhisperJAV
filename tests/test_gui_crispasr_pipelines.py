@@ -129,8 +129,13 @@ def test_a_crispasr_pass_sends_model_segmenter_and_sensitivity_only(api, tmp_pat
     assert _value(args, "--pass2-speech-segmenter") == "whisperseg"
     assert _value(args, "--pass2-sensitivity") == "conservative"
     assert _value(args, "--language") == "japanese"
-    for flag in ("--pass1-scene-detector", "--pass1-speech-enhancer", "--pass1-enhance-for-vad",
-                 "--pass2-scene-detector", "--pass2-speech-enhancer", "--pass1-qwen-params", "--pass1-params"):
+    # design 22.9.1 (owner W212 D3, W214 2, W232 8): scene detector, enhancer, enhance-for-vad
+    assert _value(args, "--pass1-scene-detector") == "auditok"
+    assert _value(args, "--pass1-speech-enhancer") == "zipenhancer"
+    assert "--pass1-enhance-for-vad" in args
+    assert _value(args, "--pass2-scene-detector") == "silero"
+    assert _value(args, "--pass2-speech-enhancer") == "ffmpeg-dsp:loudnorm"
+    for flag in ("--pass1-qwen-params", "--pass1-params", "--pass1-hf-params"):
         assert flag not in args
     assert not [a for a in args if a.startswith("--crispasr")]
 
@@ -212,19 +217,19 @@ class TestTheStatusPanel:
         result = api.get_crispasr_status("cohere-crispasr", "")
         assert result == {"success": True, "can_run": True, "lines": [
             "Model: Cohere Transcribe ja v0.1 (q8_0) — not downloaded yet (2,424 MB); downloaded when the run starts",
-            "Runs on: NVIDIA GPU"]}
+            "GPU: asks for the NVIDIA GPU (CUDA)"]}
 
     def test_a_downloaded_model_on_the_processor(self, api, stubbed):
         stubbed["downloaded"] = True
         stubbed["runtime"] = {"device": "cpu", "reason": "no NVIDIA GPU was found"}
         result = api.get_crispasr_status("parakeet-crispasr", "parakeet-tdt-0.6b-ja")
         assert result["lines"] == ["Model: Parakeet TDT 0.6B ja (q8_0) — downloaded",
-                                   "Runs on: processor (slower): no NVIDIA GPU was found"]
+                                   "CPU (not accelerated), several times slower: no NVIDIA GPU was found"]
 
     def test_apple_metal(self, api, stubbed):
         stubbed["runtime"] = {"device": "metal", "reason": None}
         assert api.get_crispasr_status("parakeet-crispasr")["lines"][1] == \
-            "Runs on: Apple GPU (Metal), not yet tested on a Mac"
+            "GPU: asks for the Apple GPU (Metal), not yet tested on a Mac"
 
     def test_crispasr_that_cannot_run(self, api, stubbed):
         stubbed["runtime"] = {"problem": "CrispASR is not installed in this WhisperJAV. Run the WhisperJAV installer again."}
