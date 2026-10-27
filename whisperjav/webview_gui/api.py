@@ -3172,7 +3172,15 @@ class WhisperJAVAPI:
         from whisperjav.crispasr.manifest import CRISPASR_PIPELINES
 
         crispasr_p1 = p1_pipeline in CRISPASR_PIPELINES
-        if crispasr_p1:
+        # BYOP XXL as pass 1 (1.10.0, item 5): the exe path and the model the user chose
+        # (#449); the extra args come from the persisted BYOP preferences, as for pass 2.
+        xxl_p1 = bool(pass1.get('isXxl')) or p1_pipeline == 'xxl'
+        if xxl_p1:
+            if pass1.get('xxlExe'):
+                args += ["--xxl-exe", pass1['xxlExe']]
+            if pass1.get('model'):
+                args += ["--pass1-model", pass1['model']]
+        elif crispasr_p1:
             args += self._crispasr_pass_args(1, pass1)
         elif pass1.get('isTransformers'):
             # Transformers pass: no sensitivity, handle HF params
@@ -3217,8 +3225,9 @@ class WhisperJAVAPI:
             if pass1.get('customized') and pass1.get('params'):
                 args += ["--pass1-params", json.dumps(pass1['params'])]
 
-        # Pass 1: Scene/Segmenter/Enhancer/Model — a CrispASR pass sent its own above.
-        if not crispasr_p1:
+        # Pass 1: Scene/Segmenter/Enhancer/Model — a CrispASR pass and an XXL pass (an
+        # external tool) sent their own above.
+        if not (crispasr_p1 or xxl_p1):
             # Pass 1: Scene Detector
             # Note: All pipelines use --pass1-scene-detector. For Qwen, pass_worker.py
             # translates this to qwen_scene parameter.
@@ -3297,14 +3306,19 @@ class WhisperJAVAPI:
                 p2_pipeline = 'qwen'
             args += ["--pass2-pipeline", p2_pipeline]
 
-            # BYOP XXL: external tool — only needs exe path.
+            # BYOP XXL: external tool — needs the exe path and the model.
             # Extra args are read from persisted BYOP preferences in asr_config.json
             # (set via the GUI extra args text field), not passed as a CLI flag.
             if pass2.get('isXxl') or p2_pipeline == 'xxl':
                 xxl_exe = pass2.get('xxlExe', '')
-                if xxl_exe:
+                # Both passes XXL (owner W271 3): one program, sent once.
+                if xxl_exe and "--xxl-exe" not in args:
                     args += ["--xxl-exe", xxl_exe]
-                # Skip all pipeline-specific args — XXL handles everything internally
+                # The model chosen in the Model column reaches XXL (#449; before 1.10.0
+                # none was sent and XXL ran large-v3).
+                if pass2.get('model'):
+                    args += ["--pass2-model", pass2['model']]
+                # Skip all other pipeline-specific args — XXL handles everything internally
             elif p2_pipeline in CRISPASR_PIPELINES:
                 # As pass 1.
                 args += self._crispasr_pass_args(2, pass2)
