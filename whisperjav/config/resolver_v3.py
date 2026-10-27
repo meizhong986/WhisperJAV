@@ -377,6 +377,9 @@ def resolve_config_v3(
         'task': task,
         'language': asr_params.get('language', 'ja'),
         'model': model_config,
+        # The device asked for (None = auto), before the CTranslate2 rule: the speech enhancer
+        # runs on PyTorch and follows it (pipeline_helper.create_enhancer_from_config).
+        'run_device': device,
         'params': {
             'asr': asr_params,
             'vad': vad_params,
