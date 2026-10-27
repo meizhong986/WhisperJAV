@@ -291,7 +291,9 @@ class TestTheCommandLine:
         assert ("Experimental in 1.10.0 (early release). "   # owner W212 D4 1
                 "The GGUF (CrispASR) pipelines do not support CJK (Chinese, Japanese, Korean) characters "
                 "in folder names.") in text
-        assert "auto uses the NVIDIA GPU, or the Apple GPU (Metal) on Apple silicon" in text
+        # T2 (design 22.10, owner W237 1): --device for every pipeline; the GGUF pipelines' builds.
+        assert "Where this run's ASR and other models run, for every pipeline." in text
+        assert "the GPU through Vulkan on Windows (Vulkan build, experimental)" in text
         assert "whisperseg for parakeet-crispasr and firered-vad for cohere-crispasr" in text
         assert "CrispASR's own program" not in text
         assert "--crispasr-exe" not in text and "--crispasr-backend" not in text
