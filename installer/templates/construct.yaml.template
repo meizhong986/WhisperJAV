@@ -41,9 +41,11 @@ post_install: post_install_v{{VERSION}}.bat
 extra_files:
   - post_install_v{{VERSION}}.bat
   - post_install_v{{VERSION}}.py
-  - requirements_v{{VERSION}}_cu130.txt  # v1.10.0 (item 2f): uv.lock, one file per PyTorch build
+  - requirements_v{{VERSION}}_cu130.txt  # v1.10.0 (item 2f): uv.lock, one file per lock extra
   - requirements_v{{VERSION}}_cu128.txt
+  - requirements_v{{VERSION}}_vulkan.txt  # design 22.2.4: GPU through Vulkan, and Own PyTorch on Windows
   - requirements_v{{VERSION}}_cpu.txt
+  - whisperjav_accelerators_v{{VERSION}}.py  # design 22.6.8: the one accelerator table, for post_install
   - WhisperJAV_Launcher_v{{VERSION}}.py
   - README_INSTALLER_v{{VERSION}}.txt
   - LICENSE.txt
