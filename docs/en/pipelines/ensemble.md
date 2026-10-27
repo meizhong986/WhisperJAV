@@ -36,10 +36,10 @@ Each pass has identical controls:
 
 | Control | Description |
 |---------|-------------|
-| **Pipeline** | ASR backend (Balanced, Fast, Faster, Qwen3-ASR, ChronosJAV, etc.) |
+| **Pipeline** | ASR backend (Balanced, Fast, Faster, Qwen3-ASR, ChronosJAV, Parakeet-CrispASR, Cohere-CrispASR, etc.) |
 | **Sensitivity** | Detection threshold (Aggressive, Balanced, Conservative) |
 | **Scene Detector** | How to split audio into scenes (Auditok, Silero, Semantic, None) |
-| **Speech Enhancer** | Audio preprocessing (None, FFmpeg DSP, ClearVoice, BS-RoFormer) |
+| **Speech Enhancer** | Audio preprocessing (None, FFmpeg DSP, ZipEnhancer, htdemucs) |
 | **Speech Segmenter** | Voice activity detection within scenes (Silero, TEN, None) |
 | **Model** | Which model to use (pipeline-dependent) |
 
