@@ -108,6 +108,23 @@ class TestCheckSuite:
         checker._check_cuda_availability()
         return pf, {r.name: r for r in checker.results}, checker.results
 
+    @pytest.mark.parametrize("record,fatal", [("own-pytorch", False), (None, False), ("cu130", True)])
+    def test_failing_cuda_operations_stop_the_check_only_on_an_nvidia_install(self, monkeypatch, record, fatal):
+        # Review P7 finding 15 (W232 2): a ROCm Own PyTorch whose GPU fails gets a warning, not exit 1.
+        from whisperjav.utils import preflight_check as pf
+        torch = _fake_torch((9, 0), [], name="AMD Radeon RX 7900", hip="6.3")
+
+        def zeros(n):
+            raise RuntimeError("HIP error: invalid device function")
+        torch.zeros = zeros
+        monkeypatch.setitem(sys.modules, "torch", torch)
+        _record(monkeypatch, record)
+        checker = pf.PreflightChecker()
+        checker._check_pytorch_cuda()
+        r = {x.name: x for x in checker.results}["CUDA Operations"]
+        assert r.fatal is fatal
+        assert r.status == (pf.CheckStatus.FAIL if fatal else pf.CheckStatus.WARN)
+
     def test_unusable_card_on_an_nvidia_install_is_the_one_failure(self, monkeypatch):
         pf, by_name, _ = self._checker(monkeypatch, _fake_torch((6, 1), CU128_LIST), "cu128")
         r = by_name["PyTorch"]
@@ -143,6 +160,12 @@ class TestCheckSuite:
         assert by_name["PyTorch"].status == pf.CheckStatus.INFO
         assert by_name["PyTorch"].message == "PyTorch 2.11.0+cu128 (your own): AMD GPU (ROCm), AMD Radeon RX 7900 — not tested"
         assert by_name["CTranslate2"].message.endswith("CPU (not accelerated)")
+
+    def test_ctranslate2_line_follows_the_runs_rule_on_a_cpu_only_install(self, monkeypatch):
+        # Seen in the CPU-only install of 2026-10-27: CTranslate2's wheel sees the NVIDIA card,
+        # but the run uses the CPU (PyTorch has no CUDA there).
+        pf, by_name, _ = self._checker(monkeypatch, _no_gpu_torch(), "cpu", ct2=True)
+        assert by_name["CTranslate2"].message == "CTranslate2 (balanced, fast, faster): CPU (not accelerated)"
 
     def test_cpu_only_install_on_a_pc_with_an_nvidia_gpu_is_a_warning(self, monkeypatch):
         pf, _, results = self._checker(monkeypatch, _no_gpu_torch(), "cpu", smi="NVIDIA GeForce RTX 4070")
