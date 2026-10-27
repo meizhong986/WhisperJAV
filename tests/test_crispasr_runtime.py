@@ -174,7 +174,8 @@ class TestTheDeviceRule:
         assert (choice.use_gpu, choice.device, choice.reason) == (True, "vulkan", None)
         assert choice.device_line("Parakeet-CrispASR") == (
             "Parakeet-CrispASR asks CrispASR's Vulkan build to use this PC's GPU (CrispASR 0.8.44+vulkan). "
-            "GPUs through Vulkan are experimental in 1.10.0 and have not been tested.")
+            "GPUs through Vulkan are experimental in 1.10.0 and have not been tested on AMD or Intel "
+            "graphics cards.")   # owner W242 2: the Vulkan build itself was run once, on an NVIDIA card
 
     def test_the_vulkan_build_with_device_cuda_says_what_to_use(self, machine):
         with pytest.raises(CrispASRSetupError) as e:
