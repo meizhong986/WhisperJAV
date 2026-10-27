@@ -204,7 +204,19 @@ WhisperJAV 接受 FFmpeg 支持的任何格式的视频和音频文件（MP4、M
 
 **Model** 标签页有一个 **Device** 菜单：**Auto (the GPU when one can be used, else the CPU)**（默认，有可用 GPU 时用 GPU，否则用 CPU）、**NVIDIA GPU (CUDA)** 或 **CPU (not accelerated)**（CPU，不加速）。
 
-对于 GGUF 通道（Parakeet-CrispASR、Cohere-CrispASR），弹窗有三个标签页：**Segmenter**、**Enhancer** 和 **Scene**，初始值就是该通道实际使用的值。通道一行下方的状态面板会显示模型（是否已下载）以及 CrispASR 将在哪里运行，例如 "GPU: asks for the NVIDIA GPU (CUDA)"。
+对于 GGUF 通道（Parakeet-CrispASR、Cohere-CrispASR），弹窗有三个标签页：**Segmenter**、**Enhancer** 和 **Scene**，初始值就是该通道实际使用的值。通道一行下方的状态面板会显示模型（是否已下载）以及 CrispASR 将在哪里运行，例如 "GPU: asks for the NVIDIA GPU (CUDA)"。对 Cohere-CrispASR，面板还会列出为其文字标出时间的对齐器。
+
+对于 ChronosJAV 通道（Qwen3-ASR、Anime-Whisper），**Alignment** 标签页设置字幕时间（见[字幕时间](../pipelines/chronosjav.md#subtitle-timing-1100)）：
+
+| 控件 | 选项 | 默认值 |
+|---|---|---|
+| **Aligner Backend** | CrispASR (GGUF, recommended)、Qwen3 ForcedAligner (PyTorch)、None (no aligner) | CrispASR |
+| **Aligner Model** | 所选后端的模型：`wav2vec2-ja`（推荐）、`parakeet-ctc-ja`（不推荐）、`qwen3-fa-gguf`；或 Qwen3-ForcedAligner-0.6B (PyTorch) | `wav2vec2-ja` |
+| **Timestamp Mode** | Aligner + VAD Fallback (recommended)、Aligner + Interpolation、Aligner Only (no recovery on collapse)、VAD Only (no aligner loaded) | Aligner + VAD Fallback |
+| **Timing Model (Whisper)** | Whisper small (recommended)、None (no timing model) | Whisper small |
+| **Adaptive Step-Down** | 勾选框 | 不勾选 |
+
+Aligner Backend 选 **None** 时，无论另外两个控件显示什么，运行都使用 VAD Only 并关闭 Step-Down。ChronosJAV 通道一行下方的状态面板会显示对齐器和时间模型（是否已下载）以及 CrispASR 在哪里运行它们。从 1.10.0 起，Alignment 标签页的值以及从中保存的预设会用于运行；从 1.8.10.post3 到 1.9.5，它们被忽略。
 
 使用 **Save Preset** 保存配置以便重用，或使用 **Load Preset** 恢复已保存的配置。预设在会话间持久保存。
 
