@@ -202,7 +202,8 @@ file): the owner, "Both G5 and G6 passed." (W90). One `assessment-adversary` rev
 **What the user sees.**
 - Two Ensemble pass pipelines for Japanese, under **GGUF** in the Pass 1 / Pass 2 menus: **Parakeet-CrispASR**
   (`parakeet-tdt-0.6b-ja`, 674 MB) and **Cohere-CrispASR** (`cohere-asr-ja-v0.1` by default, or `cohere-asr-ja`, 2,424 MB
-  each). Experimental in 1.10.0 (early release) — tooltip and `--help` say so (W212 D4 1).
+  each). Experimental in 1.10.0 (early release) — tooltip and `--help` say so (W212 D4 1). (Cohere-CrispASR's line rule
+  changed in item 12: aligned, cut at sentence ends.)
 - CrispASR comes with WhisperJAV as a Python package (`crispasr 0.8.44`), in the build of the install's accelerator: the CUDA
   build (NVIDIA), the Vulkan build (GPU through Vulkan and Own PyTorch on Windows), the macOS build (Apple GPU), the CPU build
   otherwise. WhisperJAV downloads the model on first use, pinned by commit and SHA-256 (`crispasr/manifest.py`).
@@ -261,6 +262,54 @@ environment (exit 0, record `cpu`, `--check` exit 0); the Vulkan load check; the
 `assessment-adversary` review of P2–P6, 17 findings, each checked; fixed with tests or answered (decision record §14.12);
 20 test files after the fixes, all passed (`p7_fix_tests.log`). Not checked: any AMD or Intel GPU; a real Own PyTorch install
 over another torch; the Windows installer window in a real install (plan step 5); anything on a Mac or a Linux PC.
+
+---
+
+## Item 12 — ChronosJAV timing: the CrispASR aligner and a small Whisper timing model; Cohere-CrispASR aligned (owner W245–W266)
+
+**Why.** "the accuracy of chronosjav has been a big pain point of the users" (W245 C3g): ChronosJAV's subtitles started and
+ended at the VAD group's edges, and two sentences (often two speakers) in one VAD group came out as one subtitle.
+
+**What the user sees.**
+- **Every ChronosJAV model** (Qwen3-ASR, anime-whisper; also Cohere in ChronosJAV, which 1.10.0 does not offer in the GUI
+  or through `--qwen-generator`, and which was not run) now times its text with an **aligner run by
+  CrispASR** (`crispasr.align_words`), timestamp mode `aligner_vad_fallback` by default (was `vad_only`). Aligners:
+  `wav2vec2-ja` (default, 232 MB), `qwen3-fa-gguf` (529 MB), `parakeet-ctc-ja` (1,137 MB; offered with a warning: its times
+  came back evenly spread in WhisperJAV's tests, W255). The PyTorch Qwen3-ForcedAligner stays a choice (its model ID); `vad_only`
+  loads no aligner. anime-whisper is no longer forced to `vad_only` with step-down off (W254 Q6).
+- **A timing model**, Whisper small through CrispASR's DTW class (488 MB; W255), runs as orchestrator step 8 after the aligner
+  is unloaded. Whisper's text is thrown away. It moves a subtitle's start later to the first onset Whisper counts as speech
+  (rule T2) and splits a VAD group in two at a mark of the text (。？！… 、 a closing mark, a space) near where Whisper starts
+  a new segment (T4); no mark, no split; no number of characters or seconds decides a cut (W203). `--qwen-timing-model none`
+  turns it off; without an aligner it moves starts only (T5).
+- **Step-down is off by default** for every ChronosJAV model (W266 1). Under `aligner_vad_fallback` with regrouping off, a
+  scene the collapse check flags takes the aligner-free times (VAD-group edges, start moved by the timing model, no splits).
+  Step-down stays a setting; its retry uses groups up to 6 s (the design note had said "shorter", corrected in v3).
+- **Cohere-CrispASR** aligns each VAD group's text with `wav2vec2-ja` after transcription (W248 3) and cuts aligned groups
+  only at 。？！…?! (W259, W266 3), each subtitle ending where the next starts; a group the aligner gives nothing keeps one
+  subtitle at the VAD group's edges. Parakeet-CrispASR is unchanged.
+- **The text is kept** on every failure: an aligner or timing model that cannot be loaded, a VAD group the aligner gives no
+  times (now counted and noted), a collapsed scene. Each is one line in the run summary (DRAFT texts).
+- New `--qwen-timing-model {whisper-small,none}`; `--qwen-aligner` takes the short names; ensemble `qwen_params` keys
+  `aligner_backend` (`crispasr`/`qwen3`/`none`), `aligner_id`, `timing_model`. GUI, Customize → Alignment: Aligner Backend
+  (CrispASR / Qwen3 ForcedAligner (PyTorch) / None), Aligner Model following the backend, Timing Model (Whisper). "None"
+  switches all three ChronosJAV models to VAD-only with step-down off. The CrispASR status panel also shows under ChronosJAV
+  passes (aligner and timing model), and under Cohere-CrispASR passes it lists the aligner.
+- **Fixed on the way:** since a0eb82e (2026-04-02; releases 1.8.10.post3 to 1.9.5) a ChronosJAV pass's Customize →
+  Alignment values (and a saved preset's) never reached the run; they do now.
+- Where it runs: both parts run where the install's CrispASR build runs, so on Vulkan and Apple installs this part of
+  ChronosJAV asks for the GPU. `--device cpu` cannot hold them on the CPU; the run-start box and the log say so where the
+  build would use a GPU. `--check` lists the three aligner files and the timing-model file. Models are downloaded at first
+  use, inside the pass, pinned by commit and SHA-256 (`crispasr/manifest.py`).
+
+**Checked.** Unit tests (new: `test_crispasr_aligner.py`, `test_crispasr_timer.py`, `test_timing_rules.py`,
+`test_subtitle_pipeline_timer.py`, `test_chronosjav_timing_wiring.py`) and the affected files, one per process. Real runs on
+The Naked Director S02E02 Scene 5 (`D:\WJ110_measure\timing_design_2026-10-27\s5_qwen_default\`, `…\s6\`): Qwen3-ASR with each
+aligner and the PyTorch one, timing model off, `vad_only`, anime-whisper — all exit 0; the two-speaker VAD group split at the
+speaker change. The owner's GUI click passed (W264). One `assessment-adversary` review; its findings fixed or decided (W266;
+design note v3 §15). Not run: a real step-down retry, a real load failure, `--device cpu`, Cohere inside ChronosJAV (gated
+model; skipped, W265). Not measured against the reference subtitles; the start rule T2 is to be judged from the owner's
+manual tests (W266 2). Design: `docs/plans/design/2026-10-28-chronosjav-timing-c3-c1.md` v3.
 
 ---
 
