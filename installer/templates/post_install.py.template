@@ -708,23 +708,27 @@ def window_plan(case: str, reason_lines: List[str], adapters: Sequence[str], rec
     a first install without an NVIDIA card -> CPU only after 20 s (owner R3); an NVIDIA GPU
     that 1.10 cannot use -> Stop, no time limit (W37 (2), 22.13 detail 7); a second run ->
     the recorded accelerator after 20 s (22.6.6). Returns None when no window is needed.
+    The record comes first: on a PC whose NVIDIA GPU 1.10 cannot use, a second run still keeps
+    what the user chose at the first install (22.6.6, detail 10), with the reason above it.
     """
     found = ACC.WINDOW_FOUND.format(names=", ".join(adapters)) if adapters else ""
     choices = [(key, label) for key, label, _acc in ACC.WINDOW_CHOICES]
-    if case in ("old_card", "old_driver", "not_reachable"):
-        return dict(title=ACC.WINDOW_TITLE, lines=reason_lines + [ACC.WINDOW_INTRO.format(found=found)],
-                    choices=choices, preselected="stop", timeout=None, footer="",
-                    wrongly=(case == "old_card"))
+    unusable = case in ("old_card", "old_driver", "not_reachable")
     if recorded:
-        nvidia_record = recorded in ("cu130", "cu128")
+        nvidia_record = ACC.get(recorded).nvidia
         if case == "supported" or nvidia_record:
             choices = [("nvidia", "NVIDIA GPU (CUDA)")] + choices
         # The recorded accelerator, so nothing changes unless the user picks another (22.6.6).
         key = {"own-pytorch": "4", "cpu": "5"}.get(recorded) or ("nvidia" if nvidia_record else _card_choice(adapters))
         name = VARIANT_LABELS[recorded]
-        return dict(title=ACC.SECOND_RUN_TITLE, lines=[ACC.SECOND_RUN_TEXT.format(name=name)],
+        return dict(title=ACC.SECOND_RUN_TITLE, lines=(reason_lines if unusable else []) + [ACC.SECOND_RUN_TEXT.format(name=name)],
                     choices=choices, preselected=key, timeout=ACC.WINDOW_TIMEOUT_SECONDS,
-                    footer=ACC.SECOND_RUN_FOOTER.format(name=name), wrongly=False, keep=recorded)
+                    footer=ACC.SECOND_RUN_FOOTER.format(name=name), wrongly=(case == "old_card"), keep=recorded)
+    if unusable:
+        question = ACC.WINDOW_INTRO.format(found=found) if case == "old_card" else ACC.WINDOW_QUESTION
+        return dict(title=ACC.WINDOW_TITLE, lines=reason_lines + [question],
+                    choices=choices, preselected="stop", timeout=None, footer="",
+                    wrongly=(case == "old_card"))
     if case == "supported":
         return None
     return dict(title=ACC.WINDOW_TITLE, lines=[ACC.WINDOW_INTRO.format(found=found)], choices=choices,
@@ -736,7 +740,8 @@ def accelerator_for_answer(answer: str, vulkan_present: bool, plan: Optional[dic
     if answer in ("stop", "wrongly"):
         return answer
     if answer == "nvidia":
-        return (plan or {}).get("keep") if (plan or {}).get("keep") in ("cu130", "cu128") else "cu130"
+        keep = ACC.get((plan or {}).get("keep"))
+        return keep.value if keep is not None and keep.nvidia else "cu130"
     accelerator = {key: acc for key, _label, acc in ACC.WINDOW_CHOICES}[answer]
     if accelerator == "vulkan" and not vulkan_present:
         log(ACC.NO_VULKAN_TEXT)
@@ -2844,6 +2849,12 @@ def main() -> int:
     if plan_error:
         create_failure_file(f"PyTorch installation failed: {plan_error}")
         return 1
+    if nvidia_install and torch_plan is not None and not torch_plan.uses_gpu:
+        # A second run kept the NVIDIA record, but no NVIDIA GPU 1.10 can use is found now. The
+        # record is not re-derived from the PyTorch this PC would get (review P7 finding 9).
+        log(ACC.NVIDIA_RECORD_NO_GPU_TEXT)
+        create_stopped_file("Stopped before installing: made for the NVIDIA GPU, none usable found")
+        return 0
     # The locked file: the accelerator's lock extra; for an NVIDIA install the build actually
     # selected -- the plan's, or the one already installed and kept (a repair run), never a
     # build that was only detected (owner, W56).
@@ -2943,7 +2954,7 @@ def main() -> int:
     elif build:
         log(f"WARNING: unexpected PyTorch CUDA build {build}; cuBLAS 12 not placed")
     else:
-        write_stack_file("cpu")  # an NVIDIA install that got PyTorch without CUDA: recorded as it is
+        log("WARNING: this NVIDIA install has a PyTorch without CUDA; the record is left as it is")
 
     # === Phase 5.5: Copy Launcher to Root ===
     log_section("Phase 5.5: User-Friendly Launcher Setup")
