@@ -399,7 +399,7 @@ def parse_arguments():
                                     "their model is downloaded the first time it is needed; Japanese "
                                     "only. --pass1-model picks their model. "
                                     "Experimental in 1.10.0 (early release). "
-                                    "The GGUF (CrispASR) pipelines do not support CJK (Chinese, Japanese, Korean) characters in folder names.")
+                                    "The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).")
     twopass_group.add_argument("--pass1-sensitivity", default=None,
                                choices=["conservative", "balanced", "aggressive"],
                                help="Sensitivity for pass 1 (default: aggressive when pass 1 is "
@@ -457,7 +457,7 @@ def parse_arguments():
                                     "downloaded the first time it is needed; Japanese only. "
                                     "--pass2-model picks their model. "
                                     "Experimental in 1.10.0 (early release). "
-                                    "The GGUF (CrispASR) pipelines do not support CJK (Chinese, Japanese, Korean) characters in folder names.")
+                                    "The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).")
     twopass_group.add_argument("--pass2-sensitivity", default=None,
                                choices=["conservative", "balanced", "aggressive"],
                                help="Sensitivity for pass 2 (default: aggressive when pass 2 is "
