@@ -21,6 +21,7 @@ import pytest
 import soundfile as sf
 
 from whisperjav.crispasr import install, lines
+from whisperjav.crispasr.aligner import TimedUnit
 from whisperjav.crispasr.engine import CrispSegment, CrispToken
 from whisperjav.crispasr.errors import CrispASRRunError, CrispASRSetupError
 from whisperjav.crispasr.pass_settings import (QWEN_CHUNK_THRESHOLD_S, QWEN_END_PAD_MS, QWEN_MAX_GROUP_S,
@@ -171,6 +172,41 @@ class Stage:
 
         monkeypatch.setattr(chain, "BindingEngine", Engine)
 
+        # The CrispASR aligner (Cohere-CrispASR, W248 3): its answers, one per call, in order; [] = nothing aligned.
+        self.alignments = []
+        self.aligners = []
+        self.aligner_load_error = None
+
+        class Aligner:
+            def __init__(self, model_name=None, device=None, temp_dir=None, n_threads=None, label=""):
+                self.model_name, self.device, self.label = model_name, device, label
+                self.loads = self.unloads = 0
+                self.texts = []
+                self._loaded = False
+                stage.aligners.append(self)
+
+            @property
+            def is_loaded(self):
+                return self._loaded
+
+            def load(self):
+                self.loads += 1
+                if stage.aligner_load_error is not None:
+                    raise stage.aligner_load_error
+                self._loaded = True
+
+            def align(self, audio, text):
+                assert self._loaded and audio.dtype == np.float32
+                self.texts.append((len(audio), text))
+                return stage.alignments.pop(0) if stage.alignments else []
+
+            def unload(self):
+                if self._loaded:
+                    self.unloads += 1
+                    self._loaded = False
+
+        monkeypatch.setattr(chain, "CrispAligner", Aligner)
+
     def media(self, name="film"):
         path = self.tmp / f"{name}.mp4"
         path.write_bytes(b"")
@@ -203,7 +239,9 @@ class TestTheTwoPipelines:
         assert (CohereCrispASRPipeline.PIPELINE_NAME, CohereCrispASRPipeline.LABEL) == \
             ("cohere-crispasr", "Cohere-CrispASR")
         assert ParakeetCrispASRPipeline.ENGINE == chain.EngineRow("tokens", audio_analytics=True)
-        assert CohereCrispASRPipeline.ENGINE == chain.EngineRow("group", audio_analytics=True)
+        # Cohere-CrispASR's text is aligned by the CrispASR aligner (W248 3, W249); "group" for a group it cannot.
+        assert CohereCrispASRPipeline.ENGINE == chain.EngineRow("group", audio_analytics=True, aligner="wav2vec2-ja")
+        assert ParakeetCrispASRPipeline.ENGINE.aligner is None
 
     def test_both_share_one_chain(self):
         for cls in (ParakeetCrispASRPipeline, CohereCrispASRPipeline):
@@ -413,6 +451,91 @@ class TestCohereEndToEnd:
         assert stage.calls["analytics"] == 1  # as the qwen pipeline (W202 5b)
         made = stage.framer_made[0]
         assert (made["backend"], made["max_group"], made["chunk"]) == ("firered-vad", 3.0, 0.3)
+
+
+class TestCohereAligned:
+    """Cohere-CrispASR's text aligned by the CrispASR aligner (design note 2026-10-28, section 6; W248 3, W249)."""
+
+    TEXT = "近くのカラオケでそのまま酔っぱらっちゃった。それで？"
+    # Probe P1, wav2vec2-ja on group A of S02E02 Scene 5 (3.79 s): one unit per character, marks attached; the
+    # last unit ends at the end of the group's audio (whisperjav/crispasr/aligner.py).
+    UNITS = [TimedUnit(t, s, e) for t, s, e in (
+        ("近", 0.26, 0.28), ("く", 0.38, 0.40), ("の", 0.48, 0.50), ("カ", 0.60, 0.62), ("ラ", 0.72, 0.74),
+        ("オ", 0.80, 0.82), ("ケ", 0.90, 0.92), ("で", 1.00, 1.02), ("そ", 1.12, 1.14), ("の", 1.26, 1.28),
+        ("ま", 1.52, 1.54), ("ま", 1.74, 1.76), ("酔", 1.78, 1.80), ("っ", 1.86, 1.88), ("ぱ", 1.90, 1.92),
+        ("ら", 2.08, 2.10), ("っ", 2.32, 2.34), ("ち", 2.36, 2.38), ("ゃ", 2.40, 2.42), ("っ", 2.60, 2.64),
+        ("た。", 2.66, 2.68), ("そ", 3.10, 3.12), ("れ", 3.34, 3.36), ("で？", 3.76, 3.79))]
+
+    def test_an_aligned_group_is_cut_at_the_sentence_end_and_the_subtitles_are_chained(self, stage, tmp_path):
+        stage.frames = {0: [(1.0, 4.79)], 1: []}
+        stage.answers = [[CrispSegment(self.TEXT, 0.0, 3.79)]]
+        stage.alignments = [self.UNITS]
+        md = make(CohereCrispASRPipeline, tmp_path).process(stage.media())
+        assert srt_entries(md["output_files"]["final_srt"]) == [
+            ("近くのカラオケでそのまま酔っぱらっちゃった。", 1.26, 4.1), ("それで？", 4.1, 4.79)]
+        aligner = stage.aligners[0]
+        assert (aligner.model_name, aligner.label) == ("wav2vec2-ja", "Cohere-CrispASR")
+        assert aligner.texts == [(int(3.79 * RATE), self.TEXT)]
+        assert md["stages"]["alignment"]["aligned"] == 1 and md["summary"]["notes"] == []
+        assert md["config"]["crispasr"]["aligner"] == "wav2vec2-ja"
+
+    def test_a_group_the_aligner_gives_nothing_for_keeps_its_edges_and_is_counted(self, stage, tmp_path):
+        stage.answers = [[CrispSegment("本番。", 0.0, 1.0)], [CrispSegment("いいよ", 0.0, 1.5)],
+                         [CrispSegment("監督", 0.0, 1.0)]]
+        stage.alignments = [[TimedUnit("本", 0.2, 0.22), TimedUnit("番。", 0.4, 1.0)], [], []]
+        md = make(CohereCrispASRPipeline, tmp_path).process(stage.media())
+        assert srt_entries(md["output_files"]["final_srt"]) == [("本番。", 1.2, 2.0), ("いいよ", 3.0, 4.5),
+                                                                ("監督", 10.5, 11.5)]
+        assert md["summary"]["notes"] == [
+            "Cohere-CrispASR: 2 of 3 VAD group(s) could not be aligned; they keep the VAD group's edges"]
+
+    def test_groups_without_text_are_not_sent_to_the_aligner(self, stage, tmp_path):
+        stage.answers = [[CrispSegment("", 0.0, 1.0)], [], [CrispSegment("監督", 0.0, 1.0)]]
+        make(CohereCrispASRPipeline, tmp_path).process(stage.media())
+        assert [t for _n, t in stage.aligners[0].texts] == ["監督"]
+
+    def test_an_aligner_that_cannot_load_keeps_every_groups_edges_says_so_and_is_tried_once(self, stage, tmp_path):
+        stage.aligner_load_error = CrispASRSetupError("Downloading the model wav2vec2 failed: offline\nmore")
+        pipe = make(CohereCrispASRPipeline, tmp_path)
+        for name in ("a", "b"):
+            stage.answers = [[CrispSegment("本番。", 0.0, 1.0)], [CrispSegment("いいよ", 0.0, 1.5)],
+                             [CrispSegment("監督", 0.0, 1.0)]]
+            md = pipe.process(stage.media(name))
+            assert srt_entries(md["output_files"]["final_srt"])[0] == ("本番。", 1.0, 2.0)
+            assert md["summary"]["notes"] == [
+                "Cohere-CrispASR's aligner (wav2vec2-ja) could not be loaded (Downloading the model wav2vec2 "
+                "failed: offline): each VAD group is one subtitle at the group's edges, as before 1.10.0."]
+        assert len(stage.aligners) == 1 and stage.aligners[0].loads == 1
+
+    def test_the_aligner_loads_once_per_pass_and_unloads_at_cleanup(self, stage, tmp_path):
+        pipe = make(CohereCrispASRPipeline, tmp_path)
+        pipe.process(stage.media("a"))
+        pipe.process(stage.media("b"))
+        assert len(stage.aligners) == 1 and stage.aligners[0].loads == 1 and stage.aligners[0].unloads == 0
+        pipe.cleanup()
+        assert stage.aligners[0].unloads == 1
+
+    def test_with_a_speech_enhancer_the_aligner_unloads_after_each_files_asr_step(self, stage, tmp_path, monkeypatch):
+        monkeypatch.setattr(CrispASRPipeline, "_enhance", lambda self, scenes, md: (scenes, scenes))
+        pipe = make(CohereCrispASRPipeline, tmp_path, speech_enhancer="ffmpeg-dsp")
+        pipe.process(stage.media("a"))
+        pipe.process(stage.media("b"))
+        assert stage.aligners[0].loads == 2 and stage.aligners[0].unloads == 2
+
+    def test_the_debug_record_says_which_groups_were_aligned(self, stage, tmp_path):
+        stage.frames = {0: [(1.0, 4.79)], 1: [(0.5, 1.5)]}
+        stage.answers = [[CrispSegment(self.TEXT, 0.0, 3.79)], [CrispSegment("監督", 0.0, 1.0)]]
+        stage.alignments = [self.UNITS, []]
+        make(CohereCrispASRPipeline, tmp_path, save_metadata_json=True).process(stage.media())
+        record = tmp_path / "out" / "raw_subs" / "film.cohere-crispasr.groups.jsonl"
+        rows = [json.loads(line) for line in record.read_text(encoding="utf-8").splitlines()]
+        assert [r["aligned"] for r in rows] == [True, False]
+        assert rows[0]["segments"][0]["tokens"][20] == ["た。", 2.66, 2.68, None]
+
+    def test_parakeet_makes_no_aligner(self, stage, tmp_path):
+        stage.answers = [[parakeet_segment(("はい", 0.1, 0.4))]]
+        make(ParakeetCrispASRPipeline, tmp_path).process(stage.media())
+        assert stage.aligners == []
 
 
 class TestOncePerPass:
