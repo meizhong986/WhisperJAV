@@ -5,6 +5,7 @@
 - **A fresh install for everyone.** 1.10.0 runs on Python 3.13 with PyTorch 2.11. A 1.9.x install cannot be upgraded to it; install 1.10.0 fresh (steps below). Your settings are kept.
 - **One accelerator per install.** You choose it once, when you install: NVIDIA GPU (CUDA), GPU through Vulkan (AMD, Intel or older NVIDIA card, Windows), Apple GPU (Metal), your own PyTorch, or CPU only. Runs no longer stop to ask about the CPU. A run that does not use a supported NVIDIA GPU or the Apple GPU starts with a box saying where each part runs.
 - **Two new pipelines for Japanese, experimental:** Parakeet-CrispASR and Cohere-CrispASR run as Ensemble passes (menu group GGUF). CrispASR is installed with WhisperJAV; there is nothing to download separately.
+- **ChronosJAV subtitle timing** (new, not yet measured): subtitles start where the speech starts, and two sentences in one piece of speech (for example two speakers) can become two subtitles, split at a punctuation mark or space in the text.
 - **Every install gets a fixed list of package versions for its accelerator**, so two computers with the same accelerator get the same versions.
 - Removed: the llama-cpp translation provider (use Ollama), ClearVoice speech enhancement, and the 1.9.x CrispASR mode. Google Colab and Kaggle are not supported by 1.10.0.
 
@@ -13,11 +14,12 @@
 **New**
 
 - **Parakeet-CrispASR** (Ensemble, Japanese, experimental): NVIDIA's Parakeet TDT 0.6B ja model (674 MB). Within each piece of speech (at most about 6 s), a subtitle ends only at a sentence end, a pause, or a 、 or space before a pause — never by character count.
-- **Cohere-CrispASR** (Ensemble, Japanese, experimental): Japanese versions of Cohere Transcribe, `cohere-asr-ja-v0.1` (default) or `cohere-asr-ja` (2.4 GB each), one subtitle per piece of speech.
+- **Cohere-CrispASR** (Ensemble, Japanese, experimental): Japanese versions of Cohere Transcribe, `cohere-asr-ja-v0.1` (default) or `cohere-asr-ja` (2.4 GB each). An aligner (`wav2vec2-ja`, 232 MB, downloaded on first use) times the text; within each piece of speech a subtitle ends only at a sentence end (。？！… ? !), never by character count. A piece of speech the aligner cannot time stays one subtitle.
+- **ChronosJAV timing** (Qwen3-ASR and anime-whisper): by default an aligner, `wav2vec2-ja` (232 MB), times each character of the text, and a timing model, Whisper small (488 MB; its text is not used), moves each subtitle's start later to where Whisper hears the speech begin, and splits a piece of speech at a punctuation mark or space near where Whisper starts anew — no mark, no split; never by number of characters or seconds. Both run in CrispASR and download on first use; if one cannot be loaded, the text is kept and the run summary says so. Settings: Customize → Alignment, or `--qwen-aligner`, `--qwen-timing-model`, `--qwen-timestamp-mode` (all choices on the [ChronosJAV page](https://meizhong986.github.io/WhisperJAV/pipelines/chronosjav/#subtitle-timing-1100)). New in 1.10.0; not yet measured against reference subtitles.
 - Both GGUF pipelines take the pass's scene detector, speech enhancer, Enhance for VAD only and Customize settings, and print the audio analytics report when the scene detector is Semantic (the default). A status panel under the pass shows the model and where CrispASR runs. The model downloads on first use.
 - **The installers ask what the install is made for** when there is no supported NVIDIA GPU: the Windows installer in a window, `install.py` in the console, or `install.py --accelerator nvidia|vulkan|own-pytorch|cpu` in advance. A supported NVIDIA GPU, or an Apple silicon Mac, is used without a question.
 - **Own PyTorch** (experimental): WhisperJAV installs everything except PyTorch and never replaces your PyTorch build when it installs or upgrades — for example ROCm for an AMD GPU. The Windows installer shows the one command that adds it; running that installer again replaces the whole install folder, PyTorch included, and shows the command again.
-- **GPU through Vulkan** (Windows, experimental): with an AMD, Intel or older NVIDIA card, the GGUF pipelines ask for the graphics card through Vulkan (not tested on AMD or Intel cards).
+- **GPU through Vulkan** (Windows, experimental): with an AMD, Intel or older NVIDIA card, the GGUF pipelines and ChronosJAV's aligner and timing model ask for the graphics card through Vulkan (not tested on AMD or Intel cards; ChronosJAV's aligner and timing model not yet tried through Vulkan on any card).
 - **At the start of a run**, when the install's GPU is not in use, WhisperJAV says where each part runs on this computer. An install made for the NVIDIA GPU whose GPU cannot be used now (for example after a driver change) stops with the reason and the fix; in the GUI, **Run on the CPU this time** runs the job on the CPU.
 - **`--device auto|cuda|cpu` now sets the device for every pipeline**, the speech enhancers included. `--device cpu` runs one job on the CPU.
 - **`whisperjav --check`** names the accelerator of the install, where each part runs, CrispASR and its models.
@@ -32,7 +34,10 @@
 - Qwen3-ASR runs on transformers 5 through WhisperJAV's own build of `qwen-asr`; on our two reference clips its subtitles score the same as in 1.9.5.
 - On an install made with the Windows installer, `whisperjav-upgrade` installs the newest 1.10 release, keeps the accelerator of your install, and never installs PyTorch on an Own PyTorch install.
 - The GUI's "Accept CPU-only mode" box is gone, and so is the stop-and-ask at the start of a run. Scripts that pass `--accept-cpu-mode` still run (it now does nothing); `--hf-device` and `--qwen-device` still work as other names for `--device`.
-- On an Apple silicon Mac, each pipeline says where it runs: transformers on the Apple GPU (recommended on a Mac); fidelity and the GGUF pipelines ask for it (not yet tested on a Mac); balanced, fast, faster and ChronosJAV on the CPU.
+- On an Apple silicon Mac, each pipeline says where it runs: transformers on the Apple GPU (recommended on a Mac); fidelity, the GGUF pipelines and ChronosJAV's aligner and timing model ask for it (not yet tested on a Mac); balanced, fast, faster and ChronosJAV's ASR model on the CPU.
+- ChronosJAV: anime-whisper now uses the aligner like Qwen3-ASR (it was VAD-only), and step-down is off by default for every ChronosJAV model — a scene whose alignment collapses takes the times of its pieces of speech instead.
+- ChronosJAV times from the pieces of speech, as in 1.9.5: `--qwen-timestamp-mode vad_only --qwen-timing-model none`, or in the GUI, Aligner Backend None and Timing Model None.
+- In the GUI, a ChronosJAV pass's Customize → Alignment settings (and a preset saved from that window) now reach the run; from 1.8.10.post3 to 1.9.5 they were ignored.
 
 **Removed**
 
@@ -44,7 +49,8 @@
 **Limits in 1.10.0**
 
 - The GGUF pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).
-- The GGUF pipelines need a processor with AVX2 (Intel since 2013, AMD since 2015); every other pipeline runs without it.
+- The GGUF pipelines need a processor with AVX2 (Intel since 2013, AMD since 2015); every other pipeline runs without it. ChronosJAV's aligner and timing model need it too; without it ChronosJAV keeps its text and takes the times of its pieces of speech.
+- `--device cpu` cannot hold ChronosJAV's aligner and timing model, or Cohere-CrispASR's aligner, on the CPU: where CrispASR's build uses a GPU they still ask for it, and the box at the start of the run says so. How long the timing model takes on a computer without a GPU has not been measured.
 - GPUs through Vulkan and your own PyTorch are experimental: we could not test them on AMD or Intel graphics cards. Intel GPUs are not used through PyTorch in 1.10.0. On Linux, the GGUF pipelines run on the CPU for AMD and Intel GPUs. Please tell us how they work on your PC: https://github.com/meizhong986/WhisperJAV/issues
 - **Known faults in 1.10.0:**
   - BS-RoFormer cannot start on the command line; the run goes on with the original audio and a warning in the log. In the GUI it is marked Coming Soon. (To be fixed in 1.10.1.)
