@@ -86,7 +86,8 @@ class _FakeEnhancer:
 def _stub_enhancement(monkeypatch, log):
     import whisperjav.modules.speech_enhancement as se
     monkeypatch.setattr(se, "create_enhancer_direct",
-                        lambda backend, model=None: log.append(f"enhancer {backend}") or _FakeEnhancer(log))
+                        lambda backend, model=None, device=None:
+                        log.append(f"enhancer {backend} on {device}") or _FakeEnhancer(log))
     monkeypatch.setattr(se, "enhance_scenes",
                         lambda tuples, enhancer, temp_dir, **k: [(Path(str(t[0]) + ".enh"),) + tuple(t[1:]) for t in tuples])
     monkeypatch.setattr(se, "resample_scenes",
@@ -112,8 +113,17 @@ def test_one_track_the_enhanced_scenes_for_both(tmp_path, monkeypatch):
     md = {"stages": {}}
     asr, vad = pipe._enhance(_scenes(tmp_path), md)
     assert [s.path.name for s in asr] == ["s0.wav.enh", "s1.wav.enh"] and asr == vad
-    assert log == ["enhancer zipenhancer", "enhancer released", "cuda cleanup"]   # released before the ASR
+    assert log == ["enhancer zipenhancer on auto", "enhancer released", "cuda cleanup"]   # released before the ASR
     assert md["stages"]["enhancement"]["dual_track"] is False
+
+
+def test_device_cpu_reaches_the_enhancer(tmp_path, monkeypatch):
+    # Review P7 finding 3: "Run on the CPU this time" must reach every part (22.13 detail 15).
+    log = []
+    _stub_enhancement(monkeypatch, log)
+    pipe = make(ParakeetCrispASRPipeline, tmp_path, speech_enhancer="zipenhancer", device="cpu")
+    pipe._enhance(_scenes(tmp_path), {"stages": {}})
+    assert log[0] == "enhancer zipenhancer on cpu"
 
 
 def test_enhance_for_vad_the_enhanced_to_the_segmenter_and_the_original_to_crispasr(tmp_path, monkeypatch):
@@ -147,11 +157,56 @@ def test_with_an_enhancer_the_extraction_is_at_48_khz(tmp_path, monkeypatch):
     assert rates == [48000, 16000]
 
 
-def test_with_an_enhancer_the_model_is_closed_after_each_file(tmp_path):
-    src = Path(cp.__file__).read_text(encoding="utf-8")
-    step = src[src.index('self.progress.set_current_step("Transcribing with CrispASR"'):
-               src.index('self.progress.set_current_step("Building subtitles"')]
-    assert 'self.enhancer_backend not in ("", "none")' in step and "self.asr.close()" in step
+@pytest.mark.parametrize("method", ["auditok", "silero"])
+def test_customize_seeds_the_scene_values_the_pass_runs_with(tmp_path, method):
+    # Review P7 finding 14: Apply without a change must not change the run.
+    import dataclasses
+    from whisperjav.webview_gui.api import WhisperJAVAPI
+    from whisperjav.modules.scene_detection_backends.auditok_backend import AuditokSceneDetector
+    from whisperjav.modules.scene_detection_backends.silero_backend import SileroSceneDetector
+    build = SileroSceneDetector._build_silero_config if method == "silero" else AuditokSceneDetector._build_config_from_kwargs
+    result = WhisperJAVAPI.get_crispasr_customize_defaults(None, "parakeet-crispasr", "balanced", None, method)
+    runs_with = make(ParakeetCrispASRPipeline, tmp_path, scene_detector=method).scene_detector_kwargs()
+    runs_with.pop("method")
+    assert dataclasses.asdict(build({**runs_with, **result["scene"]})) == dataclasses.asdict(build(runs_with))
+    assert result["scene"]["max_duration_s"] == 48 and result["scene"]["pass1_min_duration_s"] == 0.3
+
+
+class _FakeModel:
+    def __init__(self):
+        self.is_open = True
+
+    def close(self):
+        self.is_open = False
+
+
+def _process_until_transcribe(pipe, tmp_path, transcribe):
+    """Run process() with every step before the ASR replaced; returns the model."""
+    import types
+    runtime = types.SimpleNamespace(device_line=lambda label: "", note_in_summary=False, version="0",
+                                    build="cpu", device="cpu", use_gpu=False)
+    scenes = _scenes(tmp_path)
+    pipe._ready = lambda: (runtime, tmp_path / "m.gguf")
+    pipe._extract_audio = lambda input_file, basename: (tmp_path / "a.wav", 10.0)
+    pipe._detect_scenes = lambda wav, basename, md: scenes
+    pipe._enhance = lambda sc, md: (sc, sc)
+    pipe._speech_groups = lambda sc: ([types.SimpleNamespace(start=0.0, end=4.0)], 0)
+    pipe._transcribe = transcribe
+    pipe.asr = _FakeModel()
+    return pipe.asr
+
+
+@pytest.mark.parametrize("enhancer,closed", [("zipenhancer", True), ("none", False)])
+def test_with_an_enhancer_the_model_is_closed_even_when_the_asr_step_fails(tmp_path, enhancer, closed):
+    # Review P7 findings 15 and 16: the next file's enhancer must not run beside an open model.
+    pipe = make(ParakeetCrispASRPipeline, tmp_path, speech_enhancer=enhancer)
+
+    def fails(scenes, groups, md):
+        raise RuntimeError("CrispASR failed")
+    model = _process_until_transcribe(pipe, tmp_path, fails)
+    with pytest.raises(RuntimeError):
+        pipe.process({"path": str(tmp_path / "a.mp4"), "basename": "a"})
+    assert model.is_open is (not closed)
 
 
 def test_the_pass_worker_and_the_gui_hand_these_settings_on():
