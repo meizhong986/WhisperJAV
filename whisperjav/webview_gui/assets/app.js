@@ -735,7 +735,6 @@ const FormManager = {
             // v1.9.2 (CFF1): minutes of scene audio before the recognizer is reloaded (0 = never)
             model_refresh_audio_minutes: document.getElementById('modelRefreshAudioMinutes').value,
             temp_dir: document.getElementById('tempDir').value.trim(),
-            accept_cpu_mode: document.getElementById('acceptCpuMode').checked,
             // #415: downloaded Hugging Face models only (--offline)
             offline_mode: document.getElementById('offlineMode').checked,
             output_format: document.getElementById('outputFormat').value,
@@ -900,6 +899,41 @@ const ErrorHandler = {
 
     showSuccess(title, message) {
         ConsoleManager.log(`✓ ${title}: ${message}`, 'success');
+    }
+};
+
+// ============================================================
+// A run that did not start, or ended without a run summary (design 22.9.2; owner D-G)
+// ============================================================
+const RunStopDialog = {
+    show(title, text, offerCpu) {
+        ConsoleManager.log(`✗ ${title}: ${text}`, 'error');
+        document.getElementById('runStopTitle').textContent = title;
+        document.getElementById('runStopText').textContent = text;
+        document.getElementById('runStopCpuBtn').style.display = offerCpu ? '' : 'none';
+        document.getElementById('runStopModal').classList.add('active');
+    },
+
+    close() {
+        document.getElementById('runStopModal').classList.remove('active');
+    },
+
+    async runOnCpu() {
+        // "Run on the CPU this time": the same run again with --device cpu (every part on the CPU).
+        this.close();
+        const result = await pywebview.api.rerun_on_cpu();
+        if (result && result.success) {
+            AppState.isRunning = true;
+            ProcessManager.updateButtonStates();
+            ProgressManager.setIndeterminate(true);
+            ProgressManager.setStatus('Running on the CPU (not accelerated)...');
+            if (result.command) {
+                ConsoleManager.appendRaw(`\n> ${result.command}\n`);
+            }
+            ProcessManager.startStatusMonitoring();
+        } else {
+            ErrorHandler.show('The run could not start again', (result && result.message) || '');
+        }
     }
 };
 
@@ -1089,9 +1123,22 @@ const ProcessManager = {
                             ProgressManager.setStatus(`Finished with failures · ${tally}`);
                             ErrorHandler.show('Finished with failures',
                                 `Files: ${tally}. Exit status ${status.exit_code}; a run fails on: ${(summary.fails_on || ['failed']).join(', ')}. See the RUN SUMMARY in the console.`);
+                        } else if (status.exit_code === 3) {
+                            // design 22.9.2 (owner D-G): this install's NVIDIA GPU cannot be used now.
+                            ProgressManager.setStatus('The run did not start (exit status 3)');
+                            RunStopDialog.show('The NVIDIA GPU cannot be used', status.reason || '', true);
+                        } else if (status.exit_code === 2 || status.exit_code === 4) {
+                            // T68: an argument error (2) or PyTorch missing (4): nothing was processed.
+                            ProgressManager.setStatus(`The run did not start (exit status ${status.exit_code})`);
+                            RunStopDialog.show('The run did not start',
+                                `${status.reason || ''} Nothing was processed.`.trim(), false);
                         } else {
-                            ProgressManager.setStatus(`Finished with failures (exit status ${status.exit_code})`);
-                            ErrorHandler.show('Finished with failures', `Process exited with status ${status.exit_code} and wrote no run summary. Check the console for details.`);
+                            // T68x: a crash, possibly after some files were written -- not "did not start".
+                            ProgressManager.setStatus(`Ended without a run summary (exit status ${status.exit_code})`);
+                            RunStopDialog.show('The run ended without a run summary',
+                                `WhisperJAV stopped (exit status ${status.exit_code}) before it could write its run ` +
+                                `summary. Files finished before that are in the output folder. The console shows what happened.`,
+                                false);
                         }
                     } else if (status.status === 'cancelled') {
                         ProgressManager.reset();
@@ -1890,9 +1937,9 @@ const EnsembleManager = {
         // The CrispASR pipelines (1.10.0): the same defaults as the command line. The speech
         // segmenter is each pipeline's own when a pass names none (CRISPASR_DEFAULT_SEGMENTERS,
         // config/segmenter_presets.py: WhisperSeg for Parakeet, FireRedVAD for Cohere, owner W202);
-        // sensitivity is balanced (ENSEMBLE_DEFAULT_SENSITIVITY); the scene detector is always
-        // semantic (CRISPASR_SCENE_DETECTOR, crispasr/pass_settings.py), so that is what the greyed
-        // dropdown shows.
+        // sensitivity is balanced (ENSEMBLE_DEFAULT_SENSITIVITY); the scene detector starts at
+        // semantic (CRISPASR_SCENE_DETECTOR, crispasr/pass_settings.py; owner W214 2), and the user
+        // may choose another (design 22.9.1).
         if (this.isCrispasrPipeline(pipelineType)) {
             const segmenter = this.crispasrDefaultSegmenter(pipelineType);
             sceneSelect.value = 'semantic';
@@ -2135,15 +2182,14 @@ const EnsembleManager = {
             return;
         }
 
-        // A CrispASR pipeline (1.10.0) uses four pass settings: the model, the speech segmenter,
-        // the sensitivity (which picks the segmenter's preset: its threshold and related settings, design 4.5)
-        // and the source language (crispasr/pass_settings.py). Those stay active; the scene detector
-        // (always semantic), the speech enhancer and Customize are greyed. "None" is not offered as
-        // a segmenter: the pipelines need one (main.py refuses it).
+        // A CrispASR pipeline (1.10.0) uses the model, the speech segmenter, the sensitivity (which
+        // picks the segmenter's preset, design 4.5), the source language, and since design 22.9.1
+        // (owner W212 D3, W214 2, W232 8) the scene detector (semantic by default), the speech
+        // enhancer, Enhance for VAD only and Customize (Segmenter, Enhancer, Scene tabs). Nothing is
+        // greyed but "None" as a segmenter: the pipelines need one (main.py refuses it).
         const noneSegmenter = segmenterSelect.querySelector('option[value="none"]');
         if (noneSegmenter) noneSegmenter.disabled = !!passState.isCrispasr;
         if (passState.isCrispasr) {
-            const notUsed = `Not used by ${this.pipelineLabel(passKey)}`;
             sensitivitySelect.disabled = isPass2Disabled;
             sensitivitySelect.title = 'Picks the speech segmenter\'s preset: the detection threshold and related settings';
             segmenterSelect.disabled = isPass2Disabled;
@@ -2158,10 +2204,10 @@ const EnsembleManager = {
             const enhancerSelect = document.getElementById(`${passKey}-enhancer`);
             const modelSelect = document.getElementById(`${passKey}-model`);
             const customizeBtn = document.getElementById(`customize-${passKey}`);
-            if (sceneSelect) { sceneSelect.disabled = true; sceneSelect.title = notUsed; }
-            if (enhancerSelect) { enhancerSelect.disabled = true; enhancerSelect.title = notUsed; }
+            if (sceneSelect) { sceneSelect.disabled = isPass2Disabled; sceneSelect.title = ''; }
+            if (enhancerSelect) { enhancerSelect.disabled = isPass2Disabled; enhancerSelect.title = ''; }
             if (modelSelect) { modelSelect.disabled = isPass2Disabled; modelSelect.title = ''; }
-            if (customizeBtn) { customizeBtn.disabled = true; customizeBtn.title = notUsed; }
+            if (customizeBtn) { customizeBtn.disabled = isPass2Disabled; customizeBtn.title = ''; }
 
             const guideBtn = document.getElementById(`guide-${passKey}`);
             if (guideBtn) guideBtn.style.display = 'none';
@@ -2329,12 +2375,13 @@ const EnsembleManager = {
     },
 
     // The passes that will run with a removed enhancer still marked. A pass whose
-    // enhancer list does not apply (pass 2 off, XXL, CrispASR) is not counted: its
-    // list cannot be used, so the user could not clear the mark.
+    // enhancer list does not apply (pass 2 off, XXL) is not counted: its list cannot be
+    // used, so the user could not clear the mark. A CrispASR pass uses its enhancer
+    // since design 22.9.1, so it counts.
     passesWithRemovedEnhancer() {
         return ['pass1', 'pass2'].filter(k => this.removedEnhancer[k]
             && (k === 'pass1' || this.state.pass2.enabled)
-            && !this.state[k].isXxl && !this.state[k].isCrispasr);
+            && !this.state[k].isXxl);
     },
 
     // DSP Effects Panel Management
@@ -2583,6 +2630,10 @@ const EnsembleManager = {
             await this.openQwenCustomize(passKey);
             return;
         }
+        if (passState.isCrispasr) {
+            await this.openCrispasrCustomize(passKey);
+            return;
+        }
 
         // Legacy pipeline customize flow
         this.state.currentCustomize = passKey;
@@ -2712,9 +2763,10 @@ const EnsembleManager = {
             const currentModel = (passState.customized && passState.params && passState.params.model_name)
                 ? passState.params.model_name
                 : (rowModel || resultModel || 'large-v2');
+            // T58 (design 22.3.1, owner W237 1): Auto by default -- as this install is made for.
             const currentDevice = passState.customized && passState.params.device
                 ? passState.params.device
-                : 'cuda';
+                : 'auto';
 
             // v1.9.3: restore this modal's own tab labels before filling the panels.
             // The modal has ONE set of tab buttons shared by every pipeline, and
@@ -2780,6 +2832,48 @@ const EnsembleManager = {
         } finally {
             if (btn) btn.classList.remove('loading');
         }
+    },
+
+    // Customize for a GGUF (CrispASR) pass (design 22.9.1; owner W214 2, W232 8): three tabs --
+    // Segmenter, Enhancer, Scene -- seeded with the values the pass runs with. No Model or Quality
+    // tab: no Device control (W217 14; --device governs the pass) and no ASR model or decoder
+    // setting; the two pause values stay in the code until tuning (W211 3, W217 20).
+    async openCrispasrCustomize(passKey) {
+        const passState = this.state[passKey];
+        this.state.currentCustomize = passKey;
+        const sensitivity = passState.sensitivity || 'balanced';
+        const sceneBackend = passState.sceneDetector || 'semantic';
+        const result = await pywebview.api.get_crispasr_customize_defaults(
+            passState.pipeline, sensitivity, passState.speechSegmenter || '', sceneBackend);
+        if (!result || !result.success) {
+            ErrorHandler.show('Error', 'Failed to load the pass settings: ' + (result ? result.error : ''));
+            return;
+        }
+        const defaults = { ...result.segmenter, scene_detection_method: sceneBackend, ...result.scene };
+        this._currentDefaults = { transcriber: {}, decoder: {}, engine: {}, vad: result.segmenter,
+                                  scene: { scene_detection_method: sceneBackend, ...result.scene } };
+        const currentValues = (passState.customized && passState.params)
+            ? { ...defaults, ...passState.params } : defaults;
+
+        const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
+        document.getElementById('customizeModalTitle').textContent =
+            `${passLabel} Settings (${this.pipelineLabel(passKey)} / ${sensitivity})` +
+            (passState.customized ? ' [Custom]' : ' [Default]');
+        ['model', 'quality', 'segmenter', 'enhancer', 'scene', 'context'].forEach(tab => {
+            const panel = document.getElementById(`tab-${tab}`);
+            if (panel) panel.innerHTML = '';
+            const tabBtn = document.querySelector(`[data-tab="${tab}"]`);
+            if (tabBtn) {
+                tabBtn.textContent = tab.charAt(0).toUpperCase() + tab.slice(1);
+                tabBtn.style.display = ['segmenter', 'enhancer', 'scene'].includes(tab) ? '' : 'none';
+            }
+        });
+        await this.generateSegmenterTab('tab-segmenter', result.segmenter_backend, currentValues, true, sensitivity);
+        await this.generateEnhancerTab('tab-enhancer', passState.speechEnhancer || 'none', passState.dspEffects || ['loudnorm']);
+        await this.generateSceneTab('tab-scene', sceneBackend, currentValues);
+        this.switchModalTab('segmenter');
+        await this.refreshPresetList();
+        document.getElementById('customizeModal').classList.add('active');
     },
 
     generateTabControls(tabId, params, currentValues) {
@@ -4558,8 +4652,9 @@ const EnsembleManager = {
         deviceSelect.id = 'device-select';
 
         const deviceOptions = [
-            { value: 'cuda', label: 'CUDA (GPU)' },
-            { value: 'cpu', label: 'CPU' }
+            { value: 'auto', label: 'Auto (the GPU when one can be used, else the CPU)' },
+            { value: 'cuda', label: 'NVIDIA GPU (CUDA)' },
+            { value: 'cpu', label: 'CPU (not accelerated)' }
         ];
 
         deviceOptions.forEach(opt => {
@@ -4574,7 +4669,7 @@ const EnsembleManager = {
 
         const deviceDesc = document.createElement('p');
         deviceDesc.className = 'param-description';
-        deviceDesc.textContent = 'Processing device. CUDA (GPU) is much faster if available.';
+        deviceDesc.textContent = 'Where this runs. An NVIDIA GPU (CUDA) is much faster than the CPU (not accelerated).';
         deviceControl.appendChild(deviceDesc);
 
         container.appendChild(deviceControl);
@@ -5266,7 +5361,7 @@ const EnsembleManager = {
         // Flatten all defaults including model
         const defaults = {
             model_name: this._currentDefaults.model || 'large-v2',
-            device: 'cuda',
+            device: 'auto',
             ...this._currentDefaults.transcriber,
             ...this._currentDefaults.decoder,
             ...this._currentDefaults.engine,
@@ -5902,9 +5997,6 @@ const EnsembleManager = {
             asr_telemetry: document.getElementById('asrTelemetry').checked,
             // #415: shared Advanced-options checkbox (Transcription tab), like asrTelemetry
             offline_mode: document.getElementById('offlineMode').checked,
-            // #411: the start-up check stops on a GPU this build cannot use and, in the GUI,
-            // can only be answered by this shared box (Transcription tab, Advanced options).
-            accept_cpu_mode: document.getElementById('acceptCpuMode').checked,
             // v1.9.2 (CFF1): shared Advanced-options field (Transcription tab), like source-language
             model_refresh_audio_minutes: document.getElementById('modelRefreshAudioMinutes').value,
             temp_dir: document.getElementById('tempDir').value.trim(),
@@ -8309,7 +8401,6 @@ const SettingsPersistence = {
         'debugLogging':     { key: 'debugLogging',   prop: 'checked' },
         'keepTemp':         { key: 'keepTemp',       prop: 'checked' },
         'skipExisting':     { key: 'skipExisting',   prop: 'checked' },
-        'acceptCpuMode':    { key: 'acceptCpuMode',  prop: 'checked' },
         'offlineMode':      { key: 'offlineMode',    prop: 'checked' },
         'failOnEmpty':      { key: 'failOnEmpty',    prop: 'checked' },
         'failOnSuspect':    { key: 'failOnSuspect',  prop: 'checked' },
