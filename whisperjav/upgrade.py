@@ -107,14 +107,12 @@ IS_WINDOWS = platform.system() == 'Windows'
 # spec D. v1.10.0 (item 2f, owner W53-W56): every upgrade installs the new release's
 # locked versions for the build this PC has -- uv.lock exported per build into
 # whisperjav/installer/locked/ -- and never resolves version ranges.
-PYTORCH_INDEXES = {
-    "cpu": "https://download.pytorch.org/whl/cpu",
-    "cu128": "https://download.pytorch.org/whl/cu128",
-    "cu130": "https://download.pytorch.org/whl/cu130",
-}
-VARIANT_LABELS = {"cu130": "CUDA 13.0", "cu128": "CUDA 12.8", "cpu": "CPU"}
-# uv.lock extra per build; macOS ("metal") uses cpu, whose index has the Apple wheels.
-LOCKED_EXTRAS = {"cu130": "cu130", "cu128": "cu128", "cpu": "cpu", "metal": "cpu"}
+# v1.10.0 (design 22.6.7, 22.6.8): every install is made for one accelerator, recorded in
+# whisperjav_stack.txt; the upgrade keeps it. The facts per accelerator come from the one table.
+from whisperjav.installer.core import accelerators as _acc  # noqa: E402 -- standard library only
+
+PYTORCH_INDEXES = {a.value: a.pytorch_index for a in _acc.ACCELERATORS}   # "" = Own PyTorch: none
+VARIANT_LABELS = {a.value: a.name for a in _acc.ACCELERATORS}
 TORCH_PACKAGE_NAMES = ("torch", "torchaudio", "torchvision")
 ISSUES_URL = "https://github.com/meizhong986/WhisperJAV/issues"
 
@@ -205,7 +203,8 @@ def resolve_upgrade_source(current_version: Optional[str]) -> Tuple[Optional[str
 # =============================================================================
 
 def read_installed_stack(install_dir: Optional[Path] = None) -> Optional[str]:
-    """cu130, cu128 or cpu, as the installer recorded it; None if not recorded."""
+    """The accelerator the installer recorded (cu130, cu128, vulkan, metal, own-pytorch, cpu);
+    None if not recorded or not known to this release."""
     try:
         from whisperjav.installer.cublas12 import read_stack
         return read_stack(str(install_dir) if install_dir else None)
@@ -358,7 +357,7 @@ def fetch_release_locked_file(source: str, stack: str) -> Optional[str]:
     `source` is what pip installs: git+https://github.com/<owner>/<repo>.git@<tag>, a
     git+file:// repository @<ref>, a local wheel, or a local source folder.
     """
-    rel = f"whisperjav/installer/locked/requirements_{stack}.txt"
+    rel = f"whisperjav/installer/locked/{_acc.requirements_file(stack)}"
     try:
         m = re.match(r"^git\+https://github\.com/([^/]+)/([^/@]+?)(?:\.git)?(?:@(.+))?$", source)
         if m:
@@ -398,13 +397,17 @@ def _split_pins(install_dir: Path, lines: List[str]) -> Tuple[List[str], List[st
 
 def _pin_commands(pip_exe: Path, stack: str, rest_file: str, torch_lines: List[str],
                   dry_run: bool) -> List[Tuple[List[str], str]]:
-    """The two pip commands of a pinned install; the pre-check runs the same ones with --dry-run."""
+    """The pip commands of a pinned install; the pre-check runs the same ones with --dry-run.
+
+    On an Own PyTorch install there is no PyTorch command: WhisperJAV never installs,
+    replaces or removes PyTorch there (owner W232 3, W211 1; design 22.6.7).
+    """
     extra = ["--dry-run"] if dry_run else []
-    return [
-        ([str(pip_exe), "install", *extra, "--no-deps", "-r", rest_file], "dependencies"),
-        ([str(pip_exe), "install", *extra, "--no-deps", *torch_lines,
-          "--index-url", PYTORCH_INDEXES[stack]], "PyTorch"),
-    ]
+    commands = [([str(pip_exe), "install", *extra, "--no-deps", "-r", rest_file], "dependencies")]
+    if _acc.installs_pytorch(stack):
+        commands.append(([str(pip_exe), "install", *extra, "--no-deps", *torch_lines,
+                          "--index-url", PYTORCH_INDEXES[stack]], "PyTorch"))
+    return commands
 
 
 def _unavailable_package(stderr: str) -> Tuple[Optional[str], str]:
@@ -531,19 +534,23 @@ def _find_source_root() -> Optional[Path]:
 
 
 def _detect_cuda_for_source() -> str:
-    """Detect CUDA build for source-install upgrades.
+    """The accelerator of a source install, for its upgrade.
 
-    Returns: "cpu", "cu130", "cu128", or "metal". The stack the installer recorded
-    wins (v1.10.0: an upgrade never moves a PC to another stack). Without a record,
-    Linux gets cu128 (owner, W45) and Windows cu130 at driver 580+.
+    The record wins, first (v1.10.0, design 22.6.7: an upgrade never moves an install to
+    another accelerator; on a Mac too, so an Own PyTorch install stays one). A record this
+    release does not know returns "unknown" and the upgrade stops. Without a record (a
+    source install from before records), detected as before: Apple silicon -> metal, Linux
+    cu128 (owner, W45), Windows cu130 at driver 580+.
     """
-    # Apple Silicon
-    if sys.platform == "darwin" and platform.machine() == "arm64":
-        return "metal"
-
     recorded = read_installed_stack()
     if recorded:
         return recorded
+    if _acc.read_record()[0]:
+        return "unknown"
+
+    # Apple Silicon
+    if sys.platform == "darwin" and platform.machine() == "arm64":
+        return "metal"
 
     # Try nvidia-smi
     try:
@@ -603,7 +610,7 @@ def _wheel_fits_this_pc(platform_tag: str) -> bool:
 def lock_has_pytorch_for_this_pc(source_root: Path, cuda_version: str) -> bool:
     """D3 (owner W57): does uv.lock hold a PyTorch wheel of this build for this PC?
     The same check as install.py's."""
-    index = f'source = {{ registry = "{PYTORCH_INDEXES[LOCKED_EXTRAS.get(cuda_version, "cpu")]}" }}'
+    index = f'source = {{ registry = "{PYTORCH_INDEXES[cuda_version]}" }}'
     text = (source_root / "uv.lock").read_text(encoding="utf-8")
     for block in text.split("[[package]]"):
         if not block.lstrip().startswith('name = "torch"\n') or index not in block:
@@ -617,11 +624,17 @@ def lock_has_pytorch_for_this_pc(source_root: Path, cuda_version: str) -> bool:
 def unsupported_source_build_message(source_root: Path, cuda_version: str) -> str:
     """Why a source install's PyTorch build cannot be upgraded on this PC, or "" (D3)."""
     from whisperjav.__version__ import __version__
+    if cuda_version == "unknown":
+        return (f"This installation's record of what it is made for ({_acc.STACK_FILE}) is not one "
+                f"WhisperJAV {__version__} knows, so the upgrade cannot choose its pinned packages. Nothing "
+                f"was changed. Run install.py again to repair it.")
     if sys.platform.startswith("linux") and cuda_version == "cu130":
         return (f"This installation uses CUDA 13.0, which WhisperJAV {__version__} does not offer on Linux. "
-                f"Nothing was changed. Run install.py again with --cuda cu128 (the Linux default) or --cpu-only.")
+                f"Nothing was changed. Run install.py again with --accelerator nvidia (CUDA 12.8 on Linux).")
+    if not _acc.installs_pytorch(cuda_version):
+        return ""  # Own PyTorch: the user's PyTorch, not the lock's
     if not lock_has_pytorch_for_this_pc(source_root, cuda_version):
-        label = VARIANT_LABELS.get(LOCKED_EXTRAS.get(cuda_version, "cpu"), "CPU")
+        label = {"cu130": "CUDA 13.0", "cu128": "CUDA 12.8"}.get(cuda_version, "CPU")
         return (f"PyTorch has no {label} build for this computer ({sys.platform}, {platform.machine()}) "
                 f"in WhisperJAV {__version__}, so it cannot be upgraded here. Nothing was changed.")
     return ""
@@ -710,22 +723,25 @@ def _run_uv_sync_upgrade(source_root: Path, extras: str = "all") -> bool:
         env_type = "conda" if os.environ.get("CONDA_PREFIX") == target_env else "venv"
         print(f"      Upgrading into {env_type} environment: {target_env}")
 
-    # --frozen: the versions uv.lock records, never re-resolved (item 2f). The three
-    # PyTorch builds are extras that cannot be combined, so never --all-extras.
+    # --frozen: the versions uv.lock records, never re-resolved (item 2f). The lock
+    # extras cannot be combined, so never --all-extras.
     cmd = ["uv", "sync", "--frozen"]
 
-    # --inexact for external envs: don't remove packages we didn't install
-    if is_external:
+    # --inexact for external envs: don't remove packages we didn't install. Own PyTorch
+    # always, and without torch and torchaudio: WhisperJAV never replaces the user's
+    # PyTorch (owner W232 3, W211 1; design 22.6.7).
+    if is_external or cuda_version == "own-pytorch":
         cmd.append("--inexact")
+    if cuda_version == "own-pytorch":
+        cmd.extend(["--no-install-package", "torch", "--no-install-package", "torchaudio"])
 
     for extra in extras.split(","):
         extra = extra.strip()
         if extra:
             cmd.extend(["--extra", extra])
-    variant = LOCKED_EXTRAS.get(cuda_version, "cpu")
-    cmd.extend(["--extra", variant])
+    cmd.extend(["--extra", _acc.lock_extra(cuda_version)])
 
-    print(f"      Upgrading with release-pinned dependencies ({VARIANT_LABELS[variant]})...")
+    print(f"      Upgrading with release-pinned dependencies ({VARIANT_LABELS[cuda_version]})...")
     print(f"      Running: {' '.join(cmd)}")
     try:
         result = subprocess.run(
