@@ -2,6 +2,10 @@
 
 This guide covers how to upgrade WhisperJAV to the latest version.
 
+**From 1.9.x to 1.10.0:** install 1.10.0 fresh. 1.10.0 needs Python 3.13, and a 1.9.x install has Python 3.10, so its `whisperjav-upgrade` cannot install 1.10.0. Your settings are kept. From 1.10.0 on, `whisperjav-upgrade` installs the newest release of the 1.10 series.
+
+**Within 1.10:** the upgrade keeps the accelerator your install is made for (`whisperjav_stack.txt` in the install folder) and installs the package versions the new release was tested with for it. On an Own PyTorch install it never installs, replaces or removes PyTorch.
+
 ## GUI Users (Recommended)
 
 The GUI will automatically check for updates on startup and display a notification banner when a new version is available.
