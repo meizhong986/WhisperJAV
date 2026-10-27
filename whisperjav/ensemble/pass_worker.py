@@ -51,11 +51,11 @@ PIPELINE_CLASSES = {
 }
 
 # Pipelines whose constructors never read enhance_for_vad. Verified against their
-# source on 2026-09-17, not against their docstrings; the two CrispASR pipelines
-# (1.10.0) run no audio clean-up at all. Kept in step by
+# source on 2026-09-17, not against their docstrings. The two CrispASR pipelines read it
+# since 1.10.0 (design 22.9.1, owner W232 8). Kept in step by
 # tests/test_speech_enhancer_spec.py, which greps the pipeline modules.
 ENHANCE_FOR_VAD_IGNORED_BY = frozenset({
-    "fast", "faster", "transformers", "parakeet-crispasr", "cohere-crispasr",
+    "fast", "faster", "transformers",
 })
 
 DEFAULT_HF_PARAMS = {
@@ -1475,7 +1475,19 @@ def _build_pipeline(
             # qwen pipeline (Cohere) applies them (W208; pass_settings.segmenter_settings).
             "vad_threshold": pass_config.get("vad_threshold"),
             "speech_pad_ms": pass_config.get("speech_pad_ms"),
+            # D3 (design 22.9.1; owner W212 D3, W214 2, W232 8): the scene detector (semantic when
+            # the pass names none), the speech enhancer, Enhance for VAD only, and the Customize
+            # values of the Segmenter and Scene tabs.
+            "scene_detector": pass_config.get("scene_detector") or None,
+            "enhance_for_vad": bool(pass_config.get("enhance_for_vad", False)),
         }
+        if pass_config.get("speech_enhancer"):
+            enhancer_backend, enhancer_model = _parse_speech_enhancer(pass_config["speech_enhancer"])
+            crispasr_kwargs["speech_enhancer"] = enhancer_backend
+            crispasr_kwargs["speech_enhancer_model"] = enhancer_model
+        custom = pass_config.get("params") or {}
+        crispasr_kwargs["segmenter_overrides"] = {k: v for k, v in custom.items() if k in SEGMENTER_PARAMS}
+        crispasr_kwargs["scene_params"] = {k: v for k, v in custom.items() if k in SCENE_DETECTION_PARAMS}
         if crispasr_speech_pad_ignored(pipeline_name, crispasr_kwargs["speech_segmenter"],
                                        crispasr_kwargs["speech_pad_ms"]):
             # Fidelity's own warning, below, for the same case.
