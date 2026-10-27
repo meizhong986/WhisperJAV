@@ -28,6 +28,7 @@ from whisperjav.modules.audio_extraction import AudioExtractor
 from whisperjav.modules.transformers_asr import TransformersASR
 from whisperjav.modules.srt_postprocessing import SRTPostProcessor, normalize_language_code
 from whisperjav.modules.srt_stitching import SRTStitcher
+from whisperjav.utils.device_detector import pass_device
 from whisperjav.utils.logger import logger
 from whisperjav.utils.progress_display import DummyProgress
 
@@ -220,12 +221,14 @@ class TransformersPipeline(BasePipeline):
         if asr_backend == "qwen":
             self._enhancer_config = {
                 'backend': qwen_enhancer,
-                'model': qwen_enhancer_model
+                'model': qwen_enhancer_model,
+                'device': pass_device(qwen_device),  # --device, as every part (22.3.1)
             }
         else:
             self._enhancer_config = {
                 'backend': hf_speech_enhancer,
-                'model': hf_speech_enhancer_model
+                'model': hf_speech_enhancer_model,
+                'device': pass_device(hf_device),  # --device, as every part (22.3.1)
             }
 
         # Speech segmenter CONFIG for post-ASR VAD filtering (Phase 2)
