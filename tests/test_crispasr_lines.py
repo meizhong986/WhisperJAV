@@ -263,6 +263,48 @@ class TestCohere:
         assert lines.build("group", G0, G0 + 2.0, [CrispSegment("あ", 0, 1), CrispSegment("い。", 1, 2)])[0][0] == "あい。"
 
 
+class TestOnsetTimes:
+    """Cohere-CrispASR aligned (owner W259; design note 2026-10-28, section 6): the aligner's character times are
+    onsets, so only a sentence-end mark cuts, and each subtitle of a group but the last ends where the next starts."""
+
+    # wav2vec2-ja spikes for "…た。それで？" (probe P1); the last unit ends at the group's end.
+    SPIKES = [("った", 2.60, 2.64), ("た。", 2.66, 2.68), ("そ", 3.10, 3.12), ("れ", 3.34, 3.36), ("で？", 3.76, 3.79)]
+
+    def onsets(self, items, duration):
+        return rounded(lines.build("tokens", G0, G0 + duration, [seg(items)], onsets=True))
+
+    def test_inner_subtitles_end_where_the_next_starts(self):
+        assert self.onsets(self.SPIKES, 3.79) == [("ったた。", 2.6, 3.1), ("それで？", 3.1, 3.79)]
+
+    def test_without_onsets_the_ends_are_the_tokens(self):
+        assert rounded(build([seg(self.SPIKES)], 3.79)) == [("ったた。", 2.6, 2.68), ("それで？", 3.1, 3.79)]
+
+    def test_a_held_sound_is_no_pause_cut(self):
+        # 激しかったの (step 4 run, 115.66 s): 0.6 s and more between the onsets of 激 and し, no mark.
+        items = [("激", 0.60, 0.62), ("し", 2.08, 2.10), ("か", 2.30, 2.32), ("った", 2.50, 2.54), ("の。", 2.80, 3.14)]
+        assert self.onsets(items, 3.14) == [("激しかったの。", 0.6, 3.14)]
+        assert len(build([seg(items)], 3.14)) == 2  # Parakeet's pause cue would cut it
+
+    def test_a_comma_with_a_pause_is_no_cut(self):
+        items = [("竹", 0.0, 0.02), ("二、", 0.3, 0.32), ("竹", 1.1, 1.12), ("二", 1.3, 1.32), ("様", 2.5, 2.52),
+                 ("って。", 2.9, 3.53)]
+        assert self.onsets(items, 3.53) == [("竹二、竹二様って。", 0.0, 3.53)]
+
+    @pytest.mark.parametrize("stop", [".", "．"])
+    def test_a_full_stop_in_a_number_is_no_cut(self, stop):
+        # Owner W266 3: with onset times the ASCII and full-width full stops do not cut.
+        items = [("3" + stop, 0.0, 0.02), ("5", 0.3, 0.32), ("キ", 0.6, 0.62), ("ロ。", 0.9, 1.2)]
+        assert self.onsets(items, 1.2) == [(f"3{stop}5キロ。", 0.0, 1.2)]
+
+    def test_ascii_question_and_exclamation_marks_cut(self):
+        items = [("何", 0.0, 0.02), ("?", 0.02, 0.02), ("う", 0.5, 0.52), ("ん!", 0.8, 1.0)]
+        assert self.onsets(items, 1.0) == [("何?", 0.0, 0.5), ("うん!", 0.5, 1.0)]
+
+    def test_parakeet_keeps_the_full_stop_cue(self):
+        items = [("3.", 0.0, 0.02), ("5", 0.3, 0.32), ("キ", 0.6, 0.62), ("ロ。", 0.9, 1.2)]
+        assert len(build([seg(items)], 1.2)) == 2
+
+
 class TestTheRule:
     def test_an_unknown_rule_is_refused(self):
         with pytest.raises(ValueError):
