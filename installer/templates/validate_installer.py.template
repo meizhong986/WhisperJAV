@@ -48,10 +48,13 @@ REQUIRED_FILES = [
     "construct_v{{VERSION}}.yaml",
     "post_install_v{{VERSION}}.bat",
     "post_install_v{{VERSION}}.py",
-    # v1.10.0 (item 2f): uv.lock exported once per PyTorch build
+    # v1.10.0 (item 2f; design 22.2.4): uv.lock exported once per lock extra
     "requirements_v{{VERSION}}_cu130.txt",
     "requirements_v{{VERSION}}_cu128.txt",
+    "requirements_v{{VERSION}}_vulkan.txt",
     "requirements_v{{VERSION}}_cpu.txt",
+    # design 22.6.8: the one accelerator table, read by post_install
+    "whisperjav_accelerators_v{{VERSION}}.py",
     "WhisperJAV_Launcher_v{{VERSION}}.py",
     "README_INSTALLER_v{{VERSION}}.txt",
     "LICENSE.txt",
@@ -232,7 +235,9 @@ def validate_requirements_encoding():
     print_header("Phase 4: Locked Requirements Files Check")
 
     all_passed = True
-    for variant in ("cu130", "cu128", "cpu"):
+    # design 22.2.4: one file per lock extra; the vulkan extra takes PyTorch's CPU build.
+    torch_build = {"cu130": "cu130", "cu128": "cu128", "vulkan": "cpu", "cpu": "cpu"}
+    for variant in ("cu130", "cu128", "vulkan", "cpu"):
         filename = f"requirements_v{{VERSION}}_{variant}.txt"
         if not check_file_exists(filename):
             print_check(f"{filename}", False, "File not found")
@@ -247,9 +252,11 @@ def validate_requirements_encoding():
             all_passed = False
             continue
 
+        # A direct URL to one wheel file (CrispASR's +cuda / +vulkan builds, D10) is exact too.
         loose = [line for line in lines
-                 if "==" not in line.split(";")[0] and " @ git+" not in line]
-        torch_ok = any(line.startswith("torch==") and (variant in line) for line in lines)
+                 if "==" not in line.split(";")[0] and " @ git+" not in line
+                 and not (" @ https://" in line and ".whl" in line)]
+        torch_ok = any(line.startswith("torch==") and (torch_build[variant] in line) for line in lines)
         if len(lines) < 5:
             print_check(f"{filename}", False, f"Too few packages ({len(lines)}) - file may be corrupted")
             all_passed = False
@@ -257,7 +264,7 @@ def validate_requirements_encoding():
             print_check(f"{filename}", False, f"{len(loose)} line(s) without an exact version, e.g. {loose[0]}")
             all_passed = False
         elif not torch_ok:
-            print_check(f"{filename}", False, f"no torch=={variant} line")
+            print_check(f"{filename}", False, f"no torch=={torch_build[variant]} line")
             all_passed = False
         else:
             print_check(f"{filename}", True, f"{len(lines)} packages, all exact")
