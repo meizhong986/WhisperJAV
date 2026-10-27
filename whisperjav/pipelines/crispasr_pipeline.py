@@ -17,13 +17,17 @@ per-model table (ENGINE); everything else is here (route B design, sections 3-4)
      Cohere (whisperjav/crispasr/pass_settings.py); it is released before the model runs;
   5. each VAD group's audio, cut from its scene's audio in memory, goes to CrispASR on its own, one
      call per group (Parakeet option P2, Cohere option C1); the model is opened once per pass (W202 5a);
+  5b. with an aligner in the row (Cohere, W248 3, W249): each group's text is aligned to its audio by the
+     CrispASR aligner (whisperjav/crispasr/aligner.py, wav2vec2-ja), loaded once per pass;
   6. each group's result is taken apart and its subtitles built by the row's line rule
-     (whisperjav/crispasr/lines.py): Parakeet cut only at natural cues (W203, W204), Cohere one
-     subtitle per group;
+     (whisperjav/crispasr/lines.py): Parakeet cut only at natural cues (W203, W204); Cohere's aligned
+     groups at sentence-end marks only, with chained ends (W259), a group the aligner gives nothing for
+     one subtitle;
   7. scene SRTs, stitched; the three filters (nonverbal, nonlinguistic, scene overlap; W129 6);
      <name>.ja.whisperjav.srt.
 
-Times are the engine's own (W93 c5, W116): Parakeet's token times; Cohere's VAD group edges.
+Times: Parakeet's token times (W93 c5, W116); Cohere's from the aligner's character times, or the VAD group
+edges where there are none (design note docs/plans/design/2026-10-28-chronosjav-timing-c3-c1.md, section 6).
 """
 
 import dataclasses
@@ -37,7 +41,8 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from whisperjav.crispasr import install, lines
-from whisperjav.crispasr.engine import SAMPLE_RATE, BindingEngine, CrispSegment
+from whisperjav.crispasr.aligner import CrispAligner
+from whisperjav.crispasr.engine import SAMPLE_RATE, BindingEngine, CrispSegment, CrispToken
 from whisperjav.crispasr.errors import CrispASRRunError, CrispASRSetupError
 from whisperjav.crispasr.manifest import JAPANESE_NAMES, ModelFile, model_for
 from whisperjav.crispasr.pass_settings import SegmenterSettings, segmenter_settings
@@ -50,6 +55,11 @@ class EngineRow:
     """A pipeline's row of the per-model table (route B design 6)."""
     line_rule: str          # lines.LINE_RULES: "tokens" (Parakeet, P2) or "group" (Cohere, C1)
     audio_analytics: bool   # both pipelines today (Cohere W202 5b, Parakeet W211 C2)
+    # The CrispASR aligner that times the model's text after the ASR step (manifest.ALIGNER_MODELS short name),
+    # or None. Cohere-CrispASR: wav2vec2-ja (owner W248 3, W249; design note 2026-10-28, section 6); an aligned
+    # group's subtitles are cut by the "tokens" rule for onset times (sentence-end marks only, chained ends;
+    # W259), a group the aligner gives nothing for keeps ``line_rule``.
+    aligner: Optional[str] = None
 
 
 @dataclass
@@ -164,6 +174,8 @@ class CrispASRPipeline(BasePipeline):
 
         self.audio_extractor = None
         self.asr: Optional[BindingEngine] = None  # opened once per pass; BasePipeline.cleanup() closes it
+        self.aligner: Optional[CrispAligner] = None  # loaded once per pass when ENGINE.aligner; cleanup() unloads it
+        self._aligner_error: Optional[str] = None
         self._runtime: Optional[install.RuntimeChoice] = None
         self._model_path: Optional[Path] = None
         self._setup_error: Optional[Exception] = None
@@ -225,22 +237,28 @@ class CrispASRPipeline(BasePipeline):
 
         self.progress.set_current_step("Transcribing with CrispASR", 5, 6)
         results: List[Tuple[_Group, List[CrispSegment]]] = []
+        aligned: set = set()
         try:
             if groups:
                 results = self._transcribe(scenes, groups, md)
+                if self.ENGINE.aligner:
+                    aligned = self._align(scenes, results, md)
             else:
                 logger.info(f"{self.LABEL}: no speech was found in {basename}")
         finally:
-            if self.enhancer_backend not in ("", "none") and self.asr is not None and self.asr.is_open:
+            if self.enhancer_backend not in ("", "none"):
                 # With a speech enhancer the model is opened for each file's ASR step and closed after
                 # it, also when the step fails, so the enhancer and the CrispASR model never hold GPU
-                # memory together (W217 19; review P7 finding 15).
-                self.asr.close()
+                # memory together (W217 19; review P7 finding 15). The aligner goes with it.
+                if self.asr is not None and self.asr.is_open:
+                    self.asr.close()
+                if self.aligner is not None:
+                    self.aligner.unload()
 
         self.progress.set_current_step("Building subtitles", 6, 6)
-        stitched, count_raw = self._build_subtitles(scenes, results, basename, md)
+        stitched, count_raw = self._build_subtitles(scenes, results, basename, md, aligned)
         if self.save_metadata_json:
-            self._write_group_record(basename, scenes, results)
+            self._write_group_record(basename, scenes, results, aligned)
         stats, count = self._postprocess(stitched, count_raw)
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -283,7 +301,7 @@ class CrispASRPipeline(BasePipeline):
             "pipeline": self.PIPELINE_NAME,
             "config": {"crispasr": {"model": self.model.name, "repo": self.model.repo_id,
                                     "revision": self.model.revision, "backend": self.model.backend,
-                                    "line_rule": self.ENGINE.line_rule,
+                                    "line_rule": self.ENGINE.line_rule, "aligner": self.ENGINE.aligner,
                                     "cues": self.cues.as_dict() if self.ENGINE.line_rule == "tokens" else None,
                                     "speech_segmenter_settings": self.segmenter.as_dict(),
                                     "threads": None}},
@@ -542,22 +560,94 @@ class CrispASRPipeline(BasePipeline):
         return report
 
     # -----------------------------------------------------------------------------------------------
+    # 5b. The aligner: the model's text timed to the group's audio (owner W248 3, W249)
+    # -----------------------------------------------------------------------------------------------
+
+    # Texts approved by the owner as drafted (W268); design note 2026-10-28, section 9.
+    ALIGNER_NOT_LOADED = ("{label}'s aligner ({model}) could not be loaded ({reason}): each VAD group is one "
+                          "subtitle at the group's edges, as before 1.10.0.")
+    GROUPS_NOT_ALIGNED = "{label}: {n} of {m} VAD group(s) could not be aligned; they keep the VAD group's edges"
+
+    def _align(self, scenes: List[_Scene], results: List[Tuple[_Group, List[CrispSegment]]],
+               md: Dict) -> set:
+        """Each group's text aligned to its audio, in place: an aligned group's segments become one segment whose
+        tokens are the aligner's timed characters. Returns the indices (into ``results``) of the aligned groups.
+
+        The aligner is loaded once per pass; if it cannot be loaded, no group is aligned for the pass and each
+        file's summary says so. A group the aligner gives nothing for keeps the model's result.
+        """
+        if self._aligner_error is None and (self.aligner is None or not self.aligner.is_loaded):
+            try:
+                if self.aligner is None:
+                    self.aligner = CrispAligner(self.ENGINE.aligner, device=self.device, temp_dir=self.temp_dir,
+                                                label=self.LABEL)
+                self.aligner.load()
+            except (CrispASRSetupError, OSError, RuntimeError) as e:
+                first_line = (str(e).strip().splitlines() or [""])[0][:200]
+                self._aligner_error = self.ALIGNER_NOT_LOADED.format(label=self.LABEL, model=self.ENGINE.aligner,
+                                                                     reason=first_line)
+                logger.warning(self._aligner_error)
+        if self._aligner_error is not None:
+            self.notes.append(self._aligner_error)
+            return set()
+
+        scene_of = {sc.index: sc for sc in scenes}
+        began = time.time()
+        aligned: set = set()
+        with_text = 0
+        loaded_scene, audio = None, None
+        for i, (g, segments) in enumerate(results):
+            text = "".join(seg.text.strip() for seg in segments).strip()
+            if not text:
+                continue
+            with_text += 1
+            if loaded_scene != g.scene:
+                audio, loaded_scene = None, None
+                audio = self._read_scene(scene_of[g.scene].path)
+                loaded_scene = g.scene
+            piece = audio[int(g.start * SAMPLE_RATE):int(g.end * SAMPLE_RATE)]
+            units = self.aligner.align(piece, text)
+            if not units:
+                continue
+            tokens = tuple(CrispToken(u.text, u.start, u.end, None) for u in units)
+            results[i] = (g, [CrispSegment(text, 0.0, len(piece) / SAMPLE_RATE, (), tokens)])
+            aligned.add(i)
+        not_aligned = with_text - len(aligned)
+        md["stages"]["alignment"] = {"aligner": self.ENGINE.aligner, "groups": with_text, "aligned": len(aligned),
+                                     "not_aligned": not_aligned, "seconds": round(time.time() - began, 2)}
+        if not_aligned:
+            self.notes.append(self.GROUPS_NOT_ALIGNED.format(label=self.LABEL, n=not_aligned, m=with_text))
+        return aligned
+
+    def cleanup(self):
+        """The aligner, then the model and the rest (BasePipeline.cleanup)."""
+        if self.aligner is not None:
+            self.aligner.unload()
+        super().cleanup()
+
+    # -----------------------------------------------------------------------------------------------
     # 6-7. Subtitles per scene, stitching, post-processing
     # -----------------------------------------------------------------------------------------------
 
     def _build_subtitles(self, scenes: List[_Scene], results: List[Tuple[_Group, List[CrispSegment]]],
-                         basename: str, md: Dict) -> Tuple[Path, int]:
-        """Each group's subtitles by the row's line rule; one SRT per scene in scene time; stitched."""
+                         basename: str, md: Dict, aligned: Optional[set] = None) -> Tuple[Path, int]:
+        """Each group's subtitles by the row's line rule (an aligned group: "tokens" for onsets); one SRT per scene
+        in scene time; stitched."""
         import srt
         from whisperjav.modules.srt_stitching import SRTStitcher
 
         scene_of = {sc.index: sc for sc in scenes}
         stats = lines.LineStats()
         by_scene: Dict[int, List[lines.Subtitle]] = {}
-        for g, segments in results:
+        aligned = aligned or set()
+        for i, (g, segments) in enumerate(results):
             scene = scene_of[g.scene]
-            subs = lines.build(self.ENGINE.line_rule, scene.start + g.start, scene.start + g.end, segments, stats,
-                               self.cues)
+            if i in aligned:
+                subs = lines.build("tokens", scene.start + g.start, scene.start + g.end, segments, stats,
+                                   self.cues, onsets=True)
+            else:
+                subs = lines.build(self.ENGINE.line_rule, scene.start + g.start, scene.start + g.end, segments,
+                                   stats, self.cues)
             by_scene.setdefault(g.scene, []).extend(subs)
 
         scene_srts_dir = self.temp_dir / "scene_srts"
@@ -615,22 +705,24 @@ class CrispASRPipeline(BasePipeline):
         return stats, count
 
     def _write_group_record(self, basename: str, scenes: List[_Scene],
-                            results: List[Tuple[_Group, List[CrispSegment]]]) -> None:
-        """With --debug: one JSON line per VAD group, with CrispASR's result in group time (owner O12).
+                            results: List[Tuple[_Group, List[CrispSegment]]], aligned: Optional[set] = None) -> None:
+        """With --debug: one JSON line per VAD group, with the result its subtitles were built from, in group
+        time (owner O12): CrispASR's, or for an aligned group the aligner's timed characters ("aligned": true).
 
         In the output folder's raw_subs/, because a pass deletes its own temp folder at its end.
         """
         scene_of = {sc.index: sc for sc in scenes}
         folder = self.output_dir / "raw_subs"
+        aligned = aligned or set()
         try:
             folder.mkdir(parents=True, exist_ok=True)
             # Named after the pipeline too: both passes of an Ensemble run share the basename.
             with open(folder / f"{basename}.{self.PIPELINE_NAME}.groups.jsonl", "w", encoding="utf-8") as fh:
-                for g, segments in results:
+                for i, (g, segments) in enumerate(results):
                     scene = scene_of[g.scene]
                     fh.write(json.dumps({
                         "scene": g.scene, "start": round(scene.start + g.start, 3),
-                        "end": round(scene.start + g.end, 3),
+                        "end": round(scene.start + g.end, 3), "aligned": i in aligned,
                         "segments": [{"text": s.text, "start": s.start, "end": s.end,
                                       "words": [[w.text, w.start, w.end, w.confidence] for w in s.words],
                                       "tokens": [[t.text, t.start, t.end, t.confidence] for t in s.tokens]}
