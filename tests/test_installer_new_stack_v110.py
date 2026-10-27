@@ -1,9 +1,10 @@
 """v1.10.0 item 2 (new stack), the Windows installer's decisions -- spec checks S5 and part of S4.
 
-Old card (compute capability below 7.5) -> the owner's three choices, answered with no time
-limit (W36 (1), W37 (1), (2)); driver older than 580 on a supported card -> stop and ask for an
-update (W36 (2)); the cuBLAS 12 phase keeps CUDA 13.0 when the load check passes and moves this
-PC to the CUDA 12.8 build, with the owner's notice, when it fails (W37 (3), W42 (4), W43).
+What the install is made for (design 22.6.2): an NVIDIA GPU 1.10 cannot use (old card, old
+driver, not reachable) -> the window with the reason first and no time limit (W37 (2), D-C); no
+NVIDIA card -> the window, CPU only after 20 s (R3); a second run -> the recorded accelerator;
+the cuBLAS 12 phase keeps CUDA 13.0 when the load check passes and moves this PC to the CUDA
+12.8 build, with the owner's notice, when it fails (W37 (3), W42 (4), W43).
 
 The template is loaded as in test_installer_torch_cache_438.py. Nothing is installed: input(),
 the installer commands and the fresh-process steps are stand-ins.
@@ -57,89 +58,141 @@ def _info(m, driver=(610, 47, 0), cc=(8, 6), name="NVIDIA GeForce RTX 3060"):
     return m.DriverInfo(driver, name, "nvidia-smi", cc)
 
 
-# --- E: old card -----------------------------------------------------------------------
+# --- E, F and the window (design 22.6.2; owner W234 D-C, R3): what the install is made for -----
+
+def _plan(m, info, adapters=(), recorded=None):
+    case, lines = m.nvidia_case(info, list(adapters))
+    return case, m.window_plan(case, lines, list(adapters), recorded)
+
 
 @pytest.mark.parametrize("cc", [(6, 1), (7, 0)])
-def test_old_card_shows_the_owners_warning_and_waits_for_a_valid_answer(m, monkeypatch, cc):
-    prompts = _answers(monkeypatch, "", "x", "3")  # junk is asked again, with no time limit
-    assert m.timed_input is not None
-    monkeypatch.setattr(m, "timed_input", lambda *a, **k: pytest.fail("the old-card question must not time out"))
-    gate, reason = m.gpu_support_gate(_info(m, cc=cc, name="NVIDIA GeForce GTX 1080"))
-    assert gate == "stop" and "answer 3" in reason
-    assert len(prompts) == 3
-    text = "\n".join(m._lines)
-    assert (f"Your graphics card, NVIDIA GeForce GTX 1080 (compute capability {cc[0]}.{cc[1]}), is older than "
-            "WhisperJAV 1.10 supports. 1.10 needs a GTX 16-series, RTX 20-series or newer card.") in text
-    assert ("Choose: 1 = my card is identified wrongly (show where to report it, then stop); "
-            "2 = install for the CPU only (much slower); 3 = stop.") in text
-    assert "WhisperJAV 1.9.5 still supports this card: https://github.com/meizhong986/WhisperJAV/releases/tag/v1.9.5." in text
-    assert m._stopped_on_purpose is True
+def test_old_card_shows_the_owners_lines_first_and_waits_without_a_time_limit(m, cc):
+    case, plan = _plan(m, _info(m, cc=cc, name="NVIDIA GeForce GTX 1080"))
+    assert case == "old_card"
+    assert plan["lines"][0] == (f"Your graphics card, NVIDIA GeForce GTX 1080 (compute capability {cc[0]}.{cc[1]}), "
+                                "is older than WhisperJAV 1.10 supports. 1.10 needs a GTX 16-series, RTX 20-series "
+                                "or newer card.")
+    assert plan["lines"][1] == ("WhisperJAV 1.9.5 still supports this card: "
+                                "https://github.com/meizhong986/WhisperJAV/releases/tag/v1.9.5.")
+    assert plan["timeout"] is None and plan["preselected"] == "stop" and plan["wrongly"] is True
 
 
-def test_old_card_answer_1_shows_where_to_report_then_stops(m, monkeypatch):
-    _answers(monkeypatch, "1")
-    gate, _ = m.gpu_support_gate(_info(m, cc=(6, 1)))
-    assert gate == "stop"
+def test_old_driver_gets_the_driver_line_first_and_waits(m):
+    case, plan = _plan(m, _info(m, driver=(566, 3, 0)))
+    assert case == "old_driver"
+    assert plan["lines"][0].startswith("Your NVIDIA driver (566.03) is older than WhisperJAV 1.10 needs (580 or newer).")
+    assert "Press Enter" not in plan["lines"][0]       # 22.13 detail 9: no "Press Enter" in a window
+    assert plan["timeout"] is None and plan["preselected"] == "stop" and not plan["wrongly"]
+
+
+def test_driver_579_99_is_old_and_580_is_supported(m):
+    assert m.nvidia_case(_info(m, driver=(579, 99, 0)), [])[0] == "old_driver"
+    assert m.nvidia_case(_info(m, driver=(580, 0, 0)), [])[0] == "supported"
+
+
+def test_old_card_is_found_before_the_driver(m):
+    assert m.nvidia_case(_info(m, driver=(470, 0, 0), cc=(6, 1)), [])[0] == "old_card"
+
+
+def test_card_7_5_and_unreadable_capability_are_supported_with_no_window(m):
+    for info in (_info(m, cc=(7, 5), name="NVIDIA GeForce GTX 1660"), _info(m, cc=None)):
+        case, plan = _plan(m, info)
+        assert case == "supported" and plan is None
+
+
+def test_no_nvidia_card_gets_the_window_with_cpu_only_after_20_seconds(m):
+    case, plan = _plan(m, m.DriverInfo(None, None, "none"), adapters=["AMD Radeon RX 6600"])
+    assert case == "none"
+    assert plan["title"] == "WhisperJAV — no supported NVIDIA GPU found"
+    assert plan["lines"][0] == ("WhisperJAV found no NVIDIA graphics card that version 1.10 supports (graphics "
+                                "found: AMD Radeon RX 6600). What should this install be made for?")
+    assert [label for _k, label in plan["choices"]] == [
+        "AMD graphics card", "Intel graphics card", "NVIDIA graphics card older than WhisperJAV 1.10 supports",
+        "I have my own PyTorch for my GPU (advanced)", "None, or use the CPU only"]
+    # the pre-selection is what the timeout installs (review finding 8 of W236 I2)
+    assert plan["preselected"] == "5" and plan["timeout"] == 20
+    assert plan["footer"] == "Without an answer, the CPU-only version is installed in 20 seconds."
+
+
+def test_an_nvidia_card_windows_lists_but_the_installer_cannot_reach(m):
+    case, plan = _plan(m, m.DriverInfo(None, None, "none"), adapters=["NVIDIA GeForce RTX 4060 Laptop GPU", "Intel UHD"])
+    assert case == "not_reachable"
+    assert plan["lines"][0].startswith("Windows lists an NVIDIA graphics card (NVIDIA GeForce RTX 4060 Laptop GPU), "
+                                       "but WhisperJAV cannot reach it")
+    assert "the NVIDIA chip may be switched off" in plan["lines"][0]       # the Optimus case (#200)
+    assert plan["timeout"] is None and plan["preselected"] == "stop"
+
+
+@pytest.mark.parametrize("recorded,adapters,key", [
+    ("vulkan", ["Intel Arc A770"], "2"), ("vulkan", ["AMD Radeon"], "1"), ("own-pytorch", [], "4"),
+    ("cpu", [], "5"),
+])
+def test_a_second_run_keeps_the_recorded_accelerator_by_default(m, recorded, adapters, key):
+    case, plan = _plan(m, m.DriverInfo(None, None, "none"), adapters, recorded)
+    assert plan["title"] == "WhisperJAV — this install's accelerator"
+    assert plan["preselected"] == key and plan["timeout"] == 20
+    assert m.accelerator_for_answer(plan["preselected"], vulkan_present=True, plan=plan) == recorded
+
+
+def test_a_second_run_with_a_supported_nvidia_gpu_offers_it_and_keeps_it(m):
+    case, plan = _plan(m, _info(m, driver=(580, 0, 0)), recorded="cu130")
+    assert plan["choices"][0] == ("nvidia", "NVIDIA GPU (CUDA)") and plan["preselected"] == "nvidia"
+    assert m.accelerator_for_answer("nvidia", True, plan) == "cu130"
+    case, plan = _plan(m, _info(m, driver=(580, 0, 0)), recorded="own-pytorch")
+    assert plan["preselected"] == "4"   # an Own PyTorch install is not switched to CUDA (review finding 2)
+
+
+@pytest.mark.parametrize("answer,vulkan,expected", [
+    ("1", True, "vulkan"), ("2", True, "vulkan"), ("3", True, "vulkan"), ("1", False, "cpu"),
+    ("4", True, "own-pytorch"), ("5", True, "cpu"), ("stop", True, "stop"), ("wrongly", True, "wrongly"),
+])
+def test_answers_give_the_accelerator(m, answer, vulkan, expected):
+    assert m.accelerator_for_answer(answer, vulkan) == expected
+    if answer == "1" and not vulkan:
+        assert any("Vulkan (vulkan-1.dll) was not found" in l for l in m._lines)
+
+
+def test_choosing_stop_or_identified_wrongly_is_a_stop_on_purpose(m, monkeypatch):
+    monkeypatch.setattr(m, "windows_display_adapters", lambda: [])
+    for answer in ("stop", "wrongly"):
+        m._stopped_on_purpose = False
+        monkeypatch.setattr(m, "ask_accelerator", lambda plan, a=answer: a)
+        accelerator, reason = m.choose_install_accelerator(_info(m, cc=(6, 1)))
+        assert accelerator == "stop" and m._stopped_on_purpose is True
     assert any("https://github.com/meizhong986/WhisperJAV/issues" in l and "report" in l for l in m._lines)
 
 
-def test_old_card_answer_2_installs_for_the_cpu_only(m, monkeypatch):
-    _answers(monkeypatch, "2")
-    gate, reason = m.gpu_support_gate(_info(m, cc=(6, 1)))
-    assert (gate, reason) == ("cpu", None)
-    assert m._stopped_on_purpose is False
+def test_a_supported_nvidia_gpu_on_a_first_install_asks_nothing(m, monkeypatch):
+    monkeypatch.setattr(m, "windows_display_adapters", lambda: ["NVIDIA GeForce RTX 3060"])
+    monkeypatch.setattr(m, "ask_accelerator", lambda plan: pytest.fail("no window for a supported NVIDIA GPU"))
+    assert m.choose_install_accelerator(_info(m, driver=(580, 0, 0))) == ("cu130", None)
+
+
+def test_no_window_means_the_console_form_with_the_same_default(m, monkeypatch):
+    monkeypatch.setattr(m, "_ask_in_window", lambda plan: (_ for _ in ()).throw(RuntimeError("no display")))
+    monkeypatch.setattr(m, "timed_input", lambda prompt, timeout, default: default)
+    case, plan = _plan(m, m.DriverInfo(None, None, "none"))
+    assert m.ask_accelerator(plan) == "5"
+    case, plan = _plan(m, _info(m, cc=(6, 1)))
+    _answers(monkeypatch, "x", "7")      # junk is asked again; no time limit
+    assert m.ask_accelerator(plan) == "wrongly"
+
+
+def test_cpu_and_vulkan_get_pytorchs_cpu_build_and_own_pytorch_none(m):
     plan = m.select_torch_install_plan(_info(m, cc=(6, 1)), force_cpu=True)
     assert plan.uses_gpu is False and plan.variant == "cpu"
     assert plan.pip_args[:2] == ["install", "--no-deps"]
     assert any(a.startswith("torch==2.11.0+cpu") for a in plan.pip_args)
     assert plan.pip_args[-2:] == ["--index-url", "https://download.pytorch.org/whl/cpu"]
-
-
-def test_old_card_with_no_console_stops(m, monkeypatch):
-    def no_console(prompt=""):
-        raise EOFError
-
-    monkeypatch.setattr("builtins.input", no_console)
-    gate, _ = m.gpu_support_gate(_info(m, cc=(6, 1)))
-    assert gate == "stop"
-
-
-def test_card_7_5_is_supported_and_asks_nothing(m, monkeypatch):
-    monkeypatch.setattr("builtins.input", lambda *a: pytest.fail("no question for a supported card"))
-    assert m.gpu_support_gate(_info(m, cc=(7, 5), name="NVIDIA GeForce GTX 1660")) == ("gpu", None)
-
-
-def test_unreadable_compute_capability_gives_no_warning(m, monkeypatch):
-    monkeypatch.setattr("builtins.input", lambda *a: pytest.fail("no question when the card cannot be read"))
-    assert m.gpu_support_gate(_info(m, cc=None)) == ("gpu", None)
-
-
-def test_no_nvidia_gpu_is_left_to_the_cpu_path(m, monkeypatch):
-    monkeypatch.setattr("builtins.input", lambda *a: pytest.fail("no question without an NVIDIA GPU"))
-    assert m.gpu_support_gate(m.DriverInfo(None, None, "none")) == ("gpu", None)
-
-
-# --- F: old driver ---------------------------------------------------------------------
-
-def test_driver_566_03_stops_with_the_owners_text_and_waits_for_enter(m, monkeypatch):
-    prompts = _answers(monkeypatch, "")
-    gate, reason = m.gpu_support_gate(_info(m, driver=(566, 3, 0)))
-    assert gate == "stop" and "566.03" in reason
-    assert len(prompts) == 1  # one Enter, no time limit
-    assert ("Your NVIDIA driver (566.03) is older than WhisperJAV 1.10 needs (580 or newer). Update it from "
-            "https://www.nvidia.com/Download/index.aspx, restart the PC, and run this installer again. "
-            "Nothing has been installed. Press Enter to close.") in "\n".join(m._lines)
-    assert m._stopped_on_purpose is True
-
-
-def test_driver_579_99_also_stops(m, monkeypatch):
-    _answers(monkeypatch, "")
-    assert m.gpu_support_gate(_info(m, driver=(579, 99, 0)))[0] == "stop"
+    vulkan, error = m.plan_pytorch(m.DriverInfo(None, None, "none"), accelerator="vulkan")
+    assert error is None and vulkan.variant == "vulkan"
+    assert any(a.startswith("torch==2.11.0+cpu") for a in vulkan.pip_args)
+    assert vulkan.pip_args[-2:] == ["--index-url", "https://download.pytorch.org/whl/cpu"]
+    assert m.plan_pytorch(accelerator="own-pytorch") == (None, None)
 
 
 def test_driver_580_gets_pytorch_2_11_0_for_cuda_13(m, monkeypatch):
     monkeypatch.setattr("builtins.input", lambda *a: pytest.fail("no question for driver 580"))
-    assert m.gpu_support_gate(_info(m, driver=(580, 0, 0))) == ("gpu", None)
     plan = m.select_torch_install_plan(_info(m, driver=(580, 0, 0)))
     assert plan.uses_gpu is True and plan.target_label == "CUDA 13.0"
     # v1.10.0 (item 2f): the PyTorch lines of the cu130 locked file, --no-deps; numpy
@@ -153,10 +206,23 @@ def test_driver_580_gets_pytorch_2_11_0_for_cuda_13(m, monkeypatch):
     assert "torch==2.11.0+cu130" in plan.pip_args and "torchaudio==2.11.0+cu130" in plan.pip_args
 
 
-def test_old_card_is_asked_before_the_driver(m, monkeypatch):
-    _answers(monkeypatch, "3")
-    gate, reason = m.gpu_support_gate(_info(m, driver=(470, 0, 0), cc=(6, 1)))
-    assert gate == "stop" and "compute capability 6.1" in reason
+def test_the_record_is_the_accelerator_chosen(m):
+    m.write_stack_file("vulkan")
+    assert Path(m.STACK_FILE).read_text(encoding="utf-8").strip() == "vulkan"
+    assert m.read_stack_file() == "vulkan"
+    source = TEMPLATE.read_text(encoding="utf-8")
+    phase = source[source.index("# === Phase 5.1"):source.index("# === Phase 5.5")]
+    assert "if not nvidia_install:\n        write_stack_file(accelerator)" in phase
+
+
+def test_own_pytorch_skips_pytorch_and_shows_the_command(m, tmp_path, monkeypatch):
+    source = TEMPLATE.read_text(encoding="utf-8")
+    assert "pytorch_error = install_pytorch(driver_info, plan=torch_plan) if torch_plan else None" in source
+    monkeypatch.setattr(m.sys, "prefix", str(tmp_path))
+    text = m.own_pytorch_next_step_text()
+    assert text.startswith("WhisperJAV is installed without PyTorch, as you chose.")
+    assert f'"{tmp_path}\\python.exe" -m pip install torch torchaudio --index-url' in text
+    assert "OWN_PYTORCH_NEXT_STEP.txt" in text and "WhisperJAV will never replace it." in text
 
 
 # --- D: the cuBLAS 12 phase ------------------------------------------------------------
@@ -326,9 +392,9 @@ def test_a_deliberate_stop_writes_the_stop_marker_not_the_failure_marker(m, monk
     text = marker.read_text(encoding="utf-8")
     assert "was not installed: the installer stopped" in text and "566.03" in text
     source = TEMPLATE.read_text(encoding="utf-8")
-    gate_block = source[source.index("gate, gate_reason = gpu_support_gate(driver_info)"):][:300]
-    assert "create_stopped_file(gate_reason)" in gate_block and "return 0" in gate_block
-    assert "create_failure_file(gate_reason)" not in gate_block
+    gate_block = source[source.index("accelerator, stop_reason = choose_install_accelerator(driver_info)"):][:300]
+    assert "create_stopped_file(stop_reason)" in gate_block and "return 0" in gate_block
+    assert "create_failure_file(stop_reason)" not in gate_block
 
 
 def test_nsis_shows_the_stop_dialog_before_the_failure_dialog():
