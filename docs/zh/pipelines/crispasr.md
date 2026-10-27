@@ -51,8 +51,8 @@ Parakeet-CrispASR asks CrispASR to use the NVIDIA GPU (CUDA) (CrispASR 0.8.44+cu
 | **默认语音分割器** | WhisperSeg | FireRedVAD |
 | **默认灵敏度** | Balanced | Balanced |
 | **VAD 组最长** | 6 秒，任何灵敏度下都一样 | 3 秒 |
-| **字幕在哪里断开** | 只在语音的自然停顿处断开（见下文） | 每个 VAD 组一条字幕 |
-| **字幕时间** | 来自模型对其输出文字给出的时间 | 语音分割器找到的语音起止位置 |
+| **字幕在哪里断开** | 只在语音的自然停顿处断开（见下文） | 只在句末断开（见下文） |
+| **字幕时间** | 来自模型对其输出文字给出的时间 | 来自对齐器 `wav2vec2-ja`，它为模型写出的文字标出时间 |
 | **音频分析报告** | 有 | 有 |
 
 **VAD 组**：语音分割器找到并一次性交给模型的一段语音，长度为几秒。
@@ -82,7 +82,7 @@ Parakeet-CrispASR 使用 Fidelity 处理管线的语音分割器设置，另加 
   GPU: asks for the NVIDIA GPU (CUDA)
   ```
 
-  也可能显示 "CPU (not accelerated), several times slower: <原因>" 或 "CrispASR cannot run here: <原因>"。
+  也可能显示 "CPU (not accelerated), several times slower: <原因>" 或 "CrispASR cannot run here: <原因>"。对 Cohere-CrispASR，面板还会列出它的对齐器，例如 "Aligner: wav2vec2 large XLSR-53 ja (q4_k) — not downloaded yet (232 MB); downloaded the first time it is used"。
 
 ### 命令行
 
@@ -146,7 +146,7 @@ whisperjav --ensemble --pass1-pipeline parakeet-crispasr --dump-params settings.
 
 - `--device auto`（默认值，GUI 也使用它）：使用安装中 CrispASR 版本能用的 GPU（见[它们在哪里运行](#where-they-run)），否则使用 CPU。日志会说明用的是哪一个以及原因。
 - `--device cuda`：需要 CUDA 版和它能用的 NVIDIA GPU；否则运行会在读取任何音频之前停止。
-- `--device cpu`：始终使用 CPU。在 GUI 中，"Run on the CPU this time" 对一次运行起同样作用。
+- `--device cpu`：ASR 模型始终使用 CPU。在 GUI 中，"Run on the CPU this time" 对一次运行起同样作用。Cohere-CrispASR 的对齐器不能被限制在 CPU 上：在 CrispASR 的版本会使用 GPU 的地方，它仍会请求使用 GPU，运行开始时的提示框会说明这一点。
 
 `--device` 决定一次运行中所有处理管线的设备，包括语音增强器。
 
@@ -158,7 +158,7 @@ whisperjav --ensemble --pass1-pipeline parakeet-crispasr --dump-params settings.
 
 ---
 
-## 字幕是怎样生成的
+## 字幕是怎样生成的 {#how-the-subtitles-are-made}
 
 对每个视频，两个处理管线都会：
 
@@ -179,7 +179,9 @@ whisperjav --ensemble --pass1-pipeline parakeet-crispasr --dump-params settings.
 
 它从不按字数或时长切分，因此没有上述停顿的语音会保持为一条字幕，最长与其 VAD 组相同（约 6 秒）。每条字幕从第一个词开始处开始，到最后一个说出的词结束处结束，时间取自模型给出的时间。
 
-**Cohere-CrispASR：每个 VAD 组一条字幕。** 每个 VAD 组的文字成为一条字幕，时间从语音分割器找到的语音开始处到结束处（默认前后各有 0.1 秒填充）。VAD 组最长 3 秒；一段语音连续不断时，约为 4.2 秒。文字不再进一步切分。
+**Cohere-CrispASR：字幕在句末断开。** Cohere 写出一个 VAD 组的文字之后，对齐器 `wav2vec2-ja`（由 CrispASR 运行）找出这段文字中每个字在什么时候说出。在一个 VAD 组内，只有在文字的句末标点（。 ？ ！ … ? !）之后才开始新的一条字幕；像 3.5 这样的数字不会被切开。每条字幕从它第一个说出的字开始，在下一条开始处结束；最后一条在 VAD 组结束处结束。这里停顿不会切分：对齐器给出的是每个字开始的时刻，而不是声音结束的地方，拖长的声音看起来会像停顿。VAD 组最长 3 秒；一段语音连续不断时，约为 4.2 秒。
+
+如果对齐器对某个 VAD 组没有给出时间，这个组保持为一条字幕，时间从语音分割器找到的语音开始处到结束处，运行汇总会统计这样的组。如果对齐器完全无法加载（例如第一次运行时没有网络），所有组都这样生成，运行汇总会说明；两种情况下文字都会保留。1.10.0 新增；尚未与参考字幕对比测量。
 
 **音频分析报告。** 与 Qwen3-ASR 处理管线一样，两个处理管线都会为每个视频输出一份简短报告：哪些部分可能漏掉语音、哪些部分声学条件较差，并附上时间，方便你检查这些位置。报告需要 Semantic 场景检测器；使用其他场景检测器时，日志会用一行说明，不生成报告。
 
@@ -195,6 +197,9 @@ whisperjav --ensemble --pass1-pipeline parakeet-crispasr --dump-params settings.
 | `parakeet-tdt-0.6b-ja` | `cstr/parakeet-tdt-0.6b-ja-GGUF` | `parakeet-tdt-0.6b-ja-q8_0.gguf` |
 | `cohere-asr-ja-v0.1` | `TransWithAI/cohere-transcribe-ja-v0.1-GGUF` | `cohere-asr-ja-v0.1-q8_0.gguf` |
 | `cohere-asr-ja` | `CKHO/cohere-asr-ja-GGUF` | `cohere-asr-ja-q8_0.gguf` |
+| 对齐器 `wav2vec2-ja`（Cohere-CrispASR；也是 ChronosJAV 的默认对齐器） | `cstr/wav2vec2-large-xlsr-53-japanese-GGUF` | `wav2vec2-large-xlsr-53-japanese-q4_k.gguf` |
+
+Cohere-CrispASR 的对齐器（232 MB）在该 Pass 第一次使用时下载，下载发生在 Pass 内部，而不是运行开始之前。如果下载失败，该 Pass 会在没有对齐器的情况下继续：每个 VAD 组成为一条字幕，时间为该组的起止位置（见[字幕是怎样生成的](#how-the-subtitles-are-made)）。ChronosJAV 的其他对齐器和时间模型会在 `whisperjav --check` 中列出，也见 [ChronosJAV 页面](chronosjav.md#subtitle-timing-1100)。
 
 - 文件保存在你的 Hugging Face 缓存文件夹中（Windows 默认 `C:\Users\<你的用户名>\.cache\huggingface\`，macOS 和 Linux 默认 `~/.cache/huggingface/`），之后的运行会直接使用。
 - 首次使用前，WhisperJAV 会核对文件是否为它所需的版本。下载损坏的文件会被删除并重新下载一次。
@@ -215,6 +220,10 @@ whisperjav --ensemble --pass1-pipeline parakeet-crispasr --dump-params settings.
 ✓ CrispASR model parakeet-tdt-0.6b-ja: Parakeet TDT 0.6B ja (q8_0), for parakeet-crispasr: downloaded
 ✓ CrispASR model cohere-asr-ja-v0.1: Cohere Transcribe ja v0.1 (q8_0), for cohere-crispasr: downloaded
 ✓ CrispASR model cohere-asr-ja: Cohere ASR ja (q8_0), for cohere-crispasr: downloaded
+✓ CrispASR model wav2vec2-ja: wav2vec2 large XLSR-53 ja (q4_k), for ChronosJAV and Cohere-CrispASR (aligner): downloaded
+✓ CrispASR model parakeet-ctc-ja: Parakeet CTC 1.1B ja (q8_0), for ChronosJAV (aligner): downloaded
+✓ CrispASR model qwen3-fa-gguf: Qwen3-ForcedAligner 0.6B (q4_k), for ChronosJAV (aligner): downloaded
+✓ CrispASR model whisper-small: Whisper small, for ChronosJAV (timing model): downloaded
 ```
 
 尚未下载的模型会显示 "not downloaded" 及其大小，第一次需要它的运行会下载它。
