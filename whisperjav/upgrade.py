@@ -634,7 +634,7 @@ def unsupported_source_build_message(source_root: Path, cuda_version: str) -> st
     if not _acc.installs_pytorch(cuda_version):
         return ""  # Own PyTorch: the user's PyTorch, not the lock's
     if not lock_has_pytorch_for_this_pc(source_root, cuda_version):
-        label = {"cu130": "CUDA 13.0", "cu128": "CUDA 12.8"}.get(cuda_version, "CPU")
+        label = _acc.pytorch_build_label(cuda_version)
         return (f"PyTorch has no {label} build for this computer ({sys.platform}, {platform.machine()}) "
                 f"in WhisperJAV {__version__}, so it cannot be upgraded here. Nothing was changed.")
     return ""
