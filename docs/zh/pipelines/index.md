@@ -15,7 +15,7 @@ WhisperJAV 提供多种处理管线，在速度和准确度之间各有取舍。
 | **Transformers** | HuggingFace | 有 | 有 | 中等 | 良好 | ~4 GB |
 | **Qwen3-ASR** | Qwen3 | Assembly | Assembly | 中等 | 文本质量优秀 | ~4-8 GB |
 | **ChronosJAV** | anime-whisper / Kotoba | TEN VAD | TEN VAD | 中等 | 动漫/JAV 最佳 | ~4-8 GB |
-| **CrispASR** | 外部（Parakeet / whisper.cpp / Cohere） | 内置 | 内置 | 视情况 | 因后端而异 | 取决于引擎 |
+| **Parakeet-CrispASR / Cohere-CrispASR**（GGUF，仅集成模式） | CrispASR（Parakeet / Cohere 模型） | 是（默认 Semantic） | 是（WhisperSeg / FireRedVAD） | 未测量 | 未测量 | 未测量 |
 
 ---
 
@@ -27,7 +27,7 @@ WhisperJAV 提供多种处理管线，在速度和准确度之间各有取舍。
 | 需要快速处理大量文件 | **Faster** |
 | 动漫或 JAV 内容 | **ChronosJAV** 搭配 anime-whisper |
 | 追求最高准确度，不介意等待 | **集成模式**：Balanced + Qwen3-ASR 配合 Smart Merge |
-| 无 GPU / 仅 CPU | **Faster** 并启用仅 CPU 模式 |
+| 无 GPU（仅 CPU 安装） | **Faster** |
 | Apple Silicon Mac | **Transformers**（MPS 加速） |
 
 ---
@@ -40,4 +40,4 @@ WhisperJAV 提供多种处理管线，在速度和准确度之间各有取舍。
 
 - [ChronosJAV](chronosjav.md) — 使用 anime-whisper 和 Kotoba 模型，专为动漫/JAV 内容优化
 - [Qwen3-ASR](qwen3-asr.md) — 替代语音识别引擎，日语文本质量出色
-- [CrispASR](crispasr.md) — 外部 Parakeet / whisper.cpp / Cohere 引擎（自包含；需自行提供可执行文件）
+- [Parakeet-CrispASR 与 Cohere-CrispASR](crispasr.md) — 通过随 WhisperJAV 安装的 CrispASR 运行的 GGUF 模型；集成模式、日语、实验性
