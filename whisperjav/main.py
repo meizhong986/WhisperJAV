@@ -435,12 +435,11 @@ def parse_arguments():
     twopass_group.add_argument("--pass1-enhance-for-vad", action="store_true", default=False,
                                help="Dual-track mode for pass 1: the cleaned-up audio drives speech "
                                     "detection, the original audio goes to the recogniser. Available "
-                                    "with qwen and fidelity. NOT accepted when --pass1-pipeline is "
-                                    "balanced: balanced finds the speech inside faster-whisper itself, "
-                                    "on the same audio it transcribes, so there is nothing to split. "
-                                    "fast, faster, transformers, parakeet-crispasr and cohere-crispasr "
-                                    "ignore it: fast, faster and transformers run no separate speech "
-                                    "segmenter to feed, and the CrispASR pipelines run no audio clean-up.")
+                                    "with qwen, fidelity, parakeet-crispasr and cohere-crispasr. NOT "
+                                    "accepted when --pass1-pipeline is balanced: balanced finds the "
+                                    "speech inside faster-whisper itself, on the same audio it "
+                                    "transcribes, so there is nothing to split. fast, faster and "
+                                    "transformers ignore it: they run no separate speech segmenter to feed.")
     twopass_group.add_argument("--pass1-model", default=None,
                                help="Model name for pass 1 (e.g., large-v2, kotoba-whisper-v2.0). "
                                     "The CrispASR pipelines take a model short name: "
@@ -494,12 +493,11 @@ def parse_arguments():
     twopass_group.add_argument("--pass2-enhance-for-vad", action="store_true", default=False,
                                help="Dual-track mode for pass 2: the cleaned-up audio drives speech "
                                     "detection, the original audio goes to the recogniser. Available "
-                                    "with qwen and fidelity. NOT accepted when --pass2-pipeline is "
-                                    "balanced: balanced finds the speech inside faster-whisper itself, "
-                                    "on the same audio it transcribes, so there is nothing to split. "
-                                    "fast, faster, transformers, parakeet-crispasr and cohere-crispasr "
-                                    "ignore it: fast, faster and transformers run no separate speech "
-                                    "segmenter to feed, and the CrispASR pipelines run no audio clean-up.")
+                                    "with qwen, fidelity, parakeet-crispasr and cohere-crispasr. NOT "
+                                    "accepted when --pass2-pipeline is balanced: balanced finds the "
+                                    "speech inside faster-whisper itself, on the same audio it "
+                                    "transcribes, so there is nothing to split. fast, faster and "
+                                    "transformers ignore it: they run no separate speech segmenter to feed.")
     twopass_group.add_argument("--pass2-model", default=None,
                                help="Model name for pass 2 (e.g., large-v2, kotoba-whisper-v2.0). "
                                     "The CrispASR pipelines take a model short name: "
@@ -943,10 +941,10 @@ def parse_arguments():
     qwen_audio_group.add_argument("--enhance-for-vad", action="store_true", default=False,
                            help="Dual-track mode: the cleaned-up audio is used to find the speech "
                                 "and the original audio goes to the recogniser. Applies to the "
-                                "qwen, fidelity and decoupled pipelines. NOT accepted with "
-                                "balanced, which finds the speech inside faster-whisper itself, on "
-                                "the same audio it transcribes. Accepted but ignored by fast, "
-                                "faster, transformers, parakeet-crispasr and cohere-crispasr.")
+                                "qwen, fidelity, decoupled, parakeet-crispasr and cohere-crispasr "
+                                "pipelines. NOT accepted with balanced, which finds the speech "
+                                "inside faster-whisper itself, on the same audio it transcribes. "
+                                "Accepted but ignored by fast, faster and transformers.")
     qwen_audio_group.add_argument("--qwen-segmenter", type=str, default="whisperseg",
                            choices=["none", "silero", "silero-v4.0", "silero-v3.1", "silero-v6.2",
                                     "nemo", "nemo-lite", "whisper-vad", "ten", "whisperseg",
@@ -3223,9 +3221,11 @@ def main():
                         _p["pipeline"], _segmenter, _sensitivity, vad_threshold=_p.get("vad_threshold"),
                         speech_pad_ms=_p.get("speech_pad_ms")).as_dict(),
                     "device": _p.get("device"),
-                    "scene_detector": "semantic",
-                    "not_used": ["scene_detector", "speech_enhancer", "enhance_for_vad",
-                                 "params", "hf_params", "qwen_params", "compute_type"],
+                    # design 22.9.1 (T17): the scene detector and speech enhancer the pass runs with.
+                    "scene_detector": _p.get("scene_detector") or "semantic",
+                    "speech_enhancer": _p.get("speech_enhancer") or "none",
+                    "enhance_for_vad": bool(_p.get("enhance_for_vad")),
+                    "not_used": ["hf_params", "qwen_params", "compute_type"],
                 }
             dump_data["ensemble_config"] = ensemble_dump
         try:
