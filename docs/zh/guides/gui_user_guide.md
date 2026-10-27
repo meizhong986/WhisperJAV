@@ -192,7 +192,7 @@ WhisperJAV 接受 FFmpeg 支持的任何格式的视频和音频文件（MP4、M
 - **HuggingFace**：Transformers
 - **ChronosJAV**：Qwen3-ASR、Anime-Whisper
 - **GGUF**：Parakeet-CrispASR、Cohere-CrispASR——日语，1.10.0 中为实验性（见 [Parakeet-CrispASR 与 Cohere-CrispASR](../pipelines/crispasr.md)）
-- **外部 (BYOP)**：XXL Faster Whisper（仅第二通道）
+- **外部 (BYOP)**：XXL Faster Whisper（第一通道、第二通道或两者）
 
 ### 自定义参数
 
@@ -226,20 +226,25 @@ Aligner Backend 选 **None** 时，无论另外两个控件显示什么，运行
 
 禁用时，该行变灰且所有控制项不可用。
 
-### BYOP：XXL Faster Whisper (v1.8.9+)
+### BYOP：XXL Faster Whisper (v1.8.9+；1.10.0 起也可用于第一通道)
 
-选择 **XXL Faster Whisper** 作为第二通道处理管线，以使用 [PurfView 的 Faster Whisper XXL](https://github.com/Purfview/whisper-standalone-win) 作为外部子进程。这是"自带处理管线"（BYOP）功能 — 你提供可执行文件，WhisperJAV 负责集成。
+选择 **XXL Faster Whisper** 作为第一通道、第二通道或两者的处理管线，以使用 [PurfView 的 Faster Whisper XXL](https://github.com/Purfview/whisper-standalone-win) 作为外部程序。这是"自带处理管线"（BYOP）功能 — 你提供可执行文件，WhisperJAV 负责集成。
 
 ![集成模式中 XXL Faster Whisper 作为第二通道](images/gui-tab3-ensemble-xxl.png){ loading=lazy }
 
+某一通道选择 XXL 后，该通道的 **Model**（模型）列用于选择 XXL 运行的 Whisper 模型，第二通道一行下方会出现一个设置面板：
+
 | 字段 | 描述 |
 |------|------|
-| **Executable** | `faster-whisper-xxl.exe` 的路径。点击 **Browse** 选择。 |
-| **Extra Args** | 传递给 XXL 的额外参数（例如 `--verbose True --standard_asia`）。 |
+| **Model**（通道行中） | Large V2（默认）、Large V3、Large V3 Turbo 或 Medium。XXL 在第一次使用某个模型时下载它。两个通道都选择 XXL 时，各自有自己的模型。 |
+| **Executable** | `faster-whisper-xxl.exe` 的路径。点击 **Browse** 选择。两个通道使用同一个程序。 |
+| **Extra Args** | 传递给 XXL 的额外参数（默认 `--verbose True --standard_asia`）。请在 Model 列中选择模型：这里的 `--model` 不会被使用，控制台会给出提示。 |
 
-WhisperJAV 仅向 XXL 发送 4 个必需参数（输入文件、输出目录、模型、语言）。其他一切由 Extra Args 字段控制。XXL 的实时控制台输出会流式传输到 GUI 控制台。
+XXL 通道的其他控制项（Sensitivity、Scene Detector、Speech Enhancer、Speech Segmenter、Customize）变灰：XXL 使用自己的设置。WhisperJAV 向 XXL 发送输入文件、输出目录、模型、语言和 SRT 输出格式（字幕要译成英文时还有 `--task translate`）；其他 XXL 参数请在 Extra Args 字段中添加。XXL 的实时控制台输出会流式传输到 GUI 控制台。
 
-如果 XXL 在关闭时崩溃（这是已知的 ctranslate2 行为），但 SRT 已经写入，WhisperJAV 会保留有效输出而不是丢弃它。
+1.10.0 之前，GUI 不向 XXL 发送模型，因此即使 Extra Args 里写了 `--model large-v2`，XXL 也运行 large-v3（#449）。
+
+如果 XXL 处理某个文件失败，控制台会说明是哪个通道失败以及原因。第一通道失败时，该文件标记为失败；第二通道失败时，如果第一通道生成了字幕，该文件保留第一通道的字幕。如果 XXL 在关闭时崩溃（这是已知的 ctranslate2 行为），但 SRT 已经写入，WhisperJAV 会保留有效输出而不是丢弃它。
 
 ### 语音增强：FFmpeg DSP
 
