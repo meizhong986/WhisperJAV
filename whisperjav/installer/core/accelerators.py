@@ -143,8 +143,8 @@ WINDOW_CHOICES = (
 )
 WINDOW_EXPLANATION = (
     "With an AMD, Intel or older NVIDIA card, the GGUF pipelines (Parakeet-CrispASR and Cohere-CrispASR) "
-    "use your graphics card through Vulkan. This is experimental in 1.10.0: it has not been tested, and "
-    "we would like to hear how it works for you. All other pipelines run on the CPU (not accelerated), "
+    "ask for your graphics card through Vulkan. This is experimental in 1.10.0: it has not been tested on "
+    "AMD or Intel graphics cards, and we would like to hear how it works for you. All other pipelines run on the CPU (not accelerated), "
     "several times slower than on a supported NVIDIA GPU. With your own PyTorch, WhisperJAV installs "
     "everything except PyTorch, and you add your PyTorch build afterwards (the command is shown at the "
     "end). With the CPU only, every pipeline runs on the CPU.")
