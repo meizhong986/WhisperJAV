@@ -480,6 +480,7 @@ def _map_to_legacy_structure(config: Dict[str, Any], pipeline_def: Dict[str, Any
         'sensitivity_name': config['sensitivity_name'],
         'workflow': workflow,
         'model': config['model'],
+        'run_device': config.get('run_device'),  # the speech enhancer follows it (resolver_v3)
         'params': {
             'decoder': filtered_decoder,
             'provider': filtered_provider,
