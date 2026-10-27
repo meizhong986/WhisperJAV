@@ -7,9 +7,11 @@ per-model table (ENGINE); everything else is here (route B design, sections 3-4)
 
   1. readiness, once per pass: CrispASR, the device (--device, W194 1), the model file (downloaded by
      WhisperJAV, SHA-256 checked, staged under a plain-ASCII name when needed);
-  2. a 16 kHz mono WAV of the film;
-  3. semantic scenes of 12-48 s, ChronosJAV's (W202 5d), and the audio analytics, as the qwen and
-     fidelity pipelines print them (W202 5b, W211 C2);
+  2. a mono WAV of the film (16 kHz; 48 kHz for a speech enhancer);
+  3. scenes: the pass's scene detector, semantic by default with ChronosJAV's 12-48 s (W202 5d,
+     W214 2), auditok and silero with their own minimum and 48 s (design 22.9.1); the audio analytics
+     with semantic only (W202 5b, W211 C2, T55); then the pass's speech enhancer, if any, as the qwen
+     pipeline runs it (one track, or enhanced audio for the speech segmenter only, W232 8);
   4. the speech segmenter, scene by scene, through ChronosJAV's VadGroupedFramer, with the settings of
      the pipeline the owner named (W199 DIR1, W202): fidelity's for Parakeet, the qwen pipeline's for
      Cohere (whisperjav/crispasr/pass_settings.py); it is released before the model runs;
@@ -24,6 +26,7 @@ per-model table (ENGINE); everything else is here (route B design, sections 3-4)
 Times are the engine's own (W93 c5, W116): Parakeet's token times; Cohere's VAD group edges.
 """
 
+import dataclasses
 import gc
 import json
 import shutil
@@ -31,7 +34,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from whisperjav.crispasr import install, lines
 from whisperjav.crispasr.engine import SAMPLE_RATE, BindingEngine, CrispSegment
@@ -71,9 +74,15 @@ class CrispASRPipeline(BasePipeline):
     LABEL = ""
     ENGINE: EngineRow = EngineRow("group", False)
 
-    # ChronosJAV's semantic scenes (qwen_pipeline.py, safe chunking; W202 5d).
+    # ChronosJAV's semantic scenes (qwen_pipeline.py, safe chunking; W202 5d). auditok and silero keep
+    # their own minimum, with the same maximum: a 12 s minimum makes them drop a stretch of speech
+    # shorter than 12 s between long silences (design 22.9.1; owner W232 14).
     SCENE_MIN_S = 12
     SCENE_MAX_S = 48
+    SCENE_DETECTOR = "semantic"  # the default (owner W214 2)
+    # T55 (design 22.10).
+    ANALYTICS_NEED_SEMANTIC = ("{label}: audio analytics need the semantic scene detector; this pass uses "
+                               "{method}, so they are not made.")
     MIN_GROUP_S = 0.1  # VadGroupedFramer drops shorter groups; nothing shorter is sent to CrispASR
 
     def __init__(self,
@@ -91,6 +100,12 @@ class CrispASRPipeline(BasePipeline):
                  vad_threshold: Optional[float] = None,
                  speech_pad_ms: Optional[int] = None,
                  cues: Optional[lines.CueSettings] = None,
+                 scene_detector: Optional[str] = None,
+                 speech_enhancer: Optional[str] = None,
+                 speech_enhancer_model: Optional[str] = None,
+                 enhance_for_vad: bool = False,
+                 scene_params: Optional[Dict[str, Any]] = None,
+                 segmenter_overrides: Optional[Dict[str, Any]] = None,
                  **kwargs):
         """
         Args:
@@ -104,6 +119,11 @@ class CrispASRPipeline(BasePipeline):
             vad_threshold, speech_pad_ms: --passN-vad-threshold and --passN-speech-pad-ms (W208), applied
                 as fidelity or the qwen pipeline applies them (pass_settings.segmenter_settings).
             cues: the pause values of the "tokens" line rule (W208); None means lines.DEFAULT_CUES.
+            scene_detector: auditok, silero, semantic or none; None means semantic (design 22.9.1, W214 2).
+            speech_enhancer, speech_enhancer_model: the pass's speech enhancer; None or "none" means none.
+            enhance_for_vad: the enhanced audio goes to the speech segmenter only, the original to
+                CrispASR (W232 8), as the qwen pipeline's dual track.
+            scene_params, segmenter_overrides: the pass's Customize values (Scene and Segmenter tabs).
             **kwargs: pass settings this pipeline does not use arrive here and are not used.
         """
         super().__init__(output_dir=output_dir, temp_dir=temp_dir, keep_temp_files=keep_temp_files,
@@ -124,7 +144,20 @@ class CrispASRPipeline(BasePipeline):
         self.segmenter: SegmenterSettings = segmenter_settings(self.PIPELINE_NAME, speech_segmenter, sensitivity,
                                                                vad_threshold=vad_threshold,
                                                                speech_pad_ms=speech_pad_ms)
+        if segmenter_overrides:
+            # The Customize Segmenter tab, on top of the resolved settings (as the qwen branch does).
+            overrides = dict(segmenter_overrides)
+            self.segmenter = dataclasses.replace(
+                self.segmenter,
+                max_group_duration_s=overrides.pop("max_group_duration_s", self.segmenter.max_group_duration_s),
+                chunk_threshold_s=overrides.pop("chunk_threshold_s", self.segmenter.chunk_threshold_s),
+                config={**self.segmenter.config, **overrides})
         self.speech_segmenter = self.segmenter.backend
+        self.scene_detector = str(scene_detector or self.SCENE_DETECTOR).strip().lower()
+        self.scene_params: Dict[str, Any] = dict(scene_params or {})
+        self.enhancer_backend = str(speech_enhancer or "none").strip().lower()
+        self.enhancer_model = speech_enhancer_model
+        self.enhance_for_vad = bool(enhance_for_vad)
         self.sensitivity = self.segmenter.sensitivity
         self.device = device
         self.cues: lines.CueSettings = cues or lines.DEFAULT_CUES
@@ -174,10 +207,13 @@ class CrispASRPipeline(BasePipeline):
 
         self.progress.set_current_step("Detecting scenes", 3, 6)
         scenes = self._detect_scenes(wav, basename, md)
-        md["stages"]["scene_detection"] = {"scenes": len(scenes)}
+        md["stages"]["scene_detection"] = {"scenes": len(scenes), "method": self.scene_detector}
+        # The pass's speech enhancer (design 22.9.1): the scenes CrispASR reads, and the scenes the
+        # speech segmenter reads (the enhanced ones with --passN-enhance-for-vad).
+        scenes, vad_scenes = self._enhance(scenes, md)
 
         self.progress.set_current_step("Finding speech", 4, 6)
-        groups, failed_scenes = self._speech_groups(scenes)
+        groups, failed_scenes = self._speech_groups(vad_scenes)
         if failed_scenes:
             self.notes.append(f"{self.LABEL}: the speech segmenter failed on {failed_scenes} scene(s); "
                               f"their speech was not transcribed.")
@@ -193,6 +229,10 @@ class CrispASRPipeline(BasePipeline):
             results = self._transcribe(scenes, groups, md)
         else:
             logger.info(f"{self.LABEL}: no speech was found in {basename}")
+        if self.enhancer_backend not in ("", "none") and self.asr is not None and self.asr.is_open:
+            # With a speech enhancer the model is opened for each file's ASR step and closed after it,
+            # so the enhancer and the CrispASR model never hold GPU memory together (W217 19).
+            self.asr.close()
 
         self.progress.set_current_step("Building subtitles", 6, 6)
         stitched, count_raw = self._build_subtitles(scenes, results, basename, md)
@@ -300,29 +340,44 @@ class CrispASRPipeline(BasePipeline):
         from whisperjav.modules.audio_integrity import apply_to_run as apply_audio_integrity
 
         if self.audio_extractor is None:
-            self.audio_extractor = AudioExtractor(sample_rate=SAMPLE_RATE)
+            # 16 kHz, or 48 kHz for a speech enhancer (it resamples its output to 16 kHz).
+            from whisperjav.modules.speech_enhancement import get_extraction_sample_rate
+            self.audio_extractor = AudioExtractor(sample_rate=get_extraction_sample_rate(self.enhancer_backend))
         wav, duration = self.audio_extractor.extract(input_file, self.temp_dir / f"{basename}_extracted.wav")
         apply_audio_integrity(self.audio_extractor.last_integrity, self.degradations,
                               in_summary=self.audio_integrity_in_summary)
         return Path(wav), float(duration)
 
+    def scene_detector_kwargs(self) -> Dict[str, Any]:
+        """The scene detector's settings for this pass (design 22.9.1): semantic with ChronosJAV's
+        12-48 s; auditok and silero with their own minimum and 48 s; none, one scene per file. The
+        Customize Scene tab's values on top."""
+        kwargs: Dict[str, Any] = {"method": self.scene_detector}
+        if self.scene_detector == "semantic":
+            kwargs.update(min_duration=self.SCENE_MIN_S, max_duration=self.SCENE_MAX_S)
+        elif self.scene_detector in ("auditok", "silero"):
+            kwargs.update(max_duration=self.SCENE_MAX_S)
+        kwargs.update(self.scene_params)
+        return kwargs
+
     def _detect_scenes(self, wav: Path, basename: str, md: Dict) -> List[_Scene]:
-        """Semantic scenes with safe chunking, 12-48 s, as ChronosJAV makes them (qwen_pipeline.py)."""
+        """The pass's scenes (scene_detector_kwargs); the audio analytics with semantic scenes."""
         from whisperjav.modules.scene_detection_backends import SceneDetectorFactory
 
         scenes_dir = self.temp_dir / "scenes"
         scenes_dir.mkdir(parents=True, exist_ok=True)
-        detector = SceneDetectorFactory.safe_create_from_legacy_kwargs(method="semantic",
-                                                                       min_duration=self.SCENE_MIN_S,
-                                                                       max_duration=self.SCENE_MAX_S)
+        detector = SceneDetectorFactory.safe_create_from_legacy_kwargs(**self.scene_detector_kwargs())
         try:
             result = detector.detect_scenes(Path(wav), scenes_dir, basename)
             tuples = result.to_legacy_tuples()
-            method = getattr(result, "method", "semantic")
+            method = getattr(result, "method", self.scene_detector)
         finally:
             detector.cleanup()
         scenes = [_Scene(i, Path(p), float(s), float(e)) for i, (p, s, e, _d) in enumerate(tuples)]
-        if self.ENGINE.audio_analytics:
+        if self.ENGINE.audio_analytics and self.scene_detector != "semantic":
+            # The analytics need the semantic detector's scenes (design 21.4): one line per file (T55).
+            logger.info(self.ANALYTICS_NEED_SEMANTIC.format(label=self.LABEL, method=self.scene_detector))
+        elif self.ENGINE.audio_analytics:
             # As the qwen pipeline: which scenes look acoustically difficult. Prints only; never raises.
             from whisperjav.modules.analytics import report as report_audio_analytics
 
@@ -331,6 +386,40 @@ class CrispASRPipeline(BasePipeline):
             if analytics is not None:
                 md.setdefault("audio_analytics", analytics.to_dict())
         return scenes
+
+    def _enhance(self, scenes: List[_Scene], md: Dict) -> Tuple[List[_Scene], List[_Scene]]:
+        """The pass's speech enhancer, as the qwen pipeline runs it (qwen_pipeline.py, phase 3):
+        (the scenes CrispASR reads, the scenes the speech segmenter reads), both at 16 kHz.
+
+        One track: the enhanced scenes for both. --passN-enhance-for-vad: the enhanced scenes for the
+        speech segmenter, the original scenes resampled to 16 kHz for CrispASR. The enhancer is
+        released before the speech segmenter and the CrispASR model run (W217 19).
+        """
+        from whisperjav.modules.speech_enhancement import (create_enhancer_direct, enhance_scenes,
+                                                           is_passthrough_backend, resample_scenes)
+
+        if is_passthrough_backend(self.enhancer_backend):
+            if self.enhance_for_vad:
+                logger.warning(f"{self.LABEL}: --enhance-for-vad does nothing without a speech enhancer.")
+            return scenes, scenes
+        started = time.time()
+        tuples = [(sc.path, sc.start, sc.end, sc.end - sc.start) for sc in scenes]
+        enhancer = create_enhancer_direct(backend=self.enhancer_backend, model=self.enhancer_model)
+        try:
+            enhanced = enhance_scenes(tuples, enhancer, self.temp_dir, degradations=self.degradations)
+        finally:
+            enhancer.cleanup()
+            del enhancer
+            from whisperjav.utils.gpu_utils import safe_cuda_cleanup
+            safe_cuda_cleanup()
+        enhanced_scenes = [_Scene(sc.index, Path(t[0]), sc.start, sc.end) for sc, t in zip(scenes, enhanced)]
+        asr_scenes = enhanced_scenes
+        if self.enhance_for_vad:
+            originals = resample_scenes(tuples, self.temp_dir)
+            asr_scenes = [_Scene(sc.index, Path(t[0]), sc.start, sc.end) for sc, t in zip(scenes, originals)]
+        md["stages"]["enhancement"] = {"backend": self.enhancer_backend, "dual_track": self.enhance_for_vad,
+                                       "time_sec": round(time.time() - started, 2)}
+        return asr_scenes, enhanced_scenes
 
     @staticmethod
     def _read_scene(path: Path):
