@@ -1130,8 +1130,10 @@ const ProcessManager = {
                         } else if (status.exit_code === 2 || status.exit_code === 4) {
                             // T68: an argument error (2) or PyTorch missing (4): nothing was processed.
                             ProgressManager.setStatus(`The run did not start (exit status ${status.exit_code})`);
+                            // The probe's reason already ends with "Nothing was processed." (P7 finding 7).
+                            const reason = (status.reason || '').replace(/\s*Nothing was processed\.\s*$/, '');
                             RunStopDialog.show('The run did not start',
-                                `${status.reason || ''} Nothing was processed.`.trim(), false);
+                                `${reason} Nothing was processed.`.trim(), false);
                         } else {
                             // T68x: a crash, possibly after some files were written -- not "did not start".
                             ProgressManager.setStatus(`Ended without a run summary (exit status ${status.exit_code})`);
