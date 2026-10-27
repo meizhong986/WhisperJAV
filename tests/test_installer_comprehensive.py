@@ -793,9 +793,10 @@ class TestGeneratedRequirements:
     """Tests for the locked requirements files the installer ships (item 2f)."""
 
     def test_requirements_file_exists(self):
-        """One locked file per PyTorch build."""
+        """One locked file per lock extra (design 22.2.4)."""
         names = sorted(f.name for f in _locked_requirement_files())
-        assert names == ["requirements_cpu.txt", "requirements_cu128.txt", "requirements_cu130.txt"], names
+        assert names == ["requirements_cpu.txt", "requirements_cu128.txt", "requirements_cu130.txt",
+                         "requirements_vulkan.txt"], names
 
     def test_requirements_contains_all_pyproject_packages(self):
         """
