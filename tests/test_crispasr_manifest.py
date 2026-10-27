@@ -95,3 +95,43 @@ class TestModelFor:
     def test_a_model_of_another_pipeline_is_refused(self):
         with pytest.raises(ValueError, match="is not a model of parakeet-crispasr"):
             model_for("parakeet-crispasr", "cohere-asr-ja")
+
+
+class TestAlignerModels:
+    """ChronosJAV's CrispASR aligners (item 12 C1; design note 2026-10-28, section 4.3; W248 2, W255)."""
+
+    def test_every_aligner_file_is_pinned(self):
+        assert set(manifest.ALIGNER_MODELS) == {"wav2vec2-ja", "parakeet-ctc-ja", "qwen3-fa-gguf"}
+        for name, m in manifest.ALIGNER_MODELS.items():
+            assert m.name == name
+            assert HEX40.fullmatch(m.revision), m
+            assert HEX64.fullmatch(m.sha256), m
+            assert m.size > 0 and m.filename.endswith(".gguf"), m
+            assert re.fullmatch(r"[\w.-]+/[\w.-]+", m.repo_id), m
+            assert m.label and m.backend and m.licence, m
+
+    def test_the_file_names_pick_the_aligner_family_crispasr_reads_from_them(self):
+        # crispasr/_binding.py align_words: "forced-aligner" -> Qwen3-ForcedAligner, "wav2vec2" -> CTC with the
+        # model's vocabulary, anything else -> canary-ctc.
+        names = {n: m.filename for n, m in manifest.ALIGNER_MODELS.items()}
+        assert "wav2vec2" in names["wav2vec2-ja"]
+        assert "forced-aligner" in names["qwen3-fa-gguf"]
+        assert not any(w in names["parakeet-ctc-ja"] for w in ("wav2vec2", "forced-aligner", "qwen3-fa"))
+
+    def test_the_default_is_wav2vec2_ja(self):
+        assert manifest.DEFAULT_ALIGNER == "wav2vec2-ja"
+        assert manifest.aligner_model_for(None) is manifest.ALIGNER_MODELS["wav2vec2-ja"]
+        assert manifest.aligner_model_for("") is manifest.ALIGNER_MODELS["wav2vec2-ja"]
+
+    def test_an_unknown_aligner_is_refused_with_the_choices(self):
+        with pytest.raises(ValueError) as caught:
+            manifest.aligner_model_for("canary-ctc-aligner")
+        assert str(caught.value) == ("'canary-ctc-aligner' is not a CrispASR aligner; choose one of: "
+                                     "wav2vec2-ja, parakeet-ctc-ja, qwen3-fa-gguf")
+
+    def test_only_the_parakeet_aligner_carries_a_warning(self):
+        assert set(manifest.ALIGNER_WARNINGS) == {"parakeet-ctc-ja"}
+        assert set(manifest.ALIGNER_WARNINGS) <= set(manifest.ALIGNER_MODELS)
+
+    def test_the_aligners_are_not_pipeline_models(self):
+        assert not set(manifest.ALIGNER_MODELS) & set(MODELS)
