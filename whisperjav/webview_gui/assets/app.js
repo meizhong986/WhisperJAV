@@ -286,13 +286,14 @@ const QwenManager = {
         repetition_penalty: 1.1,
         max_tokens_per_audio_second: 20.0,
         // Alignment
-        // v1.9.0: vad_only is the default — the ForcedAligner is not loaded.
-        // aligner_backend/aligner_id only apply when an aligner mode is chosen.
-        aligner_backend: 'qwen3',
-        aligner_id: 'Qwen/Qwen3-ForcedAligner-0.6B',
+        // 1.10.0 (item 12): the CrispASR aligner (wav2vec2-ja) and the Whisper small
+        // timing model are the default for every ChronosJAV model; vad_only loads no aligner.
+        aligner_backend: 'crispasr',
+        aligner_id: 'wav2vec2-ja',
+        timing_model: 'whisper-small',
         assembly_cleaner: 'qwen3',
-        timestamp_mode: 'vad_only',
-        stepdown: true,
+        timestamp_mode: 'aligner_vad_fallback',
+        stepdown: false,  // 1.10.0 (owner W266 1): a collapsed scene takes its VAD groups' times
         stepdown_initial_group: 6.0,
         stepdown_fallback_group: 6.0,
         // Output
@@ -1759,8 +1760,10 @@ const EnsembleManager = {
     },
 
     // The CrispASR status panel under a pass row (owner W133 2; route B design 12, T16): the model,
-    // downloaded or not, and where CrispASR runs, or why it cannot run here. Shown only for a pass
-    // that runs a CrispASR pipeline; filled from api.get_crispasr_status, which never downloads.
+    // downloaded or not, and where CrispASR runs, or why it cannot run here. Shown for a pass that
+    // runs a CrispASR pipeline, and since 1.10.0 (item 12) for a ChronosJAV pass, whose aligner and
+    // timing model run in CrispASR; filled from api.get_crispasr_status /
+    // get_chronosjav_crispasr_status, which never download.
     async updateCrispasrStatus(passKey) {
         const passState = this.state[passKey];
         // The CJK folder-name note (owner W203 O14, T24) on the Pipeline dropdown itself while a GGUF
@@ -1770,17 +1773,33 @@ const EnsembleManager = {
         const panel = document.getElementById(`${passKey}-crispasr-status`);
         if (!panel) return;
         const enabled = passKey === 'pass1' || this.state.pass2.enabled;
-        if (!passState.isCrispasr || !enabled) {
+        if (!(passState.isCrispasr || passState.isQwen) || !enabled) {
             panel.style.display = 'none';
             return;
         }
         const pipeline = passState.pipeline;
         const model = passState.model || '';
+        // A ChronosJAV pass: the aligner and timing model it will use (QwenManager defaults, or the
+        // values applied in its Customize window).
+        const chronos = passState.isQwen
+            ? { ...QwenManager.defaults, ...((passState.customized && passState.params) || {}) }
+            : null;
+        const key = chronos
+            ? [chronos.aligner_backend, chronos.aligner_id, chronos.timing_model, chronos.timestamp_mode].join('|')
+            : '';
         try {
-            const result = await pywebview.api.get_crispasr_status(pipeline, model);
+            const result = chronos
+                ? await pywebview.api.get_chronosjav_crispasr_status(
+                    chronos.aligner_backend, chronos.aligner_id, chronos.timing_model, chronos.timestamp_mode)
+                : await pywebview.api.get_crispasr_status(pipeline, model);
             // The pass may have changed while CrispASR was asked.
-            if (passState.pipeline !== pipeline || (passState.model || '') !== model || !passState.isCrispasr) return;
-            if (!result || !result.success) {
+            if (passState.pipeline !== pipeline || (passState.model || '') !== model
+                || !(passState.isCrispasr || passState.isQwen)) return;
+            if (chronos) {
+                const now = { ...QwenManager.defaults, ...((passState.customized && passState.params) || {}) };
+                if ([now.aligner_backend, now.aligner_id, now.timing_model, now.timestamp_mode].join('|') !== key) return;
+            }
+            if (!result || !result.success || !result.lines.length) {
                 panel.style.display = 'none';
                 return;
             }
@@ -3831,13 +3850,12 @@ const EnsembleManager = {
             }
 
             // Override defaults for anime-whisper when not customized.
+            // 1.10.0: anime-whisper takes the aligner and timing model like Qwen3-ASR.
             if (passState.isAnimeWhisper && !passState.customized) {
                 currentValues.model_id = 'litagin/anime-whisper';
                 currentValues.repetition_penalty = 1.0;
                 currentValues.context = '';
-                currentValues.timestamp_mode = 'vad_only';
                 currentValues.assembly_cleaner = 'passthrough';
-                currentValues.stepdown = false;
             }
 
             // Override defaults for cohere when not customized (v1.8.14 D2/D3/D7).
@@ -3853,10 +3871,10 @@ const EnsembleManager = {
                 currentValues.max_new_tokens = 512;                  // D2
                 currentValues.timestamp_mode = 'aligner_vad_fallback'; // D7: aligner ON
                 currentValues.assembly_cleaner = 'passthrough';      // D3
-                currentValues.stepdown = true;
+                currentValues.stepdown = false;                      // 1.10.0, owner W266 1
                 currentValues.chunk_threshold_ms = 1000;
                 currentValues.max_group_duration = 6;
-                currentValues.aligner_backend = 'qwen3';             // D7 default
+                currentValues.aligner_backend = 'crispasr';          // D7; 1.10.0: CrispASR aligner
                 currentValues.language = 'Japanese';
             }
 
@@ -4401,21 +4419,49 @@ const EnsembleManager = {
             abDef.description
         ));
 
-        // Aligner model dropdown
+        // Aligner model dropdown: the models of the chosen backend (1.10.0: each option
+        // names its backend, "crispasr" or "qwen3"; the list is rebuilt when the backend changes).
         const aiDef = schemaSection.aligner_id;
+        const backendOf = (value) => {
+            const opt = aiDef.options.find(o => o.value === value);
+            return opt ? opt.backend : null;
+        };
+        const startBackend = currentValues.aligner_backend || abDef.default;
+        let startAligner = currentValues.aligner_id || aiDef.default;
+        if (backendOf(startAligner) !== startBackend) {
+            const first = aiDef.options.find(o => o.backend === startBackend);
+            startAligner = first ? first.value : aiDef.default;
+        }
         container.appendChild(this.createTransformersDropdown(
             'aligner_id', aiDef.label,
             aiDef.options,
-            currentValues.aligner_id || aiDef.default,
-            'ForcedAligner model for word-level timestamps'
+            startAligner,
+            'Aligner model for word-level timestamps'
         ));
 
-        // 3-minute limit note
+        // 3-minute limit note (the PyTorch Qwen3 ForcedAligner only)
         const noteDiv = document.createElement('div');
         noteDiv.className = 'param-note';
         noteDiv.innerHTML = 'ForcedAligner has a <strong>3-minute segment limit</strong>. ' +
             'Enable Safe Chunking (Audio tab) to enforce scene boundaries.';
         container.appendChild(noteDiv);
+
+        const abSelect = container.querySelector('[data-param="aligner_backend"] .param-select');
+        const aiSelect = container.querySelector('[data-param="aligner_id"] .param-select');
+        const fillAlignerModels = () => {
+            if (!abSelect || !aiSelect) return;
+            const backend = abSelect.value;
+            const keep = aiSelect.value;
+            const options = aiDef.options.filter(o => o.backend === backend);
+            aiSelect.replaceChildren(...options.map(o => {
+                const option = document.createElement('option');
+                option.value = o.value;
+                option.textContent = o.label;
+                return option;
+            }));
+            if (options.some(o => o.value === keep)) aiSelect.value = keep;
+        };
+        fillAlignerModels();
 
         // ─ Text Cleaner section ─
         const cleanerHeader = document.createElement('div');
@@ -4444,6 +4490,22 @@ const EnsembleManager = {
             currentValues.timestamp_mode || tsDef.default,
             tsDef.description
         ));
+
+        // ─ Timing Model section (1.10.0, item 12) ─ shown in every timestamp mode: without
+        // an aligner it still moves each subtitle's start to where the speech starts.
+        const tmDef = schemaSection.timing_model;
+        if (tmDef) {
+            const tmHeader = document.createElement('div');
+            tmHeader.className = 'param-group-header';
+            tmHeader.textContent = 'Timing Model';
+            container.appendChild(tmHeader);
+            container.appendChild(this.createTransformersDropdown(
+                'timing_model', tmDef.label,
+                tmDef.options,
+                currentValues.timing_model || tmDef.default,
+                tmDef.description
+            ));
+        }
 
         // ─ Step-Down Retry section ─
         const sdHeader = document.createElement('div');
@@ -4523,6 +4585,11 @@ const EnsembleManager = {
 
             alignerElements.forEach(el => { if (el) el.style.display = hideAligner ? 'none' : ''; });
             stepdownElements.forEach(el => { if (el) el.style.display = hideStepdown ? 'none' : ''; });
+            // No model list for "None"; the 3-minute note is the PyTorch ForcedAligner's.
+            const backendVal = abSelect ? abSelect.value : '';
+            const aiControl = container.querySelector('[data-param="aligner_id"]');
+            if (!hideAligner && aiControl) aiControl.style.display = backendVal === 'none' ? 'none' : '';
+            if (!hideAligner) noteDiv.style.display = backendVal === 'qwen3' ? '' : 'none';
 
             // Also hide step-down for fixed-boundary framers (srt-source, manual)
             if (!hideStepdown && passKey) {
@@ -4538,6 +4605,10 @@ const EnsembleManager = {
         const tsDropdown = container.querySelector('[data-param="timestamp_mode"] .param-select');
         if (tsDropdown) {
             tsDropdown.addEventListener('change', updateVisibility);
+        }
+        // And for the aligner backend: its model list, then what is shown
+        if (abSelect) {
+            abSelect.addEventListener('change', () => { fillAlignerModels(); updateVisibility(); });
         }
 
         // Initial visibility
@@ -4960,7 +5031,10 @@ const EnsembleManager = {
             const panel = document.getElementById(`tab-${tab}`);
             if (!panel) return;
 
-            const target = (tab === 'enhancer') ? enhancerParams : fullParams;
+            // A ChronosJAV (Qwen-family) window puts its Alignment tab in the 'enhancer' panel
+            // (generateQwenTabs): those are pass settings, not enhancer settings, so they go
+            // with the rest. Before 1.10.0 they were set aside here and never reached the run.
+            const target = (tab === 'enhancer' && !passState.isQwen) ? enhancerParams : fullParams;
 
             // Collect standard param-control values
             panel.querySelectorAll('.param-control').forEach(control => {
@@ -5185,6 +5259,9 @@ const EnsembleManager = {
         // it to, so without this the window said "on", the row said "off", and
         // the run used the value from the window (owner's GUI test A4).
         this.updateEnhanceForVadCheckbox(passKey);
+
+        // A ChronosJAV pass's aligner and timing model may have changed (1.10.0).
+        if (passState.isQwen) this.updateCrispasrStatus(passKey);
 
         const paramCount = Object.keys(fullParams).length;
         const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
@@ -5514,9 +5591,7 @@ const EnsembleManager = {
             defaults.model_id = 'litagin/anime-whisper';
             defaults.repetition_penalty = 1.0;
             defaults.context = '';
-            defaults.timestamp_mode = 'vad_only';
             defaults.assembly_cleaner = 'passthrough';
-            defaults.stepdown = false;
         } else if (passState.isCohere) {
             // Cohere defaults — mirror the openCustomize override (D2/D3/D7).
             defaults.model_id = 'CohereLabs/cohere-transcribe-03-2026';
@@ -5524,10 +5599,10 @@ const EnsembleManager = {
             defaults.max_new_tokens = 512;
             defaults.timestamp_mode = 'aligner_vad_fallback';
             defaults.assembly_cleaner = 'passthrough';
-            defaults.stepdown = true;
+            defaults.stepdown = false;   // 1.10.0, owner W266 1
             defaults.chunk_threshold_ms = 1000;
             defaults.max_group_duration = 6;
-            defaults.aligner_backend = 'qwen3';
+            defaults.aligner_backend = 'crispasr';
             defaults.language = 'Japanese';
         }
 
@@ -5565,10 +5640,21 @@ const EnsembleManager = {
             });
         });
 
+        // Alignment tab (1.10.0): the aligner model list follows the backend, so rebuild it for the
+        // default backend, then pick the default model, then refresh what is shown.
+        const alignTab = document.getElementById('tab-enhancer');
+        const abReset = alignTab && alignTab.querySelector('[data-param="aligner_backend"] .param-select');
+        const aiReset = alignTab && alignTab.querySelector('[data-param="aligner_id"] .param-select');
+        if (abReset) abReset.dispatchEvent(new Event('change'));
+        if (aiReset && defaults.aligner_id !== undefined) aiReset.value = defaults.aligner_id;
+        const tsReset = alignTab && alignTab.querySelector('[data-param="timestamp_mode"] .param-select');
+        if (tsReset) tsReset.dispatchEvent(new Event('change'));
+
         // Clear customized state
         this.state[passKey].params = null;
         this.state[passKey].customized = false;
         this.state[passKey].presetName = null;
+        this.updateCrispasrStatus(passKey);
 
         const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
         const pipelineName = passState.isAnimeWhisper
@@ -5651,12 +5737,13 @@ const EnsembleManager = {
         // Collect custom params from the modal form (same logic as applyCustomization).
         // Enhancer tab is excluded — its params (device, model) collide with ASR keys
         // and the enhancer backend receives config via --passN-speech-enhancer, not params.
+        // A ChronosJAV window's 'enhancer' panel is its Alignment tab: kept (1.10.0).
         const params = {};
         const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene', 'context'];
         tabs.forEach(tab => {
             const panel = document.getElementById(`tab-${tab}`);
             if (!panel) return;
-            if (tab === 'enhancer') return;  // Skip — same isolation as applyCustomization()
+            if (tab === 'enhancer' && !passState.isQwen) return;  // same isolation as applyCustomization()
             panel.querySelectorAll('.param-control').forEach(control => {
                 const paramName = control.dataset.param;
                 if (!paramName) return;
