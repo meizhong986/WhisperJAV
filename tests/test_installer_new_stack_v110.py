@@ -134,6 +134,35 @@ def test_a_second_run_keeps_the_recorded_accelerator_by_default(m, recorded, ada
     assert m.accelerator_for_answer(plan["preselected"], vulkan_present=True, plan=plan) == recorded
 
 
+@pytest.mark.parametrize("info,adapters,recorded,key", [
+    (dict(cc=(6, 1), name="NVIDIA GeForce GTX 1080"), ["NVIDIA GeForce GTX 1080"], "vulkan", "3"),
+    (dict(cc=(6, 1), name="NVIDIA GeForce GTX 1080"), [], "own-pytorch", "4"),
+    (dict(driver=(566, 3, 0)), [], "cpu", "5"),
+    (None, ["NVIDIA GeForce RTX 4060 Laptop GPU", "Intel UHD"], "vulkan", "2"),   # 1, 2, 3 all give vulkan
+])
+def test_a_second_run_on_an_unusable_nvidia_gpu_still_keeps_the_record(m, info, adapters, recorded, key):
+    # Review P7 finding 1: the record comes before the unusable-GPU case (22.6.6, detail 10).
+    driver = _info(m, **info) if info is not None else m.DriverInfo(None, None, "none")
+    case, plan = _plan(m, driver, adapters, recorded)
+    assert case in ("old_card", "old_driver", "not_reachable")
+    assert plan["title"] == "WhisperJAV — this install's accelerator"
+    assert plan["preselected"] == key and plan["timeout"] == 20
+    assert plan["lines"][-1].startswith("This install is made for: ")
+    assert len(plan["lines"]) > 1                      # the reason stays above T25r
+    assert m.accelerator_for_answer(plan["preselected"], vulkan_present=True, plan=plan) == recorded
+
+
+@pytest.mark.parametrize("info,adapters", [
+    (dict(driver=(566, 3, 0)), []), (None, ["NVIDIA GeForce RTX 4060 Laptop GPU"]),
+])
+def test_old_driver_and_not_reachable_do_not_say_the_card_is_unsupported(m, info, adapters):
+    # Review P7 finding 8: the card may be supported; only T25's question follows the reason.
+    driver = _info(m, **info) if info is not None else m.DriverInfo(None, None, "none")
+    _case, plan = _plan(m, driver, adapters)
+    assert plan["lines"][-1] == "What should this install be made for?"
+    assert not any("found no NVIDIA graphics card" in l for l in plan["lines"])
+
+
 def test_a_second_run_with_a_supported_nvidia_gpu_offers_it_and_keeps_it(m):
     case, plan = _plan(m, _info(m, driver=(580, 0, 0)), recorded="cu130")
     assert plan["choices"][0] == ("nvidia", "NVIDIA GPU (CUDA)") and plan["preselected"] == "nvidia"
