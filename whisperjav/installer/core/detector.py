@@ -224,10 +224,11 @@ def detect_gpu() -> GPUInfo:
             detected=True,  # Apple Silicon HAS a GPU (Metal/MPS)
             name="Apple Silicon (Metal)",
             driver_version=None,
-            cuda_version="metal",  # Sentinel: install torch from default PyPI (has MPS)
-            torch_index="",  # Empty = no --index-url needed, default PyPI has arm64+MPS wheels
+            cuda_version="metal",  # Sentinel: the Apple GPU (Metal) install, uv.lock's cpu extra
+            torch_index="",  # PyTorch's cpu index carries the Apple silicon wheels (pyproject.toml)
             detection_method="platform",
-            message="Apple Silicon detected - using Metal/MPS acceleration",
+            message=("Apple silicon Mac: installing for the Apple GPU (Metal) — PyTorch with Apple GPU "
+                     "support, and CrispASR's macOS build."),  # T30 (design 22.6.5)
         )
 
     # Try nvidia-smi first (most reliable)
@@ -249,9 +250,10 @@ def detect_gpu() -> GPUInfo:
         cuda_version=None,
         torch_index=CPU_TORCH_INDEX,
         detection_method="none",
-        message="No NVIDIA GPU detected - using CPU.\n"
-                "  If you have an NVIDIA GPU (e.g., Optimus laptop with dual GPUs),\n"
-                "  try: python install.py --force-cuda cu130",
+        # T36 (design 22.10): install.py then asks what the install is made for.
+        message="No supported NVIDIA GPU found.\n"
+                "  If this PC has an NVIDIA GPU that was not found (for example a laptop with two GPUs),\n"
+                "  run again with --accelerator nvidia.",
     )
 
 
