@@ -203,3 +203,39 @@ OWN_PYTORCH_OTHER_VERSION = ("This environment has PyTorch {version}. WhisperJAV
 OWN_PYTORCH_DONE = ("Installed without PyTorch: WhisperJAV uses your PyTorch {version} ({where}). "
                     "whisperjav-upgrade will keep it.")
 MADE_FOR_TEXT = "Made for: {name}."                                                           # T29b
+
+
+# ---------------------------------------------------------------------------------------------
+# Where the parts run, as users read it (design 22.6.8; owner W241 Q1): the three agreed wordings,
+# one per place they appear, kept here so the facts live in one file. The start of each run reads
+# the NOTICE_ / _WHERE lines, `whisperjav --check` CHECK_CRISPASR_DEVICE, the GUI's CrispASR status
+# panel GUI_CRISPASR_RUNS_ON.
+# ---------------------------------------------------------------------------------------------
+
+# The box at the start of a run (design 22.5.3).
+NOTICE_MADE_FOR = "This install of WhisperJAV is made for: {name}. On this computer:"
+NOTICE_NO_RECORD = "No GPU that WhisperJAV can use was found. On this computer:"
+NOTICE_GGUF = "• GGUF pipelines (Parakeet-CrispASR, Cohere-CrispASR): {where}"
+NOTICE_OTHERS = "• Other pipelines: {where}"
+NOTICE_DEVICE_CPU = "• Every pipeline: the CPU (not accelerated), as asked with --device cpu."
+CPU_WHERE = "the CPU (not accelerated), several times slower than on a GPU"
+GGUF_VULKAN_WHERE = "ask for the GPU through Vulkan — experimental, not tested"
+GGUF_METAL_WHERE = "ask for the Apple GPU (Metal) — not yet tested on a Mac"
+GGUF_CUDA_WHERE = "the NVIDIA GPU (CUDA)"
+GGUF_CPU_WHERE = "the CPU (not accelerated)"
+GGUF_MISSING_WHERE = "cannot run here: CrispASR is not installed (run the WhisperJAV installer again)"
+OWN_PYTORCH_WHERE = ("with your PyTorch, fidelity, transformers, ChronosJAV and the speech enhancers ask for "
+                     "{gpu} — not tested; balanced, fast and faster on {ct2}")
+
+# `whisperjav --check`, the CrispASR line (T46).
+CHECK_CRISPASR_DEVICE = {"cuda": "asks for the NVIDIA GPU (CUDA)",
+                         "vulkan": "asks for the GPU through Vulkan (experimental, not tested)",
+                         "metal": "asks for the Apple GPU (Metal) (not yet tested on a Mac)",
+                         "cpu": "CPU (not accelerated)"}
+
+# The GUI's CrispASR status panel under a pass row (T16).
+GUI_CRISPASR_RUNS_ON = {"cuda": "GPU: asks for the NVIDIA GPU (CUDA)",
+                        "metal": "GPU: asks for the Apple GPU (Metal), not yet tested on a Mac",
+                        "vulkan": ("GPU: asks for this PC's GPU through Vulkan (AMD, Intel or older NVIDIA card; "
+                                   "experimental, not tested)")}
+GUI_CRISPASR_RUNS_ON_CPU = "CPU (not accelerated), several times slower: {reason}"
