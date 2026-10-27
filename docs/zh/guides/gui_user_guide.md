@@ -152,7 +152,6 @@ WhisperJAV 接受 FFmpeg 支持的任何格式的视频和音频文件（MP4、M
 | **调试日志** | 关闭 | 将详细调试日志写入 `whisperjav.log` |
 | **保留临时文件** | 关闭 | 保留中间音频块和处理产物 |
 | **自定义临时目录** | 系统默认 | 开启"保留临时文件"后，可选择存储位置 |
-| **接受纯 CPU 模式** | 关闭 | 允许在没有 CUDA GPU 的情况下运行（速度慢很多，但可以工作） |
 
 ---
 
@@ -176,10 +175,10 @@ WhisperJAV 接受 FFmpeg 支持的任何格式的视频和音频文件（MP4、M
 
 | 控制项 | 选项 | 默认值 |
 |--------|------|--------|
-| **处理管线** | Balanced、Fast、Faster、Fidelity、Transformers、Qwen3-ASR、ChronosJAV、XXL Faster Whisper | Balanced |
+| **处理管线** | Balanced、Fast、Faster、Fidelity、Transformers、Qwen3-ASR、Anime-Whisper、Parakeet-CrispASR、Cohere-CrispASR、XXL Faster Whisper | Balanced |
 | **灵敏度** | 激进、均衡、保守 | 激进 |
 | **场景检测器** | Auditok、Silero、Semantic、None | Semantic |
-| **语音增强器** | None、FFmpeg DSP、ZipEnhancer、ClearVoice、BS-RoFormer | None |
+| **语音增强器** | None、FFmpeg DSP、ZipEnhancer、htdemucs（BS-RoFormer 和 ZipEnhancer ONNX：即将推出） | None |
 | **语音分割器** | Silero v6.2、v4.0、v3.1、Whisper VAD、TEN、None | Silero v6.2 |
 | **模型** | 取决于处理管线 — Large V2/V3/Turbo (Whisper) 或 1.7B/0.6B (Qwen) | 处理管线默认值 |
 
@@ -192,6 +191,7 @@ WhisperJAV 接受 FFmpeg 支持的任何格式的视频和音频文件（MP4、M
 - **基于 Whisper**：Balanced、Fast、Faster、Fidelity
 - **HuggingFace**：Transformers
 - **ChronosJAV**：Qwen3-ASR、Anime-Whisper
+- **GGUF**：Parakeet-CrispASR、Cohere-CrispASR——日语，1.10.0 中为实验性（见 [Parakeet-CrispASR 与 Cohere-CrispASR](../pipelines/crispasr.md)）
 - **外部 (BYOP)**：XXL Faster Whisper（仅第二通道）
 
 ### 自定义参数
@@ -201,6 +201,10 @@ WhisperJAV 接受 FFmpeg 支持的任何格式的视频和音频文件（MP4、M
 ![自定义参数弹窗 — 质量标签页](images/gui-tab3-customize-modal.png){ loading=lazy }
 
 弹窗包含 **Model**、**Quality**、**Segmenter**、**Enhancer** 和 **Scene** 设置标签页。徽标显示 **DEFAULT** 或 **CUSTOM** 表示参数是否已修改。
+
+**Model** 标签页有一个 **Device** 菜单：**Auto (the GPU when one can be used, else the CPU)**（默认，有可用 GPU 时用 GPU，否则用 CPU）、**NVIDIA GPU (CUDA)** 或 **CPU (not accelerated)**（CPU，不加速）。
+
+对于 GGUF 通道（Parakeet-CrispASR、Cohere-CrispASR），弹窗有三个标签页：**Segmenter**、**Enhancer** 和 **Scene**，初始值就是该通道实际使用的值。通道一行下方的状态面板会显示模型（是否已下载）以及 CrispASR 将在哪里运行，例如 "GPU: asks for the NVIDIA GPU (CUDA)"。
 
 使用 **Save Preset** 保存配置以便重用，或使用 **Load Preset** 恢复已保存的配置。预设在会话间持久保存。
 
@@ -274,8 +278,7 @@ WhisperJAV 仅向 XXL 发送 4 个必需参数（输入文件、输出目录、�
 
 | 提供商 | 说明 |
 |--------|------|
-| **Ollama** | 通过 Ollama 使用本地大语言模型。免费、隐私、无需 API 密钥。推荐优先于 Local。 |
-| **Local** | 使用本地大语言模型服务器 (llama-cpp)。免费、隐私。旧版 — 建议改用 Ollama。 |
+| **Ollama** | 通过 Ollama 使用本地大语言模型。免费、隐私、无需 API 密钥。 |
 | **DeepSeek** | 云端 API。性价比高，CJK 语言质量好。 |
 | **Gemini** | Google 的 API。多语言支持好。 |
 | **Claude** | Anthropic 的 API。高质量，成本较高。 |
@@ -294,7 +297,7 @@ WhisperJAV 仅向 XXL 发送 4 个必需参数（输入文件、输出目录、�
 - 绿色勾号：连接成功
 - 红色叉号：连接失败（检查密钥和端点）
 
-Local 提供商不需要 API 密钥 — 它会自动启动 llama-cpp 服务器。
+Ollama 不需要 API 密钥。（llama-cpp 本地提供商已在 1.10 中移除。）
 
 ### 语言和风格
 
@@ -350,6 +353,20 @@ Local 提供商不需要 API 密钥 — 它会自动启动 llama-cpp 服务器�
 ### 完成
 
 完成后，状态显示"Completed"，SRT 文件路径打印在控制台中。输出的 SRT 可以直接在任何媒体播放器中使用。
+
+---
+
+### 运行没有开始时
+
+如果一次运行在处理任何内容之前就停止，会弹出一个对话框说明原因：
+
+| 对话框 | 何时出现 | 你可以做什么 |
+|---|---|---|
+| **The NVIDIA GPU cannot be used**（无法使用 NVIDIA GPU） | 安装为 NVIDIA GPU 制作，而 GPU 现在不可用（例如更换驱动之后） | **Run on the CPU this time**（这次在 CPU 上运行）会在 CPU 上重新运行同一任务；**Close** 关闭。对话框会说明原因和解决办法。 |
+| **The run did not start**（运行没有开始） | 运行无法使用的设置，或缺少 PyTorch（例如在“自己的 PyTorch”安装中尚未添加 PyTorch） | 对话框会说明怎么做；没有处理任何内容 |
+| **The run ended without a run summary**（运行结束但没有运行汇总） | WhisperJAV 意外停止 | 在此之前完成的文件在输出文件夹中；控制台会显示发生了什么 |
+
+当安装的 GPU 可用时（NVIDIA GPU 或 Apple GPU 安装），运行开始时不显示任何内容。在其他所有安装上，控制台会显示各部分在这台电脑上的运行位置，然后运行继续。
 
 ---
 
@@ -440,9 +457,6 @@ WhisperJAV 在启动时自动检查更新（延迟 3 秒后）。有新版本可
 5. 设置目标语言
 6. 点击 **Start**
 
-### 纯 CPU 模式（无 GPU）
+### 没有 GPU 时
 
-1. 进入 **Advanced** 标签页
-2. 勾选 **"Accept CPU-only mode"**（必须：没有可用 GPU 的机器上，不勾选则运行会在启动检查处停下并中止，同时提示您勾选此项）
-3. 使用 **Faster** 模式以获得无 GPU 时的最佳速度
-4. 处理速度会明显变慢，但功能正常
+在仅 CPU 的安装中，不需要勾选任何选项：每次运行都使用 CPU。使用 **Faster** 模式可获得最佳速度。处理比在 GPU 上慢好几倍，但功能正常。在 GPU 安装中，要让某个通道使用 CPU，在该通道的 **Customize** 窗口中把 **Device** 选为 **CPU (not accelerated)**。
