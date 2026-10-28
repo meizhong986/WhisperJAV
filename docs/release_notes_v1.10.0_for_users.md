@@ -6,6 +6,7 @@
 - **One accelerator per install.** You choose it once, when you install: NVIDIA GPU (CUDA), GPU through Vulkan (AMD, Intel or older NVIDIA card, Windows), Apple GPU (Metal), your own PyTorch, or CPU only. Runs no longer stop to ask about the CPU. A run that does not use a supported NVIDIA GPU or the Apple GPU starts with a box saying where each part runs.
 - **Two new pipelines for Japanese, experimental:** Parakeet-CrispASR and Cohere-CrispASR run as Ensemble passes (menu group GGUF). CrispASR is installed with WhisperJAV; there is nothing to download separately.
 - **ChronosJAV subtitle timing** (new, not yet measured): subtitles start where the speech starts, and two sentences in one piece of speech (for example two speakers) can become two subtitles, split at a punctuation mark or space in the text.
+- **The GUI in Simplified Chinese:** the **中文** button in the header switches the whole window; **English** switches back.
 - **Every install gets a fixed list of package versions for its accelerator**, so two computers with the same accelerator get the same versions.
 - Removed: the llama-cpp translation provider (use Ollama), ClearVoice speech enhancement, and the 1.9.x CrispASR mode. Google Colab and Kaggle are not supported by 1.10.0.
 
@@ -24,6 +25,7 @@
 - **At the start of a run**, when the install's GPU is not in use, WhisperJAV says where each part runs on this computer. An install made for the NVIDIA GPU whose GPU cannot be used now (for example after a driver change) stops with the reason and the fix; in the GUI, **Run on the CPU this time** runs the job on the CPU.
 - **`--device auto|cuda|cpu` now sets the device for every pipeline**, the speech enhancers included. `--device cpu` runs one job on the CPU.
 - **`whisperjav --check`** names the accelerator of the install, where each part runs, CrispASR and its models.
+- **GUI in Simplified Chinese** (#448): the **中文** button in the header switches the window to Chinese — tabs, buttons, menus, tooltips, pop-up boxes, Customize Parameters and Translation Settings — and **English** switches back. The console and the messages written while files are processed stay English. The language is kept for the next start; on Windows set to Chinese, the GUI opens in Chinese the first time, also after upgrading.
 - **GUI:** clear dialogs when a run does not start ("The NVIDIA GPU cannot be used", "The run did not start") or ends without a run summary.
 - **Supported computers are checked before anything is installed.** On a computer 1.10.0 does not support, the installer says why and installs nothing.
 
