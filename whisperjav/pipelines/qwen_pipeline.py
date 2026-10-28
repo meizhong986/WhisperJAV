@@ -465,7 +465,7 @@ class QwenPipeline(BasePipeline):
         from whisperjav.modules.subtitle_pipeline.cleaners.factory import TextCleanerFactory
         from whisperjav.modules.subtitle_pipeline.framers.factory import TemporalFramerFactory
         from whisperjav.modules.subtitle_pipeline.generators.factory import TextGeneratorFactory
-        from whisperjav.modules.subtitle_pipeline.orchestrator import DecoupledSubtitlePipeline
+        from whisperjav.modules.subtitle_pipeline.orchestrator import DecoupledSubtitlePipeline, line_filter_test
         from whisperjav.modules.subtitle_pipeline.types import HardeningConfig, StepDownConfig
 
         cfg = self._asr_config
@@ -629,6 +629,11 @@ class QwenPipeline(BasePipeline):
             context=cfg.get("context", ""),
             stepdown_config=stepdown_cfg,
             timer=timer,
+            # T9 (owner W296 2, W300 3): the Phase 8 line filters this run applies.
+            line_filter=line_filter_test(
+                ellipsis_filter=self.generator_backend == "anime-whisper",
+                nonverbal_filter=self.drop_nonverbal_lines,
+            ),
         )
 
     # ------------------------------------------------------------------
@@ -942,8 +947,13 @@ class QwenPipeline(BasePipeline):
         phase5_start = time.time()
 
         # Debug artifacts directory (master text, timestamps, merged words)
-        raw_subs_dir = self.temp_dir / "raw_subs"
-        raw_subs_dir.mkdir(exist_ok=True)
+        # One folder per file: the run summary (Phase 9) reads every scene record in it, and
+        # a batch shares temp_dir, so one shared folder made the second and later files count
+        # the scenes of the files before them (since 1.9.5; owner W300 2).
+        raw_subs_dir = self.temp_dir / "raw_subs" / media_basename
+        raw_subs_dir.mkdir(parents=True, exist_ok=True)
+        for stale in raw_subs_dir.glob("scene_*_diagnostics.json"):
+            stale.unlink(missing_ok=True)
 
         scene_results: List[Tuple[Optional[stable_whisper.WhisperResult], int]] = []
 
