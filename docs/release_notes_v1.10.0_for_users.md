@@ -41,6 +41,7 @@
 - In the GUI, a ChronosJAV pass's Customize → Alignment settings (and a preset saved from that window) now reach the run; from 1.8.10.post3 to 1.9.5 they were ignored.
 - XXL Faster Whisper runs the model you choose (#449): in the GUI, the Model column of the XXL pass; on the command line, `--pass1-model` or `--pass2-model`. Before, the GUI sent no model and XXL ran large-v3. With no model chosen, XXL now runs large-v2 (was large-v3). The Extra Args box no longer starts with `--model large-v3`; a `--model` typed there is not used, and the console says so. When XXL fails for a file, the console says which pass failed and why.
 - The settings that come with WhisperJAV no longer hold a path to an XXL program on the developer's computer.
+- AI translation (#460): when the model writes its answer labels (`Translation>`, `Original>` or a `#number` line) into a subtitle, WhisperJAV now asks the model again for that group of subtitles. If the second answer has the same fault, the subtitles are kept and the console names their numbers in the translated file, so you know which lines to check. This applies to every provider.
 
 **Removed**
 
