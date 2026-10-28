@@ -42,7 +42,7 @@ The GUI is divided into five areas, top to bottom:
 
 | Area | Purpose |
 |------|---------|
-| **Header bar** | Theme switcher (4 themes) and update check button |
+| **Header bar** | Theme switcher (4 themes), language button (English / 中文) and update check button |
 | **Source** | Add video/audio files to process |
 | **Destination** | Where to save output SRT files |
 | **Options tabs** | Four tabs of configuration (see sections 5–8) |
@@ -58,6 +58,16 @@ Click the palette icon in the header to cycle through themes:
 | Google | Material Design inspired |
 | Carbon | IBM Carbon dark theme |
 | Primer | GitHub-style neutral palette |
+
+### Interface language (English / 中文)
+
+The **中文** button in the header, next to the palette icon, switches the window to Simplified Chinese. In Chinese the button
+reads **English** and switches back. The change is immediate; the file list and a run in progress are not affected.
+
+- **In Chinese:** tabs, buttons, menus, tooltips, pop-up boxes, Customize Parameters and Translation Settings.
+- **Stays English:** the console, file names, the messages written while files are processed, and the Parameter Guide page.
+- The language is kept for the next start, whether or not **Remember settings** is ticked. On Windows, the very first start
+  follows the display language: Chinese when Windows is set to Chinese, English otherwise.
 
 ---
 
