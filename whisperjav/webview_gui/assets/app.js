@@ -17,6 +17,313 @@
  */
 
 // ============================================================
+// Interface language (1.10.0, item 6, #448; owner W283): English or Simplified Chinese.
+// The catalogue (i18n_zh.js, window.WJ_I18N_ZH) is keyed by the English text. apply()
+// translates what the window shows -- text, tooltips, placeholders, menu group labels --
+// and a MutationObserver runs it on everything app.js and the Python schemas add later,
+// so the English sources stay as they are. A key may hold {name} parts (a computed value,
+// carried over unchanged). The console, the file list and program messages stay English
+// (R01: program outputs stay as is). The English of each translated node is kept, so
+// switching back restores it exactly.
+// ============================================================
+const I18n = {
+    lang: 'en',
+    // Never translated: the console and the file list (program output, paths), commands,
+    // typed text, the release notes and commit messages fetched from GitHub.
+    SKIP: '[data-i18n-skip], .file-path, code, textarea, script, style',
+    ATTRS: ['title', 'placeholder', 'aria-label', 'label'],
+    missing: new Set(),     // English texts met while Chinese is on that have no entry
+    _exact: null,           // normalized English -> Chinese
+    _reverse: null,         // Chinese -> English, for copies of translated nodes
+    _templates: [],         // {re, names, zh} for keys with {name} parts
+    _keep: null,            // texts reviewed and left as they are (names, units)
+    _contexts: [],          // {selector, map}: where one English word means two things
+                            // ("Balanced" the pipeline, kept; "Balanced" the sensitivity)
+    _textRec: new WeakMap(),  // Text node -> {en, zh} as written
+    _attrRec: new WeakMap(),  // Element -> {attr: {en, zh}}
+    _observer: null,
+
+    norm(s) {
+        return String(s).replace(/[\s ]+/g, ' ').trim();
+    },
+
+    _load() {
+        if (this._exact) return;
+        const cat = window.WJ_I18N_ZH || { texts: {}, keep: [] };
+        this._exact = new Map();
+        this._reverse = new Map();
+        this._templates = [];
+        this._keep = new Set((cat.keep || []).map(k => this.norm(k)));
+        for (const [en, zh] of Object.entries(cat.texts || {})) {
+            const key = this.norm(en);
+            if (/\{[A-Za-z_]\w*\}/.test(key)) {
+                const names = [];
+                const pattern = key.split(/(\{[A-Za-z_]\w*\})/).map(part => {
+                    const m = part.match(/^\{([A-Za-z_]\w*)\}$/);
+                    if (m) {
+                        names.push(m[1]);
+                        return '([\\s\\S]*?)';
+                    }
+                    return part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                }).join('');
+                this._templates.push({ re: new RegExp('^' + pattern + '$'), names, zh });
+            } else {
+                this._exact.set(key, zh);
+                this._reverse.set(this.norm(zh), key);
+            }
+        }
+        // The most specific template first: the one with the most fixed text.
+        const fixed = t => t.re.source.replace(/\(\[\\s\\S\]\*\?\)/g, '').length;
+        this._templates.sort((a, b) => fixed(b) - fixed(a));
+        this._contexts = Object.entries(cat.contexts || {}).map(([selector, texts]) => {
+            const map = new Map();
+            for (const [en, zh] of Object.entries(texts)) {
+                map.set(this.norm(en), zh);
+                this._reverse.set(this.norm(zh), this.norm(en));
+            }
+            return { selector, map };
+        });
+    },
+
+    // The Chinese for a text shown in a node: a context entry first (the node sits inside
+    // its selector), then the catalogue.
+    _lookupAt(node, text) {
+        this._load();
+        const el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+        if (el) {
+            for (const ctx of this._contexts) {
+                if (!el.closest(ctx.selector)) continue;
+                const hit = ctx.map.get(this.norm(text));
+                if (hit !== undefined) return hit;
+            }
+        }
+        return this.lookup(text);
+    },
+
+    // The Chinese for an English text, or null. A computed part that is itself a
+    // catalogue text (e.g. "Pass 1", or a whole sentence) is translated too; it is
+    // shorter than the text, so this ends. A part named raw_... is data -- a preset
+    // name, a file, a message from the program -- and is never translated.
+    lookup(text) {
+        this._load();
+        const key = this.norm(text);
+        if (!key) return null;
+        const hit = this._exact.get(key);
+        if (hit !== undefined) return hit;
+        for (const tpl of this._templates) {
+            const m = key.match(tpl.re);
+            if (!m) continue;
+            let out = tpl.zh;
+            tpl.names.forEach((name, i) => {
+                const part = m[i + 1];
+                const sub = (!name.startsWith('raw_') && part.trim() && this.norm(part) !== key)
+                    ? this.lookup(part) : null;
+                out = out.split('{' + name + '}').join(sub !== null ? sub : part);
+            });
+            return out;
+        }
+        return null;
+    },
+
+    _miss(text) {
+        const key = this.norm(text);
+        if (/[A-Za-z]{2,}/.test(key) && !this._keep.has(key)) this.missing.add(key);
+    },
+
+    // The English of what an element shows, whatever the language: for code that reads a
+    // shown text back (a menu entry's name for a console line, " (N/A)" added to an entry).
+    englishText(el) {
+        if (!el) return '';
+        this._load();
+        let out = '';
+        el.childNodes.forEach(n => {
+            if (n.nodeType === Node.TEXT_NODE) {
+                const rec = this._textRec.get(n);
+                if (rec && n.nodeValue === rec.zh) {
+                    out += rec.en;
+                } else {
+                    const en = this._reverse.get(this.norm(n.nodeValue));
+                    out += en !== undefined ? this._wrap(n.nodeValue, en) : n.nodeValue;
+                }
+            } else if (n.nodeType === Node.ELEMENT_NODE) {
+                out += this.englishText(n);
+            }
+        });
+        return out;
+    },
+
+    // The English HTML of an element's content, for code that keeps a copy to put back
+    // later (the external segmenter list): a copy is never left in the other language.
+    englishHTML(el) {
+        const copy = el.cloneNode(true);
+        this.restore(copy);
+        return copy.innerHTML;
+    },
+
+    // For texts that never enter the window: alert(), confirm(), prompt().
+    t(text) {
+        if (this.lang !== 'zh-CN' || typeof text !== 'string') return text;
+        const zh = this.lookup(text);
+        if (zh === null) {
+            this._miss(text);
+            return text;
+        }
+        return zh;
+    },
+
+    // Keep a text node's leading and trailing white space around the new text.
+    _wrap(raw, core) {
+        const m = raw.match(/^(\s*)[\s\S]*?(\s*)$/);
+        return m[1] + core + m[2];
+    },
+
+    _skipped(node) {
+        const el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+        return !el || !!el.closest(this.SKIP);
+    },
+
+    _applyText(node) {
+        const raw = node.nodeValue;
+        if (!raw || !raw.trim()) return;
+        const rec = this._textRec.get(node);
+        if (rec && raw === rec.zh) return;
+        const zh = this._lookupAt(node, raw);
+        if (zh === null) {
+            this._miss(raw);
+            return;
+        }
+        const out = this._wrap(raw, zh);
+        this._textRec.set(node, { en: raw, zh: out });
+        if (out !== raw) node.nodeValue = out;
+    },
+
+    _applyAttr(el, attr) {
+        if (attr === 'label' && el.tagName !== 'OPTGROUP') return;
+        const raw = el.getAttribute(attr);
+        if (!raw || !raw.trim()) return;
+        const recs = this._attrRec.get(el) || {};
+        if (recs[attr] && raw === recs[attr].zh) return;
+        const zh = this._lookupAt(el, raw);
+        if (zh === null) {
+            this._miss(raw);
+            return;
+        }
+        recs[attr] = { en: raw, zh };
+        this._attrRec.set(el, recs);
+        if (zh !== raw) el.setAttribute(attr, zh);
+    },
+
+    _walk(root, onText, onElement) {
+        if (!root) return;
+        if (root.nodeType === Node.TEXT_NODE) {
+            if (!this._skipped(root)) onText(root);
+            return;
+        }
+        if (root.nodeType !== Node.ELEMENT_NODE || this._skipped(root)) return;
+        onElement(root);
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+            acceptNode: (n) => (n.nodeType === Node.ELEMENT_NODE && n.matches(this.SKIP))
+                ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
+        });
+        for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+            if (n.nodeType === Node.TEXT_NODE) onText(n);
+            else onElement(n);
+        }
+    },
+
+    apply(root) {
+        if (this.lang !== 'zh-CN') return;
+        this._walk(root, n => this._applyText(n),
+            el => this.ATTRS.forEach(a => { if (el.hasAttribute(a)) this._applyAttr(el, a); }));
+    },
+
+    // Back to English: the kept English where the node still shows what was written,
+    // else the catalogue read backwards (a node copied from a translated one).
+    restore(root) {
+        this._load();
+        this._walk(root, n => {
+            const rec = this._textRec.get(n);
+            if (rec && n.nodeValue === rec.zh) {
+                n.nodeValue = rec.en;
+            } else if (n.nodeValue && n.nodeValue.trim()) {
+                const en = this._reverse.get(this.norm(n.nodeValue));
+                if (en !== undefined) n.nodeValue = this._wrap(n.nodeValue, en);
+            }
+            this._textRec.delete(n);
+        }, el => {
+            const recs = this._attrRec.get(el) || {};
+            this.ATTRS.forEach(a => {
+                const v = el.getAttribute(a);
+                if (v === null) return;
+                if (recs[a] && v === recs[a].zh) {
+                    el.setAttribute(a, recs[a].en);
+                } else {
+                    const en = this._reverse.get(this.norm(v));
+                    if (en !== undefined) el.setAttribute(a, en);
+                }
+            });
+            this._attrRec.delete(el);
+        });
+    },
+
+    _startObserver() {
+        if (this._observer || typeof MutationObserver === 'undefined') return;
+        this._observer = new MutationObserver(records => {
+            if (this.lang !== 'zh-CN') return;
+            for (const r of records) {
+                if (r.type === 'childList') {
+                    r.addedNodes.forEach(n => this.apply(n));
+                } else if (r.type === 'characterData') {
+                    this.apply(r.target);
+                } else if (r.type === 'attributes' && !this._skipped(r.target)) {
+                    this._applyAttr(r.target, r.attributeName);
+                }
+            }
+        });
+        this._observer.observe(document.body, {
+            childList: true, subtree: true, characterData: true,
+            attributes: true, attributeFilter: this.ATTRS
+        });
+    },
+
+    _updateButton() {
+        const btn = document.getElementById('langBtn');
+        // The button names the language it switches to, in that language.
+        if (btn) btn.textContent = this.lang === 'zh-CN' ? 'English' : '中文';
+    },
+
+    setLanguage(lang, save = true) {
+        this._startObserver();
+        this.lang = lang === 'zh-CN' ? 'zh-CN' : 'en';
+        document.documentElement.lang = this.lang;
+        if (this.lang === 'zh-CN') this.apply(document.body);
+        else this.restore(document.body);
+        this._updateButton();
+        if (save && window.pywebview && pywebview.api && pywebview.api.set_ui_language) {
+            pywebview.api.set_ui_language(this.lang).catch(e => console.warn('Could not save the language:', e));
+        }
+    },
+
+    init() {
+        this._startObserver();
+        this._updateButton();
+        const btn = document.getElementById('langBtn');
+        if (btn) btn.addEventListener('click', () => this.setLanguage(this.lang === 'zh-CN' ? 'en' : 'zh-CN'));
+    },
+
+    // Called first when the Python side is ready: the saved choice, or at the first start
+    // the computer's display language (owner W283 3).
+    async loadSaved() {
+        try {
+            const res = await pywebview.api.get_ui_language();
+            if (res && res.success) this.setLanguage(res.language, false);
+        } catch (e) {
+            console.warn('Could not read the saved language:', e);
+        }
+    }
+};
+
+// ============================================================
 // State Management
 // ============================================================
 const AppState = {
@@ -891,7 +1198,9 @@ const ErrorHandler = {
 
         // Also show browser alert for critical errors
         // In future, could be replaced with custom modal dialog
-        alert(`${title}\n\n${message}`);
+        // The GUI's own titles and messages in the chosen language; a message from the
+        // program (no catalogue entry) stays as it is.
+        alert(`${I18n.t(title)}\n\n${I18n.t(message)}`);
     },
 
     showWarning(title, message) {
@@ -1862,7 +2171,7 @@ const EnsembleManager = {
 
         if (passState.customized) {
             // Warn user that custom params will be reset
-            if (confirm(`You have custom parameters for ${passKey === 'pass1' ? 'Pass 1' : 'Pass 2'}. Changing the pipeline will reset them. Continue?`)) {
+            if (confirm(I18n.t(`You have custom parameters for ${passKey === 'pass1' ? 'Pass 1' : 'Pass 2'}. Changing the pipeline will reset them. Continue?`))) {
                 passState.pipeline = newValue;
                 passState.customized = false;
                 passState.params = null;
@@ -1936,7 +2245,7 @@ const EnsembleManager = {
         const select = document.getElementById(`${passKey}-segmenter`);
         if (!select) return;
         if (this._externalSegmenterHTML[passKey] === undefined) {
-            this._externalSegmenterHTML[passKey] = select.innerHTML;
+            this._externalSegmenterHTML[passKey] = I18n.englishHTML(select);  // 1.10.0 (item 6)
         }
         const passState = this.state[passKey];
         const isBalanced = passState.pipeline === 'balanced';
@@ -2083,7 +2392,8 @@ const EnsembleManager = {
     pipelineLabel(passKey) {
         const select = document.getElementById(`${passKey}-pipeline`);
         const option = select && select.options[select.selectedIndex];
-        return (option && option.textContent.trim()) || this.state[passKey].pipeline;
+        // 1.10.0 (item 6): the English name, also when the window shows Chinese.
+        return (option && I18n.englishText(option).trim()) || this.state[passKey].pipeline;
     },
 
     // Swap model dropdown options based on pipeline type
@@ -2340,7 +2650,7 @@ const EnsembleManager = {
 
         if (passState.customized) {
             // Warn user that custom params will be reset
-            if (confirm(`You have custom parameters for ${passKey === 'pass1' ? 'Pass 1' : 'Pass 2'}. Changing the sensitivity will reset them. Continue?`)) {
+            if (confirm(I18n.t(`You have custom parameters for ${passKey === 'pass1' ? 'Pass 1' : 'Pass 2'}. Changing the sensitivity will reset them. Continue?`))) {
                 passState.sensitivity = newValue;
                 passState.customized = false;
                 passState.params = null;
@@ -2548,6 +2858,8 @@ const EnsembleManager = {
             const btn = document.getElementById(`customize-${passKey}`);
             const passState = this.state[passKey];
             if (!badge) return;
+            // 1.10.0 (item 6): a preset's name is the user's own text, never translated.
+            badge.toggleAttribute('data-i18n-skip', !!passState.presetName);
 
             if (passState.presetName) {
                 // Preset loaded — show truncated name
@@ -5430,7 +5742,7 @@ const EnsembleManager = {
         if (!applyBtn) return;
 
         // Store original state
-        const originalText = applyBtn.textContent;
+        const originalText = I18n.englishText(applyBtn);  // put back in whatever language is on then
         const originalClass = applyBtn.className;
 
         // Show success state
@@ -5825,7 +6137,7 @@ const EnsembleManager = {
                     : (passState.isQwen ? 'Qwen' : (passState.isTransformers ? 'Transformers'
                         : passState.pipeline.charAt(0).toUpperCase() + passState.pipeline.slice(1)))))
             : 'Unknown';
-        const name = prompt(`Save preset for ${pipelineLabel} pipeline.\nPreset name:`);
+        const name = prompt(I18n.t(`Save preset for ${pipelineLabel} pipeline.\nPreset name:`));
         if (!name || !name.trim()) return;
 
         const data = this._collectPresetData();
@@ -6026,7 +6338,7 @@ const EnsembleManager = {
         const name = selector ? selector.value : '';
         if (!name) return;
 
-        if (!confirm(`Delete preset "${name}"?`)) return;
+        if (!confirm(I18n.t(`Delete preset "${name}"?`))) return;
 
         try {
             const result = await pywebview.api.delete_preset(name);
@@ -6161,8 +6473,12 @@ const EnsembleManager = {
         if (marked.length) {
             const which = marked.length === 2 ? 'Pass 1 and Pass 2'
                 : (marked[0] === 'pass1' ? 'Pass 1' : 'Pass 2');
+            // 1.10.0 (item 6): each first sentence whole, so it has one Chinese text; same English.
+            const first = marked.length === 2
+                ? 'Pass 1 and Pass 2 use ClearVoice in your saved settings.'
+                : `${which} uses ClearVoice in your saved settings.`;
             ErrorHandler.show('ClearVoice is no longer included',
-                `${which} ${marked.length === 2 ? 'use' : 'uses'} ClearVoice in your saved settings. ` +
+                `${first} ` +
                 `ClearVoice is no longer included in WhisperJAV 1.10. ` +
                 `Choose another speech enhancer for ${which}, then press Start again.`);
             return;
@@ -6258,11 +6574,11 @@ const EnsembleManager = {
                     if (info && !info.available) {
                         option.disabled = true;
                         option.title = info.hint || 'Not available';
-                        option.textContent = option.textContent.replace(/ \(N\/A\)$/, '') + ' (N/A)';
+                        option.textContent = I18n.englishText(option).replace(/ \(N\/A\)$/, '') + ' (N/A)';
                     } else {
                         option.disabled = false;
                         option.title = '';
-                        option.textContent = option.textContent.replace(/ \(N\/A\)$/, '');
+                        option.textContent = I18n.englishText(option).replace(/ \(N\/A\)$/, '');
                     }
                 });
             });
@@ -6317,11 +6633,11 @@ const EnsembleManager = {
                     if (info && !info.available) {
                         option.disabled = true;
                         option.title = info.hint || 'Not available';
-                        option.textContent = option.textContent.replace(/ \(N\/A\)$/, '') + ' (N/A)';
+                        option.textContent = I18n.englishText(option).replace(/ \(N\/A\)$/, '') + ' (N/A)';
                     } else {
                         option.disabled = false;
                         option.title = '';
-                        option.textContent = option.textContent.replace(/ \(N\/A\)$/, '');
+                        option.textContent = I18n.englishText(option).replace(/ \(N\/A\)$/, '');
                     }
                 });
             });
@@ -6430,7 +6746,7 @@ const KeyboardShortcuts = {
             if (e.key === 'F5') {
                 if (AppState.isRunning) {
                     e.preventDefault();
-                    if (confirm('Process is running. Refresh anyway? This will terminate the process.')) {
+                    if (confirm(I18n.t('Process is running. Refresh anyway? This will terminate the process.'))) {
                         location.reload();
                     }
                 }
@@ -6801,7 +7117,7 @@ const UpdateManager = {
 
     async startUpdate() {
         // Confirm with user
-        if (!confirm('WhisperJAV will close and update. The application will restart automatically after the update completes.\n\nContinue?')) {
+        if (!confirm(I18n.t('WhisperJAV will close and update. The application will restart automatically after the update completes.\n\nContinue?'))) {
             return;
         }
 
@@ -7761,7 +8077,7 @@ const TranslatorManager = {
         const apiKey = document.getElementById('translatorApiKey')?.value || null;
 
         const testBtn = document.getElementById('translatorTestConnection');
-        const originalText = testBtn.textContent;
+        const originalText = I18n.englishText(testBtn);  // put back in whatever language is on then
         testBtn.textContent = 'Testing...';
         testBtn.disabled = true;
 
@@ -8688,6 +9004,10 @@ const SettingsPersistence = {
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('WhisperJAV Web GUI - Phase 5 (Production Ready)');
 
+    // 1.10.0 (item 6): the language button and the watcher that translates what is
+    // added to the window; the saved language is applied on pywebviewready.
+    I18n.init();
+
     // Initialize state
     await AppState.init();
 
@@ -8734,6 +9054,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 // PyWebView ready event — populate dynamic options and load Tab 4 settings.
 window.addEventListener('pywebviewready', async () => {
     console.log('PyWebView API ready!');
+    // 1.10.0 (item 6): the language first, so the window changes once, early.
+    await I18n.loadSaved();
     ConsoleManager.log('PyWebView bridge connected', 'success');
 
     await AppState.loadDefaultOutputDir();
