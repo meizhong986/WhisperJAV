@@ -153,6 +153,13 @@ body {
     background: rgba(255, 255, 255, 0.12);
 }
 
+/* 1.10.0 (item 6): the English / 中文 switch, a text button beside the theme button */
+.lang-button {
+    width: auto;
+    padding: 0 6px;
+    font-size: 0.85rem;
+}
+
 .theme-menu {
     position: absolute;
     top: 30px;
