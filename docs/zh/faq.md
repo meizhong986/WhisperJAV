@@ -8,7 +8,7 @@
 
 支持 FFmpeg 可以读取的所有格式：MP4、MKV、AVI、MOV、WMV、FLV、WAV、MP3、FLAC、M4A、M4B 等等。只要 FFmpeg 能从中提取音频，WhisperJAV 就能处理。
 
-### 转录需要多长时间？
+### 转写需要多长时间？
 
 取决于模式、GPU 等级以及音频的难度。下表给出的范围基于**中端 GPU**（RTX 3060 12 GB 或 Google Colab T4 免费额度）在典型日语对话内容上的实测数据。更高端的 GPU（RTX 3090/4080/4090）大约快 1.5-3 倍；仅 CPU 模式则明显更慢（通常是最慢 GPU 行的 5-10 倍）。
 
@@ -18,11 +18,11 @@
 | **Fast** | 3-5 分钟 | 8-15 分钟 | 单次 turbo-int8 |
 | **Balanced** | 4-7 分钟 | 15-25 分钟 | 单次 large-v2-int8（推荐默认） |
 | **Fidelity** | 10-15 分钟 | 40-50 分钟* | 单次 large-v2-fp16；质量高，但运行时间方差大 |
-| **集成模式** | 15-25 分钟 | 60-90 分钟 | 双次（Pass 1 + Pass 2 顺序执行后合并） |
+| **专家模式** | 15-25 分钟 | 60-90 分钟 | 双次（第一轮 + 第二轮顺序执行后合并） |
 
 *Fidelity 在同一输入上的运行时间方差较大（约 4-5 倍），原因是 PyTorch cuDNN 自动调优——质量不受影响，仅墙钟时间会变化。
 
-**音频难度倍率**：非常密集的低语内容（ASMR 风格、轻柔呻吟、气音等）会使处理时间增加到上表数值的 **1.2-1.5 倍**，尤其是在 Fidelity 和集成模式下——模型需要在边界帧上花费更多时间。一段 ASMR 较多的 2 小时影片用 Fidelity 处理可能超过 1 小时。
+**音频难度倍率**：非常密集的低语内容（ASMR 风格、轻柔呻吟、气音等）会使处理时间增加到上表数值的 **1.2-1.5 倍**，尤其是在 Fidelity 和专家模式下——模型需要在边界帧上花费更多时间。一段 ASMR 较多的 2 小时影片用 Fidelity 处理可能超过 1 小时。
 
 **仅 CPU 模式**：Faster 模式是没有 GPU 时唯一现实的选择。预计 30 分钟片段大约需要 30-60 分钟；对大多数用户而言，多小时内容在 CPU 上不实用。
 
@@ -40,8 +40,8 @@
 
 - **动漫 / 戏剧化 JAV 对白**：**ChronosJAV** 搭配 anime-whisper。
 - **通用日语对白，单次处理**：**Balanced** 是典型默认选择。
-- **以墙钟时间换取最高准确度**：**集成模式**（Pass 1 = Balanced + Pass 2 = Qwen3-ASR 配合 Smart Merge），将两个模型的输出合并。
-- **低语 / ASMR 较多的内容**：尝试 **Fidelity** 配合 **激进** 灵敏度；它能恢复其他模式可能漏掉的安静语音。
+- **以墙钟时间换取最高准确度**：**专家模式**（第一轮 = Balanced + 第二轮 = Qwen3-ASR 配合 Smart Merge），将两个模型的输出合并。
+- **低语 / ASMR 较多的内容**：尝试 **Fidelity** 配合 **高灵敏度**；它能恢复其他模式可能漏掉的安静语音。
 
 无论选哪种，建议先用 5-10 分钟具有代表性的片段进行对比——JAV 内容的质量因配音员音色差异较大，没有任何单一推荐能在所有内容库中都表现一致。
 
@@ -49,8 +49,8 @@
 
 这是 Whisper 在静音或极安静片段上的已知行为。WhisperJAV 内置了幻觉过滤器，可移除大部分此类文本。你可以尝试：
 
-1. 尝试不同的**灵敏度**设置——某些内容下 **激进** 模式能捕获 **保守** 模式作为静音丢弃的真实语音（Whisper 随后会用幻觉填充这些"静音"）；其他内容则相反。请用代表性片段在每种设置下试运行，找到最适合您内容库的设置。
-2. 使用 **集成模式**——两个模型输出通常会对不同的幻觉产生分歧，因此合并步骤能去除比单次处理更多的幻觉。
+1. 尝试不同的**灵敏度**设置——某些内容下 **高灵敏** 设置能捕获 **低灵敏** 设置作为静音丢弃的真实语音（Whisper 随后会用幻觉填充这些"静音"）；其他内容则相反。请用代表性片段在每种设置下试运行，找到最适合您内容库的设置。
+2. 使用 **专家模式**——两个模型输出通常会对不同的幻觉产生分歧，因此合并步骤能去除比单次处理更多的幻觉。
 3. 启用 **语音增强**（ZipEnhancer 或 htdemucs）预先清理音频
 
 ### 时间轴偏移 / 字幕出现过早或过晚
@@ -140,14 +140,14 @@ Cohere Transcribe-03-2026 计划作为 **ChronosJAV** 下拉菜单的第三种�
    - **Windows（持久化）：** `setx HF_TOKEN hf_xxxxxxxxxxxx` — 设置后需重启 GUI/终端才能生效。
    - **Windows（仅当前 PowerShell 会话）：** `$env:HF_TOKEN = "hf_xxxxxxxxxxxx"`
    - **Linux/macOS：** `export HF_TOKEN=hf_xxxxxxxxxxxx`
-4. 在 GUI Ensemble 下拉菜单中选择 **ChronosJAV → Cohere-Transcribe (preview)**，或通过 CLI 运行：
+4. 在 GUI 专家模式（Ensemble）中的下拉菜单中选择 **ChronosJAV → Cohere-Transcribe (preview)**，或通过 CLI 运行：
    ```bash
    whisperjav --mode qwen --pass1-qwen-params '{"generator_backend":"cohere"}' video.mp4
    ```
 
 **首次运行下载**
 
-Cohere 权重总量约 3.85 GB（`model.safetensors` 原始 FP16 约 4.13 GB，外加分词器和自定义代码文件）。首次转录需先下载 10–30 分钟（每台机器仅一次；之后缓存在 HuggingFace 缓存目录中）。HuggingFace 使用 Xet（内容寻址）传输，会先把分块流到临时位置 — 缓存所在卷请预留**至少 5 GB 空闲空间**以保证下载稳定。
+Cohere 权重总量约 3.85 GB（`model.safetensors` 原始 FP16 约 4.13 GB，外加分词器和自定义代码文件）。首次转写需先下载 10–30 分钟（每台机器仅一次；之后缓存在 HuggingFace 缓存目录中）。HuggingFace 使用 Xet（内容寻址）传输，会先把分块流到临时位置 — 缓存所在卷请预留**至少 5 GB 空闲空间**以保证下载稳定。
 
 **显存需求**
 
@@ -157,7 +157,7 @@ FP16 约 4–8 GB。用于词级时间戳的 Qwen3-ForcedAligner 在 Cohere 卸�
 
 Cohere Transcribe-03-2026 当前只输出文本；逐词时间戳在模型作者的[路线图](https://huggingface.co/CohereLabs/cohere-transcribe-03-2026/discussions/19)中但尚未实现。WhisperJAV 将 Cohere 与 Qwen3-ForcedAligner-0.6B（与 Qwen3-ASR 流水线使用的同一对齐器）配对，从 Cohere 的输出推导出词级时间戳。您可以通过自定义参数 → *Aligner Backend → None* 禁用对齐器，回退为仅基于 VAD 的段级时间 — 如果您只需要段级字幕并希望省去对齐器加载，可以这样做。
 
-### Cohere 返回了空转录 / "gated" 错误
+### Cohere 返回了空转写 / "gated" 错误
 
 最常见的原因是启动 WhisperJAV 的环境中没有设置 `HF_TOKEN`。重新检查上述设置步骤，并在设置 token 后重启 GUI（特别是在 Windows 上使用 `setx` 时，它仅对新 shell 生效）。如果错误仍存在，请在 <https://huggingface.co/CohereLabs/cohere-transcribe-03-2026> 确认您的状态为 *Authorized* — 模型作者会手动审核访问。
 
