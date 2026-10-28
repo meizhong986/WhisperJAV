@@ -2,7 +2,7 @@
 
 Parakeet-CrispASR 和 Cohere-CrispASR 是两个处理管线，使用 GGUF 格式的 ASR 模型生成日语字幕。它们通过 CrispASR 运行；CrispASR 随每个 WhisperJAV 安装一起安装，无需另外下载任何程序。
 
-- **仅限集成模式。** 只能在 **Ensemble Mode** 选项卡中作为 Pass 1、Pass 2 或两者运行。没有对应的 `--mode` 值，也不出现在 Transcription Mode 选项卡中。
+- **仅限专家模式。** 只能在 **专家模式**（Ensemble Mode）选项卡中作为第一轮、第二轮或两者运行。没有对应的 `--mode` 值，也不出现在 Transcription Mode 选项卡中。
 - **仅支持日语。** 选择其他源语言时，运行会停止并给出提示。
 - **1.10.0 中为实验性功能（早期版本）。** 建议与你目前使用的处理管线的字幕对比，并告诉我们效果如何：https://github.com/meizhong986/WhisperJAV/issues
 
@@ -33,7 +33,7 @@ Parakeet-CrispASR 和 Cohere-CrispASR 是两个处理管线，使用 GGUF 格式
 
 处理器必须支持 AVX2（Intel 2013 年以后、AMD 2015 年以后的处理器）。不支持时，GGUF 处理管线会在读取任何音频之前停止并给出提示；其他所有处理管线照常工作。
 
-每个 Pass 开始时，日志会说明请求 CrispASR 在哪里运行，例如：
+每一轮开始时，日志会说明请求 CrispASR 在哪里运行，例如：
 
 ```
 Parakeet-CrispASR asks CrispASR to use the NVIDIA GPU (CUDA) (CrispASR 0.8.44+cuda).
@@ -65,17 +65,17 @@ Parakeet-CrispASR 使用 Fidelity 处理管线的语音分割器设置，另加 
 
 ### GUI
 
-1. 打开 **Ensemble Mode** 选项卡。
-2. 在 **Pass 1** 一行，打开 **Pipeline** 菜单，在 **GGUF** 分组下选择 **Parakeet-CrispASR** 或 **Cohere-CrispASR**。
+1. 打开 **专家模式**（Ensemble Mode）选项卡。
+2. 在 **第一轮**（Pass 1）一行，打开 **Pipeline** 菜单，在 **GGUF** 分组下选择 **Parakeet-CrispASR** 或 **Cohere-CrispASR**。
 3. 如果选的是 Cohere-CrispASR，可在 **Model** 列选择模型（默认 `cohere-asr-ja-v0.1`）。
-4. 如需第二个 Pass，勾选 **Pass 2**，选择其处理管线，并在 **Merge** 中选择两者的合并方式。
+4. 如需第二轮，勾选 **第二轮**（Pass 2），选择其处理管线，并在 **Merge** 中选择两者的合并方式。
 5. 点击 **Start**。
 
-当某个 Pass 使用这两个处理管线之一时：
+当某一轮使用这两个处理管线之一时：
 
 - **Sensitivity**、**Speech Segmenter**、**Model**、**Scene Detector**、**Speech Enhancer** 和 **Enhance for VAD only** 都可以设置，与其他 Pass 相同。语音分割器不能选 **None**：这两个处理管线只转写语音分割器找到的语音。
-- **Customize Parameters** 打开三个选项卡：**Segmenter**、**Enhancer** 和 **Scene**，初始值就是该 Pass 实际使用的值。
-- 该 Pass 一行下方会显示一个状态面板，说明模型和 CrispASR 将在哪里运行，例如：
+- **Customize Parameters** 打开三个选项卡：**Segmenter**、**Enhancer** 和 **Scene**，初始值就是这一轮实际使用的值。
+- 这一轮一行下方会显示一个状态面板，说明模型和 CrispASR 将在哪里运行，例如：
 
   ```
   Model: Parakeet TDT 0.6B ja (q8_0) — not downloaded yet (674 MB); downloaded when the run starts
@@ -86,19 +86,19 @@ Parakeet-CrispASR 使用 Fidelity 处理管线的语音分割器设置，另加 
 
 ### 命令行
 
-单个 Pass：
+单轮：
 
 ```bash
 whisperjav video.mp4 --ensemble --pass1-pipeline parakeet-crispasr
 ```
 
-两个 Pass，Pass 2 使用 Cohere-CrispASR 的另一个模型：
+两轮，第二轮使用 Cohere-CrispASR 的另一个模型：
 
 ```bash
 whisperjav video.mp4 --ensemble --pass1-pipeline parakeet-crispasr --pass2-pipeline cohere-crispasr --pass2-model cohere-asr-ja
 ```
 
-不指定 `--merge-strategy` 时，两个 Pass 按 `pass1_primary` 合并（GUI 中为 "Pass 1 + Fill From Pass 2"）。
+不指定 `--merge-strategy` 时，两轮按 `pass1_primary` 合并（GUI 中为“第一轮 + 用第二轮填补”，英文界面为 "Pass 1 + Fill From Pass 2"）。
 
 ---
 
@@ -119,7 +119,7 @@ whisperjav video.mp4 --ensemble --pass1-pipeline parakeet-crispasr --pass2-pipel
 | 设备 | — | `--device auto`、`cuda` 或 `cpu` | 见下文 |
 | 语言 | Source audio language | `--language japanese`（默认） | 其他语言会使运行停止 |
 
-（Pass 2 有对应的 `--pass2-…` 参数。）
+（第二轮有对应的 `--pass2-…` 参数。）
 
 ### 灵敏度
 
@@ -166,10 +166,10 @@ whisperjav --ensemble --pass1-pipeline parakeet-crispasr --dump-params settings.
 2. 用场景检测器把音频分成场景（默认为 Semantic，12 到 48 秒）；
 3. 如果选择了语音增强器，清理每个场景的音频；增强器在模型打开之前关闭，两者不会同时占用 GPU 显存；
 4. 对每个场景运行语音分割器，把找到的语音组成 VAD 组；
-5. 把每个 VAD 组单独交给模型；没有语音增强器时，模型每个 Pass 只加载一次，有语音增强器时，每个视频的 ASR 步骤打开模型，结束后关闭；
+5. 把每个 VAD 组单独交给模型；没有语音增强器时，模型每一轮只加载一次，有语音增强器时，每个视频的 ASR 步骤打开模型，结束后关闭；
 6. 按下文各处理管线的规则，用每个 VAD 组的文字生成字幕；
 7. 合并各场景，并使用与 Qwen3-ASR 处理管线相同的三个清理过滤器：删除「あ。」「うん。」这类单独成行的字幕、只有呻吟或呼吸声的字幕，以及两个场景交界处的重复和重叠；
-8. 写出该 Pass 的字幕文件；若有另一个 Pass，Ensemble Mode 会把两者合并。
+8. 写出这一轮的字幕文件；若有另一轮，专家模式会把两者合并。
 
 **Parakeet-CrispASR：字幕在哪里断开。** 在一个 VAD 组内，只有遇到以下自然停顿时才开始新的一条字幕：
 
@@ -199,7 +199,7 @@ whisperjav --ensemble --pass1-pipeline parakeet-crispasr --dump-params settings.
 | `cohere-asr-ja` | `CKHO/cohere-asr-ja-GGUF` | `cohere-asr-ja-q8_0.gguf` |
 | 对齐器 `wav2vec2-ja`（Cohere-CrispASR；也是 ChronosJAV 的默认对齐器） | `cstr/wav2vec2-large-xlsr-53-japanese-GGUF` | `wav2vec2-large-xlsr-53-japanese-q4_k.gguf` |
 
-Cohere-CrispASR 的对齐器（232 MB）在该 Pass 第一次使用时下载，下载发生在 Pass 内部，而不是运行开始之前。如果下载失败，该 Pass 会在没有对齐器的情况下继续：每个 VAD 组成为一条字幕，时间为该组的起止位置（见[字幕是怎样生成的](#how-the-subtitles-are-made)）。ChronosJAV 的其他对齐器和时间模型会在 `whisperjav --check` 中列出，也见 [ChronosJAV 页面](chronosjav.md#subtitle-timing-1100)。
+Cohere-CrispASR 的对齐器（232 MB）在这一轮第一次使用时下载，下载发生在这一轮内部，而不是运行开始之前。如果下载失败，这一轮会在没有对齐器的情况下继续：每个 VAD 组成为一条字幕，时间为该组的起止位置（见[字幕是怎样生成的](#how-the-subtitles-are-made)）。ChronosJAV 的其他对齐器和时间模型会在 `whisperjav --check` 中列出，也见 [ChronosJAV 页面](chronosjav.md#subtitle-timing-1100)。
 
 - 文件保存在你的 Hugging Face 缓存文件夹中（Windows 默认 `C:\Users\<你的用户名>\.cache\huggingface\`，macOS 和 Linux 默认 `~/.cache/huggingface/`），之后的运行会直接使用。
 - 首次使用前，WhisperJAV 会核对文件是否为它所需的版本。下载损坏的文件会被删除并重新下载一次。
@@ -253,7 +253,7 @@ Cohere-CrispASR 的对齐器（232 MB）在该 Pass 第一次使用时下载，�
   In the GUI: open the Ensemble Mode tab and choose Parakeet-CrispASR or Cohere-CrispASR under GGUF in the Pass 1 or Pass 2 menu.
   ```
 
-- GUI 中，Transcription Mode 选项卡 Mode 菜单里的 **crispasr** 项已删除，Ensemble Mode 选项卡中带 Backend 选项的旧 **CrispASR** 处理管线也已删除。
+- GUI 中，Transcription Mode 选项卡 Mode 菜单里的 **crispasr** 项已删除，专家模式（Ensemble Mode）选项卡中带 Backend 选项的旧 **CrispASR** 处理管线也已删除。
 - `whispercpp` 后端在新的处理管线中没有替代。
 - 1.10.0 不再使用你下载的 `crispasr` 程序及其保存的模型（默认位于 `~/.cache/whisperjav/crispasr_models`），可以删除。
 
