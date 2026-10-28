@@ -902,12 +902,12 @@ class TestCompleteness:
         data_keys = {
             k for k in DEFAULT_GUI_SETTINGS if k not in ("version", "_comment")
         }
-        # 19 Tab 1 keys + 14 Tab 3 keys + 2 preset keys = 35
+        # 19 Tab 1 keys + 14 Tab 3 keys + 2 preset keys + 1 language key = 36
         # (v1.9.0: +skip_existing, +remember_settings;
         #  v1.9.2: +fail_on_empty, +fail_on_suspect, +asr_telemetry,
         #          +model_refresh_audio_minutes, +offline_mode (#415);
-        #  1.10.0: -accept_cpu_mode, design 22.5.1)
-        assert len(data_keys) == 35, (
-            f"Expected 35 settings keys, got {len(data_keys)}: {data_keys}"
+        #  1.10.0: -accept_cpu_mode, design 22.5.1; +ui_language, item 6)
+        assert len(data_keys) == 36, (
+            f"Expected 36 settings keys, got {len(data_keys)}: {data_keys}"
         )
         assert "accept_cpu_mode" not in data_keys
