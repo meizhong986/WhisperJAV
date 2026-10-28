@@ -1,6 +1,7 @@
 """
 The timing model's rules (whisperjav/modules/subtitle_pipeline/timing_rules.py; item 12 C3, design note
-docs/plans/design/2026-10-28-chronosjav-timing-c3-c1.md section 5.2, rules T1-T8 as revised after W255).
+docs/plans/design/2026-10-28-chronosjav-timing-c3-c1.md section 5.2, rules T1-T8 as revised after W255; T2 and T6
+start at the aligner and T9 added after tuning, owner W296).
 
 The inputs are the probe figures of 2026-10-27 (design note section 14): group A of The.Naked.Director
 S02E02 Scene 5 (6.40-10.19 s), the wav2vec2-ja aligner's character times, and Whisper small's DTW onsets.
@@ -63,8 +64,13 @@ class TestSpeechStart:
 
 
 class TestGroupA:
-    def test_the_sentence_change_becomes_two_subtitles(self):
+    def test_the_sentence_change_becomes_two_subtitles_starting_at_the_aligner(self):
+        # T2/T6 since tuning (owner W296 1): each part starts at its first character's aligner time.
         got = text_and_times(pieces(words(GROUP_A), WHISPER_A, FRAME_S))
+        assert got == [("近くのカラオケでそのまま酔っぱらっちゃった。", 0.26, 3.10), ("それで？", 3.10, 3.79)]
+
+    def test_without_aligner_times_the_parts_start_at_the_onsets(self):
+        got = text_and_times(pieces(words(GROUP_A), WHISPER_A, FRAME_S, aligner_start=False))
         assert got == [("近くのカラオケでそのまま酔っぱらっちゃった。", 0.32, 3.30), ("それで？", 3.30, 3.79)]
 
     def test_the_boundary_inside_a_word_gives_no_split(self):
@@ -76,8 +82,12 @@ class TestGroupA:
         pieces(w, WHISPER_A, FRAME_S)
         assert w == words(GROUP_A)
 
-    def test_with_split_off_only_the_start_moves(self):
+    def test_with_split_off_and_aligner_times_nothing_moves(self):
         got = text_and_times(pieces(words(GROUP_A), WHISPER_A, FRAME_S, allow_split=False))
+        assert got == [("近くのカラオケでそのまま酔っぱらっちゃった。それで？", 0.26, 3.79)]
+
+    def test_with_split_off_and_no_aligner_times_only_the_start_moves(self):
+        got = text_and_times(pieces(words(GROUP_A), WHISPER_A, FRAME_S, allow_split=False, aligner_start=False))
         assert got == [("近くのカラオケでそのまま酔っぱらっちゃった。それで？", 0.32, 3.79)]
 
     def test_without_counted_segments_nothing_changes(self):
@@ -127,10 +137,43 @@ class TestTimes:
         assert all(0.0 <= w["start"] <= w["end"] <= FRAME_S for w in flat)
         assert all(a["start"] <= b["start"] for a, b in zip(flat, flat[1:]))
 
-    def test_words_before_a_late_onset_move_to_it(self):
+    def test_without_aligner_times_words_before_a_late_onset_move_to_it(self):
+        w = words([("あ", 0.1, 0.12), ("い", 0.2, 0.22), ("う", 0.9, 1.5)])
+        part = pieces(w, [TimedSegment(0.5, 0.0, True)], 1.5, aligner_start=False)[0]
+        assert [(x["start"], x["end"]) for x in part] == [(0.5, 0.5), (0.5, 0.5), (0.9, 1.5)]
+
+    def test_with_aligner_times_a_late_onset_moves_nothing(self):
         w = words([("あ", 0.1, 0.12), ("い", 0.2, 0.22), ("う", 0.9, 1.5)])
         part = pieces(w, [TimedSegment(0.5, 0.0, True)], 1.5)[0]
-        assert [(x["start"], x["end"]) for x in part] == [(0.5, 0.5), (0.5, 0.5), (0.9, 1.5)]
+        assert [(x["start"], x["end"]) for x in part] == [(0.1, 0.12), (0.2, 0.22), (0.9, 1.5)]
 
     def test_empty_words_give_nothing(self):
         assert pieces([], WHISPER_A, FRAME_S) == []
+
+
+# T9 (owner W296 2): a split never leaves a part a later line filter would remove. The words are the shape of
+# anime-whisper's line in The.Naked.Director S02E02 Scene 5, where the split after "…" lost "はぁはぁ…".
+MOAN_THEN_WORDS = [("は", 0.10, 0.12), ("ぁ", 0.20, 0.22), ("は", 0.30, 0.32), ("ぁ…", 0.40, 0.42),
+                   ("他", 1.00, 1.02), ("に", 1.10, 1.12), ("は", 1.20, 1.22), ("ど", 1.30, 1.32), ("う?", 1.40, 1.80)]
+MOAN_SEGS = [TimedSegment(0.10, 0.0, True), TimedSegment(1.00, 0.0, True)]
+
+
+class TestNoSplitCostsText:
+    def test_without_the_filters_test_the_moan_is_split_off(self):
+        assert [t for t, _, _ in text_and_times(pieces(words(MOAN_THEN_WORDS), MOAN_SEGS, 1.8))] == [
+            "はぁはぁ…", "他にはどう?"]
+
+    def test_a_part_the_filters_would_remove_stays_with_the_next(self):
+        got = text_and_times(pieces(words(MOAN_THEN_WORDS), MOAN_SEGS, 1.8,
+                                    removable=lambda t: t == "はぁはぁ…"))
+        assert got == [("はぁはぁ…他にはどう?", 0.10, 1.80)]
+
+    def test_a_last_part_the_filters_would_remove_stays_with_the_one_before(self):
+        w = words([("そ", 0.1, 0.12), ("う。", 0.3, 0.32), ("あ", 1.0, 1.02), ("っ", 1.1, 1.5)])
+        segs = [TimedSegment(0.1, 0.0, True), TimedSegment(1.0, 0.0, True)]
+        assert len(pieces(w, segs, 1.5)) == 2
+        assert [t for t, _, _ in text_and_times(pieces(w, segs, 1.5, removable=lambda t: t == "あっ"))] == [
+            "そう。あっ"]
+
+    def test_parts_with_words_are_still_split(self):
+        assert len(pieces(words(GROUP_A), WHISPER_A, FRAME_S, removable=lambda t: False)) == 2
