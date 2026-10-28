@@ -15,10 +15,15 @@ import logging
 import os
 import shutil
 import sys
+import threading
 from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+# pywebview runs each GUI call on its own thread: the form's save and the language switch
+# (1.10.0, item 6) can arrive together, and each reads, merges and writes the whole file.
+_SAVE_LOCK = threading.Lock()
 
 SETTINGS_SCHEMA_VERSION = "1.0.0"
 _MAX_BACKUPS = 3
@@ -75,6 +80,11 @@ DEFAULT_GUI_SETTINGS = {
     "merge_strategy": "pass1_primary",
     "pass1_preset": "",
     "pass2_preset": "",
+
+    # 1.10.0 (item 6, #448; owner W283 3): the interface language, "en" or "zh-CN".
+    # "" until the user first switches; the GUI then follows the computer's display
+    # language. Saved whether Remember settings is on or off (save_gui_settings merges).
+    "ui_language": "",
 }
 
 
@@ -249,18 +259,19 @@ def save_gui_settings(settings: dict) -> bool:
     settings_path = get_gui_settings_path()
 
     try:
-        # Load existing to preserve keys the caller didn't touch
-        existing = load_gui_settings()
-        for key, value in settings.items():
-            if key not in ("version", "_comment"):
-                existing[key] = value
+        with _SAVE_LOCK:
+            # Load existing to preserve keys the caller didn't touch
+            existing = load_gui_settings()
+            for key, value in settings.items():
+                if key not in ("version", "_comment"):
+                    existing[key] = value
 
-        # Ensure metadata
-        existing["version"] = SETTINGS_SCHEMA_VERSION
-        existing["_comment"] = DEFAULT_GUI_SETTINGS["_comment"]
+            # Ensure metadata
+            existing["version"] = SETTINGS_SCHEMA_VERSION
+            existing["_comment"] = DEFAULT_GUI_SETTINGS["_comment"]
 
-        # Atomic write with junction-safe fallback (#309)
-        atomic_write_json(settings_path, existing, logger_=logger)
+            # Atomic write with junction-safe fallback (#309)
+            atomic_write_json(settings_path, existing, logger_=logger)
 
         logger.debug("GUI settings saved to %s", settings_path)
         return True
