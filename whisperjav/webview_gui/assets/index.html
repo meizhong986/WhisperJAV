@@ -20,6 +20,9 @@
                     <span class="update-indicator-dot"></span>
                     <span id="updateIndicatorText">Update available</span>
                 </a>
+                <!-- 1.10.0 (item 6, #448): English / Simplified Chinese. The button names the
+                     language it switches to, so it is never translated itself. -->
+                <button id="langBtn" class="theme-button lang-button" data-i18n-skip title="English / 中文" aria-label="English / 中文">中文</button>
                 <!-- Minimal theme switch button -->
                 <button id="themeBtn" class="theme-button" aria-label="Theme" title="Theme">
                     🎨
@@ -1115,7 +1118,7 @@
                     </div>
                 </div>
                 <div class="section-content">
-                    <div class="console-output" id="consoleOutput">
+                    <div class="console-output" id="consoleOutput" data-i18n-skip>
                         <div class="console-line">Ready.</div>
                     </div>
                 </div>
@@ -1221,7 +1224,7 @@
                         <span class="changelog-version" id="changelogVersion">v1.7.5</span>
                         <span class="changelog-date" id="changelogDate"></span>
                     </div>
-                    <div class="changelog-notes" id="changelogNotes">
+                    <div class="changelog-notes" id="changelogNotes" data-i18n-skip>
                         <!-- Release notes will be inserted here -->
                     </div>
                 </div>
@@ -1281,7 +1284,7 @@
                             <div id="stableReleaseNotes" class="release-notes-section" style="display: none;">
                                 <details class="release-notes-details">
                                     <summary>Release Notes</summary>
-                                    <div id="stableReleaseNotesContent" class="release-notes-content"></div>
+                                    <div id="stableReleaseNotesContent" class="release-notes-content" data-i18n-skip></div>
                                 </details>
                             </div>
                             <div id="stableActions" class="track-actions" style="display: none;">
@@ -1308,7 +1311,7 @@
                             </div>
                             <div id="devCommitsList" class="dev-commits-list" style="display: none;">
                                 <div class="commits-header">Recent commits:</div>
-                                <ul id="devRecentCommits" class="commits-list"></ul>
+                                <ul id="devRecentCommits" class="commits-list" data-i18n-skip></ul>
                             </div>
                             <div id="devActions" class="track-actions" style="display: none;">
                                 <button id="updateToDev" class="btn btn-secondary btn-sm">Open Release Page</button>
@@ -1556,7 +1559,8 @@
         </div>
     </div>
 
-    <!-- JavaScript -->
+    <!-- JavaScript. i18n_zh.js: the Simplified Chinese texts (1.10.0, item 6), read by I18n in app.js -->
+    <script src="i18n_zh.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
