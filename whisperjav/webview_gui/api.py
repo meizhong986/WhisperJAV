@@ -4024,6 +4024,9 @@ class WhisperJAVAPI:
         "merge_strategy":            "mergeStrategy",
         "pass1_preset":              "pass1Preset",
         "pass2_preset":              "pass2Preset",
+        # 1.10.0 (item 6): read and saved through get_ui_language / set_ui_language, not
+        # with the form; mapped so get_gui_settings reports it like every other key.
+        "ui_language":               "uiLanguage",
     }
     # Reverse mapping (camelCase → snake_case)
     _GUI_SETTINGS_MAP_REV = {v: k for k, v in _GUI_SETTINGS_MAP.items()}
@@ -4059,6 +4062,51 @@ class WhisperJAVAPI:
 
             ok = save_gui_settings(backend_settings)
             return {"success": ok}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    # ------------------------------------------------------------------
+    # Interface language (1.10.0, item 6, #448; owner W283)
+    # ------------------------------------------------------------------
+
+    UI_LANGUAGES = ("en", "zh-CN")
+
+    @staticmethod
+    def _display_language_is_chinese() -> bool:
+        """True when the computer's display language is Chinese (any kind)."""
+        try:
+            if sys.platform == "win32":
+                import ctypes
+                langid = ctypes.windll.kernel32.GetUserDefaultUILanguage()
+                return (langid & 0x3FF) == 0x04  # primary language: Chinese
+            import locale
+            name = (locale.getlocale()[0] or os.environ.get("LC_ALL")
+                    or os.environ.get("LC_MESSAGES") or os.environ.get("LANG") or "")
+            return name.lower().startswith("zh")
+        except Exception:
+            return False
+
+    def get_ui_language(self) -> Dict[str, Any]:
+        """The language the GUI shows: the saved choice, or at the first start the
+        computer's display language (Chinese -> "zh-CN", anything else -> "en")."""
+        try:
+            from whisperjav.settings.gui_settings import load_gui_settings
+            saved = load_gui_settings().get("ui_language", "")
+        except Exception:
+            saved = ""
+        if saved in self.UI_LANGUAGES:
+            return {"success": True, "language": saved, "saved": True}
+        language = "zh-CN" if self._display_language_is_chinese() else "en"
+        return {"success": True, "language": language, "saved": False}
+
+    def set_ui_language(self, language: str) -> Dict[str, Any]:
+        """Save the language the user switched to. Kept whether Remember settings is
+        on or off: save_gui_settings merges this one key into the file."""
+        if language not in self.UI_LANGUAGES:
+            return {"success": False, "error": f"Unknown interface language: {language!r}"}
+        try:
+            from whisperjav.settings.gui_settings import save_gui_settings
+            return {"success": bool(save_gui_settings({"ui_language": language}))}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
