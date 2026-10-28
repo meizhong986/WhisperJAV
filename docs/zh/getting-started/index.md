@@ -35,7 +35,7 @@ WhisperSeg 语音分割器在所有安装中都在 CPU 上运行。
 
 **以后更换加速器：** 再次运行安装程序。它会显示选项，并预先选中当前安装的加速器。`whisperjav-upgrade` 从不更改它。
 
-**某一次运行改用 CPU：** 在那次运行中加上 `--device cpu`。在 GUI 中，集成模式通道的 Customize 窗口有一个 Device 菜单；选 "CPU (not accelerated)" 会让该通道使用 CPU（GGUF 处理管线不提供此项）。当 NVIDIA GPU 安装的 GPU 无法使用时，GUI 会提供 "Run on the CPU this time"（这次在 CPU 上运行）。
+**某一次运行改用 CPU：** 在那次运行中加上 `--device cpu`。在 GUI 中，专家模式中每一轮的 Customize 窗口有一个 Device 菜单；选 "CPU (not accelerated)" 会让这一轮使用 CPU（GGUF 处理管线不提供此项）。当 NVIDIA GPU 安装的 GPU 无法使用时，GUI 会提供 "Run on the CPU this time"（这次在 CPU 上运行）。
 
 **WhisperJAV 1.10.0 中的 Intel GPU：** 在 Windows 上，GGUF 处理管线（Parakeet-CrispASR 和 Cohere-CrispASR）可以通过 Vulkan 使用 Intel GPU——实验性，未经测试。WhisperJAV 1.10.0 不通过 PyTorch（Intel 的 XPU 版本）使用 Intel GPU：使用这种 PyTorch 时，其他处理管线在 CPU 上运行。通过 PyTorch 支持 Intel GPU 计划在 1.10.1 中研究。
 
