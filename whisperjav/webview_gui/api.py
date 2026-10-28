@@ -2209,6 +2209,8 @@ class WhisperJAVAPI:
     # approved by the owner as drafted (W268); design note 2026-10-28 sections 8-9, Q3, Q10.
     QWEN3_PYTORCH_ALIGNER = "Qwen/Qwen3-ForcedAligner-0.6B"
     ALIGNER_NOT_MEASURED = "new in 1.10.0; not yet measured against reference subtitles"
+    # The default aligner with the timing model was measured in tuning (owner W301).
+    TIMING_MODEL_NEW = "new in 1.10.0"
 
     def _aligner_and_timing_schema(self) -> Dict[str, Any]:
         """The aligner backend, aligner model and timing model dropdowns of the Alignment tab."""
@@ -2248,10 +2250,11 @@ class WhisperJAVAPI:
             "timing_model": {
                 "type": "dropdown",
                 "label": "Timing Model (Whisper)",
-                "description": ("Finds where speech starts and where a new sentence starts inside each VAD "
-                                "group; its text is not used. "
+                "description": ("Finds where a new sentence starts inside each VAD group, so two sentences "
+                                "can become two subtitles; where the aligner gave no times, it also moves the "
+                                "start to where speech starts. Its text is not used. "
                                 f"{timing.label}, {install.mb(timing.size)}, downloaded on first use; "
-                                f"{self.ALIGNER_NOT_MEASURED}."),
+                                f"{self.TIMING_MODEL_NEW}."),
                 "options": [
                     {"value": timing.name, "label": f"{timing.label} (recommended)"},
                     {"value": "none", "label": "None (no timing model)"},
