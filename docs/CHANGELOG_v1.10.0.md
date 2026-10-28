@@ -398,6 +398,61 @@ before the review (`run1_before_review\`) 39 batches, 2 retried; on the final co
 validation (the log does not say which check failed), exit 0, no label in any output, no warning line. Not seen: a real model
 writing labels (the reporter's model was not run).
 
+## Item 6 — the GUI in Simplified Chinese (#448; REQ6; owner W283, W286–W288)
+
+Texts approved by the owner as drafted (W290; the release notes with a Key points line).
+
+**Why.** Roadmap R01: "The option for users to switch UI language between English and Chinese… For 1.10.0 the scope can be UI
+only. The program outputs and docstrings and such can stay as is." In #448, users translated 1.9.3, 1.9.4 and 1.9.5 by hand
+with an AI tool; every update brought the English back.
+
+**What the user sees.**
+- A **中文** / **English** button in the header (next to the theme button) switches the window at once; the file list and a
+  running job are not touched. In Chinese: the window, dialogs, tooltips, placeholders, status texts, confirm boxes, and the
+  Customize Parameters labels and descriptions (W283 2). Stays English: the console (the GUI's own log lines too), file names,
+  messages from the program (also inside Chinese pop-up boxes), the Parameter Guide page (`qwen_guide.html`), the Windows file
+  dialogs' filter names, the window title.
+- The choice is saved in `gui_settings.json` (`ui_language`) and kept whatever **Remember settings** is (W283 3). Until the user
+  first switches, the GUI follows the display language: Windows `GetUserDefaultUILanguage()` (any Chinese → Chinese; Traditional
+  Chinese Windows gets Simplified), elsewhere the locale (`LANG`); so a 1.9.x user on Chinese Windows sees Chinese at the first
+  1.10.0 start. A Mac app started from Finder often has no Chinese locale set and then starts in English.
+- Simplified Chinese only (W283 1). Terms, by the owner (W286–W288): Ensemble tab 专家模式, Transcription Mode tab 基础模式,
+  the second tab 高级选项, Pass 第一轮 / 第二轮, Aggressive / Balanced / Conservative 高灵敏 / 中灵敏 / 低灵敏, transcription
+  转写 (translation 翻译), making subtitles 生成字幕, translating subtitle files AI 字幕翻译 with the provider area naming
+  大语言模型. Other terms follow docs/zh; pipeline, model and program names stay as they are. "Recognizer" in an English
+  tooltip is "ASR 模型" (W10); the GPU status lines say 请求使用 ("asks for"), as the English does.
+- docs/zh takes the same terms (W288): 14 pages, about 175 lines (集成模式 → 专家模式, 通道 → 轮, 激进 / 均衡 / 保守 → 高 / 中 /
+  低灵敏, 转录 → 转写, 语音识别 → ASR); the GUI guides (English and Chinese) get a section on the switch, the Chinese one a
+  table of the main control names in both languages.
+
+**How it works.** One catalogue, `webview_gui/assets/i18n_zh.js` (818 texts, 78 kept as they are), keyed by the English text.
+`I18n` in `app.js` translates what the window shows, and a MutationObserver translates what `app.js` and the Python schemas add
+later, so `api.py`, the YAML files and the English HTML stay as they are. A key may hold computed parts (`{name}`); a part that
+is itself a catalogue text is translated too, a part named `raw_…` (a preset name, a file, a message from the program) never.
+Switching back restores the English kept per node. Code that reads shown text back (`pipelineLabel`, the " (N/A)" menu marks,
+the Apply / Test Connection buttons, the saved Balanced segmenter list) reads the English. "Balanced" is translated as a
+sensitivity only inside the pass sensitivity menus (it stays as the pipeline name). The ClearVoice warning was rebuilt from
+whole sentences; its English is unchanged. Saving `gui_settings.json` now holds a lock (the language switch and the form save
+run on separate threads).
+
+**Checked.** New `tests/test_gui_i18n_zh.py` (14 passed): every text from `index.html`, the `app.js` literals that reach the
+window or a pop-up box, the Customize schemas and the CrispASR panel lines in `api.py` and `accelerators.py`, the tool YAML
+`gui` sections, the Hugging Face model list and the labels `app.js` builds from parameter and group names must have a Chinese
+entry or be listed as kept; the catalogue's form; one Chinese text per English text (except AI 字幕翻译, the owner's choice for
+both the tab and the tick box); no 识别 and none of the replaced terms; the saved language (first start Chinese / English,
+kept with Remember settings off, a bad value refused). `tests/test_gui_settings.py` (56 passed; 36 keys now). The other GUI
+test files, one per process: all passed. 18 lookup checks in Node (`node_lookup_check.js`). The real GUI driven by a script
+(`drive_gui.py`, settings file in a temporary folder) through the button, every tab, every pass-1 pipeline's Customize window
+and tabs, pass 2, Translation Settings and About: no errors; the click saved `zh-CN`, then `en`; left in English only preset
+names and model names; after switching back, no Chinese left. One `assessment-adversary` review: the GPU lines said "uses"
+(fixed: 请求使用), one 识别 (fixed), a preset named "Default" shown as 默认 (fixed: data parts never translated, the preset
+badge skipped), the Apply / Test Connection text in the old language after a quick switch (fixed), a possible lost save
+(fixed: lock); it could not refute the rest (no runaway work with 3,000 console lines, values and typed text untouched, the
+saved language through restart and Remember settings on/off).
+
+**Limits.** The window shows English for under a second at start-up, before the saved language is applied. Text split by
+inline tags is translated in pieces ("将要下载 4.7 GB."). The owner's click test of the final build is still to come.
+
 ---
 
 ## Found during the work, not fixed in 1.10.0 (requirements §5; places as decided or proposed)
