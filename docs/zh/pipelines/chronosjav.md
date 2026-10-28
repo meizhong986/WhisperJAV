@@ -24,17 +24,17 @@ ChronosJAV 是一个专为动漫和 JAV 内容设计的处理管线，基于专�
 
 ### GUI
 
-1. 进入 **Ensemble** 选项卡
+1. 进入 **专家模式**（Ensemble）选项卡
 2. 将 **Pipeline** 设置为 **ChronosJAV**
 3. 从下拉菜单中选择一个**模型**
 4. 点击 **Start**
 
-### 作为集成模式的一部分
+### 作为专家模式的一部分
 
 若要获得最高质量，可将 ChronosJAV 与另一个处理管线组合使用：
 
-1. **Pass 1：** ChronosJAV 搭配 anime-whisper
-2. **Pass 2：** Qwen3-ASR 或 Balanced
+1. **第一轮：** ChronosJAV 搭配 anime-whisper
+2. **第二轮：** Qwen3-ASR 或 Balanced
 3. **合并策略：** Smart Merge
 
 ---
@@ -70,7 +70,7 @@ ChronosJAV 的 ASR 模型只输出文字，不带时间。在 1.10.0 之前，Qw
 | 时间模型 | **Timing Model (Whisper)**：Whisper small (recommended)、None (no timing model) | `--qwen-timing-model whisper-small`（默认）或 `none` |
 | Step-Down | **Adaptive Step-Down**（默认关闭） | `--qwen-stepdown`（默认关闭） |
 
-在命令行的集成模式通道中，同样的选项写在 `--pass1-qwen-params` 里，例如 `'{"aligner_backend": "crispasr", "aligner_id": "qwen3-fa-gguf", "timing_model": "none"}'`。
+在命令行中专家模式的每一轮中，同样的选项写在 `--pass1-qwen-params` 里，例如 `'{"aligner_backend": "crispasr", "aligner_id": "qwen3-fa-gguf", "timing_model": "none"}'`。
 
 - 不推荐 `parakeet-ctc-ja`：在我们的测试中，它给出的时间是均匀分布的。
 - 不用对齐器时，时间模型仍会移动每条字幕的开始时间，但不切分。
