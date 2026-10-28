@@ -61,6 +61,71 @@ def apply_translation_context_filter(translator) -> bool:
     return True
 
 
+# PySubtrans keeps a subtitle's text even when the model repeats the answer
+# format inside it, e.g. "Hello.\nTranslation>\nHello." (#460). These labels
+# are never translated text. The label word is PySubtrans's task type.
+def _format_marker(task_type: str = "Translation"):
+    word = re.escape(task_type if isinstance(task_type, str) and task_type else "Translation")
+    return re.compile(
+        rf"^[ \t]*(?:(?:{word}|Original)>|</?{word}>|#[0-9]+[ \t\r]*$)",
+        re.MULTILINE,
+    )
+
+
+def format_marker_lines(lines, task_type: str = "Translation") -> list:
+    """Return the numbers of the subtitles whose text holds an answer-format label."""
+    marker = _format_marker(task_type)
+    return [line.number for line in lines or ()
+            if line.text and marker.search(line.text)]
+
+
+def apply_format_marker_check(translator) -> bool:
+    """Make PySubtrans's own check report format labels, so its retry asks again."""
+    client = getattr(translator, "client", None)
+    if client is None or not hasattr(client, "GetParser"):
+        return False
+
+    from PySubtrans.SubtitleError import TranslationValidationError
+
+    original = client.GetParser
+
+    def get_parser(*args, **kwargs):
+        parser = original(*args, **kwargs)
+        validate = parser.ValidateTranslations
+
+        def validate_translations():
+            errors = validate()
+            numbers = format_marker_lines(parser.translated, parser.task_type)
+            if numbers:
+                lines = [line for line in parser.translated if line.number in numbers]
+                errors.append(TranslationValidationError(
+                    f"Subtitles {', '.join(f'#{n}' for n in numbers)} contain the answer-format labels "
+                    "(Translation>, Original> or a #number line) inside the translated text. Give each "
+                    "subtitle once, as #number, then Translation>, then only its translation.",
+                    lines=lines,
+                ))
+            return errors
+
+        parser.ValidateTranslations = validate_translations
+        return parser
+
+    client.GetParser = get_parser
+    return True
+
+
+def srt_format_marker_entries(path, task_type: str = "Translation") -> list:
+    """Entry numbers of the saved SRT whose text holds a format label.
+
+    Read from the written file: PySubtrans numbers the SRT entries again,
+    so its own line numbers differ once an earlier line is untranslated.
+    """
+    import pysrt
+
+    marker = _format_marker(task_type)
+    return [item.index for item in pysrt.open(str(path), encoding="utf-8-sig")
+            if marker.search(item.text)]
+
+
 def clean_resumed_translation_tags(project) -> int:
     """Remove tags already saved in a .subtrans project before resume skips them."""
     changed = 0
@@ -831,6 +896,10 @@ def translate_subtitle(
             if not apply_translation_context_filter(translator):
                 print("[TRANSLATE]   WARNING: Could not install context tag filter", file=sys.stderr)
 
+        # #460: a subtitle holding Translation>/Original> is an error, so PySubtrans retries the batch
+        if not apply_format_marker_check(translator):
+            print("[TRANSLATE]   WARNING: Could not install format marker check", file=sys.stderr)
+
         translator.resume = True
         print(f"[TRANSLATE]   Resume mode: enabled (will skip already-translated batches)", file=sys.stderr)
 
@@ -1122,6 +1191,21 @@ def translate_subtitle(
                         output_path = _default_outpath
                         print(f"[TRANSLATE]   Using fallback output: {_default_outpath.name}",
                               file=sys.stderr)
+
+        # #460 (W279 2): labels the retry did not remove (or a resumed batch kept)
+        # stay in the text; name the entries of the file actually written
+        if output_path.is_file():
+            try:
+                _marked = srt_format_marker_entries(output_path, options.get('task_type'))
+            except Exception as _e:
+                _marked = []
+                print(f"[TRANSLATE]   Warning: Could not check {output_path.name} for format labels: {_e}",
+                      file=sys.stderr)
+            if _marked:
+                _shown = ", ".join(f"#{n}" for n in _marked[:20]) + (", …" if len(_marked) > 20 else "")
+                print(f"[TRANSLATE] WARNING: {len(_marked)} translated subtitles still contain answer-format "
+                      f"labels (Translation>, Original> or a #number line): {_shown} — "
+                      f"check them in {output_path.name}", file=sys.stderr)
 
         # =========================================================================
         # DIAGNOSTIC: Final Summary — truthful status
