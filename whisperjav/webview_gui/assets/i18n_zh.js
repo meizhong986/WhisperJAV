@@ -601,7 +601,7 @@ window.WJ_I18N_ZH = {
   "None (no aligner)": "无（不用对齐器）",
   "Aligner Model": "对齐模型",
   "Timing Model (Whisper)": "计时模型（Whisper）",
-  "Finds where speech starts and where a new sentence starts inside each VAD group; its text is not used. {a}, {b}, downloaded on first use; {c}.": "在每个 VAD 组内找出语音开始和新句子开始的位置；它写出的文本不会被使用。{a}，{b}，首次使用时下载；{c}。",
+  "Finds where a new sentence starts inside each VAD group, so two sentences can become two subtitles; where the aligner gave no times, it also moves the start to where speech starts. Its text is not used. {a}, {b}, downloaded on first use; {c}.": "在每个 VAD 组内找出新句子开始的位置，使两句话可以成为两条字幕；对齐器没有给出时间的地方，它还会把开始时间移到语音开始处。它写出的文本不会被使用。{a}，{b}，首次使用时下载；{c}。",
   "{model} (recommended)": "{model}（推荐）",
   "None (no timing model)": "无（不用计时模型）",
   "ASR Model": "ASR 模型",
