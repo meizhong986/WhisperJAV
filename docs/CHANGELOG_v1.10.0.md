@@ -356,6 +356,50 @@ with the real XXL (end-to-end with the stand-in only).
 
 ---
 
+## Item 11c — answer-format labels in translated subtitles (#460; owner W279)
+
+**Why.** #460 (Ollama, `huihui_ai/qwen2.5-abliterate:7b`, Japanese → Chinese): `Translation>` and repeated lines stayed in the
+translated SRT — 6 of 397 batches, 45 of 2,596 subtitles; reproduced by the reporter on 1.9.5 / PySubtrans 1.6.0 by replaying
+saved answers. The reporter's script, run in WJ110 (PySubtrans 1.6.0): as whole answers, four of the five malformed forms give a
+subtitle holding the label and no error from PySubtrans's check, so PySubtrans's own retry (`retry_on_error`, on by default) does
+not run. Inside a batch of correct entries (review probe), only the two forms with a trailing `Translation>` stay silent; the
+other two leave the line unmatched, which PySubtrans already retried. The fifth form (four numbered lines inside
+`<Translation>…</Translation>`) already failed the newline and unmatched-line checks and was retried; the retry's broken text was
+kept. The reporter's six batches were not seen, so which of these happened there is not known.
+
+**What the user sees.**
+- A translated subtitle whose text holds `Translation>` or `Original>` at the start of a row, a `<Translation>` / `</Translation>`
+  tag, or a row that is only `#number` (ASCII digits; Windows line ends allowed), is an error in PySubtrans's check, for every
+  provider (W279 1; `core.py: apply_format_marker_check()`, which wraps `client.GetParser`; the label word follows PySubtrans's
+  task type, `Translation` unless an instruction file sets another). With PySubtrans's defaults (`RETRY_ON_ERROR` on,
+  `AUTOSPLIT_ON_ERROR` off) it then asks once more for that batch, with its retry instructions (its own default text when the
+  instruction file has none) and the error text naming the subtitles. Nothing is cut or rewritten by WhisperJAV; PySubtrans's
+  own post-processing (line breaks, an unclosed `<summary>` cut) runs as before.
+- If the saved SRT still holds labels (the retry failed, or a resumed batch kept them), the subtitles are kept and one console
+  line names their entry numbers, read from the file actually written — PySubtrans numbers the SRT again, so its own line
+  numbers differ once an earlier line is untranslated (found by the review) (W279 2; text approved by the owner as drafted, W280): "[TRANSLATE] WARNING: {n}
+  translated subtitles still contain answer-format labels (Translation>, Original> or a #number line): #21, #34 — check them in
+  {output file}" (at most 20 numbers). Not checked when the run stops with an error before the save.
+- Not caught: a label in the middle of a row ("Hello. Translation> Hello."), a lowercase `translation>`. A translated row that is
+  only `#1` (a ranking, a hashtag) is taken as a label: one extra request and a console line.
+- The #455 context-tag filter is unchanged (Ollama only).
+
+**Checked.** New `tests/test_translation_format_markers.py` (7 passed): the reporter's six answers (the normal one gives no error,
+each malformed one an error naming its subtitle); ordinary text with `#` or `>` is not flagged; Windows line ends and another
+task type; three end-to-end runs of `translate_subtitle()` through the real PySubtrans against a stand-in OpenAI-compatible
+server — an answer with labels and then a clean one (2 requests, the second carries the error text, clean SRT); labels twice
+(2 requests, text kept, the console line names #1, the SRT entry that holds the label); the first line never translated (the
+console line names entry 1 of the saved file, where the model's #2 landed). With the call in `translate_subtitle()` removed, the
+first two fail (`s11c_mutation_check.py`). 11 translation test files, one per process: all passed. One `assessment-adversary`
+review: the console line's numbers (fixed: read from the saved SRT), the cause stated too broadly, a wrong code comment, Windows
+line ends and the task type (fixed), the limits above (written here). Real run: `whisperjav-translate --provider
+ollama --model qwen2.5:7b -t chinese` on the seven Netflix reference SRTs (`D:\WJ110_measure\translate_460_2026-10-27\`), twice:
+before the review (`run1_before_review\`) 39 batches, 2 retried; on the final code 39 batches, 3 retried — every retry passed
+validation (the log does not say which check failed), exit 0, no label in any output, no warning line. Not seen: a real model
+writing labels (the reporter's model was not run).
+
+---
+
 ## Found during the work, not fixed in 1.10.0 (requirements §5; places as decided or proposed)
 
 | | Finding | Place |
