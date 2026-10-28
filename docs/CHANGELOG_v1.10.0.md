@@ -278,10 +278,12 @@ ended at the VAD group's edges, and two sentences (often two speakers) in one VA
   came back evenly spread in WhisperJAV's tests, W255). The PyTorch Qwen3-ForcedAligner stays a choice (its model ID); `vad_only`
   loads no aligner. anime-whisper is no longer forced to `vad_only` with step-down off (W254 Q6).
 - **A timing model**, Whisper small through CrispASR's DTW class (488 MB; W255), runs as orchestrator step 8 after the aligner
-  is unloaded. Whisper's text is thrown away. It moves a subtitle's start later to the first onset Whisper counts as speech
-  (rule T2) and splits a VAD group in two at a mark of the text (。？！… 、 a closing mark, a space) near where Whisper starts
-  a new segment (T4); no mark, no split; no number of characters or seconds decides a cut (W203). `--qwen-timing-model none`
-  turns it off; without an aligner it moves starts only (T5).
+  is unloaded. Whisper's text is thrown away. It splits a VAD group in two at a mark of the text (。？！… 、 a closing mark,
+  a space) near where Whisper starts a new segment (T4); no mark, no split; no number of characters or seconds decides a cut
+  (W203). Each subtitle starts at its first character's aligner time; only where there is no aligner time (a frame without
+  word times, a collapsed scene, no aligner) does the start move later, to the first onset Whisper counts as speech (rule T2
+  as changed in tuning, W296 1; see "Tuning" below). `--qwen-timing-model none` turns it off; without an aligner it moves
+  starts only (T5).
 - **Step-down is off by default** for every ChronosJAV model (W266 1). Under `aligner_vad_fallback` with regrouping off, a
   scene the collapse check flags takes the aligner-free times (VAD-group edges, start moved by the timing model, no splits).
   Step-down stays a setting; its retry uses groups up to 6 s (the design note had said "shorter", corrected in v3).
@@ -310,6 +312,56 @@ speaker change. The owner's GUI click passed (W264). One `assessment-adversary` 
 design note v3 §15). Not run: a real step-down retry, a real load failure, `--device cpu`, Cohere inside ChronosJAV (gated
 model; skipped, W265). Not measured against the reference subtitles; the start rule T2 is to be judged from the owner's
 manual tests (W266 2). Design: `docs/plans/design/2026-10-28-chronosjav-timing-c3-c1.md` v3.
+
+---
+
+## Tuning (plan step 6) — 1.10.0 measured against 1.9.5; ChronosJAV's start rule; the run summary (owner W293–W301)
+
+**Why.** W293: measure 1.10.0 against 1.9.5 on the 7 Netflix scenes of The Naked Director (subeval, Netflix's Japanese
+subtitles as the reference, W94–W95) before release; W266 Q2 had left ChronosJAV's start rule T2 to this measurement.
+
+**Step 1 findings** (report `docs/plans/design/2026-10-28-tuning-step1-report.md` v2, after one `assessment-adversary`
+review). The Whisper pipelines score as in 1.9.5. ChronosJAV's T2 (start at the timing model's first onset) made starts late:
+aligner only → shipped, 125 of 146 paired starts later, none earlier, median +0.14 s, worse on 6 of 6 scenes for Qwen3-ASR.
+T4's splits mostly fall on the reference's line breaks. One split cost text: anime-whisper's "はぁはぁ…" in S02E02 Scene 5 went
+onto its own subtitle and the non-linguistic utterance filter deleted it. The run summary said "Aligner native: 0.0%" on
+every ChronosJAV run.
+
+**What changed.**
+- **T2** (W296 1): each subtitle starts where the aligner puts its first character; the onset start remains only where
+  there is no aligner time (`timing_rules.pieces(aligner_start=...)`; the collapsed-scene call passes False). The timing
+  model and its T4 splits stay. With regrouping on (T7), the start is the aligner's and the timing model moves only the
+  start of a frame without word times; it still runs (W300 4, documented on the ChronosJAV page).
+- **T9, new** (W296 2, W300 3): a split never leaves a part that a line filter the run applies afterwards would remove —
+  anime-whisper's ellipsis filter (anime-whisper only), the non-verbal line filter with its punctuation-only rule (when
+  `drop_nonverbal_lines` is on, the default) and the non-linguistic utterance filter; such a part stays with its neighbour,
+  so a lone はい。 or うん。 is not split off (as in 1.9.5). `orchestrator.line_filter_test()`, passed by `qwen_pipeline`.
+  To be reopened if user feedback asks for it. Not covered: the scene-overlap resolver, which drops a subtitle by its times.
+- **The run summary** (W296 4, W300 1): "Aligner native" counts the subtitles timed by the aligner (not an aligner-free
+  scene, a collapsed scene, a text-only frame, or one hardening had to time); "Collapse rate" is the scenes the collapse
+  check flagged out of the scenes it checked (`pipeline_analytics.scene_timing_sources`, `_compute_alignment_metrics`).
+- **Batch** (W300 2): each file writes its scene records into `raw_subs/<name>/` in the temp folder, so its run summary
+  counts only its own scenes; since 1.9.5 the second and later files of a batch also counted the earlier files' scenes.
+- The benchmark tools (`whisperjav/bench/provenance.py`, `report.py`) still read the older nested record; not changed.
+
+**Measured** (`D:\WJ110_measure\tune_2026-10-28\`, `compare_t2a.py`, `compare_w300.py`; 7 scenes, Japanese audio):
+
+| ChronosJAV | starts within 0.5 s: 1.9.5 / shipped / now | median start error | typical start (signed) | CER |
+|---|---|---|---|---|
+| Qwen3-ASR | 74.9% / 78.3% / 78.0% | 0.153 / 0.278 / 0.138 s | −0.10 / +0.26 / +0.06 s | 42.7% / 43.0% / 42.7% |
+| anime-whisper | 63.3% / 71.7% / 76.7% | 0.233 / 0.298 / 0.176 s | −0.01 / +0.27 / +0.09 s | 45.9% / 46.0% / 45.9% |
+
+On lines both runs time, starts equal the aligner-only run's; the splits are kept (misplaced edges as shipped). "はぁはぁ…他には"
+is kept (it is not in the reference, and that subtitle starts 1.5 s before the reference line). The run after the review gave
+the same subtitles as the run before it, line for line.
+
+**Checked.** One `assessment-adversary` review of the code and the re-measure; its findings fixed (the count, the batch, T9
+following the run's filters, tests of the collapsed arm and the regrouping path) or decided (W300). Tests, one file per
+process: `test_timing_rules.py` 28, `test_subtitle_pipeline_timer.py` 22, `test_pipeline_analytics_timing.py` 5 (new) and 14
+neighbouring files passed; each of the five fixed lines, broken on purpose, fails a test. `test_anime_whisper.py` (2) and
+`test_subtitle_pipeline_pathless.py` (4) fail the same way on the code before this change. Real runs on the 7 scenes:
+Qwen3-ASR S01E03 Scene 3 reports "Collapse rate 6.2%" and "Aligner native 95.2%" (one collapsed scene of 16); VAD-only
+reports "Aligner native 0.0%"; each file reports its own scene count.
 
 ---
 
