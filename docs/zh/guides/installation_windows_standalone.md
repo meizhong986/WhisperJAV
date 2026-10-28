@@ -110,7 +110,7 @@
 
 窗口会先说明原因，并预先选中 **Stop**，没有时间限制：
 
-- **较旧的显卡**（低于 GTX 16 / RTX 20）："Your graphics card, … (compute capability …), is older than WhisperJAV 1.10 supports. 1.10 needs a GTX 16-series, RTX 20-series or newer card." 以及 "WhisperJAV 1.9.5 still supports this card: https://github.com/meizhong986/WhisperJAV/releases/tag/v1.9.5."（意思是：你的显卡比 1.10 支持的更旧；1.9.5 仍然支持这张显卡。）如果你确定显卡受支持，**My card is identified wrongly**（我的显卡识别错误）会显示报告问题的地址，然后停止。
+- **较旧的显卡**（低于 GTX 16 / RTX 20）："Your graphics card, … (compute capability …), is older than WhisperJAV 1.10 supports. 1.10 needs a GTX 16-series, RTX 20-series or newer card." 以及 "WhisperJAV 1.9.5 still supports this card: https://github.com/meizhong986/WhisperJAV/releases/tag/v1.9.5."（意思是：你的显卡比 1.10 支持的更旧；1.9.5 仍然支持这张显卡。）如果你确定显卡受支持，**My card is identified wrongly**（我的显卡被认错了）会显示报告问题的地址，然后停止。
 - **较旧的驱动**（低于 580）："Your NVIDIA driver (…) is older than WhisperJAV 1.10 needs (580 or newer). Update it from https://www.nvidia.com/drivers, restart the PC, and run this installer again to get the NVIDIA GPU version. Or choose below."（意思是：驱动太旧；更新驱动并重启后再次运行安装程序，即可得到 NVIDIA GPU 版本；或在下面另选。）
 - **Windows 能列出、但 WhisperJAV 无法访问的显卡**——驱动可能缺失或不正常，或者在有两块显示芯片的笔记本上，NVIDIA 芯片可能已关闭：安装或修复 NVIDIA 驱动（580 或更新），重启电脑后再次运行安装程序。或在下面另选。
 
