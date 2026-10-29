@@ -115,7 +115,20 @@ Newer versions of the libraries behind Qwen3-ASR and behind balanced, fast and f
 - GPU through Vulkan and your own PyTorch are experimental and untested on AMD and Intel cards. Intel GPUs are not used through PyTorch. On Linux, the GGUF pipelines run on the CPU for AMD and Intel GPUs. Please report how they work: https://github.com/meizhong986/WhisperJAV/issues
 - ChronosJAV's aligner and timing model have not been tried through Vulkan on any card, and how long the timing model takes on a computer without a GPU has not been measured.
 - Nobody in the project has run 1.10.0 on a Mac or a Linux PC yet; the Apple GPU for fidelity, the GGUF pipelines and ChronosJAV's aligner and timing model is not yet tested.
-- **Known faults:** BS-RoFormer cannot start on the command line (marked Coming Soon in the GUI); ZipEnhancer cleans only the first file of a run (both to be fixed in 1.10.1); an upgrade does not remove packages the new release no longer uses.
+- **Known faults** (to be fixed in 1.10.1):
+  - BS-RoFormer cannot start on the command line (marked Coming Soon in the GUI); ZipEnhancer cleans only the first file of a run; an upgrade does not remove packages the new release no longer uses.
+  - ChronosJAV: a run without `--keep-temp` may show "Error during temporary file cleanup" for each file and leave some temporary files behind. The subtitles are already written by then.
+  - ChronosJAV with the auditok or silero scene detector (the default is semantic): scenes shorter than 12 seconds may be dropped, and their speech with them. Keep the default.
+  - Parakeet-CrispASR and Cohere-CrispASR: a speech enhancer chosen for the pass is not checked when the run starts, as it is for the other pipelines.
+  - With the silero-v6, whisper-vad or nemo speech segmenter, a segmenter that fails is treated as finding no speech: the scene gets no subtitles and no error is shown.
+  - ChronosJAV's timing model may stop the run on a very short piece of speech. We have not seen this happen in our tests.
+  - ChronosJAV's aligner and timing model, and Cohere-CrispASR's aligner, are downloaded the first time they are used, during the run. If the download fails (for example with `--offline`), Cohere-CrispASR continues without its aligner.
+  - `whisperjav-translate --configure` stops with an error when you choose ollama or custom. Give the provider on the command line instead, for example `whisperjav-translate --provider ollama …`.
+  - `--async-processing` with `--mode transformers` or `--mode qwen` may stop with an error. Leave it out for these modes.
+  - On a CPU-only install on a PC with an NVIDIA card, `--model` with balanced, fast or faster may make the run try the GPU.
+  - XXL Faster Whisper: Windows paths in Extra Args lose their backslashes (`D:\models` becomes `D:models`).
+  - `install.py --minimal` followed by a GGUF pipeline may give no subtitles. Use the full install, as 1.10.0 asks of every user.
+  - XXL Faster Whisper as pass 1 crashed once when closing, on one scene in our tests.
 - balanced gives slightly different subtitles from 1.9.5 (CTranslate2 4.8.3): on one of our two reference films, slightly fewer character errors and two more missed lines.
 
 ## Installation
