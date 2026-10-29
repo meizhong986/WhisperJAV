@@ -215,6 +215,17 @@ def test_with_regrouping_the_start_is_the_aligners(scene_wav):
     assert results[0][1]["timing_model"]["starts_moved"] == 0
 
 
+def test_every_run_records_the_vad_group_edges(scene_wav):
+    """F7, owner W307 1: the scene record keeps each VAD group's start and end (the audio sent to the ASR) in every
+    run, not only in vad_only runs; the refined display start only where it is used."""
+    orch = _orchestrator(_Timer())
+    timings = orch._step8_time([[FRAME_A]], [[np.zeros(60640, dtype=np.float32)]], [[TEXT_A]])
+    results = orch._step9_reconstruct_and_harden([[FRAME_A]], [[TEXT_A]], _aligned(), [scene_wav], [6.0],
+                                                 [None], None, scene_timings=timings)
+    assert results[0][1]["frame_timing"] == [{"vad_start": 1.0, "vad_end": 4.79, "speech_start": None,
+                                              "internal_breaks": []}]
+
+
 class TestRunSummaryCounts:
     """W300 1: the scene record counts the subtitles whose times came from the aligner."""
 
