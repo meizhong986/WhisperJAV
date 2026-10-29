@@ -15,7 +15,7 @@ WhisperJAV offers multiple processing pipelines, each trading speed for accuracy
 | **Transformers** | HuggingFace | Yes | Yes | Medium | Good | ~4 GB |
 | **Qwen3-ASR** | Qwen3 | Assembly | Assembly | Medium | Excellent text | ~4-8 GB |
 | **ChronosJAV** | anime-whisper / Kotoba | TEN VAD | TEN VAD | Medium | Best for anime/JAV | ~4-8 GB |
-| **Parakeet-CrispASR / Cohere-CrispASR** (GGUF, Ensemble only) | CrispASR (Parakeet / Cohere models) | Yes (Semantic by default) | Yes (WhisperSeg / FireRedVAD) | Not measured | Not measured | Not measured |
+| **Parakeet-CrispASR / Cohere-CrispASR** (GGUF, Ensemble only) | CrispASR (Parakeet / Cohere models) | Yes (Semantic by default) | Yes (TEN VAD / FireRedVAD) | Not measured | Not measured | Not measured |
 
 ---
 
