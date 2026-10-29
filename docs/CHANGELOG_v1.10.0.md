@@ -526,6 +526,21 @@ for the removed 1.9.x CrispASR mode name the new menu entries. Checked: `--help`
 `test_gui_crispasr_pipelines.py` 51, `test_gui_i18n_zh.py` 14, `test_crispasr_cli.py` 83, `test_crispasr_pipelines.py` 114,
 `test_balanced_defaults_v192.py` 50, `test_crispasr_d3_v110.py` 18 passed. The owner's GUI click test is still to come.
 
+**Console: CrispASR's debug lines and the per-scene framer line only with `--debug` (owner W349, W350).** In the owner's
+four-file Ensemble run (cohere + parakeet), 35,520 of the console's 39,479 lines were CrispASR's GPU library's "CUDA graph
+warmup complete / reset" and 2,712 were the per-scene `[VadGroupedFramer]` line. New `whisperjav/crispasr/native_log.py`
+registers a handler through ggml's `ggml_log_set` (in the crispasr package's `ggml-base` library) after each `import crispasr`
+(engine, aligner, timing model): without `--debug` it drops ggml's DEBUG messages (and their continuations) and passes INFO,
+WARN and ERROR unchanged; with `--debug` (log level DEBUG) everything, as before; if the library or symbol is missing,
+ggml's own logger stays. The framer line is now a debug line (it also showed for ChronosJAV). Not changed: lines CrispASR
+writes straight to the error output, which the probe showed bypass ggml's logger — the aligner's "crispasr[aligner]:
+WARNING: alignment collapse suspected …" (warnings stay, W350) and "[wav2vec2] vocab=…". FFmpeg stays 7.1.1 in 1.10.0
+(W350 1). Checked: probe (`ggml_log_probe2.py`, 40 pieces of S01E04 Scene 4: 71 warmup lines reached the handler at DEBUG,
+the aligner lines bypassed it); `test_crispasr_native_log.py` 15 passed, the aligner, timer, engine and pipeline test files
+passed; one Cohere pass on S01E04 Scene 4 without / with `--debug` (`D:\WJ110_measure\console_quiet_2026-10-29\`): exit 0
+both, 106 / 183 console lines, warmup 0 / 8, framer 0 / 10, the same subtitles byte for byte. Not run: a ChronosJAV run (its
+timing model registers the same handler), any build other than CUDA.
+
 ---
 
 ## Found during the work, not fixed in 1.10.0 (requirements §5; places as decided or proposed)
