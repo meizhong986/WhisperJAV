@@ -139,6 +139,7 @@ from whisperjav.utils.offline_mode import is_offline, hf_endpoint
 from whisperjav.modules.silero_vad_adapter import DEFAULT_VAD_VERSION, VAD_VERSIONS
 from whisperjav.config.segmenter_presets import (
     BALANCED_DEFAULT_SEGMENTER,
+    CRISPASR_DEFAULT_SENSITIVITY,
     DEFAULT_SCENE_DETECTOR,
     ENSEMBLE_DEFAULT_SENSITIVITY,
     ENSEMBLE_PASS_DEFAULTS,
@@ -418,7 +419,7 @@ def parse_arguments():
                                choices=["auditok", "silero", "semantic", "none"],
                                help="Scene detection method for pass 1 (default: semantic since v1.9.2)")
     twopass_group.add_argument("--pass1-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none). Default: firered-vad when pass 1 is Qwen3-ASR; whisperseg for parakeet-crispasr and firered-vad for cohere-crispasr, which do not accept none. Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
+                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none). Default: firered-vad when pass 1 is Qwen3-ASR; ten for parakeet-crispasr and firered-vad for cohere-crispasr, which do not accept none. Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
     twopass_group.add_argument("--pass1-vad-version", default=None,
                                choices=list(VAD_VERSIONS),
                                help="Silero VAD build for pass 1 when --pass1-pipeline is balanced "
@@ -478,7 +479,7 @@ def parse_arguments():
                                choices=["auditok", "silero", "semantic", "none"],
                                help="Scene detection method for pass 2 (default: semantic since v1.9.2)")
     twopass_group.add_argument("--pass2-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Default: ten when pass 2 is anime-whisper; whisperseg for parakeet-crispasr and firered-vad for cohere-crispasr, which do not accept none. Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
+                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Default: ten when pass 2 is anime-whisper; ten for parakeet-crispasr and firered-vad for cohere-crispasr, which do not accept none. Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
     twopass_group.add_argument("--pass2-vad-version", default=None,
                                choices=list(VAD_VERSIONS),
                                help="Silero VAD build for pass 2 when --pass2-pipeline is balanced "
@@ -2385,12 +2386,16 @@ def apply_ensemble_pass_defaults(args) -> None:
     Fill in the Ensemble defaults the user did not set (owner, 2026-10-12, v1.9.5):
     pass 1 Qwen3-ASR runs FireRedVAD at aggressive, pass 2 anime-whisper runs TEN VAD
     at aggressive (ENSEMBLE_PASS_DEFAULTS). Only for a pass that IS that pipeline,
-    and only for what the command line left out; no pipeline default changes. Every
-    other pass keeps sensitivity balanced, as before. Runs before anything reads the
-    pass settings, so --dump-params shows what the run uses.
+    and only for what the command line left out; no pipeline default changes. A
+    Parakeet-CrispASR pass runs at aggressive, a Cohere-CrispASR pass at balanced
+    (CRISPASR_DEFAULT_SENSITIVITY, owner W344). Every other pass keeps sensitivity
+    balanced, as before. Runs before anything reads the pass settings, so
+    --dump-params shows what the run uses.
     """
     for n in ("1", "2"):
         defaults = {}
+        if getattr(args, f"pass{n}_pipeline", None) in CRISPASR_DEFAULT_SENSITIVITY:
+            defaults = {"sensitivity": CRISPASR_DEFAULT_SENSITIVITY[getattr(args, f"pass{n}_pipeline")]}
         if getattr(args, f"pass{n}_pipeline", None) == "qwen":
             qwen_params = {}
             raw = getattr(args, f"pass{n}_qwen_params", None)
@@ -3239,7 +3244,7 @@ def main():
                 except ValueError as _refused:
                     _model = f"(refused: {_refused})"
                 _segmenter = effective_segmenter_for_pass(_p["pipeline"], _p.get("speech_segmenter"))
-                _sensitivity = _p.get("sensitivity") or ENSEMBLE_DEFAULT_SENSITIVITY
+                _sensitivity = _p.get("sensitivity") or CRISPASR_DEFAULT_SENSITIVITY[_p["pipeline"]]
                 _p["crispasr_effective"] = {
                     "model": _model,
                     "speech_segmenter": _segmenter,
