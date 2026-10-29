@@ -152,7 +152,8 @@ class VadGroupedFramer:
                 self._min_duration,
             )
 
-        logger.info(
+        # One line per scene: shown with --debug only (owner W350; 2,712 lines in a four-file Ensemble run).
+        logger.debug(
             "[VadGroupedFramer] %s: %d segments → %d groups → %d frames (%.1fs audio, %.1f%% speech)",
             seg_result.method,
             seg_result.num_segments,
