@@ -100,12 +100,19 @@ BALANCED_DEFAULT_SEGMENTER = "faster-whisper"
 # extra install; its model weights download from HuggingFace on first use.
 FIDELITY_DEFAULT_SEGMENTER = "firered-vad"
 
-# The CrispASR pipelines' speech segmenter when a pass names none (1.10.0; owner W202 2, 3):
-# Parakeet-CrispASR WhisperSeg, Cohere-CrispASR FireRedVAD. They transcribe the VAD groups the
-# speech segmenter finds, so they have no "none" (main.py refuses it: whisperjav/crispasr/pass_settings.py).
+# The CrispASR pipelines' speech segmenter when a pass names none (1.10.0; owner W202 3, W343, W344):
+# Parakeet-CrispASR TEN VAD (WhisperSeg until W344), Cohere-CrispASR FireRedVAD. They transcribe the VAD
+# groups the speech segmenter finds, so they have no "none" (main.py refuses it: whisperjav/crispasr/pass_settings.py).
 CRISPASR_DEFAULT_SEGMENTERS = {
-    "parakeet-crispasr": "whisperseg",
+    "parakeet-crispasr": "ten",
     "cohere-crispasr": "firered-vad",
+}
+# Their sensitivity when a pass names none (owner W343, W344): Parakeet-CrispASR aggressive, Cohere-CrispASR
+# balanced. Applied by main.py apply_ensemble_pass_defaults; the GUI Ensemble tab applies the same values
+# when the pipeline is picked (assets/app.js applyPipelinePresets). Keep them in step.
+CRISPASR_DEFAULT_SENSITIVITY = {
+    "parakeet-crispasr": "aggressive",
+    "cohere-crispasr": "balanced",
 }
 
 # Owner, 2026-10-12 (v1.9.5): the Ensemble defaults are pass 1 Qwen3-ASR with
@@ -184,7 +191,7 @@ def effective_segmenter_for_pass(
     guarding a segmenter the run does not use -- or missing the one it does.
 
     Balanced ignores the request entirely (v1.9.2, S2/S9: no external segmenter
-    exists there). Fidelity falls back to FireRedVAD, parakeet-crispasr to WhisperSeg and
+    exists there). Fidelity falls back to FireRedVAD, parakeet-crispasr to TEN VAD and
     cohere-crispasr to FireRedVAD (CRISPASR_DEFAULT_SEGMENTERS). Everything else takes what it
     was given, including None, which leaves the decision to the ASR module.
     """
