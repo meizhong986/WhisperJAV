@@ -124,7 +124,8 @@ class CrispASRPipeline(BasePipeline):
                 refused: the pipeline transcribes the VAD groups the segmenter finds.
             language: the source language; Japanese only.
             subs_language: "direct-to-english" still writes Japanese, with one console line.
-            sensitivity: the pass's sensitivity; None means balanced (W135 2, W202 2).
+            sensitivity: the pass's sensitivity; None means the pipeline's own, aggressive for Parakeet and
+                balanced for Cohere (CRISPASR_DEFAULT_SENSITIVITY; W344, W135 2).
             device: --device (None, auto, cuda, cpu; W194 1).
             vad_threshold, speech_pad_ms: --passN-vad-threshold and --passN-speech-pad-ms (W208), applied
                 as fidelity or the qwen pipeline applies them (pass_settings.segmenter_settings).
