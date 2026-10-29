@@ -130,13 +130,13 @@ class TestBalancedDefault:
         assert effective_segmenter_for_pass("fidelity", None) == FIDELITY_DEFAULT_SEGMENTER
         assert effective_segmenter_for_pass("fidelity", "") == FIDELITY_DEFAULT_SEGMENTER
         assert effective_segmenter_for_pass("fidelity", "whisperseg") == "whisperseg"
-        # The CrispASR passes (1.10.0) fall back to their own default -- WhisperSeg for
-        # Parakeet, FireRedVAD for Cohere (owner W202 2-3) -- so the start-up check guards
+        # The CrispASR passes (1.10.0) fall back to their own default -- TEN VAD for
+        # Parakeet (owner W344), FireRedVAD for Cohere (W202 3) -- so the start-up check guards
         # the segmenter they run; an explicit choice wins.
-        for pipe, default in (("parakeet-crispasr", "whisperseg"), ("cohere-crispasr", "firered-vad")):
+        for pipe, default in (("parakeet-crispasr", "ten"), ("cohere-crispasr", "firered-vad")):
             assert effective_segmenter_for_pass(pipe, None) == default
             assert effective_segmenter_for_pass(pipe, "") == default
-            assert effective_segmenter_for_pass(pipe, "ten") == "ten"
+            assert effective_segmenter_for_pass(pipe, "whisperseg") == "whisperseg"
         # Everything else takes what it was given, None included.
         for pipe in ("fast", "faster", "qwen", "transformers", None):
             assert effective_segmenter_for_pass(pipe, None) is None
