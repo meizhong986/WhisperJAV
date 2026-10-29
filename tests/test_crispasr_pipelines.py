@@ -250,16 +250,18 @@ class TestTheTwoPipelines:
                                       "__firstlineno__", "__static_attributes__",
                                       "_abc_impl", "__abstractmethods__"}
 
-    @pytest.mark.parametrize("cls, model", [(ParakeetCrispASRPipeline, "parakeet-tdt-0.6b-ja"),
-                                            (CohereCrispASRPipeline, "cohere-asr-ja-v0.1")])
-    def test_defaults(self, tmp_path, cls, model):
+    @pytest.mark.parametrize("cls, model, sensitivity, segmenter",
+                             [(ParakeetCrispASRPipeline, "parakeet-tdt-0.6b-ja", "aggressive", "ten"),   # W344
+                              (CohereCrispASRPipeline, "cohere-asr-ja-v0.1", "balanced", "firered-vad")])
+    def test_defaults(self, tmp_path, cls, model, sensitivity, segmenter):
         pipe = make(cls, tmp_path)
         assert pipe.model.name == model
-        assert pipe.sensitivity == "balanced"  # W135 2, W202 2
+        assert pipe.sensitivity == sensitivity
+        assert pipe.speech_segmenter == segmenter
         assert pipe.device is None
 
     def test_parakeet_takes_fidelitys_settings_with_6_s(self, tmp_path):
-        pipe = make(ParakeetCrispASRPipeline, tmp_path, sensitivity="aggressive")
+        pipe = make(ParakeetCrispASRPipeline, tmp_path, sensitivity="aggressive", speech_segmenter="whisperseg")
         assert pipe.speech_segmenter == "whisperseg"
         assert pipe.segmenter == segmenter_settings("parakeet-crispasr", "whisperseg", "aggressive")
         assert (pipe.segmenter.max_group_duration_s, pipe.segmenter.config["max_speech_duration_s"]) == (6.0, 6.0)
@@ -429,7 +431,7 @@ class TestParakeetEndToEnd:
         pipe = make(ParakeetCrispASRPipeline, tmp_path)
         pipe.process(stage.media())
         made = stage.framer_made[0]
-        assert (made["backend"], made["max_group"], made["chunk"], made["min"]) == ("whisperseg", 6.0, 1.0, 0.1)
+        assert (made["backend"], made["max_group"], made["chunk"], made["min"]) == ("ten", 6.0, 1.0, 0.1)  # W344
         assert made["config"] == pipe.segmenter.config
         assert stage.framers_cleaned == 1
 
