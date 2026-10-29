@@ -5,7 +5,9 @@ What is pinned here:
     Backend or Extra Args fields, no "External (CrispASR)" choice, no file dialog or saved preferences for it, and no
     CrispASR key in the shipped asr_config.json (W118: "Delete the old ... panel text fields ... from the GUI completely");
   - Parakeet-CrispASR and Cohere-CrispASR are offered in the Ensemble tab only, in the Pass 1 and Pass 2 menus, under
-    the group "GGUF" (W195 I2; "CrispASR" in W194 3), with their clean names (W118, W129 7);
+    the group "GGUF via crispasr", named "parakeet" and "cohere" (W343; "GGUF" W195 I2 until then);
+  - the Ensemble tab opens on cohere / balanced / FireRedVAD in pass 1 and parakeet / aggressive / TEN VAD in pass 2,
+    and picking either pipeline sets its own sensitivity and segmenter, as the command line does (W343, W344);
   - the model menus in app.js are the manifest's offered models, the default first;
   - each pipeline's default speech segmenter in app.js is the command line's (W202 2-3); the GGUF pipelines carry
     the CJK folder-name note (W203 O14, T24); a status panel under each pass row shows the model and the device
@@ -30,7 +32,8 @@ ROOT = Path(__file__).resolve().parent.parent
 ASSETS = ROOT / "whisperjav" / "webview_gui" / "assets"
 HTML = (ASSETS / "index.html").read_text(encoding="utf-8")
 JS = (ASSETS / "app.js").read_text(encoding="utf-8")
-LABELS = {"parakeet-crispasr": "Parakeet-CrispASR", "cohere-crispasr": "Cohere-CrispASR"}
+LABELS = {"parakeet-crispasr": "parakeet", "cohere-crispasr": "cohere"}   # W343
+GROUP = "GGUF via crispasr"                                                # W343
 
 
 @pytest.fixture
@@ -93,10 +96,26 @@ def test_the_transcription_mode_tab_offers_no_crispasr():
 
 @pytest.mark.parametrize("select_id", ["pass1-pipeline", "pass2-pipeline"])
 def test_both_passes_offer_both_pipelines_under_gguf(select_id):
-    group = re.search(r'<optgroup label="GGUF">(.*?)</optgroup>', _select(HTML, select_id), re.S)
-    assert group, f"{select_id} has no GGUF group"
+    group = re.search(r'<optgroup label="%s">(.*?)</optgroup>' % GROUP, _select(HTML, select_id), re.S)
+    assert group, f"{select_id} has no {GROUP} group"
     options = re.findall(r'<option value="([^"]+)"[^>]*>([^<]+)</option>', group.group(1))
     assert options == [(p, LABELS[p]) for p in CRISPASR_PIPELINES]
+
+
+@pytest.mark.parametrize("pass_key, pipeline, sensitivity, segmenter",
+                         [("pass1", "cohere-crispasr", "balanced", "firered-vad"),
+                          ("pass2", "parakeet-crispasr", "aggressive", "ten")])
+def test_the_ensemble_tab_opens_on_cohere_and_parakeet(pass_key, pipeline, sensitivity, segmenter):
+    # W343: the selected options in index.html are what the tab opens on (EnsembleManager.init reads them)
+    def selected(select_id):
+        return re.findall(r'<option value="([^"]+)"[^>]*\bselected\b', _select(HTML, select_id))
+    assert selected(f"{pass_key}-pipeline") == [pipeline]
+    assert selected(f"{pass_key}-sensitivity") == [sensitivity]
+    assert selected(f"{pass_key}-segmenter") == [segmenter]
+    # and the start-up state in app.js says the same
+    block = re.search(r"\n        %s: \{(.*?)\n        \}," % pass_key, JS, re.S).group(1)
+    assert f"pipeline: '{pipeline}'" in block and f"sensitivity: '{sensitivity}'" in block
+    assert f"speechSegmenter: '{segmenter}'" in block and "isCrispasr: true" in block
 
 
 @pytest.mark.parametrize("pipeline, list_name", [("parakeet-crispasr", "parakeetCrispasrModels"),
@@ -170,11 +189,14 @@ def test_whisperjav_accepts_the_command_line_the_gui_builds(api, tmp_path):
 # ---------------------------------------------------------------------------------------------------------------
 
 def test_the_default_segmenters_in_app_js_are_the_command_lines():
-    from whisperjav.config.segmenter_presets import CRISPASR_DEFAULT_SEGMENTERS
+    from whisperjav.config.segmenter_presets import CRISPASR_DEFAULT_SEGMENTERS, CRISPASR_DEFAULT_SENSITIVITY
 
     body = re.search(r"crispasrDefaultSegmenter\(pipeline\) \{(.*?)\n    \},", JS, re.S).group(1)
-    assert "pipeline === 'cohere-crispasr' ? 'firered-vad' : 'whisperseg'" in body
-    assert CRISPASR_DEFAULT_SEGMENTERS == {"parakeet-crispasr": "whisperseg", "cohere-crispasr": "firered-vad"}
+    assert "pipeline === 'cohere-crispasr' ? 'firered-vad' : 'ten'" in body
+    assert CRISPASR_DEFAULT_SEGMENTERS == {"parakeet-crispasr": "ten", "cohere-crispasr": "firered-vad"}   # W344
+    body = re.search(r"crispasrDefaultSensitivity\(pipeline\) \{(.*?)\n    \},", JS, re.S).group(1)
+    assert "pipeline === 'cohere-crispasr' ? 'balanced' : 'aggressive'" in body
+    assert CRISPASR_DEFAULT_SENSITIVITY == {"parakeet-crispasr": "aggressive", "cohere-crispasr": "balanced"}
 
 
 @pytest.mark.parametrize("select_id", ["pass1-pipeline", "pass2-pipeline"])
@@ -183,7 +205,7 @@ def test_the_gguf_pipelines_carry_the_cjk_note(select_id):
             "The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user "
             "folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a "
             "plain-named folder (the original stays where it is).")
-    group = re.search(r'<optgroup label="GGUF">(.*?)</optgroup>', _select(HTML, select_id), re.S).group(1)
+    group = re.search(r'<optgroup label="%s">(.*?)</optgroup>' % GROUP, _select(HTML, select_id), re.S).group(1)
     assert group.count(f'title="{note}"') == 2
     # and on the Pipeline dropdown itself while a GGUF pipeline is selected
     assert f"CRISPASR_CJK_NOTE: '{note}'" in JS
