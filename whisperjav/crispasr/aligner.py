@@ -22,7 +22,7 @@ from typing import List, Optional, Sequence
 
 import numpy as np
 
-from whisperjav.crispasr import install
+from whisperjav.crispasr import install, native_log
 from whisperjav.crispasr.engine import SAMPLE_RATE, default_threads
 from whisperjav.crispasr.errors import CrispASRSetupError
 from whisperjav.crispasr.manifest import ALIGNER_WARNINGS, ModelFile, aligner_model_for
@@ -133,6 +133,7 @@ class CrispAligner:
             import crispasr
         except (ImportError, OSError) as e:
             raise CrispASRSetupError(install.NOT_LOADED_TEXT.format(reason=e)) from e
+        native_log.quiet_debug_lines(crispasr)   # its GPU library's DEBUG lines only with --debug (W350)
         if not hasattr(crispasr, "align_words"):
             raise CrispASRSetupError(NO_ALIGN_TEXT.format(version=runtime.version))
         if self._path is None or not self._path.is_file():
