@@ -195,10 +195,10 @@ class TestAPassThatCannotRunIsRefused:
 
 
 class TestTheSegmenterDefault:
-    @pytest.mark.parametrize("pipeline, default", [("parakeet-crispasr", "whisperseg"),
+    @pytest.mark.parametrize("pipeline, default", [("parakeet-crispasr", "ten"),
                                                    ("cohere-crispasr", "firered-vad")])
     def test_a_crispasr_pass_with_none_named_runs_its_pipelines_default(self, pipeline, default):
-        # W202 2 ("prakket balanced whisperseg"), W202 3 ("fireredvad")
+        # W344 ("Go, CLI follows too": Parakeet TEN VAD, was W202 2 whisperseg), W202 3 ("fireredvad")
         assert CRISPASR_DEFAULT_SEGMENTERS[pipeline] == default
         assert effective_segmenter_for_pass(pipeline, None) == default
         assert effective_segmenter_for_pass(pipeline, "") == default
@@ -293,7 +293,7 @@ class TestTheCommandLine:
         # T2 (design 22.10, owner W237 1): --device for every pipeline; the GGUF pipelines' builds.
         assert "Where this run's ASR and other models run, for every pipeline." in text
         assert "the GPU through Vulkan on Windows (Vulkan build, experimental)" in text
-        assert "whisperseg for parakeet-crispasr and firered-vad for cohere-crispasr" in text
+        assert "ten for parakeet-crispasr and firered-vad for cohere-crispasr" in text   # W344
         assert "CrispASR's own program" not in text
         assert "--crispasr-exe" not in text and "--crispasr-backend" not in text
         assert "--crispasr-args" not in text
@@ -365,9 +365,9 @@ class TestTheCommandLine:
         p1 = dumped["pass1"]["crispasr_effective"]
         assert p1 == {
             "model": manifest.PIPELINE_DEFAULT_MODEL["parakeet-crispasr"],  # none named: the default
-            "speech_segmenter": "whisperseg",                                 # none named: Parakeet's default
-            "sensitivity": "balanced",                                        # none named: balanced
-            "speech_segmenter_settings": segmenter_settings("parakeet-crispasr", "whisperseg", "balanced").as_dict(),
+            "speech_segmenter": "ten",                                        # none named: Parakeet's default (W344)
+            "sensitivity": "aggressive",                                      # none named: Parakeet's (W344)
+            "speech_segmenter_settings": segmenter_settings("parakeet-crispasr", "ten", "aggressive").as_dict(),
             "device": "cpu",                                                  # --device as given
             "scene_detector": "semantic",                                     # none named: semantic (W214 2)
             "speech_enhancer": "none",
@@ -376,7 +376,7 @@ class TestTheCommandLine:
         }
         s1 = p1["speech_segmenter_settings"]
         assert (s1["threshold"], s1["max_group_duration_s"], s1["max_speech_duration_s"], s1["chunk_threshold_s"]) \
-            == (0.35, 6.0, 6.0, 1.0)                                          # fidelity's WhisperSeg; 6 s (W202 1)
+            == (0.22, 6.0, 6.0, 1.0)                                          # TEN's aggressive preset; 6 s (W202 1)
         p2 = dumped["pass2"]["crispasr_effective"]
         assert (p2["model"], p2["speech_segmenter"], p2["sensitivity"], p2["scene_detector"]) == \
             ("cohere-asr-ja", "ten", "conservative", "auditok")               # --pass2-scene-detector is used (22.9.1)
@@ -389,7 +389,7 @@ class TestTheCommandLine:
         # W208 "make the flags work": Parakeet as fidelity, Cohere as the qwen pipeline.
         dump = tmp_path / "params.json"
         result = _cli(tmp_path / "x.mp4", "--ensemble",
-                      "--pass1-pipeline", "parakeet-crispasr",
+                      "--pass1-pipeline", "parakeet-crispasr", "--pass1-speech-segmenter", "whisperseg",
                       "--pass1-vad-threshold", "0.5", "--pass1-speech-pad-ms", "120",
                       "--pass2-pipeline", "cohere-crispasr",
                       "--pass2-vad-threshold", "1.7", "--pass2-speech-pad-ms", "50",
@@ -459,9 +459,10 @@ class TestThePassWorkerBuildsThem:
     def probe(self, tmp_path_factory):
         root = tmp_path_factory.mktemp("worker")
         configs = [
-            # A pass with every setting these pipelines do not use.
+            # A pass with every setting these pipelines do not use. WhisperSeg named, so the speech pad is used
+            # (Parakeet's default since W344, TEN VAD, has no speech-pad setting; TestTheSegmenterDefault).
             {"pipeline": "parakeet-crispasr", "sensitivity": "balanced", "model": None,
-             "speech_segmenter": None, "language": "ja", "scene_detector": "auditok",
+             "speech_segmenter": "whisperseg", "language": "ja", "scene_detector": "auditok",
              "speech_enhancer": "ffmpeg-dsp", "enhance_for_vad": True, "vad_threshold": 0.4,
              "speech_pad_ms": 100, "params": {"beam_size": 5}, "hf_params": {"x": 1},
              "qwen_params": {"y": 2}},
@@ -504,7 +505,7 @@ class TestThePassWorkerBuildsThem:
             "save_metadata_json": True,          # --debug, carried in the worker's extra kwargs
             "progress_display": None,
             "model_name": None,                  # the pipeline's default model
-            "speech_segmenter": "whisperseg",    # none named: Parakeet's default (W202 2)
+            "speech_segmenter": "whisperseg",    # as named
             "language": "ja",
             "subs_language": "native",
             "sensitivity": "balanced",           # picks the speech segmenter's preset
