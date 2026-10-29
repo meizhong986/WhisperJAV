@@ -1491,8 +1491,8 @@ def _build_pipeline(
             "progress_display": None,
             # None: the pipeline's default model (whisperjav/crispasr/manifest.py).
             "model_name": pass_config.get("model") or None,
-            # The pipeline's default when the pass names none (WhisperSeg for Parakeet, FireRedVAD
-            # for Cohere, W202 2-3): the one rule main.py's start-up check uses.
+            # The pipeline's default when the pass names none (TEN VAD for Parakeet, W344; FireRedVAD
+            # for Cohere, W202 3): the one rule main.py's start-up check uses.
             "speech_segmenter": effective_segmenter_for_pass(
                 pipeline_name, pass_config.get("speech_segmenter")),
             "language": pass_config.get("language") or "ja",
