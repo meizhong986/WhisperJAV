@@ -26,7 +26,7 @@ Light: the manifest (standard library only) and the segmenter presets; no ASR im
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional
 
-from whisperjav.config.segmenter_presets import CRISPASR_DEFAULT_SEGMENTERS, ENSEMBLE_DEFAULT_SENSITIVITY
+from whisperjav.config.segmenter_presets import CRISPASR_DEFAULT_SEGMENTERS, CRISPASR_DEFAULT_SENSITIVITY
 from whisperjav.crispasr import manifest
 from whisperjav.crispasr.manifest import CRISPASR_PIPELINES, JAPANESE_NAMES
 
@@ -111,7 +111,7 @@ def segmenter_settings(pipeline: str, backend: Optional[str], sensitivity: Optio
     and both the start and the end pad for Cohere, as the qwen pipeline.
     """
     backend = (backend or default_segmenter(pipeline)).strip().lower()
-    sensitivity = sensitivity or ENSEMBLE_DEFAULT_SENSITIVITY
+    sensitivity = sensitivity or CRISPASR_DEFAULT_SENSITIVITY[pipeline]
     style = SEGMENTER_STYLE[pipeline]
     user: Dict[str, Any] = {}
     if vad_threshold is not None:
