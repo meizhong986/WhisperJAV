@@ -45,9 +45,10 @@ With the Vulkan build: "Parakeet-CrispASR asks CrispASR's Vulkan build to use th
 
 | | Parakeet-CrispASR | Cohere-CrispASR |
 |---|---|---|
+| **Name in the GUI** | **parakeet** (under **GGUF via crispasr**) | **cohere** (under **GGUF via crispasr**) |
 | **Model** | `parakeet-tdt-0.6b-ja` (674 MB) | `cohere-asr-ja-v0.1` (default) or `cohere-asr-ja` (2,424 MB each) |
-| **Default speech segmenter** | WhisperSeg | FireRedVAD |
-| **Default sensitivity** | Balanced | Balanced |
+| **Default speech segmenter** | TEN VAD | FireRedVAD |
+| **Default sensitivity** | Aggressive | Balanced |
 | **Longest VAD group** | 6 s, at every sensitivity | 3 s |
 | **Where a subtitle ends** | only at a natural break in the speech (see below) | only at a sentence end (see below) |
 | **Subtitle times** | from the model's own timing of what it wrote | from the aligner `wav2vec2-ja`, which times the model's text |
@@ -63,10 +64,10 @@ Parakeet-CrispASR uses the speech segmenter settings of the Fidelity pipeline, w
 
 ### GUI
 
-1. Open the **Ensemble Mode** tab.
-2. In the **Pass 1** row, open **Pipeline** and choose **Parakeet-CrispASR** or **Cohere-CrispASR** under **GGUF**.
-3. For Cohere-CrispASR, choose the model in the **Model** column (`cohere-asr-ja-v0.1` is the default).
-4. If you want a second pass, tick **Pass 2**, choose its pipeline, and choose how the two are combined under **Merge**.
+1. Open the **Ensemble Mode** tab. It opens with **Pass 1** on **cohere** (Balanced, FireRedVAD) and **Pass 2** on **parakeet** (Aggressive, TEN VAD); Pass 2 is off until you tick it. With **Remember settings** on, the tab opens on the passes you saved instead.
+2. To choose another pipeline for a pass, open its **Pipeline** menu: **parakeet** and **cohere** are under **GGUF via crispasr**. Choosing one sets its own sensitivity and speech segmenter, as in the table above.
+3. For cohere, choose the model in the **Model** column (`cohere-asr-ja-v0.1` is the default).
+4. If you want a second pass, tick **Pass 2**, check its pipeline, and choose how the two are combined under **Merge**.
 5. Click **Start**.
 
 When a pass uses one of these pipelines:
@@ -108,12 +109,12 @@ Without `--merge-strategy`, two passes are combined with `pass1_primary` (in the
 |---|---|---|---|
 | Model | Model | `--pass1-model`, `--pass2-model` | `parakeet-tdt-0.6b-ja`; `cohere-asr-ja-v0.1`, `cohere-asr-ja` |
 | Speech segmenter | Speech Segmenter | `--pass1-speech-segmenter` | any except `none` |
-| Sensitivity | Sensitivity | `--pass1-sensitivity` | `conservative`, `balanced` (default), `aggressive` |
+| Sensitivity | Sensitivity | `--pass1-sensitivity` | `conservative`, `balanced`, `aggressive`; default `aggressive` for Parakeet-CrispASR, `balanced` for Cohere-CrispASR |
 | Scene detector | Scene Detector | `--pass1-scene-detector` | `semantic` (default, scenes of 12 to 48 s), `auditok`, `silero` (scenes of up to 48 s), `none` (one scene per file) |
 | Speech enhancer | Speech Enhancer | `--pass1-speech-enhancer` | `none` (default) or the speech enhancers of the other passes, for example `ffmpeg-dsp`, `zipenhancer` or `htdemucs` |
 | Enhance for VAD only | Enhance for VAD only | `--pass1-enhance-for-vad` | the cleaned audio goes to the speech segmenter only; CrispASR hears the original |
 | Detection threshold | Customize, Segmenter tab | `--pass1-vad-threshold` | 0 to 1; replaces the value the sensitivity sets |
-| Padding | Customize, Segmenter tab | `--pass1-speech-pad-ms` | milliseconds added before and after each piece of speech. Cohere-CrispASR: both sides. Parakeet-CrispASR: only with a speech segmenter that has padding; with FireRedVAD or TEN VAD it is ignored, with a warning |
+| Padding | Customize, Segmenter tab | `--pass1-speech-pad-ms` | milliseconds added before and after each piece of speech. Cohere-CrispASR: both sides. Parakeet-CrispASR: only with a speech segmenter that has padding, such as WhisperSeg; with FireRedVAD or TEN VAD (its default) it is ignored, with a warning |
 | Device | — | `--device auto`, `cuda` or `cpu` | see below |
 | Language | Source audio language | `--language japanese` (default) | any other language stops the run |
 
@@ -125,8 +126,8 @@ Sensitivity picks the speech segmenter's preset. Aggressive accepts sound the sp
 
 | | Conservative | Balanced | Aggressive |
 |---|---|---|---|
-| Parakeet-CrispASR (WhisperSeg): detection threshold | 0.45 | 0.35 | 0.25 |
-| Parakeet-CrispASR: padding before and after speech | 200 ms | 300 ms | 400 ms |
+| Parakeet-CrispASR (TEN VAD): detection threshold | 0.42 | 0.32 | 0.22 |
+| Parakeet-CrispASR: padding before / after speech | 0 / 300 ms | 0 / 200 ms | 0 / 100 ms |
 | Cohere-CrispASR (FireRedVAD): detection threshold | 0.5 | 0.4 | 0.3 |
 | Cohere-CrispASR: padding before and after speech | 100 ms | 100 ms | 100 ms |
 
@@ -248,7 +249,7 @@ If CrispASR's Vulkan build cannot load on Windows, the message adds: "With the G
   CrispASR now runs in Ensemble Mode as two pipelines, Parakeet-CrispASR and Cohere-CrispASR, and WhisperJAV installs it itself.
   Example:
       whisperjav --ensemble --pass1-pipeline parakeet-crispasr <your video>
-  In the GUI: open the Ensemble Mode tab and choose Parakeet-CrispASR or Cohere-CrispASR under GGUF in the Pass 1 or Pass 2 menu.
+  In the GUI: open the Ensemble Mode tab and choose parakeet or cohere under GGUF via crispasr in the Pass 1 or Pass 2 menu.
   ```
 
 - In the GUI, the **crispasr** entry of the Mode menu in the Transcription Mode tab is gone, and so is the old **CrispASR** pipeline with its Backend choice in the Ensemble Mode tab.
