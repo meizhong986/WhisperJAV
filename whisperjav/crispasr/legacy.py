@@ -30,8 +30,8 @@ LEGACY_CRISPASR_MESSAGE = (
     "WhisperJAV installs it itself.\n"
     "Example:\n"
     "    whisperjav --ensemble --pass1-pipeline parakeet-crispasr <your video>\n"
-    "In the GUI: open the Ensemble Mode tab and choose Parakeet-CrispASR or Cohere-CrispASR under GGUF in "
-    "the Pass 1 or Pass 2 menu."
+    "In the GUI: open the Ensemble Mode tab and choose parakeet or cohere under GGUF via crispasr in "
+    "the Pass 1 or Pass 2 menu."   # the menu names since W343
 )
 
 
