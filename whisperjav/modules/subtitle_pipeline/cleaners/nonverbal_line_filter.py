@@ -5,15 +5,20 @@ capture maximum detail. A side effect is that many moan onsets, breaths and
 ASR truncations surface as standalone subtitle lines (e.g. "あ。", "は。",
 "え。", "切。"). Too many of these clutter the subtitle for the viewer.
 
-This filter drops SRT entries whose ENTIRE (stripped) text is exactly one
-owner-curated token, optionally followed by one "。". Whole-line exact match
+This filter drops SRT entries whose ENTIRE text, with all punctuation and
+whitespace removed, is exactly one owner-curated token. Whole-line exact match
 means multi-token lines and sentences are never touched.
 
 Owner-curated token set:
     - v1.9.0 (2026-07-03): single-character artifacts, validated against a real
       qwen3 pass2 SRT (MIMK-276): matched 302 / 2414 lines (12.5%), all
       high-confidence junk, zero real-dialogue hits. Broadening to other
-      trailing punctuation was tested and added nothing, so only "。" is honoured.
+      trailing punctuation was tested on Qwen3-ASR output and added nothing, so
+      only "。" was honoured until v1.10.0.
+    - v1.10.0 (2026-10-29, owner W339-W342): the token is judged with ALL
+      punctuation removed (PUNCTUATION_CHARS of the non-linguistic filter), so
+      "あ!", "うん!", "うん......", "え?" are dropped like "あ。". Parakeet-CrispASR
+      and Cohere-CrispASR write "!", "?", "!?", "……", "......", "、" after the token.
     - v1.9.2 (2026-09-05, owner CFF5): lone "はい。" and "うん。" added. In the
       owner's JAV tests roughly 90% of these lone lines are moans during
       intimate scenes, not agreement (evidence: two SRT screenshots, dozens of
@@ -37,14 +42,22 @@ from whisperjav.utils.logger import logger
 # backchannel tokens the owner asked to drop in v1.9.2 (CFF5: ~90% moans in JAV).
 NONVERBAL_TOKENS = ("つ", "ふ", "ふっ", "切", "は", "え", "あ", "ん", "はい", "うん")
 
-# Whole-line match: optional surrounding whitespace, exactly one token, and an
-# optional single "。". Longer tokens are placed first in the alternation so
+# Whole-line match on the text with all punctuation and whitespace removed:
+# exactly one token. Longer tokens are placed first in the alternation so
 # "ふっ" wins over "ふ" (anchoring already makes this safe, but keep it explicit).
 _NONVERBAL_RE = re.compile(
     r"^(?:"
     + "|".join(sorted((re.escape(t) for t in NONVERBAL_TOKENS), key=len, reverse=True))
-    + r")。?$"
+    + r")$"
 )
+
+
+def _without_punctuation(text: str) -> str:
+    """The text with every PUNCTUATION_CHARS character, CR and LF removed (v1.10.0, owner W339-W342)."""
+    from whisperjav.modules.subtitle_pipeline.cleaners.nonlinguistic_utterance_filter import (
+        PUNCTUATION_CHARS,
+    )
+    return "".join(ch for ch in text if ch not in PUNCTUATION_CHARS and ch not in "\r\n")
 
 
 def _normalizes_to_nothing(text: str) -> bool:
@@ -68,16 +81,17 @@ class NonverbalLineFilter:
 
     @staticmethod
     def is_nonverbal_line(text: str) -> bool:
-        """Return True iff the whole (stripped) line is one curated nonverbal token.
+        """Return True iff the line, with all punctuation removed, is one curated nonverbal token.
 
         Examples (drop):  "あ。", "あ", "は。", "え。", "ん。", "つ。", "ふ。",
-                          "ふっ。", "切。", "はい。", "うん。", "  は。 " (whitespace)
+                          "ふっ。", "切。", "はい。", "うん。", "  は。 " (whitespace),
+                          "あ!", "あ！", "うん!", "うん......", "え?", "あ、" (v1.10.0)
         Examples (keep):  "はいはい。", "うんうん。", "ううん。", "あ、うん。", "あー。",
-                          "あ、あ。", "はは。", "気持ちいい。", "", any sentence line.
+                          "あ、あ。", "はは。", "あっ!", "気持ちいい。", "", any sentence line.
         """
         if not text:
             return False
-        return bool(_NONVERBAL_RE.match(text.strip()))
+        return bool(_NONVERBAL_RE.match(_without_punctuation(text)))
 
     def filter_srt_file(self, srt_path: Union[str, Path]) -> Dict[str, int]:
         """Drop empty + nonverbal-token entries in place, renumber, write back.
