@@ -15,7 +15,7 @@ WhisperJAV 提供多种处理管线，在速度和准确度之间各有取舍。
 | **Transformers** | HuggingFace | 有 | 有 | 中等 | 良好 | ~4 GB |
 | **Qwen3-ASR** | Qwen3 | Assembly | Assembly | 中等 | 文本质量优秀 | ~4-8 GB |
 | **ChronosJAV** | anime-whisper / Kotoba | TEN VAD | TEN VAD | 中等 | 动漫/JAV 最佳 | ~4-8 GB |
-| **Parakeet-CrispASR / Cohere-CrispASR**（GGUF，仅专家模式） | CrispASR（Parakeet / Cohere 模型） | 是（默认 Semantic） | 是（WhisperSeg / FireRedVAD） | 未测量 | 未测量 | 未测量 |
+| **Parakeet-CrispASR / Cohere-CrispASR**（GGUF，仅专家模式） | CrispASR（Parakeet / Cohere 模型） | 是（默认 Semantic） | 是（TEN VAD / FireRedVAD） | 未测量 | 未测量 | 未测量 |
 
 ---
 
