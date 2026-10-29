@@ -1672,26 +1672,26 @@ const EnsembleManager = {
     // State - Full Configuration Snapshot approach
     state: {
         pass1: {
-            // v1.9.5 (owner, 2026-10-12): pass 1 is Qwen3-ASR / aggressive / semantic /
-            // none / FireRedVAD. Keep in step with ENSEMBLE_PASS_DEFAULTS in
-            // config/segmenter_presets.py and with applyPipelinePresets below.
-            pipeline: 'qwen',
-            sensitivity: 'aggressive',
+            // 1.10.0 (owner W343, W344): pass 1 is Cohere-CrispASR ("cohere") / balanced /
+            // semantic / none / FireRedVAD. Keep in step with index.html's selected options,
+            // CRISPASR_DEFAULT_SENSITIVITY in config/segmenter_presets.py and applyPipelinePresets below.
+            pipeline: 'cohere-crispasr',
+            sensitivity: 'balanced',
             sceneDetector: 'semantic',
             speechEnhancer: 'none',
             speechSegmenter: 'firered-vad',
             vadVersion: '4.0',  // v1.9.2: which Silero build the BUILT-IN VAD runs (balanced only).
                                 // Keep in step with defaultVadVersion below and with
                                 // DEFAULT_VAD_VERSION in modules/silero_vad_adapter.py.
-            model: 'Qwen/Qwen3-ASR-1.7B',
+            model: 'cohere-asr-ja-v0.1',
             customized: false,
             params: null,  // null = use defaults, object = full custom config
             presetName: null,  // Name of loaded preset, or null if none
             isTransformers: false,  // Track if using Transformers pipeline
-            isQwen: true,  // ChronosJAV umbrella: any of qwen / anime-whisper / cohere
+            isQwen: false,  // ChronosJAV umbrella: any of qwen / anime-whisper / cohere
             isAnimeWhisper: false,  // Track if using Anime-Whisper specifically
             isCohere: false,  // Track if using Cohere-Transcribe specifically (v1.8.14)
-            isCrispasr: false,  // Track if using a CrispASR pipeline (parakeet-crispasr / cohere-crispasr, 1.10.0)
+            isCrispasr: true,  // Track if using a CrispASR pipeline (parakeet-crispasr / cohere-crispasr, 1.10.0)
             isXxl: false,  // Track if using BYOP Faster Whisper XXL (pass 1 too since 1.10.0, item 5)
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
             dspEffects: ['loudnorm'],  // Default FFmpeg DSP effects
@@ -1699,9 +1699,9 @@ const EnsembleManager = {
         },
         pass2: {
             enabled: false,
-            // v1.9.5 (owner, 2026-10-12): pass 2 is Anime-Whisper / aggressive / semantic /
-            // none / TEN VAD, and stays off until the user ticks it.
-            pipeline: 'anime-whisper',
+            // 1.10.0 (owner W343, W344): pass 2 is Parakeet-CrispASR ("parakeet") / aggressive /
+            // semantic / none / TEN VAD, and stays off until the user ticks it.
+            pipeline: 'parakeet-crispasr',
             sensitivity: 'aggressive',
             sceneDetector: 'semantic',
             speechEnhancer: 'none',
@@ -1709,15 +1709,15 @@ const EnsembleManager = {
             vadVersion: '4.0',  // v1.9.2: which Silero build the BUILT-IN VAD runs (balanced only).
                                 // Keep in step with defaultVadVersion below and with
                                 // DEFAULT_VAD_VERSION in modules/silero_vad_adapter.py.
-            model: 'litagin/anime-whisper',
+            model: 'parakeet-tdt-0.6b-ja',
             customized: false,
             params: null,
             presetName: null,  // Name of loaded preset, or null if none
             isTransformers: false,
-            isQwen: true,  // Default pipeline is Anime-Whisper (ChronosJAV umbrella)
-            isAnimeWhisper: true,
+            isQwen: false,  // ChronosJAV umbrella: any of qwen / anime-whisper / cohere
+            isAnimeWhisper: false,
             isCohere: false,  // v1.8.14: Cohere-Transcribe preview (gated HF model)
-            isCrispasr: false,  // Track if using a CrispASR pipeline (parakeet-crispasr / cohere-crispasr, 1.10.0)
+            isCrispasr: true,  // Track if using a CrispASR pipeline (parakeet-crispasr / cohere-crispasr, 1.10.0)
             isXxl: false,  // Track if using BYOP Faster Whisper XXL
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
             dspEffects: ['loudnorm'],  // Default FFmpeg DSP effects
@@ -2082,9 +2082,15 @@ const EnsembleManager = {
     CRISPASR_CJK_NOTE: 'Experimental in 1.10.0 (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).',
 
     // Each CrispASR pipeline's speech segmenter when a pass names none (CRISPASR_DEFAULT_SEGMENTERS,
-    // config/segmenter_presets.py; owner W202 2-3); tests/test_gui_crispasr_pipelines.py compares them.
+    // config/segmenter_presets.py; owner W202 3, W344); tests/test_gui_crispasr_pipelines.py compares them.
     crispasrDefaultSegmenter(pipeline) {
-        return pipeline === 'cohere-crispasr' ? 'firered-vad' : 'whisperseg';
+        return pipeline === 'cohere-crispasr' ? 'firered-vad' : 'ten';
+    },
+
+    // Each CrispASR pipeline's sensitivity when a pass names none (CRISPASR_DEFAULT_SENSITIVITY,
+    // config/segmenter_presets.py; owner W343, W344); tests/test_gui_crispasr_pipelines.py compares them.
+    crispasrDefaultSensitivity(pipeline) {
+        return pipeline === 'cohere-crispasr' ? 'balanced' : 'aggressive';
     },
 
     // The CrispASR status panel under a pass row (owner W133 2; route B design 12, T16): the model,
@@ -2285,19 +2291,20 @@ const EnsembleManager = {
         const sensitivitySelect = document.getElementById(`${passKey}-sensitivity`);
 
         // The CrispASR pipelines (1.10.0): the same defaults as the command line. The speech
-        // segmenter is each pipeline's own when a pass names none (CRISPASR_DEFAULT_SEGMENTERS,
-        // config/segmenter_presets.py: WhisperSeg for Parakeet, FireRedVAD for Cohere, owner W202);
-        // sensitivity is balanced (ENSEMBLE_DEFAULT_SENSITIVITY); the scene detector starts at
-        // semantic (CRISPASR_SCENE_DETECTOR, crispasr/pass_settings.py; owner W214 2), and the user
-        // may choose another (design 22.9.1).
+        // segmenter and sensitivity are each pipeline's own when a pass names none
+        // (CRISPASR_DEFAULT_SEGMENTERS, CRISPASR_DEFAULT_SENSITIVITY, config/segmenter_presets.py:
+        // TEN VAD at aggressive for Parakeet, FireRedVAD at balanced for Cohere, owner W343, W344);
+        // the scene detector starts at semantic (CRISPASR_SCENE_DETECTOR, crispasr/pass_settings.py;
+        // owner W214 2), and the user may choose another (design 22.9.1).
         if (this.isCrispasrPipeline(pipelineType)) {
             const segmenter = this.crispasrDefaultSegmenter(pipelineType);
+            const sensitivity = this.crispasrDefaultSensitivity(pipelineType);
             sceneSelect.value = 'semantic';
             segmenterSelect.value = segmenter;
-            sensitivitySelect.value = 'balanced';
+            sensitivitySelect.value = sensitivity;
             this.state[passKey].sceneDetector = 'semantic';
             this.state[passKey].speechSegmenter = segmenter;
-            this.state[passKey].sensitivity = 'balanced';
+            this.state[passKey].sensitivity = sensitivity;
             return;
         }
 
