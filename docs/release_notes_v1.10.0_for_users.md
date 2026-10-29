@@ -31,6 +31,8 @@
 
 **Changed**
 
+- **The Ensemble tab opens on the GGUF pipelines:** Pass 1 on **cohere** (Cohere-CrispASR, Balanced, FireRedVAD) and Pass 2 on **parakeet** (Parakeet-CrispASR, Aggressive, TEN VAD), which stays off until you tick it; in 1.9.5 they were Qwen3-ASR and Anime-Whisper. In the Pass menus the two are named cohere and parakeet, under **GGUF via crispasr**. With Remember settings on, the tab opens on the passes you saved. On the command line, a Parakeet-CrispASR pass that names no speech segmenter or sensitivity runs TEN VAD at Aggressive; Cohere-CrispASR runs FireRedVAD at Balanced.
+- ChronosJAV, Parakeet-CrispASR and Cohere-CrispASR: a subtitle that is only a lone sound such as 「あ」, 「うん」 or 「はい」 is now removed whatever punctuation follows it (「うん!」, 「え?」, 「あ……」), as it already was with 「。」.
 - Python 3.13 and PyTorch 2.11. On Windows, the NVIDIA GPU install uses CUDA 13.0 and needs NVIDIA driver 580 or newer; where this PC cannot load the CUDA 12 library that balanced, fast and faster need, the installer uses CUDA 12.8 instead. Linux uses CUDA 12.8, driver 570 or newer.
 - NVIDIA cards older than the GTX 16 / RTX 20 series are no longer supported by the NVIDIA GPU install. The installer says so, names 1.9.5 for such a card, and offers GPU through Vulkan (Windows), your own PyTorch or CPU only.
 - balanced, fast and faster run on CTranslate2 4.8.3 (#459) and use a GPU only when CTranslate2 itself can use it.
