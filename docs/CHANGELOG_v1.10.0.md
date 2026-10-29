@@ -507,6 +507,27 @@ inline tags is translated in pieces ("将要下载 4.7 GB."). The owner's click 
 
 ---
 
+## R-NV and the Ensemble defaults (owner W334 D3, W339–W345)
+
+**R-NV (owner W334 D3, W339–W342):** the non-verbal line filter (ChronosJAV, Parakeet-CrispASR, Cohere-CrispASR) removes all
+punctuation before it checks whether a subtitle is one listed token (つ ふ ふっ 切 は え あ ん はい うん), so 「うん!」, 「うん......」,
+「え?」 and 「あ！」 are removed like 「あ。」; 「あっ!」 and repeats stay. Checked on copies of the 30 T1 raw SRTs: 5 more subtitles
+removed in the CrispASR runs (0–1 per run), none in ChronosJAV; `tests/test_nonverbal_line_filter.py` 69 passed.
+
+**The Ensemble tab and the Parakeet-CrispASR default (owner W343, W344).** In both Pass menus the group "GGUF" is now
+"GGUF via crispasr" and the entries are named "cohere" and "parakeet". The tab opens on cohere / Balanced / FireRedVAD in pass 1
+and parakeet / Aggressive / TEN VAD in pass 2 (off until ticked; was Qwen3-ASR / aggressive / FireRedVAD and Anime-Whisper /
+aggressive / TEN VAD); picking cohere sets Balanced and FireRedVAD, picking parakeet Aggressive and TEN VAD. The command line
+follows (W344): a `parakeet-crispasr` pass naming no speech segmenter or sensitivity runs TEN VAD at aggressive (was WhisperSeg at
+balanced; `CRISPASR_DEFAULT_SEGMENTERS`, new `CRISPASR_DEFAULT_SENSITIVITY` in `config/segmenter_presets.py`); `--passN-speech-pad-ms`
+is then ignored with the existing warning (TEN VAD has no speech-pad setting). The `--help` segmenter lines and the exit-2 message
+for the removed 1.9.x CrispASR mode name the new menu entries. Checked: `--help` exit 0; `--dump-params` for
+`--pass1-pipeline cohere-crispasr --pass2-pipeline parakeet-crispasr` gives firered-vad/balanced and ten/aggressive; tests
+`test_gui_crispasr_pipelines.py` 51, `test_gui_i18n_zh.py` 14, `test_crispasr_cli.py` 83, `test_crispasr_pipelines.py` 114,
+`test_balanced_defaults_v192.py` 50, `test_crispasr_d3_v110.py` 18 passed. The owner's GUI click test is still to come.
+
+---
+
 ## Found during the work, not fixed in 1.10.0 (requirements §5; places as decided or proposed)
 
 | | Finding | Place |
