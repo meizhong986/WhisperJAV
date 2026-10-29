@@ -47,9 +47,10 @@ Parakeet-CrispASR asks CrispASR to use the NVIDIA GPU (CUDA) (CrispASR 0.8.44+cu
 
 | | Parakeet-CrispASR | Cohere-CrispASR |
 |---|---|---|
+| **GUI 中的名称** | **parakeet**（在 **GGUF via crispasr** 分组下） | **cohere**（在 **GGUF via crispasr** 分组下） |
 | **模型** | `parakeet-tdt-0.6b-ja`（674 MB） | `cohere-asr-ja-v0.1`（默认）或 `cohere-asr-ja`（各 2,424 MB） |
-| **默认语音分割器** | WhisperSeg | FireRedVAD |
-| **默认灵敏度** | Balanced | Balanced |
+| **默认语音分割器** | TEN VAD | FireRedVAD |
+| **默认灵敏度** | Aggressive | Balanced |
 | **VAD 组最长** | 6 秒，任何灵敏度下都一样 | 3 秒 |
 | **字幕在哪里断开** | 只在语音的自然停顿处断开（见下文） | 只在句末断开（见下文） |
 | **字幕时间** | 来自模型对其输出文字给出的时间 | 来自对齐器 `wav2vec2-ja`，它为模型写出的文字标出时间 |
@@ -65,10 +66,10 @@ Parakeet-CrispASR 使用 Fidelity 处理管线的语音分割器设置，另加 
 
 ### GUI
 
-1. 打开 **专家模式**（Ensemble Mode）选项卡。
-2. 在 **第一轮**（Pass 1）一行，打开 **Pipeline** 菜单，在 **GGUF** 分组下选择 **Parakeet-CrispASR** 或 **Cohere-CrispASR**。
-3. 如果选的是 Cohere-CrispASR，可在 **Model** 列选择模型（默认 `cohere-asr-ja-v0.1`）。
-4. 如需第二轮，勾选 **第二轮**（Pass 2），选择其处理管线，并在 **Merge** 中选择两者的合并方式。
+1. 打开 **专家模式**（Ensemble Mode）选项卡。打开时 **第一轮**（Pass 1）为 **cohere**（Balanced，FireRedVAD），**第二轮**（Pass 2）为 **parakeet**（Aggressive，TEN VAD）；第二轮在勾选之前不运行。如果开启了 **Remember settings**，选项卡打开时显示的是你保存的设置。
+2. 要为某一轮换处理管线，打开它的 **Pipeline** 菜单：**parakeet** 和 **cohere** 在 **GGUF via crispasr** 分组下。选择其中之一时，会同时设好它自己的灵敏度和语音分割器（见上表）。
+3. 如果选的是 cohere，可在 **Model** 列选择模型（默认 `cohere-asr-ja-v0.1`）。
+4. 如需第二轮，勾选 **第二轮**（Pass 2），确认其处理管线，并在 **Merge** 中选择两者的合并方式。
 5. 点击 **Start**。
 
 当某一轮使用这两个处理管线之一时：
@@ -110,12 +111,12 @@ whisperjav video.mp4 --ensemble --pass1-pipeline parakeet-crispasr --pass2-pipel
 |---|---|---|---|
 | 模型 | Model | `--pass1-model`、`--pass2-model` | `parakeet-tdt-0.6b-ja`；`cohere-asr-ja-v0.1`、`cohere-asr-ja` |
 | 语音分割器 | Speech Segmenter | `--pass1-speech-segmenter` | 除 `none` 以外均可 |
-| 灵敏度 | Sensitivity | `--pass1-sensitivity` | `conservative`、`balanced`（默认）、`aggressive` |
+| 灵敏度 | Sensitivity | `--pass1-sensitivity` | `conservative`、`balanced`、`aggressive`；Parakeet-CrispASR 默认 `aggressive`，Cohere-CrispASR 默认 `balanced` |
 | 场景检测器 | Scene Detector | `--pass1-scene-detector` | `semantic`（默认，场景 12 到 48 秒）、`auditok`、`silero`（场景最长 48 秒）、`none`（每个文件一个场景） |
 | 语音增强器 | Speech Enhancer | `--pass1-speech-enhancer` | `none`（默认），或其他 Pass 可用的语音增强器，例如 `ffmpeg-dsp`、`zipenhancer` 或 `htdemucs` |
 | 仅用于 VAD 的增强 | Enhance for VAD only | `--pass1-enhance-for-vad` | 增强后的音频只交给语音分割器；CrispASR 听到的是原始音频 |
 | 检测阈值 | Customize，Segmenter 选项卡 | `--pass1-vad-threshold` | 0 到 1；覆盖灵敏度设定的值 |
-| 前后填充 | Customize，Segmenter 选项卡 | `--pass1-speech-pad-ms` | 每段语音前后各加的毫秒数。Cohere-CrispASR：前后都加。Parakeet-CrispASR：仅对有此设置的语音分割器生效；使用 FireRedVAD 或 TEN VAD 时会被忽略并给出警告 |
+| 前后填充 | Customize，Segmenter 选项卡 | `--pass1-speech-pad-ms` | 每段语音前后各加的毫秒数。Cohere-CrispASR：前后都加。Parakeet-CrispASR：仅对有此设置的语音分割器（例如 WhisperSeg）生效；使用 FireRedVAD 或 TEN VAD（它的默认分割器）时会被忽略并给出警告 |
 | 设备 | — | `--device auto`、`cuda` 或 `cpu` | 见下文 |
 | 语言 | Source audio language | `--language japanese`（默认） | 其他语言会使运行停止 |
 
@@ -127,8 +128,8 @@ whisperjav video.mp4 --ensemble --pass1-pipeline parakeet-crispasr --pass2-pipel
 
 | | Conservative | Balanced | Aggressive |
 |---|---|---|---|
-| Parakeet-CrispASR（WhisperSeg）：检测阈值 | 0.45 | 0.35 | 0.25 |
-| Parakeet-CrispASR：语音前后填充 | 200 ms | 300 ms | 400 ms |
+| Parakeet-CrispASR（TEN VAD）：检测阈值 | 0.42 | 0.32 | 0.22 |
+| Parakeet-CrispASR：语音前 / 后填充 | 0 / 300 ms | 0 / 200 ms | 0 / 100 ms |
 | Cohere-CrispASR（FireRedVAD）：检测阈值 | 0.5 | 0.4 | 0.3 |
 | Cohere-CrispASR：语音前后填充 | 100 ms | 100 ms | 100 ms |
 
@@ -250,7 +251,7 @@ Cohere-CrispASR 的对齐器（232 MB）在这一轮第一次使用时下载，�
   CrispASR now runs in Ensemble Mode as two pipelines, Parakeet-CrispASR and Cohere-CrispASR, and WhisperJAV installs it itself.
   Example:
       whisperjav --ensemble --pass1-pipeline parakeet-crispasr <your video>
-  In the GUI: open the Ensemble Mode tab and choose Parakeet-CrispASR or Cohere-CrispASR under GGUF in the Pass 1 or Pass 2 menu.
+  In the GUI: open the Ensemble Mode tab and choose parakeet or cohere under GGUF via crispasr in the Pass 1 or Pass 2 menu.
   ```
 
 - GUI 中，Transcription Mode 选项卡 Mode 菜单里的 **crispasr** 项已删除，专家模式（Ensemble Mode）选项卡中带 Backend 选项的旧 **CrispASR** 处理管线也已删除。
