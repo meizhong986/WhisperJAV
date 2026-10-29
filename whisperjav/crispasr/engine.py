@@ -17,6 +17,7 @@ from typing import List, Optional, Protocol, Sequence, Tuple
 
 import numpy as np
 
+from whisperjav.crispasr import native_log
 from whisperjav.crispasr.errors import CrispASRRunError, CrispASRSetupError
 
 SAMPLE_RATE = 16000
@@ -104,6 +105,7 @@ class BindingEngine:
             import crispasr
         except ImportError as e:
             raise CrispASRSetupError(f"CrispASR could not be loaded on this computer: {e}") from e
+        native_log.quiet_debug_lines(crispasr)   # its GPU library's DEBUG lines only with --debug (W350)
         try:
             # The model family is detected from the file; it is checked after opening, not passed.
             session = crispasr.Session(str(self.model_path), n_threads=self.n_threads, use_gpu=self.use_gpu)
