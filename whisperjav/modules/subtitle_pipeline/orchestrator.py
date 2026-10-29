@@ -1269,20 +1269,19 @@ class DecoupledSubtitlePipeline:
                         for s, e in per_scene_regions
                     ]
 
-                # "3a" audit trail: raw VAD frame boundaries (fed to the ASR)
-                # vs refined display starts (used for subtitle timing).
+                # "3a" audit trail: raw VAD frame boundaries (the audio fed to the ASR),
+                # written in every run (F7, owner W307 1: before, only in vad_only runs),
+                # and the refined display start where it is used (vad_only; else None).
                 # internal_breaks reserved for the future "3b" splitter.
-                frame_timing = None
-                if scene_starts is not None:
-                    frame_timing = [
-                        {
-                            "vad_start": round(fr.start, 3),
-                            "vad_end": round(fr.end, 3),
-                            "speech_start": round(display_starts[fi], 3),
-                            "internal_breaks": [],
-                        }
-                        for fi, fr in enumerate(frames)
-                    ]
+                frame_timing = [
+                    {
+                        "vad_start": round(fr.start, 3),
+                        "vad_end": round(fr.end, 3),
+                        "speech_start": round(display_starts[fi], 3) if scene_starts is not None else None,
+                        "internal_breaks": [],
+                    }
+                    for fi, fr in enumerate(frames)
+                ]
 
                 scene_diag = SceneDiagnostics(
                     schema_version="2.0.0",
