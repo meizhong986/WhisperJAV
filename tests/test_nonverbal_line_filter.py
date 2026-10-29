@@ -55,11 +55,33 @@ class TestIsNonverbalLine:
     def test_negatives_are_kept(self, text):
         assert NonverbalLineFilter.is_nonverbal_line(text) is False
 
-    def test_multichar_trailing_punct_not_matched(self):
-        # Only a single optional "。" is honoured; other/extra punct ⇒ keep.
-        assert NonverbalLineFilter.is_nonverbal_line("あ。。") is False
-        assert NonverbalLineFilter.is_nonverbal_line("あ、") is False
-        assert NonverbalLineFilter.is_nonverbal_line("あ…") is False
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "あ。。", "あ、", "あ…",               # extra / other punctuation
+            "あ!", "あ！", "うん!", "うん......",  # T1 Cohere-CrispASR, Qwen3-ASR raw (2026-10-29)
+            "え?", "うん?", "は?",                # T1 Parakeet-CrispASR
+            "あ!?", "うん……", "「はい」", " うん! ",
+        ],
+    )
+    def test_any_punctuation_is_removed_before_the_token_check(self, text):
+        # v1.10.0 (owner W339-W342): all punctuation removed, then exactly one token ⇒ drop.
+        assert NonverbalLineFilter.is_nonverbal_line(text) is True
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "あっ!",          # small っ is not punctuation; "あっ" is not a token
+            "あっ、あっ、あっ!",  # repeats
+            "ああ。",         # two tokens back to back
+            "あ、うん。",     # two tokens with punctuation between
+            "うん!すごい!",   # a word
+            "クイズ!",
+            "すごい!",
+        ],
+    )
+    def test_punctuation_removal_keeps_non_token_lines(self, text):
+        assert NonverbalLineFilter.is_nonverbal_line(text) is False
 
 
 class TestFilterSrtFile:
