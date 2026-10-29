@@ -17,7 +17,7 @@ from typing import List, Optional
 
 import numpy as np
 
-from whisperjav.crispasr import install
+from whisperjav.crispasr import install, native_log
 from whisperjav.crispasr.engine import LANGUAGE
 from whisperjav.crispasr.errors import CrispASRSetupError
 from whisperjav.crispasr.manifest import ModelFile, timing_model_for
@@ -82,6 +82,7 @@ class CrispTimer:
             import crispasr
         except (ImportError, OSError) as e:
             raise CrispASRSetupError(install.NOT_LOADED_TEXT.format(reason=e)) from e
+        native_log.quiet_debug_lines(crispasr)   # its GPU library's DEBUG lines only with --debug (W350)
         if not hasattr(crispasr, "CrispASR"):
             raise CrispASRSetupError(NO_WHISPER_TEXT.format(version=runtime.version))
         path = install.stage_model(install.ensure_model(self.model), self.temp_dir, self.model.sha256,
