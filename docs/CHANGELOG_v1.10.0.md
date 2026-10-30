@@ -6,6 +6,14 @@
 > what the user sees, the commits, the owner's decisions (W-numbers in `docs/plans/OWNER_WORDS_V110_CYCLE.md`), how it was checked, and
 > what was found and left open. Specs: `docs/requirements/v1.10.x/specs/`. Both folders are git-ignored.
 >
+> **State, 2026-10-30 (release):** every item in this log is done and committed: items 1, 2a–2f, 3, 4, the
+> accelerators, 12, tuning, 5, 11c, 6, R-NV and the Ensemble defaults; F7 (ChronosJAV's scene records keep the
+> VAD-group times) committed on 2026-10-29 (`0568cac`, `14af1fa`, `606eea8`). Installer built on 2026-10-29 from
+> `606eea8`: `WhisperJAV-1.10.0-Windows-x86_64.exe`, 351,195,281 bytes, SHA-256
+> `5000FBC98D93C85D9BC466F2120D16F6B14429C00A022C2C3753B2D28E68CDE1`; installed and checked on an NVIDIA PC
+> (evidence `D:\WJ110_measure\build_2026-10-29\`). After it, two release edits: this paragraph, and the GitHub
+> check `automated-execution.yml` on Python 3.13 (was 3.12). Nothing pushed; every push on the owner's word.
+>
 > **State, 2026-10-27:** items 1, 2a–2f, 3 and 4 (CrispASR, as the GGUF pipelines) done, and the accelerator
 > redesign (one accelerator per install, owner W234, design section 22 v2 approved W238); branch at `f9950dd`, 349
 > commits ahead of `main`, nothing pushed. No installer has been built since 2026-10-17. The branch has no commits yet for items 12, 5, 10, 11a–c
