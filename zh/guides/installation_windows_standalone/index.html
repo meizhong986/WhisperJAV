@@ -1,0 +1,2448 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/WhisperJAV/zh/guides/installation_windows_standalone/">
+      
+      
+        <link rel="prev" href="../../getting-started/">
+      
+      
+        <link rel="next" href="../installation_windows_python/">
+      
+      
+        
+          <link rel="alternate" href="../../../guides/installation_windows_standalone/" hreflang="en">
+        
+          <link rel="alternate" href="./" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Windows (Installer) - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#whisperjav-windows" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../../" title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Windows (Installer)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="选择当前语言">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="../../../guides/installation_windows_standalone/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../" title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        目录
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#before-you-install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装前准备
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="安装前准备">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        你的电脑
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        你的显卡
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        杀毒软件
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        中国用户
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装步骤
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-this-install-is-made-for" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装为哪种加速器制作
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="安装为哪种加速器制作">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nvidia-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        受支持的 NVIDIA GPU
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nvidia-gpu_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        没有受支持的 NVIDIA GPU：窗口
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#110-nvidia-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.10 无法使用的 NVIDIA GPU
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pytorch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        自己的 PyTorch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装的选择保存在哪里
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装程序有意停止时
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        首次运行
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checking-your-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        检查安装
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#coming-from-19x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        从 1.9.x 升级
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#updating-within-110" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        在 1.10 内更新
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-the-installer-again" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        再次运行安装程序
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#uninstalling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        卸载
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        故障排除
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#technical-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        技术细节
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="技术细节">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        静默安装
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装文件夹中的文件
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装程序访问的地址
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pipelines/crispasr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GGUF (CrispASR)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV 升级指南
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        目录
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#before-you-install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装前准备
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="安装前准备">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        你的电脑
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        你的显卡
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        杀毒软件
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        中国用户
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装步骤
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-this-install-is-made-for" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装为哪种加速器制作
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="安装为哪种加速器制作">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nvidia-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        受支持的 NVIDIA GPU
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nvidia-gpu_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        没有受支持的 NVIDIA GPU：窗口
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#110-nvidia-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.10 无法使用的 NVIDIA GPU
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pytorch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        自己的 PyTorch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装的选择保存在哪里
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装程序有意停止时
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        首次运行
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checking-your-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        检查安装
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#coming-from-19x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        从 1.9.x 升级
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#updating-within-110" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        在 1.10 内更新
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-the-installer-again" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        再次运行安装程序
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#uninstalling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        卸载
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        故障排除
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#technical-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        技术细节
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="技术细节">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        静默安装
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装文件夹中的文件
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        安装程序访问的地址
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/en/zh/guides/installation_windows_standalone.md" title="编辑此页" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="whisperjav-windows">WhisperJAV Windows 安装程序指南<a class="headerlink" href="#whisperjav-windows" title="Permanent link">&para;</a></h1>
+<p><strong>版本：</strong> 1.10.0
+<strong>安装程序：</strong> <code>WhisperJAV-1.10.0-Windows-x86_64.exe</code>（无需管理员权限）</p>
+<hr />
+<h2 id="_1">目录<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<ol>
+<li><a href="#before-you-install">安装前准备</a></li>
+<li><a href="#installation-steps">安装步骤</a></li>
+<li><a href="#what-this-install-is-made-for">安装为哪种加速器制作</a></li>
+<li><a href="#first-run">首次运行</a></li>
+<li><a href="#checking-your-installation">检查安装</a></li>
+<li><a href="#coming-from-19x">从 1.9.x 升级</a></li>
+<li><a href="#updating-within-110">在 1.10 内更新</a></li>
+<li><a href="#running-the-installer-again">再次运行安装程序</a></li>
+<li><a href="#uninstalling">卸载</a></li>
+<li><a href="#troubleshooting">故障排除</a></li>
+<li><a href="#technical-details">技术细节</a></li>
+</ol>
+<hr />
+<h2 id="before-you-install">安装前准备<a class="headerlink" href="#before-you-install" title="Permanent link">&para;</a></h2>
+<h3 id="_2">你的电脑<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>要求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Windows</td>
+<td>Windows 10 或 11，64 位（x86-64）。不支持 Windows on ARM（例如 Snapdragon 笔记本）：安装程序会在第一个界面停止。</td>
+</tr>
+<tr>
+<td>内存</td>
+<td>8 GB（推荐 16 GB）</td>
+</tr>
+<tr>
+<td>可用磁盘空间</td>
+<td>约 10 GB，用于安装和首次使用时下载的模型</td>
+</tr>
+<tr>
+<td>网络</td>
+<td>安装时以及每个模型首次运行时</td>
+</tr>
+<tr>
+<td>WebView2</td>
+<td>Microsoft Edge WebView2 Runtime，供 GUI 使用（缺失时安装程序会提供）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_3">你的显卡<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
+<p>安装程序会把这次安装制作为一种加速器的安装（见<a href="../../getting-started/#accelerated-or-not">是否加速</a>）：</p>
+<ul>
+<li><strong>1.10 支持的 NVIDIA GPU</strong>——GTX 16 系列、RTX 20 系列或更新，驱动 580 或更新：安装自动为 NVIDIA GPU（CUDA）制作，不会提问。</li>
+<li><strong>其他情况</strong>——AMD 或 Intel 显卡、比 1.10 支持范围更旧的 NVIDIA 显卡、较旧的驱动，或没有 WhisperJAV 能用的显卡：会弹出一个窗口，询问这次安装要为什么制作。</li>
+</ul>
+<p>查看 NVIDIA 驱动版本：右键点击桌面，打开 NVIDIA 控制面板，在左下角查看"驱动程序版本"。更新驱动：<a href="https://www.nvidia.com/drivers">nvidia.com/drivers</a>，然后重启电脑。</p>
+<h3 id="_4">杀毒软件<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<p>一些杀毒软件会阻止安装程序下载。遇到这种情况时，请为 <code>%LOCALAPPDATA%\WhisperJAV</code> 添加排除项，或在安装期间暂停实时扫描。</p>
+<h3 id="_5">中国用户<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
+<p>安装程序会从 GitHub、PyPI、download.pytorch.org 和 Hugging Face 下载。请在整个安装过程中保持 VPN 开启。</p>
+<hr />
+<h2 id="installation-steps">安装步骤<a class="headerlink" href="#installation-steps" title="Permanent link">&para;</a></h2>
+<ol>
+<li>从<a href="https://github.com/meizhong986/WhisperJAV/releases">发布页面</a>下载 <code>WhisperJAV-1.10.0-Windows-x86_64.exe</code>。</li>
+<li>双击运行。无需以管理员身份运行。如果 Windows SmartScreen 发出警告，点击 <strong>更多信息</strong>，再点击 <strong>仍要运行</strong>。</li>
+<li>接受许可协议。</li>
+<li>选择 <strong>Just Me</strong>（推荐；无需管理员权限）或 <strong>All Users</strong>。</li>
+<li>选择文件夹。默认为 <code>C:\Users\&lt;你的用户名&gt;\AppData\Local\WhisperJAV</code>。路径尽量短，尽量不含空格。</li>
+<li>点击 <strong>Install</strong>。</li>
+</ol>
+<p>文件解压后，一个控制台窗口会完成其余安装，并显示各个阶段：</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>检查：磁盘剩余空间、到 PyPI 的连接、Visual C++ 运行库、WebView2</td>
+</tr>
+<tr>
+<td>2</td>
+<td>查找 NVIDIA GPU 及其驱动</td>
+</tr>
+<tr>
+<td>2.5</td>
+<td>决定安装为哪种加速器制作；需要询问时显示窗口（见下文）</td>
+</tr>
+<tr>
+<td>3–4.5</td>
+<td>安装本版本测试过的软件包版本，然后安装适合该加速器的 PyTorch</td>
+</tr>
+<tr>
+<td>5</td>
+<td>安装 WhisperJAV</td>
+</tr>
+<tr>
+<td>5.1</td>
+<td>仅 NVIDIA GPU（CUDA）安装：放置 balanced、fast 和 faster 需要的 CUDA 12 库；如果这台电脑无法加载它，改为安装 PyTorch 的 CUDA 12.8 版</td>
+</tr>
+<tr>
+<td>5.5–5.8</td>
+<td>创建 <code>WhisperJAV-GUI.exe</code> 启动器，下载 FireRedVAD 语音检测模型，检查图标</td>
+</tr>
+<tr>
+<td>6</td>
+<td>检查已安装的程序能否启动</td>
+</tr>
+</tbody>
+</table>
+<p>最后会显示一份摘要，说明安装了什么以及安装为哪种加速器制作，并创建桌面快捷方式 "WhisperJAV v1.10.0"。安装需要约 10 到 30 分钟，取决于网速。</p>
+<hr />
+<h2 id="what-this-install-is-made-for">安装为哪种加速器制作<a class="headerlink" href="#what-this-install-is-made-for" title="Permanent link">&para;</a></h2>
+<h3 id="nvidia-gpu">受支持的 NVIDIA GPU<a class="headerlink" href="#nvidia-gpu" title="Permanent link">&para;</a></h3>
+<p>不会提问。安装为 NVIDIA GPU（CUDA 13.0）制作。如果这台电脑无法加载 balanced、fast 和 faster 需要的 CUDA 12 库，安装程序会用带边框的消息说明，并改为安装 CUDA 12.8 版。</p>
+<h3 id="nvidia-gpu_1">没有受支持的 NVIDIA GPU：窗口<a class="headerlink" href="#nvidia-gpu_1" title="Permanent link">&para;</a></h3>
+<p>如果安装程序找不到 1.10 支持的 NVIDIA GPU，会弹出标题为 <strong>"WhisperJAV — no supported NVIDIA GPU found"</strong> 的窗口并询问：</p>
+<blockquote>
+<p>WhisperJAV found no NVIDIA graphics card that version 1.10 supports (graphics found: …). What should this install be made for?</p>
+</blockquote>
+<p>（意思是：WhisperJAV 没有找到 1.10 支持的 NVIDIA 显卡。这次安装要为什么制作？）</p>
+<table>
+<thead>
+<tr>
+<th>选项</th>
+<th>安装为哪种加速器制作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AMD graphics card（AMD 显卡）</td>
+<td>通过 Vulkan 使用 GPU</td>
+</tr>
+<tr>
+<td>Intel graphics card（Intel 显卡）</td>
+<td>通过 Vulkan 使用 GPU</td>
+</tr>
+<tr>
+<td>NVIDIA graphics card older than WhisperJAV 1.10 supports（比 1.10 支持范围更旧的 NVIDIA 显卡）</td>
+<td>通过 Vulkan 使用 GPU</td>
+</tr>
+<tr>
+<td>I have my own PyTorch for my GPU (advanced)（我有适合自己 GPU 的 PyTorch，进阶）</td>
+<td>自己的 PyTorch</td>
+</tr>
+<tr>
+<td>None, or use the CPU only（没有，或仅使用 CPU）</td>
+<td>仅 CPU（不加速）</td>
+</tr>
+</tbody>
+</table>
+<p>窗口中的说明（意思）：使用 AMD、Intel 或较旧的 NVIDIA 显卡时，GGUF 处理管线（Parakeet-CrispASR 和 Cohere-CrispASR）请求通过 Vulkan 使用你的显卡。这在 1.10.0 中是实验性功能：尚未在 AMD 或 Intel 显卡上测试，我们希望听到它在你电脑上的表现。其他所有处理管线在 CPU 上运行（不加速），比在受支持的 NVIDIA GPU 上慢好几倍。选择自己的 PyTorch 时，WhisperJAV 安装除 PyTorch 以外的一切，之后由你添加自己的 PyTorch 版本（安装结束时会显示命令）。选择仅 CPU 时，所有处理管线都在 CPU 上运行。</p>
+<p>如果 20 秒内没有回答，会安装仅 CPU 版本。<strong>Stop</strong> 会结束安装程序，不安装任何内容。</p>
+<p>通过 Vulkan 使用 GPU 需要 Vulkan 运行库（<code>vulkan-1.dll</code>），它随显卡驱动一起安装。如果缺失，安装程序会说明并安装仅 CPU 版本；更新显卡驱动后再次运行安装程序即可改变。</p>
+<h3 id="110-nvidia-gpu">1.10 无法使用的 NVIDIA GPU<a class="headerlink" href="#110-nvidia-gpu" title="Permanent link">&para;</a></h3>
+<p>窗口会先说明原因，并预先选中 <strong>Stop</strong>，没有时间限制：</p>
+<ul>
+<li><strong>较旧的显卡</strong>（低于 GTX 16 / RTX 20）："Your graphics card, … (compute capability …), is older than WhisperJAV 1.10 supports. 1.10 needs a GTX 16-series, RTX 20-series or newer card." 以及 "WhisperJAV 1.9.5 still supports this card: https://github.com/meizhong986/WhisperJAV/releases/tag/v1.9.5."（意思是：你的显卡比 1.10 支持的更旧；1.9.5 仍然支持这张显卡。）如果你确定显卡受支持，<strong>My card is identified wrongly</strong>（我的显卡被认错了）会显示报告问题的地址，然后停止。</li>
+<li><strong>较旧的驱动</strong>（低于 580）："Your NVIDIA driver (…) is older than WhisperJAV 1.10 needs (580 or newer). Update it from https://www.nvidia.com/drivers, restart the PC, and run this installer again to get the NVIDIA GPU version. Or choose below."（意思是：驱动太旧；更新驱动并重启后再次运行安装程序，即可得到 NVIDIA GPU 版本；或在下面另选。）</li>
+<li><strong>Windows 能列出、但 WhisperJAV 无法访问的显卡</strong>——驱动可能缺失或不正常，或者在有两块显示芯片的笔记本上，NVIDIA 芯片可能已关闭：安装或修复 NVIDIA 驱动（580 或更新），重启电脑后再次运行安装程序。或在下面另选。</li>
+</ul>
+<h3 id="pytorch">自己的 PyTorch<a class="headerlink" href="#pytorch" title="Permanent link">&para;</a></h3>
+<p>WhisperJAV 安装除 PyTorch 以外的一切，并且在安装和升级时从不在这个安装中安装、替换或删除 PyTorch。再次运行安装程序会替换整个安装文件夹，包括 PyTorch：窗口会保留"自己的 PyTorch"并再次显示命令。安装结束时，一个窗口会显示要运行的那一条命令，其中已填好 WhisperJAV 的 Python：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>"&lt;安装文件夹&gt;\python.exe" -m pip install torch torchaudio --index-url &lt;你的 PyTorch 版本的地址&gt;
+</code></pre></div>
+<p>推荐 PyTorch 2.11。同一条命令也保存在 <code>&lt;安装文件夹&gt;\OWN_PYTORCH_NEXT_STEP.txt</code> 中。在你运行它之前，每次 WhisperJAV 运行都会在开始时停止，并再次显示这条命令。</p>
+<h3 id="_6">安装的选择保存在哪里<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
+<p>安装程序把加速器写入安装文件夹中的 <code>whisperjav_stack.txt</code>。每次运行、<code>whisperjav-upgrade</code> 以及以后再次运行安装程序都遵循它。</p>
+<h3 id="_7">安装程序有意停止时<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h3>
+<p>如果你选择 Stop，一个结束对话框会显示："WhisperJAV was not installed. The installer stopped for the reason shown in its console window."（意思是：WhisperJAV 未安装；停止原因见控制台窗口。）原因也保存在安装文件夹中的 <code>INSTALLATION_STOPPED_v1.10.0.txt</code>。</p>
+<hr />
+<h2 id="first-run">首次运行<a class="headerlink" href="#first-run" title="Permanent link">&para;</a></h2>
+<p>双击 <strong>WhisperJAV v1.10.0</strong> 快捷方式，或安装文件夹中的 <code>WhisperJAV-GUI.exe</code>。</p>
+<p>处理管线第一次需要某个模型时，WhisperJAV 会下载它（例如 Whisper large-v3 约 3 GB，Parakeet-CrispASR 674 MB）。之后的运行会直接使用。</p>
+<p>每次运行开始时，WhisperJAV 会检查安装：</p>
+<ul>
+<li><strong>NVIDIA GPU（CUDA）安装，GPU 可用：</strong> 不显示任何内容，运行继续。</li>
+<li><strong>NVIDIA GPU（CUDA）安装，GPU 现在不可用</strong>（例如更换驱动之后）：运行不会开始。一个框会说明原因和解决办法。要这次在 CPU 上运行，加上 <code>--device cpu</code>；在 GUI 中，对话框 <strong>"The NVIDIA GPU cannot be used"</strong> 提供 <strong>Run on the CPU this time</strong>（这次在 CPU 上运行）。</li>
+<li><strong>其他所有安装：</strong> 一个框说明安装为哪种加速器制作，以及各部分在这台电脑上的运行位置，然后运行继续。</li>
+</ul>
+<p>基本流程：添加文件，选择模式（Balanced 是不错的起点），点击 <strong>Start</strong>。字幕会写入你选择的输出文件夹。</p>
+<hr />
+<h2 id="checking-your-installation">检查安装<a class="headerlink" href="#checking-your-installation" title="Permanent link">&para;</a></h2>
+<p>打开命令提示符（按开始键，输入 <code>cmd</code>，按 Enter）并运行：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>cd /d "%LOCALAPPDATA%\WhisperJAV"
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>Scripts\whisperjav.exe --check
+</code></pre></div>
+<p>（如果你选择了其他安装文件夹，请改用那个文件夹。）</p>
+<p>它会列出 Python、PyTorch、安装的加速器、各部分在哪里运行、FFmpeg、CrispASR 和模型。在 NVIDIA GPU（CUDA）安装上，例如：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>✓ PyTorch: PyTorch 2.11.0+cu130: NVIDIA GPU (CUDA 13.0), NVIDIA GeForce RTX 3060
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>✓ CrispASR: 0.8.44+cuda (CUDA build), GGUF pipelines: asks for the NVIDIA GPU (CUDA)
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>ℹ Accelerator: Accelerator of this install: NVIDIA GPU (CUDA 13.0).
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>ℹ CTranslate2: CTranslate2 (balanced, fast, faster): NVIDIA GPU (CUDA)
+</code></pre></div>
+<p><code>Scripts\whisperjav.exe --version</code> 显示版本：<code>WhisperJAV 1.10.0</code>。</p>
+<p>安装日志是安装文件夹中的 <code>install_log_v1.10.0.txt</code>。</p>
+<hr />
+<h2 id="coming-from-19x">从 1.9.x 升级<a class="headerlink" href="#coming-from-19x" title="Permanent link">&para;</a></h2>
+<p>请全新安装 1.10.0：1.10.0 需要 Python 3.13，因此 <code>whisperjav-upgrade</code> 无法把 1.9.x 安装升级到 1.10.0。如果安装到旧版本所在的文件夹，安装程序会发现它并提出替换：该文件夹中的所有内容会先被删除。<code>%APPDATA%\WhisperJAV</code> 中的设置和已下载的模型会保留。</p>
+<hr />
+<h2 id="updating-within-110">在 1.10 内更新<a class="headerlink" href="#updating-within-110" title="Permanent link">&para;</a></h2>
+<p>以后的 1.10 版本可以用 <code>whisperjav-upgrade</code> 安装，它会保留安装的加速器及其 PyTorch：</p>
+<ol>
+<li>打开命令提示符。</li>
+<li><code>cd /d "%LOCALAPPDATA%\WhisperJAV"</code>（或你的安装文件夹）。</li>
+<li><code>Scripts\whisperjav-upgrade.exe</code></li>
+<li>检查版本：<code>Scripts\whisperjav.exe --version</code></li>
+</ol>
+<p>不要用普通的 <code>pip install -U whisperjav…</code> 更新：在 Windows 上，PyPI 提供的是仅 CPU 版的 PyTorch，可能会在毫无提示的情况下替换你的 GPU 版本。</p>
+<hr />
+<h2 id="running-the-installer-again">再次运行安装程序<a class="headerlink" href="#running-the-installer-again" title="Permanent link">&para;</a></h2>
+<p>把安装程序再次运行到同一个文件夹，可以修复安装或更改它为哪种加速器制作。标题为 <strong>"WhisperJAV — this install's accelerator"</strong> 的窗口会显示 "This install is made for: …. Keep it, or choose another."（意思是：这次安装为……制作；保留它，或另选一个。）当前加速器已预先选中；20 秒内没有回答时，安装保持原样。如果当时 NVIDIA GPU 不可用，原因会显示在选项上方。安装程序会先删除旧的安装文件夹（设置和已下载的模型保留），只保留它所记录的加速器；在"自己的 PyTorch"安装中，请用安装结束时显示的命令重新添加你的 PyTorch。</p>
+<hr />
+<h2 id="uninstalling">卸载<a class="headerlink" href="#uninstalling" title="Permanent link">&para;</a></h2>
+<p>打开 Windows <strong>设置 &gt; 应用</strong>，找到 <strong>WhisperJAV</strong>，选择 <strong>卸载</strong>。下载的模型保留在 <code>%USERPROFILE%\.cache</code>（Hugging Face 和 Whisper 缓存），设置保留在 <code>%APPDATA%\WhisperJAV</code>；如需释放空间，请手动删除这些文件夹。</p>
+<hr />
+<h2 id="troubleshooting">故障排除<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<p><strong>有 NVIDIA 显卡，却显示 "No supported NVIDIA GPU found"。</strong> 请阅读窗口的第一行：它说明了原因（显卡较旧、驱动较旧，或 WhisperJAV 无法访问的显卡）。更新或修复驱动，重启电脑后再次运行安装程序。在有两块显示芯片的笔记本上，请确认 NVIDIA 芯片已开启。</p>
+<p><strong>运行停止："THE NVIDIA GPU CANNOT BE USED"。</strong> 安装为 NVIDIA GPU 制作，而 GPU 现在不可用。框中会说明原因和解决办法。<code>--device cpu</code> 让这一次在 CPU 上运行。</p>
+<p><strong>处理很慢。</strong> 查看运行开始时的框，或运行 <code>whisperjav --check</code>：它们会说明各部分在哪里运行。在仅 CPU 安装中，所有处理管线都在 CPU 上运行，比在 GPU 上慢好几倍。</p>
+<p><strong>GGUF 处理管线停止："CrispASR could not be loaded"。</strong> 在"通过 Vulkan 使用 GPU"或"自己的 PyTorch"安装中，这通常意味着缺少 Vulkan 运行库（<code>vulkan-1.dll</code>）：更新显卡驱动，或再次运行安装程序并选择仅 CPU。</p>
+<p><strong>下载失败或超时。</strong> 检查网络连接；在防火墙后面时，允许 <code>python.exe</code>、<code>uv.exe</code> 和 <code>git.exe</code> 访问网络。安装程序会用更长的超时重试 GitHub 下载。在中国，请在整个安装过程中保持 VPN 开启。</p>
+<p><strong>GUI 无法打开，或窗口空白。</strong> 从 <a href="https://go.microsoft.com/fwlink/p/?LinkId=2124703">Microsoft</a> 安装 WebView2。要查看错误信息，在命令提示符中运行 <code>"%LOCALAPPDATA%\WhisperJAV\python.exe" -m whisperjav.webview_gui.main</code>。</p>
+<p><strong>安装失败。</strong> 打开安装文件夹中的 <code>install_log_v1.10.0.txt</code>：它会指出失败的阶段。<code>INSTALLATION_FAILED_v1.10.0.txt</code> 记录了原因。再次运行安装程序；它会提出替换不完整的安装。如果仍然失败，请在 <a href="https://github.com/meizhong986/WhisperJAV/issues">GitHub Issues</a> 提交问题，并附上日志。</p>
+<hr />
+<h2 id="technical-details">技术细节<a class="headerlink" href="#technical-details" title="Permanent link">&para;</a></h2>
+<h3 id="_8">静默安装<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>cmd /C START /WAIT WhisperJAV-1.10.0-Windows-x86_64.exe /S /D=C:\WhisperJAV
+</code></pre></div>
+<p><code>/S</code> 不显示安装程序的界面进行安装；<code>/D=</code> 设置文件夹，必须放在最后。<code>WhisperJAV-1.10.0-Windows-x86_64.exe /?</code> 列出所有选项。需要询问时，<a href="#what-this-install-is-made-for">安装为哪种加速器制作</a>中的窗口仍会打开：在没有受支持 NVIDIA GPU 的电脑上，20 秒内没有回答时安装仅 CPU 版本；有 1.10 无法使用的 NVIDIA GPU 时，它会一直等待回答。</p>
+<h3 id="_9">安装文件夹中的文件<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>install_log_v1.10.0.txt</code></td>
+<td>安装日志</td>
+</tr>
+<tr>
+<td><code>whisperjav_stack.txt</code></td>
+<td>安装为哪种加速器制作</td>
+</tr>
+<tr>
+<td><code>OWN_PYTORCH_NEXT_STEP.txt</code></td>
+<td>仅"自己的 PyTorch"安装：添加你的 PyTorch 的命令</td>
+</tr>
+<tr>
+<td><code>INSTALLATION_STOPPED_v1.10.0.txt</code></td>
+<td>仅当安装程序有意停止时：原因</td>
+</tr>
+<tr>
+<td><code>INSTALLATION_FAILED_v1.10.0.txt</code></td>
+<td>仅当安装失败时：原因</td>
+</tr>
+<tr>
+<td><code>WhisperJAV-GUI.exe</code></td>
+<td>GUI 启动器</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_10">安装程序访问的地址<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>地址</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pypi.org</code>、<code>files.pythonhosted.org</code></td>
+<td>Python 软件包</td>
+</tr>
+<tr>
+<td><code>download.pytorch.org</code></td>
+<td>PyTorch</td>
+</tr>
+<tr>
+<td><code>github.com</code></td>
+<td>CrispASR 的 GPU 版本，以及从 GitHub 安装的软件包</td>
+</tr>
+<tr>
+<td><code>huggingface.co</code></td>
+<td>模型（安装时和首次运行时）</td>
+</tr>
+<tr>
+<td><code>aka.ms</code>、<code>go.microsoft.com</code></td>
+<td>Visual C++ 运行库和 WebView2（缺失时）</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="页脚" >
+        
+          
+          <a href="../../getting-started/" class="md-footer__link md-footer__link--prev" aria-label="上一页: 快速入门">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                上一页
+              </span>
+              <div class="md-ellipsis">
+                快速入门
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../installation_windows_python/" class="md-footer__link md-footer__link--next" aria-label="下一页: Windows (Python)">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                下一页
+              </span>
+              <div class="md-ellipsis">
+                Windows (Python)
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+    
+  </body>
+</html>

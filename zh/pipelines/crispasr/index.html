@@ -1,0 +1,2328 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/WhisperJAV/zh/pipelines/crispasr/">
+      
+      
+        <link rel="prev" href="../qwen3-asr/">
+      
+      
+        <link rel="next" href="../../UPGRADE/">
+      
+      
+        
+          <link rel="alternate" href="../../../pipelines/crispasr/" hreflang="en">
+        
+          <link rel="alternate" href="./" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>GGUF (CrispASR) - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#parakeet-crispasr-cohere-crispasrgguf" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../../" title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              GGUF (CrispASR)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="选择当前语言">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="../../../pipelines/crispasr/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../" title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GGUF (CrispASR)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GGUF (CrispASR)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#where-they-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        它们在哪里运行
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        两个处理管线
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        使用方法
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="使用方法">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#gui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GUI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        命令行
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        设置
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="设置">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        可以设置的项目
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        灵敏度
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        设备
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        这两个处理管线不使用的设置
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-the-subtitles-are-made" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        字幕是怎样生成的
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模型下载
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        检查你的环境
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        视频部分处理失败时
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upgrading-from-19x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        从 1.9.x 升级
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        致谢
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV 升级指南
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#where-they-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        它们在哪里运行
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        两个处理管线
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        使用方法
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="使用方法">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#gui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GUI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        命令行
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        设置
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="设置">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        可以设置的项目
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        灵敏度
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        设备
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        这两个处理管线不使用的设置
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-the-subtitles-are-made" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        字幕是怎样生成的
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模型下载
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        检查你的环境
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        视频部分处理失败时
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upgrading-from-19x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        从 1.9.x 升级
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        致谢
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/en/zh/pipelines/crispasr.md" title="编辑此页" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="parakeet-crispasr-cohere-crispasrgguf">Parakeet-CrispASR 与 Cohere-CrispASR（GGUF）<a class="headerlink" href="#parakeet-crispasr-cohere-crispasrgguf" title="Permanent link">&para;</a></h1>
+<p>Parakeet-CrispASR 和 Cohere-CrispASR 是两个处理管线，使用 GGUF 格式的 ASR 模型生成日语字幕。它们通过 CrispASR 运行；CrispASR 随每个 WhisperJAV 安装一起安装，无需另外下载任何程序。</p>
+<ul>
+<li><strong>仅限专家模式。</strong> 只能在 <strong>专家模式</strong>（Ensemble Mode）选项卡中作为第一轮、第二轮或两者运行。没有对应的 <code>--mode</code> 值，也不出现在 Transcription Mode 选项卡中。</li>
+<li><strong>仅支持日语。</strong> 选择其他源语言时，运行会停止并给出提示。</li>
+<li><strong>1.10.0 中为实验性功能（早期版本）。</strong> 建议与你目前使用的处理管线的字幕对比，并告诉我们效果如何：https://github.com/meizhong986/WhisperJAV/issues</li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">文件夹名称</p>
+<p>程序中的提示原文：The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).</p>
+<p>意思是：GGUF（CrispASR）处理管线需要只由西文字母（ASCII）组成的文件夹名称。如果你的用户文件夹名称含有中文、日文或韩文字符，WhisperJAV 会把模型以链接或复制的方式放到一个名称只含 ASCII 字符的文件夹中（原文件保留在原处）。</p>
+<p>这一限制针对存放模型文件的文件夹：CrispASR 只接收这一个路径（音频在内存中交给它）。在 Windows 上，WhisperJAV 先尝试使用该文件夹的短名称（8.3 格式）；只有在没有短名称时，才把链接或副本放在 <code>C:\Users\Public\WhisperJAV\crispasr</code>（或 <code>C:\ProgramData\WhisperJAV\crispasr</code>），并在日志中说明。副本最多占用 2.4 GB，并保留供以后使用。已检查过一次：安装在含日文字符文件夹中的 CrispASR CPU 版能从那里加载模型并转写。WhisperJAV 本身以及 CrispASR 的 CUDA 版和 Vulkan 版尚未在这种文件夹中检查过。</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">从 1.9.x 升级？</p>
+<p>1.9.x 中需要自行下载 <code>crispasr</code> 程序的 CrispASR 模式已被移除。详见<a href="#upgrading-from-19x">从 1.9.x 升级</a>。</p>
+</div>
+<hr />
+<h2 id="where-they-run">它们在哪里运行<a class="headerlink" href="#where-they-run" title="Permanent link">&para;</a></h2>
+<p>每个 1.10.0 安装都包含 CrispASR，版本与安装所针对的加速器相符（见<a href="../../getting-started/#accelerated-or-not">是否加速</a>）：</p>
+<table>
+<thead>
+<tr>
+<th>安装为哪种加速器制作</th>
+<th>CrispASR 版本</th>
+<th>GGUF 处理管线运行在</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NVIDIA GPU（CUDA），Windows 和 Linux x86-64</td>
+<td>CUDA 版</td>
+<td>NVIDIA GPU</td>
+</tr>
+<tr>
+<td>通过 Vulkan 使用 GPU（Windows）</td>
+<td>Vulkan 版</td>
+<td>通过 Vulkan 使用你的显卡——实验性，未经测试</td>
+</tr>
+<tr>
+<td>自己的 PyTorch，Windows</td>
+<td>Vulkan 版</td>
+<td>通过 Vulkan 使用你的显卡——实验性，未经测试</td>
+</tr>
+<tr>
+<td>Apple GPU（Metal），Apple silicon Mac</td>
+<td>macOS 版</td>
+<td>请求使用 Apple GPU（Metal）——尚未在 Mac 上测试</td>
+</tr>
+<tr>
+<td>自己的 PyTorch，Apple silicon Mac</td>
+<td>macOS 版</td>
+<td>请求使用 Apple GPU（Metal）——尚未在 Mac 上测试</td>
+</tr>
+<tr>
+<td>仅 CPU；Linux 上的自己的 PyTorch；ARM64 Linux</td>
+<td>CPU 版</td>
+<td>CPU（不加速），慢好几倍</td>
+</tr>
+</tbody>
+</table>
+<p>处理器必须支持 AVX2（Intel 2013 年以后、AMD 2015 年以后的处理器）。不支持时，GGUF 处理管线会在读取任何音频之前停止并给出提示；其他所有处理管线照常工作。</p>
+<p>每一轮开始时，日志会说明请求 CrispASR 在哪里运行，例如：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Parakeet-CrispASR asks CrispASR to use the NVIDIA GPU (CUDA) (CrispASR 0.8.44+cuda).
+</code></pre></div>
+<p>使用 Vulkan 版时为："Parakeet-CrispASR asks CrispASR's Vulkan build to use this PC's GPU (CrispASR 0.8.44+vulkan). GPUs through Vulkan are experimental in 1.10.0 and have not been tested on AMD or Intel graphics cards."（意思是：通过 Vulkan 使用 GPU 在 1.10.0 中为实验性，尚未在 AMD 或 Intel 显卡上测试。）WhisperJAV 目前无法读取 CrispASR 实际使用的设备，这一行只说明它请求了什么。</p>
+<hr />
+<h2 id="_1">两个处理管线<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Parakeet-CrispASR</th>
+<th>Cohere-CrispASR</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>GUI 中的名称</strong></td>
+<td><strong>parakeet</strong>（在 <strong>GGUF via crispasr</strong> 分组下）</td>
+<td><strong>cohere</strong>（在 <strong>GGUF via crispasr</strong> 分组下）</td>
+</tr>
+<tr>
+<td><strong>模型</strong></td>
+<td><code>parakeet-tdt-0.6b-ja</code>（674 MB）</td>
+<td><code>cohere-asr-ja-v0.1</code>（默认）或 <code>cohere-asr-ja</code>（各 2,424 MB）</td>
+</tr>
+<tr>
+<td><strong>默认语音分割器</strong></td>
+<td>TEN VAD</td>
+<td>FireRedVAD</td>
+</tr>
+<tr>
+<td><strong>默认灵敏度</strong></td>
+<td>Aggressive</td>
+<td>Balanced</td>
+</tr>
+<tr>
+<td><strong>VAD 组最长</strong></td>
+<td>6 秒，任何灵敏度下都一样</td>
+<td>3 秒</td>
+</tr>
+<tr>
+<td><strong>字幕在哪里断开</strong></td>
+<td>只在语音的自然停顿处断开（见下文）</td>
+<td>只在句末断开（见下文）</td>
+</tr>
+<tr>
+<td><strong>字幕时间</strong></td>
+<td>来自模型对其输出文字给出的时间</td>
+<td>来自对齐器 <code>wav2vec2-ja</code>，它为模型写出的文字标出时间</td>
+</tr>
+<tr>
+<td><strong>音频分析报告</strong></td>
+<td>有</td>
+<td>有</td>
+</tr>
+</tbody>
+</table>
+<p><strong>VAD 组</strong>：语音分割器找到并一次性交给模型的一段语音，长度为几秒。</p>
+<p>Parakeet-CrispASR 使用 Fidelity 处理管线的语音分割器设置，另加 6 秒上限；Cohere-CrispASR 使用 Qwen3-ASR 处理管线的设置。</p>
+<hr />
+<h2 id="_2">使用方法<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<h3 id="gui">GUI<a class="headerlink" href="#gui" title="Permanent link">&para;</a></h3>
+<ol>
+<li>打开 <strong>专家模式</strong>（Ensemble Mode）选项卡。打开时 <strong>第一轮</strong>（Pass 1）为 <strong>cohere</strong>（Balanced，FireRedVAD），<strong>第二轮</strong>（Pass 2）为 <strong>parakeet</strong>（Aggressive，TEN VAD）；第二轮在勾选之前不运行。如果开启了 <strong>Remember settings</strong>，选项卡打开时显示的是你保存的设置。</li>
+<li>要为某一轮换处理管线，打开它的 <strong>Pipeline</strong> 菜单：<strong>parakeet</strong> 和 <strong>cohere</strong> 在 <strong>GGUF via crispasr</strong> 分组下。选择其中之一时，会同时设好它自己的灵敏度和语音分割器（见上表）。</li>
+<li>如果选的是 cohere，可在 <strong>Model</strong> 列选择模型（默认 <code>cohere-asr-ja-v0.1</code>）。</li>
+<li>如需第二轮，勾选 <strong>第二轮</strong>（Pass 2），确认其处理管线，并在 <strong>Merge</strong> 中选择两者的合并方式。</li>
+<li>点击 <strong>Start</strong>。</li>
+</ol>
+<p>当某一轮使用这两个处理管线之一时：</p>
+<ul>
+<li><strong>Sensitivity</strong>、<strong>Speech Segmenter</strong>、<strong>Model</strong>、<strong>Scene Detector</strong>、<strong>Speech Enhancer</strong> 和 <strong>Enhance for VAD only</strong> 都可以设置，与其他 Pass 相同。语音分割器不能选 <strong>None</strong>：这两个处理管线只转写语音分割器找到的语音。</li>
+<li><strong>Customize Parameters</strong> 打开三个选项卡：<strong>Segmenter</strong>、<strong>Enhancer</strong> 和 <strong>Scene</strong>，初始值就是这一轮实际使用的值。</li>
+<li>这一轮一行下方会显示一个状态面板，说明模型和 CrispASR 将在哪里运行，例如：</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Model: Parakeet TDT 0.6B ja (q8_0) — not downloaded yet (674 MB); downloaded when the run starts
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>GPU: asks for the NVIDIA GPU (CUDA)
+</code></pre></div>
+<p>也可能显示 "CPU (not accelerated), several times slower: &lt;原因&gt;" 或 "CrispASR cannot run here: &lt;原因&gt;"。对 Cohere-CrispASR，面板还会列出它的对齐器，例如 "Aligner: wav2vec2 large XLSR-53 ja (q4_k) — not downloaded yet (232 MB); downloaded the first time it is used"。</p>
+<h3 id="_3">命令行<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
+<p>单轮：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--ensemble<span class="w"> </span>--pass1-pipeline<span class="w"> </span>parakeet-crispasr
+</code></pre></div>
+<p>两轮，第二轮使用 Cohere-CrispASR 的另一个模型：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>whisperjav<span class="w"> </span>video.mp4<span class="w"> </span>--ensemble<span class="w"> </span>--pass1-pipeline<span class="w"> </span>parakeet-crispasr<span class="w"> </span>--pass2-pipeline<span class="w"> </span>cohere-crispasr<span class="w"> </span>--pass2-model<span class="w"> </span>cohere-asr-ja
+</code></pre></div>
+<p>不指定 <code>--merge-strategy</code> 时，两轮按 <code>pass1_primary</code> 合并（GUI 中为“第一轮 + 用第二轮填补”，英文界面为 "Pass 1 + Fill From Pass 2"）。</p>
+<hr />
+<h2 id="_4">设置<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<h3 id="_5">可以设置的项目<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>设置</th>
+<th>GUI</th>
+<th>命令行</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>模型</td>
+<td>Model</td>
+<td><code>--pass1-model</code>、<code>--pass2-model</code></td>
+<td><code>parakeet-tdt-0.6b-ja</code>；<code>cohere-asr-ja-v0.1</code>、<code>cohere-asr-ja</code></td>
+</tr>
+<tr>
+<td>语音分割器</td>
+<td>Speech Segmenter</td>
+<td><code>--pass1-speech-segmenter</code></td>
+<td>除 <code>none</code> 以外均可</td>
+</tr>
+<tr>
+<td>灵敏度</td>
+<td>Sensitivity</td>
+<td><code>--pass1-sensitivity</code></td>
+<td><code>conservative</code>、<code>balanced</code>、<code>aggressive</code>；Parakeet-CrispASR 默认 <code>aggressive</code>，Cohere-CrispASR 默认 <code>balanced</code></td>
+</tr>
+<tr>
+<td>场景检测器</td>
+<td>Scene Detector</td>
+<td><code>--pass1-scene-detector</code></td>
+<td><code>semantic</code>（默认，场景 12 到 48 秒）、<code>auditok</code>、<code>silero</code>（场景最长 48 秒）、<code>none</code>（每个文件一个场景）</td>
+</tr>
+<tr>
+<td>语音增强器</td>
+<td>Speech Enhancer</td>
+<td><code>--pass1-speech-enhancer</code></td>
+<td><code>none</code>（默认），或其他 Pass 可用的语音增强器，例如 <code>ffmpeg-dsp</code>、<code>zipenhancer</code> 或 <code>htdemucs</code></td>
+</tr>
+<tr>
+<td>仅用于 VAD 的增强</td>
+<td>Enhance for VAD only</td>
+<td><code>--pass1-enhance-for-vad</code></td>
+<td>增强后的音频只交给语音分割器；CrispASR 听到的是原始音频</td>
+</tr>
+<tr>
+<td>检测阈值</td>
+<td>Customize，Segmenter 选项卡</td>
+<td><code>--pass1-vad-threshold</code></td>
+<td>0 到 1；覆盖灵敏度设定的值</td>
+</tr>
+<tr>
+<td>前后填充</td>
+<td>Customize，Segmenter 选项卡</td>
+<td><code>--pass1-speech-pad-ms</code></td>
+<td>每段语音前后各加的毫秒数。Cohere-CrispASR：前后都加。Parakeet-CrispASR：仅对有此设置的语音分割器（例如 WhisperSeg）生效；使用 FireRedVAD 或 TEN VAD（它的默认分割器）时会被忽略并给出警告</td>
+</tr>
+<tr>
+<td>设备</td>
+<td>—</td>
+<td><code>--device auto</code>、<code>cuda</code> 或 <code>cpu</code></td>
+<td>见下文</td>
+</tr>
+<tr>
+<td>语言</td>
+<td>Source audio language</td>
+<td><code>--language japanese</code>（默认）</td>
+<td>其他语言会使运行停止</td>
+</tr>
+</tbody>
+</table>
+<p>（第二轮有对应的 <code>--pass2-…</code> 参数。）</p>
+<h3 id="_6">灵敏度<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
+<p>灵敏度选择语音分割器的预设。Aggressive 会接受语音分割器不太确定是否为语音的声音；Conservative 只接受它更有把握的声音。使用默认语音分割器时：</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Conservative</th>
+<th>Balanced</th>
+<th>Aggressive</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Parakeet-CrispASR（TEN VAD）：检测阈值</td>
+<td>0.42</td>
+<td>0.32</td>
+<td>0.22</td>
+</tr>
+<tr>
+<td>Parakeet-CrispASR：语音前 / 后填充</td>
+<td>0 / 300 ms</td>
+<td>0 / 200 ms</td>
+<td>0 / 100 ms</td>
+</tr>
+<tr>
+<td>Cohere-CrispASR（FireRedVAD）：检测阈值</td>
+<td>0.5</td>
+<td>0.4</td>
+<td>0.3</td>
+</tr>
+<tr>
+<td>Cohere-CrispASR：语音前后填充</td>
+<td>100 ms</td>
+<td>100 ms</td>
+<td>100 ms</td>
+</tr>
+</tbody>
+</table>
+<p>检测阈值表示语音分割器要有多大把握才把一段声音当作语音，取值 0 到 1。无论灵敏度如何，VAD 组最长都保持 6 秒（Parakeet-CrispASR）或 3 秒（Cohere-CrispASR）。换用其他语音分割器时，Parakeet-CrispASR 使用 Fidelity 处理管线为它给出的值，Cohere-CrispASR 使用 Qwen3-ASR 处理管线为它给出的值；Parakeet-CrispASR 保留 6 秒上限。</p>
+<p>不实际运行、只查看某次运行会用到的值：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>whisperjav<span class="w"> </span>--ensemble<span class="w"> </span>--pass1-pipeline<span class="w"> </span>parakeet-crispasr<span class="w"> </span>--dump-params<span class="w"> </span>settings.json
+</code></pre></div>
+<p>然后查看 <code>settings.json</code> 中的 <code>crispasr_effective</code>。</p>
+<h3 id="_7">设备<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>--device auto</code>（默认值，GUI 也使用它）：使用安装中 CrispASR 版本能用的 GPU（见<a href="#where-they-run">它们在哪里运行</a>），否则使用 CPU。日志会说明用的是哪一个以及原因。</li>
+<li><code>--device cuda</code>：需要 CUDA 版和它能用的 NVIDIA GPU；否则运行会在读取任何音频之前停止。</li>
+<li><code>--device cpu</code>：ASR 模型始终使用 CPU。在 GUI 中，"Run on the CPU this time" 对一次运行起同样作用。Cohere-CrispASR 的对齐器不能被限制在 CPU 上：在 CrispASR 的版本会使用 GPU 的地方，它仍会请求使用 GPU，运行开始时的提示框会说明这一点。</li>
+</ul>
+<p><code>--device</code> 决定一次运行中所有处理管线的设备，包括语音增强器。</p>
+<h3 id="_8">这两个处理管线不使用的设置<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
+<ul>
+<li>如果指定了 <code>--pass1-hf-params</code> 或 <code>--pass1-qwen-params</code>，日志会用一行列出它们（"Parakeet-CrispASR does not use: …"），运行继续。</li>
+<li><code>--compute-type</code> 会被忽略并给出警告：CrispASR 的模型文件只有一种数值格式（8 位）。</li>
+<li><code>--subs-language direct-to-english</code> 仍然生成日语字幕，并给出警告。之后可用 <code>--translate</code> 或 <code>whisperjav-translate</code> 翻译。</li>
+</ul>
+<hr />
+<h2 id="how-the-subtitles-are-made">字幕是怎样生成的<a class="headerlink" href="#how-the-subtitles-are-made" title="Permanent link">&para;</a></h2>
+<p>对每个视频，两个处理管线都会：</p>
+<ol>
+<li>提取音频（16 kHz，单声道；选择了语音增强器时为 48 kHz，增强后得到 16 kHz 音频）；</li>
+<li>用场景检测器把音频分成场景（默认为 Semantic，12 到 48 秒）；</li>
+<li>如果选择了语音增强器，清理每个场景的音频；增强器在模型打开之前关闭，两者不会同时占用 GPU 显存；</li>
+<li>对每个场景运行语音分割器，把找到的语音组成 VAD 组；</li>
+<li>把每个 VAD 组单独交给模型；没有语音增强器时，模型每一轮只加载一次，有语音增强器时，每个视频的 ASR 步骤打开模型，结束后关闭；</li>
+<li>按下文各处理管线的规则，用每个 VAD 组的文字生成字幕；</li>
+<li>合并各场景，并使用与 Qwen3-ASR 处理管线相同的三个清理过滤器：删除「あ。」「うん。」这类单独成行的字幕、只有呻吟或呼吸声的字幕，以及两个场景交界处的重复和重叠；</li>
+<li>写出这一轮的字幕文件；若有另一轮，专家模式会把两者合并。</li>
+</ol>
+<p><strong>Parakeet-CrispASR：字幕在哪里断开。</strong> 在一个 VAD 组内，只有遇到以下自然停顿时才开始新的一条字幕：</p>
+<ul>
+<li>句末标点之后（。？！… 等）；</li>
+<li>至少 0.6 秒的停顿；</li>
+<li>「、」或空格之后紧跟至少 0.4 秒的停顿。</li>
+</ul>
+<p>它从不按字数或时长切分，因此没有上述停顿的语音会保持为一条字幕，最长与其 VAD 组相同（约 6 秒）。每条字幕从第一个词开始处开始，到最后一个说出的词结束处结束，时间取自模型给出的时间。</p>
+<p><strong>Cohere-CrispASR：字幕在句末断开。</strong> Cohere 写出一个 VAD 组的文字之后，对齐器 <code>wav2vec2-ja</code>（由 CrispASR 运行）找出这段文字中每个字在什么时候说出。在一个 VAD 组内，只有在文字的句末标点（。 ？ ！ … ? !）之后才开始新的一条字幕；像 3.5 这样的数字不会被切开。每条字幕从它第一个说出的字开始，在下一条开始处结束；最后一条在 VAD 组结束处结束。这里停顿不会切分：对齐器给出的是每个字开始的时刻，而不是声音结束的地方，拖长的声音看起来会像停顿。VAD 组最长 3 秒；一段语音连续不断时，约为 4.2 秒。</p>
+<p>如果对齐器对某个 VAD 组没有给出时间，这个组保持为一条字幕，时间从语音分割器找到的语音开始处到结束处，运行汇总会统计这样的组。如果对齐器完全无法加载（例如第一次运行时没有网络），所有组都这样生成，运行汇总会说明；两种情况下文字都会保留。1.10.0 新增；尚未与参考字幕对比测量。</p>
+<p><strong>音频分析报告。</strong> 与 Qwen3-ASR 处理管线一样，两个处理管线都会为每个视频输出一份简短报告：哪些部分可能漏掉语音、哪些部分声学条件较差，并附上时间，方便你检查这些位置。报告需要 Semantic 场景检测器；使用其他场景检测器时，日志会用一行说明，不生成报告。</p>
+<hr />
+<h2 id="_9">模型下载<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
+<ul>
+<li>处理管线第一次需要某个模型时，WhisperJAV 会在运行开始、读取任何音频之前下载它。下载前会先检查磁盘剩余空间是否足够（模型大小再加 10%）。</li>
+<li>模型来自 Hugging Face：</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>Hugging Face 仓库</th>
+<th>文件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>parakeet-tdt-0.6b-ja</code></td>
+<td><code>cstr/parakeet-tdt-0.6b-ja-GGUF</code></td>
+<td><code>parakeet-tdt-0.6b-ja-q8_0.gguf</code></td>
+</tr>
+<tr>
+<td><code>cohere-asr-ja-v0.1</code></td>
+<td><code>TransWithAI/cohere-transcribe-ja-v0.1-GGUF</code></td>
+<td><code>cohere-asr-ja-v0.1-q8_0.gguf</code></td>
+</tr>
+<tr>
+<td><code>cohere-asr-ja</code></td>
+<td><code>CKHO/cohere-asr-ja-GGUF</code></td>
+<td><code>cohere-asr-ja-q8_0.gguf</code></td>
+</tr>
+<tr>
+<td>对齐器 <code>wav2vec2-ja</code>（Cohere-CrispASR；也是 ChronosJAV 的默认对齐器）</td>
+<td><code>cstr/wav2vec2-large-xlsr-53-japanese-GGUF</code></td>
+<td><code>wav2vec2-large-xlsr-53-japanese-q4_k.gguf</code></td>
+</tr>
+</tbody>
+</table>
+<p>Cohere-CrispASR 的对齐器（232 MB）在这一轮第一次使用时下载，下载发生在这一轮内部，而不是运行开始之前。如果下载失败，这一轮会在没有对齐器的情况下继续：每个 VAD 组成为一条字幕，时间为该组的起止位置（见<a href="#how-the-subtitles-are-made">字幕是怎样生成的</a>）。ChronosJAV 的其他对齐器和时间模型会在 <code>whisperjav --check</code> 中列出，也见 <a href="../chronosjav/#subtitle-timing-1100">ChronosJAV 页面</a>。</p>
+<ul>
+<li>文件保存在你的 Hugging Face 缓存文件夹中（Windows 默认 <code>C:\Users\&lt;你的用户名&gt;\.cache\huggingface\</code>，macOS 和 Linux 默认 <code>~/.cache/huggingface/</code>），之后的运行会直接使用。</li>
+<li>首次使用前，WhisperJAV 会核对文件是否为它所需的版本。下载损坏的文件会被删除并重新下载一次。</li>
+<li><strong>无法访问 huggingface.co 时</strong>，WhisperJAV 会改用镜像 hf-mirror.com 下载，与它的其他模型相同。也可以用 <code>--hf-endpoint &lt;地址&gt;</code> 指定其他镜像。</li>
+<li>使用 <code>--offline</code>（GUI 中为 "Offline mode (downloaded Hugging Face models only)"）时不会下载任何内容。如果模型缺失，运行会在转写之前停止并说明原因；请先不加 <code>--offline</code> 运行一次。</li>
+<li>如果下载或核对失败，运行会停止，显示 "CrispASR is not ready for this run" 及原因，不会转写任何内容。</li>
+</ul>
+<p><strong>使用自己下载的模型文件。</strong> 把文件（文件名保持不变）放到一个名称为纯英文字符的文件夹中，并把环境变量 <code>WHISPERJAV_CRISPASR_MODEL_DIR</code> 设为该文件夹。只有文件大小符合预期时 WhisperJAV 才会使用它，并在首次使用前核对；核对不通过时运行会停止，文件不会被删除。</p>
+<hr />
+<h2 id="_10">检查你的环境<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
+<p><code>whisperjav --check</code> 会列出 CrispASR 及其模型。在一切就绪的 NVIDIA GPU（CUDA）安装上显示：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>✓ CrispASR: 0.8.44+cuda (CUDA build), GGUF pipelines: asks for the NVIDIA GPU (CUDA)
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>✓ CrispASR model parakeet-tdt-0.6b-ja: Parakeet TDT 0.6B ja (q8_0), for parakeet-crispasr: downloaded
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>✓ CrispASR model cohere-asr-ja-v0.1: Cohere Transcribe ja v0.1 (q8_0), for cohere-crispasr: downloaded
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>✓ CrispASR model cohere-asr-ja: Cohere ASR ja (q8_0), for cohere-crispasr: downloaded
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>✓ CrispASR model wav2vec2-ja: wav2vec2 large XLSR-53 ja (q4_k), for ChronosJAV and Cohere-CrispASR (aligner): downloaded
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>✓ CrispASR model parakeet-ctc-ja: Parakeet CTC 1.1B ja (q8_0), for ChronosJAV (aligner): downloaded
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>✓ CrispASR model qwen3-fa-gguf: Qwen3-ForcedAligner 0.6B (q4_k), for ChronosJAV (aligner): downloaded
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>✓ CrispASR model whisper-small: Whisper small, for ChronosJAV (timing model): downloaded
+</code></pre></div>
+<p>尚未下载的模型会显示 "not downloaded" 及其大小，第一次需要它的运行会下载它。</p>
+<p>如果 Windows 上 CrispASR 的 Vulkan 版无法加载，提示会附加："With the GPU-through-Vulkan or Own PyTorch install on Windows this usually means the Vulkan runtime (vulkan-1.dll) is missing: update the graphics driver, or run the WhisperJAV installer again and choose CPU only."（意思是：缺少 Vulkan 运行库 vulkan-1.dll；请更新显卡驱动，或重新运行安装程序并选择仅 CPU。）</p>
+<hr />
+<h2 id="_11">视频部分处理失败时<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h2>
+<ul>
+<li>如果 CrispASR 在某个视频的部分 VAD 组上失败，这些部分没有字幕，运行汇总会在该视频下说明数量。如果所有 VAD 组都失败，该视频处理失败。</li>
+<li>如果语音分割器在某个场景上失败，该场景的语音不会被转写，运行汇总中会注明。</li>
+</ul>
+<hr />
+<h2 id="upgrading-from-19x">从 1.9.x 升级<a class="headerlink" href="#upgrading-from-19x" title="Permanent link">&para;</a></h2>
+<p>1.9.x 有一个 CrispASR 模式，运行你自行下载的 <code>crispasr</code> 程序。1.10.0 移除了该模式：</p>
+<ul>
+<li><code>--mode crispasr</code>、<code>--pass1-pipeline crispasr</code>、<code>--pass2-pipeline crispasr</code>、<code>--crispasr-exe</code>、<code>--crispasr-backend</code> 和 <code>--crispasr-args</code> 不再可用。运行会停止（退出码 2），并显示：</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>--mode crispasr is no longer available: WhisperJAV 1.10 removed the "bring your own CrispASR" mode.
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>CrispASR now runs in Ensemble Mode as two pipelines, Parakeet-CrispASR and Cohere-CrispASR, and WhisperJAV installs it itself.
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>Example:
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    whisperjav --ensemble --pass1-pipeline parakeet-crispasr &lt;your video&gt;
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>In the GUI: open the Ensemble Mode tab and choose parakeet or cohere under GGUF via crispasr in the Pass 1 or Pass 2 menu.
+</code></pre></div>
+<ul>
+<li>GUI 中，Transcription Mode 选项卡 Mode 菜单里的 <strong>crispasr</strong> 项已删除，专家模式（Ensemble Mode）选项卡中带 Backend 选项的旧 <strong>CrispASR</strong> 处理管线也已删除。</li>
+<li><code>whispercpp</code> 后端在新的处理管线中没有替代。</li>
+<li>1.10.0 不再使用你下载的 <code>crispasr</code> 程序及其保存的模型（默认位于 <code>~/.cache/whisperjav/crispasr_models</code>），可以删除。</li>
+</ul>
+<p>改用：<code>--ensemble --pass1-pipeline parakeet-crispasr</code> 替代 <code>--mode crispasr --crispasr-backend parakeet</code>；<code>--ensemble --pass1-pipeline cohere-crispasr</code> 替代 <code>--mode crispasr --crispasr-backend cohere</code>。</p>
+<hr />
+<h2 id="_12">致谢<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h2>
+<p>CrispASR 由 <a href="https://github.com/CrispStrobe/CrispASR">CrispStrobe/CrispASR</a> 开发。模型：NVIDIA 的 parakeet-tdt_ctc-0.6b-ja（CC-BY-4.0），由 cstr 转为 GGUF 格式；Cohere Transcribe 的日语微调版由 efwkjn 制作，由 TransWithAI 和 CKHO 转为 GGUF 格式。</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="页脚" >
+        
+          
+          <a href="../qwen3-asr/" class="md-footer__link md-footer__link--prev" aria-label="上一页: Qwen3-ASR">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                上一页
+              </span>
+              <div class="md-ellipsis">
+                Qwen3-ASR
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../../UPGRADE/" class="md-footer__link md-footer__link--next" aria-label="下一页: WhisperJAV 升级指南">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                下一页
+              </span>
+              <div class="md-ellipsis">
+                WhisperJAV 升级指南
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+    
+  </body>
+</html>
