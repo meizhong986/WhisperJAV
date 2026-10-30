@@ -5,15 +5,18 @@ REM ============================================================================
 REM
 REM This script builds the conda-constructor installer for WhisperJAV v{{VERSION}}
 REM
-REM Prerequisites:
-REM - Conda with constructor package installed:
-REM   conda install constructor -c conda-forge
-REM - All v{{VERSION}} installer files must be present in installer/ directory
+REM Prerequisites (v1.10.0, item 2f -- three environments, each with one job):
+REM - First, in WJ110 (development): python installer\build_release.py
+REM   (exports uv.lock, builds the wheel, writes these files)
+REM - Then run this script in WJ110_build (build tools only), made from the repo:
+REM   conda env create -f installer\build_env.yml
+REM   conda activate WJ110_build
+REM   Never install constructor into WJ110 (owner, W52).
 REM
 REM Build Process:
-REM 1. Check prerequisites (constructor, Python)
-REM 2. Verify/build WhisperJAV wheel
-REM 3. Download uv package manager (fast installer)
+REM 1. Check prerequisites (constructor 3.17.3, Python)
+REM 2. Check the WhisperJAV wheel made by build_release.py
+REM 3. Take uv 0.9.26 from this build environment
 REM 4. Validate installer configuration
 REM 5. Clean previous v{{VERSION}} builds
 REM 6. Run constructor to build installer
@@ -71,6 +74,16 @@ for /f "tokens=*" %%a in ('constructor --version 2^>^&1') do set CONS_VER=%%a
 echo   - Constructor: %CONS_VER%
 echo   - Constructor: %CONS_VER% >> "%BUILD_LOG%"
 
+REM v1.10.0 (item 2f): the custom NSIS template is written for this constructor version.
+if not "%CONS_VER%"=="constructor 3.17.3" (
+    echo.
+    echo ERROR: constructor 3.17.3 is required; found: %CONS_VER%
+    echo ERROR: wrong constructor version: %CONS_VER% >> "%BUILD_LOG%"
+    echo Run this script in WJ110_build: conda env create -f installer\build_env.yml
+    pause
+    exit /b 1
+)
+
 REM Check if Python is available
 python --version >nul 2>nul
 if errorlevel 1 (
@@ -115,203 +128,52 @@ echo   - Wheel: !WHEEL_FILE! (pre-built) >> "%BUILD_LOG%"
 goto :WheelReady
 
 :BuildWheel
-echo   - No wheel found, building from source...
-call ..\build_whisperjav_wheel.bat
-if errorlevel 1 (
-    echo.
-    echo ERROR: Failed to build WhisperJAV wheel!
-    echo ERROR: Wheel build failed >> "%BUILD_LOG%"
-    echo.
-    pause
-    exit /b 1
-)
-REM Verify wheel now exists
-set "WHEEL_FILE="
-for %%f in (whisperjav-*.whl) do set "WHEEL_FILE=%%f"
-if not defined WHEEL_FILE (
-    echo.
-    echo ERROR: Wheel still not found after build!
-    echo ERROR: Wheel missing after build >> "%BUILD_LOG%"
-    echo.
-    pause
-    exit /b 1
-)
-echo   - WhisperJAV wheel built: !WHEEL_FILE!
-echo   - Wheel: !WHEEL_FILE! (local build) >> "%BUILD_LOG%"
+REM v1.10.0 (item 2f): the wheel comes from build_release.py in WJ110 only, after it has
+REM exported uv.lock into the package; a wheel built here would skip that.
+echo.
+echo ERROR: No WhisperJAV wheel found.
+echo ERROR: Wheel missing >> "%BUILD_LOG%"
+echo Run first, in WJ110: python installer\build_release.py
+echo.
+pause
+exit /b 1
+
 
 :WheelReady
 echo.
 
-REM ===== Phase 3: Obtain uv Package Manager =====
-echo [Phase 3/7] Obtaining uv package manager...
-echo [Phase 3/7] Obtaining uv... >> "%BUILD_LOG%"
+REM ===== Phase 3: uv from the build environment =====
+echo [Phase 3/7] Taking uv from the build environment...
+echo [Phase 3/7] Taking uv from the build environment... >> "%BUILD_LOG%"
 
-REM uv is a fast package installer (10-30x faster than pip)
-REM It MUST be bundled with the installer - no pip fallback allowed
-REM Strategy: 1) Local copy, 2) Common install locations, 3) PATH, 4) Download, 5) FAIL
-
-set "UV_FOUND=0"
-
-REM === Step 1: Check if uv.exe already exists in current directory ===
-if exist "uv.exe" (
-    uv.exe --version >nul 2>nul
-    if not errorlevel 1 (
-        for /f "tokens=*" %%a in ('uv.exe --version 2^>^&1') do set UV_VER=%%a
-        echo   - Found existing uv.exe: !UV_VER!
-        echo   - uv: !UV_VER! (existing local) >> "%BUILD_LOG%"
-        set "UV_FOUND=1"
-        goto :UvVerify
-    ) else (
-        echo   - Local uv.exe exists but is not functional, removing...
-        del uv.exe 2>nul
-    )
-)
-
-REM === Step 2: Check common installation locations (not just PATH) ===
-echo   - Checking common installation locations...
-set "UV_LOCATIONS="
-set "UV_LOCATIONS=!UV_LOCATIONS! %USERPROFILE%\.local\bin\uv.exe"
-set "UV_LOCATIONS=!UV_LOCATIONS! %USERPROFILE%\.cargo\bin\uv.exe"
-set "UV_LOCATIONS=!UV_LOCATIONS! %LOCALAPPDATA%\uv\uv.exe"
-set "UV_LOCATIONS=!UV_LOCATIONS! %APPDATA%\uv\uv.exe"
-set "UV_LOCATIONS=!UV_LOCATIONS! %LOCALAPPDATA%\Programs\uv\uv.exe"
-
-for %%p in (!UV_LOCATIONS!) do (
-    if exist "%%p" (
-        echo   - Found uv at: %%p
-        echo   - uv: found at %%p >> "%BUILD_LOG%"
-        copy "%%p" "uv.exe" >nul
-        if exist "uv.exe" (
-            uv.exe --version >nul 2>nul
-            if not errorlevel 1 (
-                for /f "tokens=*" %%a in ('uv.exe --version 2^>^&1') do set UV_VER=%%a
-                echo   - Copied to local: !UV_VER!
-                echo   - uv: !UV_VER! (copied from %%p) >> "%BUILD_LOG%"
-                set "UV_FOUND=1"
-                goto :UvVerify
-            )
-        )
-    )
-)
-
-REM === Step 3: Check system PATH with 'where uv' ===
-echo   - Checking system PATH...
-where uv >nul 2>nul
-if not errorlevel 1 (
-    for /f "tokens=*" %%a in ('where uv') do (
-        set "SYSTEM_UV=%%a"
-        echo   - Found in PATH: !SYSTEM_UV!
-        echo   - uv: found in PATH at !SYSTEM_UV! >> "%BUILD_LOG%"
-        copy "!SYSTEM_UV!" "uv.exe" >nul
-        if exist "uv.exe" (
-            uv.exe --version >nul 2>nul
-            if not errorlevel 1 (
-                for /f "tokens=*" %%b in ('uv.exe --version 2^>^&1') do set UV_VER=%%b
-                echo   - Copied to local: !UV_VER!
-                echo   - uv: !UV_VER! (copied from PATH) >> "%BUILD_LOG%"
-                set "UV_FOUND=1"
-                goto :UvVerify
-            )
-        )
-        goto :UvTryDownload
-    )
-)
-
-REM === Step 4: Download from GitHub ===
-:UvTryDownload
-echo   - uv not found locally, downloading from GitHub...
-echo   - uv: downloading from GitHub... >> "%BUILD_LOG%"
-
-REM Download latest uv release for Windows x64
-REM Using PowerShell for reliable HTTPS download
-REM Note: The zip structure may vary between versions, so we search for uv.exe
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-    "Write-Host '    Downloading from github.com/astral-sh/uv...' ; " ^
-    "$ProgressPreference = 'SilentlyContinue'; " ^
-    "$url = 'https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip'; " ^
-    "$zip = 'uv-temp.zip'; " ^
-    "try { " ^
-    "    Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing -TimeoutSec 120; " ^
-    "    Expand-Archive -Path $zip -DestinationPath 'uv-temp' -Force; " ^
-    "    $uvExe = Get-ChildItem -Path 'uv-temp' -Filter 'uv.exe' -Recurse | Select-Object -First 1; " ^
-    "    if ($uvExe) { " ^
-    "        Copy-Item -Path $uvExe.FullName -Destination 'uv.exe' -Force; " ^
-    "        Write-Host ('    Found and copied: ' + $uvExe.FullName) " ^
-    "    } else { " ^
-    "        Write-Host '    ERROR: uv.exe not found in downloaded archive'; " ^
-    "        exit 1 " ^
-    "    }; " ^
-    "    Remove-Item -Path $zip -Force -ErrorAction SilentlyContinue; " ^
-    "    Remove-Item -Path 'uv-temp' -Recurse -Force -ErrorAction SilentlyContinue; " ^
-    "    Write-Host '    Download complete.' " ^
-    "} catch { " ^
-    "    Write-Host ('    Download failed: ' + $_.Exception.Message); " ^
-    "    exit 1 " ^
-    "}"
-
-if exist "uv.exe" (
-    uv.exe --version >nul 2>nul
-    if not errorlevel 1 (
-        for /f "tokens=*" %%a in ('uv.exe --version 2^>^&1') do set UV_VER=%%a
-        echo   - Downloaded and verified: !UV_VER!
-        echo   - uv: !UV_VER! (downloaded) >> "%BUILD_LOG%"
-        set "UV_FOUND=1"
-        goto :UvVerify
-    ) else (
-        echo   - Downloaded uv.exe but it's not functional
-        echo   - uv: download failed (not functional) >> "%BUILD_LOG%"
-        del uv.exe 2>nul
-    )
-)
-
-REM === Step 5: FAIL - uv.exe could not be obtained ===
-echo.
-echo ===============================================================================
-echo   FATAL ERROR: Failed to obtain uv.exe!
-echo ===============================================================================
-echo.
-echo   uv.exe is REQUIRED for building the installer. Without uv, users would
-echo   experience 10-30x slower installation times with pip.
-echo.
-echo   Attempted locations:
-echo     - Current directory: NOT FOUND
-echo     - %%USERPROFILE%%\.local\bin\uv.exe: NOT FOUND
-echo     - %%USERPROFILE%%\.cargo\bin\uv.exe: NOT FOUND
-echo     - %%LOCALAPPDATA%%\uv\uv.exe: NOT FOUND
-echo     - System PATH (where uv): NOT FOUND
-echo     - GitHub download: FAILED
-echo.
-echo   Solutions:
-echo     1. Install uv: powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-echo     2. Check internet connection and firewall settings
-echo     3. Manually download uv.exe and place it in: %CD%
-echo        Download from: https://github.com/astral-sh/uv/releases
-echo.
-echo ERROR: uv.exe could not be obtained >> "%BUILD_LOG%"
-pause
-exit /b 1
-
-REM === Final verification that uv.exe exists and works ===
-:UvVerify
-if not exist "uv.exe" (
+REM v1.10.0 (item 2f, owner W53-W56): the installer ships exactly the uv version that
+REM installer\build_env.yml pins, from this environment -- never a copy found elsewhere
+REM on the developer's PC, an old uv.exe left in this folder, or the newest download.
+set "UV_REQUIRED=uv 0.9.26"
+set "UV_SRC=%CONDA_PREFIX%\Library\bin\uv.exe"
+if not exist "%UV_SRC%" set "UV_SRC=%CONDA_PREFIX%\Scripts\uv.exe"
+if not exist "%UV_SRC%" (
     echo.
-    echo FATAL ERROR: uv.exe does not exist after obtain phase!
-    echo ERROR: uv.exe missing after obtain phase >> "%BUILD_LOG%"
+    echo ERROR: uv.exe not found in the build environment: %CONDA_PREFIX%
+    echo ERROR: uv.exe not found in %CONDA_PREFIX% >> "%BUILD_LOG%"
+    echo Run this script in WJ110_build: conda env create -f installer\build_env.yml
     pause
     exit /b 1
 )
-
-uv.exe --version >nul 2>nul
-if errorlevel 1 (
+if exist "uv.exe" del uv.exe
+copy "%UV_SRC%" "uv.exe" >nul
+set "UV_VER="
+for /f "tokens=1,2" %%a in ('uv.exe --version 2^>^&1') do set "UV_VER=%%a %%b"
+if not "!UV_VER!"=="%UV_REQUIRED%" (
     echo.
-    echo FATAL ERROR: uv.exe exists but is not functional!
-    echo ERROR: uv.exe not functional >> "%BUILD_LOG%"
+    echo ERROR: %UV_REQUIRED% is required; %UV_SRC% is: !UV_VER!
+    echo ERROR: wrong uv version: !UV_VER! >> "%BUILD_LOG%"
     del uv.exe 2>nul
     pause
     exit /b 1
 )
-
-echo   - uv.exe verified and ready
+echo   - uv: !UV_VER! (from %UV_SRC%)
+echo   - uv: !UV_VER! (from %UV_SRC%) >> "%BUILD_LOG%"
 echo.
 
 REM ===== Phase 4: Validate Configuration =====

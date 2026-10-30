@@ -100,7 +100,7 @@ class TestRegistry:
         extras = generate_pyproject_extras()
 
         # Should have all non-core extras
-        expected_extras = ["cli", "gui", "translate", "llm", "enhance", "huggingface", "analysis"]
+        expected_extras = ["cli", "gui", "translate", "enhance", "huggingface", "analysis"]
         for extra_name in expected_extras:
             assert extra_name in extras, f"Missing extra: {extra_name}"
             assert isinstance(extras[extra_name], list), f"Extra {extra_name} should be a list"

@@ -10,8 +10,8 @@ Quick Start:
         EnhancementResult,
     )
 
-    # Create enhancer (default: ClearVoice 48kHz)
-    enhancer = SpeechEnhancerFactory.create("clearvoice")
+    # Create enhancer (ZipEnhancer 16kHz)
+    enhancer = SpeechEnhancerFactory.create("zipenhancer")
 
     # Get preferred extraction rate
     extraction_sr = enhancer.get_preferred_sample_rate()  # 48000
@@ -35,7 +35,6 @@ Available Backends:
     - none: Passthrough (no enhancement)
     - ffmpeg-dsp: FFmpeg audio filters (loudnorm, compress, denoise)
     - zipenhancer: ZipEnhancer 16kHz via ModelScope (lightweight, SOTA quality)
-    - clearvoice: ClearerVoice speech enhancement (denoising, 48kHz)
     - bs-roformer: BS-RoFormer vocal isolation (44.1kHz)
 
 Design Principles:

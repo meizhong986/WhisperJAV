@@ -1,619 +1,257 @@
-# WhisperJAV Windows 独立安装程序安装指南
+# WhisperJAV Windows 安装程序指南
 
-**版本：** 1.8.9
-**最后更新：** 2026-03-19
-**安装程序类型：** 独立 .exe（无需管理员权限）
-
----
-
-## 系统要求
-
-### 最低要求
-
-| 组件 | 要求 |
-|------|------|
-| 操作系统 | Windows 10（64 位）或 Windows 11 |
-| 内存 | 8 GB |
-| 可用磁盘空间 | 8 GB（安装 + AI 模型 + 缓存）|
-| 网络 | 安装过程中需要联网以下载依赖项 |
-| 运行时 | Microsoft Edge WebView2（安装程序会在缺失时提示安装）|
-
-### 推荐配置（最佳性能）
-
-| 组件 | 推荐 |
-|------|------|
-| GPU | NVIDIA GPU，6+ GB 显存（RTX 2060 或更好）|
-| GPU 驱动程序 | NVIDIA 驱动程序 570+（支持 CUDA 12.8）|
-| 内存 | 16 GB |
-| 存储 | SSD（处理速度显著提升）|
-| 网络 | 宽带连接（用于首次下载模型）|
-
-### GPU 兼容性
-
-WhisperJAV 使用 NVIDIA CUDA 进行 GPU 加速转录。安装程序会自动检测您的 GPU 并安装相应版本：
-
-| 您的 NVIDIA 驱动程序版本 | 安装的 CUDA 版本 | 兼容的 GPU |
-|--------------------------|-----------------|------------|
-| 570 或更新 | CUDA 12.8（最优）| RTX 20xx、30xx、40xx、50xx 系列 |
-| 450 - 569 | CUDA 11.8（通用）| 所有支持 CUDA 的 NVIDIA GPU |
-| 无 NVIDIA GPU | 仅 CPU（较慢）| 任何系统（比 GPU 慢 6-10 倍）|
-
-如果您没有 NVIDIA GPU，WhisperJAV 仍然可以在纯 CPU 模式下工作。处理速度会较慢（每小时视频大约需要 30-60 分钟，而使用 GPU 仅需 5-10 分钟）。
-
-### 支持的 NVIDIA GPU
-
-- **GeForce：** GTX 1060+、RTX 2060+、RTX 3060+、RTX 4060+、RTX 5070+
-- **Quadro / RTX Professional：** Quadro RTX、RTX A 系列
-- **数据中心：** T4、A10、A100、H100、B100
+**版本：** 1.10.0
+**安装程序：** `WhisperJAV-1.10.0-Windows-x86_64.exe`（无需管理员权限）
 
 ---
 
-## 安装前准备
+## 目录
 
-### 1. 更新 NVIDIA 驱动程序（推荐）
-
-为获得最佳性能，请将 NVIDIA 驱动程序更新至 570 或更新版本：
-
-1. 访问 [nvidia.com/drivers](https://www.nvidia.com/drivers)
-2. 选择您的 GPU 型号
-3. 下载并安装最新的 "Game Ready" 或 "Studio" 驱动程序
-4. 安装后重启计算机
-
-您可以通过以下方式检查当前驱动程序版本：
-- 右键点击桌面，选择"NVIDIA 控制面板"
-- 查看左下角的"驱动程序版本"
-
-### 2. 确认 WebView2 已安装
-
-WhisperJAV 使用 Microsoft Edge WebView2 作为图形界面。大多数 Windows 10 和 11 系统已预装此组件。如果您不确定，安装程序会自动检查并在需要时提供下载链接。
-
-手动检查方法：
-1. 打开 Windows 设置中的"添加或删除程序"
-2. 搜索 "WebView2"
-3. 如果显示 "Microsoft Edge WebView2 Runtime"，说明已就绪
-
-如未安装，请从以下地址下载：
-[https://go.microsoft.com/fwlink/p/?LinkId=2124703](https://go.microsoft.com/fwlink/p/?LinkId=2124703)
-
-### 3. 释放磁盘空间
-
-确保 WhisperJAV 安装目标磁盘至少有 8 GB 可用空间。空间大致分配如下：
-
-| 组件 | 大小 |
-|------|------|
-| 基础安装（Python + conda）| ~500 MB |
-| 包含 CUDA 的 PyTorch | ~2.5 GB |
-| Python 依赖项 | ~1.5 GB |
-| AI 模型（首次使用时下载）| ~3 GB |
-| **合计** | **~7.5 GB** |
-
-### 4. 临时排除杀毒软件（如有需要）
-
-部分杀毒软件可能会标记安装程序或安装后的下载内容。如果遇到问题：
-
-1. 临时禁用实时扫描，或
-2. 为 `%LOCALAPPDATA%\WhisperJAV` 添加排除规则
+1. [安装前准备](#before-you-install)
+2. [安装步骤](#installation-steps)
+3. [安装为哪种加速器制作](#what-this-install-is-made-for)
+4. [首次运行](#first-run)
+5. [检查安装](#checking-your-installation)
+6. [从 1.9.x 升级](#coming-from-19x)
+7. [在 1.10 内更新](#updating-within-110)
+8. [再次运行安装程序](#running-the-installer-again)
+9. [卸载](#uninstalling)
+10. [故障排除](#troubleshooting)
+11. [技术细节](#technical-details)
 
 ---
 
-## 安装步骤
+## 安装前准备 {#before-you-install}
 
-### 步骤 1：下载安装程序
+### 你的电脑
 
-从 [GitHub Releases 页面](https://github.com/meizhong986/whisperjav/releases) 下载 `WhisperJAV-1.8.9-Windows-x86_64.exe`。
+| | 要求 |
+|---|---|
+| Windows | Windows 10 或 11，64 位（x86-64）。不支持 Windows on ARM（例如 Snapdragon 笔记本）：安装程序会在第一个界面停止。 |
+| 内存 | 8 GB（推荐 16 GB） |
+| 可用磁盘空间 | 约 10 GB，用于安装和首次使用时下载的模型 |
+| 网络 | 安装时以及每个模型首次运行时 |
+| WebView2 | Microsoft Edge WebView2 Runtime，供 GUI 使用（缺失时安装程序会提供） |
 
-安装程序文件大小约为 150 MB。
+### 你的显卡
 
-### 步骤 2：运行安装程序
+安装程序会把这次安装制作为一种加速器的安装（见[是否加速](../getting-started/index.md#accelerated-or-not)）：
 
-双击下载的 `.exe` 文件。**不需要**以管理员身份运行。
+- **1.10 支持的 NVIDIA GPU**——GTX 16 系列、RTX 20 系列或更新，驱动 580 或更新：安装自动为 NVIDIA GPU（CUDA）制作，不会提问。
+- **其他情况**——AMD 或 Intel 显卡、比 1.10 支持范围更旧的 NVIDIA 显卡、较旧的驱动，或没有 WhisperJAV 能用的显卡：会弹出一个窗口，询问这次安装要为什么制作。
 
-如果 Windows SmartScreen 显示警告：
-1. 点击"更多信息"
-2. 点击"仍要运行"
+查看 NVIDIA 驱动版本：右键点击桌面，打开 NVIDIA 控制面板，在左下角查看"驱动程序版本"。更新驱动：[nvidia.com/drivers](https://www.nvidia.com/drivers)，然后重启电脑。
 
-### 步骤 3：接受许可协议
+### 杀毒软件
 
-阅读并接受 MIT 许可协议以继续。
+一些杀毒软件会阻止安装程序下载。遇到这种情况时，请为 `%LOCALAPPDATA%\WhisperJAV` 添加排除项，或在安装期间暂停实时扫描。
 
-### 步骤 4：选择安装类型
+### 中国用户
 
-- **仅为当前用户安装（推荐）：** 仅为当前用户安装，无需管理员权限。
-- **为所有用户安装：** 为计算机上的所有用户安装，需要管理员权限。
+安装程序会从 GitHub、PyPI、download.pytorch.org 和 Hugging Face 下载。请在整个安装过程中保持 VPN 开启。
 
-### 步骤 5：选择安装位置
+---
 
-默认安装位置为：
+## 安装步骤 {#installation-steps}
+
+1. 从[发布页面](https://github.com/meizhong986/WhisperJAV/releases)下载 `WhisperJAV-1.10.0-Windows-x86_64.exe`。
+2. 双击运行。无需以管理员身份运行。如果 Windows SmartScreen 发出警告，点击 **更多信息**，再点击 **仍要运行**。
+3. 接受许可协议。
+4. 选择 **Just Me**（推荐；无需管理员权限）或 **All Users**。
+5. 选择文件夹。默认为 `C:\Users\<你的用户名>\AppData\Local\WhisperJAV`。路径尽量短，尽量不含空格。
+6. 点击 **Install**。
+
+文件解压后，一个控制台窗口会完成其余安装，并显示各个阶段：
+
+| 阶段 | 内容 |
+|---|---|
+| 1 | 检查：磁盘剩余空间、到 PyPI 的连接、Visual C++ 运行库、WebView2 |
+| 2 | 查找 NVIDIA GPU 及其驱动 |
+| 2.5 | 决定安装为哪种加速器制作；需要询问时显示窗口（见下文） |
+| 3–4.5 | 安装本版本测试过的软件包版本，然后安装适合该加速器的 PyTorch |
+| 5 | 安装 WhisperJAV |
+| 5.1 | 仅 NVIDIA GPU（CUDA）安装：放置 balanced、fast 和 faster 需要的 CUDA 12 库；如果这台电脑无法加载它，改为安装 PyTorch 的 CUDA 12.8 版 |
+| 5.5–5.8 | 创建 `WhisperJAV-GUI.exe` 启动器，下载 FireRedVAD 语音检测模型，检查图标 |
+| 6 | 检查已安装的程序能否启动 |
+
+最后会显示一份摘要，说明安装了什么以及安装为哪种加速器制作，并创建桌面快捷方式 "WhisperJAV v1.10.0"。安装需要约 10 到 30 分钟，取决于网速。
+
+---
+
+## 安装为哪种加速器制作 {#what-this-install-is-made-for}
+
+### 受支持的 NVIDIA GPU
+
+不会提问。安装为 NVIDIA GPU（CUDA 13.0）制作。如果这台电脑无法加载 balanced、fast 和 faster 需要的 CUDA 12 库，安装程序会用带边框的消息说明，并改为安装 CUDA 12.8 版。
+
+### 没有受支持的 NVIDIA GPU：窗口
+
+如果安装程序找不到 1.10 支持的 NVIDIA GPU，会弹出标题为 **"WhisperJAV — no supported NVIDIA GPU found"** 的窗口并询问：
+
+> WhisperJAV found no NVIDIA graphics card that version 1.10 supports (graphics found: …). What should this install be made for?
+
+（意思是：WhisperJAV 没有找到 1.10 支持的 NVIDIA 显卡。这次安装要为什么制作？）
+
+| 选项 | 安装为哪种加速器制作 |
+|---|---|
+| AMD graphics card（AMD 显卡） | 通过 Vulkan 使用 GPU |
+| Intel graphics card（Intel 显卡） | 通过 Vulkan 使用 GPU |
+| NVIDIA graphics card older than WhisperJAV 1.10 supports（比 1.10 支持范围更旧的 NVIDIA 显卡） | 通过 Vulkan 使用 GPU |
+| I have my own PyTorch for my GPU (advanced)（我有适合自己 GPU 的 PyTorch，进阶） | 自己的 PyTorch |
+| None, or use the CPU only（没有，或仅使用 CPU） | 仅 CPU（不加速） |
+
+窗口中的说明（意思）：使用 AMD、Intel 或较旧的 NVIDIA 显卡时，GGUF 处理管线（Parakeet-CrispASR 和 Cohere-CrispASR）请求通过 Vulkan 使用你的显卡。这在 1.10.0 中是实验性功能：尚未在 AMD 或 Intel 显卡上测试，我们希望听到它在你电脑上的表现。其他所有处理管线在 CPU 上运行（不加速），比在受支持的 NVIDIA GPU 上慢好几倍。选择自己的 PyTorch 时，WhisperJAV 安装除 PyTorch 以外的一切，之后由你添加自己的 PyTorch 版本（安装结束时会显示命令）。选择仅 CPU 时，所有处理管线都在 CPU 上运行。
+
+如果 20 秒内没有回答，会安装仅 CPU 版本。**Stop** 会结束安装程序，不安装任何内容。
+
+通过 Vulkan 使用 GPU 需要 Vulkan 运行库（`vulkan-1.dll`），它随显卡驱动一起安装。如果缺失，安装程序会说明并安装仅 CPU 版本；更新显卡驱动后再次运行安装程序即可改变。
+
+### 1.10 无法使用的 NVIDIA GPU
+
+窗口会先说明原因，并预先选中 **Stop**，没有时间限制：
+
+- **较旧的显卡**（低于 GTX 16 / RTX 20）："Your graphics card, … (compute capability …), is older than WhisperJAV 1.10 supports. 1.10 needs a GTX 16-series, RTX 20-series or newer card." 以及 "WhisperJAV 1.9.5 still supports this card: https://github.com/meizhong986/WhisperJAV/releases/tag/v1.9.5."（意思是：你的显卡比 1.10 支持的更旧；1.9.5 仍然支持这张显卡。）如果你确定显卡受支持，**My card is identified wrongly**（我的显卡被认错了）会显示报告问题的地址，然后停止。
+- **较旧的驱动**（低于 580）："Your NVIDIA driver (…) is older than WhisperJAV 1.10 needs (580 or newer). Update it from https://www.nvidia.com/drivers, restart the PC, and run this installer again to get the NVIDIA GPU version. Or choose below."（意思是：驱动太旧；更新驱动并重启后再次运行安装程序，即可得到 NVIDIA GPU 版本；或在下面另选。）
+- **Windows 能列出、但 WhisperJAV 无法访问的显卡**——驱动可能缺失或不正常，或者在有两块显示芯片的笔记本上，NVIDIA 芯片可能已关闭：安装或修复 NVIDIA 驱动（580 或更新），重启电脑后再次运行安装程序。或在下面另选。
+
+### 自己的 PyTorch
+
+WhisperJAV 安装除 PyTorch 以外的一切，并且在安装和升级时从不在这个安装中安装、替换或删除 PyTorch。再次运行安装程序会替换整个安装文件夹，包括 PyTorch：窗口会保留"自己的 PyTorch"并再次显示命令。安装结束时，一个窗口会显示要运行的那一条命令，其中已填好 WhisperJAV 的 Python：
+
 ```
-C:\Users\[用户名]\AppData\Local\WhisperJAV
+"<安装文件夹>\python.exe" -m pip install torch torchaudio --index-url <你的 PyTorch 版本的地址>
 ```
 
-您可以更改为任意位置。请注意以下建议：
-- 尽量避免路径中包含空格（例如 "Program Files"）
-- 除非已启用长路径支持，否则避免路径超过 46 个字符
-- 避免路径中包含特殊字符（重音字母、中日韩字符）
+推荐 PyTorch 2.11。同一条命令也保存在 `<安装文件夹>\OWN_PYTORCH_NEXT_STEP.txt` 中。在你运行它之前，每次 WhisperJAV 运行都会在开始时停止，并再次显示这条命令。
 
-### 步骤 6：安装选项
+### 安装的选择保存在哪里
 
-安装程序将显示可选设置：
-- **添加到 PATH：** 默认启用。允许从命令行运行 `whisperjav`，并支持后续通过 `whisperjav-upgrade` 进行升级。
-- **创建快捷方式：** 在桌面创建快捷方式以便快速访问。
+安装程序把加速器写入安装文件夹中的 `whisperjav_stack.txt`。每次运行、`whisperjav-upgrade` 以及以后再次运行安装程序都遵循它。
 
-点击"安装"开始。
+### 安装程序有意停止时
 
-### 步骤 7：安装后配置（自动执行）
-
-基础环境解压完成后，安装后脚本会自动运行。这是安装过程中耗时最长的部分。一个控制台窗口将显示进度：
-
-#### 阶段 1：预检（< 1 分钟）
-- 磁盘空间验证（最低 8 GB）
-- 网络连接检查（到 PyPI）
-- Visual C++ Redistributable 检查（缺失时自动安装）
-- WebView2 运行时检查（缺失时提示下载）
-
-#### 阶段 2：GPU 检测（< 1 分钟）
-- 检测 NVIDIA GPU 及驱动程序版本
-- 选择适当的 CUDA 版本
-
-#### 阶段 3：PyTorch 安装（3-5 分钟）
-- 下载并安装包含 CUDA 支持的 PyTorch（~2.5 GB）
-- 如果未检测到 GPU，系统将询问是否安装仅 CPU 版本的 PyTorch
-
-#### 阶段 3.5：核心 Whisper 包（2-3 分钟）
-- 安装 OpenAI Whisper、Stable-TS、FFmpeg-Python（来自 GitHub）
-- 这些包使用 git，对于防火墙后的用户可能触发 Git 超时处理
-
-#### 阶段 4：Python 依赖项（3-5 分钟）
-- 从需求文件安装所有剩余 Python 包
-- 约 500 MB 的下载量
-
-#### 阶段 5：WhisperJAV 应用程序（< 1 分钟）
-- 从捆绑的 wheel 包安装 WhisperJAV 应用程序
-
-#### 阶段 5.3：本地大语言模型翻译（可选，交互式）
-- 系统将提示安装本地大语言模型以进行离线翻译
-- 输入 "Y" 安装（推荐）或 "N" 跳过
-- 如果 30 秒内未响应，默认选择 "Y"
-- 如果现在跳过，之后仍可安装
-
-#### 阶段 5.5-5.8：启动器和图标设置（< 1 分钟）
-- 在安装目录中创建 `WhisperJAV-GUI.exe` 启动器
-- 验证图标文件
-
-所有阶段完成后，桌面上将创建名为 "WhisperJAV v1.8.9" 的快捷方式。
-
-### 步骤 8：完成
-
-安装摘要将显示：
-- 安装目录
-- Python 版本
-- PyTorch 版本和 CUDA 状态
-- WebView2 状态
-- 安装耗时
-
-按 Enter 关闭安装程序窗口。
-
-**总安装时间：** 根据网速和硬件情况，约 10-20 分钟。
+如果你选择 Stop，一个结束对话框会显示："WhisperJAV was not installed. The installer stopped for the reason shown in its console window."（意思是：WhisperJAV 未安装；停止原因见控制台窗口。）原因也保存在安装文件夹中的 `INSTALLATION_STOPPED_v1.10.0.txt`。
 
 ---
 
-## 首次运行体验
+## 首次运行 {#first-run}
 
-### 启动 WhisperJAV
+双击 **WhisperJAV v1.10.0** 快捷方式，或安装文件夹中的 `WhisperJAV-GUI.exe`。
 
-双击桌面上的 **"WhisperJAV v1.8.9"** 快捷方式。或者，双击安装目录中的 `WhisperJAV-GUI.exe`。
+处理管线第一次需要某个模型时，WhisperJAV 会下载它（例如 Whisper large-v3 约 3 GB，Parakeet-CrispASR 674 MB）。之后的运行会直接使用。
 
-### 首次转录：AI 模型下载
+每次运行开始时，WhisperJAV 会检查安装：
 
-首次处理视频时，WhisperJAV 需要下载 AI 模型。这是一次性操作：
+- **NVIDIA GPU（CUDA）安装，GPU 可用：** 不显示任何内容，运行继续。
+- **NVIDIA GPU（CUDA）安装，GPU 现在不可用**（例如更换驱动之后）：运行不会开始。一个框会说明原因和解决办法。要这次在 CPU 上运行，加上 `--device cpu`；在 GUI 中，对话框 **"The NVIDIA GPU cannot be used"** 提供 **Run on the CPU this time**（这次在 CPU 上运行）。
+- **其他所有安装：** 一个框说明安装为哪种加速器制作，以及各部分在这台电脑上的运行位置，然后运行继续。
 
-| 模型 | 大小 | 下载时间 |
-|------|------|----------|
-| Whisper Large-v3 | ~3 GB | 5-10 分钟 |
-
-下载进度将在 GUI 中显示。初次下载后，模型将缓存在本地，无需再次下载。
-
-模型存储位置：
-```
-C:\Users\[用户名]\.cache\whisper\
-```
-
-### 基本工作流程
-
-1. **添加文件：** 点击 "Add File(s)" 或拖放视频/音频文件
-2. **选择模式：** 选择 "Balanced" 获得最佳质量，选择 "Faster" 获得更快速度
-3. **开始处理：** 点击 "Start"
-4. **找到字幕：** 输出的 SRT 文件保存在输入文件旁边的 `_output` 文件夹中
+基本流程：添加文件，选择模式（Balanced 是不错的起点），点击 **Start**。字幕会写入你选择的输出文件夹。
 
 ---
 
-## 验证安装
+## 检查安装 {#checking-your-installation}
 
-### 检查 GPU 加速
-
-安装完成后，从安装目录打开命令提示符并运行：
+打开命令提示符（按开始键，输入 `cmd`，按 Enter）并运行：
 
 ```cmd
-python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}'); print(f'GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"None\"}')"
+cd /d "%LOCALAPPDATA%\WhisperJAV"
+Scripts\whisperjav.exe --check
 ```
 
-GPU 系统的预期输出：
+（如果你选择了其他安装文件夹，请改用那个文件夹。）
+
+它会列出 Python、PyTorch、安装的加速器、各部分在哪里运行、FFmpeg、CrispASR 和模型。在 NVIDIA GPU（CUDA）安装上，例如：
+
 ```
-CUDA available: True
-GPU: NVIDIA GeForce RTX 4070
+✓ PyTorch: PyTorch 2.11.0+cu130: NVIDIA GPU (CUDA 13.0), NVIDIA GeForce RTX 3060
+✓ CrispASR: 0.8.44+cuda (CUDA build), GGUF pipelines: asks for the NVIDIA GPU (CUDA)
+ℹ Accelerator: Accelerator of this install: NVIDIA GPU (CUDA 13.0).
+ℹ CTranslate2: CTranslate2 (balanced, fast, faster): NVIDIA GPU (CUDA)
 ```
 
-### 检查 WhisperJAV 版本
+`Scripts\whisperjav.exe --version` 显示版本：`WhisperJAV 1.10.0`。
+
+安装日志是安装文件夹中的 `install_log_v1.10.0.txt`。
+
+---
+
+## 从 1.9.x 升级 {#coming-from-19x}
+
+请全新安装 1.10.0：1.10.0 需要 Python 3.13，因此 `whisperjav-upgrade` 无法把 1.9.x 安装升级到 1.10.0。如果安装到旧版本所在的文件夹，安装程序会发现它并提出替换：该文件夹中的所有内容会先被删除。`%APPDATA%\WhisperJAV` 中的设置和已下载的模型会保留。
+
+---
+
+## 在 1.10 内更新 {#updating-within-110}
+
+以后的 1.10 版本可以用 `whisperjav-upgrade` 安装，它会保留安装的加速器及其 PyTorch：
+
+1. 打开命令提示符。
+2. `cd /d "%LOCALAPPDATA%\WhisperJAV"`（或你的安装文件夹）。
+3. `Scripts\whisperjav-upgrade.exe`
+4. 检查版本：`Scripts\whisperjav.exe --version`
+
+不要用普通的 `pip install -U whisperjav…` 更新：在 Windows 上，PyPI 提供的是仅 CPU 版的 PyTorch，可能会在毫无提示的情况下替换你的 GPU 版本。
+
+---
+
+## 再次运行安装程序 {#running-the-installer-again}
+
+把安装程序再次运行到同一个文件夹，可以修复安装或更改它为哪种加速器制作。标题为 **"WhisperJAV — this install's accelerator"** 的窗口会显示 "This install is made for: …. Keep it, or choose another."（意思是：这次安装为……制作；保留它，或另选一个。）当前加速器已预先选中；20 秒内没有回答时，安装保持原样。如果当时 NVIDIA GPU 不可用，原因会显示在选项上方。安装程序会先删除旧的安装文件夹（设置和已下载的模型保留），只保留它所记录的加速器；在"自己的 PyTorch"安装中，请用安装结束时显示的命令重新添加你的 PyTorch。
+
+---
+
+## 卸载 {#uninstalling}
+
+打开 Windows **设置 > 应用**，找到 **WhisperJAV**，选择 **卸载**。下载的模型保留在 `%USERPROFILE%\.cache`（Hugging Face 和 Whisper 缓存），设置保留在 `%APPDATA%\WhisperJAV`；如需释放空间，请手动删除这些文件夹。
+
+---
+
+## 故障排除 {#troubleshooting}
+
+**有 NVIDIA 显卡，却显示 "No supported NVIDIA GPU found"。** 请阅读窗口的第一行：它说明了原因（显卡较旧、驱动较旧，或 WhisperJAV 无法访问的显卡）。更新或修复驱动，重启电脑后再次运行安装程序。在有两块显示芯片的笔记本上，请确认 NVIDIA 芯片已开启。
+
+**运行停止："THE NVIDIA GPU CANNOT BE USED"。** 安装为 NVIDIA GPU 制作，而 GPU 现在不可用。框中会说明原因和解决办法。`--device cpu` 让这一次在 CPU 上运行。
+
+**处理很慢。** 查看运行开始时的框，或运行 `whisperjav --check`：它们会说明各部分在哪里运行。在仅 CPU 安装中，所有处理管线都在 CPU 上运行，比在 GPU 上慢好几倍。
+
+**GGUF 处理管线停止："CrispASR could not be loaded"。** 在"通过 Vulkan 使用 GPU"或"自己的 PyTorch"安装中，这通常意味着缺少 Vulkan 运行库（`vulkan-1.dll`）：更新显卡驱动，或再次运行安装程序并选择仅 CPU。
+
+**下载失败或超时。** 检查网络连接；在防火墙后面时，允许 `python.exe`、`uv.exe` 和 `git.exe` 访问网络。安装程序会用更长的超时重试 GitHub 下载。在中国，请在整个安装过程中保持 VPN 开启。
+
+**GUI 无法打开，或窗口空白。** 从 [Microsoft](https://go.microsoft.com/fwlink/p/?LinkId=2124703) 安装 WebView2。要查看错误信息，在命令提示符中运行 `"%LOCALAPPDATA%\WhisperJAV\python.exe" -m whisperjav.webview_gui.main`。
+
+**安装失败。** 打开安装文件夹中的 `install_log_v1.10.0.txt`：它会指出失败的阶段。`INSTALLATION_FAILED_v1.10.0.txt` 记录了原因。再次运行安装程序；它会提出替换不完整的安装。如果仍然失败，请在 [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) 提交问题，并附上日志。
+
+---
+
+## 技术细节 {#technical-details}
+
+### 静默安装
 
 ```cmd
-python -c "from whisperjav.__version__ import __version__; print(f'WhisperJAV {__version__}')"
+cmd /C START /WAIT WhisperJAV-1.10.0-Windows-x86_64.exe /S /D=C:\WhisperJAV
 ```
 
-预期输出：
-```
-WhisperJAV 1.8.9
-```
-
-### 检查安装日志
-
-安装日志位于：
-```
-[安装目录]\install_log_v1.8.9.txt
-```
-
-此文件包含安装过程中每个步骤的详细信息，对于诊断问题非常有用。
-
----
-
-## 从旧版本升级
-
-### 自动升级检测
-
-如果将 WhisperJAV v1.8.9 安装到与旧版本相同的目录，安装程序将：
-
-1. 检测现有的 WhisperJAV 安装
-2. 询问是否要替换
-3. 确认后，将在安装前干净地删除旧版本
-
-升级期间，`%APPDATA%\WhisperJAV` 中的用户配置将被保留。
-
-### 通过 pip 手动升级
-
-如果已启用 PATH（默认设置），无需重新下载安装程序即可升级：
-
-```cmd
-whisperjav-upgrade
-```
-
-**请勿使用普通的 `pip install -U whisperjav...` 升级。** 在 Windows 上，PyPI 只提供**仅 CPU** 版的
-PyTorch；CUDA 版只在 `download.pytorch.org` 上提供。因此，任何涉及 PyTorch 的依赖解析都会悄悄地把您的
-GPU 版替换为 CPU 版。同一命令还会改动其他已固定版本的包。`whisperjav-upgrade` 会传入保护 GPU 相关包的约束条件。
-
-### 保留配置
-
-用户设置存储在：
-```
-%APPDATA%\WhisperJAV\whisperjav_config.json
-```
-
-此文件在升级或重新安装时不会被删除。如果您从 v1.8.0 之前的版本升级，安装程序将自动从旧位置迁移您的配置。
-
----
-
-## 卸载
-
-### 方法 1：Windows 设置（推荐）
-
-1. 打开 Windows 设置 > 应用 > 应用和功能
-2. 搜索 "WhisperJAV"
-3. 点击"卸载"
-4. 按提示操作
-
-### 方法 2：卸载脚本
-
-运行安装目录中的 `uninstall_v1.8.9.bat` 文件。此交互式脚本将：
-
-1. 删除桌面快捷方式
-2. 删除开始菜单快捷方式
-3. 询问是否删除用户配置文件
-4. 询问是否删除缓存的 AI 模型（~3 GB）
-5. 删除安装目录
-
-### 方法 3：手动删除
-
-1. **删除安装目录：**
-   ```
-   %LOCALAPPDATA%\WhisperJAV
-   ```
-   （或您自定义的安装位置）
-
-2. **删除桌面快捷方式：**
-   ```
-   %USERPROFILE%\Desktop\WhisperJAV v1.8.9.lnk
-   ```
-
-3. **（可选）删除缓存的 AI 模型**以释放约 3 GB 空间：
-   ```
-   %USERPROFILE%\.cache\whisper
-   ```
-
-4. **（可选）删除用户配置：**
-   ```
-   %APPDATA%\WhisperJAV
-   ```
-
-5. **（可选）清理 PATH 条目：**
-   如果安装时启用了 "Add to PATH"，请从用户 PATH 中删除以下条目：
-   - `[安装目录]\Scripts`
-   - `[安装目录]\Library\bin`
-
----
-
-## 故障排除
-
-### 安装问题
-
-#### "NVIDIA driver not found" 或 "No NVIDIA GPU detected"
-
-**原因：** 未安装 NVIDIA GPU，或驱动程序未安装/版本过旧。
-
-**解决方案：**
-- 如果您有 NVIDIA GPU，请从 [nvidia.com/drivers](https://www.nvidia.com/drivers) 下载并安装最新驱动程序
-- 如果没有 NVIDIA GPU，在提示时接受仅 CPU 安装。处理速度会较慢但功能完全正常。
-
-#### "WebView2 runtime not detected"
-
-**原因：** 未安装 Microsoft Edge WebView2。图形界面需要此组件。
-
-**解决方案：**
-1. 安装程序将自动打开下载页面
-2. 从 [Microsoft](https://go.microsoft.com/fwlink/p/?LinkId=2124703) 下载并安装 "Evergreen Standalone Installer"
-3. 安装完成后，在安装程序窗口中按 Enter 继续
-
-#### "Network connection failed"
-
-**原因：** 无网络连接或防火墙阻止下载。
-
-**解决方案：**
-- 检查网络连接
-- 临时禁用 VPN 或代理
-- 检查防火墙设置：允许 `python.exe`、`pip.exe`、`git.exe` 和 `uv.exe` 访问网络
-- 如果在企业防火墙后，请联系 IT 部门
-
-#### "Git connection timeout" 或 "Failed to connect to github.com"
-
-**原因：** GitHub 被屏蔽或访问缓慢（在中国大陆防火墙后或某些 VPN 配置下常见）。
-
-**解决方案：**
-- 安装程序会自动检测并配置延长的 Git 超时时间
-- 等待自动重试（最多 3 次）
-- 如果重试失败，请尝试：
-  - 切换到不同的 VPN 节点
-  - 使用 GitHub 镜像/代理
-  - 在网络拥堵较低的时段运行安装程序
-
-#### "Out of disk space"
-
-**原因：** 安装目标磁盘可用空间不足 8 GB。
-
-**解决方案：**
-- 释放磁盘空间后重新运行安装程序
-- 选择空间更大的其他磁盘
-- 注意 AI 模型（首次使用时下载）还需要约 3 GB
-
-#### "Installation failed after retries"
-
-**解决方案：**
-1. 检查安装目录中的 `install_log_v1.8.9.txt` 获取具体错误信息
-2. 常见原因：
-   - 杀毒软件阻止下载：为安装目录添加排除规则
-   - 网络超时：使用更好的网络连接重试
-   - 下载损坏：删除安装目录后重新开始
-3. 尝试以管理员身份运行安装程序（右键 > 以管理员身份运行）
-
-#### "Post-install script failed"
-
-**原因：** 自动化包安装阶段发生错误。
-
-**解决方案：**
-1. 检查 `install_log_v1.8.9.txt` 确定失败的具体阶段
-2. 如果在 PyTorch 安装阶段失败：检查 GPU 驱动程序版本
-3. 如果在依赖项安装阶段失败：检查网络连接
-4. 重新运行安装程序；它会检测到现有的不完整安装并提供替换选项
-
-### 运行时问题
-
-#### "GUI 无法启动"或出现空白窗口
-
-**解决方案：**
-1. 确认 WebView2 已安装（见上文）
-2. 尝试从命令行启动以查看错误信息：
-   ```cmd
-   cd %LOCALAPPDATA%\WhisperJAV
-   python.exe -m whisperjav.webview_gui.main
-   ```
-3. 检查杀毒软件是否阻止了应用程序
-
-#### 处理速度非常慢
-
-**解决方案：**
-1. 查看处理开始时的控制台输出，确认是否已启用 GPU 加速
-2. 如果显示 "CPU-only mode"，说明 GPU 未被使用
-3. 验证 CUDA 安装：`python -c "import torch; print(torch.cuda.is_available())"`
-4. 关闭其他占用 GPU 的应用程序（游戏、视频编辑器）
-5. 使用 "Faster" 模式以牺牲部分精度换取更快的结果
-
-#### "Model download stuck"
-
-**解决方案：**
-- 大型模型（约 3 GB）根据网络状况需要 5-20 分钟下载
-- 下载中断后可以恢复
-- 如果卡住超过 30 分钟，请取消并检查网络连接
-- 模型缓存在 `%USERPROFILE%\.cache\whisper\`
-
-#### 处理过程中应用程序崩溃
-
-**解决方案：**
-1. 确保有足够内存（大型模型推荐 16 GB）
-2. 尝试一次只处理一个文件
-3. 使用较小的 Whisper 模型（例如 "medium" 代替 "large-v3"）
-4. 查看 GUI 控制台中的错误信息
-5. 在 [GitHub Issues](https://github.com/meizhong986/whisperjav/issues) 报告持续崩溃的问题
-
----
-
-## 静默安装/无人值守安装
-
-安装程序支持命令行选项以进行自动化部署：
-
-```cmd
-WhisperJAV-1.8.9-Windows-x86_64.exe /S /D=C:\WhisperJAV
-```
-
-### 可用选项
-
-| 选项 | 说明 | 默认值 |
-|------|------|--------|
-| `/S` | 静默模式（无 GUI）| 关闭 |
-| `/Q` | 安静模式（抑制控制台输出）| 关闭 |
-| `/D=<路径>` | 安装目录（必须是最后一个参数）| `%LOCALAPPDATA%\WhisperJAV` |
-| `/InstallationType=AllUsers` | 为所有用户安装（需要管理员权限）| JustMe |
-| `/AddToPath=0` 或 `1` | 添加到系统 PATH | 1（启用）|
-| `/NoShortcuts=0` 或 `1` | 跳过快捷方式创建 | 0（创建快捷方式）|
-| `/InstallLocalLLM=0` 或 `1` | 安装本地大语言模型翻译 | 提示选择 |
-| `/NoRegistry=0` 或 `1` | 跳过注册表条目 | 0 |
-| `/?` | 显示帮助 | -- |
-
-### 示例
-
-静默安装到自定义目录：
-```cmd
-cmd /C START /WAIT WhisperJAV-1.8.9-Windows-x86_64.exe /S /D=D:\WhisperJAV
-```
-
-静默安装，跳过本地大语言模型，不修改 PATH：
-```cmd
-cmd /C START /WAIT WhisperJAV-1.8.9-Windows-x86_64.exe /S /AddToPath=0 /InstallLocalLLM=0
-```
-
----
-
-## 常见问题
-
-### 问：需要 NVIDIA GPU 吗？
-
-**答：** 不需要。WhisperJAV 可以在任何 Windows 10/11 系统上运行。没有 NVIDIA GPU 时将以纯 CPU 模式运行，速度约慢 6-10 倍。偶尔使用的话，CPU 模式完全可以胜任。如果经常使用或处理长视频，强烈推荐使用 NVIDIA GPU。
-
-### 问：需要多少磁盘空间？
-
-**答：** 总共约 8 GB：约 4.5 GB 用于安装，约 3 GB 用于 AI 模型（首次使用时下载）。如果还安装了用于翻译的本地大语言模型，则额外需要约 4-8 GB。
-
-### 问：可以安装到网络驱动器吗？
-
-**答：** 不推荐。WhisperJAV 需要快速的磁盘访问来处理临时文件和加载模型。建议安装到本地 SSD 以获得最佳体验。
-
-### 问：我的数据会被发送到网络吗？
-
-**答：** 不会。所有转录都在您的计算机本地完成。仅在安装期间（下载包）和首次运行时（下载 AI 模型）需要联网。之后，WhisperJAV 可以完全离线工作。唯一的例外是如果您使用云端翻译提供商（DeepSeek、Gemini 等），它们需要 API 密钥并会将字幕文本发送到这些服务。
-
-### 问：可以与其他 Python 安装并存吗？
-
-**答：** 可以。WhisperJAV 安装了自己独立的 Python 环境，不会干扰系统上现有的任何 Python 安装。
-
-### 问：如何更新到新版本？
-
-**答：** 下载并运行新的安装程序。如果安装到同一目录，安装程序会检测到旧版本并提供替换选项。您的用户设置会被保留。或者，如果已启用 PATH，可以运行 `whisperjav-upgrade`，它在升级时会保护您的 GPU 版 PyTorch。请勿使用普通的 `pip install -U whisperjav...`：在 Windows 上，PyPI 只提供仅 CPU 版的 PyTorch，可能会悄悄替换掉您的 GPU 版本。
-
-### 问：支持哪些视频格式？
-
-**答：** WhisperJAV 支持 FFmpeg 能读取的所有格式，涵盖几乎所有常见的视频和音频格式：MP4、MKV、AVI、MOV、WMV、FLV、WebM、MP3、WAV、FLAC、AAC、OGG 等。
-
-### 问：字幕文件保存在哪里？
-
-**答：** 字幕文件（SRT 格式）保存在输入视频文件旁边的 `_output` 子文件夹中。例如，如果视频位于 `D:\Videos\movie.mp4`，字幕将位于 `D:\Videos\movie_output\movie.srt`。
-
-### 问：安装程序卡在 "Extracting packages"
-
-**答：** 此阶段解压 conda 包，根据磁盘速度可能需要 2-5 分钟。虽然看起来可能像是卡住了，但实际上正在工作。可以通过任务管理器查看磁盘活动来确认。
-
-### 问：安装完成后可以移动安装目录吗？
-
-**答：** 不可以。移动安装目录会破坏内部路径。如果需要更改位置，请卸载后重新安装到新位置。
-
-### 问：安装时的"本地大语言模型"选项是什么？
-
-**答：** 这会安装 llama-cpp-python，使您能够使用计算机上的本地 AI 模型翻译字幕，无需 API 密钥或网络连接。它需要额外的磁盘空间（4-8 GB），配合 NVIDIA GPU 效果最佳。安装时可以跳过，之后需要时再添加。
-
-### 问：我在企业防火墙/中国大陆防火墙后
-
-**答：** 安装程序内置了对 GitHub 慢速或被屏蔽连接的检测和处理机制。它会自动配置延长的超时时间并重试失败的下载。如果安装仍然失败，请尝试使用能够访问 github.com 和 pypi.org 的 VPN 或代理。
-
----
-
-## 技术详情
-
-### 安装目录结构
-
-安装完成后，目录结构如下：
-
-```
-%LOCALAPPDATA%\WhisperJAV\
-    python.exe                    # Python 解释器
-    pythonw.exe                   # Python（无控制台窗口）
-    WhisperJAV-GUI.exe            # GUI 启动器
-    whisperjav_icon.ico           # 应用程序图标
-    install_log_v1.8.9.txt        # 安装日志
-    uninstall_v1.8.9.bat          # 卸载脚本
-    Lib\                          # Python 标准库
-        site-packages\
-            whisperjav\           # WhisperJAV 应用程序代码
-            torch\                # PyTorch
-            ...
-    Scripts\                      # 可执行脚本
-        whisperjav.exe            # CLI 入口点
-        whisperjav-gui.exe        # GUI 入口点
-        whisperjav-translate.exe  # 翻译 CLI
-        pip.exe                   # 包管理器
-        ...
-    Library\
-        bin\                      # FFmpeg、git 及其他工具
-            ffmpeg.exe
-            git.exe
-            ...
-```
-
-### 日志文件位置
-
-| 日志 | 路径 | 用途 |
-|------|------|------|
-| 安装日志 | `[安装目录]\install_log_v1.8.9.txt` | 详细安装进度 |
-| 失败标记 | `[安装目录]\INSTALLATION_FAILED_v1.8.9.txt` | 仅在安装失败时创建 |
-| 卸载日志 | `%TEMP%\whisperjav_uninstall_v1.8.9.txt` | 卸载详情 |
-
-### 网络要求
-
-安装期间需要能够访问以下域名：
-
-| 域名 | 用途 |
-|------|------|
-| `pypi.org` | Python 包下载 |
-| `files.pythonhosted.org` | Python 包文件 |
-| `github.com` | 基于 Git 的包下载 |
-| `download.pytorch.org` | PyTorch CUDA wheels |
-| `huggingface.co` | AI 模型下载（首次运行时）|
-| `aka.ms` | VC++ Redistributable（如需要）|
-| `go.microsoft.com` | WebView2 运行时（如需要）|
-
----
-
-## 支持
-
-如果您遇到本指南未涵盖的问题：
-
-1. 检查安装日志 `install_log_v1.8.9.txt`
-2. 在 [GitHub Issues](https://github.com/meizhong986/whisperjav/issues) 搜索已有问题
-3. 提交新 issue，请包含：
-   - 您的 Windows 版本
-   - GPU 型号和驱动程序版本
-   - 安装日志文件
-   - 问题描述
+`/S` 不显示安装程序的界面进行安装；`/D=` 设置文件夹，必须放在最后。`WhisperJAV-1.10.0-Windows-x86_64.exe /?` 列出所有选项。需要询问时，[安装为哪种加速器制作](#what-this-install-is-made-for)中的窗口仍会打开：在没有受支持 NVIDIA GPU 的电脑上，20 秒内没有回答时安装仅 CPU 版本；有 1.10 无法使用的 NVIDIA GPU 时，它会一直等待回答。
+
+### 安装文件夹中的文件
+
+| 文件 | 说明 |
+|---|---|
+| `install_log_v1.10.0.txt` | 安装日志 |
+| `whisperjav_stack.txt` | 安装为哪种加速器制作 |
+| `OWN_PYTORCH_NEXT_STEP.txt` | 仅"自己的 PyTorch"安装：添加你的 PyTorch 的命令 |
+| `INSTALLATION_STOPPED_v1.10.0.txt` | 仅当安装程序有意停止时：原因 |
+| `INSTALLATION_FAILED_v1.10.0.txt` | 仅当安装失败时：原因 |
+| `WhisperJAV-GUI.exe` | GUI 启动器 |
+
+### 安装程序访问的地址
+
+| 地址 | 用途 |
+|---|---|
+| `pypi.org`、`files.pythonhosted.org` | Python 软件包 |
+| `download.pytorch.org` | PyTorch |
+| `github.com` | CrispASR 的 GPU 版本，以及从 GitHub 安装的软件包 |
+| `huggingface.co` | 模型（安装时和首次运行时） |
+| `aka.ms`、`go.microsoft.com` | Visual C++ 运行库和 WebView2（缺失时） |

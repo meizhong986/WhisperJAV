@@ -51,6 +51,7 @@ from whisperjav.modules.srt_postprocessing import SRTPostProcessor, normalize_la
 from whisperjav.modules.srt_stitching import SRTStitcher
 from whisperjav.modules.subtitle_pipeline.types import TimestampMode
 from whisperjav.pipelines.base_pipeline import BasePipeline
+from whisperjav.utils.device_detector import pass_device
 from whisperjav.utils.logger import logger
 
 # Lazy imports to avoid loading heavy modules until needed:
@@ -134,17 +135,22 @@ class QwenPipeline(BasePipeline):
         max_new_tokens: int = 4096,
         language: str = "Japanese",
         timestamps: str = "word",
-        aligner_id: str = "Qwen/Qwen3-ForcedAligner-0.6B",
+        # 1.10.0 (item 12, C1): a CrispASR aligner short name (manifest.ALIGNER_MODELS; wav2vec2-ja the
+        # default) or a PyTorch model ID (Qwen/Qwen3-ForcedAligner-0.6B). aligner_backend None follows
+        # from the value ("crispasr" / "qwen3"); "none" loads no aligner.
+        aligner_id: str = "wav2vec2-ja",
+        aligner_backend: Optional[str] = None,
+        # 1.10.0 (item 12, C3): Whisper small through CrispASR, step 8 of the orchestrator; "none" = off.
+        timing_model: str = "whisper-small",
         context: str = "",
         context_file: Optional[str] = None,
         attn_implementation: str = "auto",
 
         # Timestamp resolution (bridges Phase 4 VAD and Phase 5 ASR)
-        # v1.9.0: vad_only is the default — no ForcedAligner load (~1GB VRAM
-        # saved), VAD frame boundaries drive timestamps. Matches the CLI
-        # default in main.py. Cohere overrides to aligner_vad_fallback below
-        # (no native timestamps).
-        timestamp_mode: str = "vad_only",
+        # 1.10.0 (item 12, design note 2026-10-28 section 7, owner W254 Q6): aligner_vad_fallback is the
+        # default for every ChronosJAV model — the 230 MB CrispASR aligner times the text; a VAD group it
+        # cannot align keeps its VAD times. Matches the CLI default in main.py. vad_only loads no aligner.
+        timestamp_mode: str = "aligner_vad_fallback",
 
         # Japanese post-processing — DISABLED for Qwen3 (C2 fix, ADR-006).
         # Qwen3 uses AssemblyTextCleaner, not the Whisper-era JapanesePostProcessor.
@@ -173,8 +179,9 @@ class QwenPipeline(BasePipeline):
         # scenes don't overlap. Default on for all qwen backends.
         resolve_scene_overlaps: bool = True,
 
-        # Adaptive Step-Down
-        stepdown_enabled: bool = True,
+        # Adaptive Step-Down: off by default since 1.10.0 (owner W266 1). A collapsed scene
+        # under aligner_vad_fallback takes the aligner-free times instead of a retry.
+        stepdown_enabled: bool = False,
         stepdown_initial_group: float = 6.0,
         stepdown_fallback_group: float = 6.0,
 
@@ -269,10 +276,10 @@ class QwenPipeline(BasePipeline):
             self.timestamp_mode = TimestampMode(timestamp_mode)
         except ValueError:
             logger.warning(
-                "Unknown timestamp_mode '%s', defaulting to 'vad_only'",
+                "Unknown timestamp_mode '%s', defaulting to 'aligner_vad_fallback'",
                 timestamp_mode,
             )
-            self.timestamp_mode = TimestampMode.VAD_ONLY
+            self.timestamp_mode = TimestampMode.ALIGNER_WITH_VAD_FALLBACK
 
         # Deprecation warning: japanese_postprocess is always False for Qwen3
         if japanese_postprocess:
@@ -310,9 +317,11 @@ class QwenPipeline(BasePipeline):
         # Generator backend selection (v1.8.6+)
         self.generator_backend = generator_backend
 
-        # anime-whisper preset: vad_only (skip ForcedAligner, save ~1GB VRAM),
-        # passthrough cleaner, no step-down (no aligner = no collapse),
-        # tighter grouping for anime speech patterns.
+        # anime-whisper preset: passthrough cleaner. Until 1.10.0 it was also forced
+        # to vad_only with step-down off (43f60d1: skip the ~1 GB ForcedAligner; no
+        # aligner, no collapse). Neither reason holds for the 230 MB CrispASR aligner,
+        # so anime-whisper now takes the same timing as Qwen3-ASR (design note
+        # 2026-10-28 section 7, owner W254 Q6).
         #
         # v1.8.13 (post-acceptance test): segmenter_backend is NO LONGER
         # overridden here. Earlier versions hard-stamped "ten" (or after
@@ -323,9 +332,8 @@ class QwenPipeline(BasePipeline):
         # that anime-whisper takes whisperseg by default when the user
         # doesn't pass an explicit segmenter, so removing this override
         # preserves the default behavior while honoring explicit choices.
-        # The other anime-whisper presets (timestamp_mode, cleaner, stepdown)
-        # remain because they are tightly coupled to the anime-whisper
-        # generator's expectations.
+        # The anime-whisper cleaner preset remains because it is tightly coupled
+        # to the anime-whisper generator's expectations.
         #
         # v1.9.0: the chunk_threshold/max_group override that used to live here
         # (0.5/5.0) was REMOVED. It unconditionally clobbered the constructor
@@ -338,17 +346,14 @@ class QwenPipeline(BasePipeline):
         # Cohere keeps its override below (its standalone path has no CLI branch
         # to supply the value, and the owner scoped this retune to qwen3+anime).
         if generator_backend == "anime-whisper":
-            self.timestamp_mode = TimestampMode.VAD_ONLY
             self.assembly_cleaner_enabled = False
-            self.stepdown_enabled = False
         elif generator_backend == "cohere":
-            # D7: Qwen3 ForcedAligner is the default for word-level timestamps
-            # (Cohere has no native timestamps — see HF discussion #19).
-            # User can disable via Customize Parameters → aligner=none, which
-            # also flips timestamp_mode and stepdown atomically (triple-flip).
-            self.timestamp_mode = TimestampMode.ALIGNER_WITH_VAD_FALLBACK
+            # Cohere has no native timestamps (HF discussion #19): the aligner times
+            # its text, as for every ChronosJAV model since 1.10.0 (aligner_vad_fallback
+            # is the default). User can disable via Customize Parameters → aligner=none,
+            # which also flips timestamp_mode and stepdown atomically (triple-flip);
+            # that vad_only is honoured here.
             self.assembly_cleaner_enabled = False  # D3: passthrough cleaner
-            self.stepdown_enabled = True            # aligner present → stepdown safe
             self.segmenter_chunk_threshold = 1.0    # Cohere prefers fewer cuts
             self.segmenter_max_group_duration = 6.0
 
@@ -363,6 +368,8 @@ class QwenPipeline(BasePipeline):
             "timestamps": timestamps,
             "use_aligner": timestamps == "word",
             "aligner_id": aligner_id,
+            "aligner_backend": self._aligner_backend_for(aligner_backend, aligner_id),
+            "timing_model": timing_model or "none",
             "context": self._resolve_context(context, context_file),
             "attn_implementation": attn_implementation,
             "japanese_postprocess": False,  # C2 fix: Qwen3 uses AssemblyTextCleaner, not JapanesePostProcessor
@@ -410,6 +417,17 @@ class QwenPipeline(BasePipeline):
     def get_mode_name(self) -> str:
         return "qwen"
 
+    @staticmethod
+    def _aligner_backend_for(aligner_backend: Optional[str], aligner_id: Optional[str]) -> str:
+        """Which aligner backend runs: the one named, else the one the model value belongs to — a CrispASR
+        short name (manifest.ALIGNER_MODELS) means "crispasr", anything else (a PyTorch model ID) "qwen3"."""
+        if aligner_backend:
+            return aligner_backend
+        if not aligner_id:
+            return "none"
+        from whisperjav.crispasr.manifest import ALIGNER_MODELS
+        return "crispasr" if aligner_id in ALIGNER_MODELS else "qwen3"
+
     # ------------------------------------------------------------------
     # Context resolution
     # ------------------------------------------------------------------
@@ -447,7 +465,7 @@ class QwenPipeline(BasePipeline):
         from whisperjav.modules.subtitle_pipeline.cleaners.factory import TextCleanerFactory
         from whisperjav.modules.subtitle_pipeline.framers.factory import TemporalFramerFactory
         from whisperjav.modules.subtitle_pipeline.generators.factory import TextGeneratorFactory
-        from whisperjav.modules.subtitle_pipeline.orchestrator import DecoupledSubtitlePipeline
+        from whisperjav.modules.subtitle_pipeline.orchestrator import DecoupledSubtitlePipeline, line_filter_test
         from whisperjav.modules.subtitle_pipeline.types import HardeningConfig, StepDownConfig
 
         cfg = self._asr_config
@@ -554,22 +572,40 @@ class QwenPipeline(BasePipeline):
         else:
             cleaner = TextCleanerFactory.create("passthrough")
 
-        # TextAligner: Qwen3 ForcedAligner (or None if timestamps disabled)
-        # G1 fix: vad_only mode has no use for the 0.6B aligner — skip loading
+        # TextAligner: the CrispASR aligner (1.10.0 default, wav2vec2-ja), the Qwen3
+        # ForcedAligner (PyTorch), or None if timestamps are disabled.
+        # G1 fix: vad_only mode has no use for an aligner — skip loading
         # entirely so we save VRAM and take Branch B (aligner-free) in the
         # orchestrator's _step9_reconstruct_and_harden().
         aligner = None
-        if self.timestamp_mode == TimestampMode.VAD_ONLY:
+        if self.timestamp_mode == TimestampMode.VAD_ONLY or cfg["aligner_backend"] == "none":
             # No aligner → Branch B; no collapse possible → step-down irrelevant
             pass
         elif cfg.get("use_aligner", True):
-            aligner = TextAlignerFactory.create(
-                "qwen3",
-                aligner_id=cfg["aligner_id"],
-                device=cfg["device"],
-                dtype=cfg["dtype"],
-                language=cfg["language"],
-            )
+            if cfg["aligner_backend"] == "crispasr":
+                aligner = TextAlignerFactory.create(
+                    "crispasr",
+                    model=cfg["aligner_id"],
+                    device=cfg["device"],
+                    language=cfg["language"] or "ja",
+                    temp_dir=self.temp_dir,
+                )
+            else:
+                aligner = TextAlignerFactory.create(
+                    "qwen3",
+                    aligner_id=cfg["aligner_id"],
+                    device=cfg["device"],
+                    dtype=cfg["dtype"],
+                    language=cfg["language"],
+                )
+
+        # Timing model (step 8): where speech starts in each VAD group and where a new
+        # sentence starts (design note 2026-10-28 section 5). It also runs without an
+        # aligner: then it moves the subtitle's start only (rule T5).
+        timer = None
+        if cfg["timing_model"] != "none":
+            from whisperjav.modules.subtitle_pipeline.timers.crispasr import CrispASRTimer
+            timer = CrispASRTimer(model=cfg["timing_model"], device=cfg["device"], temp_dir=self.temp_dir)
 
         # Step-down retry config (uses existing Qwen pipeline params)
         # Disabled when aligner is None (no alignment = no collapse = nothing to step-down)
@@ -592,6 +628,12 @@ class QwenPipeline(BasePipeline):
             language=cfg.get("language", "ja"),
             context=cfg.get("context", ""),
             stepdown_config=stepdown_cfg,
+            timer=timer,
+            # T9 (owner W296 2, W300 3): the Phase 8 line filters this run applies.
+            line_filter=line_filter_test(
+                ellipsis_filter=self.generator_backend == "anime-whisper",
+                nonverbal_filter=self.drop_nonverbal_lines,
+            ),
         )
 
     # ------------------------------------------------------------------
@@ -784,6 +826,7 @@ class QwenPipeline(BasePipeline):
             enhancer = create_enhancer_direct(
                 backend=self.enhancer_backend,
                 model=self.enhancer_model,
+                device=pass_device(self._asr_config.get("device")),  # --device, as every part (22.3.1)
             )
 
             def _enhancement_progress(scene_num, total, scene_name):
@@ -811,6 +854,7 @@ class QwenPipeline(BasePipeline):
             enhancer = create_enhancer_direct(
                 backend=self.enhancer_backend,
                 model=self.enhancer_model,
+                device=pass_device(self._asr_config.get("device")),  # --device, as every part (22.3.1)
             )
 
             def _enhancement_progress(scene_num, total, scene_name):
@@ -903,8 +947,13 @@ class QwenPipeline(BasePipeline):
         phase5_start = time.time()
 
         # Debug artifacts directory (master text, timestamps, merged words)
-        raw_subs_dir = self.temp_dir / "raw_subs"
-        raw_subs_dir.mkdir(exist_ok=True)
+        # One folder per file: the run summary (Phase 9) reads every scene record in it, and
+        # a batch shares temp_dir, so one shared folder made the second and later files count
+        # the scenes of the files before them (since 1.9.5; owner W300 2).
+        raw_subs_dir = self.temp_dir / "raw_subs" / media_basename
+        raw_subs_dir.mkdir(parents=True, exist_ok=True)
+        for stale in raw_subs_dir.glob("scene_*_diagnostics.json"):
+            stale.unlink(missing_ok=True)
 
         scene_results: List[Tuple[Optional[stable_whisper.WhisperResult], int]] = []
 
@@ -953,6 +1002,12 @@ class QwenPipeline(BasePipeline):
         # A failed aligner load no longer ends the job (#436); say so in the summary.
         if getattr(self._subtitle_pipeline, "alignment_unavailable", None):
             self.degradations.append(self._subtitle_pipeline.alignment_unavailable)
+        # The aligner loaded but gave no times for some VAD groups (1.10.0, item 12).
+        if getattr(self._subtitle_pipeline, "alignment_partial", None):
+            self.degradations.append(self._subtitle_pipeline.alignment_partial)
+        # The same for the timing model (1.10.0, item 12): the subtitles are kept, unsplit.
+        if getattr(self._subtitle_pipeline, "timing_unavailable", None):
+            self.degradations.append(self._subtitle_pipeline.timing_unavailable)
 
         # Convert to Phase 6 format: (WhisperResult, scene_idx)
         for idx, (result, _diag) in enumerate(orch_results):
@@ -1002,6 +1057,10 @@ class QwenPipeline(BasePipeline):
             "model_id": self.model_id,
             "input_mode": self.input_mode.value,
             "timestamp_mode": self.timestamp_mode.value,
+            "aligner": (f"{self._asr_config['aligner_backend']}:{self._asr_config['aligner_id']}"
+                        if self._subtitle_pipeline is not None and self._subtitle_pipeline.aligner is not None
+                        else "none"),
+            "timing_model": self._asr_config["timing_model"],
             "safe_chunking": self.safe_chunking,
             "scenes_transcribed": sum(1 for r, _ in scene_results if r is not None and r.segments),
             "scenes_empty": sum(1 for r, _ in scene_results if r is not None and not r.segments),

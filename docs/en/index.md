@@ -71,12 +71,14 @@ That's it. For more control, see the [GUI User Guide](guides/gui_user_guide.md).
 | Feature | Description |
 |---------|-------------|
 | **Multiple pipelines** | Balanced, Fast, Faster, Fidelity, Transformers — trade speed for accuracy |
+| **GGUF pipelines** | Parakeet-CrispASR and Cohere-CrispASR, through CrispASR, in Ensemble mode (Japanese, experimental in 1.10.0) |
+| **One accelerator per install** | NVIDIA GPU (CUDA), GPU through Vulkan (Windows), Apple GPU (Metal), your own PyTorch, or CPU only — chosen when you install ([Accelerated or not](getting-started/index.md#accelerated-or-not)) |
 | **Ensemble mode** | Run two passes with different backends, merge for best results |
-| **BYOP XXL** | Bring Your Own Pipeline — use Faster Whisper XXL as Pass 2 in ensemble mode |
+| **BYOP XXL** | Bring Your Own Pipeline — use Faster Whisper XXL as Pass 1, Pass 2 or both in ensemble mode |
 | **ChronosJAV** | Dedicated pipeline with anime-whisper and Kotoba models for anime/JAV content |
 | **Qwen3-ASR** | Alternative ASR engine with strong Japanese performance |
 | **AI Translation** | Translate subtitles using Ollama (local), DeepSeek, Gemini, Claude, GPT, or other providers |
-| **Speech enhancement** | ClearVoice denoising, BS-RoFormer vocal isolation, FFmpeg DSP chain |
+| **Speech enhancement** | ZipEnhancer denoising, htdemucs vocal isolation, FFmpeg DSP chain |
 | **Scene detection** | Auditok, Silero, Semantic — split long audio for better accuracy |
 | **GUI + CLI** | Full-featured GUI for interactive use, CLI for automation and scripting |
 

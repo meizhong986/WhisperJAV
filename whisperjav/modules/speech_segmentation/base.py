@@ -72,6 +72,9 @@ class SegmentationResult:
     audio_duration_sec: float
     parameters: Dict[str, Any]
     processing_time_sec: float = 0.0
+    # Set when the backend caught its own failure and returned an empty result, so a caller can tell
+    # a failed scene from a silent one (the CrispASR pipelines count it in a note).
+    error: Optional[str] = None
 
     @property
     def speech_coverage_sec(self) -> float:

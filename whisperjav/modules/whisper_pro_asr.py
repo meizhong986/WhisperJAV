@@ -19,7 +19,7 @@ import traceback
 import logging
 
 from whisperjav.utils.logger import logger
-from whisperjav.utils.device_detector import get_best_device
+from whisperjav.utils.device_detector import APPLE_SILICON_FIDELITY_TEXT, get_best_device
 from whisperjav.utils.parameter_tracer import NullTracer
 from whisperjav.modules.segment_filters import SegmentFilterConfig, SegmentFilterHelper
 from whisperjav.modules.speech_segmentation import SpeechSegmenterFactory
@@ -48,7 +48,9 @@ class WhisperProASR:
         self.device = model_config.get("device") or get_best_device()
         if self.device == "auto":
             self.device = get_best_device()
-        
+        if self.device == "mps":
+            logger.info(APPLE_SILICON_FIDELITY_TEXT)  # T52 (design 22.8)
+
         decoder_params = params["decoder"]
         vad_params = params["vad"]
         provider_params = params["provider"]

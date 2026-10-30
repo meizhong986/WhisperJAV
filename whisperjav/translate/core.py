@@ -61,6 +61,71 @@ def apply_translation_context_filter(translator) -> bool:
     return True
 
 
+# PySubtrans keeps a subtitle's text even when the model repeats the answer
+# format inside it, e.g. "Hello.\nTranslation>\nHello." (#460). These labels
+# are never translated text. The label word is PySubtrans's task type.
+def _format_marker(task_type: str = "Translation"):
+    word = re.escape(task_type if isinstance(task_type, str) and task_type else "Translation")
+    return re.compile(
+        rf"^[ \t]*(?:(?:{word}|Original)>|</?{word}>|#[0-9]+[ \t\r]*$)",
+        re.MULTILINE,
+    )
+
+
+def format_marker_lines(lines, task_type: str = "Translation") -> list:
+    """Return the numbers of the subtitles whose text holds an answer-format label."""
+    marker = _format_marker(task_type)
+    return [line.number for line in lines or ()
+            if line.text and marker.search(line.text)]
+
+
+def apply_format_marker_check(translator) -> bool:
+    """Make PySubtrans's own check report format labels, so its retry asks again."""
+    client = getattr(translator, "client", None)
+    if client is None or not hasattr(client, "GetParser"):
+        return False
+
+    from PySubtrans.SubtitleError import TranslationValidationError
+
+    original = client.GetParser
+
+    def get_parser(*args, **kwargs):
+        parser = original(*args, **kwargs)
+        validate = parser.ValidateTranslations
+
+        def validate_translations():
+            errors = validate()
+            numbers = format_marker_lines(parser.translated, parser.task_type)
+            if numbers:
+                lines = [line for line in parser.translated if line.number in numbers]
+                errors.append(TranslationValidationError(
+                    f"Subtitles {', '.join(f'#{n}' for n in numbers)} contain the answer-format labels "
+                    "(Translation>, Original> or a #number line) inside the translated text. Give each "
+                    "subtitle once, as #number, then Translation>, then only its translation.",
+                    lines=lines,
+                ))
+            return errors
+
+        parser.ValidateTranslations = validate_translations
+        return parser
+
+    client.GetParser = get_parser
+    return True
+
+
+def srt_format_marker_entries(path, task_type: str = "Translation") -> list:
+    """Entry numbers of the saved SRT whose text holds a format label.
+
+    Read from the written file: PySubtrans numbers the SRT entries again,
+    so its own line numbers differ once an earlier line is untranslated.
+    """
+    import pysrt
+
+    marker = _format_marker(task_type)
+    return [item.index for item in pysrt.open(str(path), encoding="utf-8-sig")
+            if marker.search(item.text)]
+
+
 def clean_resumed_translation_tags(project) -> int:
     """Remove tags already saved in a .subtrans project before resume skips them."""
     changed = 0
@@ -89,7 +154,7 @@ def clean_resumed_translation_tags(project) -> int:
 def cap_batch_size_for_context(max_batch_size: int, n_ctx: int) -> int:
     """Cap translation batch size to fit within the LLM context window.
 
-    Local LLMs (e.g., gemma-9b via llama-cpp) have limited context windows.
+    Local LLMs (e.g., models run by Ollama) have limited context windows.
     PySubtrans formats each subtitle line with numbered headers, original text,
     and translation placeholders. Both the prompt (input) and the expected
     response must fit within n_ctx tokens.
@@ -412,30 +477,15 @@ def server_log_hint(provider_config: dict, verbose: bool = False):
     """
     Where this run's server keeps its own log, as lines to print.
 
-    Which server that is depends on the provider the user chose: "local" is the
-    llama-cpp-python server WhisperJAV starts on this machine and whose log path
-    it prints; "ollama" is Ollama; a server the user gave an address for is
-    theirs; anything else is a service on the internet with no local log at all.
+    Which server that is depends on the provider the user chose: "ollama" is
+    Ollama; a server the user gave an address for is theirs; anything else is a
+    service on the internet with no local log at all.
 
     Read 'whisperjav_provider', never 'pysubtrans_name': the latter is the name
-    of PySubtrans's client class, and local, ollama, glm, groq and custom are
-    all 'Custom Server' there.
+    of PySubtrans's client class, and ollama, glm, groq and custom are all
+    'Custom Server' there.
     """
     name = str(provider_config.get('whisperjav_provider', '')).lower()
-
-    if name == 'local':
-        try:
-            from whisperjav.translate import local_backend
-            # Without this the log is deleted when the server stops, which is
-            # before the user can go and read it.
-            local_backend.keep_server_log()
-            path = getattr(local_backend, '_server_stderr_path', None)
-        except Exception:
-            path = None
-        if path:
-            return [f"The local translation server's own log: {path}"]
-        return ["The local translation server writes its own log; its path is "
-                "printed as [LOCAL-LLM] Server log: when the server starts."]
 
     if name == 'ollama':
         if verbose:
@@ -846,6 +896,10 @@ def translate_subtitle(
             if not apply_translation_context_filter(translator):
                 print("[TRANSLATE]   WARNING: Could not install context tag filter", file=sys.stderr)
 
+        # #460: a subtitle holding Translation>/Original> is an error, so PySubtrans retries the batch
+        if not apply_format_marker_check(translator):
+            print("[TRANSLATE]   WARNING: Could not install format marker check", file=sys.stderr)
+
         translator.resume = True
         print(f"[TRANSLATE]   Resume mode: enabled (will skip already-translated batches)", file=sys.stderr)
 
@@ -945,9 +999,8 @@ def translate_subtitle(
                               file=sys.stderr)
                     else:
                         # Owner, 2026-09-17: this used to tell every provider to
-                        # "check Ollama server logs", including the local one,
-                        # which is llama-cpp-python and has nothing to do with
-                        # Ollama. The advice now matches the server in use.
+                        # "check Ollama server logs". The advice now matches the
+                        # server in use.
                         _where = _server_log_hint()
                         for _line in _where:
                             print(f"[TRANSLATE]   {_line}", file=sys.stderr)
@@ -1138,6 +1191,21 @@ def translate_subtitle(
                         output_path = _default_outpath
                         print(f"[TRANSLATE]   Using fallback output: {_default_outpath.name}",
                               file=sys.stderr)
+
+        # #460 (W279 2): labels the retry did not remove (or a resumed batch kept)
+        # stay in the text; name the entries of the file actually written
+        if output_path.is_file():
+            try:
+                _marked = srt_format_marker_entries(output_path, options.get('task_type'))
+            except Exception as _e:
+                _marked = []
+                print(f"[TRANSLATE]   Warning: Could not check {output_path.name} for format labels: {_e}",
+                      file=sys.stderr)
+            if _marked:
+                _shown = ", ".join(f"#{n}" for n in _marked[:20]) + (", …" if len(_marked) > 20 else "")
+                print(f"[TRANSLATE] WARNING: {len(_marked)} translated subtitles still contain answer-format "
+                      f"labels (Translation>, Original> or a #number line): {_shown} — "
+                      f"check them in {output_path.name}", file=sys.stderr)
 
         # =========================================================================
         # DIAGNOSTIC: Final Summary — truthful status

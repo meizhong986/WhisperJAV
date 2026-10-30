@@ -192,3 +192,38 @@ class TextAligner(Protocol):
     def cleanup(self) -> None:
         """Final cleanup — called when the aligner is no longer needed."""
         ...
+
+
+# ---------------------------------------------------------------------------
+# SpeechTimer
+# ---------------------------------------------------------------------------
+
+
+@runtime_checkable
+class SpeechTimer(Protocol):
+    """
+    Says where speech starts in a frame and where a new sentence starts (1.10.0, item 12 C3).
+
+    Optional. Returns timing_rules.TimedSegment entries, onsets in seconds from the frame's start;
+    the rules in timing_rules.py move the subtitle's start and split it. Its text is never used.
+
+    Manages its own model lifecycle via load()/unload().
+    """
+
+    accepts_array: bool
+
+    def time(self, audio: Any) -> list:
+        """Timed segments of one frame's audio (a path or a 16 kHz array)."""
+        ...
+
+    def load(self) -> None:
+        """Load the timing model."""
+        ...
+
+    def unload(self) -> None:
+        """Unload the timing model and release memory."""
+        ...
+
+    def cleanup(self) -> None:
+        """Final cleanup — called when the timer is no longer needed."""
+        ...

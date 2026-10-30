@@ -34,19 +34,17 @@ Each method is tried in order; first success wins.
 
 CUDA VERSION SELECTION:
 ----------------------
-The driver version determines the MAXIMUM CUDA version supported:
-- Driver 570+ → CUDA 12.8 (cu128) - RTX 20xx/30xx/40xx/50xx modern drivers
-- Driver 450+ → CUDA 11.8 (cu118) - Universal fallback
-- Older → CPU only
+v1.10.0: one stack, PyTorch 2.11.0 for CUDA 13.0.
+- Driver 580+ → CUDA 13.0 (cu130)
+- Older → cuda_version None; install.py stops and asks for a driver update
+- The card's compute capability is read too: below 7.5 is older than 1.10 supports
 
 VERIFICATION SOURCE:
 https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html
 Section: "CUDA Toolkit and Corresponding Driver Versions"
 
-WHY WE DON'T ALWAYS USE NEWEST CUDA:
-- cu118 has widest ecosystem compatibility
-- Some packages don't have cu128 builds yet
-- cu118 is safe default that works for most users
+cu128 remains only as the per-PC fallback when cuBLAS 12 cannot be loaded next
+to CUDA 13 (item 2 spec D).
 
 Author: Senior Architect
 Date: 2026-01-26
@@ -62,9 +60,11 @@ import platform
 from typing import Optional, Tuple, NamedTuple, List
 from enum import Enum, auto
 
+from .accelerators import FORCE_NVIDIA_HINT  # T36, one text (design 22.6.8)
 from .config import (
     CUDA_DRIVER_MATRIX,
     CPU_TORCH_INDEX,
+    TORCH_INDEXES,
     PYTHON_MIN_VERSION,
     PYTHON_MAX_VERSION,
 )
@@ -104,10 +104,11 @@ class GPUInfo(NamedTuple):
     - detected: Was a compatible GPU found?
     - name: GPU model name (e.g., "NVIDIA GeForce RTX 4090")
     - driver_version: Tuple (major, minor, patch) or None
-    - cuda_version: Selected CUDA version ("cu118", "cu128") or None for CPU
+    - cuda_version: Selected CUDA version ("cu130") or None for CPU
     - torch_index: URL for pip --index-url
     - detection_method: How we detected ("nvidia-smi", "nvml", "proc", "none")
     - message: Human-readable status message
+    - compute_capability: (major, minor) of GPU 0, or None if it could not be read
     """
     detected: bool
     name: Optional[str]
@@ -116,6 +117,7 @@ class GPUInfo(NamedTuple):
     torch_index: str
     detection_method: str
     message: str
+    compute_capability: Optional[Tuple[int, int]] = None
 
 
 class PrerequisiteResult(NamedTuple):
@@ -205,9 +207,8 @@ def detect_gpu() -> GPUInfo:
     3. Registry check (Windows fallback - not implemented yet)
 
     CUDA selection based on driver version:
-    - Driver 570+ → cu128 (CUDA 12.8)
-    - Driver 450+ → cu118 (CUDA 11.8)
-    - Otherwise → CPU
+    - Driver 580+ → cu130 (CUDA 13.0)
+    - Otherwise → None (install.py stops: driver update needed)
 
     Returns:
         GPUInfo with detection results
@@ -224,10 +225,11 @@ def detect_gpu() -> GPUInfo:
             detected=True,  # Apple Silicon HAS a GPU (Metal/MPS)
             name="Apple Silicon (Metal)",
             driver_version=None,
-            cuda_version="metal",  # Sentinel: install torch from default PyPI (has MPS)
-            torch_index="",  # Empty = no --index-url needed, default PyPI has arm64+MPS wheels
+            cuda_version="metal",  # Sentinel: the Apple GPU (Metal) install, uv.lock's cpu extra
+            torch_index="",  # PyTorch's cpu index carries the Apple silicon wheels (pyproject.toml)
             detection_method="platform",
-            message="Apple Silicon detected - using Metal/MPS acceleration",
+            message=("Apple silicon Mac: installing for the Apple GPU (Metal) — PyTorch with Apple GPU "
+                     "support, and CrispASR's macOS build."),  # T30 (design 22.6.5)
         )
 
     # Try nvidia-smi first (most reliable)
@@ -249,9 +251,8 @@ def detect_gpu() -> GPUInfo:
         cuda_version=None,
         torch_index=CPU_TORCH_INDEX,
         detection_method="none",
-        message="No NVIDIA GPU detected - using CPU.\n"
-                "  If you have an NVIDIA GPU (e.g., Optimus laptop with dual GPUs),\n"
-                "  try: python install.py --force-cuda cu128",
+        # T36 (design 22.10): install.py then asks what the install is made for.
+        message="No supported NVIDIA GPU found.\n  " + FORCE_NVIDIA_HINT,
     )
 
 
@@ -324,6 +325,7 @@ def _detect_via_nvidia_smi() -> GPUInfo:
             torch_index=torch_index,
             detection_method="nvidia-smi",
             message=message,
+            compute_capability=_read_compute_capability(nvidia_smi),
         )
 
     except subprocess.TimeoutExpired:
@@ -346,6 +348,21 @@ def _detect_via_nvidia_smi() -> GPUInfo:
             detection_method="nvidia-smi",
             message=f"nvidia-smi error: {e}",
         )
+
+
+def _read_compute_capability(nvidia_smi: str) -> Optional[Tuple[int, int]]:
+    """Compute capability of GPU 0 from nvidia-smi; None if it cannot be read."""
+    try:
+        result = subprocess.run(
+            [nvidia_smi, "--query-gpu=compute_cap", "--format=csv,noheader"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode != 0:
+            return None
+        major, minor = result.stdout.strip().split("\n")[0].strip().split(".", 1)
+        return int(major), int(minor)
+    except Exception:
+        return None
 
 
 def _detect_via_proc() -> GPUInfo:
@@ -476,11 +493,11 @@ def _select_cuda_version(
                 f"{entry.description} (driver {driver_version[0]}.{driver_version[1]})",
             )
 
-    # Driver too old for any CUDA version
+    # Driver too old for CUDA 13.0: install.py stops and asks for an update
     return (
         None,
         CPU_TORCH_INDEX,
-        f"Driver {driver_version[0]}.{driver_version[1]} too old for CUDA - using CPU",
+        f"Driver {driver_version[0]}.{driver_version[1]:02d} is too old for CUDA 13.0 (580 or newer needed)",
     )
 
 
@@ -489,7 +506,7 @@ def get_torch_index_url(cuda_version: Optional[str] = None) -> str:
     Get PyTorch index URL for CUDA version or auto-detect.
 
     Args:
-        cuda_version: "cu118", "cu128", "cpu", or None for auto-detect
+        cuda_version: "cu130", "cu128", "cpu", or None for auto-detect
 
     Returns:
         PyTorch index URL
@@ -504,10 +521,8 @@ def get_torch_index_url(cuda_version: Optional[str] = None) -> str:
     if cuda_version == "metal":
         return ""  # Apple Silicon: use default PyPI (has arm64+MPS wheels)
 
-    # Find in CUDA matrix
-    for entry in CUDA_DRIVER_MATRIX:
-        if entry.cuda_version == cuda_version:
-            return entry.torch_index
+    if cuda_version in TORCH_INDEXES:
+        return TORCH_INDEXES[cuda_version]
 
     # Unknown CUDA version - return CPU as safe fallback
     return CPU_TORCH_INDEX

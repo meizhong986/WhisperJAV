@@ -10,26 +10,31 @@ processing flow defined in ADR-006 Section 9.2:
     3. Text generation (batch, with VRAM lifecycle)
     4. Text cleaning (batch, lightweight)
     5-7. Alignment (batch, with VRAM lifecycle)
-    8. Word merging (frame-relative → scene-relative)
-    9. Sentinel + Reconstruction + Hardening (per scene)
+    8. Timing model (optional, 1.10.0 item 12 C3): where speech starts in each
+       frame and where a new sentence starts (timing_rules.py)
+    9. Word merging (frame-relative → scene-relative), Sentinel +
+       Reconstruction + Hardening (per scene)
 
 VRAM swap pattern:
     generator.load() → generate → generator.unload()
     → safe_cuda_cleanup()
     → aligner.load() → align → aligner.unload()
     → safe_cuda_cleanup()
+    → timer.load() → time → timer.unload()
 """
 
 import json
 import tempfile
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import numpy as np
 
 from whisperjav.modules.subtitle_pipeline.hardening import harden_scene_result
+from whisperjav.modules.subtitle_pipeline import timing_rules
 from whisperjav.modules.subtitle_pipeline.protocols import (
+    SpeechTimer,
     TemporalFramer,
     TextAligner,
     TextCleaner,
@@ -58,6 +63,46 @@ except ImportError:
     sf = None  # type: ignore[assignment]
 
 
+def line_filter_test(ellipsis_filter: bool = False, nonverbal_filter: bool = True) -> Callable[[str], bool]:
+    """Rule T9 (owner W296 2, W300 3): a test of whether a line filter the run applies after this pipeline
+    would remove a subtitle with this text, so a split never hands one a part to delete. The ChronosJAV
+    Phase 8 filters' own tests, as the run has them: anime-whisper's ellipsis filter (``ellipsis_filter``),
+    the non-verbal line filter with its punctuation-only rule (``nonverbal_filter``; off with
+    --no-qwen-drop-nonverbal-lines) and the non-linguistic utterance filter (always). The defaults are
+    Qwen3-ASR's."""
+    from whisperjav.modules.subtitle_pipeline.cleaners.anime_whisper import AnimeWhisperCleaner
+    from whisperjav.modules.subtitle_pipeline.cleaners.nonlinguistic_utterance_filter import (
+        NonlinguisticUtteranceFilter,
+    )
+    from whisperjav.modules.subtitle_pipeline.cleaners.nonverbal_line_filter import (
+        NonverbalLineFilter,
+        _normalizes_to_nothing,
+    )
+
+    def removed(text: str) -> bool:
+        text = text.strip()
+        if not text:
+            return True
+        if ellipsis_filter and AnimeWhisperCleaner._is_ellipsis_only(text):
+            return True
+        if nonverbal_filter and (_normalizes_to_nothing(text) or NonverbalLineFilter.is_nonverbal_line(text)):
+            return True
+        return NonlinguisticUtteranceFilter.is_nonlinguistic(text)
+
+    return removed
+
+# The run-summary lines when a part could not be loaded (#436; item 12). Texts
+# approved by the owner as drafted (W268); design note 2026-10-28, section 9. The timing model's line departs from the section 9
+# draft ("keep their VAD group edges"), which is untrue when the aligner worked.
+ALIGNER_FALLBACK_TEXT = "subtitle times come from the VAD groups, and no subtitle was split; the text is kept."
+ALIGNER_NOT_LOADED_TEXT = "ChronosJAV's aligner ({name}) could not be loaded ({error}): " + ALIGNER_FALLBACK_TEXT
+TIMING_NOT_LOADED_TEXT = ("ChronosJAV's timing model ({name}) could not be loaded ({error}): no subtitle was "
+                          "split, and subtitle times come from the aligner or the VAD groups; the text is kept.")
+GROUPS_NOT_ALIGNED_TEXT = ("ChronosJAV's aligner ({name}) gave no times for {n} of {m} VAD group(s): each keeps "
+                           "its text as one unsplit subtitle, timed from its VAD group (the timing model may "
+                           "still move its start).")
+
+
 class DecoupledSubtitlePipeline:
     """
     Model-agnostic subtitle generation pipeline.
@@ -78,6 +123,8 @@ class DecoupledSubtitlePipeline:
         language: str = "ja",
         context: str = "",
         stepdown_config: Optional[StepDownConfig] = None,
+        timer: Optional[SpeechTimer] = None,
+        line_filter: Optional[Callable[[str], bool]] = None,
     ):
         """
         Initialize the pipeline with protocol components.
@@ -95,6 +142,14 @@ class DecoupledSubtitlePipeline:
             stepdown_config: Optional step-down retry config. When enabled
                 and alignment collapses on a scene, the orchestrator re-frames
                 with tighter grouping and retries generation + alignment.
+            timer: Optional timing model (SpeechTimer). When given, step 8
+                splits a frame where a new sentence starts and, where there
+                are no aligner times, moves its start to where the speech
+                starts (timing_rules.py).
+                None = no timing step (the behaviour before 1.10.0).
+            line_filter: The test of the line filters the caller runs after
+                this pipeline (line_filter_test()); a split never leaves a
+                part it would remove (rule T9). None = line_filter_test().
         """
         self.framer = framer
         self.generator = generator
@@ -105,18 +160,27 @@ class DecoupledSubtitlePipeline:
         self.language = language
         self.context = context
         self.stepdown_config = stepdown_config
+        self.timer = timer
+        self.line_filter = line_filter if line_filter is not None else line_filter_test()
 
         # Sentinel stats accumulated across all scenes
         self.sentinel_stats: dict[str, Any] = {
             "total_scenes": 0,
             "collapsed_scenes": 0,
             "recovered_scenes": 0,
-            "recovery_strategies": {"vad_guided": 0, "proportional": 0},
+            "recovery_strategies": {"vad_guided": 0, "proportional": 0, "vad_fallback": 0},
         }
 
         # Set when the aligner could not be loaded for the current file and the
         # times came from the aligner-free path instead (#436). Reset per file.
         self.alignment_unavailable: Optional[str] = None
+        # Set when the aligner loaded but gave no times for some VAD groups with text
+        # (first pass only). Reset per file.
+        self.alignment_partial: Optional[str] = None
+        self._last_align_counts = (0, 0)
+        # Set when the timing model could not be loaded for the current file: the
+        # subtitles keep their times and no frame is split. Reset per file.
+        self.timing_unavailable: Optional[str] = None
 
         # Temp files for cleanup
         self._temp_files: list[Path] = []
@@ -156,20 +220,29 @@ class DecoupledSubtitlePipeline:
             raise ValueError(f"vad_audio_paths ({len(vad_audio_paths)}) and scene_audio_paths ({n_scenes}) must match")
 
         self.alignment_unavailable = None
+        self.alignment_partial = None
+        self.timing_unavailable = None
 
         logger.info(
-            "[DecoupledPipeline] Processing %d scenes (aligner=%s, step-down=%s%s)",
+            "[DecoupledPipeline] Processing %d scenes (aligner=%s, timer=%s, step-down=%s%s)",
             n_scenes,
             "yes" if self.aligner else "none",
+            "yes" if self.timer else "none",
             "enabled" if (self.stepdown_config and self.stepdown_config.enabled) else "disabled",
             ", dual-track=yes" if vad_audio_paths else "",
         )
 
         # --- Pass 1: Normal processing ---
+        self._last_align_counts = (0, 0)
         results = self._run_pass(
             scene_audio_paths, scene_durations, scene_speech_regions,
             vad_audio_paths=vad_audio_paths,
         )
+        # From the first pass only, so a step-down retry does not count a VAD group twice.
+        with_text, unaligned = self._last_align_counts
+        if unaligned:
+            self.alignment_partial = GROUPS_NOT_ALIGNED_TEXT.format(
+                name=getattr(self.aligner, "display_name", "aligner"), n=unaligned, m=with_text)
 
         # --- Identify collapsed scenes ---
         collapsed_indices = [
@@ -205,11 +278,11 @@ class DecoupledSubtitlePipeline:
             # the pass-1 results (already recovered) and say what happened.
             if self.alignment_unavailable:
                 self.alignment_unavailable = self.alignment_unavailable.replace(
-                    "ForcedAligner could not be loaded",
-                    "ForcedAligner could not be reloaded for the step-down retry", 1,
+                    "could not be loaded",
+                    "could not be reloaded for the step-down retry", 1,
                 ).replace(
-                    "subtitle times come from the speech segments instead; the text is kept",
-                    f"{len(collapsed_indices)} collapsed scene(s) keep their first-pass timing", 1,
+                    ALIGNER_FALLBACK_TEXT,
+                    f"{len(collapsed_indices)} collapsed scene(s) keep their first-pass timing.", 1,
                 )
                 return results
             # Replace Pass 1 results for retried scenes with Pass 2 results
@@ -297,11 +370,13 @@ class DecoupledSubtitlePipeline:
             )
             scene_texts = self._step2_4_generate_and_clean(scene_frames, frame_audio_paths, scene_durations)
             scene_alignments = self._step5_7_align(scene_frames, frame_audio_paths, scene_texts, scene_durations)
+            scene_timings = self._step8_time(scene_frames, frame_audio_paths, scene_texts)
             results = self._step9_reconstruct_and_harden(
                 scene_frames, scene_texts, scene_alignments,
                 scene_audio_paths, scene_durations,
                 frame_speech_regions, scene_speech_regions,
                 frame_speech_starts=frame_speech_starts,
+                scene_timings=scene_timings,
             )
         finally:
             self._cleanup_temp_files()
@@ -393,7 +468,7 @@ class DecoupledSubtitlePipeline:
         # Fail-safe: if either condition is unmet, fall back to the WAV path.
         pathless = getattr(self.generator, "accepts_array", False) and (
             self.aligner is None or getattr(self.aligner, "accepts_array", False)
-        )
+        ) and (self.timer is None or getattr(self.timer, "accepts_array", False))
         if pathless:
             logger.info(
                 "[DecoupledPipeline] Step 1: pathless mode — in-memory frame audio, no temp WAVs"
@@ -659,6 +734,7 @@ class DecoupledSubtitlePipeline:
         )
         step57_start = _time.monotonic()
         scene_alignments: list[list[list[dict[str, Any]]]] = []
+        frames_with_text = frames_unaligned = 0
 
         # The aligner loads only now, after all text is generated. A failed load
         # (first use with an interrupted model download, out of memory) used to
@@ -668,9 +744,9 @@ class DecoupledSubtitlePipeline:
             self.aligner.load()
         except Exception as load_err:
             first_line = (str(load_err).strip().splitlines() or [""])[0][:200]
-            self.alignment_unavailable = (
-                f"ForcedAligner could not be loaded ({type(load_err).__name__}: {first_line}); "
-                f"subtitle times come from the speech segments instead; the text is kept"
+            self.alignment_unavailable = ALIGNER_NOT_LOADED_TEXT.format(
+                name=getattr(self.aligner, "display_name", "aligner"),
+                error=f"{type(load_err).__name__}: {first_line}",
             )
             logger.warning("[DecoupledPipeline] %s", self.alignment_unavailable, exc_info=True)
             try:
@@ -760,6 +836,11 @@ class DecoupledSubtitlePipeline:
                                 )
 
                 scene_alignments.append(frame_alignments)
+                # VAD groups with text that the aligner gave no times (it returns nothing when the
+                # library cannot open the model, or the call fails): they keep their text over the
+                # VAD group's time, and the run summary says how many (item 12).
+                frames_with_text += len(batch_indices)
+                frames_unaligned += sum(1 for i in batch_indices if not frame_alignments[i])
 
                 scene_words = sum(len(fa) for fa in frame_alignments)
                 logger.debug(
@@ -788,8 +869,104 @@ class DecoupledSubtitlePipeline:
             "[DecoupledPipeline] Steps 5-7: Complete — %d scenes aligned, %d total words (%.1fs)",
             n_scenes, total_words, elapsed,
         )
+        self._last_align_counts = (frames_with_text, frames_unaligned)
+        if frames_unaligned:
+            logger.warning(
+                "[DecoupledPipeline] The aligner gave no times for %d of %d VAD group(s)",
+                frames_unaligned, frames_with_text,
+            )
 
         return scene_alignments
+
+    # -----------------------------------------------------------------------
+    # Step 8: Timing model (1.10.0, item 12 C3)
+    # -----------------------------------------------------------------------
+
+    def _step8_time(
+        self,
+        scene_frames: list[list[TemporalFrame]],
+        frame_audio_paths: list[list[Path]],
+        scene_texts: list[list[str]],
+    ) -> Optional[list[list[Optional[list[timing_rules.TimedSegment]]]]]:
+        """
+        Run the timing model on every frame that has text.
+
+        VRAM lifecycle: timer.load() → time all → timer.unload(), after the
+        aligner is unloaded, so the three models never share memory.
+
+        Returns:
+            None if no timer (or it could not be loaded), otherwise
+            scene_timings[scene_idx][frame_idx] = list of TimedSegment
+            (onsets relative to the frame), or None for a frame without text.
+        """
+        if self.timer is None:
+            return None
+
+        import time as _time
+
+        step8_start = _time.monotonic()
+        try:
+            self.timer.load()
+        except Exception as load_err:
+            first_line = (str(load_err).strip().splitlines() or [""])[0][:200]
+            self.timing_unavailable = TIMING_NOT_LOADED_TEXT.format(
+                name=getattr(self.timer, "display_name", "timing model"),
+                error=f"{type(load_err).__name__}: {first_line}",
+            )
+            logger.warning("[DecoupledPipeline] %s", self.timing_unavailable, exc_info=True)
+            try:
+                self.timer.unload()
+            except Exception:
+                pass
+            return None
+
+        scene_timings: list[list[Optional[list[timing_rules.TimedSegment]]]] = []
+        try:
+            for scene_idx, frames in enumerate(scene_frames):
+                frame_timings: list[Optional[list[timing_rules.TimedSegment]]] = []
+                for frame_idx, (audio, text) in enumerate(zip(frame_audio_paths[scene_idx], scene_texts[scene_idx])):
+                    if not text.strip():
+                        frame_timings.append(None)
+                        continue
+                    try:
+                        frame_timings.append(list(self.timer.time(audio)))
+                    except Exception:
+                        logger.warning(
+                            "[DecoupledPipeline] Timing failed for scene %d frame %d; its times are kept",
+                            scene_idx, frame_idx, exc_info=True,
+                        )
+                        frame_timings.append(None)
+                scene_timings.append(frame_timings)
+                if self.artifacts_dir:
+                    self._save_artifact(
+                        scene_idx,
+                        "timed",
+                        json.dumps(
+                            [None if ft is None else [asdict(s) for s in ft] for ft in frame_timings],
+                            ensure_ascii=False, indent=2,
+                        ),
+                        ext=".json",
+                    )
+        finally:
+            self.timer.unload()
+
+        logger.info(
+            "[DecoupledPipeline] Step 8: Timing model done — %d scenes (%.1fs)",
+            len(scene_timings), _time.monotonic() - step8_start,
+        )
+        return scene_timings
+
+    def _timing_of(
+        self,
+        scene_timings: Optional[list[list[Optional[list[timing_rules.TimedSegment]]]]],
+        scene_idx: int,
+        frame_idx: int,
+    ) -> Optional[list[timing_rules.TimedSegment]]:
+        """The timed segments of one frame, or None."""
+        if scene_timings is None or scene_idx >= len(scene_timings):
+            return None
+        frame_timings = scene_timings[scene_idx]
+        return frame_timings[frame_idx] if frame_idx < len(frame_timings) else None
 
     # -----------------------------------------------------------------------
     # Step 9: Reconstruction + Sentinel + Hardening
@@ -805,9 +982,14 @@ class DecoupledSubtitlePipeline:
         frame_speech_regions: list[Optional[list[list[tuple[float, float]]]]],
         scene_speech_regions: Optional[list[list[tuple[float, float]]]],
         frame_speech_starts: Optional[list[Optional[list[Optional[float]]]]] = None,
+        scene_timings: Optional[list[list[Optional[list[timing_rules.TimedSegment]]]]] = None,
     ) -> list[tuple[Any, dict[str, Any]]]:
         """
         Per-scene: merge words → sentinel → reconstruct → harden.
+
+        With ``scene_timings`` (step 8), each subtitle starts where the speech
+        starts, and with word timestamps and regrouping off a frame is split
+        where a new sentence starts (timing_rules.py).
 
         Returns list of (WhisperResult_or_None, diagnostics) per scene.
         """
@@ -857,11 +1039,15 @@ class DecoupledSubtitlePipeline:
                 display_starts.append(ds)
 
             self.sentinel_stats["total_scenes"] += 1
+            frame_timings = scene_timings[scene_idx] if scene_timings and scene_idx < len(scene_timings) else None
+            timing_info: Optional[dict[str, Any]] = None
 
             try:
                 word_count = 0
                 assessment = None
                 recovery_info = None
+                vad_fallback_scene = False
+                not_aligner = 0  # subtitles whose times are not the aligner's (the run summary)
 
                 if scene_alignments is not None:
                     # Branch A: Aligned workflow — merge frame-relative → scene-relative
@@ -869,23 +1055,53 @@ class DecoupledSubtitlePipeline:
                     regroup_a = resolve_regroup(self.hardening_config.regroup_mode, is_branch_b=False)
 
                     if regroup_a is False:
-                        # Frame-native path: one segment per frame, skip sentinel recovery.
+                        # Frame-native path: one segment per frame (or per timed piece,
+                        # step 8), skip sentinel recovery.
                         # User explicitly set regroup_mode=OFF — they want raw frame output.
-                        frame_word_groups = self._group_frame_words(frames, scene_alignments[scene_idx])
-                        word_count = sum(len(g) for g in frame_word_groups)
-
-                        # Sentinel assessment for diagnostics only (no recovery)
-                        flat_words = [w for g in frame_word_groups for w in g]
+                        # Sentinel assessment for diagnostics only (no recovery); a
+                        # collapsed scene is not split by the timing model (rule T5).
+                        flat_words = self._merge_frame_words(frames, scene_alignments[scene_idx], texts)
                         assessment = assess_alignment_quality(flat_words, duration)
                         sentinel_status = assessment["status"]
                         if sentinel_status == "COLLAPSED":
                             self.sentinel_stats["collapsed_scenes"] += 1
                             total_collapses += 1
 
-                        result = reconstruct_frame_native(frame_word_groups, audio_path)
+                        if (sentinel_status == "COLLAPSED"
+                                and self.hardening_config.timestamp_mode == TimestampMode.ALIGNER_WITH_VAD_FALLBACK):
+                            # Owner W266 1: a collapsed scene takes the aligner-free times
+                            # (Branch B below: VAD-group edges, the start moved by the timing
+                            # model, no splits), as "Aligner + VAD Fallback" says; no retry.
+                            vad_fallback_scene = True
+                            self.sentinel_stats["recovered_scenes"] += 1
+                            self.sentinel_stats["recovery_strategies"]["vad_fallback"] += 1
+                            recovery_info = {"strategy": "vad_fallback", "words_redistributed": 0}
+                            logger.warning(
+                                "[SENTINEL] Scene %d/%d: Alignment Collapse — its subtitles take "
+                                "the VAD groups' times instead of the aligner's",
+                                scene_idx + 1, n_scenes,
+                            )
+                        else:
+                            frame_word_groups, timing_info = self._timed_frame_groups(
+                                frames, scene_alignments[scene_idx], texts, frame_timings,
+                                allow_split=sentinel_status != "COLLAPSED",
+                                aligner_start=sentinel_status != "COLLAPSED",
+                                removable=self.line_filter,
+                            )
+                            not_aligner = self._text_only_frames(frames, scene_alignments[scene_idx], texts)
+                            word_count = sum(len(g) for g in frame_word_groups)
+
+                            result = reconstruct_frame_native(frame_word_groups, audio_path)
                     else:
-                        # Standard merge-and-regroup path
-                        all_words = self._merge_frame_words(frames, scene_alignments[scene_idx])
+                        # Standard merge-and-regroup path. The splits are the regrouping's;
+                        # the start is the aligner's, so the timing model moves only the start
+                        # of a frame without word times (T2; owner W296 1, W300 4).
+                        frame_word_groups, timing_info = self._timed_frame_groups(
+                            frames, scene_alignments[scene_idx], texts, frame_timings, allow_split=False,
+                        )
+                        # At most one subtitle per text-only frame; regrouping may join it to another.
+                        not_aligner = self._text_only_frames(frames, scene_alignments[scene_idx], texts)
+                        all_words = [w for g in frame_word_groups for w in g]
                         word_count = len(all_words)
 
                         # Sentinel assessment (always run for diagnostics visibility)
@@ -948,8 +1164,22 @@ class DecoupledSubtitlePipeline:
                                 all_words, audio_path, suppress_silence=False, regroup=regroup_a,
                             )
 
-                else:
-                    # Branch B: Aligner-free
+                if scene_alignments is None or vad_fallback_scene:
+                    # Branch B: Aligner-free (also a collapsed scene under aligner_vad_fallback
+                    # with regrouping off, owner W266 1)
+                    # The timing model (step 8) moves each frame's start to where the
+                    # speech starts; without word times it splits nothing (rule T5).
+                    if frame_timings is not None:
+                        timing_info = {"frames_timed": 0, "starts_moved": 0, "splits": 0, "split_times": []}
+                        for fi, frame in enumerate(frames):
+                            segs = frame_timings[fi] if fi < len(frame_timings) else None
+                            if segs is None:
+                                continue
+                            timing_info["frames_timed"] += 1
+                            start = timing_rules.speech_start(segs, frame.duration)
+                            if start is not None and frame.start + start > display_starts[fi]:
+                                display_starts[fi] = frame.start + start
+                                timing_info["starts_moved"] += 1
                     # Resolve regroup mode for Branch B (aligner-free)
                     regroup = resolve_regroup(self.hardening_config.regroup_mode, is_branch_b=True)
 
@@ -966,7 +1196,8 @@ class DecoupledSubtitlePipeline:
                                 }])
                         word_count = len(frame_word_groups)
                         result = reconstruct_frame_native(frame_word_groups, audio_path)
-                        sentinel_status = "N/A"
+                        if not vad_fallback_scene:
+                            sentinel_status = "N/A"
                     else:
                         # Standard split-and-regroup path
                         words = []
@@ -995,7 +1226,8 @@ class DecoupledSubtitlePipeline:
                             result = reconstruct_from_words(
                                 words, audio_path, suppress_silence=suppress, regroup=False,
                             )
-                        sentinel_status = "N/A"
+                        if not vad_fallback_scene:
+                            sentinel_status = "N/A"
 
                 # Hardening (shared by all paths)
                 # Resolve per-scene speech regions for VAD_ONLY mode
@@ -1018,11 +1250,16 @@ class DecoupledSubtitlePipeline:
                     scene_idx + 1, n_scenes, word_count, segment_count, sentinel_status,
                 )
 
-                # Canonical diagnostics (SceneDiagnostics v2.0.0)
-                aligner_native_count = max(
-                    0,
-                    segment_count - hardening_diag.interpolated_count - hardening_diag.fallback_count,
-                )
+                # Canonical diagnostics (SceneDiagnostics v2.0.0). Aligner native counts
+                # the subtitles whose times came from the aligner (owner W300 1): not those
+                # of an aligner-free scene (vad_only, an aligner that could not be loaded,
+                # a collapsed scene's VAD-group times) or of any collapsed scene, not a
+                # text-only frame's (rule T3), not those hardening had to time.
+                hardened = hardening_diag.interpolated_count + hardening_diag.fallback_count
+                if scene_alignments is None or vad_fallback_scene or sentinel_status == "COLLAPSED":
+                    not_aligner = segment_count
+                not_aligner = min(max(0, segment_count - hardened), not_aligner)
+                aligner_native_count = max(0, segment_count - hardened - not_aligner)
 
                 # VAD regions for this scene (if available)
                 vad_regions = None
@@ -1032,20 +1269,19 @@ class DecoupledSubtitlePipeline:
                         for s, e in per_scene_regions
                     ]
 
-                # "3a" audit trail: raw VAD frame boundaries (fed to the ASR)
-                # vs refined display starts (used for subtitle timing).
+                # "3a" audit trail: raw VAD frame boundaries (the audio fed to the ASR),
+                # written in every run (F7, owner W307 1: before, only in vad_only runs),
+                # and the refined display start where it is used (vad_only; else None).
                 # internal_breaks reserved for the future "3b" splitter.
-                frame_timing = None
-                if scene_starts is not None:
-                    frame_timing = [
-                        {
-                            "vad_start": round(fr.start, 3),
-                            "vad_end": round(fr.end, 3),
-                            "speech_start": round(display_starts[fi], 3),
-                            "internal_breaks": [],
-                        }
-                        for fi, fr in enumerate(frames)
-                    ]
+                frame_timing = [
+                    {
+                        "vad_start": round(fr.start, 3),
+                        "vad_end": round(fr.end, 3),
+                        "speech_start": round(display_starts[fi], 3) if scene_starts is not None else None,
+                        "internal_breaks": [],
+                    }
+                    for fi, fr in enumerate(frames)
+                ]
 
                 scene_diag = SceneDiagnostics(
                     schema_version="2.0.0",
@@ -1060,12 +1296,13 @@ class DecoupledSubtitlePipeline:
                     sentinel_recovery=recovery_info,
                     timing_aligner_native=aligner_native_count,
                     timing_interpolated=hardening_diag.interpolated_count,
-                    timing_vad_fallback=hardening_diag.fallback_count,
+                    timing_vad_fallback=hardening_diag.fallback_count + not_aligner,
                     timing_total_segments=segment_count,
                     hardening_clamped=hardening_diag.clamped_count,
                     hardening_sorted=hardening_diag.sorted,
                     vad_regions=vad_regions,
                     frame_timing=frame_timing,
+                    timing_model=timing_info,
                 )
                 diagnostics = asdict(scene_diag)
 
@@ -1106,21 +1343,36 @@ class DecoupledSubtitlePipeline:
     # -----------------------------------------------------------------------
 
     @staticmethod
+    def _frame_words_or_text(
+        frame: TemporalFrame,
+        word_list: list[dict[str, Any]],
+        text: Optional[str],
+    ) -> list[dict[str, Any]]:
+        """A frame's aligned words; a frame whose text got no word times keeps its text as one
+        word spanning the frame (frame-relative), so no text is lost (rule T3, 1.10.0)."""
+        if word_list or not text or not text.strip():
+            return list(word_list)
+        return [{"word": text.strip(), "start": 0.0, "end": frame.duration}]
+
+    @staticmethod
     def _merge_frame_words(
         frames: list[TemporalFrame],
         frame_word_lists: list[list[dict[str, Any]]],
+        texts: Optional[list[str]] = None,
     ) -> list[dict[str, Any]]:
         """
         Merge per-frame word lists into a single scene-relative word list.
 
         Each frame's words are in frame-relative coordinates.  We offset
         them by frame.start to convert to scene-relative coordinates.
+        With ``texts``, a frame with text but no word times keeps its text.
         """
         all_words: list[dict[str, Any]] = []
 
-        for frame, word_list in zip(frames, frame_word_lists):
+        for fi, (frame, word_list) in enumerate(zip(frames, frame_word_lists)):
             offset = frame.start
-            for w in word_list:
+            text = texts[fi] if texts and fi < len(texts) else None
+            for w in DecoupledSubtitlePipeline._frame_words_or_text(frame, word_list, text):
                 all_words.append(
                     {
                         "word": w["word"],
@@ -1156,6 +1408,73 @@ class DecoupledSubtitlePipeline:
             if frame_words:
                 groups.append(frame_words)
         return groups
+
+    @staticmethod
+    def _text_only_frames(
+        frames: list[TemporalFrame],
+        frame_word_lists: list[list[dict[str, Any]]],
+        texts: Optional[list[str]],
+    ) -> int:
+        """The frames with text but no word times (rule T3): each is one subtitle not timed by the aligner."""
+        return sum(
+            1 for fi, (_frame, word_list) in enumerate(zip(frames, frame_word_lists))
+            if not word_list and texts and fi < len(texts) and texts[fi] and texts[fi].strip()
+        )
+
+    @staticmethod
+    def _timed_frame_groups(
+        frames: list[TemporalFrame],
+        frame_word_lists: list[list[dict[str, Any]]],
+        texts: Optional[list[str]],
+        frame_timings: Optional[list[Optional[list[timing_rules.TimedSegment]]]],
+        allow_split: bool = True,
+        aligner_start: bool = True,
+        removable: Optional[Callable[[str], bool]] = None,
+    ) -> tuple[list[list[dict[str, Any]]], Optional[dict[str, Any]]]:
+        """
+        Scene-relative word groups: one per frame, or one per timed piece (step 8).
+
+        A frame with text but no word times keeps its text (rule T3). With the
+        frame's timed segments, timing_rules.pieces() splits it where a new
+        sentence starts (when ``allow_split`` and the frame has word times). Each
+        part starts at its first character's aligner time (T2, owner W296 1); a
+        frame without word times, or with ``aligner_start`` off (a collapsed
+        scene), moves its start to the Whisper onset instead. A split never leaves
+        a part ``removable`` says a later line filter would remove (T9, W296 2).
+        Without timings this is _group_frame_words() plus the kept text.
+
+        Returns the groups and the timing counts for the diagnostics (None
+        without timings).
+        """
+        groups: list[list[dict[str, Any]]] = []
+        info: Optional[dict[str, Any]] = None
+        if frame_timings is not None:
+            info = {"frames_timed": 0, "starts_moved": 0, "splits": 0, "split_times": []}
+        for fi, (frame, word_list) in enumerate(zip(frames, frame_word_lists)):
+            text = texts[fi] if texts and fi < len(texts) else None
+            words = DecoupledSubtitlePipeline._frame_words_or_text(frame, word_list, text)
+            segs = frame_timings[fi] if frame_timings is not None and fi < len(frame_timings) else None
+            if not words:
+                continue
+            if segs is None:
+                parts = [[dict(w) for w in words]]
+            else:
+                parts = timing_rules.pieces(words, segs, frame.duration,
+                                            allow_split=allow_split and bool(word_list),
+                                            aligner_start=aligner_start and bool(word_list),
+                                            removable=removable)
+                info["frames_timed"] += 1
+                if parts and parts[0][0]["start"] > words[0]["start"] + 1e-9:
+                    info["starts_moved"] += 1
+                info["splits"] += max(0, len(parts) - 1)
+                info["split_times"].extend(round(frame.start + p[0]["start"], 3) for p in parts[1:])
+            for part in parts:
+                if part:
+                    groups.append([
+                        {"word": w["word"], "start": w["start"] + frame.start, "end": w["end"] + frame.start}
+                        for w in part
+                    ])
+        return groups, info
 
     # -----------------------------------------------------------------------
     # Speech regions resolution

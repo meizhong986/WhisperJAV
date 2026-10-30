@@ -208,6 +208,13 @@ def _compute_alignment_metrics(scenes: List[Dict]) -> Dict:
     total_groups = t1_total + t2_total
     total_collapsed = t1_collapsed + t2_collapsed
     collapse_rate = total_collapsed / total_groups if total_groups > 0 else 0.0
+    if total_groups == 0:
+        # The decoupled pipeline's scene records carry no step-down tiers: the rate is the
+        # scenes the collapse check flagged, out of the scenes it checked (owner W300 1).
+        statuses = [s.get("sentinel_status") for s in scenes]
+        checked = sum(1 for st in statuses if st in ("OK", "COLLAPSED"))
+        total_collapsed = sum(1 for st in statuses if st == "COLLAPSED")
+        collapse_rate = total_collapsed / checked if checked > 0 else 0.0
 
     # Recovery strategy breakdown from sentinel
     recovery_vad_guided = 0
@@ -334,6 +341,22 @@ def _compute_subtitle_metrics(
 # Metric computation: Timing Sources
 # ---------------------------------------------------------------------------
 
+def scene_timing_sources(scene: Dict) -> Dict:
+    """A scene's timing sources: the nested ``timing_sources`` record when present, else the flat
+    ``timing_*`` fields the decoupled pipeline saves (SceneDiagnostics through ``asdict``). Before
+    1.10.0 only the nested form was read, so the run summary showed "Aligner native: 0.0%" for every
+    ChronosJAV run (found in tuning, owner W296 4; the counts themselves, W300 1)."""
+    ts = scene.get("timing_sources")
+    if isinstance(ts, dict):
+        return ts
+    return {
+        "aligner_native": scene.get("timing_aligner_native", 0),
+        "vad_fallback": scene.get("timing_vad_fallback", 0),
+        "interpolated": scene.get("timing_interpolated", 0),
+        "total_segments": scene.get("timing_total_segments", 0),
+    }
+
+
 def _compute_timing_metrics(scenes: List[Dict]) -> Dict:
     """Compute timing source breakdown across all scenes."""
     aligner_native = 0
@@ -342,7 +365,7 @@ def _compute_timing_metrics(scenes: List[Dict]) -> Dict:
     total_segments = 0
 
     for s in scenes:
-        ts = s.get("timing_sources", {})
+        ts = scene_timing_sources(s)
         aligner_native += ts.get("aligner_native", 0)
         vad_fallback += ts.get("vad_fallback", 0)
         interpolated += ts.get("interpolated", 0)

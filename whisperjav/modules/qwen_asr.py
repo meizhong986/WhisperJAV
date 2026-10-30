@@ -325,10 +325,14 @@ class QwenASR:
     def _detect_device(self) -> str:
         """Detect best available device."""
         if self.device_request == "auto":
-            if torch.cuda.is_available():
-                return "cuda:0"
-            else:
-                return "cpu"
+            # Through device_detector, as every other PyTorch part (design 22.3.1, owner W237 1):
+            # its test of a card this PyTorch has no code for (#411) applies here too. ChronosJAV
+            # does not use the Apple GPU in 1.10.0 (design 22.8, T51), so MPS stays the CPU here.
+            from whisperjav.utils.device_detector import APPLE_SILICON_CHRONOSJAV_TEXT, get_best_device
+            best = get_best_device()
+            if best == "mps":
+                logger.warning(APPLE_SILICON_CHRONOSJAV_TEXT)  # T51 (design 22.8)
+            return "cuda:0" if best == "cuda" else "cpu"
         elif self.device_request == "cuda":
             if torch.cuda.is_available():
                 return "cuda:0"

@@ -228,9 +228,13 @@ class SceneDiagnostics:
     hardening_sorted: bool = False
     stepdown: Optional[dict] = None  # {"attempted": bool, "enabled": bool, "improved": bool}
     vad_regions: Optional[list] = None
-    # "3a" audit trail (vad_only): per-frame {vad_start, vad_end, speech_start,
-    # internal_breaks}. vad_start/vad_end are the RAW boundaries fed to the ASR;
-    # speech_start is the refined display start actually used for the subtitle.
+    # "3a" audit trail: per-frame {vad_start, vad_end, speech_start,
+    # internal_breaks}, scene-relative, in every run (F7, owner W307 1). vad_start/
+    # vad_end are the RAW boundaries fed to the ASR; speech_start is the refined
+    # display start used for the subtitle (vad_only runs; None otherwise).
     frame_timing: Optional[list] = None
+    # Timing model (step 8, 1.10.0 item 12 C3): {"frames_timed", "starts_moved",
+    # "splits", "split_times"}; None when no timing model ran for the scene.
+    timing_model: Optional[dict] = None
     group_details: Optional[list] = None
     error: Optional[str] = None

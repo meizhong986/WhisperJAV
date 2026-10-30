@@ -226,7 +226,7 @@ class TestUnknownEnhancerIsRejectedAtTheBoundary:
             SpeechEnhancerFactory,
         )
 
-        ok, hint = SpeechEnhancerFactory.is_backend_available("clearvoice")
+        ok, hint = SpeechEnhancerFactory.is_backend_available("bs-roformer")
         # Whatever the answer on this machine, it must be a usable pair and must
         # not be reported as an unknown backend.
         assert isinstance(ok, bool)

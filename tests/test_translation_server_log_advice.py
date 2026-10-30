@@ -3,10 +3,13 @@ When translation fails against a server, WhisperJAV says where that server's own
 log is. Which server it is depends on the provider the user chose.
 
 These tests exist because the first version of this advice keyed on
-``pysubtrans_name``, which is the name of PySubtrans's *client class*: local,
-ollama, glm, groq and custom are all 'Custom Server' there, so the local and
-ollama branches were unreachable and every one of them got the custom-server
-line. The provider the user chose is now carried in 'whisperjav_provider'.
+``pysubtrans_name``, which is the name of PySubtrans's *client class*: ollama,
+glm, groq and custom are all 'Custom Server' there, so the ollama branch was
+unreachable and every one of them got the custom-server line. The provider the
+user chose is now carried in 'whisperjav_provider'.
+
+v1.10.0: the 'local' provider (the llama-cpp server WhisperJAV started itself) is
+removed, and with it the tests of its log advice.
 """
 
 import pytest
@@ -31,43 +34,11 @@ class TestEveryProviderIsIdentifiable:
                   for k in ("ollama", "glm", "groq", "custom")}
         assert shared == {"Custom Server"}
 
-    def test_the_local_marker_does_not_survive_to_the_translator(self):
-        # The registry says 'Local', but a local run never reaches
-        # translate_subtitle with that config: cli.py and service.py build a
-        # fresh one naming the llama-cpp server they just started, and PySubtrans
-        # has to be told 'Custom Server' to talk to it. That is what made the
-        # local branch of the advice unreachable.
-        assert PROVIDER_CONFIGS["local"]["pysubtrans_name"] == "Local"
-
-        # A wiring guard, not a behaviour test: the two places that build that
-        # config cannot be imported here (both run argparse at import time) and
-        # cannot be exercised without starting a real llama-cpp server, so the
-        # only thing that can be checked cheaply is that the marker is still
-        # written where the advice will look for it.
-        from pathlib import Path
-
-        translate = Path(__file__).resolve().parents[1] / "whisperjav" / "translate"
-        for name in ("cli.py", "service.py"):
-            source = (translate / name).read_text(encoding="utf-8")
-            marker = source.index("local_provider_config = {")
-            block = source[marker:marker + 400]
-            assert "'pysubtrans_name': 'Custom Server'" in block, name
-            assert "'whisperjav_provider': 'local'" in block, name
+    def test_the_removed_local_provider_is_not_offered(self):
+        assert "local" not in PROVIDER_CONFIGS
 
 
 class TestTheAdviceMatchesTheServerInUse:
-    def test_local_is_pointed_at_whisperjavs_own_log(self):
-        # The config cli.py and service.py build for a local run: PySubtrans
-        # sees a custom server, but WhisperJAV started it.
-        config = {
-            "pysubtrans_name": "Custom Server",
-            "whisperjav_provider": "local",
-            "server_address": "http://127.0.0.1:8080",
-        }
-        text = advice(config)
-        assert "local translation server" in text
-        assert "ollama" not in text.lower()
-
     def test_ollama_is_pointed_at_ollamas_log(self):
         text = advice(PROVIDER_CONFIGS["ollama"])
         assert "ollama logs" in text
@@ -105,48 +76,6 @@ class TestARedirectedCloudProviderIsNotCalledCloud:
 
     def test_the_real_cloud_endpoint_is_still_cloud(self):
         assert "cloud service" in advice(PROVIDER_CONFIGS["deepseek"])
-
-
-class TestTheLogItPointsAtIsStillThere:
-    def test_naming_the_local_log_asks_for_it_to_be_kept(self):
-        # Advice naming a file that stop_local_server deletes a moment later is
-        # advice the user cannot act on.
-        from whisperjav.translate import local_backend
-
-        local_backend._keep_server_log = False
-        advice({"whisperjav_provider": "local"})
-        assert local_backend._keep_server_log is True
-
-    def test_a_kept_log_survives_stopping_the_server(self, tmp_path):
-        from whisperjav.translate import local_backend
-
-        log = tmp_path / "llm_server.log"
-        log.write_text("the reason it failed", encoding="utf-8")
-
-        local_backend._server_process = None
-        local_backend._server_stderr_path = str(log)
-        local_backend._keep_server_log = True
-        try:
-            local_backend.stop_local_server()
-            assert log.exists()
-        finally:
-            local_backend._server_stderr_path = None
-            local_backend._keep_server_log = False
-
-    def test_an_ordinary_run_still_cleans_its_log_up(self, tmp_path):
-        from whisperjav.translate import local_backend
-
-        log = tmp_path / "llm_server.log"
-        log.write_text("nothing went wrong", encoding="utf-8")
-
-        local_backend._server_process = None
-        local_backend._server_stderr_path = str(log)
-        local_backend._keep_server_log = False
-        try:
-            local_backend.stop_local_server()
-            assert not log.exists()
-        finally:
-            local_backend._server_stderr_path = None
 
 
 if __name__ == "__main__":

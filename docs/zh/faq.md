@@ -8,7 +8,7 @@
 
 支持 FFmpeg 可以读取的所有格式：MP4、MKV、AVI、MOV、WMV、FLV、WAV、MP3、FLAC、M4A、M4B 等等。只要 FFmpeg 能从中提取音频，WhisperJAV 就能处理。
 
-### 转录需要多长时间？
+### 转写需要多长时间？
 
 取决于模式、GPU 等级以及音频的难度。下表给出的范围基于**中端 GPU**（RTX 3060 12 GB 或 Google Colab T4 免费额度）在典型日语对话内容上的实测数据。更高端的 GPU（RTX 3090/4080/4090）大约快 1.5-3 倍；仅 CPU 模式则明显更慢（通常是最慢 GPU 行的 5-10 倍）。
 
@@ -18,17 +18,17 @@
 | **Fast** | 3-5 分钟 | 8-15 分钟 | 单次 turbo-int8 |
 | **Balanced** | 4-7 分钟 | 15-25 分钟 | 单次 large-v2-int8（推荐默认） |
 | **Fidelity** | 10-15 分钟 | 40-50 分钟* | 单次 large-v2-fp16；质量高，但运行时间方差大 |
-| **集成模式** | 15-25 分钟 | 60-90 分钟 | 双次（Pass 1 + Pass 2 顺序执行后合并） |
+| **专家模式** | 15-25 分钟 | 60-90 分钟 | 双次（第一轮 + 第二轮顺序执行后合并） |
 
 *Fidelity 在同一输入上的运行时间方差较大（约 4-5 倍），原因是 PyTorch cuDNN 自动调优——质量不受影响，仅墙钟时间会变化。
 
-**音频难度倍率**：非常密集的低语内容（ASMR 风格、轻柔呻吟、气音等）会使处理时间增加到上表数值的 **1.2-1.5 倍**，尤其是在 Fidelity 和集成模式下——模型需要在边界帧上花费更多时间。一段 ASMR 较多的 2 小时影片用 Fidelity 处理可能超过 1 小时。
+**音频难度倍率**：非常密集的低语内容（ASMR 风格、轻柔呻吟、气音等）会使处理时间增加到上表数值的 **1.2-1.5 倍**，尤其是在 Fidelity 和专家模式下——模型需要在边界帧上花费更多时间。一段 ASMR 较多的 2 小时影片用 Fidelity 处理可能超过 1 小时。
 
 **仅 CPU 模式**：Faster 模式是没有 GPU 时唯一现实的选择。预计 30 分钟片段大约需要 30-60 分钟；对大多数用户而言，多小时内容在 CPU 上不实用。
 
 ### 没有 GPU 也能使用 WhisperJAV 吗？
 
-可以。进入 **Advanced**（高级）→ 勾选 **"Accept CPU-only mode"**（接受仅 CPU 模式）。这个选项是必须的：找不到可用 GPU 时，启动检查会停下来询问是否改用 CPU 继续，而 GUI 无法提问，不勾选则运行会中止并提示您勾选。命令行请加 `--accept-cpu-mode`（或 `--device cpu`）。使用 **Faster** 模式可获得最佳 CPU 速度。功能正常，只是明显较慢。
+可以。安装时选择 **仅 CPU**（Windows 安装程序的窗口中，或源码安装时用 `--accelerator cpu`）；之后每次运行都使用 CPU，不需要勾选任何选项。在 GPU 安装中，`--device cpu` 让某一次运行使用 CPU。使用 **Faster** 模式可获得最佳 CPU 速度。功能正常，只是比在 GPU 上慢好几倍。见[是否加速](getting-started/index.md#accelerated-or-not)。
 
 ---
 
@@ -40,8 +40,8 @@
 
 - **动漫 / 戏剧化 JAV 对白**：**ChronosJAV** 搭配 anime-whisper。
 - **通用日语对白，单次处理**：**Balanced** 是典型默认选择。
-- **以墙钟时间换取最高准确度**：**集成模式**（Pass 1 = Balanced + Pass 2 = Qwen3-ASR 配合 Smart Merge），将两个模型的输出合并。
-- **低语 / ASMR 较多的内容**：尝试 **Fidelity** 配合 **激进** 灵敏度；它能恢复其他模式可能漏掉的安静语音。
+- **以墙钟时间换取最高准确度**：**专家模式**（第一轮 = Balanced + 第二轮 = Qwen3-ASR 配合 Smart Merge），将两个模型的输出合并。
+- **低语 / ASMR 较多的内容**：尝试 **Fidelity** 配合 **高灵敏度**；它能恢复其他模式可能漏掉的安静语音。
 
 无论选哪种，建议先用 5-10 分钟具有代表性的片段进行对比——JAV 内容的质量因配音员音色差异较大，没有任何单一推荐能在所有内容库中都表现一致。
 
@@ -49,9 +49,9 @@
 
 这是 Whisper 在静音或极安静片段上的已知行为。WhisperJAV 内置了幻觉过滤器，可移除大部分此类文本。你可以尝试：
 
-1. 尝试不同的**灵敏度**设置——某些内容下 **激进** 模式能捕获 **保守** 模式作为静音丢弃的真实语音（Whisper 随后会用幻觉填充这些"静音"）；其他内容则相反。请用代表性片段在每种设置下试运行，找到最适合您内容库的设置。
-2. 使用 **集成模式**——两个模型输出通常会对不同的幻觉产生分歧，因此合并步骤能去除比单次处理更多的幻觉。
-3. 启用 **语音增强**（ClearVoice 或 BS-RoFormer）预先清理音频
+1. 尝试不同的**灵敏度**设置——某些内容下 **高灵敏** 设置能捕获 **低灵敏** 设置作为静音丢弃的真实语音（Whisper 随后会用幻觉填充这些"静音"）；其他内容则相反。请用代表性片段在每种设置下试运行，找到最适合您内容库的设置。
+2. 使用 **专家模式**——两个模型输出通常会对不同的幻觉产生分歧，因此合并步骤能去除比单次处理更多的幻觉。
+3. 启用 **语音增强**（ZipEnhancer 或 htdemucs）预先清理音频
 
 ### 时间轴偏移 / 字幕出现过早或过晚
 
@@ -102,9 +102,9 @@
 ### 提示 "CUDA not available"，但我有 NVIDIA GPU
 
 1. 验证 NVIDIA 驱动版本：`nvidia-smi`
-2. CUDA 11.8 需要驱动 450+，CUDA 12.8 需要驱动 570+
+2. 1.10.0 需要 Windows 驱动 580 或更新、Linux 驱动 570 或更新，以及 GTX 16 / RTX 20 系列或更新的显卡；可以先运行 `whisperjav --check`，它会说明安装的加速器以及 PyTorch 能否使用 GPU
 3. 你**不需要**安装 CUDA Toolkit —— PyTorch 自带 CUDA 运行时
-4. 尝试重新安装对应 CUDA 版本的 PyTorch
+4. 如果安装是为仅 CPU 制作的：使用 Windows 安装程序时，再次运行它；有受支持的 NVIDIA GPU 时，它会制作 NVIDIA GPU 安装。源码安装时，运行 `python install.py --accelerator nvidia`
 
 ### 如何升级？
 
@@ -112,7 +112,9 @@
 whisperjav-upgrade
 ```
 
-或仅更新代码（更快）：`whisperjav-upgrade --wheel-only`
+或仅更新代码（更快）：`whisperjav-upgrade --wheel-only`。它会保留安装的加速器。这适用于用 Windows 安装程序制作的安装。源码安装：运行 `git fetch --tags`，`git checkout` 新版本的标签，然后激活相同的 Python 环境再次运行安装程序。
+
+从 1.9.x 升级时，请全新安装 1.10.0：1.10.0 需要 Python 3.13，`whisperjav-upgrade` 无法把 1.9.x 安装升级到它。
 
 详情请参阅[升级指南](UPGRADE.md)。
 
@@ -120,9 +122,9 @@ whisperjav-upgrade
 
 ## Cohere-Transcribe（尚未提供）
 
-> **状态：** WhisperJAV 尚未提供 Cohere-Transcribe。它需要 transformers 5.x，而 WhisperJAV 目前还不支持。暂无发布日期。下拉菜单中的入口已置灰。
+> **状态：** WhisperJAV 尚未提供 Cohere-Transcribe。暂无发布日期。下拉菜单中的入口已置灰。
 
-> **已升级 transformers 用户的迁移说明：** 如果您最近运行过 `pip install transformers --upgrade`（或以其他方式将 transformers 5.x 安装到了 WhisperJAV 环境中），Qwen3-ASR 将无法加载。请使用 `pip install "transformers>=4.40.0,<5.0"` 恢复稳定，然后通过 `python -c "from qwen_asr import Qwen3ASRModel; print('OK')"` 验证 Qwen3-ASR 是否能正常加载。
+> **关于 transformers：** WhisperJAV 1.10.0 安装 transformers 5.20，以及为它制作的 WhisperJAV 自有版 `qwen-asr`（[meizhong986/Qwen3-ASR](https://github.com/meizhong986/Qwen3-ASR)）。不要把 transformers 降级到 5.0 以下。如果 Qwen3-ASR 无法加载，请再次运行安装程序，它会恢复测试过的版本。
 
 下方的设置说明供日后提供时使用。
 
@@ -138,14 +140,14 @@ Cohere Transcribe-03-2026 计划作为 **ChronosJAV** 下拉菜单的第三种�
    - **Windows（持久化）：** `setx HF_TOKEN hf_xxxxxxxxxxxx` — 设置后需重启 GUI/终端才能生效。
    - **Windows（仅当前 PowerShell 会话）：** `$env:HF_TOKEN = "hf_xxxxxxxxxxxx"`
    - **Linux/macOS：** `export HF_TOKEN=hf_xxxxxxxxxxxx`
-4. 在 GUI Ensemble 下拉菜单中选择 **ChronosJAV → Cohere-Transcribe (preview)**，或通过 CLI 运行：
+4. 在 GUI 专家模式（Ensemble）中的下拉菜单中选择 **ChronosJAV → Cohere-Transcribe (preview)**，或通过 CLI 运行：
    ```bash
    whisperjav --mode qwen --pass1-qwen-params '{"generator_backend":"cohere"}' video.mp4
    ```
 
 **首次运行下载**
 
-Cohere 权重总量约 3.85 GB（`model.safetensors` 原始 FP16 约 4.13 GB，外加分词器和自定义代码文件）。首次转录需先下载 10–30 分钟（每台机器仅一次；之后缓存在 HuggingFace 缓存目录中）。HuggingFace 使用 Xet（内容寻址）传输，会先把分块流到临时位置 — 缓存所在卷请预留**至少 5 GB 空闲空间**以保证下载稳定。
+Cohere 权重总量约 3.85 GB（`model.safetensors` 原始 FP16 约 4.13 GB，外加分词器和自定义代码文件）。首次转写需先下载 10–30 分钟（每台机器仅一次；之后缓存在 HuggingFace 缓存目录中）。HuggingFace 使用 Xet（内容寻址）传输，会先把分块流到临时位置 — 缓存所在卷请预留**至少 5 GB 空闲空间**以保证下载稳定。
 
 **显存需求**
 
@@ -155,7 +157,7 @@ FP16 约 4–8 GB。用于词级时间戳的 Qwen3-ForcedAligner 在 Cohere 卸�
 
 Cohere Transcribe-03-2026 当前只输出文本；逐词时间戳在模型作者的[路线图](https://huggingface.co/CohereLabs/cohere-transcribe-03-2026/discussions/19)中但尚未实现。WhisperJAV 将 Cohere 与 Qwen3-ForcedAligner-0.6B（与 Qwen3-ASR 流水线使用的同一对齐器）配对，从 Cohere 的输出推导出词级时间戳。您可以通过自定义参数 → *Aligner Backend → None* 禁用对齐器，回退为仅基于 VAD 的段级时间 — 如果您只需要段级字幕并希望省去对齐器加载，可以这样做。
 
-### Cohere 返回了空转录 / "gated" 错误
+### Cohere 返回了空转写 / "gated" 错误
 
 最常见的原因是启动 WhisperJAV 的环境中没有设置 `HF_TOKEN`。重新检查上述设置步骤，并在设置 token 后重启 GUI（特别是在 Windows 上使用 `setx` 时，它仅对新 shell 生效）。如果错误仍存在，请在 <https://huggingface.co/CohereLabs/cohere-transcribe-03-2026> 确认您的状态为 *Authorized* — 模型作者会手动审核访问。
 

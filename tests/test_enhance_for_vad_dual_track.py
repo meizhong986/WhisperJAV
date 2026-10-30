@@ -183,7 +183,7 @@ class TestBalancedDoesNotOfferIt:
             [sys.executable, "-m", "whisperjav.main", "dummy.mp4",
              "--dump-params", str(tmp_path / "params.json"), "--ensemble",
              f"--pass{n}-pipeline", "balanced",
-             f"--pass{n}-speech-enhancer", "clearvoice",
+             f"--pass{n}-speech-enhancer", "zipenhancer",
              f"--pass{n}-enhance-for-vad"],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
         assert result.returncode == 2
@@ -199,7 +199,7 @@ class TestBalancedDoesNotOfferIt:
             [sys.executable, "-m", "whisperjav.main", "dummy.mp4",
              "--dump-params", str(tmp_path / "params.json"), "--ensemble",
              "--pass1-pipeline", pipeline,
-             "--pass1-speech-enhancer", "clearvoice", "--pass1-enhance-for-vad",
+             "--pass1-speech-enhancer", "zipenhancer", "--pass1-enhance-for-vad",
              "--pass2-pipeline", "balanced"],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
         assert result.returncode == 0, (result.stdout + result.stderr)[-500:]

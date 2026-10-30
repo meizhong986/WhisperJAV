@@ -1,22 +1,15 @@
 """Drift guards added in v1.9.2, after the installer shipped without faster-whisper.
 
-The Windows installer describes its dependencies in four places:
-
-* ``pyproject.toml``                              — what pip installs from source
-* ``whisperjav/installer/core/registry.py``       — the single source of truth
-* ``installer/templates/post_install.py.template``— what the .exe installs, by phase
-* ``installer/templates/requirements.txt.template``— the fallback list
-
-Three of those had drifted apart by v1.9.2: faster-whisper became a commit pin
-in pyproject.toml and the registry, the requirements generator silently drops
-anything git-addressed, and the fallback template still asked PyPI for
-``faster-whisper>=1.1.0`` — a build with different Silero VAD weights than the
+In v1.9.2 the installer's requirements generator silently dropped anything
+git-addressed, and the fallback template still asked PyPI for
+``faster-whisper>=1.1.0`` -- a build with different Silero VAD weights than the
 one the maintainer tests against.
 
-These tests fail when any two of those four places disagree again. The
-companion test that every git-addressed dependency is actually installed by
-Phase 3.5 lives in
-``tests/test_installer_comprehensive.py::TestPostInstallTemplate``.
+v1.10.0 (item 2f): the generator and the fallback template are gone. Every
+install takes the locked files ``whisperjav/installer/locked/requirements_<build>.txt``
+-- ``uv.lock`` exported once per PyTorch build by ``installer/build_release.py`` --
+which carry the git packages at the commits the lock records. These tests check
+those files against ``pyproject.toml``, the registry and a fresh export.
 """
 
 import re
@@ -30,7 +23,8 @@ except ImportError:  # Python 3.10 without tomli
     tomllib = None
 
 PROJECT_ROOT = Path(__file__).parent.parent
-REQUIREMENTS_TEMPLATE = PROJECT_ROOT / "installer" / "templates" / "requirements.txt.template"
+LOCKED_DIR = PROJECT_ROOT / "whisperjav" / "installer" / "locked"
+VARIANTS = ("cu130", "cu128", "vulkan", "cpu")
 
 
 def _pyproject_specs() -> dict:
@@ -61,18 +55,14 @@ def _pyproject_specs() -> dict:
     return specs
 
 
-def _requirements_template_lines() -> list:
-    """The dependency lines of the fallback template, comments stripped."""
-    content = REQUIREMENTS_TEMPLATE.read_text(encoding="utf-8")
-    lines = []
-    for line in content.splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or line.startswith("{{"):
-            continue
-        if "  #" in line:
-            line = line.split("  #")[0].strip()
-        lines.append(line)
-    return lines
+def _locked_lines(variant: str) -> list:
+    """The requirement lines of one locked file, comments and blank lines dropped."""
+    content = (LOCKED_DIR / f"requirements_{variant}.txt").read_text(encoding="utf-8")
+    return [l.strip() for l in content.splitlines() if l.strip() and not l.lstrip().startswith("#")]
+
+
+def _name(line: str) -> str:
+    return re.split(r"[>=<\[@ ;]", line)[0].strip().lower()
 
 
 class TestGitPinDrift:
@@ -135,131 +125,54 @@ class TestGitPinDrift:
         )
 
 
-class TestRequirementsTemplateDrift:
-    """The fallback requirements list must not fight Phase 3.5 or the registry."""
+class TestLockedRequirements:
+    """The files every install takes (item 2f): exact, complete, and current with uv.lock."""
 
-    def test_template_has_no_git_dependencies(self):
-        """Git dependencies belong in Phase 3.5, never in a requirements list.
+    @pytest.mark.parametrize("variant", VARIANTS)
+    def test_every_line_is_an_exact_version_or_a_git_commit(self, variant):
+        loose = [l for l in _locked_lines(variant)
+                 if "==" not in l.split(";")[0] and not re.search(r" @ git\+\S+@[0-9a-f]{40}", l)
+                 # a direct URL to one wheel file (CrispASR's +cuda / +vulkan builds, D10) is exact too
+                 and not re.search(r" @ https://\S+\.whl", l)]
+        assert not loose, f"requirements_{variant}.txt has lines without an exact version: {loose}"
 
-        pip resolving a git URL inside ``-r requirements.txt`` re-resolves
-        dependencies and can pull a CPU torch over the CUDA one installed in
-        Phase 3, which is the reason the generator strips them in the first place.
-        """
-        offenders = [line for line in _requirements_template_lines() if "git+" in line or " @ " in line]
+    @pytest.mark.parametrize("variant", VARIANTS)
+    def test_faster_whisper_is_the_commit_pyproject_pins(self, variant):
+        pyproject = _pyproject_specs()["faster-whisper"]
+        commit = re.search(r"@([0-9a-f]{40})", pyproject).group(1)
+        lines = [l for l in _locked_lines(variant) if _name(l) == "faster-whisper"]
+        assert len(lines) == 1 and lines[0].endswith(commit), (
+            f"faster-whisper in requirements_{variant}.txt: {lines}; pyproject.toml pins {commit}")
 
-        assert not offenders, (
-            "The fallback requirements template lists git dependencies. They must be "
-            "installed by Phase 3.5 of post_install.py.template instead:\n  "
-            + "\n  ".join(offenders)
-        )
-
-    def test_template_does_not_ask_pypi_for_faster_whisper(self):
-        """v1.9.2 regression guard: the template asked PyPI for faster-whisper>=1.1.0.
-
-        That line would have installed a different build from the pinned commit
-        Phase 3.5 installs, whichever ran last.
-        """
-        offenders = [
-            line for line in _requirements_template_lines()
-            if re.split(r"[>=<\[ ;]", line)[0].strip().lower() == "faster-whisper"
-        ]
-
-        assert not offenders, (
-            "The fallback requirements template must not list faster-whisper: it is "
-            "installed from a pinned commit in Phase 3.5. Found:\n  " + "\n  ".join(offenders)
-        )
-
-    def test_template_ctranslate2_matches_registry(self):
-        """CTranslate2 4.6.2 reproduces the #125 crash on exit; 4.8.1 does not."""
-        from whisperjav.installer.core.registry import PACKAGES
-
-        ct2 = next((p for p in PACKAGES if p.name == "ctranslate2"), None)
-        assert ct2 is not None, "ctranslate2 is not in the registry"
-
-        registry_spec = ct2.pyproject_spec().split(";")[0].strip()
-
-        template_lines = [
-            line for line in _requirements_template_lines()
-            if re.split(r"[>=<\[ ;]", line)[0].strip().lower() == "ctranslate2"
-        ]
-
-        assert template_lines, (
-            "ctranslate2 is missing from the fallback requirements template. "
-            "faster-whisper is installed there with --no-deps, so nothing else "
-            f"would install it. Expected: {registry_spec}"
-        )
-        assert len(template_lines) == 1, f"ctranslate2 listed more than once: {template_lines}"
-        assert template_lines[0] == registry_spec, (
-            f"ctranslate2 pin drift: template='{template_lines[0]}' vs "
-            f"registry='{registry_spec}'"
-        )
-
-class TestGeneratedRequirements:
-    """The list the .exe actually installs, built from pyproject.toml.
-
-    This is the path the real build takes. The fallback template tested above is
-    used only when pyproject.toml cannot be read, so a test that only reads the
-    template proves nothing about what ships. The generator is called directly
-    rather than reading installer/generated/, which is gitignored and may hold a
-    stale build.
-    """
-
-    @staticmethod
-    def _generate() -> str:
-        import importlib.util
-
-        spec = importlib.util.spec_from_file_location(
-            "whisperjav_build_release", PROJECT_ROOT / "installer" / "build_release.py"
-        )
-        build_release = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(build_release)
-
-        content = build_release.ReleaseBuilder(dry_run=True).generate_requirements_from_pyproject()
-        assert content, "the generator fell back to the template — pyproject.toml unreadable?"
-        return content
-
-    @staticmethod
-    def _names(content: str) -> dict:
-        names = {}
-        for line in content.splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            names[re.split(r"[>=<\[@ ;]", line)[0].strip().lower()] = line
-        return names
-
-    def test_the_generated_list_has_no_faster_whisper(self):
-        """It is installed from a pinned commit in Phase 3.5, not from this list.
-
-        The generator drops every git-addressed dependency, which is why Phase
-        3.5 has to install it — and why it was missing from the 1.9.2 installer
-        until the entry was added there.
-        """
-        names = self._names(self._generate())
-        assert "faster-whisper" not in names, (
-            f"faster-whisper must not reach the requirements file: {names.get('faster-whisper')}"
-        )
-
-    def test_the_generated_list_pins_ctranslate2(self):
-        """faster-whisper is installed --no-deps, so nothing else brings it in."""
+    @pytest.mark.parametrize("variant", VARIANTS)
+    def test_ctranslate2_matches_the_registry(self, variant):
+        """CTranslate2 4.6.2 reproduces the #125 crash on exit; the registry names the pin."""
         from whisperjav.installer.core.registry import PACKAGES
 
         ct2 = next(p for p in PACKAGES if p.name == "ctranslate2")
-        names = self._names(self._generate())
+        lines = [l for l in _locked_lines(variant) if _name(l) == "ctranslate2"]
+        assert lines == [ct2.pyproject_spec().split(";")[0].strip()], lines
 
-        assert "ctranslate2" in names, (
-            "ctranslate2 is missing from the generated requirements file; "
-            "faster-whisper would have no inference engine"
-        )
-        assert names["ctranslate2"] == ct2.pyproject_spec().split(";")[0].strip()
+    @pytest.mark.parametrize("variant", VARIANTS)
+    def test_torch_is_the_build_of_the_file(self, variant):
+        torch = [l for l in _locked_lines(variant) if _name(l) == "torch"]
+        build = {"vulkan": "cpu"}.get(variant, variant)   # the vulkan extra takes PyTorch's CPU build
+        assert any(l.startswith(f"torch==2.11.0+{build}") for l in torch), torch
 
-    def test_the_generated_list_contains_no_git_addresses(self):
-        offenders = [
-            line for line in self._generate().splitlines()
-            if line.strip() and not line.strip().startswith("#")
-            and ("git+" in line or " @ " in line)
-        ]
-        assert not offenders, (
-            "pip resolving a git URL from requirements.txt can replace the CUDA "
-            f"torch installed in Phase 3: {offenders}"
-        )
+    def test_the_files_equal_a_fresh_export_of_uv_lock(self):
+        """A pyproject.toml or uv.lock change without a new export is caught here."""
+        import shutil
+        import subprocess
+
+        uv = shutil.which("uv")
+        if not uv:
+            pytest.skip("uv not on PATH")
+        for variant in VARIANTS:
+            r = subprocess.run(
+                [uv, "export", "--frozen", "--no-hashes", "--no-emit-project", "--no-header",
+                 "--extra", "all", "--extra", variant, "--format", "requirements-txt"],
+                cwd=PROJECT_ROOT, capture_output=True, text=True, encoding="utf-8")
+            assert r.returncode == 0, r.stderr
+            fresh = [l.strip() for l in r.stdout.splitlines() if l.strip() and not l.lstrip().startswith("#")]
+            assert fresh == _locked_lines(variant), (
+                f"requirements_{variant}.txt is stale: run python installer/build_release.py")

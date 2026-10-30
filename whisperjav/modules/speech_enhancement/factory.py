@@ -5,10 +5,11 @@ Supports lazy loading to avoid import overhead for unused backends.
 
 Design Decisions (v1.7.3, extended v1.8.x):
 - Single backend entry with model parameter (not separate entries per sample rate)
-- Default model varies by backend (e.g., 48kHz for ClearVoice, 16kHz for ZipEnhancer)
+- Default model varies by backend (e.g., "torch" for ZipEnhancer, "vocals" for BS-RoFormer)
 - Graceful degradation handled at backend level
 - Consistent with SpeechSegmenterFactory pattern
-- Six backends: none, ffmpeg-dsp, zipenhancer, clearvoice, bs-roformer, htdemucs
+- Five backends: none, ffmpeg-dsp, zipenhancer, bs-roformer, htdemucs
+  (ClearVoice was removed in v1.10.0; see REMOVED_BACKENDS)
 """
 
 from typing import Dict, Type, Optional, Any, List, Tuple
@@ -16,7 +17,7 @@ import importlib
 import importlib.util
 import logging
 
-from .base import SpeechEnhancer, EnhancementResult
+from .base import SpeechEnhancer, EnhancementResult, SpeechEnhancerUnavailable
 
 logger = logging.getLogger("whisperjav")
 
@@ -25,7 +26,6 @@ _BACKEND_REGISTRY: Dict[str, str] = {
     "none": "whisperjav.modules.speech_enhancement.backends.none.NullSpeechEnhancer",
     "ffmpeg-dsp": "whisperjav.modules.speech_enhancement.backends.ffmpeg_dsp.FFmpegDSPBackend",
     "zipenhancer": "whisperjav.modules.speech_enhancement.backends.zipenhancer.ZipEnhancerBackend",
-    "clearvoice": "whisperjav.modules.speech_enhancement.backends.clearvoice.ClearVoiceSpeechEnhancer",
     "bs-roformer": "whisperjav.modules.speech_enhancement.backends.bs_roformer.BSRoformerSpeechEnhancer",
     "htdemucs": "whisperjav.modules.speech_enhancement.backends.htdemucs.HtDemucsSpeechEnhancer",
 }
@@ -52,13 +52,6 @@ _BACKEND_DEPENDENCIES: Dict[str, Dict[str, Any]] = {
         "install_hint": "pip install modelscope>=1.20",
         "always_available": False,
         "description": "ZipEnhancer 16kHz (lightweight, SOTA quality)",
-        "fatal_when_unavailable": True,
-    },
-    "clearvoice": {
-        "packages": ["clearvoice"],
-        "install_hint": "pip install clearvoice",
-        "always_available": False,
-        "description": "ClearerVoice speech enhancement (denoising)",
         "fatal_when_unavailable": True,
     },
     "bs-roformer": {
@@ -99,10 +92,60 @@ FATAL_WHEN_UNAVAILABLE = frozenset(
 _DEFAULT_MODELS: Dict[str, str] = {
     "ffmpeg-dsp": "loudnorm",  # Default effect (can be comma-separated for combos)
     "zipenhancer": "torch",  # torch (GPU) or onnx (CPU/GPU)
-    "clearvoice": "MossFormer2_SE_48K",  # 48kHz for best quality
     "bs-roformer": "vocals",
     "htdemucs": "htdemucs",
 }
+
+# Backends WhisperJAV no longer includes, with the name users knew them by.
+#
+# ClearVoice left in v1.10.0 (owner, W73). A value that still names it -- a saved
+# GUI setting, an Ensemble preset, a script's command line or pass parameters --
+# stops the run with removed_backend_message (owner, W75; text approved W79).
+# Without this, an unknown name reaching the enhancer helpers would fall back to
+# no clean-up with only a warning in the log.
+REMOVED_BACKENDS: Dict[str, str] = {
+    "clearvoice": "ClearVoice",
+}
+
+
+def removed_backend_message(value: Any, where: str) -> Optional[str]:
+    """
+    The message for a speech-enhancer value that names a removed backend, else None.
+
+    value may be "backend" or "backend:model". where names what carried it -- a
+    flag such as "--pass1-speech-enhancer" or a pass parameter -- and is put into
+    the message as the place to choose another enhancer.
+    """
+    if not isinstance(value, str):
+        return None
+    label = REMOVED_BACKENDS.get(value.split(":", 1)[0].strip().lower())
+    if label is None:
+        return None
+    return (f"{label} is no longer included in WhisperJAV 1.10. Choose another speech "
+            f"enhancer for {where} (none, zipenhancer, bs-roformer, ffmpeg-dsp or "
+            f"htdemucs) and run again.")
+
+
+def removed_backend_in_pass(pass_config: Dict[str, Any], pass_number: int) -> Optional[str]:
+    """
+    removed_backend_message for an ensemble pass configuration, else None.
+
+    Looks where a pass can carry a speech enhancer: its speech_enhancer, and the
+    qwen_enhancer / hf_speech_enhancer keys of its Qwen3-ASR and Transformers
+    parameters, which are passed through to the pipeline unchecked. The pass
+    worker calls this before the pass reads any audio.
+    """
+    candidates = [(pass_config.get("speech_enhancer"), f"--pass{pass_number}-speech-enhancer")]
+    for params_key, key, flag in (("qwen_params", "qwen_enhancer", "qwen-params"),
+                                  ("hf_params", "hf_speech_enhancer", "hf-params")):
+        params = pass_config.get(params_key)
+        if isinstance(params, dict):
+            candidates.append((params.get(key), f"{key} in --pass{pass_number}-{flag}"))
+    for value, where in candidates:
+        message = removed_backend_message(value, where)
+        if message:
+            return message
+    return None
 
 
 class SpeechEnhancerFactory:
@@ -112,19 +155,19 @@ class SpeechEnhancerFactory:
     Supports lazy loading to avoid import overhead for unused backends.
 
     Example:
-        # Create default ClearVoice enhancer (48kHz model)
-        enhancer = SpeechEnhancerFactory.create("clearvoice")
+        # Create default ZipEnhancer enhancer (torch model)
+        enhancer = SpeechEnhancerFactory.create("zipenhancer")
 
         # Create with specific model
         enhancer = SpeechEnhancerFactory.create(
-            "clearvoice",
-            model="FRCRN_SE_16K"
+            "zipenhancer",
+            model="onnx"
         )
 
         # Check availability before creating
-        available, hint = SpeechEnhancerFactory.is_backend_available("clearvoice")
+        available, hint = SpeechEnhancerFactory.is_backend_available("zipenhancer")
         if available:
-            enhancer = SpeechEnhancerFactory.create("clearvoice")
+            enhancer = SpeechEnhancerFactory.create("zipenhancer")
 
         # Get preferred sample rate for extraction
         if enhancer:
@@ -142,7 +185,7 @@ class SpeechEnhancerFactory:
         Check if a backend's dependencies are installed.
 
         Args:
-            name: Backend name (e.g., "clearvoice", "bs-roformer")
+            name: Backend name (e.g., "zipenhancer", "bs-roformer")
 
         Returns:
             Tuple of (is_available, install_hint)
@@ -180,7 +223,6 @@ class SpeechEnhancerFactory:
             "none": "None (Skip Enhancement)",
             "ffmpeg-dsp": "FFmpeg DSP (Audio Filters)",
             "zipenhancer": "ZipEnhancer 16kHz (Recommended)",
-            "clearvoice": "ClearerVoice (48kHz)",
             "bs-roformer": "BS-RoFormer Vocal Isolation",
         }
 
@@ -224,8 +266,6 @@ class SpeechEnhancerFactory:
                 return ["loudnorm", "normalize", "compress", "denoise", "highpass", "lowpass", "deess", "amplify"]
             elif name == "zipenhancer":
                 return ["zipenhancer"]  # No model variants
-            elif name == "clearvoice":
-                return ["FRCRN_SE_16K", "MossFormer2_SE_48K", "MossFormerGAN_SE_16K", "MossFormer2_SS_16K"]
             elif name == "bs-roformer":
                 return ["vocals", "other"]
             return []
@@ -289,10 +329,10 @@ class SpeechEnhancerFactory:
         Create a speech enhancer instance.
 
         Args:
-            name: Backend name ('none', 'clearvoice', 'bs-roformer')
+            name: Backend name ('none', 'zipenhancer', 'bs-roformer')
             config: Configuration dict (from resolved config or GUI)
             **kwargs: Additional backend-specific parameters (override config)
-                - model: Model variant to use (e.g., "MossFormer2_SE_48K")
+                - model: Model variant to use (e.g., "vocals")
                 - device: Device to use ("cuda", "cpu", "auto")
 
         Returns:
@@ -303,18 +343,22 @@ class SpeechEnhancerFactory:
             ImportError: If backend dependencies not installed
 
         Example:
-            # Simple creation (uses default 48kHz model)
-            enhancer = SpeechEnhancerFactory.create("clearvoice")
+            # Simple creation (uses the default model)
+            enhancer = SpeechEnhancerFactory.create("zipenhancer")
 
             # With specific model
             enhancer = SpeechEnhancerFactory.create(
-                "clearvoice",
-                model="FRCRN_SE_16K"
+                "bs-roformer",
+                model="vocals"
             )
 
             # Passthrough (no enhancement)
             enhancer = SpeechEnhancerFactory.create("none")
         """
+        removed = removed_backend_message(name, "this run")
+        if removed:
+            raise SpeechEnhancerUnavailable(removed)
+
         # Merge config with kwargs (kwargs take precedence)
         params = dict(config or {})
         params.update(kwargs)

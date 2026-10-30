@@ -97,17 +97,15 @@ Files are processed sequentially. Each output SRT is saved next to its source vi
 
 ---
 
-## CPU-Only Mode (No GPU)
+## Without a GPU
 
-WhisperJAV works without a GPU, just slower. When no usable GPU is found, the start-up check stops and asks whether to continue on the CPU; the GUI cannot ask, so the box below is required (on the command line, `--accept-cpu-mode` or `--device cpu`).
+WhisperJAV works without a GPU, just slower. Choose **CPU only** when you install; every run then uses the CPU, with nothing to tick. On a GPU install, `--device cpu` runs one job on the CPU.
 
-1. Go to the **Advanced** tab
-2. Check **"Accept CPU-only mode"**
-3. Use **Faster** mode for the best speed without GPU
-4. Click **Start**
+1. Use **Faster** mode for the best speed without a GPU
+2. Click **Start**
 
 !!! warning
-    CPU mode is 5-10x slower than GPU mode. A 2-hour video may take 30-60 minutes.
+    On the CPU, transcription is several times slower than on a GPU.
 
 ---
 

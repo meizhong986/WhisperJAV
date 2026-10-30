@@ -20,6 +20,9 @@
                     <span class="update-indicator-dot"></span>
                     <span id="updateIndicatorText">Update available</span>
                 </a>
+                <!-- 1.10.0 (item 6, #448): English / Simplified Chinese. The button names the
+                     language it switches to, so it is never translated itself. -->
+                <button id="langBtn" class="theme-button lang-button" data-i18n-skip title="English / 中文" aria-label="English / 中文">中文</button>
                 <!-- Minimal theme switch button -->
                 <button id="themeBtn" class="theme-button" aria-label="Theme" title="Theme">
                     🎨
@@ -210,11 +213,7 @@
                                             <option value="balanced" selected>balanced&nbsp;&nbsp;&nbsp;&nbsp;(large-v2-int8&nbsp;&nbsp;&nbsp;&nbsp;6GB VRAM)</option>
                                             <option value="fast">fast&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(turbo-int8&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;4GB VRAM)</option>
                                             <option value="faster">faster&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(turbo-int8-batch8&nbsp;&nbsp;6GB VRAM)</option>
-                                            <!-- kotoba-faster-whisper temporarily hidden (implementation preserved)
-                                            <option value="kotoba-faster-whisper">kotoba&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(kotoba-v2-fp16&nbsp;&nbsp;&nbsp;6GB VRAM)</option>
-                                            -->
                                             <option value="transformers">transformers&nbsp;&nbsp;(HF kotoba-bilingual&nbsp;6GB VRAM)</option>
-                                            <option value="crispasr">crispasr&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(external provider — set exe path)</option>
                                             <option value="anime" disabled>anime (future placeholder)</option>
                                         </select>
                                     </div>
@@ -275,37 +274,6 @@
                                         <strong>Transformers Mode:</strong> Uses HuggingFace pipeline with chunked long-form algorithm.
                                         Sensitivity presets do not apply. Use Ensemble tab's "Customize Parameters" button for fine-tuning.
                                     </p>
-                                </div>
-                            </div>
-
-                            <!-- Row 4: CrispASR settings (shown when crispasr mode selected).
-                                 Self-contained external provider — NOT the BYOP panel. -->
-                            <div class="byop-settings-panel" id="crispasrModeRow" style="display: none;">
-                                <div class="byop-settings-header">
-                                    <span class="byop-title">CrispASR (external provider)</span>
-                                    <span class="byop-hint">Self-contained engine — WhisperJAV scene/segmenter/enhancer settings do not apply</span>
-                                </div>
-                                <div class="byop-settings-row">
-                                    <label class="byop-label" for="crispasr-mode-backend">Backend</label>
-                                    <select id="crispasr-mode-backend" class="form-select compact">
-                                        <option value="parakeet" selected>parakeet (native word ts)</option>
-                                        <option value="whispercpp">whispercpp (whisper.cpp large-v2)</option>
-                                        <option value="cohere">cohere (native word ts)</option>
-                                    </select>
-                                </div>
-                                <div class="byop-settings-row">
-                                    <label class="byop-label" for="crispasr-mode-exe-path">Executable</label>
-                                    <input type="text" id="crispasr-mode-exe-path" class="form-input byop-path-input"
-                                           placeholder="Path to the crispasr executable" readonly
-                                           title="Click Browse to select the crispasr executable">
-                                    <button type="button" class="btn btn-secondary btn-compact" id="crispasr-mode-browse-btn"
-                                            title="Browse for the crispasr executable">Browse</button>
-                                </div>
-                                <div class="byop-settings-row">
-                                    <label class="byop-label" for="crispasr-mode-extra-args">Extra Args</label>
-                                    <input type="text" id="crispasr-mode-extra-args" class="form-input byop-args-input"
-                                           placeholder="e.g. --vad --split-on-punct"
-                                           title="Additional command-line arguments passed verbatim to crispasr">
                                 </div>
                             </div>
 
@@ -391,14 +359,9 @@
                                 </div>
                             </div>
 
-                            <!-- Row 3: Accept CPU mode -->
+                            <!-- Row 3: offline mode (1.10.0: the "Accept CPU-only mode" box is gone,
+                                 design 22.5.1 -- each install is made for one accelerator; nothing asks) -->
                             <div class="form-row" id="adv-row-3">
-                                <div class="form-group">
-                                    <label class="checkbox-label" title="The answer to the start-up check: when no usable GPU is found (none present, or the card is not supported by this PyTorch build) a run stops and asks whether to continue on the CPU. The GUI cannot ask, so without this box such a run aborts. Applies to Transcription and Ensemble runs (same as --accept-cpu-mode).">
-                                        <input type="checkbox" id="acceptCpuMode">
-                                        <span>Accept CPU-only mode (proceed on the CPU when the GPU is missing or unsupported)</span>
-                                    </label>
-                                </div>
                                 <div class="form-group">
                                     <label class="checkbox-label" title="Use only the Hugging Face models already downloaded and make no requests to huggingface.co (same as --offline). A model that has not been downloaded fails immediately instead of retrying for minutes. Silero via torch.hub, openai-whisper weights, ModelScope enhancers and NeMo configs are not covered.">
                                         <input type="checkbox" id="offlineMode">
@@ -477,20 +440,25 @@
                                                 <option value="transformers">Transformers (HF)</option>
                                             </optgroup>
                                             <optgroup label="ChronosJAV">
-                                                <option value="qwen" selected>Qwen3-ASR</option>
+                                                <option value="qwen">Qwen3-ASR</option>
                                                 <option value="anime-whisper">Anime-Whisper</option>
                                                 <option value="cohere" disabled>Cohere-Transcribe (not available yet)</option>
                                             </optgroup>
-                                            <optgroup label="External (CrispASR)">
-                                                <option value="crispasr">CrispASR</option>
+                                            <!-- 1.10.0 (item 5, REQ5): XXL as pass 1, as in the pass 2 menu -->
+                                            <optgroup label="External (BYOP)">
+                                                <option value="xxl">XXL Faster Whisper</option>
+                                            </optgroup>
+                                            <optgroup label="GGUF via crispasr">
+                                                <option value="parakeet-crispasr" title="Experimental in 1.10.0 (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">parakeet</option>
+                                                <option value="cohere-crispasr" selected title="Experimental in 1.10.0 (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">cohere</option>
                                             </optgroup>
                                         </select>
                                     </div>
                                     <div class="col-separator"></div>
                                     <div class="col-sensitivity">
                                         <select id="pass1-sensitivity" class="form-select compact">
-                                            <option value="aggressive" selected>Aggressive</option>
-                                            <option value="balanced">Balanced</option>
+                                            <option value="aggressive">Aggressive</option>
+                                            <option value="balanced" selected>Balanced</option>
                                             <option value="conservative">Conservative</option>
                                         </select>
                                     </div>
@@ -510,14 +478,8 @@
                                                 <option value="ffmpeg-dsp">Audio Filters...</option>
                                             </optgroup>
                                             <optgroup label="ZipEnhancer (Recommended)">
-                                                <option value="zipenhancer">Torch (GPU)</option>
+                                                <option value="zipenhancer">PyTorch (GPU when available)</option>
                                                 <option value="zipenhancer:onnx" disabled class="coming-soon">ONNX (Coming Soon)</option>
-                                            </optgroup>
-                                            <optgroup label="ClearVoice">
-                                                <option value="clearvoice:MossFormer2_SE_48K" disabled title="Unstable on 8GB VRAM - causes memory fragmentation">MossFormer2 48kHz (Unstable)</option>
-                                                <option value="clearvoice:FRCRN_SE_16K">FRCRN 16kHz</option>
-                                                <option value="clearvoice:MossFormerGAN_SE_16K">MossFormerGAN 16kHz</option>
-                                                <option value="clearvoice:MossFormer2_SS_16K">MossFormer2 SS 16kHz</option>
                                             </optgroup>
                                             <optgroup label="BS-RoFormer">
                                                 <option value="bs-roformer:vocals" disabled class="coming-soon">Vocals (Coming Soon)</option>
@@ -573,6 +535,9 @@
                                         <span id="pass1-badge" class="pass-badge default">DEFAULT</span>
                                     </div>
                                 </div>
+
+                                <!-- Pass 1 CrispASR status (shown when a GGUF pipeline is selected; T16) -->
+                                <div class="crispasr-status-panel" id="pass1-crispasr-status" style="display: none;"></div>
 
                                 <!-- Pass 1 DSP Effects Panel (shown when FFmpeg DSP selected) -->
                                 <div class="dsp-effects-panel" id="pass1-dsp-panel" style="display: none;">
@@ -646,14 +611,15 @@
                                             </optgroup>
                                             <optgroup label="ChronosJAV">
                                                 <option value="qwen">Qwen3-ASR</option>
-                                                <option value="anime-whisper" selected>Anime-Whisper</option>
+                                                <option value="anime-whisper">Anime-Whisper</option>
                                                 <option value="cohere" disabled>Cohere-Transcribe (not available yet)</option>
                                             </optgroup>
                                             <optgroup label="External (BYOP)">
                                                 <option value="xxl">XXL Faster Whisper</option>
                                             </optgroup>
-                                            <optgroup label="External (CrispASR)">
-                                                <option value="crispasr">CrispASR</option>
+                                            <optgroup label="GGUF via crispasr">
+                                                <option value="parakeet-crispasr" selected title="Experimental in 1.10.0 (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">parakeet</option>
+                                                <option value="cohere-crispasr" title="Experimental in 1.10.0 (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">cohere</option>
                                             </optgroup>
                                         </select>
                                     </div>
@@ -681,14 +647,8 @@
                                                 <option value="ffmpeg-dsp">Audio Filters...</option>
                                             </optgroup>
                                             <optgroup label="ZipEnhancer (Recommended)">
-                                                <option value="zipenhancer">Torch (GPU)</option>
+                                                <option value="zipenhancer">PyTorch (GPU when available)</option>
                                                 <option value="zipenhancer:onnx" disabled class="coming-soon">ONNX (Coming Soon)</option>
-                                            </optgroup>
-                                            <optgroup label="ClearVoice">
-                                                <option value="clearvoice:MossFormer2_SE_48K" disabled title="Unstable on 8GB VRAM - causes memory fragmentation">MossFormer2 48kHz (Unstable)</option>
-                                                <option value="clearvoice:FRCRN_SE_16K">FRCRN 16kHz</option>
-                                                <option value="clearvoice:MossFormerGAN_SE_16K">MossFormerGAN 16kHz</option>
-                                                <option value="clearvoice:MossFormer2_SS_16K">MossFormer2 SS 16kHz</option>
                                             </optgroup>
                                             <optgroup label="BS-RoFormer">
                                                 <option value="bs-roformer:vocals" disabled class="coming-soon">Vocals (Coming Soon)</option>
@@ -745,6 +705,9 @@
                                     </div>
                                 </div>
 
+                                <!-- Pass 2 CrispASR status (shown when a GGUF pipeline is selected; T16) -->
+                                <div class="crispasr-status-panel" id="pass2-crispasr-status" style="display: none;"></div>
+
                                 <!-- Pass 2 DSP Effects Panel (shown when FFmpeg DSP selected) -->
                                 <div class="dsp-effects-panel" id="pass2-dsp-panel" style="display: none;">
                                     <div class="dsp-effects-header">
@@ -796,7 +759,7 @@
                                     </div>
                                 </div>
 
-                                <!-- BYOP Settings Row (shown when XXL Faster Whisper selected as Pass 2) -->
+                                <!-- BYOP Settings Row (shown when XXL Faster Whisper is selected in either pass; one panel for both) -->
                                 <div class="byop-settings-panel" id="byop-settings-panel" style="display: none;">
                                     <div class="byop-settings-header">
                                         <span class="byop-title">XXL Faster Whisper</span>
@@ -812,34 +775,12 @@
                                     </div>
                                     <div class="byop-settings-row">
                                         <label class="byop-label" for="xxl-extra-args">Extra Args</label>
+                                        <!-- 1.10.0 (item 5, owner W271 4): no model here; the Model column picks it.
+                                             Texts G2 (placeholder) and G3 (title), approved by the owner as drafted (W275). -->
                                         <input type="text" id="xxl-extra-args" class="form-input byop-args-input"
-                                               value="--model large-v3 --verbose True --standard_asia"
-                                               placeholder="e.g. --model large-v3 --verbose --standard_asia"
-                                               title="Additional command-line arguments passed directly to XXL">
-                                    </div>
-                                </div>
-
-                                <!-- CrispASR Settings Row (shown when CrispASR selected as Pass 1 or Pass 2).
-                                     Separate from the BYOP panel — CrispASR is not BYOP/XXL coupled.
-                                     Backend is chosen via the per-pass Model column. -->
-                                <div class="byop-settings-panel" id="crispasr-settings-panel" style="display: none;">
-                                    <div class="byop-settings-header">
-                                        <span class="byop-title">CrispASR (external provider)</span>
-                                        <span class="byop-hint">Backend is selected in the Model column. Exe path is shared across passes.</span>
-                                    </div>
-                                    <div class="byop-settings-row">
-                                        <label class="byop-label" for="crispasr-exe-path">Executable</label>
-                                        <input type="text" id="crispasr-exe-path" class="form-input byop-path-input"
-                                               placeholder="Path to the crispasr executable" readonly
-                                               title="Click Browse to select the crispasr executable">
-                                        <button type="button" class="btn btn-secondary btn-compact" id="crispasr-browse-btn"
-                                                title="Browse for the crispasr executable">Browse</button>
-                                    </div>
-                                    <div class="byop-settings-row">
-                                        <label class="byop-label" for="crispasr-extra-args">Extra Args</label>
-                                        <input type="text" id="crispasr-extra-args" class="form-input byop-args-input"
-                                               placeholder="e.g. --vad --split-on-punct"
-                                               title="Additional command-line arguments passed verbatim to crispasr">
+                                               value="--verbose True --standard_asia"
+                                               placeholder="e.g. --verbose True --standard_asia (choose the model in the Model column)"
+                                               title="Additional command-line arguments passed directly to XXL. The model is chosen in the Model column; a --model here is not used.">
                                     </div>
                                 </div>
 
@@ -875,7 +816,6 @@
                                             <option value="" disabled selected>— Select a Provider —</option>
                                             <optgroup label="Local LLM">
                                                 <option value="ollama">Ollama</option>
-                                                <option value="local">llama-cpp (deprecated)</option>
                                             </optgroup>
                                             <optgroup label="Cloud AI">
                                                 <option value="deepseek">DeepSeek</option>
@@ -935,9 +875,6 @@
                                             <span class="ollama-ready-text">Ollama server connected</span>
                                         </div>
                                     </div>
-                                    <div id="ensembleDeprecationHint" class="provider-deprecation-hint" style="display:none">
-                                        This backend is being retired in v1.9.0. Consider switching to Ollama.
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -963,7 +900,6 @@
                                                 <option value="" disabled selected>— Select a Provider —</option>
                                                 <optgroup label="Local LLM">
                                                     <option value="ollama">Ollama</option>
-                                                    <option value="local">llama-cpp (deprecated)</option>
                                                 </optgroup>
                                                 <optgroup label="Cloud AI">
                                                     <option value="deepseek">DeepSeek</option>
@@ -1013,9 +949,6 @@
                                                 <span class="ollama-ready-dot"></span>
                                                 <span class="ollama-ready-text">Ollama server connected</span>
                                             </div>
-                                        </div>
-                                        <div id="srtDeprecationHint" class="provider-deprecation-hint" style="display:none">
-                                            This backend is being retired in v1.9.0. Consider switching to Ollama.
                                         </div>
                                         <div class="form-group">
                                             <label for="translatorModel" class="form-label">Model:</label>
@@ -1185,7 +1118,7 @@
                     </div>
                 </div>
                 <div class="section-content">
-                    <div class="console-output" id="consoleOutput">
+                    <div class="console-output" id="consoleOutput" data-i18n-skip>
                         <div class="console-line">Ready.</div>
                     </div>
                 </div>
@@ -1257,6 +1190,23 @@
         </div>
     </div>
 
+    <!-- A run that did not start, or ended without a run summary (design 22.9.2; owner D-G) -->
+    <div class="modal-overlay" id="runStopModal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h2 id="runStopTitle">The run did not start</h2>
+                <button class="modal-close" onclick="RunStopDialog.close()" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="runStopText"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="runStopCpuBtn" onclick="RunStopDialog.runOnCpu()" style="display: none;">Run on the CPU this time</button>
+                <button class="btn btn-primary" onclick="RunStopDialog.close()">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Changelog Modal -->
     <div class="modal-overlay" id="changelogModal">
         <div class="modal-dialog">
@@ -1274,7 +1224,7 @@
                         <span class="changelog-version" id="changelogVersion">v1.7.5</span>
                         <span class="changelog-date" id="changelogDate"></span>
                     </div>
-                    <div class="changelog-notes" id="changelogNotes">
+                    <div class="changelog-notes" id="changelogNotes" data-i18n-skip>
                         <!-- Release notes will be inserted here -->
                     </div>
                 </div>
@@ -1334,7 +1284,7 @@
                             <div id="stableReleaseNotes" class="release-notes-section" style="display: none;">
                                 <details class="release-notes-details">
                                     <summary>Release Notes</summary>
-                                    <div id="stableReleaseNotesContent" class="release-notes-content"></div>
+                                    <div id="stableReleaseNotesContent" class="release-notes-content" data-i18n-skip></div>
                                 </details>
                             </div>
                             <div id="stableActions" class="track-actions" style="display: none;">
@@ -1361,7 +1311,7 @@
                             </div>
                             <div id="devCommitsList" class="dev-commits-list" style="display: none;">
                                 <div class="commits-header">Recent commits:</div>
-                                <ul id="devRecentCommits" class="commits-list"></ul>
+                                <ul id="devRecentCommits" class="commits-list" data-i18n-skip></ul>
                             </div>
                             <div id="devActions" class="track-actions" style="display: none;">
                                 <button id="updateToDev" class="btn btn-secondary btn-sm">Open Release Page</button>
@@ -1609,7 +1559,8 @@
         </div>
     </div>
 
-    <!-- JavaScript -->
+    <!-- JavaScript. i18n_zh.js: the Simplified Chinese texts (1.10.0, item 6), read by I18n in app.js -->
+    <script src="i18n_zh.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

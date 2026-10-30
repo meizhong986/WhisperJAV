@@ -1,6 +1,6 @@
 # AI 字幕翻译
 
-WhisperJAV 可以使用 AI 语言模型将日语字幕翻译为其他语言。翻译既可以作为独立工具使用，也可以集成到转录处理管线中。
+WhisperJAV 可以使用 大语言模型将日语字幕翻译为其他语言。翻译既可以作为独立工具使用，也可以集成到转写处理管线中。
 
 ---
 
@@ -9,7 +9,6 @@ WhisperJAV 可以使用 AI 语言模型将日语字幕翻译为其他语言。�
 | 提供商 | 类型 | 需要 API 密钥 | 适用场景 |
 |--------|------|--------------|----------|
 | **Ollama** | 本地 | 否 | 隐私、免费、易于配置。推荐用于本地翻译。 |
-| **本地大语言模型** | 本地 | 否 | 旧版本地选项 (llama-cpp)。建议改用 Ollama。 |
 | **DeepSeek** | 云端 | 是 | 性价比高，CJK 语言质量好 |
 | **Gemini** | 云端 | 是 | 多语言支持好 |
 | **Claude** | 云端 | 是 | 高质量 |
@@ -57,16 +56,9 @@ OllamaManager 自动启动服务器、检测你的 GPU，并推荐模型：
 | 12 GB | gemma3:12b |
 | 16 GB+ | qwen2.5:14b |
 
-### 本地大语言模型（旧版）
+### 使用 llama-cpp 的本地翻译：已在 1.10 中移除
 
-Local 提供商在你的机器上运行 llama-cpp 服务器。无需 API 密钥，但需要：
-
-- 约 8GB 显存的 GPU
-- 安装 `[llm]` extra（`pip install whisperjav[llm]`）
-- GGUF 模型文件（首次使用时自动下载）
-
-!!! note "说明"
-    建议切换到 Ollama — 更易配置、更可靠，且支持更多模型。
+`local`（llama-cpp）提供商已在 WhisperJAV 1.10 中移除。Ollama 是本地翻译工具。已保存的 llama-cpp 选择会以 Ollama 打开；`--provider local` 会停止，并提示改用 `--provider ollama`。
 
 ---
 
@@ -81,16 +73,16 @@ Local 提供商在你的机器上运行 llama-cpp 服务器。无需 API 密钥�
 
 ## 两种翻译方式
 
-### 方式一：转录时同步翻译
+### 方式一：转写时同步翻译
 
-在一个工作流程中完成转录和翻译：
+在一个工作流程中完成转写和翻译：
 
-1. 在 **Ensemble** 标签页配置你的转录设置
+1. 在 **专家模式**（Ensemble）标签页配置你的转写设置
 2. 在合并策略后面勾选 **"AI-translate"**
 3. 选择提供商和模型
 4. 点击 **Start**
 
-转录完成后自动运行翻译。
+转写完成后自动运行翻译。
 
 ### 方式二：翻译已有的 SRT
 
@@ -125,7 +117,7 @@ WhisperJAV 会根据上下文窗口大小自动调整批量大小，但你也可
 
 ```bash
 # CLI：显式设置批量大小
-whisperjav-translate -i subtitles.srt --provider local --max-batch-size 10
+whisperjav-translate -i subtitles.srt --provider ollama --max-batch-size 10
 
 # 或持久化配置
 whisperjav-translate --configure
@@ -164,5 +156,5 @@ whisperjav-translate -i subtitles.srt --target-language portuguese
 whisperjav-translate -i subtitles.srt --target-language Chinese
 
 # 本地大语言模型减小批量大小（适用于 8K 上下文窗口模型）
-whisperjav-translate -i subtitles.srt --provider local --max-batch-size 10
+whisperjav-translate -i subtitles.srt --provider ollama --max-batch-size 10
 ```

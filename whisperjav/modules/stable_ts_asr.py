@@ -21,7 +21,7 @@ except Exception:  # pragma: no cover - optional dependency guard
     snapshot_download = None
 
 from whisperjav.utils.logger import logger
-from whisperjav.utils.device_detector import get_best_device
+from whisperjav.utils.device_detector import APPLE_SILICON_CTRANSLATE2_TEXT, ctranslate2_device, get_best_device
 from whisperjav.modules.japanese_postprocessor import JapanesePostProcessor
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
 
@@ -150,9 +150,11 @@ class StableTSASR:
         # Use smart device detection: CUDA -> MPS -> CPU
         # Standard mode wraps OpenAI Whisper which does NOT accept "auto" —
         # it passes device to torch.load(map_location=device). Resolve here.
-        self.device = model_config.get("device") or get_best_device()
+        self.device = model_config.get("device") or "auto"
         if self.device == "auto":
-            self.device = get_best_device()
+            # turbo_mode runs on CTranslate2, which decides whether it can use the GPU
+            # (design 22.3.3); standard mode is PyTorch.
+            self.device = ctranslate2_device("auto") if turbo_mode else get_best_device()
         self.turbo_mode = turbo_mode
 
         # CTRANSLATE2 COMPATIBILITY: MPS is not supported by ctranslate2/faster-whisper
@@ -160,11 +162,7 @@ class StableTSASR:
         # CTranslate2 only supports "cuda" or "cpu" devices.
         # See: https://github.com/OpenNMT/CTranslate2/issues/1562
         if self.device == "mps" and self.turbo_mode:
-            logger.warning(
-                "Apple Silicon MPS detected, but faster-whisper/ctranslate2 doesn't support MPS. "
-                "Using CPU mode with Apple Accelerate optimization. "
-                "For GPU acceleration on Mac, use --mode transformers instead."
-            )
+            logger.warning(APPLE_SILICON_CTRANSLATE2_TEXT)  # T53 (design 22.8)
             self.device = "cpu"
 
         # Default to int8 for quantized models (faster-whisper uses CTranslate2 quantized models)
@@ -268,7 +266,8 @@ class StableTSASR:
         try:
             snapshot_dir = snapshot_download(
                 repo_id=self.model_repo,
-                resume_download=not force,
+                # v1.10.0 (item 3): huggingface-hub 1.x removed resume_download; it
+                # always resumes an interrupted download.
                 force_download=force,
                 local_files_only=False,
                 allow_patterns=[

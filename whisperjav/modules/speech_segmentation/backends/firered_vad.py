@@ -398,6 +398,7 @@ class FireRedVadSpeechSegmenter:
                 audio_duration_sec=duration,
                 parameters=self._get_parameters(),
                 processing_time_sec=time.time() - start_time,
+                error=str(e) or type(e).__name__,
             )
 
         groups = group_segments(segments, self.max_group_duration_s, self.chunk_threshold_s)

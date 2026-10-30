@@ -98,4 +98,5 @@ def test_main_no_longer_deletes_every_file_it_finds():
 def test_work_dirs_are_shared_with_the_labeller():
     """Cleanup and labelling must not keep separate folder lists again."""
     assert "resampled_scenes" in WHISPERJAV_WORK_DIRS
-    assert "crispasr_out" in WHISPERJAV_WORK_DIRS
+    assert "crispasr_stage" in WHISPERJAV_WORK_DIRS  # a CrispASR model staged under a plain name (route B)
+    assert "crispasr_out" not in WHISPERJAV_WORK_DIRS  # the removed program route's working folders

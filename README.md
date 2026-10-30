@@ -235,7 +235,7 @@ Each stage has several interchangeable providers — the full menu, with strengt
 | **qwen** (ChronosJAV) | Qwen3-ASR | Modern text-first recognizer |
 | **anime-whisper** (ChronosJAV) | anime-whisper | Anime/JAV-tuned dialogue |
 | **transformers** | HuggingFace | Kotoba and other HF Whisper models |
-| **crispasr** | External | Bring-your-own CrispASR build (experimental) |
+| **parakeet-crispasr**, **cohere-crispasr** (Ensemble passes) | CrispASR (GGUF models) | Japanese; experimental in 1.10.0 |
 
 **Sensitivity** applies to every mode: **conservative** (fewer false positives, good for noisy content) · **balanced** · **aggressive** (catches more quiet dialogue; good for whisper/ASMR content — and the tuning target of most of our benchmark work).
 
@@ -262,7 +262,7 @@ whisperjav video.mp4 --ensemble \
 - **Merge strategies:** `pass1_primary` / `pass2_primary` (one pass leads, the other fills gaps), `smart_merge`, `full_merge`, `pass1_overlap` / `pass2_overlap`, `longest`
 - **Presets:** save and reload named ensemble configurations from the GUI
 - **Serial mode** (`--ensemble-serial`): finish each file completely before starting the next, so results appear as they're done
-- **Bring your own pass 2:** [PurfView's Faster-Whisper XXL](https://github.com/Purfview/whisper-standalone-win) (`--pass2-pipeline xxl --xxl-exe ...`) or an external CrispASR build
+- **Bring your own pass 1, pass 2 or both:** [PurfView's Faster-Whisper XXL](https://github.com/Purfview/whisper-standalone-win) (`--pass1-pipeline xxl` and/or `--pass2-pipeline xxl`, with `--xxl-exe ...`; the model with `--pass1-model` / `--pass2-model`, default `large-v2`)
 
 ---
 
@@ -283,7 +283,8 @@ The recipe that ties the other choices together.
 | **qwen** (ChronosJAV) | Modern text-first recognizer; robust on messy audio | Timestamps come from the VAD, so the segmenter choice matters doubly |
 | **anime-whisper** (ChronosJAV) | Best-in-class on anime-style/JAV dialogue; heavily benchmark-tuned here | Can miss very faint, isolated utterances |
 | **transformers** | Runs any HF Whisper model; best GPU path on Apple Silicon | Uses HF's own chunking — scene/segmenter choices don't apply |
-| **crispasr** / **xxl** | Bring your own external engine as a pass | Self-contained: WhisperJAV's knobs don't reach inside |
+| **parakeet-crispasr** / **cohere-crispasr** | GGUF models through CrispASR, installed with WhisperJAV; scene detection, enhancement and VAD work as for the other passes | Experimental in 1.10.0; Japanese only |
+| **xxl** | Bring your own external engine as a pass | Self-contained: WhisperJAV's knobs don't reach inside |
 
 > **Naming note (CLI users).** *ChronosJAV* is one pipeline with interchangeable recognizers, so **qwen** and **anime-whisper** are two backends of it rather than two separate pipelines. The GUI lists them side by side in the pipeline dropdown; on the command line both live under `qwen`, and the backend is chosen inside the params:
 >
@@ -317,8 +318,7 @@ Off by default — remember the pre-processing paradox. The **"Enhance for VAD o
 | **none** | No artefacts, no surprises — the right default | Won't rescue genuinely bad audio |
 | **ffmpeg-dsp** | Transparent classic filters (loudnorm, denoise, compress…); loudnorm genuinely helps very quiet recordings | Aggressive settings dull consonants |
 | **zipenhancer** | Lightweight neural denoise; good against hiss | 16 kHz processing; can soften detail |
-| **clearvoice** | Stronger neural denoise, up to 48 kHz | Heavier; artefact risk on music-heavy audio |
-| **bs-roformer** | Vocal isolation — separates voice from loud BGM | The biggest intervention of all; reserve for music-dominated content |
+| **htdemucs** | Vocal isolation — separates voice from loud BGM | The biggest intervention of all; reserve for music-dominated content |
 
 ### Speech segmentation (VAD)
 
@@ -393,7 +393,6 @@ whisperjav-translate -i subtitles.srt --provider ollama
 | DeepSeek | cheap | Good quality/price for this content |
 | Gemini | free tier | |
 | Claude / GPT / OpenRouter / GLM / Groq | paid API | |
-| Local LLM (llama-cpp) | free, local | Legacy option; auto-installs on first use |
 
 Interrupted translations resume where they left off — just run the same command again.
 
@@ -430,7 +429,9 @@ These are starting points, not rules — see [Mix-and-match strategies](#mix-and
 
 ## Installation
 
-> **Already installed?** Upgrade with `whisperjav-upgrade` (all platforms). Rollback is available: `whisperjav-upgrade --rollback`.
+> **Already on 1.10?** Windows installer: upgrade with `whisperjav-upgrade`; it keeps the accelerator of your install. Source install: `git fetch --tags`, `git checkout` the new release tag, and run the installer again with the same Python environment active. Rollback is available: `whisperjav-upgrade --rollback`. **On 1.9.x?** Install 1.10.0 fresh: it needs Python 3.13, so `whisperjav-upgrade` cannot take 1.9.x to it.
+>
+> **Each install is made for one accelerator**, chosen when you install: NVIDIA GPU (CUDA), GPU through Vulkan (AMD, Intel or older NVIDIA card, Windows), Apple GPU (Metal), your own PyTorch, or CPU only. See [Accelerated or not](https://meizhong986.github.io/WhisperJAV/getting-started/#accelerated-or-not).
 
 ### Windows — standalone installer (recommended)
 
@@ -438,23 +439,23 @@ No Python knowledge needed.
 
 1. Download the `.exe` from [**Releases**](https://github.com/meizhong986/WhisperJAV/releases/latest)
 2. Run it — no admin rights required (installs to `%LOCALAPPDATA%\WhisperJAV`)
-3. Wait 10–20 minutes while it sets up Python, PyTorch, FFmpeg and dependencies. It detects your NVIDIA driver and installs the matching CUDA build automatically (or CPU-only if no GPU)
+3. Wait 10–30 minutes while it sets up Python, PyTorch, FFmpeg and dependencies. With a supported NVIDIA GPU (GTX 16 / RTX 20 or newer, driver 580+) it installs for the GPU by itself; otherwise a window asks what the install should be made for
 4. Launch from the desktop shortcut. First transcription downloads models (~3 GB)
 
 ### Google Colab / Kaggle
 
-No local install at all — use the badges at the top of this page. Maintained notebooks for both platforms.
+Not supported by 1.10.0, which is made and tested for installs on your own computer only. The Colab expert notebook (badge at the top) keeps installing 1.9.5.
 
 <details>
 <summary><b>Windows — install from source</b></summary>
 
-Prerequisites: Python 3.10–3.12, Git, FFmpeg in PATH.
+Prerequisites: Python 3.13, Git, FFmpeg in PATH.
 
 ```batch
-git clone https://github.com/meizhong986/whisperjav.git
+git clone --branch v1.10.0 https://github.com/meizhong986/whisperjav.git
 cd whisperjav
-installer\install_windows.bat            :: auto-detects GPU
-installer\install_windows.bat --cpu-only :: or force CPU
+installer\install_windows.bat                    :: a supported NVIDIA GPU is used; otherwise it asks
+installer\install_windows.bat --accelerator cpu  :: or choose: nvidia, vulkan, own-pytorch, cpu
 ```
 
 Full guide: [docs/en/guides/installation_windows_python.md](docs/en/guides/installation_windows_python.md)
@@ -465,15 +466,15 @@ Full guide: [docs/en/guides/installation_windows_python.md](docs/en/guides/insta
 
 ```bash
 xcode-select --install
-brew install python@3.12 ffmpeg portaudio git
+brew install python@3.13 ffmpeg portaudio git
 
-git clone https://github.com/meizhong986/whisperjav.git
+git clone --branch v1.10.0 https://github.com/meizhong986/whisperjav.git
 cd whisperjav
-python3 -m venv ~/venvs/whisperjav && source ~/venvs/whisperjav/bin/activate
+python3.13 -m venv ~/venvs/whisperjav && source ~/venvs/whisperjav/bin/activate
 chmod +x installer/install_mac.sh && ./installer/install_mac.sh
 ```
 
-M-series chips get MPS acceleration for Whisper pipelines (`--mode transformers` performs best). The CTranslate2-based modes and the Qwen pipeline currently run on CPU on Mac. Intel Macs are CPU-only.
+Apple silicon, macOS 14 or newer; the install is made for the Apple GPU (Metal). The transformers pipeline uses the Apple GPU and is recommended on a Mac; fidelity and the GGUF pipelines ask for it (not yet tested on a Mac); balanced, fast, faster and ChronosJAV run on the CPU. Intel Macs are not supported by 1.10.0.
 
 Full guide: [docs/en/guides/installation_mac_apple_silicon.md](docs/en/guides/installation_mac_apple_silicon.md)
 </details>
@@ -491,12 +492,12 @@ sudo apt-get install -y python3 python3-pip python3-venv python3-dev \
 Then:
 
 ```bash
-git clone https://github.com/meizhong986/whisperjav.git
+git clone --branch v1.10.0 https://github.com/meizhong986/whisperjav.git
 cd whisperjav
 chmod +x installer/install_linux.sh && ./installer/install_linux.sh
 ```
 
-You need the NVIDIA driver (450+), but not the CUDA Toolkit — PyTorch bundles its own runtime. On distros with externally-managed Python (Ubuntu 24.04+), use a venv; the script detects this and tells you what to do.
+Linux with glibc 2.35 or newer (Ubuntu 22.04+, Debian 12+, Fedora 36+) and Python 3.13. For the GPU you need the NVIDIA driver (570+), but not the CUDA Toolkit — PyTorch bundles its own runtime. On distros with externally-managed Python (Ubuntu 24.04+), use a venv; the script detects this and tells you what to do.
 
 The GUI needs a pywebview backend **inside** your environment — the distro's WebKit2GTK packages install system-wide, where a plain virtual environment cannot see them, which is why the GUI can still stop with `ModuleNotFoundError: No module named 'gi'`. Either `pip install "pywebview[qt]"` (the Qt backend, no system GTK bindings needed), or create the venv with `python3 -m venv --system-site-packages` so it can see the distro's bindings.
 
@@ -504,45 +505,32 @@ Full guide: [docs/en/guides/installation_linux.md](docs/en/guides/installation_l
 </details>
 
 <details>
-<summary><b>Expert: pip with modular extras</b></summary>
+<summary><b>Expert: your own Python environment and PyTorch</b></summary>
 
-Install PyTorch first (pick your platform):
-
-```bash
-pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128  # NVIDIA
-pip install torch torchaudio                                                     # Apple Silicon
-pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu    # CPU
-```
-
-Then WhisperJAV with the extras you want:
+Every 1.10.0 install gets the package versions this release was tested with: `install.py` installs them from the lock file with `uv sync`. To keep a PyTorch build you already have in your environment (for example ROCm for an AMD GPU), install with:
 
 ```bash
-pip install "whisperjav[all] @ git+https://github.com/meizhong986/whisperjav.git"
+python install.py --accelerator own-pytorch
 ```
 
-Extras: `cli`, `gui`, `translate`, `llm`, `enhance`, `huggingface`, `analysis`, `colab`, `all`.
+WhisperJAV then installs everything except PyTorch and never replaces it (experimental in 1.10.0).
 </details>
 
 ### System requirements
 
 | | Minimum | Recommended |
 |---|---|---|
-| OS | Windows 10 / macOS 11 / Ubuntu 20.04 | Windows 11 / macOS 14 / Ubuntu 22.04 |
-| Python (source installs) | 3.10 | 3.11 |
+| OS | Windows 10 (x86-64) / macOS 14 on Apple silicon / Linux with glibc 2.35 (Ubuntu 22.04) | Windows 11 / macOS 14 or newer / Ubuntu 24.04 |
+| Python (source installs) | 3.13 | 3.13 |
 | RAM | 8 GB | 16 GB |
 | Disk | 8 GB | 15 GB with models |
-| GPU | none (CPU works, slowly) | NVIDIA RTX 2060+ or Apple Silicon |
+| GPU | none (CPU works, slowly) | NVIDIA GTX 16 / RTX 20 or newer, or Apple silicon |
 
 Rough speed per hour of video: **RTX GPU** 5–10 min · **Apple Silicon** 8–15 min · **CPU** 30–60 min.
 
-### CPU-only users
+### Without a supported NVIDIA GPU
 
-When WhisperJAV finds no usable GPU at start-up it stops and asks whether to continue on the CPU. In the GUI, tick **Accept CPU-only mode** on the Advanced tab (the GUI cannot ask, so without the box the run aborts and tells you to tick it); on the command line pass `--accept-cpu-mode` or `--device cpu`.
-
-- **No GPU at all:** everything then runs on the CPU. The Whisper-family pipelines (Balanced, Faster, Fast, Fidelity) are the practical choice at the rough speed above. The ChronosJAV models (Qwen3-ASR, anime-whisper, Cohere) and the neural speech enhancers also fall back to the CPU but were not timed there and will be far slower.
-- **A GPU the installed PyTorch cannot use** (a GTX 10-series card with the current installer): the Whisper-family pipelines honour the CPU choice. Qwen3-ASR, anime-whisper, Cohere and the transformers pipeline still try the card unless their own device setting says CPU: `--qwen-device cpu` / `--hf-device cpu` on the command line, or in the GUI the pass's *Customize Parameters* → *Model* → *Hardware* → *Device*. The NeMo segmenter and the ZipEnhancer and ClearVoice enhancers try the card and fail, with no override in this release. Simplest: use Balanced, Faster, Fast or Fidelity with speech enhancement off, or install a PyTorch build with kernels for the card.
-
-Details: [v1.9.2 release notes, "CPU-only users"](docs/release_notes_v1.9.2.md#cpu-only-users).
+Choose what the install is made for when you install — GPU through Vulkan (Windows: AMD, Intel or older NVIDIA card; the GGUF pipelines use it, experimental), your own PyTorch, or CPU only. Every run then follows that choice; nothing needs ticking. At the start of each run WhisperJAV says where each part runs. `--device cpu` runs one job on the CPU. Details: [Accelerated or not](https://meizhong986.github.io/WhisperJAV/getting-started/#accelerated-or-not).
 
 ---
 
@@ -550,7 +538,7 @@ Details: [v1.9.2 release notes, "CPU-only users"](docs/release_notes_v1.9.2.md#c
 
 - **The Windows installer stopped and said the installation failed.** Since v1.9.2 it checks that what WhisperJAV needs to run actually imports, and **stops rather than leaving you a shortcut to a broken install**. It names what failed and writes `INSTALLATION_FAILED_v<version>.txt` next to `install_log_v<version>.txt` in the installation folder. Run the installer again first — the usual cause is a download that did not finish. If it fails twice, attach both files to an issue.
 - **"FFmpeg not found"** — install FFmpeg and add it to PATH.
-- **Very slow, GPU warning in log** — your PyTorch is CPU-only. Reinstall it with the CUDA index URL shown above.
+- **Very slow** — run `whisperjav --check`, or read the box at the start of a run: they say where each part runs. On a CPU-only install everything runs on the CPU, several times slower than on a GPU.
 - **`model.bin` error in faster mode** — enable Windows Developer Mode (or run once as admin), then delete the cached model folder under `%USERPROFILE%\.cache\huggingface\hub`.
 - **An empty or very short subtitle file, with the run reporting success.** v1.9.2 fixes one cause of this on Balanced and now reports the outcome per file rather than always claiming success — see [New in v1.9.2](#new-in-v192). If it still happens, that is worth a report.
 - Anything else: open a [GitHub issue](https://github.com/meizhong986/WhisperJAV/issues) with your system info and the console log. `tools/whisperjav_env_report.py` in this repository prints your package versions, GPU, driver and CUDA in one go — run it with the same Python that runs WhisperJAV (Windows users can right-click `whisperjav_env_report.ps1`). Logs and reproduction details make fixes much faster.

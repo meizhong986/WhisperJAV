@@ -42,7 +42,7 @@ The GUI is divided into five areas, top to bottom:
 
 | Area | Purpose |
 |------|---------|
-| **Header bar** | Theme switcher (4 themes) and update check button |
+| **Header bar** | Theme switcher (4 themes), language button (English / 中文) and update check button |
 | **Source** | Add video/audio files to process |
 | **Destination** | Where to save output SRT files |
 | **Options tabs** | Four tabs of configuration (see sections 5–8) |
@@ -58,6 +58,16 @@ Click the palette icon in the header to cycle through themes:
 | Google | Material Design inspired |
 | Carbon | IBM Carbon dark theme |
 | Primer | GitHub-style neutral palette |
+
+### Interface language (English / 中文)
+
+The **中文** button in the header, next to the palette icon, switches the window to Simplified Chinese. In Chinese the button
+reads **English** and switches back. The change is immediate; the file list and a run in progress are not affected.
+
+- **In Chinese:** tabs, buttons, menus, tooltips, pop-up boxes, Customize Parameters and Translation Settings.
+- **Stays English:** the console, file names, the messages written while files are processed, and the Parameter Guide page.
+- The language is kept for the next start, whether or not **Remember settings** is ticked. On Windows, the very first start
+  follows the display language: Chinese when Windows is set to Chinese, English otherwise.
 
 ---
 
@@ -152,7 +162,6 @@ The **Advanced** tab (Tab 2) provides additional controls for troubleshooting an
 | **Debug logging** | Off | Writes detailed debug logs to `whisperjav.log` |
 | **Keep temp files** | Off | Preserves intermediate audio chunks and processing artifacts |
 | **Custom temp dir** | System default | When "Keep temp files" is on, optionally choose where to store them |
-| **Accept CPU-only mode** | Off | Required on a machine without a usable GPU: the start-up check stops and asks whether to continue on the CPU, and the GUI cannot ask, so without this box such a run aborts. Much slower. |
 
 ---
 
@@ -176,10 +185,10 @@ Always active. Each pass has identical controls:
 
 | Control | Options | Default |
 |---------|---------|---------|
-| **Pipeline** | Balanced, Fast, Faster, Fidelity, Transformers, Qwen3-ASR, ChronosJAV, XXL Faster Whisper | Balanced |
+| **Pipeline** | Balanced, Fast, Faster, Fidelity, Transformers, Qwen3-ASR, Anime-Whisper, Parakeet-CrispASR, Cohere-CrispASR, XXL Faster Whisper | Balanced |
 | **Sensitivity** | Aggressive, Balanced, Conservative | Aggressive |
 | **Scene Detector** | Auditok, Silero, Semantic, None | Semantic |
-| **Speech Enhancer** | None, FFmpeg DSP, ZipEnhancer, ClearVoice, BS-RoFormer | None |
+| **Speech Enhancer** | None, FFmpeg DSP, ZipEnhancer, htdemucs (BS-RoFormer and ZipEnhancer ONNX: coming soon) | None |
 | **Speech Segmenter** | Silero v6.2, v4.0, v3.1, Whisper VAD, TEN, None | Silero v6.2 |
 | **Model** | Depends on pipeline — Large V2/V3/Turbo (Whisper) or 1.7B/0.6B (Qwen) | Pipeline default |
 
@@ -192,7 +201,8 @@ The pipeline dropdown groups options by backend:
 - **Whisper-Based**: Balanced, Fast, Faster, Fidelity
 - **HuggingFace**: Transformers
 - **ChronosJAV**: Qwen3-ASR, Anime-Whisper
-- **External (BYOP)**: XXL Faster Whisper (Pass 2 only)
+- **GGUF**: Parakeet-CrispASR, Cohere-CrispASR — Japanese, experimental in 1.10.0 (see [Parakeet-CrispASR and Cohere-CrispASR](../pipelines/crispasr.md))
+- **External (BYOP)**: XXL Faster Whisper (Pass 1, Pass 2 or both)
 
 ### Customize Parameters
 
@@ -202,6 +212,22 @@ Click the **Customize** button on a pass to open the parameter tuning modal. Thi
 
 The modal has tabs for **Model**, **Quality**, **Segmenter**, **Enhancer**, and **Scene** settings. A badge shows **DEFAULT** or **CUSTOM** to indicate whether parameters have been modified.
 
+The **Model** tab has a **Device** menu: **Auto (the GPU when one can be used, else the CPU)** (the default), **NVIDIA GPU (CUDA)** or **CPU (not accelerated)**.
+
+For a GGUF pass (Parakeet-CrispASR, Cohere-CrispASR), the modal has three tabs: **Segmenter**, **Enhancer** and **Scene**. They start from the values the pass runs with. A status panel under the pass row shows the model (downloaded or not) and where CrispASR will run, for example "GPU: asks for the NVIDIA GPU (CUDA)". For Cohere-CrispASR it also lists the aligner that times its text.
+
+For a ChronosJAV pass (Qwen3-ASR, Anime-Whisper), the **Alignment** tab sets the subtitle timing (see [Subtitle timing](../pipelines/chronosjav.md#subtitle-timing-1100)):
+
+| Control | Options | Default |
+|---|---|---|
+| **Aligner Backend** | CrispASR (GGUF, recommended), Qwen3 ForcedAligner (PyTorch), None (no aligner) | CrispASR |
+| **Aligner Model** | the models of the chosen backend: `wav2vec2-ja` (recommended), `parakeet-ctc-ja` (not recommended), `qwen3-fa-gguf`; or Qwen3-ForcedAligner-0.6B (PyTorch) | `wav2vec2-ja` |
+| **Timestamp Mode** | Aligner + VAD Fallback (recommended), Aligner + Interpolation, Aligner Only (no recovery on collapse), VAD Only (no aligner loaded) | Aligner + VAD Fallback |
+| **Timing Model (Whisper)** | Whisper small (recommended), None (no timing model) | Whisper small |
+| **Adaptive Step-Down** | a tick box | not ticked |
+
+With Aligner Backend **None**, the run uses VAD Only with Step-Down off, whatever those two controls show. A status panel under a ChronosJAV pass row shows the aligner and the timing model (downloaded or not) and where CrispASR runs them. Since 1.10.0 the Alignment tab's values, and a preset saved from it, reach the run; from 1.8.10.post3 to 1.9.5 they were ignored.
+
 Use **Save Preset** to save your configuration for reuse, or **Load Preset** to restore a saved configuration. Presets persist across sessions.
 
 ### Pass 2 Configuration
@@ -210,20 +236,25 @@ Check the **Pass 2** checkbox to enable the second pass. Controls are identical 
 
 When disabled, the row is greyed out and all controls are inactive.
 
-### BYOP: XXL Faster Whisper (v1.8.9+)
+### BYOP: XXL Faster Whisper (v1.8.9+; Pass 1 since 1.10.0)
 
-Select **XXL Faster Whisper** as the Pass 2 pipeline to use [PurfView's Faster Whisper XXL](https://github.com/Purfview/whisper-standalone-win) as an external subprocess. This is a "Bring Your Own Pipeline" (BYOP) feature — you supply the executable, WhisperJAV handles integration.
+Select **XXL Faster Whisper** as the pipeline of Pass 1, Pass 2 or both to use [PurfView's Faster Whisper XXL](https://github.com/Purfview/whisper-standalone-win) as an external program. This is a "Bring Your Own Pipeline" (BYOP) feature — you supply the executable, WhisperJAV handles integration.
 
 ![Ensemble Mode with XXL Faster Whisper as Pass 2](images/gui-tab3-ensemble-xxl.png){ loading=lazy }
 
+When a pass is XXL, its **Model** column picks the Whisper model XXL runs, and a settings panel appears below the Pass 2 row:
+
 | Field | Description |
 |-------|-------------|
-| **Executable** | Path to your `faster-whisper-xxl.exe`. Click **Browse** to select it. |
-| **Extra Args** | Any additional flags to pass to XXL (e.g., `--verbose True --standard_asia`). |
+| **Model** (in the pass row) | Large V2 (default), Large V3, Large V3 Turbo or Medium. XXL downloads the model the first time it is used. When both passes are XXL, each has its own model. |
+| **Executable** | Path to your `faster-whisper-xxl.exe`. Click **Browse** to select it. Both passes use the same one. |
+| **Extra Args** | Any additional flags to pass to XXL (default `--verbose True --standard_asia`). Choose the model in the Model column: a `--model` here is not used, and the console says so. |
 
-WhisperJAV sends only 4 required args to XXL (input file, output dir, model, language). Everything else is controlled by your Extra Args field. XXL's real-time console output is streamed to the GUI console.
+The other controls of an XXL pass (Sensitivity, Scene Detector, Speech Enhancer, Speech Segmenter, Customize) are greyed out: XXL uses its own settings. WhisperJAV sends XXL the input file, the output folder, the model, the language and the SRT output format (and `--task translate` when the subtitles are to be in English); you add any other XXL flags in the Extra Args field. XXL's real-time console output is streamed to the GUI console.
 
-If XXL crashes during shutdown (a known ctranslate2 behavior) but the SRT was already written, WhisperJAV keeps the valid output instead of discarding it.
+Before 1.10.0 the GUI sent no model to XXL, so XXL ran large-v3 even when Extra Args said `--model large-v2` (#449).
+
+If XXL fails for a file, the console says which pass failed and why. A failed Pass 1 marks the file failed; a failed Pass 2 leaves the file with Pass 1's subtitles, if Pass 1 made them. If XXL crashes during shutdown (a known ctranslate2 behavior) but the SRT was already written, WhisperJAV keeps the valid output instead of discarding it.
 
 ### Speech Enhancement: FFmpeg DSP
 
@@ -285,7 +316,6 @@ Providers are grouped into **Local LLM** and **Cloud AI** in the dropdown.
 | Provider | Notes |
 |----------|-------|
 | **Ollama** | Connects to your locally installed Ollama. Free, private, no API key. See below. |
-| **llama-cpp (deprecated)** | Legacy local LLM server. Being removed in v1.9.0 — use Ollama instead. |
 | **DeepSeek** | Cloud API. Cost-effective, good quality for CJK languages. |
 | **Gemini** | Google's API. Good multilingual support. |
 | **Claude** | Anthropic's API. High quality, higher cost. |
@@ -395,6 +425,20 @@ When finished, the status shows "Completed" and the SRT file path is printed in 
 
 ---
 
+### When a run does not start
+
+If a run stops before it processes anything, a dialog says why:
+
+| Dialog | When | What you can do |
+|---|---|---|
+| **The NVIDIA GPU cannot be used** | the install is made for the NVIDIA GPU, and the GPU cannot be used now (for example after a driver change) | **Run on the CPU this time** runs the same job again on the CPU; **Close** leaves it. The dialog names the reason and the fix. |
+| **The run did not start** | a setting the run cannot use, or PyTorch missing (for example on an Own PyTorch install before you added your PyTorch) | the dialog says what to do; nothing was processed |
+| **The run ended without a run summary** | WhisperJAV stopped unexpectedly | files finished before that are in the output folder; the console shows what happened |
+
+When the install's GPU can be used (an NVIDIA GPU or Apple GPU install), nothing is shown at the start of a run. On every other install, the console shows where each part runs on this computer; the run then goes on.
+
+---
+
 ## 10. Console Output
 
 The console at the bottom shows real-time log messages from the processing pipeline.
@@ -492,9 +536,6 @@ Accessible from the **Translation Settings** button in the Ensemble tab's AI-tra
 6. Add your SRT file(s) and click **Start**
 7. No API key or internet needed — everything runs locally on your GPU
 
-### CPU-Only Mode (No GPU)
+### Without a GPU
 
-1. Go to **Advanced** tab
-2. Check **"Accept CPU-only mode"** (required: without it a run on a machine with no usable GPU stops at the start-up check and aborts, telling you to tick this box)
-3. Use **Faster** mode for best speed without GPU
-4. Processing will be significantly slower but functional
+On an install made for the CPU only, there is nothing to tick: every run uses the CPU. Use **Faster** mode for the best speed. Processing is several times slower than on a GPU, but works. To run one pass on the CPU on a GPU install, choose **CPU (not accelerated)** as the **Device** in that pass's **Customize** window.

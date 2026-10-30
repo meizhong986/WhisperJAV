@@ -22,12 +22,16 @@ from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
-from whisperjav.pipelines.kotoba_faster_whisper_pipeline import (
-    KotobaFasterWhisperPipeline,
-)
 from whisperjav.pipelines.transformers_pipeline import TransformersPipeline
 from whisperjav.pipelines.qwen_pipeline import QwenPipeline
-from whisperjav.pipelines.crispasr_pipeline import CrispASRPipeline
+from whisperjav.pipelines.parakeet_crispasr_pipeline import ParakeetCrispASRPipeline
+from whisperjav.pipelines.cohere_crispasr_pipeline import CohereCrispASRPipeline
+from whisperjav.crispasr.errors import FAILURE_PREFIX as CRISPASR_FAILURE_PREFIX, CrispASRRunError, CrispASRSetupError
+from whisperjav.crispasr.manifest import CRISPASR_PIPELINES
+from whisperjav.crispasr.pass_settings import (ignored_hardware_message, ignored_hardware_settings,
+                                               speech_pad_ignored as crispasr_speech_pad_ignored,
+                                               unused_pass_settings, unused_settings_message)
+from whisperjav.utils.device_detector import pass_device
 from whisperjav.utils.logger import logger, setup_logger
 from whisperjav.utils.parameter_tracer import create_tracer, NullTracer
 
@@ -38,17 +42,20 @@ PIPELINE_CLASSES = {
     "fast": FastPipeline,
     "faster": FasterPipeline,
     "fidelity": FidelityPipeline,
-    "kotoba-faster-whisper": KotobaFasterWhisperPipeline,
     "transformers": TransformersPipeline,
     "qwen": QwenPipeline,  # Dedicated Qwen3-ASR pipeline (ADR-004)
-    "crispasr": CrispASRPipeline,  # Standalone external-provider pipeline (docs/plans/crispasr_v190/08)
+    # CrispASR through its Python binding, Ensemble passes only (1.10.0; route B, W176). They
+    # replace the 1.9.x "crispasr" pipeline, whose name main.py now stops (exit status 2).
+    "parakeet-crispasr": ParakeetCrispASRPipeline,
+    "cohere-crispasr": CohereCrispASRPipeline,
 }
 
 # Pipelines whose constructors never read enhance_for_vad. Verified against their
-# source on 2026-09-17, not against their docstrings. Kept in step by
+# source on 2026-09-17, not against their docstrings. The two CrispASR pipelines read it
+# since 1.10.0 (design 22.9.1, owner W232 8). Kept in step by
 # tests/test_speech_enhancer_spec.py, which greps the pipeline modules.
 ENHANCE_FOR_VAD_IGNORED_BY = frozenset({
-    "fast", "faster", "transformers", "kotoba-faster-whisper", "crispasr",
+    "fast", "faster", "transformers",
 })
 
 DEFAULT_HF_PARAMS = {
@@ -248,7 +255,6 @@ PIPELINE_BACKENDS = {
     "fast": "stable_ts",
     "faster": "stable_ts",
     "fidelity": "openai_whisper",
-    "kotoba-faster-whisper": "kotoba_faster_whisper",
 }
 
 
@@ -266,7 +272,7 @@ def get_valid_provider_params(pipeline_name: str) -> set:
 
     valid = PROVIDER_PARAMS_COMMON.copy()
 
-    if backend in ("faster_whisper", "kotoba_faster_whisper"):
+    if backend == "faster_whisper":
         valid.update(PROVIDER_PARAMS_FASTER_WHISPER)
     elif backend == "openai_whisper":
         valid.update(PROVIDER_PARAMS_OPENAI_WHISPER)
@@ -305,6 +311,11 @@ class FileResult:
     # and the user would be told nothing (agreed error-handling table,
     # 2026-09-17, cross-cutting rule 1).
     degradations: List[str] = field(default_factory=list)
+    # Routine notes from this pass, in plain language (owner Q21, CrispASR master plan
+    # 2.6): printed in the run summary, and they change nothing -- no state, no exit
+    # status. Carried back the same way as degradations, but kept apart from them,
+    # because any degradation makes the file "suspect".
+    notes: List[str] = field(default_factory=list)
 
 
 def prepare_transformers_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -374,7 +385,8 @@ DEFAULT_QWEN_PARAMS = {
     "qwen_max_tokens": 4096,
     "qwen_language": "Japanese",  # WhisperJAV is purpose-built for Japanese
     "qwen_timestamps": "word",
-    "qwen_aligner": "Qwen/Qwen3-ForcedAligner-0.6B",
+    "qwen_aligner": "wav2vec2-ja",  # 1.10.0: the CrispASR aligner (design note 2026-10-28)
+    "qwen_timing_model": "whisper-small",  # 1.10.0: the CrispASR timing model, step 8
     "qwen_scene": "semantic",
     "qwen_context": "",
     "qwen_context_file": None,
@@ -388,11 +400,11 @@ DEFAULT_QWEN_PARAMS = {
     "qwen_input_mode": "assembly",
     "qwen_framer": "vad-grouped",  # Preserve previous VAD_SLICING behavior for ensemble
     "qwen_safe_chunking": True,
-    "qwen_timestamp_mode": "vad_only",  # v1.9.0: no ForcedAligner by default
+    "qwen_timestamp_mode": "aligner_vad_fallback",  # 1.10.0: the aligner times the text (owner W254)
     "qwen_assembly_cleaner": True,
     "qwen_repetition_penalty": 1.1,
     "qwen_max_tokens_per_second": 20.0,
-    "qwen_stepdown": True,
+    "qwen_stepdown": False,  # 1.10.0: off (owner W266 1); a collapsed scene takes the VAD groups' times
     "qwen_generator_backend": "qwen3",
     "qwen_regroup_mode": "off",
     # NOTE: qwen_max_group_duration, qwen_chunk_threshold,
@@ -433,6 +445,7 @@ def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
         "scene_max_duration": "qwen_scene_max_duration",
         "scene_clustering_threshold": "qwen_scene_clustering_threshold",  # v1.9.2 CFF2
         "aligner_backend": "qwen_aligner_backend",
+        "timing_model": "qwen_timing_model",
         "timestamp_mode": "qwen_timestamp_mode",
         "assembly_cleaner": "qwen_assembly_cleaner",
         "repetition_penalty": "qwen_repetition_penalty",
@@ -470,12 +483,27 @@ def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
     if qwen_params.get("use_aligner") is False:
         params["qwen_aligner"] = None
 
-    # Handle aligner_backend: "none" → disable aligner, "qwen3" → keep existing
+    # Handle aligner_backend: "none" → disable aligner; "crispasr" / "qwen3" → that
+    # backend, with its default model when the aligner named is not one of its own
+    # (an older GUI preset may pair "qwen3" with nothing, or "crispasr" with the HF id).
     aligner_backend = qwen_params.get("aligner_backend")
-    if aligner_backend == "none":
+    if aligner_backend == "none" or qwen_params.get("use_aligner") is False:
         params["qwen_aligner"] = None
         params["qwen_timestamps"] = "none"  # Pipeline derives use_aligner from timestamps
-    # ("qwen3" or absent → no change, use existing aligner_id)
+        # The GUI's triple flip, for qwen_params written by hand too: no aligner means
+        # VAD-group times and no step-down, unless the pass names them itself.
+        if "timestamp_mode" not in qwen_params and "qwen_timestamp_mode" not in qwen_params:
+            params["qwen_timestamp_mode"] = "vad_only"
+        if "stepdown" not in qwen_params and "qwen_stepdown" not in qwen_params:
+            params["qwen_stepdown"] = False
+    elif aligner_backend in ("crispasr", "qwen3"):
+        from whisperjav.crispasr.manifest import ALIGNER_MODELS, DEFAULT_ALIGNER
+        is_crispasr_name = params.get("qwen_aligner") in ALIGNER_MODELS
+        if aligner_backend == "crispasr" and not is_crispasr_name:
+            params["qwen_aligner"] = DEFAULT_ALIGNER
+        elif aligner_backend == "qwen3" and (is_crispasr_name or not params.get("qwen_aligner")):
+            params["qwen_aligner"] = "Qwen/Qwen3-ForcedAligner-0.6B"
+    # (absent → the backend follows from qwen_aligner: a CrispASR short name or a PyTorch ID)
 
     # Handle assembly_cleaner string values (GUI sends "qwen3"/"passthrough",
     # CLI sends bool via store_true/store_false)
@@ -627,6 +655,20 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
         # This line should never be reached, but guard against it
         return  # pragma: no cover
 
+    # v1.10.0 (item 3, owner W75): a speech enhancer WhisperJAV no longer includes
+    # (ClearVoice) stops the pass here, before any audio is read. main.py checks the
+    # command line; this covers whatever else builds a pass configuration.
+    removed = _removed_enhancer_in_pass(pass_config, pass_number)
+    if removed:
+        logger.error("[Worker %s] Pass %s: %s", os.getpid(), pass_number, removed)
+        _write_dropbox_and_exit(result_file, {
+            "results": [
+                FileResult(basename=info["basename"], status="failed", error=removed).__dict__
+                for info in media_files
+            ],
+            "worker_error": removed,
+        }, tracer, 1)
+
     try:
         pipeline = _build_pipeline(
             pass_config=pass_config,
@@ -766,6 +808,7 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                         # worker reads the same channel everything else does.
                         degradations=list(
                             result.get("summary", {}).get("degradations") or []),
+                        notes=list(result.get("summary", {}).get("notes") or []),
                     )
                 )
                 logger.debug(
@@ -778,6 +821,12 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                 # --fail-on suspect: a requested stop, not a crash.
                 logger.error("[Worker %s] Pass %s: %s: %s", os.getpid(), pass_number, basename, stop)
                 results.append(FileResult(basename=basename, status="failed", error=str(stop)))
+            except (CrispASRRunError, CrispASRSetupError) as failure:
+                # CrispASR or its model failed, with the reason in plain words: the run summary
+                # shows it, prefixed, instead of a traceback.
+                logger.error("[Worker %s] Pass %s: %s: %s", os.getpid(), pass_number, basename, failure)
+                results.append(FileResult(basename=basename, status="failed",
+                                          error=f"{CRISPASR_FAILURE_PREFIX}{failure}"))
             except Exception:
                 logger.exception(
                     "[Worker %s] Pass %s failed for %s", os.getpid(), pass_number, basename
@@ -862,7 +911,8 @@ def _run_xxl_pass(
     """
     import time as _time
 
-    from whisperjav.byop.xxl_runner import run_xxl
+    from whisperjav.byop.xxl_runner import (DEFAULT_XXL_MODEL, failure_note, failure_reason,
+                                            model_override_note, run_xxl)
 
     pass_config = payload.pass_config
     xxl_exe = pass_config.get("xxl_exe") if pass_config else None
@@ -887,13 +937,19 @@ def _run_xxl_pass(
 
     pass_temp_dir.mkdir(parents=True, exist_ok=True)
     xxl_extra_args = pass_config.get("xxl_args", "")
-    xxl_model = pass_config.get("model") or "large-v3"
+    xxl_model = pass_config.get("model") or DEFAULT_XXL_MODEL
     asr_task = "translate" if payload.subs_language == "direct-to-english" else "transcribe"
 
     logger.info(
         "[Worker %s] Pass %s: BYOP XXL (exe=%s, model=%s)",
         os.getpid(), pass_number, xxl_exe, xxl_model,
     )
+
+    # A model named in the extra arguments is not used (#272); say so once per pass worker --
+    # once per pass, or once per file and pass with --ensemble-serial (owner W271 4).
+    override_note = model_override_note(pass_number, xxl_model, xxl_extra_args, xxl_exe)
+    if override_note:
+        logger.warning(override_note)
 
     for media_info in media_files:
         basename = media_info["basename"]
@@ -949,8 +1005,11 @@ def _run_xxl_pass(
                 "[Worker %s] Pass %s [XXL] %s -> %d subtitles in %.1fs",
                 os.getpid(), pass_number, basename, subtitle_count, elapsed,
             )
-        except Exception:
+        except Exception as xxl_error:
             elapsed = _time.monotonic() - file_start
+            # An XXL failure is never silent (owner W92); see failure_note.
+            failure_line = failure_note(pass_number, basename, xxl_error)
+            logger.error(failure_line)
             logger.exception(
                 "[Worker %s] Pass %s [XXL] failed for %s (%.1fs)",
                 os.getpid(), pass_number, basename, elapsed,
@@ -959,7 +1018,8 @@ def _run_xxl_pass(
                 FileResult(
                     basename=basename,
                     status="failed",
-                    error=traceback.format_exc(),
+                    # The plain reason first: the Ensemble summary shows the start of the first line.
+                    error=f"{failure_reason(xxl_error)}\n{traceback.format_exc()}",
                 )
             )
 
@@ -1019,6 +1079,7 @@ def _build_pipeline(
     pipeline_class = PIPELINE_CLASSES.get(pipeline_name)
     if not pipeline_class:
         raise ValueError(f"Unknown pipeline: {pipeline_name}")
+    is_crispasr = pipeline_name in CRISPASR_PIPELINES
 
     # Pass enhance_for_vad flag to all pipelines via extra_kwargs.
     #
@@ -1028,15 +1089,19 @@ def _build_pipeline(
     #   balanced, fidelity -- the flag is read and reported in an INFO line, but
     #     the enhanced audio goes to BOTH; separating them needs recogniser-side
     #     changes (balanced_pipeline.py, fidelity_pipeline.py).
-    #   fast, faster, transformers, kotoba-faster-whisper, crispasr -- never read.
+    #   fast, faster, transformers -- never read.
     #     The owner accepted that on 2026-09-17; it is stated here and in --help
     #     so it is not mistaken for an oversight.
+    #   parakeet-crispasr, cohere-crispasr (1.10.0) -- never read either: they run
+    #     no audio clean-up at all (CrispASR master plan 2.2). A user who set it on
+    #     such a pass is told below, in one line naming every pass setting the pass
+    #     does not use; the reason the line here gives would be wrong for them.
     #
     # A user who asked for it and is getting nothing is told so once, rather than
     # being left to infer it from the absence of any mention.
     if pass_config.get("enhance_for_vad"):
         extra_kwargs = {**extra_kwargs, "enhance_for_vad": True}
-        if pipeline_name in ENHANCE_FOR_VAD_IGNORED_BY:
+        if pipeline_name in ENHANCE_FOR_VAD_IGNORED_BY and not is_crispasr:
             logger.info(
                 "Pass %s: --pass%s-enhance-for-vad has no effect on the %s pipeline, "
                 "which does not run a separate speech segmenter. The audio clean-up "
@@ -1095,6 +1160,8 @@ def _build_pipeline(
             if enhancer_model:
                 hf_defaults["hf_speech_enhancer_model"] = enhancer_model
             logger.debug("Pass %s: Override hf_speech_enhancer = %s, model = %s", pass_number, enhancer_backend, enhancer_model)
+        # --device governs every pipeline (design 22.3.1, owner W237 1); --device cpu is absolute.
+        hf_defaults["hf_device"] = pass_device(pass_config.get("device"), hf_defaults.get("hf_device"))
         logger.debug(
             "[Worker %s] Pass %s: Creating TransformersPipeline with hf_model_id=%s, hf_task=%s, hf_language=%s",
             os.getpid(), pass_number,
@@ -1244,13 +1311,18 @@ def _build_pipeline(
         # Map qwen_* prefixed params to QwenPipeline's parameter names
         qwen_pipeline_params = {
             "model_id": qwen_defaults.get("qwen_model_id", "Qwen/Qwen3-ASR-1.7B"),
-            "device": qwen_defaults.get("qwen_device", "auto"),
+            # --device governs every pipeline (design 22.3.1, owner W237 1); --device cpu is absolute.
+            "device": pass_device(pass_config.get("device"), qwen_defaults.get("qwen_device")),
             "dtype": qwen_defaults.get("qwen_dtype", "auto"),
             "batch_size": qwen_defaults.get("qwen_batch_size", 1),
             "max_new_tokens": qwen_defaults.get("qwen_max_tokens", 4096),
             "language": (lambda _l: None if _l in (None, "null", "") else _l)(qwen_defaults.get("qwen_language", "Japanese")),
             "timestamps": qwen_defaults.get("qwen_timestamps", "word"),
-            "aligner_id": qwen_defaults.get("qwen_aligner", "Qwen/Qwen3-ForcedAligner-0.6B"),
+            "aligner_id": qwen_defaults.get("qwen_aligner", "wav2vec2-ja"),
+            "aligner_backend": (qwen_defaults.get("qwen_aligner_backend")
+                                if qwen_defaults.get("qwen_aligner_backend") in ("crispasr", "qwen3", "none")
+                                else None),
+            "timing_model": qwen_defaults.get("qwen_timing_model", "whisper-small"),
             "scene_detector": qwen_defaults.get("qwen_scene", "none"),
             "context": qwen_defaults.get("qwen_context", ""),
             "context_file": qwen_defaults.get("qwen_context_file", None),
@@ -1264,11 +1336,11 @@ def _build_pipeline(
             "qwen_input_mode": qwen_defaults.get("qwen_input_mode", "assembly"),
             "qwen_framer": qwen_defaults.get("qwen_framer", "vad-grouped"),
             "qwen_safe_chunking": qwen_defaults.get("qwen_safe_chunking", True),
-            "timestamp_mode": qwen_defaults.get("qwen_timestamp_mode", "vad_only"),
+            "timestamp_mode": qwen_defaults.get("qwen_timestamp_mode", "aligner_vad_fallback"),
             "assembly_cleaner": qwen_defaults.get("qwen_assembly_cleaner", True),
             "repetition_penalty": qwen_defaults.get("qwen_repetition_penalty", 1.1),
             "max_tokens_per_audio_second": qwen_defaults.get("qwen_max_tokens_per_second", 20.0),
-            "stepdown_enabled": qwen_defaults.get("qwen_stepdown", True),
+            "stepdown_enabled": qwen_defaults.get("qwen_stepdown", False),
             "generator_backend": qwen_defaults.get("qwen_generator_backend", "qwen3"),
             "regroup_mode": qwen_defaults.get("qwen_regroup_mode", "standard"),
             "segmenter_config": segmenter_config if segmenter_config else None,
@@ -1285,12 +1357,10 @@ def _build_pipeline(
             _aw_vad = anime_whisperseg_defaults(qwen_sensitivity)
             if "model_id" not in _user_qwen and not pass_config.get("model"):
                 qwen_pipeline_params["model_id"] = "litagin/anime-whisper"
-            if "timestamp_mode" not in _user_qwen:
-                qwen_pipeline_params["timestamp_mode"] = "vad_only"
+            # 1.10.0: no longer vad_only with step-down off; the aligner and timing model
+            # apply as for Qwen3-ASR (design note 2026-10-28 section 7, owner W254 Q6).
             if "assembly_cleaner" not in _user_qwen:
                 qwen_pipeline_params["assembly_cleaner"] = False
-            if "stepdown" not in _user_qwen:
-                qwen_pipeline_params["stepdown_enabled"] = False
             if "chunk_threshold" not in _user_qwen:
                 qwen_pipeline_params["segmenter_chunk_threshold"] = _aw_vad["chunk_threshold_s"]
             if "max_group_duration" not in _user_qwen:
@@ -1307,7 +1377,8 @@ def _build_pipeline(
             if _end_pad_default is not None and "vad_padding" not in _user_qwen and "vad_end_pad" not in _user_qwen:
                 qwen_pipeline_params["segmenter_end_pad_ms"] = _end_pad_default
         elif _gen_backend == "cohere":
-            # Cohere Transcribe defaults (D7: Qwen3 ForcedAligner ON by default).
+            # Cohere Transcribe defaults (D7: aligner ON by default; since 1.10.0 the
+            # CrispASR aligner wav2vec2-ja, as for every ChronosJAV model, owner W254 Q6).
             # User can disable aligner via Customize Parameters; the customize
             # handler must triple-flip aligner+timestamp_mode+stepdown atomically.
             _user_qwen = pass_config.get("qwen_params") or {}
@@ -1317,7 +1388,7 @@ def _build_pipeline(
                 qwen_pipeline_params["timestamp_mode"] = "aligner_vad_fallback"
             if "assembly_cleaner" not in _user_qwen:
                 qwen_pipeline_params["assembly_cleaner"] = False  # D3: passthrough
-            # stepdown defaults to True for Cohere (aligner ON by D7); leave qwen_defaults to drive it
+            # step-down: off by default as for every ChronosJAV model (owner W266 1); qwen_defaults drive it
             if "chunk_threshold" not in _user_qwen:
                 qwen_pipeline_params["segmenter_chunk_threshold"] = 1.0
             if "max_group_duration" not in _user_qwen:
@@ -1391,48 +1462,87 @@ def _build_pipeline(
             )
             raise
 
-    # CrispASR — simple standalone external-provider pipeline
-    # (docs/plans/crispasr_v190/08).  Constructs directly from pass_config
-    # like transformers/qwen.  It deliberately does NOT fall through to
-    # resolve_legacy_pipeline(): crispasr is not a LEGACY_PIPELINES entry
-    # (legacy.py:172 would raise), and per legacy.py's own docstring,
-    # dedicated-CLI-arg pipelines construct their config separately.
-    if pipeline_name == "crispasr":
+    # The CrispASR pipelines (1.10.0; route B design 4.1): Ensemble passes that run CrispASR
+    # through its Python binding. Built from the pass settings they use -- model, speech
+    # segmenter, sensitivity, source language, device -- and returned here, before resolve_legacy_pipeline(),
+    # which raises for any name outside LEGACY_PIPELINES (config/legacy.py). main.py has
+    # already refused a model they do not know, a language other than Japanese and the
+    # segmenter "none" (whisperjav/crispasr/pass_settings.py). The pass settings they do
+    # not use are named in one line and otherwise left alone: the GUI and saved Ensemble
+    # presets carry them for every pipeline.
+    if is_crispasr:
+        unused = unused_pass_settings(pass_config, pass_number)
+        if unused:
+            logger.info(unused_settings_message(
+                getattr(pipeline_class, "LABEL", pipeline_name), unused))
+        # --compute-type is not used, with a logged warning; --device is (W194 1). The GUI sends
+        # neither for an Ensemble pass.
+        hardware = ignored_hardware_settings(pass_config)
+        if hardware:
+            logger.warning(ignored_hardware_message(
+                getattr(pipeline_class, "LABEL", pipeline_name), hardware))
         crispasr_kwargs = {
             "output_dir": output_dir,
             "temp_dir": str(pass_temp_dir),
             "keep_temp_files": keep_temp_files,
-            "save_metadata_json": pass_config.get("save_metadata_json", False),
+            # --debug. The worker carries it in extra_kwargs (the orchestrator's own
+            # settings); pass_config never holds it.
+            "save_metadata_json": bool(extra_kwargs.get("save_metadata_json", False)),
             "progress_display": None,
+            # None: the pipeline's default model (whisperjav/crispasr/manifest.py).
+            "model_name": pass_config.get("model") or None,
+            # The pipeline's default when the pass names none (TEN VAD for Parakeet, W344; FireRedVAD
+            # for Cohere, W202 3): the one rule main.py's start-up check uses.
+            "speech_segmenter": effective_segmenter_for_pass(
+                pipeline_name, pass_config.get("speech_segmenter")),
+            "language": pass_config.get("language") or "ja",
             "subs_language": subs_language,
-            "crispasr_exe": pass_config.get("crispasr_exe"),
-            "crispasr_args": pass_config.get("crispasr_args") or "",
-            "crispasr_language": pass_config.get("language") or "ja",
+            # Picks the speech segmenter's preset, as the fidelity or the qwen pipeline does
+            # (W199 DIR1, W202). main.py fills in balanced when the pass names none.
+            "sensitivity": pass_config.get("sensitivity"),
+            # --device (W194 1: A + Metal); None when the user gave none, as the GUI does.
+            "device": pass_config.get("device"),
+            # --passN-vad-threshold, --passN-speech-pad-ms, applied as fidelity (Parakeet) or the
+            # qwen pipeline (Cohere) applies them (W208; pass_settings.segmenter_settings).
+            "vad_threshold": pass_config.get("vad_threshold"),
+            "speech_pad_ms": pass_config.get("speech_pad_ms"),
+            # D3 (design 22.9.1; owner W212 D3, W214 2, W232 8): the scene detector (semantic when
+            # the pass names none), the speech enhancer, Enhance for VAD only, and the Customize
+            # values of the Segmenter and Scene tabs.
+            "scene_detector": pass_config.get("scene_detector") or None,
+            "enhance_for_vad": bool(pass_config.get("enhance_for_vad", False)),
         }
-        # Only forward the backend when set so the pipeline default applies
-        # (passing None would override the default with None).
-        _crispasr_backend = pass_config.get("crispasr_backend")
-        if _crispasr_backend:
-            crispasr_kwargs["crispasr_backend"] = _crispasr_backend
+        if pass_config.get("speech_enhancer"):
+            enhancer_backend, enhancer_model = _parse_speech_enhancer(pass_config["speech_enhancer"])
+            crispasr_kwargs["speech_enhancer"] = enhancer_backend
+            crispasr_kwargs["speech_enhancer_model"] = enhancer_model
+        custom = pass_config.get("params") or {}
+        crispasr_kwargs["segmenter_overrides"] = {k: v for k, v in custom.items() if k in SEGMENTER_PARAMS}
+        crispasr_kwargs["scene_params"] = {k: v for k, v in custom.items() if k in SCENE_DETECTION_PARAMS}
+        if crispasr_speech_pad_ignored(pipeline_name, crispasr_kwargs["speech_segmenter"],
+                                       crispasr_kwargs["speech_pad_ms"]):
+            # Fidelity's own warning, below, for the same case.
+            logger.warning(
+                "Pass %s: the speech pad of %dms is ignored -- the '%s' speech "
+                "segmenter has no speech-pad setting. It pads the start and end of "
+                "each segment separately, at the values this pass's sensitivity chose.",
+                pass_number, max(0, int(crispasr_kwargs["speech_pad_ms"])), crispasr_kwargs["speech_segmenter"],
+            )
         logger.debug(
-            "[Worker %s] Pass %s: Creating CrispASRPipeline with backend=%s, exe=%s",
-            os.getpid(), pass_number,
-            _crispasr_backend or "(default)",
-            crispasr_kwargs["crispasr_exe"],
+            "[Worker %s] Pass %s: Creating %s with model=%s, speech_segmenter=%s, sensitivity=%s",
+            os.getpid(), pass_number, pipeline_class.__name__,
+            crispasr_kwargs["model_name"] or "(default)", crispasr_kwargs["speech_segmenter"],
+            crispasr_kwargs["sensitivity"],
         )
         try:
-            pipeline = CrispASRPipeline(**crispasr_kwargs)
-            logger.debug(
-                "[Worker %s] Pass %s: CrispASRPipeline created successfully",
-                os.getpid(), pass_number
-            )
-            return pipeline
+            pipeline = pipeline_class(**crispasr_kwargs)
         except Exception as e:
             logger.error(
-                "[Worker %s] Pass %s: FAILED to create CrispASRPipeline - %s: %s",
-                os.getpid(), pass_number, type(e).__name__, e
+                "[Worker %s] Pass %s: FAILED to create %s - %s: %s",
+                os.getpid(), pass_number, pipeline_class.__name__, type(e).__name__, e
             )
             raise
+        return pipeline
 
     # v1.9.2: resolve the scene detector BEFORE the config. The resolved parameter NAMES
     # depend on the backend that will run — semantic reads min_duration / max_duration,
@@ -1448,12 +1558,19 @@ def _build_pipeline(
             pass_number, _scene_method,
         )
 
+    # --device governs this pass as every other (design 22.3.1, 22.13 detail 15): --device cpu
+    # is absolute; otherwise the pass's Customize Device stands. Taken out of the Customize
+    # values here so apply_custom_params cannot put it back over --device cpu (review P7 finding 2),
+    # and given to the resolver so the CTranslate2 rule and the compute type follow it.
+    custom_params = dict(pass_config.get("params") or {})
+    legacy_device = pass_device(pass_config.get("device"), custom_params.pop("device", None))
+
     resolved_config = resolve_legacy_pipeline(
         pipeline_name=pipeline_name,
         sensitivity=pass_config.get("sensitivity", "balanced"),
         task=asr_task,  # Derived from subs_language above
         overrides=pass_config.get("overrides"),
-        device=pass_config.get("device"),  # None = auto-detect
+        device=legacy_device,  # "auto" = auto-detect
         compute_type=pass_config.get("compute_type"),  # None = auto
         scene_method=_scene_method,
     )
@@ -1470,10 +1587,10 @@ def _build_pipeline(
     # Apply GUI-specified overrides for legacy pipelines
     _apply_gui_overrides(resolved_config, pass_config, pass_number)
 
-    if pass_config.get("params"):
+    if custom_params:
         unknown_params = apply_custom_params(
             resolved_config=resolved_config,
-            custom_params=pass_config["params"],
+            custom_params=custom_params,
             pass_number=pass_number,
             pipeline_name=pipeline_name,
         )
@@ -1645,17 +1762,23 @@ def apply_custom_params(
 
 # Map GUI speech enhancer values to factory-compatible backend names
 # Supports two formats:
-#   1. Legacy: "clearvoice" -> uses default model
-#   2. New:    "clearvoice:MossFormer2_SE_48K" -> backend + specific model
+#   1. Legacy: "bs-roformer" -> uses default model
+#   2. New:    "bs-roformer:vocals" -> backend + specific model
 #   3. FFmpeg DSP: "ffmpeg-dsp:loudnorm,denoise" -> backend + comma-separated effects
 SPEECH_ENHANCER_MAP = {
     "": "none",                 # Empty string -> disabled
     "ffmpeg-dsp": "ffmpeg-dsp", # FFmpeg DSP audio filters
     "none": "none",             # Explicit disable
     "zipenhancer": "zipenhancer",       # ZipEnhancer 16kHz (recommended, lightweight)
-    "clearvoice": "clearvoice", # Default ClearVoice (uses MossFormer2_SE_48K)
     "bs-roformer": "bs-roformer",       # BS-RoFormer vocal isolation
 }
+
+
+def _removed_enhancer_in_pass(pass_config: Dict[str, Any], pass_number: int) -> Optional[str]:
+    """The stop message when this pass names a removed speech enhancer (ClearVoice), else None."""
+    from whisperjav.modules.speech_enhancement.factory import removed_backend_in_pass
+
+    return removed_backend_in_pass(pass_config, pass_number)
 
 
 def _parse_speech_enhancer(enhancer_value: str) -> tuple:
@@ -1664,9 +1787,9 @@ def _parse_speech_enhancer(enhancer_value: str) -> tuple:
 
     Supports formats:
         - "none" -> ("none", None)
-        - "clearvoice" -> ("clearvoice", None)  # Uses factory default
-        - "clearvoice:MossFormer2_SE_48K" -> ("clearvoice", "MossFormer2_SE_48K")
+        - "bs-roformer" -> ("bs-roformer", None)  # Uses factory default
         - "bs-roformer:vocals" -> ("bs-roformer", "vocals")
+        - "ffmpeg-dsp:loudnorm,denoise" -> ("ffmpeg-dsp", "loudnorm,denoise")
 
     Returns:
         Tuple of (backend_name, model_name or None)

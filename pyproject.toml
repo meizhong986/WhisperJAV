@@ -31,7 +31,9 @@ readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "MeiZhong"}]
 maintainers = [{name = "MeiZhong"}]
-requires-python = ">=3.10,<3.14"
+# v1.10.0: Python 3.13 only (owner, REQ2). The lower bound also stops a 1.9.x
+# `whisperjav-upgrade` on Python 3.10 from installing 1.10 out of `main`.
+requires-python = ">=3.13,<3.14"
 keywords = [
     "whisper",
     "transcription",
@@ -53,9 +55,6 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Multimedia :: Sound/Audio :: Speech",
     "Topic :: Multimedia :: Video",
@@ -80,7 +79,10 @@ dependencies = [
     #
     # CTranslate2 4.6.2 reproduces the #125 crash on exit (0xC0000409); 4.8.1 does not.
     "faster-whisper @ git+https://github.com/SYSTRAN/faster-whisper.git@ed9a06cd89a93e47838f564998a6c09b655d7f43",
-    "ctranslate2==4.8.1",
+    # v1.10.0: 4.8.3 (#459), taken without measurement (owner, W36 (4)). It has no
+    # CUDA 13 build; on Windows it runs on the cuBLAS 12 DLLs the installer places
+    # in its package folder.
+    "ctranslate2==4.8.3",
 
     # Audio/video handling
     "ffmpeg-python @ git+https://github.com/kkroening/ffmpeg-python.git",
@@ -112,11 +114,53 @@ dependencies = [
 
 [project.optional-dependencies]
 
-# PyTorch ecosystem (resolved from named 'pytorch' index, see [tool.uv.sources])
+# PyTorch versions (the build -- cu130, cu128 or cpu -- comes from the extras below)
 # Install with: pip install whisperjav[torch]
 torch = [
-    "torch",
-    "torchaudio",
+    # v1.10.0: pinned. torchaudio has no release after 2.11.0, so PyTorch stays
+    # there; the CUDA build (cu130, or cu128 as the per-PC fallback) is chosen by
+    # the installer.
+    "torch==2.11.0",
+    "torchaudio==2.11.0",
+]
+
+# v1.10.0 (item 2f; design section 22, owner W234/W238): one extra per install, never mixed
+# ([tool.uv] conflicts); each takes torch and torchaudio from its own index ([tool.uv.sources]).
+#   cu130   NVIDIA GPU (CUDA 13.0), Windows default
+#   cu128   NVIDIA GPU (CUDA 12.8): the Windows per-PC fallback; Linux (owner, W45)
+#   vulkan  GPU through Vulkan (AMD, Intel or older NVIDIA card), Windows only; also Own PyTorch on
+#           Windows, installed without torch and torchaudio
+#   cpu     CPU only; the Apple GPU (Metal) install on Apple silicon (that index carries the Apple
+#           wheels); Own PyTorch on Linux and Mac, installed without torch and torchaudio
+# v1.10.0 (item 3, owner W78 C2): torchvision left with ClearVoice, its only user.
+# CrispASR's Python package (route B, owner W176-W178), one line per platform in each extra: the
+# CUDA build (+cuda, its own CUDA 12.8 libraries inside) and the Vulkan build (+vulkan) from the
+# v0.8.44 GitHub release, each pinned by URL and SHA-256 (decision record D10; the hashes equal the
+# release's own digests); everywhere else PyPI's build (CPU on Windows and Linux, Metal inside on
+# Apple silicon; owner W217 13, W217 15, W225).
+cu130 = [
+    "torch==2.11.0",
+    "torchaudio==2.11.0",
+    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-win_amd64.whl#sha256=9be6897bdce3276d8d98253ec2cfd474963fd8b695431fbce988498e97f95e39 ; sys_platform == 'win32' and platform_machine == 'AMD64'",
+    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-manylinux_2_35_x86_64.whl#sha256=1da4ce56f957da29b2d931163fbcddd27eb24e19e8cf2cc9ee3bb0a049ba2c7f ; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "crispasr==0.8.44 ; sys_platform == 'linux' and platform_machine == 'aarch64'",
+]
+cu128 = [
+    "torch==2.11.0",
+    "torchaudio==2.11.0",
+    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-win_amd64.whl#sha256=9be6897bdce3276d8d98253ec2cfd474963fd8b695431fbce988498e97f95e39 ; sys_platform == 'win32' and platform_machine == 'AMD64'",
+    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bcuda-py3-none-manylinux_2_35_x86_64.whl#sha256=1da4ce56f957da29b2d931163fbcddd27eb24e19e8cf2cc9ee3bb0a049ba2c7f ; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "crispasr==0.8.44 ; sys_platform == 'linux' and platform_machine == 'aarch64'",
+]
+vulkan = [
+    "torch==2.11.0",
+    "torchaudio==2.11.0",
+    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bvulkan-py3-none-win_amd64.whl#sha256=f6f71430ee379ac728ff6721d9394c54fd2cf67e0d9973e3e11cb63ba4366522 ; sys_platform == 'win32' and platform_machine == 'AMD64'",
+]
+cpu = [
+    "torch==2.11.0",
+    "torchaudio==2.11.0",
+    "crispasr==0.8.44 ; (sys_platform == 'win32' and platform_machine == 'AMD64') or (sys_platform == 'linux' and platform_machine == 'x86_64') or (sys_platform == 'linux' and platform_machine == 'aarch64') or (sys_platform == 'darwin' and platform_machine == 'arm64')",
 ]
 
 # CLI audio processing features
@@ -128,9 +172,19 @@ cli = [
     # Audio I/O
     "soundfile",
     "pydub",
+    # v1.10.0 (item 3): pydub imports audioop, which Python 3.13 no longer has. It came in
+    # through gradio (qwen-asr 0.0.6's demo programs) until the fork dropped them.
+    "audioop-lts",
 
     # Scientific computing
-    "numpy>=2.0.0",
+    # numpy, v1.10.0 (owner, W44: plan ahead for MOSS and the other roadmap items).
+    # PyPI metadata read 2026-10-14: numba 0.68 (the newest) needs numpy <2.6; MOSS-
+    # Transcribe-Diarize (GitHub pyproject) >=1.26,<3; crispasr >=1.20; transformers 5
+    # >=1.17; nemo_toolkit 3.0 >=1.22; scipy 1.18 <2.8; librosa 1.0 >=2.1; numpy 2.5
+    # needs Python >=3.12. 2.5.x satisfies all of them. funasr-onnx caps numpy at
+    # 1.26.4, which has no Python 3.13 wheels, so SenseVoice (R05) would come through funasr
+    # or CrispASR instead. Raise the upper bound only together with numba.
+    "numpy>=2.5,<2.6",
     "scipy>=1.13.0",
 
     # Audio analysis
@@ -170,17 +224,6 @@ translate = [
     "google-api-core>=2.14.0",  # Required by pysubtrans Gemini provider (undeclared transitive dep)
 ]
 
-# Local LLM support (server dependencies)
-# Install with: pip install whisperjav[llm]
-# Note: llama-cpp-python itself is installed separately with CUDA detection
-llm = [
-    "uvicorn>=0.22.0",
-    "fastapi>=0.100.0",
-    "pydantic-settings>=2.0.1",
-    "sse-starlette>=1.6.1",
-    "starlette-context>=0.3.6,<0.4",
-]
-
 # Speech enhancement backends
 # Install with: pip install whisperjav[enhance]
 #
@@ -189,13 +232,16 @@ llm = [
 #   sudo dnf install libsndfile       (Fedora/RHEL)
 #
 # VERSION NOTES:
-# - datasets: ModelScope requires >=3.0.0,<=3.6.0 (as of modelscope master 2026-03)
-# - modelscope: >=1.20 required, 1.22.0+ recommended.
+# - datasets: v1.10.0 (item 3). ModelScope's pipeline module imports it (ZipEnhancer
+#   needs it); ModelScope 1.40 declares datasets >=4.0.0,<=4.8.4 in its extras, which
+#   WhisperJAV does not install, so the same range is stated here. datasets 4.8.4
+#   caps huggingface-hub below 2.0.
+# - modelscope: >=1.40 (the first release that accepts datasets 4.x).
 # - setuptools: Required by modelscope at runtime (uses pkg_resources in utils/plugins.py)
 # - einops: Required by modelscope framework for tensor operations
 enhance = [
     # ModelScope (ZipEnhancer) - core framework
-    "modelscope>=1.20",
+    "modelscope>=1.40",
     # setuptools: modelscope uses pkg_resources at runtime (not just build-time)
     # setuptools 82.0.0 removed pkg_resources — pin to <82 until modelscope migrates
     "setuptools>=61.0,<82",
@@ -205,27 +251,21 @@ enhance = [
     "oss2",
     "addict",
     "attrs",  # Required by modelscope framework
-    "datasets>=3.0.0,<=3.6.0",  # Must match modelscope's constraint (was >=2.14.0)
+    "datasets>=4.0.0,<=4.8.4",  # ModelScope's tested range (see VERSION NOTES)
     "simplejson",
     "sortedcontainers",
     "packaging",
     "Pillow",  # Required by modelscope framework
 
-    # ClearVoice (fork with relaxed librosa)
-    "clearvoice @ git+https://github.com/meizhong986/ClearerVoice-Studio.git#subdirectory=clearvoice",
-
-    # ClearVoice transitive deps (explicit for --no-deps safety in installer)
-    "gdown",
+    # v1.10.0 (item 3, owner W73): ClearVoice is no longer included, and with it
+    # gdown, opencv-python, python-speech-features, scenedetect, torchinfo and
+    # yamlargparse. joblib (scikit-learn) and rotary-embedding-torch (BS-RoFormer)
+    # are still needed by others.
     "joblib",
-    "opencv-python>=4.10.0",
-    "python-speech-features>=0.6",
-    "rotary-embedding-torch>=0.8",
-    "scenedetect>=0.6",
-    "torchinfo",
-    "yamlargparse",
 
     # BS-RoFormer vocal isolation
     "bs-roformer-infer",
+    "rotary-embedding-torch>=0.8",
 
     # htdemucs vocal isolation (Demucs v4). Owner's decision, 2026-09-17 (second
     # decision, replacing the first): an ordinary dependency like any other, not
@@ -245,9 +285,14 @@ enhance = [
 # HuggingFace ecosystem (for kotoba-whisper, model downloads)
 # Install with: pip install whisperjav[huggingface]
 huggingface = [
-    "huggingface-hub>=0.25.0",
-    "transformers>=4.40.0,<5.0",  # v1.8.14: upper bound — Qwen3-ASR fork breaks on transformers 5.x (`@check_model_inputs()` API change). Removal deferred to v1.9.x (needs Qwen3-ASR fork patch + Cohere ship; also gates the jaykwok -hf CTC-aligner models, which need transformers>=5.13).
-    "accelerate>=0.26.0",
+    # v1.10.0 (item 3): huggingface-hub 2.x waits on datasets (see [enhance]).
+    "huggingface-hub>=1.0,<2",
+    # v1.10.0 (item 3, owner W76, W78): 5.20 is the first release with every model
+    # class the 1.10.x roadmap names (qwen3_asr 5.13, cohere_asr 5.4, vibevoice_asr
+    # 5.3, Parakeet TDT 5.10, canary 5.17, MOSS-Transcribe-Diarize 5.20). Qwen3-ASR
+    # itself runs through the qwen-asr fork ([qwen]). The lock fixes the exact version.
+    "transformers>=5.20,<6",
+    "accelerate>=1.15",
     "hf_xet",  # Faster HuggingFace downloads
 ]
 
@@ -272,7 +317,11 @@ whisperseg-gpu = [
 # Install with: pip install whisperjav[qwen]
 # Note: Requires huggingface extra for transformers backend
 qwen = [
-    "qwen-asr>=0.0.6",
+    # v1.10.0 (item 3, owner W75, W76): the qwen-asr code from the WhisperJAV fork,
+    # which runs on transformers 5 (upstream PR #125, a fix for upstream issue #218,
+    # lower-bound pins, no demo programs). Same package name, so it replaces a PyPI
+    # copy cleanly.
+    "qwen-asr @ git+https://github.com/meizhong986/Qwen3-ASR.git@10cfb322e42c74cd75a6be622054c9becfeb3082",
     "whisperjav[huggingface]",  # Transformers/torch dependency
 ]
 
@@ -302,6 +351,7 @@ dev = [
     "pytest-cov",
     "ruff>=0.1.0",
     "pre-commit",
+    "build",  # v1.10.0 (item 2f): installer/build_release.py builds the wheel with it
 ]
 
 # =============================================================================
@@ -311,7 +361,7 @@ dev = [
 # Full installation with all features
 # Install with: pip install whisperjav[all]
 all = [
-    "whisperjav[cli,gui,translate,llm,enhance,huggingface,qwen,analysis,compatibility]",
+    "whisperjav[cli,gui,translate,enhance,huggingface,qwen,analysis,compatibility]",
 ]
 
 # Google Colab optimized (no GUI, focused on transcription + translation)
@@ -375,7 +425,14 @@ exclude = ["tests*", "docs*", "installer*", "notebook*"]
 
 [tool.setuptools.package-data]
 whisperjav = [
-    "config/*.json",
+    # v1.10.0 (N1): named one by one -- "config/*.json" also packed the
+    # untracked asr_config.backup.*.json files lying in the working folder.
+    "config/asr_config.json",
+    "config/asr_config.pre_v189_cleanup.json",
+    "config/asr_config_v1.6_beta.json",
+    "config/asr_config_v1_5_4.json",
+    "config/config.template.json",
+    "config/ollama_models.json",
     "config/v4/**/*.yaml",
     "config/v4/**/*.md",
     "config/components/**/*.py",
@@ -392,6 +449,9 @@ whisperjav = [
     "assets/vad/*.onnx",
     "assets/vad/*.txt",
     "assets/vad/*.md",
+    # v1.10.0 (item 2f): uv.lock exported per PyTorch build; whisperjav-upgrade
+    # installs the new release's file from the wheel it has just installed.
+    "installer/locked/requirements_*.txt",
 ]
 
 # -----------------------------------------------------------------------------
@@ -478,28 +538,56 @@ exclude_lines = [
 # -----------------------------------------------------------------------------
 # Tool Configuration: uv (Package Manager)
 # -----------------------------------------------------------------------------
-# uv replaces pip's 6-stage installation with a single `uv sync` command.
-# Named indexes solve the GPU lock-in problem: torch/torchaudio resolve from
-# the PyTorch CUDA index while all other packages use PyPI.
-#
-# Override CUDA version at install time:
-#   uv sync --index pytorch=https://download.pytorch.org/whl/cu118
-#   uv sync --index pytorch=https://download.pytorch.org/whl/cpu
+# v1.10.0 (item 2f): uv.lock is the one source of exact versions for development,
+# source installs, the installer and upgrades. Pick the PyTorch build with its
+# extra; never override an index (that re-resolves and rewrites uv.lock):
+#   uv sync --frozen --extra all --extra cu130     (Windows default)
+#   uv sync --frozen --extra all --extra cu128     (Windows fallback; Linux)
+#   uv sync --frozen --extra all --extra vulkan    (Windows, GPU through Vulkan)
+#   uv sync --frozen --extra all --extra cpu
+# Own PyTorch: the platform's extra (Windows vulkan, else cpu) with
+#   --inexact --no-install-package torch --no-install-package torchaudio
+# installer/build_release.py exports the lock once per build to
+# whisperjav/installer/locked/requirements_<variant>.txt (exact versions, no hashes).
 
 [tool.uv]
-# Named index for PyTorch GPU wheels
-# Default: CUDA 12.8 (most common modern NVIDIA setup)
+# uv 0.9.26 made this lock and ships in the installer (installer/build_env.yml).
+required-version = ">=0.9.26"
+conflicts = [
+    [{ extra = "cu130" }, { extra = "cu128" }, { extra = "vulkan" }, { extra = "cpu" }],
+]
+
 [[tool.uv.index]]
-name = "pytorch"
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true  # Only torch and torchaudio use these indexes, not numpy/scipy/etc.
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
 url = "https://download.pytorch.org/whl/cu128"
-explicit = true  # Only torch/torchaudio use this index, not numpy/scipy/etc.
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [tool.uv.sources]
-# macOS gets torch from default PyPI (has built-in MPS support for Apple Silicon)
-# Linux/Windows get torch from the named pytorch CUDA index
+# Each extra takes the two packages from its own index on every platform: uv
+# 0.9.26 did not narrow an extra's source by platform marker (with markers, the
+# exports still carried +cu130 for Linux and macOS). Which extra a platform uses
+# is the installers' choice: Windows cu130, or cu128 as the fallback; Linux
+# cu128 (owner, W45); no NVIDIA GPU and macOS cpu (that index carries the Apple
+# Silicon wheels); vulkan takes PyTorch's CPU build, as cpu does.
 torch = [
-    { index = "pytorch", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu130", extra = "cu130" },
+    { index = "pytorch-cu128", extra = "cu128" },
+    { index = "pytorch-cpu", extra = "vulkan" },
+    { index = "pytorch-cpu", extra = "cpu" },
 ]
 torchaudio = [
-    { index = "pytorch", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu130", extra = "cu130" },
+    { index = "pytorch-cu128", extra = "cu128" },
+    { index = "pytorch-cpu", extra = "vulkan" },
+    { index = "pytorch-cpu", extra = "cpu" },
 ]

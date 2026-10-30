@@ -29,14 +29,11 @@
 #   - whisperjav/installer/ - Unified installer module
 #
 # Options (forwarded to install.py):
-#   --cpu-only              Install CPU-only PyTorch
-#   --cuda VERSION          Install PyTorch for specific CUDA (e.g. cu118, cu124, cu128)
+#   --accelerator NAME      What this install is made for: nvidia, own-pytorch or cpu
+#                           (without it: a supported NVIDIA GPU is used, otherwise it asks)
 #   --no-speech-enhancement Skip speech enhancement packages
 #   --minimal               Minimal install (transcription only)
 #   --dev                   Install in development/editable mode
-#   --local-llm             Install local LLM support (prebuilt wheel)
-#   --local-llm-build       Install local LLM support (build from source)
-#   --no-local-llm          Skip local LLM installation
 #   --help                  Show help message
 #
 # Author: Senior Architect
@@ -124,6 +121,14 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
     exit 1
 fi
 
+# Is this computer supported by WhisperJAV 1.10? First, before asking for anything else
+# (design 22.1.2, owner W233 R6): the same check install.py makes, run with this system's python3.
+if command -v python3 &>/dev/null; then
+    if ! python3 -I "$REPO_ROOT/whisperjav/installer/core/supported.py"; then
+        exit 1
+    fi
+fi
+
 echo "============================================================"
 echo "  WhisperJAV Linux Installation (via install.py)"
 echo "============================================================"
@@ -132,7 +137,7 @@ echo ""
 # Check for Python
 if ! command -v python3 >/dev/null 2>&1; then
     echo -e "${RED}Error: Python 3 is not installed.${NC}"
-    echo "Please install Python 3.10-3.12 first:"
+    echo "Please install Python 3.13 first:"
     echo "  Debian/Ubuntu: sudo apt-get install python3 python3-pip python3-venv"
     echo "  Fedora/RHEL:   sudo dnf install python3 python3-pip"
     echo "  Arch Linux:    sudo pacman -S python python-pip"

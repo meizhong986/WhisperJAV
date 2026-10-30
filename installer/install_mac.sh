@@ -14,13 +14,11 @@
 # the gap at the shell wrapper layer.
 #
 # Options (forwarded to install.py):
-#   --cpu-only              Install CPU-only PyTorch
+#   --accelerator own-pytorch  Keep the PyTorch of the active Python environment
+#                              (without it: the install is made for the Apple GPU (Metal))
 #   --no-speech-enhancement Skip speech enhancement packages
 #   --minimal               Minimal install (transcription only)
 #   --dev                   Install in development/editable mode
-#   --local-llm             Install local LLM support (prebuilt wheel)
-#   --local-llm-build       Install local LLM support (build from source)
-#   --no-local-llm          Skip local LLM installation
 #   --help                  Show help message
 #
 # Author: Senior Architect
@@ -44,16 +42,27 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 # Architecture Detection
 # ==============================================================================
 
-detect_architecture() {
-    local arch
-    arch="$(uname -m)"
-    if [[ "$arch" == "arm64" ]]; then
-        echo -e "${GREEN}Architecture: Apple Silicon (M-series) - native GPU acceleration available${NC}"
-    elif [[ "$arch" == "x86_64" ]]; then
-        echo -e "${YELLOW}Architecture: Intel Mac - CPU-only mode (no GPU acceleration)${NC}"
-    else
-        echo -e "${YELLOW}Architecture: $arch${NC}"
+# Is this Mac supported by WhisperJAV 1.10? First, before anything else (design 22.1.2, owner
+# W233 R6). The same tests and texts as whisperjav/installer/core/supported.py, made here in the
+# shell: on an Intel Mac without the Xcode tools, running python3 would open Apple's install
+# dialog first. This is the one place the check exists twice.
+check_supported_mac() {
+    if [[ "$(sysctl -n hw.optional.arm64 2>/dev/null)" != "1" ]]; then
+        echo "WhisperJAV 1.10.0 does not support Intel Macs. This is due to PyTorch 2.11, which WhisperJAV 1.10.0 needs, not being made for Intel Macs. Nothing was installed."
+        exit 1
     fi
+    local version major
+    version="$(sw_vers -productVersion 2>/dev/null)"
+    major="${version%%.*}"
+    if [[ -n "$major" && "$major" -lt 14 ]]; then
+        echo "WhisperJAV 1.10.0 does not support macOS $version. This is due to ONNX Runtime 1.29, which WhisperJAV 1.10.0 needs: it requires macOS 14 (Sonoma) or newer. Nothing was installed."
+        exit 1
+    fi
+}
+
+detect_architecture() {
+    # T31 (design 22.10)
+    echo -e "${GREEN}Apple silicon Mac: the transformers pipeline asks for the Apple GPU (Metal); the GGUF pipelines and fidelity ask for it too (not yet tested on a Mac); balanced, fast, faster and ChronosJAV run on the CPU (not accelerated).${NC}"
 }
 
 # ==============================================================================
@@ -98,28 +107,28 @@ check_python() {
         py_version="$(python3 --version 2>&1)"
         echo -e "${GREEN}Python: $py_version${NC}"
 
-        # Check version range (3.10-3.12)
+        # Check version (v1.10.0: 3.13 only)
         local py_minor
         py_minor="$(python3 -c 'import sys; print(sys.version_info.minor)' 2>/dev/null)"
-        if [[ "$py_minor" -lt 10 || "$py_minor" -gt 12 ]]; then
+        if [[ "$py_minor" -ne 13 ]]; then
             echo ""
             echo -e "${RED}Python 3.$py_minor is not supported.${NC}"
-            echo "WhisperJAV requires Python 3.10, 3.11, or 3.12."
+            echo "WhisperJAV 1.10 requires Python 3.13."
             echo ""
             echo "Install a supported version with:"
-            echo "  brew install python@3.12"
+            echo "  brew install python@3.13"
             echo ""
             echo "Or use pyenv:"
             echo "  brew install pyenv"
-            echo "  pyenv install 3.12"
-            echo "  pyenv global 3.12"
+            echo "  pyenv install 3.13"
+            echo "  pyenv global 3.13"
             exit 1
         fi
     else
         echo ""
         echo -e "${RED}Python 3 is not installed.${NC}"
         echo "Install it with:"
-        echo "  brew install python@3.12"
+        echo "  brew install python@3.13"
         echo ""
         echo "Or download from: https://www.python.org/downloads/"
         exit 1
@@ -197,8 +206,8 @@ check_venv_requirement() {
         echo ""
         echo -e "${GREEN}Option 2: Use pyenv to manage Python versions${NC}"
         echo "  brew install pyenv"
-        echo "  pyenv install 3.12"
-        echo "  pyenv global 3.12"
+        echo "  pyenv install 3.13"
+        echo "  pyenv global 3.13"
         echo ""
 
         # Ask user if they want to continue
@@ -217,6 +226,8 @@ check_venv_requirement() {
 # ==============================================================================
 # Main Execution
 # ==============================================================================
+
+check_supported_mac
 
 echo "============================================================"
 echo "  WhisperJAV macOS Installation (via install.py)"
@@ -382,6 +393,9 @@ if [[ -f "$LAUNCHER" ]]; then
 fi
 echo "  Or from Terminal:"
 echo -e "    ${GREEN}whisperjav-gui${NC}"
+echo ""
+# T31b (design 22.10)
+echo "  On an Apple silicon Mac, the transformers pipeline is recommended: it asks for the Apple GPU (Metal)."
 echo ""
 
 exit 0

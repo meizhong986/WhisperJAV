@@ -145,7 +145,7 @@ class TestS01FirstLaunch:
             "debug_logging": False,
             "keep_temp": False,
             "temp_dir": "",
-            "accept_cpu_mode": False,
+            # 1.10.0 (design 22.5.1): the "Accept CPU-only mode" box is gone, so is its key.
             "offline_mode": False,
             "async_processing": False,
             # v1.9.5 (owner, 2026-10-12): new Ensemble defaults
@@ -535,7 +535,6 @@ class TestS20BooleanRoundtrip:
         ("output_to_source", False),
         ("debug_logging", True),
         ("keep_temp", True),
-        ("accept_cpu_mode", True),
         ("offline_mode", True),
         ("async_processing", True),
         ("pass2_enabled", True),
@@ -903,10 +902,12 @@ class TestCompleteness:
         data_keys = {
             k for k in DEFAULT_GUI_SETTINGS if k not in ("version", "_comment")
         }
-        # 20 Tab 1 keys + 14 Tab 3 keys + 2 preset keys = 36
+        # 19 Tab 1 keys + 14 Tab 3 keys + 2 preset keys + 1 language key = 36
         # (v1.9.0: +skip_existing, +remember_settings;
         #  v1.9.2: +fail_on_empty, +fail_on_suspect, +asr_telemetry,
-        #          +model_refresh_audio_minutes, +offline_mode (#415))
+        #          +model_refresh_audio_minutes, +offline_mode (#415);
+        #  1.10.0: -accept_cpu_mode, design 22.5.1; +ui_language, item 6)
         assert len(data_keys) == 36, (
             f"Expected 36 settings keys, got {len(data_keys)}: {data_keys}"
         )
+        assert "accept_cpu_mode" not in data_keys

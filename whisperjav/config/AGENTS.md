@@ -13,7 +13,7 @@ Do not reason from it. Current reality below. (Correcting those two docs is an o
 
 ## Current model (v1.8.9+)
 
-- **Legacy modes** (`balanced/faster/fast/fidelity/kotoba`):
+- **Legacy modes** (`balanced/faster/fast/fidelity`):
   `resolve_legacy_pipeline(mode, sensitivity)` → `resolve_config_v3()` →
   **Pydantic component presets = SINGLE source of truth**:
   - `config/components/asr/faster_whisper.py` — decoder/transcriber/engine (incl. `chunk_length`)
@@ -21,13 +21,17 @@ Do not reason from it. Current reality below. (Correcting those two docs is an o
   - `config/components/vad/silero.py` — threshold, speech_pad_ms, max_group_duration_s, …
   - `config/components/features/scene_detection.py`
   - `component.get_preset(sensitivity).model_dump()`, then **CLI overrides only if non-None**.
-- **Modern modes** (`transformers/qwen/crispasr`): **direct CLI args → pipeline**. No legacy
-  resolution, no Pydantic. Qwen sensitivity uses the **v4** path
+- **Modern modes** (`transformers/qwen`, and the Ensemble passes `parakeet-crispasr/cohere-crispasr`
+  since 1.10.0): **direct CLI args → pipeline**. No legacy resolution, no Pydantic. The CrispASR
+  passes take a model short name (`whisperjav/crispasr/manifest.py`) and a speech segmenter, and
+  have no sensitivity presets. Qwen sensitivity uses the **v4** path
   (`ConfigManager.get_tool_config()` → `config/v4/manager.py:109-160`, order:
   ecosystem → model spec → preset → overrides). v4 YAML governs qwen/tools, NOT legacy modes.
 - **`asr_config.json`**: only `version` + `ui_preferences` (console verbosity), via
   `ConfigManager.get_ui_preferences()`. NOT a parameter source. (Its `ui_preferences.crispasr`
-  exe-path leak is the intentionally-uncommitted change on `dev_v1.9.0`.)
+  block -- a developer's crispasr.exe path and extra arguments -- is committed (e6ee399) and ships in
+  the wheel. 1.10.0 removed the mode that used it; only the GUI ever read it, and the CrispASR plan
+  removes that GUI code in its GUI step (step 3).)
 
 ## Fixed (NOT sensitivity-controlled)
 

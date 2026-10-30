@@ -28,14 +28,11 @@ REM   - install.py (root) - Main installation script
 REM   - whisperjav/installer/ - Unified installer module
 REM
 REM Options (forwarded to install.py):
-REM   --cpu-only              Install CPU-only PyTorch
-REM   --cuda VERSION          Install PyTorch for specific CUDA (e.g. cu118, cu124, cu128)
+REM   --accelerator NAME      What this install is made for: nvidia, vulkan, own-pytorch or cpu
+REM                           (without it: a supported NVIDIA GPU is used, otherwise it asks)
 REM   --no-speech-enhancement Skip speech enhancement packages
 REM   --minimal               Minimal install (transcription only)
 REM   --dev                   Install in development/editable mode
-REM   --local-llm             Install local LLM support (prebuilt wheel)
-REM   --local-llm-build       Install local LLM support (build from source)
-REM   --no-local-llm          Skip local LLM installation
 REM   --help                  Show help message
 REM
 REM Author: Senior Architect
@@ -85,7 +82,7 @@ REM Check if Python is available
 where python >nul 2>&1
 if errorlevel 1 (
     echo ERROR: Python not found in PATH
-    echo Please install Python 3.10-3.12 and add it to PATH
+    echo Please install Python 3.13 and add it to PATH
     exit /b 1
 )
 

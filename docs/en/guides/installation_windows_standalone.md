@@ -1,650 +1,257 @@
-# WhisperJAV Windows Standalone Installation Guide
+# WhisperJAV Windows Installer Guide
 
-**Version:** 1.8.9
-**Last Updated:** 2026-03-19
-**Installer Type:** Standalone .exe (no admin required)
-
----
-
-## Table of Contents
-
-1. [System Requirements](#system-requirements)
-2. [Before You Install](#before-you-install)
-3. [Installation Steps](#installation-steps)
-4. [First-Run Experience](#first-run-experience)
-5. [Verifying Your Installation](#verifying-your-installation)
-6. [Upgrading from a Previous Version](#upgrading-from-a-previous-version)
-7. [Uninstallation](#uninstallation)
-8. [Troubleshooting](#troubleshooting)
-9. [Silent/Unattended Installation](#silentunattended-installation)
-10. [FAQ](#faq)
+**Version:** 1.10.0
+**Installer:** `WhisperJAV-1.10.0-Windows-x86_64.exe` (no administrator rights needed)
 
 ---
 
-## System Requirements
+## Contents
 
-### Minimum Requirements
-
-| Component | Requirement |
-|-----------|-------------|
-| Operating System | Windows 10 (64-bit) or Windows 11 |
-| RAM | 8 GB |
-| Free Disk Space | 8 GB (installation + AI models + cache) |
-| Internet | Required during installation for downloading dependencies |
-| Runtime | Microsoft Edge WebView2 (installer will prompt if missing) |
-
-### Recommended for Best Performance
-
-| Component | Recommendation |
-|-----------|----------------|
-| GPU | NVIDIA GPU with 6+ GB VRAM (RTX 2060 or better) |
-| GPU Driver | NVIDIA Driver 570+ (for CUDA 12.8 support) |
-| RAM | 16 GB |
-| Storage | SSD (significantly faster processing) |
-| Internet | Broadband connection (for initial model download) |
-
-### GPU Compatibility
-
-WhisperJAV uses NVIDIA CUDA for GPU-accelerated transcription. The installer automatically detects your GPU and installs the appropriate version:
-
-| Your NVIDIA Driver | CUDA Version Installed | Compatible GPUs |
-|--------------------|------------------------|-----------------|
-| 570 or newer | CUDA 12.8 (optimal) | RTX 20xx, 30xx, 40xx, 50xx series |
-| 450 - 569 | CUDA 11.8 (universal) | All CUDA-capable NVIDIA GPUs |
-| No NVIDIA GPU | CPU-only (slower) | Any system (6-10x slower than GPU) |
-
-If you do not have an NVIDIA GPU, WhisperJAV will still work in CPU-only mode: tick **Accept CPU-only mode** on the GUI's Advanced tab (or pass `--accept-cpu-mode` on the command line). Without it, the start-up check stops and asks whether to continue on the CPU, and in the GUI the run aborts with a message telling you to tick that box. Processing will be slower (approximately 30-60 minutes per hour of video, compared to 5-10 minutes with a GPU).
-
-### Supported NVIDIA GPUs
-
-- **GeForce:** GTX 1060+, RTX 2060+, RTX 3060+, RTX 4060+, RTX 5070+
-- **Quadro / RTX Professional:** Quadro RTX, RTX A-series
-- **Data Center:** T4, A10, A100, H100, B100
+1. [Before you install](#before-you-install)
+2. [Installation steps](#installation-steps)
+3. [What this install is made for](#what-this-install-is-made-for)
+4. [First run](#first-run)
+5. [Checking your installation](#checking-your-installation)
+6. [Coming from 1.9.x](#coming-from-19x)
+7. [Updating within 1.10](#updating-within-110)
+8. [Running the installer again](#running-the-installer-again)
+9. [Uninstalling](#uninstalling)
+10. [Troubleshooting](#troubleshooting)
+11. [Technical details](#technical-details)
 
 ---
 
-## Before You Install
+## Before you install
 
-### 1. Update Your NVIDIA Driver (Recommended)
+### Your computer
 
-For the best performance, update your NVIDIA driver to version 570 or newer:
+| | Needed |
+|---|---|
+| Windows | Windows 10 or 11, 64-bit (x86-64). Windows on ARM (for example Snapdragon laptops) is not supported: the installer stops on its first screen. |
+| RAM | 8 GB (16 GB recommended) |
+| Free disk space | about 10 GB, for the install and the models it downloads on first use |
+| Internet | while installing, and on the first run of each model |
+| WebView2 | Microsoft Edge WebView2 Runtime, for the GUI (the installer offers it if it is missing) |
 
-1. Visit [nvidia.com/drivers](https://www.nvidia.com/drivers)
-2. Select your GPU model
-3. Download and install the latest "Game Ready" or "Studio" driver
-4. Restart your computer after installation
+### Your graphics card
 
-You can check your current driver version by:
-- Right-clicking on the desktop and selecting "NVIDIA Control Panel"
-- Looking at the bottom-left corner for "Driver Version"
+The installer makes this install for one accelerator (see [Accelerated or not](../getting-started/index.md#accelerated-or-not)):
 
-### 2. Ensure WebView2 is Installed
+- **An NVIDIA GPU that 1.10 supports** — GTX 16 series, RTX 20 series or newer, with driver 580 or newer: the install is made for the NVIDIA GPU (CUDA) by itself, without a question.
+- **Anything else** — an AMD or Intel graphics card, an NVIDIA card older than 1.10 supports, an older driver, or no graphics card WhisperJAV can use: a window asks what the install should be made for.
 
-WhisperJAV uses Microsoft Edge WebView2 for its graphical interface. Most Windows 10 and 11 systems have this pre-installed. If you are unsure, the installer will check for you and provide a download link if needed.
+To check your NVIDIA driver version, right-click the desktop, open the NVIDIA Control Panel and look at "Driver Version" in the bottom-left corner. To update it: [nvidia.com/drivers](https://www.nvidia.com/drivers), then restart the PC.
 
-To check manually:
-1. Open "Add or remove programs" in Windows Settings
-2. Search for "WebView2"
-3. If "Microsoft Edge WebView2 Runtime" appears, you are ready
+### Antivirus
 
-If not installed, download it from:
-[https://go.microsoft.com/fwlink/p/?LinkId=2124703](https://go.microsoft.com/fwlink/p/?LinkId=2124703)
+Some antivirus programs block the installer's downloads. If that happens, add an exclusion for `%LOCALAPPDATA%\WhisperJAV`, or pause real-time scanning while installing.
 
-### 3. Free Up Disk Space
+### Users in China
 
-Ensure you have at least 8 GB of free space on the drive where WhisperJAV will be installed. The space breakdown is approximately:
-
-| Component | Size |
-|-----------|------|
-| Base installation (Python + conda) | ~500 MB |
-| PyTorch with CUDA | ~2.5 GB |
-| Python dependencies | ~1.5 GB |
-| AI models (downloaded on first use) | ~3 GB |
-| **Total** | **~7.5 GB** |
-
-### 4. Temporary Antivirus Exclusion (If Needed)
-
-Some antivirus software may flag the installer or post-installation downloads. If you encounter issues:
-
-1. Temporarily disable real-time scanning, or
-2. Add an exclusion for `%LOCALAPPDATA%\WhisperJAV`
+The installer downloads from GitHub, PyPI, download.pytorch.org and Hugging Face. Keep your VPN on during the whole installation.
 
 ---
 
-## Installation Steps
+## Installation steps
 
-### Step 1: Download the Installer
+1. Download `WhisperJAV-1.10.0-Windows-x86_64.exe` from the [releases page](https://github.com/meizhong986/WhisperJAV/releases).
+2. Double-click it. You do not need to run it as administrator. If Windows SmartScreen warns, click **More info**, then **Run anyway**.
+3. Accept the licence.
+4. Choose **Just Me** (recommended; no administrator rights) or **All Users**.
+5. Choose the folder. The default is `C:\Users\<you>\AppData\Local\WhisperJAV`. Keep the path short, and avoid spaces if you can.
+6. Click **Install**.
 
-Download `WhisperJAV-1.8.9-Windows-x86_64.exe` from the [GitHub Releases page](https://github.com/meizhong986/whisperjav/releases).
+After the files are unpacked, a console window runs the rest of the installation. It shows each phase:
 
-The installer file is approximately 150 MB.
+| Phase | What happens |
+|---|---|
+| 1 | Checks: free disk space, the connection to PyPI, the Visual C++ runtime, WebView2 |
+| 2 | Looks for an NVIDIA GPU and its driver |
+| 2.5 | Decides what the install is made for; shows the window when it has to ask (see below) |
+| 3–4.5 | Installs the package versions this release was tested with, then PyTorch for that accelerator |
+| 5 | Installs WhisperJAV |
+| 5.1 | NVIDIA GPU (CUDA) install only: places the CUDA 12 library balanced, fast and faster need; if this PC cannot load it, installs the CUDA 12.8 build of PyTorch instead |
+| 5.5–5.8 | Creates the `WhisperJAV-GUI.exe` launcher, downloads the FireRedVAD speech detection model, checks the icons |
+| 6 | Checks that the installed program starts |
 
-### Step 2: Run the Installer
+At the end, a summary shows what was installed and what the install is made for, and a desktop shortcut "WhisperJAV v1.10.0" is created. The installation takes about 10 to 30 minutes, depending on your connection.
 
-Double-click the downloaded `.exe` file. You do **not** need to run it as Administrator.
+---
 
-If Windows SmartScreen shows a warning:
-1. Click "More info"
-2. Click "Run anyway"
+## What this install is made for
 
-### Step 3: Accept the License Agreement
+### A supported NVIDIA GPU
 
-Read and accept the MIT license agreement to continue.
+No question is asked. The install is made for the NVIDIA GPU (CUDA 13.0). If this PC cannot load the CUDA 12 library that balanced, fast and faster need, the installer says so in a framed message and installs the CUDA 12.8 build instead.
 
-### Step 4: Choose Installation Type
+### No supported NVIDIA GPU: the window
 
-- **Just Me (recommended):** Installs for the current user only. No admin privileges needed.
-- **All Users:** Installs for all users on the computer. Requires admin privileges.
+When the installer finds no NVIDIA GPU that 1.10 supports, a window titled **"WhisperJAV — no supported NVIDIA GPU found"** asks:
 
-### Step 5: Choose Installation Location
+> WhisperJAV found no NVIDIA graphics card that version 1.10 supports (graphics found: …). What should this install be made for?
 
-The default location is:
+| Choice | The install is made for |
+|---|---|
+| AMD graphics card | GPU through Vulkan |
+| Intel graphics card | GPU through Vulkan |
+| NVIDIA graphics card older than WhisperJAV 1.10 supports | GPU through Vulkan |
+| I have my own PyTorch for my GPU (advanced) | Own PyTorch |
+| None, or use the CPU only | CPU only (not accelerated) |
+
+The window explains:
+
+> With an AMD, Intel or older NVIDIA card, the GGUF pipelines (Parakeet-CrispASR and Cohere-CrispASR) ask for your graphics card through Vulkan. This is experimental in 1.10.0: it has not been tested on AMD or Intel graphics cards, and we would like to hear how it works for you. All other pipelines run on the CPU (not accelerated), several times slower than on a supported NVIDIA GPU. With your own PyTorch, WhisperJAV installs everything except PyTorch, and you add your PyTorch build afterwards (the command is shown at the end). With the CPU only, every pipeline runs on the CPU.
+
+Without an answer, the CPU-only version is installed after 20 seconds. **Stop** ends the installer without installing anything.
+
+GPU through Vulkan needs the Vulkan runtime (`vulkan-1.dll`), which comes with your graphics driver. If it is missing, the installer says so and installs the CPU-only version; update the graphics driver and run the installer again to change that.
+
+### An NVIDIA GPU that 1.10 cannot use
+
+The window starts with the reason, and **Stop** is pre-selected, with no time limit:
+
+- **An older card** (below GTX 16 / RTX 20): "Your graphics card, … (compute capability …), is older than WhisperJAV 1.10 supports. 1.10 needs a GTX 16-series, RTX 20-series or newer card." and "WhisperJAV 1.9.5 still supports this card: https://github.com/meizhong986/WhisperJAV/releases/tag/v1.9.5." If you are sure the card is supported, **My card is identified wrongly** shows where to report it, then stops.
+- **An older driver** (below 580): "Your NVIDIA driver (…) is older than WhisperJAV 1.10 needs (580 or newer). Update it from https://www.nvidia.com/drivers, restart the PC, and run this installer again to get the NVIDIA GPU version. Or choose below."
+- **A card Windows lists but WhisperJAV cannot reach** — the driver may be missing or not working, or, on a laptop with two graphics chips, the NVIDIA chip may be switched off: install or repair the NVIDIA driver (580 or newer), restart the PC and run the installer again. Or choose below.
+
+### Own PyTorch
+
+WhisperJAV installs everything except PyTorch, and never installs, replaces or removes PyTorch in this install at install or upgrade. Running the installer again replaces the whole install folder, PyTorch included: the window keeps Own PyTorch and shows the command again. At the end, a window shows the one command to run, with WhisperJAV's Python filled in:
+
 ```
-C:\Users\[YourName]\AppData\Local\WhisperJAV
+"<install folder>\python.exe" -m pip install torch torchaudio --index-url <the address of your PyTorch build>
 ```
 
-You can change this to any location. Keep these guidelines in mind:
-- Avoid paths with spaces (e.g., "Program Files") if possible
-- Avoid paths longer than 46 characters unless you have Long Paths enabled
-- Avoid paths with special characters (accented letters, CJK characters)
+PyTorch 2.11 is recommended. The same command is saved in `<install folder>\OWN_PYTORCH_NEXT_STEP.txt`. Until you have run it, every WhisperJAV run stops at its start and shows the command again.
 
-### Step 6: Installation Options
+### Where the install's choice is kept
 
-The installer will show optional settings:
-- **Add to PATH:** Enabled by default. Allows running `whisperjav` from the command line and enables future upgrades via `whisperjav-upgrade`.
-- **Create shortcuts:** Creates a desktop shortcut for easy access.
+The installer writes the accelerator into `whisperjav_stack.txt` in the install folder. Every run, `whisperjav-upgrade` and every later run of the installer follow it.
 
-Click "Install" to begin.
+### When the installer stops on purpose
 
-### Step 7: Post-Installation (Automated)
-
-After the base environment is extracted, a post-installation script runs automatically. This is the longest part of the installation. A console window will appear showing progress:
-
-#### Phase 1: Preflight Checks (< 1 minute)
-- Disk space verification (8 GB minimum)
-- Network connectivity check (to PyPI)
-- Visual C++ Redistributable check (auto-installed if missing)
-- WebView2 runtime check (prompts download if missing)
-
-#### Phase 2: GPU Detection (< 1 minute)
-- Detects NVIDIA GPU and driver version
-- Selects appropriate CUDA version
-
-#### Phase 3: PyTorch Installation (3-5 minutes)
-- Downloads and installs PyTorch with CUDA support (~2.5 GB)
-- If no GPU is detected, you will be asked whether to install CPU-only PyTorch
-
-#### Phase 3.5: Core Whisper Packages (2-3 minutes)
-- Installs OpenAI Whisper, Stable-TS, FFmpeg-Python from GitHub
-- These packages use git and may trigger Git timeout handling for users behind firewalls
-
-#### Phase 4: Python Dependencies (3-5 minutes)
-- Installs all remaining Python packages from requirements file
-- Approximately 500 MB of downloads
-
-#### Phase 5: WhisperJAV Application (< 1 minute)
-- Installs the WhisperJAV application from the bundled wheel
-
-#### Phase 5.3: Local LLM Translation (Optional, Interactive)
-- You will be prompted to install a local Large Language Model for offline translation
-- Type "Y" to install (recommended) or "N" to skip
-- If you do not respond within 30 seconds, it defaults to "Y"
-- This can be installed later if you skip it now
-
-#### Phase 5.5-5.8: Launcher and Icon Setup (< 1 minute)
-- Creates `WhisperJAV-GUI.exe` launcher in the installation directory
-- Verifies icon files
-
-After all phases complete, a desktop shortcut named "WhisperJAV v1.8.9" is created.
-
-### Step 8: Complete
-
-The installation summary will display:
-- Installation directory
-- Python version
-- PyTorch version and CUDA status
-- WebView2 status
-- Installation time
-
-Press Enter to close the installer window.
-
-**Total installation time:** 10-20 minutes depending on internet speed and hardware.
+If you choose Stop, a closing dialog says: "WhisperJAV was not installed. The installer stopped for the reason shown in its console window." The reason is also saved in `INSTALLATION_STOPPED_v1.10.0.txt` in the install folder.
 
 ---
 
-## First-Run Experience
+## First run
 
-### Launching WhisperJAV
+Double-click the **WhisperJAV v1.10.0** shortcut, or `WhisperJAV-GUI.exe` in the install folder.
 
-Double-click the **"WhisperJAV v1.8.9"** shortcut on your desktop. Alternatively, double-click `WhisperJAV-GUI.exe` in the installation directory.
+The first time a pipeline needs a model, WhisperJAV downloads it (for example about 3 GB for Whisper large-v3, 674 MB for Parakeet-CrispASR). Later runs reuse it.
 
-### First Transcription: AI Model Download
+At the start of each run, WhisperJAV checks the install:
 
-The first time you process a video, WhisperJAV needs to download AI models. This is a one-time process:
+- **NVIDIA GPU (CUDA) install, GPU usable:** nothing is shown; the run goes on.
+- **NVIDIA GPU (CUDA) install, GPU not usable now** (for example after a driver change): the run does not start. A box names the reason and the fix. To run on the CPU this time, add `--device cpu`; in the GUI, the dialog **"The NVIDIA GPU cannot be used"** offers **Run on the CPU this time**.
+- **Every other install:** a box says what the install is made for and where each part runs on this computer, then the run goes on.
 
-| Model | Size | Download Time |
-|-------|------|---------------|
-| Whisper Large-v3 | ~3 GB | 5-10 minutes |
-
-The download progress is shown in the GUI. After the initial download, models are cached locally and no further downloads are needed.
-
-Models are stored in:
-```
-C:\Users\[YourName]\.cache\whisper\
-```
-
-### Basic Workflow
-
-1. **Add files:** Click "Add File(s)" or drag and drop video/audio files
-2. **Select mode:** Choose "Balanced" for best quality, "Faster" for speed
-3. **Start processing:** Click "Start"
-4. **Find your subtitles:** Output SRT files are saved next to your input files in an `_output` folder
+Basic workflow: add files, choose a mode (Balanced is a good start), click **Start**. The subtitles are written to the output folder you chose.
 
 ---
 
-## Verifying Your Installation
+## Checking your installation
 
-### Check GPU Acceleration
-
-After installation, open a command prompt from the installation directory and run:
+Open a Command Prompt (press Start, type `cmd`, press Enter) and run:
 
 ```cmd
-python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}'); print(f'GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"None\"}')"
+cd /d "%LOCALAPPDATA%\WhisperJAV"
+Scripts\whisperjav.exe --check
 ```
 
-Expected output for GPU systems:
+(Use your install folder if you chose another one.)
+
+It lists Python, PyTorch, the accelerator of the install, where each part runs, FFmpeg, CrispASR and the models. On an NVIDIA GPU (CUDA) install, for example:
+
 ```
-CUDA available: True
-GPU: NVIDIA GeForce RTX 4070
+✓ PyTorch: PyTorch 2.11.0+cu130: NVIDIA GPU (CUDA 13.0), NVIDIA GeForce RTX 3060
+✓ CrispASR: 0.8.44+cuda (CUDA build), GGUF pipelines: asks for the NVIDIA GPU (CUDA)
+ℹ Accelerator: Accelerator of this install: NVIDIA GPU (CUDA 13.0).
+ℹ CTranslate2: CTranslate2 (balanced, fast, faster): NVIDIA GPU (CUDA)
 ```
 
-### Check WhisperJAV Version
+`Scripts\whisperjav.exe --version` prints the version: `WhisperJAV 1.10.0`.
 
-```cmd
-python -c "from whisperjav.__version__ import __version__; print(f'WhisperJAV {__version__}')"
-```
-
-Expected output:
-```
-WhisperJAV 1.8.9
-```
-
-### Check Installation Log
-
-The installation log is located at:
-```
-[install_directory]\install_log_v1.8.9.txt
-```
-
-This file contains detailed information about every step of the installation process and is useful for diagnosing issues.
+The installation log is `install_log_v1.10.0.txt` in the install folder.
 
 ---
 
-## Upgrading from a Previous Version
+## Coming from 1.9.x
 
-### Which version are you on?
-
-- **On v1.9.2** — either works. Upgrade, or do a fresh install. v1.9.3 changes no underlying
-  library; the only new package is `demucs`, for htdemucs vocal isolation.
-- **On anything older than v1.9.2** — **do a fresh install.** v1.9.2 pinned Faster-Whisper to an
-  exact commit and CTranslate2 to 4.8.1, and an in-place upgrade from an older version can leave
-  your previous versions of those behind. A fresh install puts you on the combination the release
-  was tested with.
-
-### Automatic Upgrade Detection
-
-If you install WhisperJAV v1.8.9 to the same directory as a previous version, the installer will:
-
-1. Detect the existing WhisperJAV installation
-2. Ask if you want to replace it
-3. If you confirm, it will cleanly remove the old version before installing
-
-Your user configuration in `%APPDATA%\WhisperJAV` is preserved during upgrades.
-
-### Manual Upgrade via pip
-
-If you have PATH enabled (the default), you can upgrade without re-downloading the installer:
-
-```cmd
-whisperjav-upgrade
-```
-
-**Do not upgrade with a plain `pip install -U whisperjav...`.** On Windows, PyPI serves the
-**CPU-only** build of PyTorch; the CUDA builds are only on `download.pytorch.org`. Any resolution
-that touches PyTorch will therefore replace your GPU build with a CPU one, silently. The same
-command also moves other pinned packages around. `whisperjav-upgrade` passes constraints that
-protect the GPU packages.
-
-> **Upgrading to v1.9.3:** `whisperjav-upgrade` does not install the optional groups, so it will not
-> bring `demucs` (new in v1.9.3, for htdemucs vocal isolation). If you want htdemucs, run
-> `pip install demucs` once afterwards. Choosing htdemucs without it stops the run with a clear
-> message rather than failing quietly.
-
-### Preserving Configuration
-
-User settings are stored in:
-```
-%APPDATA%\WhisperJAV\whisperjav_config.json
-```
-
-This file is NOT deleted during upgrades or reinstallation. If you are upgrading from a version older than v1.8.0, the installer will automatically migrate your configuration from the old location.
+Install 1.10.0 fresh: 1.10.0 needs Python 3.13, so `whisperjav-upgrade` cannot take a 1.9.x install to 1.10.0. If you install into the folder of your old version, the installer finds it and offers to replace it: everything in that folder is removed first. Your settings in `%APPDATA%\WhisperJAV` and your downloaded models stay.
 
 ---
 
-## Uninstallation
+## Updating within 1.10
 
-### Method 1: Windows Settings (Recommended)
+Later 1.10 releases can be installed with `whisperjav-upgrade`, which keeps the accelerator of your install and its PyTorch:
 
-1. Open Windows Settings > Apps > Apps & features
-2. Search for "WhisperJAV"
-3. Click "Uninstall"
-4. Follow the prompts
+1. Open a Command Prompt.
+2. `cd /d "%LOCALAPPDATA%\WhisperJAV"` (or your install folder).
+3. `Scripts\whisperjav-upgrade.exe`
+4. Check the version: `Scripts\whisperjav.exe --version`
 
-### Method 2: Uninstall Script
+Do not update with a plain `pip install -U whisperjav…`: on Windows, PyPI serves the CPU-only build of PyTorch, so it can replace your GPU build without a word.
 
-Run the `uninstall_v1.8.9.bat` file located in the installation directory. This interactive script will:
+---
 
-1. Remove the desktop shortcut
-2. Remove the Start Menu shortcut
-3. Ask whether to delete user configuration files
-4. Ask whether to delete cached AI models (~3 GB)
-5. Remove the installation directory
+## Running the installer again
 
-### Method 3: Manual Removal
+Run the installer again into the same folder to repair the install or to change what it is made for. A window titled **"WhisperJAV — this install's accelerator"** says "This install is made for: …. Keep it, or choose another." The current accelerator is pre-selected; without an answer, the install is kept as it is after 20 seconds. If the NVIDIA GPU cannot be used at that moment, the reason is shown above the choice. The installer removes the old install folder first (your settings and downloaded models stay) and keeps only its record of the accelerator; on an Own PyTorch install, add your PyTorch again with the command shown at the end.
 
-1. **Delete the installation directory:**
-   ```
-   %LOCALAPPDATA%\WhisperJAV
-   ```
-   (or your custom installation location)
+---
 
-2. **Delete the desktop shortcut:**
-   ```
-   %USERPROFILE%\Desktop\WhisperJAV v1.8.9.lnk
-   ```
+## Uninstalling
 
-3. **(Optional) Delete cached AI models** to free approximately 3 GB:
-   ```
-   %USERPROFILE%\.cache\whisper
-   ```
-
-4. **(Optional) Delete user configuration:**
-   ```
-   %APPDATA%\WhisperJAV
-   ```
-
-5. **(Optional) Clean PATH entries:**
-   If "Add to PATH" was enabled during installation, remove these entries from your user PATH:
-   - `[install_dir]\Scripts`
-   - `[install_dir]\Library\bin`
+Open Windows **Settings > Apps**, find **WhisperJAV** and choose **Uninstall**. The downloaded models stay in `%USERPROFILE%\.cache` (Hugging Face and Whisper caches) and your settings in `%APPDATA%\WhisperJAV`; delete those folders by hand to free the space.
 
 ---
 
 ## Troubleshooting
 
-### Installation Issues
+**"No supported NVIDIA GPU found" although you have an NVIDIA card.** Read the first line of the window: it names the reason (old card, old driver, or a card WhisperJAV cannot reach). Update or repair the driver, restart the PC and run the installer again. On a laptop with two graphics chips, make sure the NVIDIA chip is switched on.
 
-#### "NVIDIA driver not found" or "No NVIDIA GPU detected"
+**The run stops: "THE NVIDIA GPU CANNOT BE USED".** The install is made for the NVIDIA GPU, and the GPU cannot be used now. The box names the reason and the fix. `--device cpu` runs that one job on the CPU.
 
-**Cause:** No NVIDIA GPU installed, or drivers are not installed/outdated.
+**Processing is slow.** Look at the box at the start of the run, or run `whisperjav --check`: they say where each part runs. On a CPU-only install, every pipeline runs on the CPU, several times slower than on a GPU.
 
-**Solution:**
-- If you have an NVIDIA GPU, download and install the latest driver from [nvidia.com/drivers](https://www.nvidia.com/drivers)
-- If you do not have an NVIDIA GPU, accept the CPU-only installation when prompted. Processing will be slower but fully functional.
+**The GGUF pipelines stop: "CrispASR could not be loaded".** With the GPU-through-Vulkan or Own PyTorch install, this usually means the Vulkan runtime (`vulkan-1.dll`) is missing: update the graphics driver, or run the installer again and choose CPU only.
 
-#### "WebView2 runtime not detected"
+**Downloads fail or time out.** Check the connection; behind a firewall, allow `python.exe`, `uv.exe` and `git.exe`. The installer retries GitHub downloads with longer timeouts. In China, keep your VPN on for the whole installation.
 
-**Cause:** Microsoft Edge WebView2 is not installed. This is required for the graphical interface.
+**The GUI does not open, or the window is blank.** Install WebView2 from [Microsoft](https://go.microsoft.com/fwlink/p/?LinkId=2124703). To see error messages, run `"%LOCALAPPDATA%\WhisperJAV\python.exe" -m whisperjav.webview_gui.main` in a Command Prompt.
 
-**Solution:**
-1. The installer will automatically open a download page
-2. Download and install the "Evergreen Standalone Installer" from [Microsoft](https://go.microsoft.com/fwlink/p/?LinkId=2124703)
-3. After installation, press Enter in the installer window to continue
-
-#### "Network connection failed"
-
-**Cause:** No internet connection or firewall blocking downloads.
-
-**Solution:**
-- Check your internet connection
-- Temporarily disable VPN or proxy
-- Check firewall settings: allow `python.exe`, `pip.exe`, `git.exe`, and `uv.exe` to access the internet
-- If behind a corporate firewall, contact your IT department
-
-#### "Git connection timeout" or "Failed to connect to github.com"
-
-**Cause:** GitHub is blocked or slow (common behind the Great Firewall of China or with some VPN configurations).
-
-**Solution:**
-- The installer automatically detects this and configures extended Git timeouts
-- Wait for the automatic retry (up to 3 attempts)
-- If retries fail, try:
-  - Switching to a different VPN endpoint
-  - Using a GitHub mirror/proxy
-  - Running the installer at a different time when network congestion is lower
-
-#### "Out of disk space"
-
-**Cause:** Less than 8 GB of free space on the installation drive.
-
-**Solution:**
-- Free up disk space and re-run the installer
-- Choose a different installation drive with more space
-- Note that AI models (downloaded on first use) also require approximately 3 GB
-
-#### "Installation failed after retries"
-
-**Solution:**
-1. Check `install_log_v1.8.9.txt` in the installation directory for the specific error
-2. Common causes:
-   - Antivirus blocking downloads: add an exclusion for the installation directory
-   - Network timeout: try again with a better connection
-   - Corrupted download: delete the installation directory and start fresh
-3. Try running the installer as Administrator (right-click > Run as administrator)
-
-#### "Post-install script failed"
-
-**Cause:** An error occurred during the automated package installation phase.
-
-**Solution:**
-1. Check `install_log_v1.8.9.txt` for the specific phase that failed
-2. If it failed at PyTorch installation: check your GPU driver version
-3. If it failed at dependency installation: check network connectivity
-4. Re-run the installer; it will detect the existing partial installation and offer to replace it
-
-### Runtime Issues
-
-#### "GUI won't launch" or blank window appears
-
-**Solution:**
-1. Ensure WebView2 is installed (see above)
-2. Try launching from the command line to see error messages:
-   ```cmd
-   cd %LOCALAPPDATA%\WhisperJAV
-   python.exe -m whisperjav.webview_gui.main
-   ```
-3. Check if antivirus is blocking the application
-
-#### Processing is very slow
-
-**Solution:**
-1. Check if GPU acceleration is enabled by looking at the console output when processing starts
-2. If it says "CPU-only mode", your GPU is not being used
-3. Verify CUDA installation: `python -c "import torch; print(torch.cuda.is_available())"`
-4. Close other GPU-intensive applications (games, video editors)
-5. Use "Faster" mode for quicker results at the cost of some accuracy
-
-#### "Model download stuck"
-
-**Solution:**
-- Large models (approximately 3 GB) take 5-20 minutes depending on your connection
-- The download will resume if interrupted
-- If stuck for more than 30 minutes, cancel and check your internet connection
-- Models are cached in `%USERPROFILE%\.cache\whisper\`
-
-#### Application crashes during processing
-
-**Solution:**
-1. Ensure you have enough RAM (16 GB recommended for large models)
-2. Try processing one file at a time
-3. Use a smaller Whisper model (e.g., "medium" instead of "large-v3")
-4. Check the GUI console for error messages
-5. Report persistent crashes at [GitHub Issues](https://github.com/meizhong986/whisperjav/issues)
+**The installation failed.** Open `install_log_v1.10.0.txt` in the install folder: it names the phase that failed. `INSTALLATION_FAILED_v1.10.0.txt` holds the reason. Run the installer again; it offers to replace the partial install. If it keeps failing, open an issue at [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) with the log attached.
 
 ---
 
-## Silent/Unattended Installation
+## Technical details
 
-The installer supports command-line options for automated deployment:
+### Silent installation
 
 ```cmd
-WhisperJAV-1.8.9-Windows-x86_64.exe /S /D=C:\WhisperJAV
+cmd /C START /WAIT WhisperJAV-1.10.0-Windows-x86_64.exe /S /D=C:\WhisperJAV
 ```
 
-### Available Options
+`/S` installs without the installer's screens; `/D=` sets the folder and must come last. `WhisperJAV-1.10.0-Windows-x86_64.exe /?` lists every option. The window of [What this install is made for](#what-this-install-is-made-for) still opens when the installer has to ask: on a PC without a supported NVIDIA GPU it installs the CPU-only version after 20 seconds without an answer; with an NVIDIA GPU that 1.10 cannot use, it waits for an answer.
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `/S` | Silent mode (no GUI) | Off |
-| `/Q` | Quiet mode (suppress console output) | Off |
-| `/D=<path>` | Installation directory (must be last parameter) | `%LOCALAPPDATA%\WhisperJAV` |
-| `/InstallationType=AllUsers` | Install for all users (requires admin) | JustMe |
-| `/AddToPath=0` or `1` | Add to system PATH | 1 (on) |
-| `/NoShortcuts=0` or `1` | Skip shortcut creation | 0 (create shortcuts) |
-| `/InstallLocalLLM=0` or `1` | Install local LLM translation | Prompt |
-| `/NoRegistry=0` or `1` | Skip registry entries | 0 |
-| `/?` | Show help | -- |
+### Files in the install folder
 
-### Examples
+| File | What it is |
+|---|---|
+| `install_log_v1.10.0.txt` | the installation log |
+| `whisperjav_stack.txt` | what the install is made for |
+| `OWN_PYTORCH_NEXT_STEP.txt` | Own PyTorch install only: the command that adds your PyTorch |
+| `INSTALLATION_STOPPED_v1.10.0.txt` | only when the installer stopped on purpose: the reason |
+| `INSTALLATION_FAILED_v1.10.0.txt` | only when the installation failed: the reason |
+| `WhisperJAV-GUI.exe` | the GUI launcher |
 
-Install silently to a custom directory:
-```cmd
-cmd /C START /WAIT WhisperJAV-1.8.9-Windows-x86_64.exe /S /D=D:\WhisperJAV
-```
+### Addresses the installer downloads from
 
-Install silently, skip local LLM, no PATH modification:
-```cmd
-cmd /C START /WAIT WhisperJAV-1.8.9-Windows-x86_64.exe /S /AddToPath=0 /InstallLocalLLM=0
-```
-
----
-
-## FAQ
-
-### Q: Do I need an NVIDIA GPU?
-
-**A:** No. WhisperJAV works on any Windows 10/11 system. Without an NVIDIA GPU, it runs in CPU-only mode once you tick **Accept CPU-only mode** (Advanced tab); the start-up check otherwise stops and asks. CPU mode is approximately 6-10 times slower. For occasional use, CPU mode is perfectly fine. For regular use or long videos, an NVIDIA GPU is strongly recommended.
-
-### Q: How much disk space do I need?
-
-**A:** Approximately 8 GB total: about 4.5 GB for the installation and about 3 GB for AI models (downloaded on first use). If you also install the local LLM for translation, add approximately 4-8 GB more.
-
-### Q: Can I install on a network drive?
-
-**A:** This is not recommended. WhisperJAV requires fast disk access for temporary files and model loading. Install on a local SSD for the best experience.
-
-### Q: Is my data sent to the internet?
-
-**A:** No. All transcription happens locally on your computer. Internet access is only needed during installation (to download packages) and on first run (to download AI models). After that, WhisperJAV works completely offline. The only exception is if you use cloud translation providers (DeepSeek, Gemini, etc.), which require API keys and send subtitle text to those services.
-
-### Q: Can I use this alongside another Python installation?
-
-**A:** Yes. WhisperJAV installs its own isolated Python environment. It does not interfere with any existing Python installation on your system.
-
-### Q: How do I update to a newer version?
-
-**A:** Download and run the new installer. If you install to the same directory, the installer will detect the previous version and offer to replace it. Your user settings are preserved. Alternatively, if PATH was enabled, run `whisperjav-upgrade`, which protects your GPU PyTorch while it works. Do not use a plain `pip install -U whisperjav...`: on Windows, PyPI serves the CPU-only build of PyTorch, so it can silently replace your GPU build.
-
-### Q: What video formats are supported?
-
-**A:** WhisperJAV supports any format that FFmpeg can read, which includes virtually all common video and audio formats: MP4, MKV, AVI, MOV, WMV, FLV, WebM, MP3, WAV, FLAC, AAC, OGG, and many others.
-
-### Q: Where are the subtitle files saved?
-
-**A:** Subtitle files (SRT format) are saved next to your input video files in an `_output` subfolder. For example, if your video is at `D:\Videos\movie.mp4`, the subtitle will be at `D:\Videos\movie_output\movie.srt`.
-
-### Q: The installer is stuck at "Extracting packages"
-
-**A:** This phase extracts the conda packages and can take 2-5 minutes depending on your disk speed. It may appear frozen but is working. Check disk activity in Task Manager to confirm.
-
-### Q: Can I move the installation after it is complete?
-
-**A:** No. Moving the installation directory will break internal paths. If you need to change the location, uninstall and reinstall to the new location.
-
-### Q: What is the "local LLM" option during installation?
-
-**A:** This installs llama-cpp-python, which enables translating subtitles using a local AI model on your computer, without needing API keys or internet access. It requires additional disk space (4-8 GB) and works best with an NVIDIA GPU. You can skip this during installation and add it later if needed.
-
-### Q: I am behind a corporate firewall / Great Firewall of China
-
-**A:** The installer has built-in detection and handling for slow or blocked connections to GitHub. It will automatically configure extended timeouts and retry failed downloads. If installation still fails, try using a VPN or proxy that allows access to github.com and pypi.org.
-
----
-
-## Technical Details
-
-### Installation Directory Structure
-
-After installation, the directory structure looks like this:
-
-```
-%LOCALAPPDATA%\WhisperJAV\
-    python.exe                    # Python interpreter
-    pythonw.exe                   # Python (no console window)
-    WhisperJAV-GUI.exe            # GUI launcher
-    whisperjav_icon.ico           # Application icon
-    install_log_v1.8.9.txt        # Installation log
-    uninstall_v1.8.9.bat          # Uninstall script
-    Lib\                          # Python standard library
-        site-packages\
-            whisperjav\           # WhisperJAV application code
-            torch\                # PyTorch
-            ...
-    Scripts\                      # Executable scripts
-        whisperjav.exe            # CLI entry point
-        whisperjav-gui.exe        # GUI entry point
-        whisperjav-translate.exe  # Translation CLI
-        pip.exe                   # Package manager
-        ...
-    Library\
-        bin\                      # FFmpeg, git, and other tools
-            ffmpeg.exe
-            git.exe
-            ...
-```
-
-### Log File Locations
-
-| Log | Path | Purpose |
-|-----|------|---------|
-| Installation log | `[install_dir]\install_log_v1.8.9.txt` | Detailed installation progress |
-| Failure marker | `[install_dir]\INSTALLATION_FAILED_v1.8.9.txt` | Created only if installation fails |
-| Uninstall log | `%TEMP%\whisperjav_uninstall_v1.8.9.txt` | Uninstallation details |
-
-### Network Requirements
-
-During installation, the following domains must be accessible:
-
-| Domain | Purpose |
-|--------|---------|
-| `pypi.org` | Python package downloads |
-| `files.pythonhosted.org` | Python package files |
-| `github.com` | Git-based package downloads |
-| `download.pytorch.org` | PyTorch CUDA wheels |
-| `huggingface.co` | AI model downloads (first run) |
-| `aka.ms` | VC++ Redistributable (if needed) |
-| `go.microsoft.com` | WebView2 runtime (if needed) |
-
----
-
-## Support
-
-If you encounter issues not covered in this guide:
-
-1. Check the installation log at `install_log_v1.8.9.txt`
-2. Search existing issues at [GitHub Issues](https://github.com/meizhong986/whisperjav/issues)
-3. Open a new issue with:
-   - Your Windows version
-   - Your GPU model and driver version
-   - The installation log file
-   - A description of the problem
+| Address | For |
+|---|---|
+| `pypi.org`, `files.pythonhosted.org` | Python packages |
+| `download.pytorch.org` | PyTorch |
+| `github.com` | CrispASR's GPU builds and packages installed from GitHub |
+| `huggingface.co` | models (installation and first run) |
+| `aka.ms`, `go.microsoft.com` | the Visual C++ runtime and WebView2, if missing |

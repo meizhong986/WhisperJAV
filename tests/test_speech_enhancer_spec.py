@@ -17,6 +17,7 @@ Run with: pytest tests/test_speech_enhancer_spec.py -v
 """
 
 import argparse
+import os
 import subprocess
 import sys
 
@@ -33,10 +34,10 @@ class TestAccepted:
     @pytest.mark.parametrize("value,expected", [
         ("none", "none"),
         ("ffmpeg-dsp", "ffmpeg-dsp"),
-        ("clearvoice", "clearvoice"),
+        ("zipenhancer", "zipenhancer"),
         ("ffmpeg-dsp:loudnorm", "ffmpeg-dsp:loudnorm"),
         ("ffmpeg-dsp:loudnorm,denoise,highpass", "ffmpeg-dsp:loudnorm,denoise,highpass"),
-        ("clearvoice:MossFormer2_SE_48K", "clearvoice:MossFormer2_SE_48K"),
+        ("htdemucs:htdemucs", "htdemucs:htdemucs"),
         ("bs-roformer:vocals", "bs-roformer:vocals"),
         # Whitespace is tidied so downstream sees a clean value.
         ("  ffmpeg-dsp : loudnorm , denoise ", "ffmpeg-dsp:loudnorm,denoise"),
@@ -134,10 +135,12 @@ class TestTheFlagsThemselves:
 
 class TestEnhanceForVadIsIgnoredWhereWeSayItIs:
     """
-    The owner accepted on 2026-09-17 that fast, faster, transformers and crispasr
-    ignore --passN-enhance-for-vad, on condition it is documented. The list that
+    The owner accepted on 2026-09-17 that fast, faster and transformers ignore
+    --passN-enhance-for-vad, on condition it is documented. parakeet-crispasr and
+    cohere-crispasr read it since design 22.9.1 (owner W232 8). The list that
     documents it must not drift from the pipelines themselves, so this reads their
-    source rather than their docstrings.
+    source -- each class and the pipeline classes it inherits from, short of
+    BasePipeline -- rather than their docstrings.
     """
 
     def test_the_list_matches_the_pipeline_sources(self):
@@ -145,7 +148,8 @@ class TestEnhanceForVadIsIgnoredWhereWeSayItIs:
             "import inspect, json;"
             "from whisperjav.ensemble.pass_worker import PIPELINE_CLASSES, ENHANCE_FOR_VAD_IGNORED_BY;"
             "ignores = sorted(n for n, c in PIPELINE_CLASSES.items()"
-            " if 'enhance_for_vad' not in inspect.getsource(c));"
+            " if not any('enhance_for_vad' in inspect.getsource(k) for k in c.__mro__"
+            " if k.__module__.startswith('whisperjav.pipelines') and k.__name__ != 'BasePipeline'));"
             "print('IGNORES=' + json.dumps(ignores));"
             "print('DECLARED=' + json.dumps(sorted(ENHANCE_FOR_VAD_IGNORED_BY)))"
         )
@@ -160,9 +164,14 @@ class TestEnhanceForVadIsIgnoredWhereWeSayItIs:
             "pipeline classes actually read")
 
     def test_the_help_names_the_pipelines_that_ignore_it(self):
+        # argparse wraps help text at hyphens too ("parakeet-" / "crispasr"), so the
+        # phrase below survives only an unwrapped line: ask for a wide terminal.
         result = subprocess.run([sys.executable, "-m", "whisperjav.main", "--help"],
                                 capture_output=True, text=True,
-                                encoding="utf-8", errors="replace", timeout=300)
+                                encoding="utf-8", errors="replace", timeout=300,
+                                env={**os.environ, "COLUMNS": "1000"})
         assert result.returncode == 0
         help_text = " ".join(result.stdout.split())
-        assert "fast, faster, transformers and crispasr ignore it" in help_text
+        assert "fast, faster and transformers ignore it" in help_text
+        assert "Accepted but ignored by fast, faster and transformers." in help_text
+        assert "Available with qwen, fidelity, parakeet-crispasr and cohere-crispasr." in help_text

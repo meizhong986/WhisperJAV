@@ -153,6 +153,13 @@ body {
     background: rgba(255, 255, 255, 0.12);
 }
 
+/* 1.10.0 (item 6): the English / 中文 switch, a text button beside the theme button */
+.lang-button {
+    width: auto;
+    padding: 0 6px;
+    font-size: 0.85rem;
+}
+
 .theme-menu {
     position: absolute;
     top: 30px;
@@ -2074,16 +2081,6 @@ button:focus-visible,
     font-weight: 500;
 }
 
-.provider-deprecation-hint {
-    font-size: 11px;
-    color: #856404;
-    background: rgba(255, 193, 7, 0.1);
-    border: 1px solid rgba(255, 193, 7, 0.25);
-    border-radius: var(--border-radius);
-    padding: 6px 12px;
-    margin-top: 8px;
-}
-
 /* Ollama Pull Modal — smaller variant */
 .modal-sm {
     max-width: 400px;
@@ -3710,4 +3707,22 @@ details.translation-advanced-section[open] .collapse-icon {
 /* Ensure spinner shows properly in loading state */
 .update-check-loading .spinner {
     display: block;
+}
+
+/* The CrispASR status panel under a pass row (1.10.0; route B design 12, T16) */
+.crispasr-status-panel {
+    background: var(--background-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    margin: 4px 0 8px 0;
+    padding: 6px 12px;
+    font-size: 0.85em;
+}
+
+.crispasr-status-panel.cannot-run {
+    border-color: var(--danger-color, #c0392b);
+}
+
+.crispasr-status-line + .crispasr-status-line {
+    margin-top: 2px;
 }

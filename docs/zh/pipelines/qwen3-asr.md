@@ -1,6 +1,6 @@
 # Qwen3-ASR 处理管线
 
-Qwen3-ASR 是一个基于阿里巴巴 Qwen 架构的替代语音识别引擎，以不同的语音识别方法提供高质量的日语文本输出。
+Qwen3-ASR 是一个基于阿里巴巴 Qwen 架构的替代ASR 引擎，以不同的 ASR 方法提供高质量的日语文本输出。
 
 ---
 
@@ -15,9 +15,9 @@ Qwen3-ASR 是一个基于阿里巴巴 Qwen 架构的替代语音识别引擎，�
 
 ## 使用方法
 
-### GUI（Ensemble 选项卡）
+### GUI（专家模式选项卡）
 
-1. 进入 **Ensemble** 选项卡
+1. 进入 **专家模式**（Ensemble）选项卡
 2. 将 **Pipeline** 设置为 **Qwen3-ASR**
 3. 选择模型大小
 4. 点击 **Start**
@@ -28,12 +28,12 @@ Qwen3-ASR 是一个基于阿里巴巴 Qwen 架构的替代语音识别引擎，�
 whisperjav video.mp4 --mode qwen
 ```
 
-### 作为集成模式的 Pass 2
+### 作为专家模式的第二轮
 
 Qwen3-ASR 与基于 Whisper 的处理管线配合良好：
 
-1. **Pass 1：** Balanced（Whisper — 良好的时间轴）
-2. **Pass 2：** Qwen3-ASR（良好的文本质量）
+1. **第一轮：** Balanced（Whisper — 良好的时间轴）
+2. **第二轮：** Qwen3-ASR（良好的文本质量）
 3. **合并策略：** Smart Merge
 
 ---

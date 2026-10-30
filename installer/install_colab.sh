@@ -30,6 +30,17 @@ WHISPERJAV_BRANCH="${WHISPERJAV_REF:-main}"
 HF_WHEEL_REPO="mei986/whisperjav-wheels"
 LLAMA_CPP_VERSION="0.3.21"
 
+# WhisperJAV 1.10.0 does not support hosted notebooks (owner W42 3; design 22.1.2, 22.13 detail 13).
+# First, before anything is installed. A notebook pinned to an earlier release (WHISPERJAV_REF=v1.9.x
+# and older) keeps installing that release.
+case "$WHISPERJAV_BRANCH" in
+    v1.[0-9].*|1.[0-9].*) ;;
+    *)
+        echo "WhisperJAV 1.10.0 does not support Google Colab or Kaggle notebooks. This is due to 1.10.0 being made and tested for installs on your own computer only. Nothing was installed."
+        exit 1
+        ;;
+esac
+
 # Debug mode
 DEBUG=false
 if [[ "$1" == "--debug" ]] || [[ "$1" == "-d" ]]; then

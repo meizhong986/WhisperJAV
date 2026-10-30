@@ -23,7 +23,7 @@ from whisperjav.utils.run_outcome import (
     parse_fail_on,
 )
 
-SHORTFALL = "2 of 3 scenes went through without being cleaned up by ClearVoice"
+SHORTFALL = "2 of 3 scenes went through without being cleaned up by ZipEnhancer"
 
 
 @pytest.fixture

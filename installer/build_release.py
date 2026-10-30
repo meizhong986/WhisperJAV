@@ -10,6 +10,18 @@ Usage:
     python build_release.py --dry-run # Preview without changes
     python build_release.py --clean   # Remove generated files
     python build_release.py --validate # Validate only
+    python build_release.py --check-tree          # Only: no uncommitted/untracked files?
+    python build_release.py --check-wheel <wheel> # Only: every package file tracked by git?
+    python build_release.py --check-settings      # Only: shipped settings hold no path from this PC?
+
+A full build stops if the working tree is not committed (checked after phase 1),
+if the shipped settings file holds a path from this computer, or if the wheel holds
+a package file that git does not track.
+
+v1.10.0 (item 2f; design section 22): the dependency lists come from uv.lock, one per
+lock extra (cu130, cu128, vulkan, cpu), exported into whisperjav/installer/locked/ (tracked by git, so a
+lock change shows up as uncommitted files and stops the build until committed).
+Needs uv on PATH (uv.lock's required-version names the lowest).
 """
 
 import os
@@ -20,16 +32,6 @@ import configparser
 import argparse
 from pathlib import Path
 from datetime import datetime
-
-# Python 3.11+ has tomllib built-in
-try:
-    import tomllib
-except ImportError:
-    # For Python 3.10, use tomli if available
-    try:
-        import tomli as tomllib
-    except ImportError:
-        tomllib = None
 
 # Configure UTF-8 encoding for Windows console.
 #
@@ -51,6 +53,44 @@ RED = '\033[91m'
 YELLOW = '\033[93m'
 BLUE = '\033[94m'
 RESET = '\033[0m'
+
+# v1.10.0 (item 2f; design 22.6.8): the uv.lock extras, one locked file each, from the one
+# accelerator table (standard library only, so this import needs nothing installed).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from whisperjav.installer.core.accelerators import LOCK_EXTRAS as LOCKED_VARIANTS  # noqa: E402
+
+# v1.10.0 (item 5, owner W275): the settings file every install starts with. A developer
+# whose WhisperJAV runs from this folder writes GUI choices into it (ConfigManager keeps it
+# inside the package), so a path from the developer's computer can end up in a release --
+# 1.9.5 shipped an XXL path that way.
+SHIPPED_SETTINGS = Path(__file__).resolve().parent.parent / "whisperjav" / "config" / "asr_config.json"
+
+
+def shipped_settings_problems(config):
+    """The settings in ui_preferences that hold a path from this computer: an XXL program path
+    (xxl_exe_path) or any absolute path (C:\\..., \\\\server\\..., /home/...). Returns
+    "ui_preferences.key.key: value" lines; empty when the file may ship."""
+    import re
+
+    problems = []
+
+    def walk(node, where):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                here = f"{where}.{key}"
+                if key == "xxl_exe_path":
+                    problems.append(f"{here}: {value!r}")
+                else:
+                    walk(value, here)
+        elif isinstance(node, list):
+            for i, value in enumerate(node):
+                walk(value, f"{where}[{i}]")
+        elif isinstance(node, str) and re.match(r"^([A-Za-z]:[\\/]|\\\\|/[^\s/])", node):
+            problems.append(f"{where}: {node!r}")
+
+    walk(config.get("ui_preferences", {}), "ui_preferences")
+    return problems
+
 
 class ReleaseBuilder:
     def __init__(self, dry_run=False):
@@ -164,95 +204,58 @@ class ReleaseBuilder:
             content = content.replace(placeholder, value)
         return content
 
-    def generate_requirements_from_pyproject(self):
+    def locked_requirements_dir(self):
+        """whisperjav/installer/locked/ -- the exported files, shipped in the wheel too."""
+        return self.project_root / "whisperjav" / "installer" / "locked"
+
+    def export_locked_requirements(self):
+        """v1.10.0 (item 2f): export uv.lock once per PyTorch build, exact versions, no hashes.
+
+        Every install -- this installer, install.py, whisperjav-upgrade -- installs one of
+        these files, so users get the versions development tested (owner, W53-W56).
+        Stops if uv.lock no longer matches pyproject.toml: run `uv lock`, commit, build again.
         """
-        Generate requirements.txt from pyproject.toml.
+        self.print_header("Phase 1.5: Export Locked Requirements (uv.lock)")
+        uv = shutil.which("uv")
+        if not uv:
+            print(f"  {RED}✗{RESET} uv not found on PATH (see installer/build_env.yml for the version)")
+            return False
+        check = subprocess.run([uv, "lock", "--check"], cwd=self.project_root, capture_output=True, text=True)
+        if check.returncode != 0:
+            print(f"  {RED}✗{RESET} uv.lock does not match pyproject.toml:")
+            print(f"      {(check.stderr or check.stdout).strip()[:500]}")
+            print("  Run `uv lock`, commit uv.lock, then build again.")
+            return False
+        print(f"  {GREEN}✓{RESET} uv.lock matches pyproject.toml")
 
-        Extracts dependencies from [project.dependencies] and selected
-        [project.optional-dependencies] extras, excluding git-based
-        dependencies which are handled separately in post_install.py.
-
-        This ensures requirements.txt is always in sync with pyproject.toml.
-        """
-        pyproject_path = self.project_root / "pyproject.toml"
-
-        if not pyproject_path.exists():
-            print(f"  {YELLOW}⚠{RESET} pyproject.toml not found, using template fallback")
-            return None
-
-        if tomllib is None:
-            print(f"  {YELLOW}⚠{RESET} tomllib not available (Python 3.10 without tomli), using template fallback")
-            return None
-
-        try:
-            with open(pyproject_path, "rb") as f:
-                config = tomllib.load(f)
-        except Exception as e:
-            print(f"  {YELLOW}⚠{RESET} Failed to parse pyproject.toml: {e}")
-            return None
-
-        project = config.get("project", {})
-        core_deps = project.get("dependencies", [])
-        optional_deps = project.get("optional-dependencies", {})
-
-        # Extras to include for the Windows installer
-        # These match what the installer needs for full functionality
-        installer_extras = [
-            "cli",
-            "gui",
-            "translate",
-            "llm",
-            "enhance",
-            "huggingface",
-            "qwen",
-            "analysis",
-            "compatibility",
-        ]
-
-        # Collect all dependencies (excluding git-based ones)
-        all_deps = set()
-
-        # Add core dependencies
-        for dep in core_deps:
-            if "git+" not in dep and "@" not in dep:
-                all_deps.add(dep)
-
-        # Add optional dependencies for selected extras
-        for extra in installer_extras:
-            if extra in optional_deps:
-                for dep in optional_deps[extra]:
-                    # Skip self-references like "whisperjav[cli]"
-                    if not dep.startswith("whisperjav["):
-                        # Skip git-based dependencies
-                        if "git+" not in dep and "@" not in dep:
-                            all_deps.add(dep)
-
-        # Sort dependencies alphabetically (case-insensitive)
-        sorted_deps = sorted(all_deps, key=lambda x: x.lower().split("[")[0].split(">")[0].split("<")[0].split("=")[0])
-
-        # Build requirements.txt content
-        header = f"""# WhisperJAV v{self.version} Requirements
-# ================================
-# Auto-generated from pyproject.toml by build_release.py
-# Do NOT edit this file directly - edit pyproject.toml instead.
-#
-# Extras included: {', '.join(installer_extras)}
-#
-# Note: The following are installed separately in post_install_v{self.version}.py:
-# - Phase 3: PyTorch (CUDA version detected at install time)
-# - Phase 3.5: Git-based packages (require git, benefit from retry logic):
-#   - openai-whisper (core ASR)
-#   - stable-ts (WhisperJAV fork for Japanese)
-#   - faster-whisper (pinned to SYSTRAN master @ ed9a06c)
-#   - ffmpeg-python (audio/video processing)
-#   - clearvoice (speech enhancement)
-#
-# Installation: pip install -r requirements_v{self.version}.txt
-
-"""
-        content = header + "\n".join(sorted_deps) + "\n"
-
-        return content
+        out_dir = self.locked_requirements_dir()
+        for variant in LOCKED_VARIANTS:
+            command = ["export", "--frozen", "--no-hashes", "--no-emit-project", "--no-header",
+                       "--extra", "all", "--extra", variant, "--format", "requirements-txt"]
+            result = subprocess.run([uv, *command], cwd=self.project_root, capture_output=True,
+                                    text=True, encoding="utf-8")
+            if result.returncode != 0:
+                print(f"  {RED}✗{RESET} uv export ({variant}) failed: {result.stderr.strip()[:500]}")
+                return False
+            content = (
+                f"# WhisperJAV -- release-pinned dependencies, PyTorch build {variant}\n"
+                f"# Exported from uv.lock by installer/build_release.py; do not edit -- change\n"
+                f"# pyproject.toml, run `uv lock`, then build again.\n"
+                f"# uv {' '.join(command)}\n"
+                + result.stdout
+            )
+            path = out_dir / f"requirements_{variant}.txt"
+            if self.dry_run:
+                print(f"  [DRY-RUN] Would write {path.relative_to(self.project_root)}")
+                continue
+            old = path.read_bytes() if path.exists() else None
+            out_dir.mkdir(exist_ok=True)
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
+                f.write(content)
+            state = "unchanged" if old == path.read_bytes() else "UPDATED -- commit it"
+            pins = len([l for l in content.splitlines() if l and not l.startswith((" ", "#"))])
+            print(f"  {GREEN}✓{RESET} {path.relative_to(self.project_root)} ({pins} packages, {state})")
+        return True
 
     def print_header(self, title):
         """Print formatted header."""
@@ -317,12 +320,11 @@ __version_info__ = {{
             self.generated_dir.mkdir(exist_ok=True)
 
         # Template to output filename mapping
-        # Note: requirements.txt is generated from pyproject.toml, not a template
+        # The requirements files are not templates: they are exported from uv.lock (item 2f)
         file_mappings = {
             'construct.yaml.template': f'construct_v{self.version}.yaml',
             'post_install.bat.template': f'post_install_v{self.version}.bat',
             'post_install.py.template': f'post_install_v{self.version}.py',
-            # 'requirements.txt.template' removed - now generated from pyproject.toml
             'WhisperJAV_Launcher.py.template': f'WhisperJAV_Launcher_v{self.version}.py',
             'README_INSTALLER.txt.template': f'README_INSTALLER_v{self.version}.txt',
             'build_installer.bat.template': f'build_installer_v{self.version}.bat',
@@ -354,37 +356,44 @@ __version_info__ = {{
 
             generated_count += 1
 
-        # Generate requirements.txt from pyproject.toml
-        print(f"\n  Generating requirements.txt from pyproject.toml...")
-        requirements_output = f'requirements_v{self.version}.txt'
-        requirements_content = self.generate_requirements_from_pyproject()
-
-        if requirements_content:
+        # v1.10.0 (item 2f): the locked files, under the installer's versioned names.
+        for variant in LOCKED_VARIANTS:
+            src = self.locked_requirements_dir() / f"requirements_{variant}.txt"
+            output_name = f"requirements_v{self.version}_{variant}.txt"
             if self.dry_run:
-                print(f"  [DRY-RUN] Would generate {requirements_output} from pyproject.toml")
+                print(f"  [DRY-RUN] Would copy {src.name} to {output_name}")
+            elif not src.exists():
+                print(f"  {RED}✗{RESET} {src} missing (phase 1.5 writes it)")
+                return False
             else:
-                output_path = self.generated_dir / requirements_output
-                output_path.write_text(requirements_content, encoding='utf-8')
-                # Count lines (excluding blank and comment lines)
-                dep_count = len([l for l in requirements_content.split('\n') if l and not l.startswith('#')])
-                print(f"  {GREEN}✓{RESET} Generated {requirements_output} ({dep_count} dependencies)")
+                shutil.copy(src, self.generated_dir / output_name)
+                print(f"  {GREEN}✓{RESET} Copied {output_name}")
             generated_count += 1
+
+        # design 22.6.8: the one accelerator table, shipped next to post_install (which cannot
+        # import WhisperJAV before its phase 5) -- the file itself, so there is no second copy.
+        table = self.project_root / "whisperjav" / "installer" / "core" / "accelerators.py"
+        output_name = f"whisperjav_accelerators_v{self.version}.py"
+        if self.dry_run:
+            print(f"  [DRY-RUN] Would copy {table.name} to {output_name}")
         else:
-            # Fallback to template if pyproject.toml parsing failed
-            template_path = self.templates_dir / 'requirements.txt.template'
-            if template_path.exists():
-                content = template_path.read_text(encoding='utf-8')
-                content = self._substitute_placeholders(content)
-                if self.dry_run:
-                    print(f"  [DRY-RUN] Would generate {requirements_output} from template (fallback)")
-                else:
-                    output_path = self.generated_dir / requirements_output
-                    output_path.write_text(content, encoding='utf-8')
-                    print(f"  {YELLOW}⚠{RESET} Generated {requirements_output} from template (fallback)")
-                generated_count += 1
+            shutil.copy(table, self.generated_dir / output_name)
+            print(f"  {GREEN}✓{RESET} Copied {output_name}")
+        generated_count += 1
 
         print(f"\n  Generated {generated_count} files")
         return True
+
+    def remove_stale_build_dirs(self):
+        """v1.10.0 (N1): remove setuptools' leftovers from earlier builds.
+
+        A stale whisperjav.egg-info/SOURCES.txt and build/lib/ carry files from old
+        builds into the new wheel even after the package-data rules stop matching them.
+        """
+        for stale in (self.project_root / "build", self.project_root / "whisperjav.egg-info"):
+            if stale.exists():
+                shutil.rmtree(stale)
+                print(f"  Removed stale {stale.name}/")
 
     def build_wheel(self):
         """Build wheel package."""
@@ -401,6 +410,8 @@ __version_info__ = {{
         if dist_dir.exists():
             for whl in dist_dir.glob("*.whl"):
                 whl.unlink()
+
+        self.remove_stale_build_dirs()
 
         # Build wheel (PEP 517 via python -m build)
         try:
@@ -431,6 +442,97 @@ __version_info__ = {{
             return False
 
         return True
+
+    def _git_lines(self, *args):
+        """Run a git command in the project root; return its output lines."""
+        result = subprocess.run(
+            ["git", *args], cwd=self.project_root, capture_output=True, text=True, check=True
+        )
+        return [line for line in result.stdout.splitlines() if line]
+
+    def check_tree(self):
+        """v1.10.0 (N1): stop if the working tree holds uncommitted or untracked files.
+
+        The wheel is built from the working folder, so anything lying there can end up
+        in it. Runs after phase 1, so a __version__.py that differs from VERSION must be
+        committed first. Ignored files are not listed here; check_wheel() catches those.
+        """
+        self.print_header("Check: Working Tree Committed")
+        try:
+            dirty = self._git_lines("status", "--porcelain")
+        except (OSError, subprocess.CalledProcessError) as e:
+            print(f"  {RED}✗{RESET} git status failed: {e}")
+            return False
+        if not dirty:
+            print(f"  {GREEN}✓{RESET} No uncommitted or untracked files")
+            return True
+        print(f"  {RED}✗{RESET} {len(dirty)} uncommitted or untracked file(s):")
+        for line in dirty:
+            print(f"      {line}")
+        if self.dry_run:
+            print(f"  [DRY-RUN] A real build would stop here")
+            return True
+        print("  Commit, move or delete them, then build again.")
+        return False
+
+    def check_shipped_settings(self):
+        """v1.10.0 (item 5, owner W275): stop if the shipped settings file holds a path from
+        this computer (see shipped_settings_problems)."""
+        import json
+
+        self.print_header("Check: Shipped Settings Hold No Path From This Computer")
+        try:
+            config = json.loads(SHIPPED_SETTINGS.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            print(f"  {RED}✗{RESET} Cannot read {SHIPPED_SETTINGS}: {e}")
+            return False
+        problems = shipped_settings_problems(config)
+        if not problems:
+            print(f"  {GREEN}✓{RESET} {SHIPPED_SETTINGS.name} holds no path from this computer")
+            return True
+        print(f"  {RED}✗{RESET} {SHIPPED_SETTINGS} holds {len(problems)} path(s) from this computer:")
+        for line in problems:
+            print(f"      {line}")
+        if self.dry_run:
+            print(f"  [DRY-RUN] A real build would stop here")
+            return True
+        print("  Remove them from the file (every install starts with it), commit, then build again.")
+        return False
+
+    def check_wheel(self, wheel_path):
+        """v1.10.0 (N1): stop if the wheel holds a package file that git does not track.
+
+        Catches ignored files the package-data rules pick up (the 1.9.x wheels shipped
+        50 asr_config.backup.*.json files this way).
+        """
+        import zipfile
+
+        self.print_header("Check: Wheel Holds Only Tracked Files")
+        wheel_path = Path(wheel_path)
+        if not wheel_path.exists():
+            if self.dry_run:
+                print(f"  [DRY-RUN] Would check {wheel_path.name}")
+                return True
+            print(f"  {RED}✗{RESET} Wheel not found: {wheel_path}")
+            return False
+        try:
+            tracked = set(self._git_lines("ls-files", "whisperjav"))
+        except (OSError, subprocess.CalledProcessError) as e:
+            print(f"  {RED}✗{RESET} git ls-files failed: {e}")
+            return False
+        with zipfile.ZipFile(wheel_path) as zf:
+            entries = [n for n in zf.namelist() if n.startswith("whisperjav/") and not n.endswith("/")]
+        untracked = sorted(n for n in entries if n not in tracked)
+        if not untracked:
+            print(f"  {GREEN}✓{RESET} All {len(entries)} package files in {wheel_path.name} are tracked by git")
+            return True
+        print(f"  {RED}✗{RESET} {len(untracked)} file(s) in {wheel_path.name} are not tracked by git:")
+        for name in untracked:
+            print(f"      {name}")
+        if self.dry_run:
+            print(f"  [DRY-RUN] A real build would stop here")
+            return True
+        return False
 
     def copy_static_files(self):
         """Copy static files (LICENSE, icon) to generated directory."""
@@ -511,8 +613,13 @@ __version_info__ = {{
 
         steps = [
             ("Update __version__.py", self.update_version_py),
+            ("Export locked requirements", self.export_locked_requirements),
             ("Generate from templates", self.generate_from_templates),
+            ("Check working tree", self.check_tree),
+            ("Check shipped settings", self.check_shipped_settings),
             ("Build wheel package", self.build_wheel),
+            ("Check wheel contents", lambda: self.check_wheel(
+                self.project_root / "dist" / f"whisperjav-{self.version}-py3-none-any.whl")),
             ("Copy static files", self.copy_static_files),
             ("Run validation", self.run_validation),
         ]
@@ -538,9 +645,24 @@ def main():
     parser.add_argument('--dry-run', action='store_true', help='Preview without making changes')
     parser.add_argument('--clean', action='store_true', help='Remove generated files')
     parser.add_argument('--validate', action='store_true', help='Run validation only')
+    parser.add_argument('--check-tree', action='store_true',
+                        help='Only check that the working tree has no uncommitted or untracked files')
+    parser.add_argument('--check-wheel', metavar='WHEEL',
+                        help='Only check that every package file in WHEEL is tracked by git')
+    parser.add_argument('--check-settings', action='store_true',
+                        help='Only check that the shipped settings file holds no path from this computer')
     args = parser.parse_args()
 
     builder = ReleaseBuilder(dry_run=args.dry_run)
+
+    if args.check_tree:
+        return 0 if builder.check_tree() else 1
+
+    if args.check_settings:
+        return 0 if builder.check_shipped_settings() else 1
+
+    if args.check_wheel:
+        return 0 if builder.check_wheel(args.check_wheel) else 1
 
     if args.clean:
         builder.clean()

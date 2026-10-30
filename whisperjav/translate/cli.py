@@ -59,7 +59,8 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from .providers import PROVIDER_CONFIGS, SUPPORTED_SOURCES, SUPPORTED_TARGETS
+from .providers import (PROVIDER_CONFIGS, REMOVED_LOCAL_PROVIDER, SUPPORTED_SOURCES,
+                        SUPPORTED_TARGETS, removed_local_provider_error)
 from .core import translate_subtitle, _normalize_api_base, _api_base_to_custom_server, cap_batch_size_for_context, compute_max_output_tokens
 from .instructions import get_instruction_content, get_cache_dir
 from .settings import load_settings, create_default_settings, show_settings, get_settings_path, resolve_config
@@ -224,14 +225,17 @@ def main():
     translation_group = parser.add_argument_group("Translation Options")
     translation_group.add_argument(
         '--provider',
-        choices=list(PROVIDER_CONFIGS.keys()),
+        # 'local' (llama-cpp, removed in v1.10.0) is still accepted here so that typing
+        # it gets the owner's error text and exit 1, not argparse's "invalid choice";
+        # the metavar keeps it out of --help.
+        choices=list(PROVIDER_CONFIGS.keys()) + [REMOVED_LOCAL_PROVIDER],
+        metavar='{' + ','.join(PROVIDER_CONFIGS.keys()) + '}',
         default=None,
         help=f"AI provider (default: {settings.get('provider', 'deepseek')})"
     )
     translation_group.add_argument(
         '--model',
-        help="Model override. For --provider local: llama-8b (6GB VRAM, default), "
-             "gemma-9b (8GB VRAM, best), llama-3b (3GB VRAM), auto"
+        help="Model override (default: the provider's own default model)"
     )
     translation_group.add_argument(
         '-t', '--target',
@@ -308,7 +312,9 @@ def main():
         '--translate-gpu-layers',
         type=int,
         default=-1,
-        help="GPU layers for local LLM: -1=all (default), 0=CPU only, N=specific count"
+        # Only the removed 'local' provider used it (v1.10.0). Still accepted, with no
+        # effect, so that existing scripts that pass it do not stop; hidden from --help.
+        help=argparse.SUPPRESS
     )
 
     # Instructions
@@ -393,6 +399,11 @@ def main():
     parser.add_argument('--debug', action='store_true', help="Enable debug output")
 
     args = parser.parse_args()
+
+    # v1.10.0 (owner, W42 (2)): 'local' typed on the command line stops here.
+    if args.provider == REMOVED_LOCAL_PROVIDER:
+        print(removed_local_provider_error('--provider'), file=sys.stderr)
+        sys.exit(1)
 
     # Setup logging
     if args.debug:
@@ -514,8 +525,8 @@ def main():
             provider_config['endpoint'] = endpoint_path
             provider_config.pop('api_base', None)
 
-    # Get API key (not needed for local/custom/ollama providers)
-    if provider_name in ('local', 'custom', 'ollama'):
+    # Get API key (not needed for custom/ollama providers)
+    if provider_name in ('custom', 'ollama'):
         api_key = args.api_key if hasattr(args, 'api_key') and args.api_key else ''
     else:
         env_var = provider_config.get('env_var')
@@ -566,22 +577,6 @@ def main():
         print(f"  Instructions: {instruction_file}", file=sys.stderr)
     print(f"  Provider options: {provider_options}", file=sys.stderr)
     print(f"  Debug: {getattr(args, 'debug', False)}", file=sys.stderr)
-    if provider_name == 'local':
-        print(
-            "\n  [DEPRECATION WARNING] --provider local is deprecated as of v1.8.10.",
-            file=sys.stderr,
-        )
-        print(
-            "  Please migrate to --provider ollama for better stability and model support.",
-            file=sys.stderr,
-        )
-        print(
-            "  The local LLM server (llama-cpp-python) will be removed in a later release.\n",
-            file=sys.stderr,
-        )
-        n_gpu_layers = getattr(args, 'translate_gpu_layers', -1)
-        print(f"  NOTE: Local LLM provider - server will be started", file=sys.stderr)
-        print(f"  GPU layers: {n_gpu_layers} (-1=all, 0=CPU only)", file=sys.stderr)
     if provider_name == 'ollama':
         print(f"  NOTE: Ollama provider — smart detection + auto-start", file=sys.stderr)
     print(f"{'='*60}\n", file=sys.stderr)
@@ -717,99 +712,8 @@ def main():
                 if i == 0:  # Only print provider info once
                     print(f"Provider: {provider_name} ({model})", file=sys.stderr)
 
-            # Dispatch to local backend (via server) or PySubtrans
-            if provider_name == 'local':
-                from .local_backend import start_local_server, stop_local_server
-
-                # Start local LLM server (only once for batch)
-                if i == 0:
-                    n_gpu_layers = getattr(args, 'translate_gpu_layers', -1)
-                    print(f"\n[CLI] Starting local LLM server...", file=sys.stderr)
-                    print(f"[CLI]   Model: {model}", file=sys.stderr)
-                    print(f"[CLI]   GPU layers: {n_gpu_layers} (-1=all, 0=CPU)", file=sys.stderr)
-                    try:
-                        api_base, server_port, server_diagnostics = start_local_server(
-                            model=model, n_gpu_layers=n_gpu_layers,
-                            # This path translates with stream=True below, so the
-                            # start-up check has to ask in the streamed shape.
-                            chat_stream=True)
-                        print(f"[CLI]   Server ready at: {api_base}", file=sys.stderr)
-                        if server_diagnostics.inference_speed_tps > 0:
-                            print(f"[CLI]   Inference speed: {server_diagnostics.inference_speed_tps:.1f} tokens/sec", file=sys.stderr)
-                    except Exception as e:
-                        print(f"[CLI] ERROR: Failed to start local server: {e}", file=sys.stderr)
-                        sys.exit(1)
-
-                    # Auto-cap batch size to fit within local LLM context window.
-                    # See #183: default batch_size=30 exceeds 8K context → "Hit API
-                    # token limit" + "No matches" from PySubtrans.
-                    local_n_ctx = 8192  # matches start_local_server() default
-                    _user_batch = merged.get('max_batch_size', 30)
-                    local_batch_size = cap_batch_size_for_context(_user_batch, local_n_ctx)
-                    if local_batch_size < _user_batch:
-                        print(f"[CLI]   NOTE: Batch size auto-reduced from {_user_batch} to "
-                              f"{local_batch_size} to fit {local_n_ctx}-token context window", file=sys.stderr)
-
-                    # Compute max_tokens to prevent finish_reason='length' on the server.
-                    # CJK tokenization: Japanese chars encode as ~3 BPE tokens/char in
-                    # LLaMA/Gemma → long JAV narration lines consume up to 300 input
-                    # tokens each. Without a max_tokens cap the server fills all remaining
-                    # context with output, truncating mid-translation and breaking the
-                    # PySubtrans parser ("No matches found"). See issue #196.
-                    local_max_tokens = compute_max_output_tokens(local_batch_size, local_n_ctx)
-                    print(f"[CLI]   Output token limit (max_tokens): {local_max_tokens} "
-                          f"(JAV/CJK-tuned, prevents context overflow)", file=sys.stderr)
-
-                # Use Custom Server provider - designed for local OpenAI-compatible servers
-                # This uses /v1/chat/completions endpoint which llama-cpp-python supports
-                server_address = api_base.replace('/v1', '')
-                local_provider_config = {
-                    'pysubtrans_name': 'Custom Server',
-                    # PySubtrans talks to it as a custom server; WhisperJAV
-                    # started it and knows where its log is.
-                    'whisperjav_provider': 'local',
-                    'server_address': server_address,
-                    'endpoint': '/v1/chat/completions',
-                    'supports_conversation': True,
-                    'supports_system_messages': True,
-                    'max_tokens': local_max_tokens,  # Prevents finish_reason='length' (#196)
-                    'supports_streaming': True,       # Required: CustomClient.enable_streaming =
-                                                      # stream_responses AND supports_streaming.
-                                                      # Without this flag CustomClient silently
-                                                      # disables streaming even when requested.
-                }
-                if i == 0:
-                    print(f"[CLI]   PySubtrans config: Custom Server at {server_address}", file=sys.stderr)
-
-                try:
-                    result_path = translate_subtitle(
-                        input_path=str(input_path),
-                        output_path=output_path,
-                        provider_config=local_provider_config,
-                        model='local',
-                        api_key='',
-                        source_lang=source_lang,
-                        target_lang=target_lang,
-                        instruction_file=instruction_file,
-                        scene_threshold=merged.get('scene_threshold', 60.0),
-                        max_batch_size=local_batch_size,
-                        stream=True,  # Always stream for local LLM: non-streaming blocks the
-                                      # entire HTTP connection until the last token is generated.
-                                      # On slow backends (MPS, CPU) this exceeds the read timeout
-                                      # every batch. Streaming delivers tokens incrementally so
-                                      # no read timeout can fire. Output is identical. (#196)
-                        debug=args.debug,
-                        provider_options=provider_options,
-                        extra_context=extra_context if extra_context else None,
-                        emit_raw_output=not getattr(args, 'no_progress', False)
-                    )
-                finally:
-                    # Stop server after last file
-                    if i == len(files_to_process) - 1:
-                        print(f"\n[CLI] Stopping local LLM server...", file=sys.stderr)
-                        stop_local_server()
-                        print(f"[CLI]   Server stopped, GPU memory released", file=sys.stderr)
-            elif provider_name == 'ollama':
+            # Dispatch to PySubtrans
+            if provider_name == 'ollama':
                 result_path = translate_subtitle(
                     input_path=str(input_path),
                     output_path=output_path,

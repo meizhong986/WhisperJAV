@@ -132,16 +132,12 @@ Run the upgrade script using WhisperJAV's Python:
 
 **Symptoms:** GPU acceleration stopped working
 
-**Cause:** CPU-only PyTorch was installed over CUDA version
+**Cause:** usually a CPU-only PyTorch was installed over the CUDA one (for example by a plain `pip install`), or the NVIDIA driver changed.
 
 **Solution:**
-```cmd
-REM Check your CUDA version first
-nvidia-smi
-
-REM Reinstall CUDA PyTorch (example for CUDA 12.1)
-python.exe -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121 --force-reinstall
-```
+1. Run `whisperjav --check`: it names the accelerator of the install and what PyTorch can use.
+2. Check the driver with `nvidia-smi` (580 or newer on Windows, 570 or newer on Linux).
+3. Run the WhisperJAV installer again: it keeps the accelerator of the install and puts back the PyTorch build that belongs to it.
 
 ### Version didn't change after upgrade
 

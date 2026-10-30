@@ -132,7 +132,7 @@ class TestInstallationConstraints:
         assert "optional-dependencies" in data["project"]
 
         extras = data["project"]["optional-dependencies"]
-        expected_extras = ["cli", "gui", "translate", "llm", "enhance",
+        expected_extras = ["cli", "gui", "translate", "enhance",
                            "huggingface", "qwen", "analysis", "compatibility", "dev"]
         for extra in expected_extras:
             assert extra in extras, f"Missing extra: {extra}"
@@ -282,9 +282,8 @@ class TestInstallationConstraints:
                 )
 
     @pytest.mark.parametrize("pkg_info", [
-        ("modelscope", ">=1.20", "modelscope"),
+        ("modelscope", ">=1.40", "modelscope"),
         ("onnxruntime", ">=1.16.0", "onnxruntime"),
-        ("opencv-python", ">=4.10.0", "cv2"),
         ("bs-roformer-infer", None, "bs_roformer"),
     ], ids=lambda x: x[0] if isinstance(x, tuple) else str(x))
     def test_enhance_package_installed(self, pkg_info):
@@ -301,10 +300,10 @@ class TestInstallationConstraints:
                 )
 
     @pytest.mark.parametrize("pkg_info", [
-        ("huggingface-hub", ">=0.25.0", "huggingface_hub"),
-        # v1.8.14: <5.0 upper bound — Qwen3-ASR fork breaks on transformers 5.x.
-        ("transformers", ">=4.40.0,<5.0", "transformers"),
-        ("accelerate", ">=0.26.0", "accelerate"),
+        ("huggingface-hub", ">=1.0,<2", "huggingface_hub"),
+        # v1.10.0 (item 3): transformers 5.20; Qwen3-ASR runs through the qwen-asr fork.
+        ("transformers", ">=5.20,<6", "transformers"),
+        ("accelerate", ">=1.15", "accelerate"),
     ], ids=lambda x: x[0] if isinstance(x, tuple) else str(x))
     def test_huggingface_package_installed(self, pkg_info):
         """HuggingFace packages are importable where applicable."""
@@ -328,7 +327,8 @@ class TestInstallationConstraints:
 class TestCrossSourceConsistency:
     """
     Verify that version constraints are identical across all declaration sources:
-    pyproject.toml, registry.py, requirements.txt, requirements.txt.template.
+    pyproject.toml and registry.py. (v1.10.0, item 2f: the installer's lists are
+    exported from uv.lock; tests/test_dependency_drift_v192.py checks them.)
     """
 
     @staticmethod
@@ -370,22 +370,6 @@ class TestCrossSourceConsistency:
             specs[pkg.name.lower()] = spec
         return specs
 
-    @staticmethod
-    def _extract_template_specs() -> dict:
-        """Extract specs from requirements.txt.template."""
-        content = _read_file("installer/templates/requirements.txt.template")
-        specs = {}
-        for line in content.splitlines():
-            line = line.strip()
-            if not line or line.startswith("#") or line.startswith("{{"):
-                continue
-            # Remove inline comments
-            if "  #" in line:
-                line = line.split("  #")[0].strip()
-            name = re.split(r"[>=<\[@ ;]", line)[0].strip()
-            specs[name.lower()] = line
-        return specs
-
     def test_registry_matches_pyproject(self):
         """Every package in registry has matching spec in pyproject.toml."""
         pyproject = self._extract_pyproject_specs()
@@ -413,35 +397,6 @@ class TestCrossSourceConsistency:
 
         assert not mismatches, (
             f"Registry/pyproject.toml mismatches:\n" + "\n".join(mismatches)
-        )
-
-    def test_template_matches_registry(self):
-        """
-        Packages in requirements.txt.template match registry constraints.
-
-        The template is a subset (excludes git packages, torch, dev, llm).
-        """
-        from whisperjav.installer.core.registry import PACKAGES
-
-        template = self._extract_template_specs()
-        registry = {pkg.name.lower(): pkg for pkg in PACKAGES}
-
-        mismatches = []
-        for name, tmpl_spec in template.items():
-            if name not in registry:
-                continue  # Template may have packages not in registry
-
-            pkg = registry[name]
-            reg_spec = pkg.pyproject_spec().split(";")[0].strip()
-            tmpl_base = tmpl_spec.split(";")[0].strip()
-
-            if reg_spec != tmpl_base:
-                mismatches.append(
-                    f"  {name}: template='{tmpl_base}' vs registry='{reg_spec}'"
-                )
-
-        assert not mismatches, (
-            f"Template/registry mismatches:\n" + "\n".join(mismatches)
         )
 
     def test_no_duplicate_packages_in_registry(self):

@@ -132,16 +132,12 @@ Expected:     C:\Users\...\AppData\Local\WhisperJAV
 
 **症状：** GPU 加速不再可用
 
-**原因：** CPU 版 PyTorch 覆盖了 CUDA 版本
+**原因：** 通常是 CPU 版 PyTorch 覆盖了 CUDA 版本（例如普通的 `pip install` 造成的），或 NVIDIA 驱动发生了变化。
 
 **解决方案：**
-```cmd
-REM 先检查你的 CUDA 版本
-nvidia-smi
-
-REM 重新安装 CUDA 版 PyTorch（以 CUDA 12.1 为例）
-python.exe -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121 --force-reinstall
-```
+1. 运行 `whisperjav --check`：它会说明安装的加速器以及 PyTorch 能使用什么。
+2. 用 `nvidia-smi` 检查驱动（Windows 580 或更新，Linux 570 或更新）。
+3. 再次运行 WhisperJAV 安装程序：它会保留安装的加速器，并恢复与之对应的 PyTorch 版本。
 
 ### 升级后版本未变化
 

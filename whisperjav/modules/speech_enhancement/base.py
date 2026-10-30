@@ -5,7 +5,7 @@ This module defines the core data structures and interface that all
 speech enhancement backends must implement.
 
 Design Decisions (v1.7.3):
-- Single backend entry with model parameter (e.g., clearvoice with model selection)
+- Single backend entry with model parameter (e.g., bs-roformer with stem selection)
 - Graceful degradation: failures log warning and return original audio
 - In-memory processing for scene-level chunks (memory-efficient)
 - Sample rate negotiation via get_preferred_sample_rate() / get_output_sample_rate()
@@ -51,7 +51,7 @@ class EnhancementResult:
     Attributes:
         audio: Enhanced audio data (float32, mono)
         sample_rate: Sample rate of output audio
-        method: Backend name with model info (e.g., "clearvoice-MossFormer2_SE_48K")
+        method: Backend name with model info (e.g., "bs-roformer-vocals")
         parameters: Parameters used for enhancement
         processing_time_sec: Time taken to process (seconds)
         metadata: Backend-specific metadata (SNR improvement, etc.)
@@ -122,7 +122,7 @@ class SpeechEnhancer(Protocol):
         """
         Unique backend identifier.
 
-        Examples: "clearvoice", "bs-roformer", "none"
+        Examples: "zipenhancer", "bs-roformer", "none"
         """
         ...
 
@@ -131,7 +131,7 @@ class SpeechEnhancer(Protocol):
         """
         Human-readable name for GUI display.
 
-        Examples: "ClearerVoice (48kHz)", "BS-RoFormer Vocal Isolation"
+        Examples: "ZipEnhancer 16kHz", "BS-RoFormer Vocal Isolation"
         """
         ...
 
@@ -198,7 +198,7 @@ class SpeechEnhancer(Protocol):
         """
         Return list of supported model variants.
 
-        Examples for ClearerVoice: ["FRCRN_SE_16K", "MossFormer2_SE_48K", "MossFormerGAN_SE_16K"]
+        Examples for BS-RoFormer: ["vocals", "other"]
 
         Returns:
             List of model identifiers
@@ -218,7 +218,6 @@ class SpeechEnhancer(Protocol):
 
         Examples:
             - ZipEnhancer (2.04M params, ~500MB): True
-            - ClearVoice MossFormer2 (100M+ params, 9-16GB): False
             - BS-RoFormer: False
 
         Returns:
@@ -260,12 +259,10 @@ def resolve_torch_device(requested: Optional[str] = None) -> str:
         # Unknown device string — fall through to auto-detect
         logger.debug(f"Unknown device '{requested}', auto-detecting")
 
-    # Auto-detect: CUDA > MPS > CPU
-    if torch.cuda.is_available():
-        return "cuda"
-    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        return "mps"
-    return "cpu"
+    # Auto-detect: CUDA > MPS > CPU, through the device detector as every other PyTorch part
+    # (design 22.3.1): a card this PyTorch has no code for (#411) is not used (review P7 finding 3).
+    from whisperjav.utils.device_detector import get_best_device
+    return get_best_device()
 
 
 def load_audio_to_array(

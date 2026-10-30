@@ -1,0 +1,30 @@
+# WhisperJAV build-tool environment (environment A, "WJ110_build") -- v1.10.0, item 2f.
+#
+# Three environments, each with one job (owner, W52-W54):
+#   A  WJ110_build  this file: the tools that turn installer/generated/ into the .exe
+#   B  WJ110        development and test: Python from conda, everything else from uv.lock
+#   C  the program the installer creates on a user's PC
+# Nothing WhisperJAV needs at run time lives here, and constructor never goes into B.
+# Disposable: delete it and create it again whenever the toolchain changes.
+#
+#   conda env create -f installer/build_env.yml
+#   conda activate WJ110_build
+#   (first, in WJ110: python installer/build_release.py)
+#   cd installer\generated
+#   build_installer_v<version>.bat
+#
+# Exact versions (a conda-forge dry-run solve of these pins succeeded on 2026-10-14):
+#   constructor 3.17.3 -- the custom NSIS template is written for it;
+#   conda-standalone 26.5.2 and nsis 3.12 -- what constructor 3.17.3 resolved to;
+#   uv 0.9.26 -- shipped inside the installer (owner W56, C2: exact) and the version
+#     that made uv.lock (pyproject.toml requires at least this one).
+name: WJ110_build
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.13.16
+  - constructor=3.17.3
+  - conda-standalone=26.5.2
+  - nsis=3.12
+  - uv=0.9.26

@@ -147,14 +147,14 @@ class TestPhase6Outcome:
         assert any("Faster-Whisper" in w for w in warnings), warnings
 
     def test_an_optional_package_that_is_absent_is_only_a_warning(self, phase6):
-        """llama-cpp-python, ClearVoice and Transformers are optional features."""
+        """llama-cpp-python and Transformers are optional features."""
         phase6.set_imports({
-            "llama-cpp-python": "fail", "ClearVoice": "fail", "Transformers": "fail",
+            "llama-cpp-python": "fail", "Transformers": "fail",
         })
         _passes, fails, warnings, failures = phase6.module.run_post_install_verification()
 
         assert fails == 0, f"optional packages must never end the install; {failures}"
-        assert any("ClearVoice" in w for w in warnings), warnings
+        assert any("Transformers" in w for w in warnings), warnings
 
     def test_a_missing_critical_entry_point_is_a_failure(self, phase6, tmp_path):
         """Without whisperjav-gui.exe the desktop shortcut points at nothing."""

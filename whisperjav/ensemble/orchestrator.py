@@ -456,11 +456,26 @@ class EnsembleOrchestrator:
             for _note in _pass.get('degradations') or []:
                 degradations.append(f"pass {_pass_number}: {_note}")
 
+        # Routine notes (owner Q21, CrispASR master plan 2.6): printed in the run
+        # summary, and they change nothing -- no state, no exit status. From the same
+        # passes as the degradations above, but not labelled by pass: each note names
+        # its pipeline itself where that matters, and a note both passes make (the
+        # CrispASR program running on the CPU build, say) is printed once, in the
+        # order the passes made them.
+        notes: List[str] = []
+        for _pass in (pass1, pass2):
+            if not _pass or _pass.get('status') != 'completed':
+                continue
+            for _note in _pass.get('notes') or []:
+                if _note not in notes:
+                    notes.append(_note)
+
         ensemble_metadata['summary'] = {
             'final_output': str(final_output_path) if final_output_path else None,
             'passes_completed': passes_completed,
             'total_processing_time_seconds': total_time,
             'degradations': degradations,
+            'notes': notes,
         }
         ensemble_metadata['output_files'] = {
             'final_srt': str(final_output_path) if final_output_path else None,

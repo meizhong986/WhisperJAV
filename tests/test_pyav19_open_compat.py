@@ -59,6 +59,6 @@ def test_other_wrong_arguments_still_raise_and_wrapping_happens_once(fake_av):
 def test_every_faster_whisper_site_installs_it():
     from pathlib import Path
     root = Path(pyav_compat.__file__).resolve().parents[1] / "modules"
-    for rel in ("faster_whisper_pro_asr.py", "kotoba_faster_whisper_asr.py", "analytics.py",
+    for rel in ("faster_whisper_pro_asr.py", "analytics.py",
                 "speech_segmentation/backends/whisper_vad.py"):
         assert "ensure_av_open_compat()" in (root / rel).read_text(encoding="utf-8"), rel

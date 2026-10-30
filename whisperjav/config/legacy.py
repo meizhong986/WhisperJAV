@@ -22,7 +22,7 @@ Pipelines that:
 - Use the `resolve_legacy_pipeline()` function for configuration
 - Accept `resolved_config` parameter in their __init__
 - Rely on the v3 config structure with model, params, and features sections
-- Examples: balanced, fast, faster, fidelity, kotoba-faster-whisper
+- Examples: balanced, fast, faster, fidelity
 
 WHAT DOES NOT BELONG HERE
 -------------------------
@@ -172,13 +172,6 @@ LEGACY_PIPELINES = {
         },
         "description": "OpenAI Whisper with VAD and scene detection. Maximum fidelity.",
     },
-    "kotoba-faster-whisper": {
-        "asr": "kotoba_faster_whisper",
-        "vad": "none",  # Uses internal VAD (faster-whisper built-in)
-        "features": ["auditok_scene_detection"],  # Scene detection always enabled
-        "description": "Japanese-optimized Kotoba Faster-Whisper with internal VAD.",
-        "use_v3_structure": True,  # Return V3 config, not legacy mapped
-    },
     # NOTE: "transformers" mode is NOT listed here.
     # It uses dedicated --hf-* CLI arguments and bypasses legacy config resolution entirely.
     # See whisperjav/pipelines/transformers_pipeline.py for its implementation.
@@ -288,7 +281,7 @@ def resolve_legacy_pipeline(
     This provides backward compatibility with the old CLI interface.
 
     Args:
-        pipeline_name: Legacy pipeline name ('balanced', 'faster', 'fast', 'fidelity', 'kotoba-faster-whisper')
+        pipeline_name: Legacy pipeline name ('balanced', 'faster', 'fast', 'fidelity')
         sensitivity: Sensitivity level
         task: Task type
         overrides: Parameter overrides
@@ -344,11 +337,6 @@ def resolve_legacy_pipeline(
     # Add legacy compatibility fields
     config['pipeline_name'] = pipeline_name
     config['sensitivity_name'] = sensitivity
-
-    # For pipelines that use V3 structure (like kotoba-faster-whisper),
-    # return V3 config directly without legacy mapping
-    if pipeline_def.get("use_v3_structure", False):
-        return config
 
     # Map to old output structure for backward compatibility
     return _map_to_legacy_structure(config, pipeline_def)
@@ -492,6 +480,7 @@ def _map_to_legacy_structure(config: Dict[str, Any], pipeline_def: Dict[str, Any
         'sensitivity_name': config['sensitivity_name'],
         'workflow': workflow,
         'model': config['model'],
+        'run_device': config.get('run_device'),  # the speech enhancer follows it (resolver_v3)
         'params': {
             'decoder': filtered_decoder,
             'provider': filtered_provider,

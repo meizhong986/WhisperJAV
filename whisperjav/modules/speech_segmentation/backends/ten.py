@@ -266,6 +266,7 @@ class TenSpeechSegmenter:
                 audio_duration_sec=duration,
                 parameters=self._get_parameters(),
                 processing_time_sec=time.time() - start_time,
+                error=str(e) or type(e).__name__,
             )
 
         # 6. Group segments

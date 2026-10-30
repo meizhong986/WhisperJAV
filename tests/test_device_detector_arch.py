@@ -1,7 +1,8 @@
-"""#411: a GPU the installed PyTorch build has no kernels for is not a usable GPU.
+"""#411: a GPU the installed PyTorch build has no kernels for is not a usable GPU; and the start of
+each run and --check by the install record (design 22.5, owner W234 D-A).
 
-Covers the pure rule, the detector that every device choice derives from, and
-the --check suite, with a stand-in torch so no real CUDA is needed.
+Covers the pure rule, the detector that every device choice derives from, the --check suite and
+the start-of-run check, with a stand-in torch so no real CUDA is needed.
 """
 from __future__ import annotations
 
@@ -13,18 +14,6 @@ import pytest
 from whisperjav.utils import device_detector as dd
 
 CU128_LIST = ["sm_75", "sm_80", "sm_86", "sm_90", "sm_100", "sm_120"]
-
-
-@pytest.fixture(autouse=True)
-def _no_leaked_consent():
-    # enforce_gpu_requirement writes WHISPERJAV_CPU_ACCEPTED=1 into the real os.environ;
-    # monkeypatch.delenv(raising=False) records no undo when the name was absent, so
-    # the value would leak into later tests (and make the "passes silently" test vacuous).
-    import os
-    from whisperjav.utils import preflight_check as pf
-    os.environ.pop(pf.CPU_ACCEPTED_ENV, None)
-    yield
-    os.environ.pop(pf.CPU_ACCEPTED_ENV, None)
 
 
 class TestRule:
@@ -60,7 +49,7 @@ class TestRule:
         assert dd.cuda_build_supports_device(capability, arch_list) is expected
 
 
-def _fake_torch(capability, arch_list, name="NVIDIA GeForce GTX 1060 6GB"):
+def _fake_torch(capability, arch_list, name="NVIDIA GeForce GTX 1060 6GB", hip=None, mps=False):
     cuda = types.SimpleNamespace(
         is_available=lambda: True,
         get_device_name=lambda i=0: name,
@@ -68,7 +57,16 @@ def _fake_torch(capability, arch_list, name="NVIDIA GeForce GTX 1060 6GB"):
         get_arch_list=lambda: list(arch_list),
         device_count=lambda: 1,
     )
-    return types.SimpleNamespace(cuda=cuda, version=types.SimpleNamespace(cuda="12.8"))
+    backends = types.SimpleNamespace(mps=types.SimpleNamespace(is_available=lambda: mps))
+    return types.SimpleNamespace(cuda=cuda, backends=backends, __version__="2.11.0+cu128",
+                                 version=types.SimpleNamespace(cuda="12.8", hip=hip))
+
+
+def _no_gpu_torch(cuda_build="", mps=False):
+    cuda = types.SimpleNamespace(is_available=lambda: False)
+    backends = types.SimpleNamespace(mps=types.SimpleNamespace(is_available=lambda: mps))
+    return types.SimpleNamespace(cuda=cuda, backends=backends, __version__="2.11.0",
+                                 version=types.SimpleNamespace(cuda=cuda_build or None, hip=None))
 
 
 class TestDetector:
@@ -87,183 +85,239 @@ class TestDetector:
         assert dd.CUDA_UNUSABLE_REASON is None
 
 
+# --- the record of the install --------------------------------------------------------------
+
+def _record(monkeypatch, value):
+    """Stand in for the install record: a value, or None for no record."""
+    from whisperjav.installer.core import accelerators
+    monkeypatch.setattr(accelerators, "read_record",
+                        lambda prefix=None: (value is not None, value))
+
+
 class TestCheckSuite:
-    def test_check_reports_the_build_mismatch_as_fatal(self, monkeypatch):
-        from whisperjav.utils.preflight_check import CheckStatus, PreflightChecker
-        monkeypatch.setitem(sys.modules, "torch", _fake_torch((6, 1), CU128_LIST))
-        checker = PreflightChecker()
+    """--check's Accelerators group (design 22.5.5; owner W232 2: exit 1 only when the install does
+    not fit the computer)."""
+
+    def _checker(self, monkeypatch, torch_module, record, ct2=False, smi=""):
+        from whisperjav.utils import preflight_check as pf
+        monkeypatch.setitem(sys.modules, "torch", torch_module)
+        _record(monkeypatch, record)
+        monkeypatch.setattr(pf, "_ctranslate2_sees_cuda", lambda: ct2)
+        monkeypatch.setattr(pf, "_nvidia_smi_gpu_name", lambda: smi)
+        checker = pf.PreflightChecker()
         checker._check_cuda_availability()
-        r = checker.results[-1]
-        assert r.name == "CUDA Availability"
-        assert r.status == CheckStatus.FAIL and r.fatal
-        assert "not supported by this PyTorch build" in r.message
-        assert any("6.1" in d for d in r.details)
+        return pf, {r.name: r for r in checker.results}, checker.results
 
-    def test_check_passes_for_a_supported_card(self, monkeypatch):
-        from whisperjav.utils.preflight_check import CheckStatus, PreflightChecker
-        monkeypatch.setitem(sys.modules, "torch", _fake_torch((8, 6), CU128_LIST, "RTX 3060"))
-        checker = PreflightChecker()
-        checker._check_cuda_availability()
-        assert checker.results[-1].status == CheckStatus.PASS
-
-
-class TestCpuConsent:
-    @pytest.mark.parametrize("argv,expected", [
-        (["x.mp4", "--accept-cpu-mode"], True),
-        (["x.mp4", "--device", "cpu"], True),
-        (["x.mp4", "--device=cpu"], True),
-        (["x.mp4", "--device", "cuda"], False),
-        (["x.mp4", "--device"], False),
-        (["x.mp4"], False),
-    ])
-    def test_command_line_answers(self, argv, expected):
-        from whisperjav.utils.preflight_check import cpu_consent_in_argv
-        assert cpu_consent_in_argv(argv) is expected
-
-
-class TestStartupGate:
-    """The unconditional gate every run passes through (owner, 2026-09-06): an
-    unusable GPU stops the run and ASKS proceed-or-abort; nothing continues on its
-    own; where nobody can answer, it aborts and says how to answer."""
-
-    def _gate(self, monkeypatch, interactive, answer=None):
+    @pytest.mark.parametrize("record,fatal", [("own-pytorch", False), (None, False), ("cu130", True)])
+    def test_failing_cuda_operations_stop_the_check_only_on_an_nvidia_install(self, monkeypatch, record, fatal):
+        # Review P7 finding 15 (W232 2): a ROCm Own PyTorch whose GPU fails gets a warning, not exit 1.
         from whisperjav.utils import preflight_check as pf
-        monkeypatch.delenv(pf.CPU_ACCEPTED_ENV, raising=False)
-        monkeypatch.setitem(sys.modules, "torch", _fake_torch((6, 1), CU128_LIST))
-        monkeypatch.setattr(pf, "_stdin_is_interactive", lambda: interactive)
-        asked = []
-        monkeypatch.setattr(pf, "_ask", lambda prompt: (asked.append(prompt), answer or "")[1])
-        return pf, asked
+        torch = _fake_torch((9, 0), [], name="AMD Radeon RX 7900", hip="6.3")
 
-    def test_console_user_is_asked_and_no_means_abort(self, monkeypatch, capsys):
-        pf, asked = self._gate(monkeypatch, interactive=True, answer="")
-        with pytest.raises(SystemExit) as ei:
-            pf.enforce_gpu_requirement(accept_cpu_mode=False)
-        assert ei.value.code == 1
-        assert asked == ["Continue on the CPU anyway? [y/N] "]
-        out = capsys.readouterr().out
-        assert "compute capability 6.1" in out and "Aborted. Nothing was processed." in out
+        def zeros(n):
+            raise RuntimeError("HIP error: invalid device function")
+        torch.zeros = zeros
+        monkeypatch.setitem(sys.modules, "torch", torch)
+        _record(monkeypatch, record)
+        checker = pf.PreflightChecker()
+        checker._check_pytorch_cuda()
+        r = {x.name: x for x in checker.results}["CUDA Operations"]
+        assert r.fatal is fatal
+        assert r.status == (pf.CheckStatus.FAIL if fatal else pf.CheckStatus.WARN)
 
-    def test_console_user_can_choose_to_continue_on_cpu(self, monkeypatch, capsys):
-        pf, asked = self._gate(monkeypatch, interactive=True, answer="y")
-        assert pf.enforce_gpu_requirement(accept_cpu_mode=False) is True
-        assert asked and "Continuing on the CPU" in capsys.readouterr().out
+    def test_unusable_card_on_an_nvidia_install_is_the_one_failure(self, monkeypatch):
+        pf, by_name, _ = self._checker(monkeypatch, _fake_torch((6, 1), CU128_LIST), "cu128")
+        r = by_name["PyTorch"]
+        assert r.status == pf.CheckStatus.FAIL and r.fatal
+        assert "the NVIDIA GPU cannot be used" in r.message and "6.1" in r.message
+        assert r.details[0] == "1. Run the WhisperJAV installer again"
+        assert by_name["Accelerator"].message == "Accelerator of this install: NVIDIA GPU (CUDA 12.8)."
 
-    def test_yes_is_remembered_for_the_run_and_its_workers(self, monkeypatch, capsys):
-        # The check runs at import time and again in main(), and every spawned
-        # worker re-runs whisperjav.main's module level: one answer must serve all.
-        import os
-        pf, asked = self._gate(monkeypatch, interactive=True, answer="y")
-        assert pf.enforce_gpu_requirement(accept_cpu_mode=False) is True
-        assert os.environ.get(pf.CPU_ACCEPTED_ENV) == "1"
-        assert pf.enforce_gpu_requirement(accept_cpu_mode=False) is True
-        assert len(asked) == 1
-        # a worker with no console inherits the answer and does not abort
-        monkeypatch.setattr(pf, "_stdin_is_interactive", lambda: False)
-        assert pf.enforce_gpu_requirement(accept_cpu_mode=False) is True
-        assert len(asked) == 1
+    def test_driver_problem_on_an_nvidia_install_names_the_driver(self, monkeypatch):
+        pf, by_name, _ = self._checker(monkeypatch, _no_gpu_torch(cuda_build="13.0"), "cu130")
+        r = by_name["PyTorch"]
+        assert r.status == pf.CheckStatus.FAIL and r.fatal
+        assert r.details[0].startswith("1. Update the NVIDIA driver (580 or newer)")
+        assert "pip" not in " ".join(r.details)
 
-    def test_accept_cpu_mode_is_remembered_too(self, monkeypatch):
-        import os
-        pf, asked = self._gate(monkeypatch, interactive=False)
-        assert pf.enforce_gpu_requirement(accept_cpu_mode=True) is True
-        assert os.environ.get(pf.CPU_ACCEPTED_ENV) == "1"
+    @pytest.mark.parametrize("record", ["cpu", "vulkan", "own-pytorch", None])
+    def test_no_gpu_on_other_installs_is_info_not_a_failure(self, monkeypatch, record):
+        pf, by_name, results = self._checker(monkeypatch, _no_gpu_torch(), record)
+        assert by_name["PyTorch"].status == pf.CheckStatus.INFO
+        assert by_name["PyTorch"].message.endswith("CPU (not accelerated)")
+        assert not [r for r in results if r.status == pf.CheckStatus.FAIL]
 
-    def test_gui_child_marker_means_nobody_can_answer(self, monkeypatch):
+    def test_a_supported_card_passes(self, monkeypatch):
+        pf, by_name, _ = self._checker(monkeypatch, _fake_torch((8, 6), CU128_LIST, "RTX 3060"), "cu128", ct2=True)
+        assert by_name["PyTorch"].status == pf.CheckStatus.PASS
+        assert by_name["PyTorch"].message == "PyTorch 2.11.0+cu128: NVIDIA GPU (CUDA 12.8), RTX 3060"
+        assert by_name["CTranslate2"].message == "CTranslate2 (balanced, fast, faster): NVIDIA GPU (CUDA)"
+        assert by_name["ONNX Runtime"].message.endswith("CPU (not accelerated) in every install")
+
+    def test_rocm_own_pytorch_is_info_and_not_tested(self, monkeypatch):
+        pf, by_name, _ = self._checker(
+            monkeypatch, _fake_torch((9, 0), [], "AMD Radeon RX 7900", hip="6.2"), "own-pytorch")
+        assert by_name["PyTorch"].status == pf.CheckStatus.INFO
+        assert by_name["PyTorch"].message == "PyTorch 2.11.0+cu128 (your own): AMD GPU (ROCm), AMD Radeon RX 7900 — not tested"
+        assert by_name["CTranslate2"].message.endswith("CPU (not accelerated)")
+
+    def test_ctranslate2_line_follows_the_runs_rule_on_a_cpu_only_install(self, monkeypatch):
+        # Seen in the CPU-only install of 2026-10-27: CTranslate2's wheel sees the NVIDIA card,
+        # but the run uses the CPU (PyTorch has no CUDA there).
+        pf, by_name, _ = self._checker(monkeypatch, _no_gpu_torch(), "cpu", ct2=True)
+        assert by_name["CTranslate2"].message == "CTranslate2 (balanced, fast, faster): CPU (not accelerated)"
+
+    def test_cpu_only_install_on_a_pc_with_an_nvidia_gpu_is_a_warning(self, monkeypatch):
+        pf, _, results = self._checker(monkeypatch, _no_gpu_torch(), "cpu", smi="NVIDIA GeForce RTX 4070")
+        warn = [r for r in results if r.status == pf.CheckStatus.WARN]
+        assert len(warn) == 1 and "RTX 4070" in warn[0].message and "made for the CPU only" in warn[0].message
+        # owner W242 2: a source install keeps its record, so it needs --accelerator nvidia
+        assert "(for a source install: python install.py --accelerator nvidia)" in warn[0].message
+
+    def test_no_pip_command_for_pytorch_anywhere_in_the_checks(self):
+        from pathlib import Path
         from whisperjav.utils import preflight_check as pf
-        monkeypatch.setenv("WHISPERJAV_NO_CONSOLE", "1")
-        monkeypatch.setattr(sys, "stdin", types.SimpleNamespace(isatty=lambda: True))
-        assert pf._stdin_is_interactive() is False
+        text = Path(pf.__file__).read_text(encoding="utf-8")
+        for removed in ("pip install torch torchvision torchaudio", "pip install --upgrade torch",
+                        "pip uninstall torch"):
+            assert removed not in text
+        assert "pip install fireredvad" in text  # not a PyTorch command; stays
 
-    def test_no_console_aborts_and_says_how_to_answer(self, monkeypatch, capsys):
-        pf, asked = self._gate(monkeypatch, interactive=False)
-        with pytest.raises(SystemExit) as ei:
-            pf.enforce_gpu_requirement(accept_cpu_mode=False)
-        assert ei.value.code == 1 and asked == []
-        out = capsys.readouterr().out
-        assert "--accept-cpu-mode" in out and "Accept CPU-only mode" in out
 
-    def test_nothing_continues_on_a_timer(self):
-        # The 30 s "auto-continue" helper is gone: nothing proceeds without an answer.
-        import inspect
+# --- the start of each run ------------------------------------------------------------------
+
+def _flat(out):
+    """The box's text as one line: the box wraps long sentences."""
+    return " ".join(out.replace("║", " ").split())
+
+
+class TestStartOfRun:
+    """design 22.5.2 (owner W234 D-A): by the install record, silent / a notice / the one stop.
+    Nothing is ever asked."""
+
+    def _run(self, monkeypatch, torch_module, record, device=None):
+        import builtins
         from whisperjav.utils import preflight_check as pf
-        assert not hasattr(pf, "_wait_for_keypress_with_timeout")
-        assert "timeout" not in str(inspect.signature(pf.enforce_gpu_requirement))
+        monkeypatch.setitem(sys.modules, "torch", torch_module)
+        _record(monkeypatch, record)
+        monkeypatch.setattr(pf, "_gguf_where", lambda best: f"GGUF[{best}]")
+        monkeypatch.setattr(pf, "cublas12_files_missing", lambda: [])
+        monkeypatch.setattr(pf, "_ctranslate2_sees_cuda", lambda: False)
+        monkeypatch.setattr(builtins, "input", lambda *a: pytest.fail("the start of a run asked a question"))
+        return pf.start_of_run_check(device=device)
 
-    def test_end_of_input_means_nobody_answered(self, monkeypatch, capsys):
-        # Windows reports a piped stdin as a terminal; input() then hits EOF.
-        # That is "nobody can answer": abort and say how to answer in advance.
-        pf, _ = self._gate(monkeypatch, interactive=True)
-        monkeypatch.setattr(pf, "_ask", lambda prompt: None)
+    def test_nvidia_install_with_unusable_gpu_stops_with_status_3(self, monkeypatch, capsys):
         with pytest.raises(SystemExit) as ei:
-            pf.enforce_gpu_requirement(accept_cpu_mode=False)
-        assert ei.value.code == 1
-        out = capsys.readouterr().out
-        assert "input ended before you answered" in out and "--accept-cpu-mode" in out
-        assert "no console to ask on" not in out
+            self._run(monkeypatch, _fake_torch((6, 1), CU128_LIST), "cu128")
+        assert ei.value.code == 3
+        out = _flat(capsys.readouterr().out)
+        assert "This install is made for an NVIDIA GPU, but the GPU cannot be used now" in out
+        assert "6.1" in out and "WhisperJAV 1.9.5 does" in out   # the old card: the owner's W43 line
+        assert "--device cpu" in out and "Nothing was processed." in out
+        assert "╔" in out and "╚" in out
 
-    def test_question_is_printed_in_a_box(self, monkeypatch, capsys):
-        pf, asked = self._gate(monkeypatch, interactive=True, answer="")
-        with pytest.raises(SystemExit):
-            pf.enforce_gpu_requirement(accept_cpu_mode=False)
-        out = capsys.readouterr().out
-        assert "╔" in out and "╚" in out and "YOUR ANSWER IS NEEDED" in out
-        assert out.index("YOUR ANSWER IS NEEDED") > out.index("compute capability 6.1")
+    def test_nvidia_install_with_unusable_gpu_and_device_cpu_goes_on(self, monkeypatch, capsys):
+        assert self._run(monkeypatch, _fake_torch((6, 1), CU128_LIST), "cu130", device="cpu") == "notice"
+        out = _flat(capsys.readouterr().out)
+        assert "made for: NVIDIA GPU (CUDA 13.0)" in out and "as asked with --device cpu" in out
 
-    def test_accept_cpu_mode_answers_in_advance(self, monkeypatch):
-        pf, asked = self._gate(monkeypatch, interactive=False)
-        assert pf.enforce_gpu_requirement(accept_cpu_mode=True) is True
-        assert asked == []
-
-    def _no_gpu(self, monkeypatch, interactive, answer=None):
-        # a machine with no GPU at all: CUDA absent, no MPS
+    @pytest.mark.parametrize("gpu_where", [True, False])
+    def test_device_cpu_names_the_crispasr_parts_only_where_they_use_a_gpu(self, monkeypatch, capsys, gpu_where):
+        """Item 12: CrispASR's aligner and timing model cannot be held on the CPU. The box says so only where the
+        CrispASR build would ask for a GPU, and then does not also say 'every pipeline'."""
         from whisperjav.utils import preflight_check as pf
-        monkeypatch.delenv(pf.CPU_ACCEPTED_ENV, raising=False)
-        cuda = types.SimpleNamespace(is_available=lambda: False)
-        backends = types.SimpleNamespace(mps=types.SimpleNamespace(is_available=lambda: False))
-        monkeypatch.setitem(sys.modules, "torch", types.SimpleNamespace(cuda=cuda, backends=backends))
-        monkeypatch.setattr(pf, "_stdin_is_interactive", lambda: interactive)
-        asked = []
-        monkeypatch.setattr(pf, "_ask", lambda prompt: (asked.append(prompt), answer or "")[1])
-        return pf, asked
+        real_run = pf.start_of_run_check
 
-    def test_no_gpu_machine_is_asked_the_same_question(self, monkeypatch, capsys):
-        # owner, 2026-09-06 item 3: the no-GPU path asks too, in the same box
-        pf, asked = self._no_gpu(monkeypatch, interactive=True, answer="")
-        with pytest.raises(SystemExit) as ei:
-            pf.enforce_gpu_requirement(accept_cpu_mode=False)
-        assert ei.value.code == 1
-        assert asked == [pf.CPU_QUESTION]
-        out = capsys.readouterr().out
-        assert "No GPU found" in out and "YOUR ANSWER IS NEEDED" in out
-        assert "Aborted. Nothing was processed." in out
-        assert "Auto-continuing" not in out and "Press any key" not in out
+        def run_with_gguf(device=None):
+            monkeypatch.setattr(pf, "_gguf_where",
+                                lambda best: pf.GGUF_CUDA_WHERE if gpu_where else pf.GGUF_CPU_WHERE)
+            return real_run(device=device)
 
-    def test_no_gpu_machine_yes_continues_and_is_remembered(self, monkeypatch, capsys):
-        import os
-        pf, asked = self._no_gpu(monkeypatch, interactive=True, answer="yes")
-        assert pf.enforce_gpu_requirement(accept_cpu_mode=False) is True
-        assert os.environ.get(pf.CPU_ACCEPTED_ENV) == "1"
-        assert "Continuing on the CPU" in capsys.readouterr().out
+        monkeypatch.setattr(pf, "start_of_run_check", run_with_gguf)
+        assert self._run(monkeypatch, _fake_torch((8, 6), CU128_LIST, "RTX 3060"), "cu130", device="cpu") == "notice"
+        out = _flat(capsys.readouterr().out)
+        if gpu_where:
+            assert "Every pipeline's ASR model: the CPU (not accelerated)" in out
+            assert "still ask for the GPU: CrispASR cannot hold them on the CPU" in out
+            assert "Every pipeline: the CPU" not in out
+        else:
+            assert "Every pipeline: the CPU (not accelerated), as asked with --device cpu." in out
+            assert "CrispASR cannot hold" not in out
 
-    def test_no_gpu_machine_without_console_aborts_and_says_how(self, monkeypatch, capsys):
-        pf, asked = self._no_gpu(monkeypatch, interactive=False)
-        with pytest.raises(SystemExit) as ei:
-            pf.enforce_gpu_requirement(accept_cpu_mode=False)
-        assert ei.value.code == 1 and asked == []
-        out = capsys.readouterr().out
-        assert "--accept-cpu-mode" in out and "Accept CPU-only mode" in out
-
-    def test_no_gpu_machine_accept_cpu_mode_asks_nothing(self, monkeypatch, capsys):
-        pf, asked = self._no_gpu(monkeypatch, interactive=True)
-        assert pf.enforce_gpu_requirement(accept_cpu_mode=True) is True
-        assert asked == [] and "No GPU found" not in capsys.readouterr().out
-
-    def test_supported_card_passes_silently(self, monkeypatch, capsys):
-        import os
-        from whisperjav.utils import preflight_check as pf
-        assert pf.CPU_ACCEPTED_ENV not in os.environ   # must pass through the GPU branch, not the shortcut
-        monkeypatch.setitem(sys.modules, "torch", _fake_torch((8, 6), CU128_LIST, "RTX 3060"))
-        assert pf.enforce_gpu_requirement(accept_cpu_mode=False) is True
+    def test_nvidia_install_with_a_working_gpu_is_silent(self, monkeypatch, capsys):
+        assert self._run(monkeypatch, _fake_torch((8, 6), CU128_LIST, "RTX 3060"), "cu128") == "silent"
         assert capsys.readouterr().out == ""
-        assert pf.CPU_ACCEPTED_ENV not in os.environ
+
+    @pytest.mark.parametrize("record,name", [
+        ("vulkan", "GPU through Vulkan (AMD, Intel or older NVIDIA card)"),
+        ("cpu", "CPU only (not accelerated)"),
+    ])
+    def test_other_installs_get_the_notice_and_go_on(self, monkeypatch, capsys, record, name):
+        assert self._run(monkeypatch, _no_gpu_torch(), record) == "notice"
+        out = _flat(capsys.readouterr().out)
+        assert f"This install of WhisperJAV is made for: {name}. On this computer:" in out
+        assert "GGUF[cpu]" in out and "Other pipelines, and ChronosJAV's ASR model: the CPU (not accelerated)" in out
+        assert "?" not in out  # no question
+
+    def test_apple_install_is_silent_with_the_apple_gpu_and_a_notice_without(self, monkeypatch, capsys):
+        assert self._run(monkeypatch, _no_gpu_torch(mps=True), "metal") in ("silent", "notice")
+        monkeypatch.setattr(dd, "get_best_device", lambda prefer_cpu=False: "mps")
+        from whisperjav.utils import preflight_check as pf
+        monkeypatch.setattr(pf, "get_best_device", lambda: "mps")
+        assert self._run(monkeypatch, _no_gpu_torch(mps=True), "metal") == "silent"
+        capsys.readouterr()
+        monkeypatch.setattr(pf, "get_best_device", lambda: "cpu")
+        assert self._run(monkeypatch, _no_gpu_torch(), "metal") == "notice"
+        assert "made for: Apple GPU (Metal)" in _flat(capsys.readouterr().out)
+
+    def test_own_pytorch_on_rocm_names_its_gpu(self, monkeypatch, capsys):
+        assert self._run(monkeypatch, _fake_torch((9, 0), [], "AMD Radeon RX 7900", hip="6.2"),
+                         "own-pytorch") == "notice"
+        out = capsys.readouterr().out.replace("\n", " ").replace("║", " ")
+        out = " ".join(out.split())
+        assert "made for: Own PyTorch" in out
+        assert "ask for its AMD GPU (ROCm), AMD Radeon RX 7900 — not tested" in out
+        assert "balanced, fast and faster on the CPU (not accelerated)" in out
+
+    def test_no_record_is_judged_by_pytorch_and_never_stops(self, monkeypatch, capsys):
+        # report v2 3.3, restored after review finding 4
+        assert self._run(monkeypatch, _fake_torch((8, 6), CU128_LIST, "RTX 3060"), None) == "silent"
+        assert self._run(monkeypatch, _fake_torch((6, 1), CU128_LIST), None) == "notice"
+        assert self._run(monkeypatch, _no_gpu_torch(cuda_build="12.8"), None) == "notice"
+        assert "No GPU that WhisperJAV can use was found" in _flat(capsys.readouterr().out)
+
+    def test_the_notice_and_the_stop_reach_the_log_file(self, monkeypatch, tmp_path):
+        import logging
+        from whisperjav.utils.logger import logger as wj_logger
+        log = tmp_path / "run.log"
+        handler = logging.FileHandler(log, encoding="utf-8")
+        wj_logger.addHandler(handler)
+        try:
+            self._run(monkeypatch, _no_gpu_torch(), "cpu")
+            with pytest.raises(SystemExit):
+                self._run(monkeypatch, _fake_torch((6, 1), CU128_LIST), "cu128")
+        finally:
+            wj_logger.removeHandler(handler)
+            handler.close()
+        text = log.read_text(encoding="utf-8")
+        assert "made for: CPU only (not accelerated)" in text and "the GPU cannot be used now" in text
+
+    def test_gguf_line_follows_the_installed_crispasr_build(self, monkeypatch):
+        from whisperjav.crispasr import install as crisp
+        from whisperjav.utils import preflight_check as pf
+        monkeypatch.setattr(crisp, "crispasr_installed", lambda: True)
+        for build, best, expected in [("vulkan", "cpu", pf.GGUF_VULKAN_WHERE), ("cuda", "cuda", pf.GGUF_CUDA_WHERE),
+                                      ("cuda", "cpu", pf.GGUF_CPU_WHERE), ("cpu", "cpu", pf.GGUF_CPU_WHERE)]:
+            monkeypatch.setattr(crisp, "installed_build", lambda b=build: ("0.8.44", b))
+            assert pf._gguf_where(best) == expected
+
+    def test_the_question_and_its_consent_mechanisms_are_gone(self):
+        from pathlib import Path
+        from whisperjav.utils import preflight_check as pf
+        for name in ("enforce_gpu_requirement", "cpu_consent_in_argv", "CPU_ACCEPTED_ENV",
+                     "_ask_to_continue_on_cpu", "CPU_QUESTION"):
+            assert not hasattr(pf, name), name
+        main_src = (Path(pf.__file__).parents[1] / "main.py").read_text(encoding="utf-8")
+        assert "enforce_gpu_requirement" not in main_src and "cpu_consent_in_argv" not in main_src
+        assert main_src.index("start_of_run_check(device=args.device)") > main_src.index(
+            "logger = setup_logger(\"whisperjav\", log_level, args.log_file)")

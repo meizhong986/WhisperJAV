@@ -10,9 +10,9 @@
 2. [界面概览](#2-界面概览)
 3. [添加文件](#3-添加文件)
 4. [选择输出位置](#4-选择输出位置)
-5. [基本转录](#5-基本转录)
+5. [基础模式](#5-基础模式)
 6. [高级选项](#6-高级选项)
-7. [集成模式（双通道）](#7-集成模式双通道)
+7. [专家模式（两轮）](#7-专家模式两轮)
 8. [AI 字幕翻译](#8-ai-字幕翻译)
 9. [运行任务](#9-运行任务)
 10. [控制台输出](#10-控制台输出)
@@ -42,7 +42,7 @@ GUI 从上到下分为五个区域：
 
 | 区域 | 用途 |
 |------|------|
-| **顶部栏** | 主题切换器（4 种主题）和检查更新按钮 |
+| **顶部栏** | 主题切换器（4 种主题）、界面语言按钮（English / 中文）和检查更新按钮 |
 | **来源** | 添加要处理的视频/音频文件 |
 | **目标** | 设置输出 SRT 文件的保存位置 |
 | **选项标签页** | 四个配置标签页（参见第 5-8 节） |
@@ -58,6 +58,28 @@ GUI 从上到下分为五个区域：
 | Google | Material Design 风格 |
 | Carbon | IBM Carbon 深色主题 |
 | Primer | GitHub 风格的中性色调 |
+
+### 界面语言（English / 中文）
+
+点击顶部栏调色板图标旁的 **中文** 按钮，窗口即切换为简体中文；切换后按钮显示 **English**，再点一次即切回英文。切换立即生效，不影响文件列表和正在进行的运行。
+
+- **切换为中文的内容：** 标签页、按钮、菜单、提示文字、弹出对话框、自定义参数（Customize Parameters）和翻译设置。
+- **保持英文的内容：** 控制台、文件名、处理文件时写出的信息，以及参数指南（Parameter Guide）页面。
+- 所选语言在下次启动时保留，与是否勾选“记住设置”（Remember settings）无关。在 Windows 上，首次启动时界面跟随系统显示语言：系统为中文时显示中文，否则显示英文。
+
+本指南中的控件名称沿用英文界面。中文界面中的主要名称如下：
+
+| 英文界面 | 中文界面 |
+|------|------|
+| Transcription Mode | 基础模式 |
+| Transcription Adv. Options | 高级选项 |
+| Ensemble Mode | 专家模式 |
+| AI SRT Translate | AI 字幕翻译 |
+| Pass 1 / Pass 2 | 第一轮 / 第二轮 |
+| Aggressive / Balanced / Conservative（灵敏度） | 高灵敏 / 中灵敏 / 低灵敏 |
+| Customize Parameters | 自定义参数 |
+| AI-translate | AI 字幕翻译 |
+| Start / Cancel | 开始 / 取消 |
 
 ---
 
@@ -93,9 +115,9 @@ WhisperJAV 接受 FFmpeg 支持的任何格式的视频和音频文件（MP4、M
 
 ---
 
-## 5. 基本转录
+## 5. 基础模式
 
-**Transcription Mode** 标签页（标签页 1）控制核心转录处理管线。
+**基础模式**（Transcription Mode）标签页（标签页 1）控制核心转写处理管线。
 
 ![Transcription Mode 标签页默认设置](images/gui-tab1-transcription.png){ loading=lazy }
 
@@ -109,19 +131,19 @@ WhisperJAV 接受 FFmpeg 支持的任何格式的视频和音频文件（MP4、M
 |------|------|----------|------------|----------|
 | **Fidelity** | Whisper | 是 | 完整 | 最高精度，速度较慢 |
 | **Balanced**（默认） | Whisper | 是 | 是 | 通用场景 |
-| **Fast** | Whisper | 是 | 否 | 具有场景感知的快速转录 |
+| **Fast** | Whisper | 是 | 否 | 具有场景感知的快速转写 |
 | **Faster** | Faster-Whisper | 否 | 否 | 最快速度，最少处理 |
 | **Transformers** | HuggingFace | 是 | 是 | 替代后端 |
 
 ### 灵敏度
 
-控制系统检测和分割语音的激进程度。
+控制系统检测和分割语音的灵敏程度。
 
 | 灵敏度 | 描述 |
 |--------|------|
-| **激进**（默认） | 较低阈值，捕获更多语音（包括安静段落） |
-| **均衡** | 居中水平 |
-| **保守** | 较高阈值，误报更少，可能遗漏安静的语音 |
+| **高灵敏**（默认） | 较低阈值，捕获更多语音（包括安静段落） |
+| **中灵敏** | 居中水平 |
+| **低灵敏** | 较高阈值，误报更少，可能遗漏安静的语音 |
 
 ### 源语言
 
@@ -133,13 +155,13 @@ WhisperJAV 接受 FFmpeg 支持的任何格式的视频和音频文件（MP4、M
 ### 字幕输出
 
 - **原语言**（默认） — 以原始语言输出字幕
-- **直接转英语** — Whisper 在转录过程中翻译为英语（质量低于专门的翻译工具）
+- **直接转英语** — Whisper 在转写过程中翻译为英语（质量低于专门的翻译工具）
 
 ---
 
 ## 6. 高级选项
 
-**Advanced** 标签页（标签页 2）提供用于故障排除和微调的额外控制。
+**高级选项**（Advanced）标签页（标签页 2）提供用于故障排除和微调的额外控制。
 
 ![Advanced Options 标签页](images/gui-tab2-advanced.png){ loading=lazy }
 
@@ -152,34 +174,33 @@ WhisperJAV 接受 FFmpeg 支持的任何格式的视频和音频文件（MP4、M
 | **调试日志** | 关闭 | 将详细调试日志写入 `whisperjav.log` |
 | **保留临时文件** | 关闭 | 保留中间音频块和处理产物 |
 | **自定义临时目录** | 系统默认 | 开启"保留临时文件"后，可选择存储位置 |
-| **接受纯 CPU 模式** | 关闭 | 允许在没有 CUDA GPU 的情况下运行（速度慢很多，但可以工作） |
 
 ---
 
-## 7. 集成模式（双通道）
+## 7. 专家模式（两轮）
 
-**Ensemble** 标签页（标签页 3）允许运行两个不同的处理管线并合并结果，以获得更高的精度。这是最强大的模式。
+**专家模式**（Ensemble）标签页（标签页 3）允许运行两个不同的处理管线并合并结果，以获得更高的精度。这是最强大的模式。
 
-![集成模式标签页概览](images/gui-tab3-ensemble.png){ loading=lazy }
+![专家模式标签页概览](images/gui-tab3-ensemble.png){ loading=lazy }
 
-### 集成模式的工作原理
+### 专家模式的工作原理
 
-1. **第一通道** 使用一种处理管线配置处理视频
-2. **第二通道**（可选）使用另一种配置处理同一视频
+1. **第一轮** 使用一种处理管线配置处理视频
+2. **第二轮**（可选）使用另一种配置处理同一视频
 3. 两个 SRT 输出通过可配置的策略进行**合并**
 
 这种方式利用了不同后端的优势 — 例如，Whisper 用于时间轴精度，Qwen3-ASR 用于文本质量。
 
-### 通道配置
+### 每一轮的配置
 
-始终处于活动状态。每个通道具有相同的控制项：
+始终处于活动状态。每一轮具有相同的控制项：
 
 | 控制项 | 选项 | 默认值 |
 |--------|------|--------|
-| **处理管线** | Balanced、Fast、Faster、Fidelity、Transformers、Qwen3-ASR、ChronosJAV、XXL Faster Whisper | Balanced |
-| **灵敏度** | 激进、均衡、保守 | 激进 |
+| **处理管线** | Balanced、Fast、Faster、Fidelity、Transformers、Qwen3-ASR、Anime-Whisper、Parakeet-CrispASR、Cohere-CrispASR、XXL Faster Whisper | Balanced |
+| **灵敏度** | 高灵敏、中灵敏、低灵敏 | 高灵敏 |
 | **场景检测器** | Auditok、Silero、Semantic、None | Semantic |
-| **语音增强器** | None、FFmpeg DSP、ZipEnhancer、ClearVoice、BS-RoFormer | None |
+| **语音增强器** | None、FFmpeg DSP、ZipEnhancer、htdemucs（BS-RoFormer 和 ZipEnhancer ONNX：即将推出） | None |
 | **语音分割器** | Silero v6.2、v4.0、v3.1、Whisper VAD、TEN、None | Silero v6.2 |
 | **模型** | 取决于处理管线 — Large V2/V3/Turbo (Whisper) 或 1.7B/0.6B (Qwen) | 处理管线默认值 |
 
@@ -192,38 +213,60 @@ WhisperJAV 接受 FFmpeg 支持的任何格式的视频和音频文件（MP4、M
 - **基于 Whisper**：Balanced、Fast、Faster、Fidelity
 - **HuggingFace**：Transformers
 - **ChronosJAV**：Qwen3-ASR、Anime-Whisper
-- **外部 (BYOP)**：XXL Faster Whisper（仅第二通道）
+- **GGUF**：Parakeet-CrispASR、Cohere-CrispASR——日语，1.10.0 中为实验性（见 [Parakeet-CrispASR 与 Cohere-CrispASR](../pipelines/crispasr.md)）
+- **外部 (BYOP)**：XXL Faster Whisper（第一轮、第二轮或两者）
 
 ### 自定义参数
 
-点击某个通道上的 **Customize** 按钮打开参数调整弹窗。可以对模型、质量、语音分割器、语音增强器、场景检测和上下文参数进行精细控制。
+点击某一轮上的 **Customize** 按钮打开参数调整弹窗。可以对模型、质量、语音分割器、语音增强器、场景检测和上下文参数进行精细控制。
 
 ![自定义参数弹窗 — 质量标签页](images/gui-tab3-customize-modal.png){ loading=lazy }
 
 弹窗包含 **Model**、**Quality**、**Segmenter**、**Enhancer** 和 **Scene** 设置标签页。徽标显示 **DEFAULT** 或 **CUSTOM** 表示参数是否已修改。
 
+**Model** 标签页有一个 **Device** 菜单：**Auto (the GPU when one can be used, else the CPU)**（默认，有可用 GPU 时用 GPU，否则用 CPU）、**NVIDIA GPU (CUDA)** 或 **CPU (not accelerated)**（CPU，不加速）。
+
+对于 GGUF 处理管线（Parakeet-CrispASR、Cohere-CrispASR），弹窗有三个标签页：**Segmenter**、**Enhancer** 和 **Scene**，初始值就是这一轮实际使用的值。这一轮那一行下方的状态面板会显示模型（是否已下载）以及 CrispASR 将在哪里运行，例如“GPU：请求使用 NVIDIA GPU（CUDA）”（英文界面为 "GPU: asks for the NVIDIA GPU (CUDA)"）。对 Cohere-CrispASR，面板还会列出为其文字标出时间的对齐器。
+
+对于 ChronosJAV 处理管线（Qwen3-ASR、Anime-Whisper），**Alignment** 标签页设置字幕时间（见[字幕时间](../pipelines/chronosjav.md#subtitle-timing-1100)）：
+
+| 控件 | 选项 | 默认值 |
+|---|---|---|
+| **Aligner Backend** | CrispASR (GGUF, recommended)、Qwen3 ForcedAligner (PyTorch)、None (no aligner) | CrispASR |
+| **Aligner Model** | 所选后端的模型：`wav2vec2-ja`（推荐）、`parakeet-ctc-ja`（不推荐）、`qwen3-fa-gguf`；或 Qwen3-ForcedAligner-0.6B (PyTorch) | `wav2vec2-ja` |
+| **Timestamp Mode** | Aligner + VAD Fallback (recommended)、Aligner + Interpolation、Aligner Only (no recovery on collapse)、VAD Only (no aligner loaded) | Aligner + VAD Fallback |
+| **Timing Model (Whisper)** | Whisper small (recommended)、None (no timing model) | Whisper small |
+| **Adaptive Step-Down** | 勾选框 | 不勾选 |
+
+Aligner Backend 选 **None** 时，无论另外两个控件显示什么，运行都使用 VAD Only 并关闭 Step-Down。ChronosJAV 处理管线一行下方的状态面板会显示对齐器和时间模型（是否已下载）以及 CrispASR 在哪里运行它们。从 1.10.0 起，Alignment 标签页的值以及从中保存的预设会用于运行；从 1.8.10.post3 到 1.9.5，它们被忽略。
+
 使用 **Save Preset** 保存配置以便重用，或使用 **Load Preset** 恢复已保存的配置。预设在会话间持久保存。
 
-### 第二通道配置
+### 第二轮配置
 
-勾选 **Pass 2** 复选框启用第二通道。控制项与第一通道相同。
+勾选 **第二轮**（Pass 2）复选框启用第二轮。控制项与第一轮相同。
 
 禁用时，该行变灰且所有控制项不可用。
 
-### BYOP：XXL Faster Whisper (v1.8.9+)
+### BYOP：XXL Faster Whisper (v1.8.9+；1.10.0 起也可用于第一轮)
 
-选择 **XXL Faster Whisper** 作为第二通道处理管线，以使用 [PurfView 的 Faster Whisper XXL](https://github.com/Purfview/whisper-standalone-win) 作为外部子进程。这是"自带处理管线"（BYOP）功能 — 你提供可执行文件，WhisperJAV 负责集成。
+选择 **XXL Faster Whisper** 作为第一轮、第二轮或两者的处理管线，以使用 [PurfView 的 Faster Whisper XXL](https://github.com/Purfview/whisper-standalone-win) 作为外部程序。这是"自带处理管线"（BYOP）功能 — 你提供可执行文件，WhisperJAV 负责集成。
 
-![集成模式中 XXL Faster Whisper 作为第二通道](images/gui-tab3-ensemble-xxl.png){ loading=lazy }
+![专家模式中 XXL Faster Whisper 作为第二轮](images/gui-tab3-ensemble-xxl.png){ loading=lazy }
+
+某一轮选择 XXL 后，这一轮的 **Model**（模型）列用于选择 XXL 运行的 Whisper 模型，第二轮一行下方会出现一个设置面板：
 
 | 字段 | 描述 |
 |------|------|
-| **Executable** | `faster-whisper-xxl.exe` 的路径。点击 **Browse** 选择。 |
-| **Extra Args** | 传递给 XXL 的额外参数（例如 `--verbose True --standard_asia`）。 |
+| **Model**（这一轮的那一行中） | Large V2（默认）、Large V3、Large V3 Turbo 或 Medium。XXL 在第一次使用某个模型时下载它。两轮都选择 XXL 时，各自有自己的模型。 |
+| **Executable** | `faster-whisper-xxl.exe` 的路径。点击 **Browse** 选择。两轮使用同一个程序。 |
+| **Extra Args** | 传递给 XXL 的额外参数（默认 `--verbose True --standard_asia`）。请在 Model 列中选择模型：这里的 `--model` 不会被使用，控制台会给出提示。 |
 
-WhisperJAV 仅向 XXL 发送 4 个必需参数（输入文件、输出目录、模型、语言）。其他一切由 Extra Args 字段控制。XXL 的实时控制台输出会流式传输到 GUI 控制台。
+选择 XXL 的那一轮的其他控制项（Sensitivity、Scene Detector、Speech Enhancer、Speech Segmenter、Customize）变灰：XXL 使用自己的设置。WhisperJAV 向 XXL 发送输入文件、输出目录、模型、语言和 SRT 输出格式（字幕要译成英文时还有 `--task translate`）；其他 XXL 参数请在 Extra Args 字段中添加。XXL 的实时控制台输出会流式传输到 GUI 控制台。
 
-如果 XXL 在关闭时崩溃（这是已知的 ctranslate2 行为），但 SRT 已经写入，WhisperJAV 会保留有效输出而不是丢弃它。
+1.10.0 之前，GUI 不向 XXL 发送模型，因此即使 Extra Args 里写了 `--model large-v2`，XXL 也运行 large-v3（#449）。
+
+如果 XXL 处理某个文件失败，控制台会说明是哪一轮失败以及原因。第一轮失败时，该文件标记为失败；第二轮失败时，如果第一轮生成了字幕，该文件保留第一轮的字幕。如果 XXL 在关闭时崩溃（这是已知的 ctranslate2 行为），但 SRT 已经写入，WhisperJAV 会保留有效输出而不是丢弃它。
 
 ### 语音增强：FFmpeg DSP
 
@@ -242,23 +285,23 @@ WhisperJAV 仅向 XXL 发送 4 个必需参数（输入文件、输出目录、�
 
 ### 合并策略
 
-启用第二通道后，选择两个输出的合并方式：
+启用第二轮后，选择两个输出的合并方式：
 
 | 策略 | 描述 |
 |------|------|
-| **Pass 1 Primary**（默认） | 以第一通道为基础，用第二通道填补空缺 |
-| **Smart Merge** | 基于质量启发式算法智能选择每个通道的最佳字幕 |
-| **Full Merge** | 合并两个通道的所有字幕，解决重叠问题 |
-| **Longest** | 当通道重叠时，选择较长（更详细）的字幕 |
-| **Pass 2 Primary** | 以第二通道为基础，用第一通道填补空缺 |
-| **Pass 1 Overlap (30%)** | 以第一通道为基础，需要 30% 的时间重叠才从第二通道合并 |
-| **Pass 2 Overlap (30%)** | 以第二通道为基础，需要 30% 的时间重叠才从第一通道合并 |
+| **Pass 1 Primary**（默认） | 以第一轮为基础，用第二轮填补空缺 |
+| **Smart Merge** | 基于质量启发式算法智能选择每一轮的最佳字幕 |
+| **Full Merge** | 合并两轮的所有字幕，解决重叠问题 |
+| **Longest** | 当两轮的字幕重叠时，选择较长（更详细）的字幕 |
+| **Pass 2 Primary** | 以第二轮为基础，用第一轮填补空缺 |
+| **Pass 1 Overlap (30%)** | 以第一轮为基础，需要 30% 的时间重叠才从第二轮合并 |
+| **Pass 2 Overlap (30%)** | 以第二轮为基础，需要 30% 的时间重叠才从第一轮合并 |
 
 ### 串行模式
 
-勾选 **"Finish each file"** 以在处理多个文件时，先完整处理每个文件（第一通道 → 第二通道 → 合并），再处理下一个。这样可以在结果出来时立即查看，而不必等待整个批次完成。
+勾选 **"Finish each file"** 以在处理多个文件时，先完整处理每个文件（第一轮 → 第二轮 → 合并），再处理下一个。这样可以在结果出来时立即查看，而不必等待整个批次完成。
 
-### 内联 AI 翻译（集成模式）
+### 内联 AI 翻译（专家模式）
 
 勾选合并策略后面的 **"AI-translate"** 以自动翻译合并后的输出。这会显示一个内联的提供商/模型选择器和设置按钮。
 
@@ -266,7 +309,7 @@ WhisperJAV 仅向 XXL 发送 4 个必需参数（输入文件、输出目录、�
 
 ## 8. AI 字幕翻译
 
-**AI SRT Translate** 标签页（标签页 4）是一个独立工具，用于使用 AI 语言模型翻译现有的 SRT 文件。
+**AI 字幕翻译**（AI SRT Translate）标签页（标签页 4）是一个独立工具，用于使用 大语言模型翻译现有的 SRT 文件。
 
 ![AI SRT Translate 标签页 — 完整视图](images/gui-tab4-translation.png){ loading=lazy }
 
@@ -274,8 +317,7 @@ WhisperJAV 仅向 XXL 发送 4 个必需参数（输入文件、输出目录、�
 
 | 提供商 | 说明 |
 |--------|------|
-| **Ollama** | 通过 Ollama 使用本地大语言模型。免费、隐私、无需 API 密钥。推荐优先于 Local。 |
-| **Local** | 使用本地大语言模型服务器 (llama-cpp)。免费、隐私。旧版 — 建议改用 Ollama。 |
+| **Ollama** | 通过 Ollama 使用本地大语言模型。免费、隐私、无需 API 密钥。 |
 | **DeepSeek** | 云端 API。性价比高，CJK 语言质量好。 |
 | **Gemini** | Google 的 API。多语言支持好。 |
 | **Claude** | Anthropic 的 API。高质量，成本较高。 |
@@ -294,7 +336,7 @@ WhisperJAV 仅向 XXL 发送 4 个必需参数（输入文件、输出目录、�
 - 绿色勾号：连接成功
 - 红色叉号：连接失败（检查密钥和端点）
 
-Local 提供商不需要 API 密钥 — 它会自动启动 llama-cpp 服务器。
+Ollama 不需要 API 密钥。（llama-cpp 本地提供商已在 1.10 中移除。）
 
 ### 语言和风格
 
@@ -335,7 +377,7 @@ Local 提供商不需要 API 密钥 — 它会自动启动 llama-cpp 服务器�
 2. 在相应标签页上配置选项
 3. 点击 **Start**
 
-进度条显示整体完成百分比。状态标签描述当前阶段（例如"正在提取音频..."、"正在转录场景 3/12..."）。
+进度条显示整体完成百分比。状态标签描述当前阶段（例如"正在提取音频..."、"正在转写场景 3/12..."）。
 
 ### 取消
 
@@ -350,6 +392,20 @@ Local 提供商不需要 API 密钥 — 它会自动启动 llama-cpp 服务器�
 ### 完成
 
 完成后，状态显示"Completed"，SRT 文件路径打印在控制台中。输出的 SRT 可以直接在任何媒体播放器中使用。
+
+---
+
+### 运行没有开始时
+
+如果一次运行在处理任何内容之前就停止，会弹出一个对话框说明原因：
+
+| 对话框 | 何时出现 | 你可以做什么 |
+|---|---|---|
+| **The NVIDIA GPU cannot be used**（无法使用 NVIDIA GPU） | 安装为 NVIDIA GPU 制作，而 GPU 现在不可用（例如更换驱动之后） | **Run on the CPU this time**（这次在 CPU 上运行）会在 CPU 上重新运行同一任务；**Close** 关闭。对话框会说明原因和解决办法。 |
+| **The run did not start**（运行没有开始） | 运行无法使用的设置，或缺少 PyTorch（例如在“自己的 PyTorch”安装中尚未添加 PyTorch） | 对话框会说明怎么做；没有处理任何内容 |
+| **The run ended without a run summary**（运行结束但没有运行汇总） | WhisperJAV 意外停止 | 在此之前完成的文件在输出文件夹中；控制台会显示发生了什么 |
+
+当安装的 GPU 可用时（NVIDIA GPU 或 Apple GPU 安装），运行开始时不显示任何内容。在其他所有安装上，控制台会显示各部分在这台电脑上的运行位置，然后运行继续。
 
 ---
 
@@ -384,7 +440,7 @@ WhisperJAV 在启动时自动检查更新（延迟 3 秒后）。有新版本可
 
 ### 翻译设置弹窗
 
-可从 Ensemble 标签页 AI 翻译行中的 **Translation Settings** 按钮访问。以紧凑的弹窗形式提供与标签页 4 相同的配置。
+可从 专家模式（Ensemble）标签页 AI 翻译行中的 **Translation Settings** 按钮访问。以紧凑的弹窗形式提供与标签页 4 相同的配置。
 
 ![翻译设置弹窗](images/gui-translation-settings-modal.png){ loading=lazy }
 
@@ -404,45 +460,42 @@ WhisperJAV 在启动时自动检查更新（延迟 3 秒后）。有新版本可
 
 ## 13. 常见工作流程
 
-### 快速转录（最快）
+### 快速转写（最快）
 
 1. 将视频文件拖放到应用中
-2. 保持默认设置（Balanced 模式、激进灵敏度、日语）
+2. 保持默认设置（Balanced 模式、高灵敏度、日语）
 3. 点击 **Start**
 4. SRT 文件出现在视频文件旁边
 
-### 高质量转录（集成模式）
+### 高质量转写（专家模式）
 
 1. 添加文件
-2. 进入 **Ensemble** 标签页
-3. 第一通道：Balanced 处理管线、Semantic 场景检测（默认）
-4. 启用第二通道：选择 **Qwen3-ASR** 处理管线
+2. 进入 **专家模式**（Ensemble）标签页
+3. 第一轮：Balanced 处理管线、Semantic 场景检测（默认）
+4. 启用第二轮：选择 **Qwen3-ASR** 处理管线
 5. 合并策略：**Smart Merge**
 6. 点击 **Start**
-7. 两个通道依次运行，然后合并结果
+7. 两轮依次运行，然后合并结果
 
-### 一步完成转录和翻译
+### 一步完成转写和翻译
 
 1. 添加文件
-2. 进入 **Ensemble** 标签页
-3. 按需配置通道
+2. 进入 **专家模式**（Ensemble）标签页
+3. 按需配置每一轮
 4. 勾选 **"AI-translate"**
 5. 选择提供商，如需要则输入 API 密钥
 6. 点击 **Start**
-7. 转录完成后自动获取翻译好的 SRT
+7. 转写完成后自动获取翻译好的 SRT
 
 ### 翻译已有的 SRT
 
-1. 进入 **AI SRT Translate** 标签页（标签页 4）
+1. 进入 **AI 字幕翻译**（AI SRT Translate）标签页（标签页 4）
 2. 添加你的 SRT 文件
 3. 选择提供商和模型
 4. 输入 API 密钥并测试连接
 5. 设置目标语言
 6. 点击 **Start**
 
-### 纯 CPU 模式（无 GPU）
+### 没有 GPU 时
 
-1. 进入 **Advanced** 标签页
-2. 勾选 **"Accept CPU-only mode"**（必须：没有可用 GPU 的机器上，不勾选则运行会在启动检查处停下并中止，同时提示您勾选此项）
-3. 使用 **Faster** 模式以获得无 GPU 时的最佳速度
-4. 处理速度会明显变慢，但功能正常
+在仅 CPU 的安装中，不需要勾选任何选项：每次运行都使用 CPU。使用 **Faster** 模式可获得最佳速度。处理比在 GPU 上慢好几倍，但功能正常。在 GPU 安装中，要让某一轮使用 CPU，在这一轮的 **Customize** 窗口中把 **Device** 选为 **CPU (not accelerated)**。

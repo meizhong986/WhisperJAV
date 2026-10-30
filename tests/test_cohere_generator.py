@@ -476,8 +476,8 @@ class TestQwenPipelineCohereIntegration:
         assert pipeline.timestamp_mode == TimestampMode.ALIGNER_WITH_VAD_FALLBACK
         # D3: passthrough cleaner
         assert pipeline.assembly_cleaner_enabled is False
-        # Aligner ON → stepdown safe
-        assert pipeline.stepdown_enabled is True
+        # 1.10.0 (owner W266 1): step-down off by default; a collapsed scene takes its VAD groups' times
+        assert pipeline.stepdown_enabled is False
         # Cohere prefers fewer cuts
         assert pipeline.segmenter_chunk_threshold == 1.0
         assert pipeline.segmenter_max_group_duration == 6.0

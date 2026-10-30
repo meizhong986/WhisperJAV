@@ -42,10 +42,12 @@ from typing import Tuple, NamedTuple
 # on a system with only CUDA 11.8 support (older driver), torch.cuda.is_available()
 # returns False and the user gets CPU-only inference (6-10x slower).
 #
-# The driver version determines the MAXIMUM CUDA version supported:
-# - Driver 570+ → CUDA 12.8 (modern GPUs with latest drivers)
-# - Driver 450+ → CUDA 11.8 (universal fallback, works on most setups)
-# - Older → CPU only (no CUDA support)
+# v1.10.0 (REQ2): one stack, PyTorch 2.11.0 for CUDA 13.0.
+# - Driver 580+ → CUDA 13.0 (cu130). NVIDIA's CUDA 13.0 minimum.
+# - Older driver on a supported card → the installer stops and asks for a driver
+#   update (owner, W36 (2)); it is not moved to the CPU build.
+# - cu128 is kept only as the per-PC fallback when cuBLAS 12 cannot be loaded next
+#   to CUDA 13 (item 2 spec D); it is not chosen from the driver.
 #
 # VERIFICATION SOURCE:
 # https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html
@@ -54,7 +56,7 @@ from typing import Tuple, NamedTuple
 # HISTORY:
 # - 2024-03: Added cu118 as baseline (covers most users)
 # - 2025-01: Added cu128 for RTX 50xx series and modern drivers
-# - Future: Will need cu130+ when PyTorch adds support
+# - 2026-10 (v1.10.0): cu130 only; cu118 and the driver-chosen cu128 removed
 #
 
 
@@ -76,34 +78,35 @@ class CUDADriverEntry(NamedTuple):
 CUDA_DRIVER_MATRIX: Tuple[CUDADriverEntry, ...] = (
     # ORDER MATTERS: First match wins, so highest driver requirements come first
     #
-    # Entry 1: CUDA 12.8 for modern systems
-    # WHY 570+: CUDA 12.8 requires driver 570.00 or later
-    # WHO: Users with RTX 20xx/30xx/40xx/50xx and recent driver updates
+    # CUDA 13.0 -- the 1.10 stack (PyTorch 2.11.0, pinned in pyproject.toml)
+    # WHY 580+: NVIDIA's minimum driver for CUDA 13.0
+    # WHO: GTX 16-series, RTX 20-series and newer (compute capability 7.5+)
     CUDADriverEntry(
-        min_driver=(570, 0, 0),
-        cuda_version="cu128",
-        torch_index="https://download.pytorch.org/whl/cu128",
-        description="CUDA 12.8 (RTX 20xx/30xx/40xx/50xx with modern drivers)",
-    ),
-
-    # Entry 2: CUDA 11.8 as universal fallback
-    # WHY 450+: CUDA 11.8 requires driver 450.80.02 or later
-    # WHO: Most users - this has widest compatibility
-    # WHY NOT NEWER: cu118 has the most tested compatibility with Whisper ecosystem
-    CUDADriverEntry(
-        min_driver=(450, 0, 0),
-        cuda_version="cu118",
-        torch_index="https://download.pytorch.org/whl/cu118",
-        description="CUDA 11.8 (Universal fallback for older drivers)",
+        min_driver=(580, 0, 0),
+        cuda_version="cu130",
+        torch_index="https://download.pytorch.org/whl/cu130",
+        description="CUDA 13.0 (GTX 16 / RTX 20 series and newer, driver 580+)",
     ),
 )
+
+# Every PyTorch index an install may use, by name. cu128 is the per-PC fallback of
+# item 2 spec D (and the Linux choice if the owner keeps Linux on CUDA 12.8).
+TORCH_INDEXES = {
+    "cu130": "https://download.pytorch.org/whl/cu130",
+    "cu128": "https://download.pytorch.org/whl/cu128",
+    "cpu": "https://download.pytorch.org/whl/cpu",
+}
+
+# Oldest card PyTorch 2.11.0 cu130 has kernels for: its arch list is sm_75 .. sm_120,
+# with no PTX (read on the owner's PC, 2026-10-14). GTX 900/1000 and V100 are older.
+MIN_COMPUTE_CAPABILITY: Tuple[int, int] = (7, 5)
 
 # CPU fallback URL - used when no GPU detected or driver too old
 # WHY SEPARATE URL: PyPI's torch is CPU-only; GPU requires specific index URLs
 CPU_TORCH_INDEX = "https://download.pytorch.org/whl/cpu"
 
 # Minimum CUDA version we support (for validation messages)
-MIN_TORCH_CUDA_VERSION: Tuple[int, int, int] = (11, 8, 0)
+MIN_TORCH_CUDA_VERSION: Tuple[int, int, int] = (13, 0, 0)
 
 
 # =============================================================================
@@ -252,36 +255,21 @@ GIT_TIMEOUT_PATTERNS = [
 # Platform Requirements
 # =============================================================================
 #
-# WHY PYTHON 3.10-3.12:
-# - 3.9: Dropped because pysubtrans requires 3.10+ features
-# - 3.10: Minimum for type hint improvements we use
-# - 3.11: Fully supported, slightly faster
-# - 3.12: Fully supported, recommended
-# - 3.13+: openai-whisper has compatibility issues (as of 2025-01)
+# WHY PYTHON 3.13 ONLY (v1.10.0, REQ2):
+# - The 1.10 stack (PyTorch 2.11.0 cu130, numpy 2.5) is Colab's stack, built for 3.13;
+#   numpy 2.5 needs 3.12+, PyTorch 2.15 drops 3.10. Every compiled dependency has
+#   cp313 wheels (research 1.2). 3.14 is untested.
+# - pyproject.toml says the same: requires-python = ">=3.13,<3.14".
 #
 # DO NOT CHANGE WITHOUT TESTING:
 # Changing Python version bounds requires testing the full dependency tree.
 #
 
-PYTHON_MIN_VERSION = (3, 10)
-"""
-Minimum Python version (inclusive).
+PYTHON_MIN_VERSION = (3, 13)
+"""Minimum Python version (inclusive). v1.10.0: 3.13 only."""
 
-WHY 3.10:
-- pysubtrans requires 3.10+ (async features)
-- Type hints we use (X | Y syntax) require 3.10+
-- Older versions are security EOL
-"""
-
-PYTHON_MAX_VERSION = (3, 12)
-"""
-Maximum Python version (inclusive).
-
-WHY 3.12 (not 3.13):
-- openai-whisper has issues with 3.13 as of 2025-01
-- tiktoken compilation fails on 3.13 (some platforms)
-- Will bump to 3.13 when ecosystem catches up
-"""
+PYTHON_MAX_VERSION = (3, 13)
+"""Maximum Python version (inclusive). v1.10.0: 3.14 is untested."""
 
 # Disk space requirements
 DISK_SPACE_REQUIRED_GB = 8
@@ -389,11 +377,11 @@ PYTORCH_INDEX_TEMPLATE = "https://download.pytorch.org/whl/{cuda}"
 """
 PyTorch wheel index URL template.
 
-{cuda} is replaced with: cu118, cu128, or cpu
+{cuda} is replaced with: cu130, cu128, or cpu
 """
 
 HUGGINGFACE_WHEEL_BASE = "https://huggingface.co"
-"""Base URL for HuggingFace wheel downloads (llama-cpp-python, etc.)."""
+"""Base URL for HuggingFace wheel downloads."""
 
 
 # =============================================================================

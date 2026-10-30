@@ -36,10 +36,10 @@ Each pass has identical controls:
 
 | Control | Description |
 |---------|-------------|
-| **Pipeline** | ASR backend (Balanced, Fast, Faster, Qwen3-ASR, ChronosJAV, etc.) |
+| **Pipeline** | ASR backend (Balanced, Fast, Faster, Qwen3-ASR, ChronosJAV, Parakeet-CrispASR, Cohere-CrispASR, etc.) |
 | **Sensitivity** | Detection threshold (Aggressive, Balanced, Conservative) |
 | **Scene Detector** | How to split audio into scenes (Auditok, Silero, Semantic, None) |
-| **Speech Enhancer** | Audio preprocessing (None, FFmpeg DSP, ClearVoice, BS-RoFormer) |
+| **Speech Enhancer** | Audio preprocessing (None, FFmpeg DSP, ZipEnhancer, htdemucs) |
 | **Speech Segmenter** | Voice activity detection within scenes (Silero, TEN, None) |
 | **Model** | Which model to use (pipeline-dependent) |
 
@@ -63,24 +63,31 @@ Click **Customize** on any pass for fine-grained parameter control.
 
 ---
 
-## BYOP: XXL Faster Whisper (v1.8.9+)
+## BYOP: XXL Faster Whisper (v1.8.9+; Pass 1 since 1.10.0)
 
-Select **XXL Faster Whisper** as the Pass 2 pipeline to use [PurfView's Faster Whisper XXL](https://github.com/Purfview/whisper-standalone-win) as an external subprocess. This is "Bring Your Own Pipeline" — you supply the executable.
+Select **XXL Faster Whisper** as the pipeline of Pass 1, Pass 2 or both to use [PurfView's Faster Whisper XXL](https://github.com/Purfview/whisper-standalone-win) as an external program. This is "Bring Your Own Pipeline" — you supply the executable.
 
 ### Setup
 
 1. Download Faster Whisper XXL from the link above
-2. In the Ensemble tab, select **XXL Faster Whisper** for Pass 2
-3. Click **Browse** to point to your `faster-whisper-xxl.exe`
-4. Add any extra args (e.g., `--verbose True --standard_asia`)
+2. In the Ensemble tab, select **XXL Faster Whisper** for Pass 1, Pass 2 or both
+3. In that pass's **Model** column, choose the model XXL runs: Large V2 (default), Large V3, Large V3 Turbo or Medium
+4. Click **Browse** to point to your `faster-whisper-xxl.exe`
+5. Add any extra args (default `--verbose True --standard_asia`). Choose the model in the Model column, not here: a `--model` in Extra Args is not used, and the console says so.
 
-WhisperJAV sends only 4 required args (input, output dir, model, language). Everything else is controlled by your Extra Args field.
+WhisperJAV sends XXL the input file, the output folder, the model, the language and the SRT output format (and `--task translate` when the subtitles are to be in English); you add any other XXL flags in the Extra Args field. If XXL fails for a file, the console says which pass failed and why; a failed Pass 1 marks the file failed, a failed Pass 2 leaves the file with Pass 1's subtitles, if Pass 1 made them.
 
 ### CLI
 
 ```bash
-whisperjav video.mp4 --pass2-pipeline xxl --xxl-exe /path/to/faster-whisper-xxl.exe
+# XXL as Pass 1, Qwen3-ASR as Pass 2
+whisperjav video.mp4 --ensemble --pass1-pipeline xxl --pass1-model large-v2 --pass2-pipeline qwen --xxl-exe /path/to/faster-whisper-xxl.exe
+
+# XXL as Pass 2
+whisperjav video.mp4 --ensemble --pass1-pipeline fidelity --pass2-pipeline xxl --pass2-model large-v2 --xxl-exe /path/to/faster-whisper-xxl.exe
 ```
+
+`--pass1-model` / `--pass2-model` pick the model XXL runs (default `large-v2`). The extra args are the ones saved in the GUI's Extra Args field; the command line has no option for them.
 
 ---
 

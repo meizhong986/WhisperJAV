@@ -91,8 +91,6 @@ def test_every_compatible_model_can_be_shown_in_the_row(js):
     """Compatibility ⊆ legacyModels, or the row cannot offer it either."""
     row = _js_array_of_objects(js, "legacyModels:")
     for pipeline, models in _compatibility_map(js).items():
-        if pipeline == "kotoba-faster-whisper":
-            continue  # not offered in the row's pipeline dropdown
         missing = models - row
         assert not missing, (
             "%s is allowed models the row cannot offer: %s" % (pipeline, sorted(missing)))
