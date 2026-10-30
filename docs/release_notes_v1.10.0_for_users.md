@@ -1,5 +1,11 @@
 # WhisperJAV 1.10.0
 
+**Coming from 1.9.x or earlier: do not upgrade — do a complete, fresh install of 1.10.0.** Do not run `whisperjav-upgrade` or the GUI's update button on a 1.9.x install; they cannot take it to 1.10.0. Your settings and downloaded models are kept.
+
+**从 1.9.x 或更早版本而来：请不要升级，请全新完整安装 1.10.0。** 不要在 1.9.x 安装上运行 `whisperjav-upgrade` 或 GUI 中的更新按钮，它们无法升级到 1.10.0。您的设置和已下载的模型会保留。
+
+**1.10.0 首次提供简体中文界面。** 点击窗口顶部的「中文」按钮即可将整个界面切换为中文，点击「English」切换回英文，您的选择会被记住。如果电脑的显示语言是中文，首次启动时直接显示中文界面。GUI 中的运行日志和 Qwen 指南页仍为英文。如果您发现更好的译法，欢迎在这里告诉我们：https://github.com/meizhong986/WhisperJAV/issues
+
 ## Key points
 
 - **A fresh install for everyone.** 1.10.0 runs on Python 3.13 and PyTorch 2.11, so a 1.9.x install cannot be upgraded to it. Install it fresh with the steps below; your settings and downloaded models are kept.
