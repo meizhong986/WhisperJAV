@@ -397,10 +397,10 @@ def parse_arguments():
                                         *CRISPASR_PIPELINES],
                                # 1.10.0 (item 5, REQ5): xxl as pass 1. Text H1, approved by the owner as drafted (W275).
                                help="Pipeline for pass 1 (default: balanced). 'xxl' = BYOP XXL Faster Whisper "
-                                    "(requires --xxl-exe). parakeet-crispasr and "
-                                    "cohere-crispasr run through CrispASR, installed with WhisperJAV; "
-                                    "their model is downloaded the first time it is needed; Japanese "
-                                    "only. --pass1-model picks their model. "
+                                    "(requires --xxl-exe). The GGUF pipelines ("
+                                    + ", ".join(CRISPASR_PIPELINES) + ") run through CrispASR, "
+                                    "installed with WhisperJAV; their model is downloaded the first time "
+                                    "it is needed; Japanese only. --pass1-model picks their model. "
                                     "Experimental in 1.10.0 (early release). "
                                     "The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).")
     twopass_group.add_argument("--pass1-sensitivity", default=None,
@@ -419,7 +419,7 @@ def parse_arguments():
                                choices=["auditok", "silero", "semantic", "none"],
                                help="Scene detection method for pass 1 (default: semantic since v1.9.2)")
     twopass_group.add_argument("--pass1-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none). Default: firered-vad when pass 1 is Qwen3-ASR; ten for parakeet-crispasr and firered-vad for cohere-crispasr, which do not accept none. Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
+                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none). Default: firered-vad when pass 1 is Qwen3-ASR; for the GGUF pipelines, which do not accept none: ten for parakeet-crispasr and reazonspeech-crispasr, firered-vad for the others. Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
     twopass_group.add_argument("--pass1-vad-version", default=None,
                                choices=list(VAD_VERSIONS),
                                help="Silero VAD build for pass 1 when --pass1-pipeline is balanced "
@@ -438,7 +438,7 @@ def parse_arguments():
     twopass_group.add_argument("--pass1-enhance-for-vad", action="store_true", default=False,
                                help="Dual-track mode for pass 1: the cleaned-up audio drives speech "
                                     "detection, the original audio goes to the recogniser. Available "
-                                    "with qwen, fidelity, parakeet-crispasr and cohere-crispasr. NOT "
+                                    "with qwen, fidelity and the GGUF pipelines. NOT "
                                     "accepted when --pass1-pipeline is balanced: balanced finds the "
                                     "speech inside faster-whisper itself, on the same audio it "
                                     "transcribes, so there is nothing to split. fast, faster and "
@@ -457,10 +457,10 @@ def parse_arguments():
                                choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen", "xxl",
                                         *CRISPASR_PIPELINES],
                                help="Pipeline for pass 2 (enables pass 2). 'xxl' = BYOP XXL Faster Whisper "
-                                    "(requires --xxl-exe). parakeet-crispasr and cohere-crispasr run "
-                                    "through CrispASR, installed with WhisperJAV; their model is "
-                                    "downloaded the first time it is needed; Japanese only. "
-                                    "--pass2-model picks their model. "
+                                    "(requires --xxl-exe). The GGUF pipelines ("
+                                    + ", ".join(CRISPASR_PIPELINES) + ") run through CrispASR, "
+                                    "installed with WhisperJAV; their model is downloaded the first time "
+                                    "it is needed; Japanese only. --pass2-model picks their model. "
                                     "Experimental in 1.10.0 (early release). "
                                     "The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).")
     twopass_group.add_argument("--pass2-sensitivity", default=None,
@@ -479,7 +479,7 @@ def parse_arguments():
                                choices=["auditok", "silero", "semantic", "none"],
                                help="Scene detection method for pass 2 (default: semantic since v1.9.2)")
     twopass_group.add_argument("--pass2-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Default: ten when pass 2 is anime-whisper; ten for parakeet-crispasr and firered-vad for cohere-crispasr, which do not accept none. Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
+                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Default: ten when pass 2 is anime-whisper; for the GGUF pipelines, which do not accept none: ten for parakeet-crispasr and reazonspeech-crispasr, firered-vad for the others. Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
     twopass_group.add_argument("--pass2-vad-version", default=None,
                                choices=list(VAD_VERSIONS),
                                help="Silero VAD build for pass 2 when --pass2-pipeline is balanced "
@@ -498,7 +498,7 @@ def parse_arguments():
     twopass_group.add_argument("--pass2-enhance-for-vad", action="store_true", default=False,
                                help="Dual-track mode for pass 2: the cleaned-up audio drives speech "
                                     "detection, the original audio goes to the recogniser. Available "
-                                    "with qwen, fidelity, parakeet-crispasr and cohere-crispasr. NOT "
+                                    "with qwen, fidelity and the GGUF pipelines. NOT "
                                     "accepted when --pass2-pipeline is balanced: balanced finds the "
                                     "speech inside faster-whisper itself, on the same audio it "
                                     "transcribes, so there is nothing to split. fast, faster and "
@@ -560,7 +560,7 @@ def parse_arguments():
                                     "used, else the CPU (not accelerated); cpu = this run on the CPU (not "
                                     "accelerated); cuda = an NVIDIA GPU is required. balanced, fast and "
                                     "faster use only NVIDIA GPUs (their engine is CTranslate2). For the GGUF "
-                                    "pipelines (parakeet-crispasr, cohere-crispasr), auto asks the installed "
+                                    "pipelines (the *-crispasr pipelines), auto asks the installed "
                                     "CrispASR build for its GPU: the NVIDIA GPU (CUDA build), the GPU through "
                                     "Vulkan on Windows (Vulkan build, experimental) or the Apple GPU (Metal) "
                                     "on an Apple silicon Mac.")
@@ -950,7 +950,7 @@ def parse_arguments():
     qwen_audio_group.add_argument("--enhance-for-vad", action="store_true", default=False,
                            help="Dual-track mode: the cleaned-up audio is used to find the speech "
                                 "and the original audio goes to the recogniser. Applies to the "
-                                "qwen, fidelity, decoupled, parakeet-crispasr and cohere-crispasr "
+                                "qwen, fidelity and decoupled pipelines and the GGUF (*-crispasr) "
                                 "pipelines. NOT accepted with balanced, which finds the speech "
                                 "inside faster-whisper itself, on the same audio it transcribes. "
                                 "Accepted but ignored by fast, faster and transformers.")
