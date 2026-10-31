@@ -26,6 +26,11 @@ from whisperjav.pipelines.transformers_pipeline import TransformersPipeline
 from whisperjav.pipelines.qwen_pipeline import QwenPipeline
 from whisperjav.pipelines.parakeet_crispasr_pipeline import ParakeetCrispASRPipeline
 from whisperjav.pipelines.cohere_crispasr_pipeline import CohereCrispASRPipeline
+from whisperjav.pipelines.reazonspeech_crispasr_pipeline import ReazonSpeechCrispASRPipeline
+from whisperjav.pipelines.kotoba_crispasr_pipeline import KotobaCrispASRPipeline
+from whisperjav.pipelines.whisper_turbo_crispasr_pipeline import WhisperTurboCrispASRPipeline
+from whisperjav.pipelines.whisper_large_crispasr_pipeline import WhisperLargeCrispASRPipeline
+from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
 from whisperjav.crispasr.errors import FAILURE_PREFIX as CRISPASR_FAILURE_PREFIX, CrispASRRunError, CrispASRSetupError
 from whisperjav.crispasr.manifest import CRISPASR_PIPELINES
 from whisperjav.crispasr.pass_settings import (ignored_hardware_message, ignored_hardware_settings,
@@ -48,6 +53,12 @@ PIPELINE_CLASSES = {
     # replace the 1.9.x "crispasr" pipeline, whose name main.py now stops (exit status 2).
     "parakeet-crispasr": ParakeetCrispASRPipeline,
     "cohere-crispasr": CohereCrispASRPipeline,
+    # 1.10.1 (owner W397, W401).
+    "reazonspeech-crispasr": ReazonSpeechCrispASRPipeline,
+    "kotoba-crispasr": KotobaCrispASRPipeline,
+    "whisper-turbo-crispasr": WhisperTurboCrispASRPipeline,
+    "whisper-large-crispasr": WhisperLargeCrispASRPipeline,
+    "moss-crispasr": MossCrispASRPipeline,
 }
 
 # Pipelines whose constructors never read enhance_for_vad. Verified against their
