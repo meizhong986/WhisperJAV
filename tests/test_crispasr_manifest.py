@@ -18,6 +18,7 @@ from whisperjav.crispasr.manifest import (
     MODELS,
     PIPELINE_DEFAULT_MODEL,
     PIPELINE_MODELS,
+    menu_label,
     model_for,
 )
 
@@ -33,12 +34,19 @@ class TestModels:
             assert HEX40.fullmatch(m.revision), m
             assert HEX64.fullmatch(m.sha256), m
             assert m.size > 0, m
-            assert m.filename.endswith(".gguf"), m
+            # GGUF files; the Whisper models are whisper.cpp files (1.10.1)
+            assert m.filename.endswith(".bin" if m.backend == "whisper" else ".gguf"), m
             assert re.fullmatch(r"[\w.-]+/[\w.-]+", m.repo_id), m
             assert m.label and m.backend and m.licence, m
+            # W400: every offered model has its measured GPU memory, and its label names the quantization
+            assert m.vram_mib > 0, m
+            assert re.fullmatch(r".+ \((f16|q8_0|q5_0)\)", m.label), m
 
     def test_every_pipeline_model_exists_and_runs_on_its_back_end(self):
-        backends = {"parakeet-crispasr": "parakeet", "cohere-crispasr": "cohere"}
+        # the model family CrispASR 0.8.44 reported opening each file (2026-10-31); ReazonSpeech opens as parakeet
+        backends = {"parakeet-crispasr": "parakeet", "cohere-crispasr": "cohere", "reazonspeech-crispasr": "parakeet",
+                    "kotoba-crispasr": "whisper", "whisper-turbo-crispasr": "whisper",
+                    "whisper-large-crispasr": "whisper", "moss-crispasr": "moss-diarize"}
         assert set(PIPELINE_MODELS) == set(backends)
         for pipeline, names in PIPELINE_MODELS.items():
             assert names, pipeline
@@ -52,15 +60,53 @@ class TestModels:
         assert CRISPASR_PIPELINES == tuple(PIPELINE_MODELS)
 
     def test_the_defaults(self):
-        # Cohere v0.1 (W129 1)
+        # Cohere v0.1 (W129 1); the 1.10.0 defaults stay (W401 1); each new pipeline's largest file (W400)
         assert PIPELINE_DEFAULT_MODEL == {"parakeet-crispasr": "parakeet-tdt-0.6b-ja",
-                                          "cohere-crispasr": "cohere-asr-ja-v0.1"}
+                                          "cohere-crispasr": "cohere-asr-ja-v0.1",
+                                          "reazonspeech-crispasr": "reazonspeech-nemo-v2-f16",
+                                          "kotoba-crispasr": "kotoba-whisper-v2.0-f16",
+                                          "whisper-turbo-crispasr": "whisper-large-v3-turbo-f16",
+                                          "whisper-large-crispasr": "whisper-large-v2-f16",
+                                          "moss-crispasr": "moss-transcribe-diarize-0.9b-f16"}
+
+    def test_each_new_default_is_a_full_size_file(self):
+        # W400: the largest files; Whisper-Large offers two full-size files, large-v2 (the default) and large-v3
+        for pipeline in CRISPASR_PIPELINES[2:]:
+            default = MODELS[PIPELINE_DEFAULT_MODEL[pipeline]]
+            assert default.label.endswith("(f16)"), pipeline
+            biggest = max(MODELS[n].size for n in PIPELINE_MODELS[pipeline])
+            assert default.size > 0.99 * biggest, pipeline
+
+    def test_every_offered_model_fits_14_gb(self):
+        # W400: 8-16 GB cards with 2 GB taken; the largest files that fit 6-14 GB
+        for names in PIPELINE_MODELS.values():
+            for name in names:
+                assert MODELS[name].vram_mib <= 14 * 1024, name
 
     def test_the_offered_models_without_the_ctc_model(self):
-        # The Parakeet CTC model is not offered (W129 2).
-        assert PIPELINE_MODELS == {"parakeet-crispasr": ("parakeet-tdt-0.6b-ja",),
-                                   "cohere-crispasr": ("cohere-asr-ja-v0.1", "cohere-asr-ja")}
-        assert set(MODELS) == {"parakeet-tdt-0.6b-ja", "cohere-asr-ja-v0.1", "cohere-asr-ja"}
+        # The Parakeet CTC model is not offered (W129 2); the full-size files join (W401 1).
+        assert PIPELINE_MODELS == {
+            "parakeet-crispasr": ("parakeet-tdt-0.6b-ja", "parakeet-tdt-0.6b-ja-f16"),
+            "cohere-crispasr": ("cohere-asr-ja-v0.1", "cohere-asr-ja-v0.1-f16", "cohere-asr-ja", "cohere-asr-ja-f16"),
+            "reazonspeech-crispasr": ("reazonspeech-nemo-v2-f16", "reazonspeech-nemo-v2-q8_0"),
+            "kotoba-crispasr": ("kotoba-whisper-v2.0-f16", "kotoba-whisper-v2.0-q5_0"),
+            "whisper-turbo-crispasr": ("whisper-large-v3-turbo-f16", "whisper-large-v3-turbo-q8_0"),
+            "whisper-large-crispasr": ("whisper-large-v2-f16", "whisper-large-v2-q8_0",
+                                       "whisper-large-v3-f16", "whisper-large-v3-q5_0"),
+            "moss-crispasr": ("moss-transcribe-diarize-0.9b-f16", "moss-transcribe-diarize-0.9b-q8_0")}
+        assert set(MODELS) == {name for names in PIPELINE_MODELS.values() for name in names}
+
+    def test_the_menu_label_names_quantization_and_gpu_memory(self):
+        # W400; rounded up to a tenth of a GB
+        model = MODELS["whisper-large-v2-f16"]
+        gb = model.vram_mib / 1024
+        assert menu_label(model).startswith("Whisper large-v2 (f16), ~") and menu_label(model).endswith(" GB VRAM")
+        shown = float(menu_label(model).split("~")[1].split(" ")[0])
+        assert gb <= shown < gb + 0.1 + 1e-9
+
+    def test_the_aligned_pipelines(self):
+        # every pipeline but Parakeet-CrispASR times its text with the CrispASR aligner (1.10.1)
+        assert manifest.ALIGNED_PIPELINES == set(CRISPASR_PIPELINES) - {"parakeet-crispasr"}
 
     def test_nothing_of_the_program_route_is_left(self):
         for name in ("PROGRAM_BUILDS", "CRISPASR_VERSION", "CRISPASR_GIT", "CUDA13_RUNTIME_FILES",
@@ -73,7 +119,8 @@ class TestModels:
 
 class TestModelFor:
     @pytest.mark.parametrize("pipeline, default", [("parakeet-crispasr", "parakeet-tdt-0.6b-ja"),
-                                                   ("cohere-crispasr", "cohere-asr-ja-v0.1")])
+                                                   ("cohere-crispasr", "cohere-asr-ja-v0.1"),
+                                                   ("whisper-large-crispasr", "whisper-large-v2-f16")])
     def test_a_pipeline_without_a_named_model_gets_its_default(self, pipeline, default):
         assert model_for(pipeline, None) is MODELS[default]
         assert model_for(pipeline, "") is MODELS[default]
@@ -82,6 +129,8 @@ class TestModelFor:
         ("parakeet-crispasr", "parakeet-tdt-0.6b-ja"),
         ("cohere-crispasr", "cohere-asr-ja-v0.1"),
         ("cohere-crispasr", "cohere-asr-ja"),
+        ("cohere-crispasr", "cohere-asr-ja-f16"),
+        ("whisper-large-crispasr", "whisper-large-v3-q5_0"),
     ])
     def test_a_named_model(self, pipeline, name):
         assert model_for(pipeline, name) is MODELS[name]
@@ -90,7 +139,7 @@ class TestModelFor:
         with pytest.raises(ValueError) as caught:
             model_for("parakeet-crispasr", "parakeet-ctc-1.1b-ja")
         assert str(caught.value) == ("'parakeet-ctc-1.1b-ja' is not a model of parakeet-crispasr; "
-                                     "choose one of: parakeet-tdt-0.6b-ja")
+                                     "choose one of: parakeet-tdt-0.6b-ja, parakeet-tdt-0.6b-ja-f16")
 
     def test_a_model_of_another_pipeline_is_refused(self):
         with pytest.raises(ValueError, match="is not a model of parakeet-crispasr"):
