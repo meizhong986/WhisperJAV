@@ -15,95 +15,54 @@
 - **The GUI in Simplified Chinese**, with a 中文 / English button.
 - Removed: llama-cpp translation (use Ollama), ClearVoice, the 1.9.x CrispASR mode. Google Colab and Kaggle are not supported; the Colab notebook keeps installing 1.9.5.
 
-## What is new and changed
+## New in this release
 
-### 1. Installing and running on your computer
+- Added ASR pipeline cohere-crispasr: Cohere Transcribe ja models (GGUF)
+- Added ASR pipeline parakeet-crispasr: NVIDIA Parakeet TDT 0.6B ja (GGUF)
+- Added GGUF model support through CrispASR 0.8.44
+- Added GGUF forced aligners: wav2vec2-ja (default), parakeet-ctc-ja, qwen3-fa
+- Added timing model (Whisper small) to split ChronosJAV subtitles at sentences
+- Added Chinese GUI (Simplified Chinese), 中文 / English button (#448)
+- Added XXL Faster Whisper as Pass 1 (#451, #452)
+- Added one accelerator per install: NVIDIA, Vulkan, Apple GPU, own PyTorch, CPU
+- Added GPU through Vulkan on Windows: AMD, Intel, older NVIDIA (experimental)
+- Added own-PyTorch install, e.g. ROCm (experimental)
+- Added installer window to choose the accelerator when no NVIDIA GPU is found
+- Added `install.py --accelerator nvidia|vulkan|own-pytorch|cpu`
 
-Each install is now made for one accelerator (the graphics card, or the CPU, that it runs on) and gets exactly the package versions we tested for it. Computers 1.10.0 cannot support are refused before anything is installed, and a run no longer stops to ask about the CPU: it says where each part runs.
+## Enhancements
 
-- **One accelerator per install:** NVIDIA GPU (CUDA); GPU through Vulkan (AMD, Intel or older NVIDIA card; Windows, experimental: only the GGUF pipelines and ChronosJAV's aligner and timing model use the card, the rest runs on the CPU); Apple GPU (Metal); your own PyTorch (experimental); or CPU only. The choice is recorded; every run and every upgrade follows it.
-- **The Windows installer asks** what the install is for when it finds no supported NVIDIA GPU. With no NVIDIA card it installs CPU only after 20 seconds without an answer; with an NVIDIA card 1.10 cannot use, it names the reason and waits.
-- **Source installs** take the same choice: `python install.py --accelerator nvidia|vulkan|own-pytorch|cpu`. Without it, a supported NVIDIA GPU or an Apple silicon Mac is used by itself; otherwise the installer asks.
-- **Your own PyTorch** (for example ROCm for an AMD card): WhisperJAV installs everything except PyTorch and never replaces your PyTorch when it installs or upgrades. The Windows installer shows the one command that adds it; running that installer again replaces the whole folder, PyTorch included. A source install needs your PyTorch already installed in the active Python environment.
-- **New versions:** Python 3.13 and PyTorch 2.11. On Windows, the NVIDIA install uses CUDA 13.0 and needs driver 580 or newer; where this PC cannot load the CUDA 12 library that balanced, fast and faster need, it uses CUDA 12.8. Linux uses CUDA 12.8, driver 570 or newer.
-- **Older NVIDIA cards** (before GTX 16 / RTX 20) are no longer supported by the NVIDIA install. The installer says so, names 1.9.5 for such a card, and offers GPU through Vulkan (Windows), your own PyTorch or CPU only.
-- **Unsupported computers are refused before anything is installed,** with the reason: Windows on ARM or older than Windows 10, Linux with glibc older than 2.35, Intel Macs and macOS 13 or older.
-- **Exact versions everywhere:** the Windows installer, the source installers and `whisperjav-upgrade` install the same tested package versions for each accelerator, so two computers with the same accelerator get the same versions.
-- **At the start of a run** that does not use a supported NVIDIA GPU or the Apple GPU, a box says where each part runs. An NVIDIA install whose GPU cannot be used now stops with the reason and the fix; in the GUI, **Run on the CPU this time** runs the job on the CPU.
-- **No CPU question any more:** the GUI's "Accept CPU-only mode" box is gone. Scripts that pass `--accept-cpu-mode` still run (it does nothing); `--hf-device` and `--qwen-device` still work as other names for `--device`.
-- **`--device auto|cuda|cpu` now applies to every pipeline**, the speech enhancers included; `--device cpu` runs one job on the CPU.
-- **`whisperjav --check`** names the install's accelerator, where each part runs, CrispASR and its models.
-- balanced, fast and faster no longer try a graphics card they cannot use (for example with your own ROCm PyTorch for an AMD card); on an Apple silicon Mac each pipeline says where it runs.
-- When PyTorch is missing or damaged, the run stops at once and names the command that repairs the install.
-- **`whisperjav-upgrade`** (installs made with the Windows installer) installs the newest 1.10.x release (never unreleased code), keeps the accelerator of your install, and never installs PyTorch on an own-PyTorch install. Source installs update with Git; see Installation.
-
-### 2. New: GGUF pipelines through CrispASR
-
-Two Japanese ASR pipelines that run through CrispASR, which comes with WhisperJAV. They run in Ensemble mode only and can use the NVIDIA GPU, a graphics card through Vulkan (Windows) or the Apple GPU (not yet tested on a Mac); otherwise the CPU. Both are experimental in 1.10.0.
-
-- **parakeet** (Parakeet-CrispASR): NVIDIA's Parakeet TDT 0.6B ja model (674 MB). Within each piece of speech (at most about 6 s), a subtitle ends only at a sentence end, a pause, or a 、 or space before a pause, never by character count.
-- **cohere** (Cohere-CrispASR): Japanese versions of Cohere Transcribe, `cohere-asr-ja-v0.1` (default) or `cohere-asr-ja` (2.4 GB each). An aligner (`wav2vec2-ja`, 232 MB) times the text; a subtitle ends only at a sentence end (。？！… ? !).
-- **The Ensemble tab starts with them:** Pass 1 cohere (Balanced, FireRedVAD), Pass 2 parakeet (Aggressive, TEN VAD; off until you tick it); 1.9.5 opened on Qwen3-ASR and Anime-Whisper. In the Pass menus they are under **GGUF via crispasr**. With Remember settings on, your saved passes open instead.
-- Both take the pass's scene detector, speech enhancer, Enhance for VAD only and Customize settings, and print the audio analytics report with the Semantic scene detector (the default).
-- A status panel under the pass shows the model, whether it is downloaded, and where CrispASR runs. Models download on first use.
-- On the command line: `--ensemble --pass1-pipeline parakeet-crispasr` (or `cohere-crispasr`); without `--ensemble` the run is a single Balanced pass. A Parakeet pass that names no speech segmenter or sensitivity runs TEN VAD at Aggressive; Cohere runs FireRedVAD at Balanced.
-
-### 3. Better subtitle timing in ChronosJAV
-
-ChronosJAV (Qwen3-ASR and anime-whisper) now starts each subtitle at its first word instead of at the start of the piece of speech, and can split one piece of speech in two at a sentence break. The last subtitle of a piece of speech still ends where that piece ends. On our 7 test scenes, more subtitles start within half a second of Netflix's Japanese subtitles than in 1.9.5, with the same text.
-
-- **An aligner** (`wav2vec2-ja`, through CrispASR) times each character; each subtitle starts at its first character. Customize → Alignment offers two other CrispASR aligners and the PyTorch Qwen3-ForcedAligner.
-- **A timing model** (Whisper small; its text is not used) splits a piece of speech at a punctuation mark or space near where Whisper starts anew, for example at a change of speaker. Never a split without a mark, by character count or by seconds.
-- The aligner (232 MB) and the timing model (488 MB) download the first time ChronosJAV uses them.
-- **Measured:** subtitles starting within 0.5 s of Netflix's Japanese subtitles: Qwen3-ASR 78% (1.9.5: 75%), anime-whisper 77% (1.9.5: 63%), with the same text.
-- **The text is always kept:** if the aligner or timing model cannot be loaded, or gives no times, the subtitles keep the times of their piece of speech and the run summary says so.
-- anime-whisper now uses the aligner like Qwen3-ASR (it was VAD-only), and Adaptive Step-Down is off by default for every ChronosJAV model.
-- 1.9.5 timing remains available: `--qwen-timestamp-mode vad_only --qwen-timing-model none`, or in Customize → Alignment, Aligner Backend None and Timing Model None.
-
-### 4. Cleaner subtitles
-
-Fewer subtitles that hold nothing but a lone sound.
-
-- ChronosJAV, parakeet and cohere: a subtitle that is only a lone sound such as 「あ」, 「うん」 or 「はい」 is now removed whatever punctuation follows it (「うん!」, 「え?」, 「あ……」), as it already was with 「。」.
-
-### 5. XXL Faster Whisper
-
-PurfView's XXL Faster Whisper (your own copy) can now be either pass, and it runs the model you choose.
-
-- **XXL as Pass 1** (#451, #452), Pass 2 or both in Ensemble mode (`--ensemble --pass1-pipeline xxl --xxl-exe <path to XXL>`). One program path and one Extra Args box serve both passes.
-- Each XXL pass picks its model in the Model column: Large V2 (default), Large V3, Large V3 Turbo or Medium.
-- When XXL fails for a file, the console says which pass failed and why.
-
-### 6. Translation
-
-Ollama is now the only local translator, and translations that contain the model's answer labels are caught and asked for again (see Fixed).
-
-- **Ollama is the local translator.** The llama-cpp provider is removed; a saved llama-cpp choice opens as Ollama, and `--provider local` (or `--translate-provider local`) stops with a message pointing to Ollama.
-
-### 7. The GUI
-
-The window can be switched to Simplified Chinese, and messages are clearer when a run does not start.
-
-- **Simplified Chinese** (#448): the **中文** button in the header switches the window, tabs, menus, tooltips, pop-up boxes and Customize Parameters; **English** switches back. On Windows set to Chinese, the GUI opens in Chinese the first time. The console stays English.
-- **Clearer messages** when a run does not start ("The NVIDIA GPU cannot be used", "The run did not start") or ends without a run summary.
-
-### 8. Updated engines
-
-Newer versions of the libraries behind Qwen3-ASR and behind balanced, fast and faster; results as in 1.9.5, except the small difference for balanced under Limits.
-
-- Qwen3-ASR runs on transformers 5 through WhisperJAV's own build of `qwen-asr`; on our two reference clips its subtitles score the same as in 1.9.5.
-- balanced, fast and faster run on CTranslate2 4.8.3 (#459).
+- Updated to Python 3.13 and PyTorch 2.11
+- Updated to CUDA 13.0 on Windows (driver 580+); CUDA 12.8 on Linux (driver 570+)
+- Updated Qwen3-ASR to transformers 5, through WhisperJAV's qwen-asr build
+- Updated CTranslate2 to 4.8.3 for balanced, fast and faster (#459)
+- Every install and upgrade gets the same locked package versions
+- NVIDIA install needs GTX 16 / RTX 20 or newer; older cards: Vulkan or CPU
+- Unsupported computers are refused before install, with the reason
+- No CPU-mode question; the run shows where each part runs
+- `--device auto|cuda|cpu` applies to every pipeline and speech enhancer
+- `whisperjav --check` shows the accelerator, CrispASR and its models
+- `whisperjav-upgrade` stays within 1.10.x and keeps the accelerator
+- ChronosJAV subtitles start at their first word (aligner timing)
+- anime-whisper uses the aligner, like Qwen3-ASR
+- Adaptive Step-Down is off by default for every ChronosJAV model
+- 1.9.5 timing kept as an option: Aligner Backend None, Timing Model None
+- ChronosJAV and GGUF pipelines remove 「うん!」「え?」 as they did 「うん。」
+- Ensemble tab opens on cohere (Pass 1) and parakeet (Pass 2)
+- XXL: each pass runs the model chosen in its Model column
+- XXL: the console names the failed pass and the reason
+- Clearer messages when a run does not start
 
 ## Fixed
 
-- **In the GUI, XXL ran large-v3 whatever model you set** (#449). It now runs the model in the Model column; with none chosen, large-v2. A `--model` typed in Extra Args is not used, and the console says so.
-- **ChronosJAV's Customize → Alignment settings** (and presets saved from that window) now reach the run; from 1.8.10.post3 to 1.9.5 they were ignored.
-- **Batch runs:** each file's ChronosJAV run summary counts only its own scenes; since 1.9.5 the second and later files also counted the scenes of the files before them.
-- The ChronosJAV run summary's figures "Aligner native" (subtitles the aligner timed) and "Collapse rate" (scenes where alignment failed) are now right; both showed a wrong figure before.
-- **AI translation labels** (#460): a subtitle holding `Translation>`, `Original>` or a `#number` line is sent to the model again; if the answer is the same, the subtitles are kept and the console names them. All providers. A label in the middle of a line, or in lower case, is not caught.
-- **An NVIDIA driver too old** for the GPU install: the installer now names your driver version and the 580 minimum, then asks what to install instead (Stop is pre-selected); 1.9.5 silently installed the CPU version.
-- **A deliberate stop in the Windows installer** (old card, old driver) now ends with "WhisperJAV was not installed." instead of "Failed to run post install script".
-- The WhisperJAV package no longer carries a path to the developer's XXL program or the developer's settings backups; your own settings backups now go to your settings folder.
+- Fixed XXL running large-v3 whatever model was chosen (#449)
+- Fixed ChronosJAV Customize → Alignment settings being ignored (since 1.8.10)
+- Fixed batch runs counting earlier files' scenes in the ChronosJAV summary
+- Fixed wrong "Aligner native" and "Collapse rate" in the ChronosJAV summary
+- Fixed answer labels (Translation>, Original>) left in translations (#460)
+- Fixed old NVIDIA driver silently getting the CPU install; the installer asks
+- Fixed "Failed to run post install script" on a deliberate installer stop
+- Fixed the package carrying a developer XXL path and settings backups
 
 ## Removed
 
