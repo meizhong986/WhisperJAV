@@ -1775,16 +1775,56 @@ const EnsembleManager = {
         // a quality baseline.
         { value: 'CohereLabs/cohere-transcribe-03-2026', label: 'Cohere-Transcribe-03-2026    ~4-8GB (gated)' }
     ],
-    // The CrispASR pipelines' models (1.10.0): the short names --passN-model takes, the first one the
-    // pipeline's default. Keep in step with whisperjav/crispasr/manifest.py (PIPELINE_MODELS,
-    // PIPELINE_DEFAULT_MODEL); tests/test_gui_crispasr_pipelines.py compares them.
-    parakeetCrispasrModels: [
-        { value: 'parakeet-tdt-0.6b-ja', label: 'parakeet-tdt-0.6b-ja' }
-    ],
-    cohereCrispasrModels: [
-        { value: 'cohere-asr-ja-v0.1', label: 'cohere-asr-ja-v0.1' },
-        { value: 'cohere-asr-ja', label: 'cohere-asr-ja' }
-    ],
+    // The CrispASR pipelines' models (1.10.0; 1.10.1, owner W400, W401): per pipeline, the short names
+    // --passN-model takes, the pipeline's default first, each named by its quantization and the GPU memory
+    // it needs. Keep in step with whisperjav/crispasr/manifest.py (PIPELINE_MODELS, PIPELINE_DEFAULT_MODEL,
+    // menu_label); tests/test_gui_crispasr_pipelines.py compares them.
+    crispasrModels: {
+        'parakeet-crispasr': [
+            { value: 'parakeet-tdt-0.6b-ja', label: 'Parakeet TDT 0.6B ja (q8_0), ~0.9 GB VRAM' },
+            { value: 'parakeet-tdt-0.6b-ja-f16', label: 'Parakeet TDT 0.6B ja (f16), ~1.5 GB VRAM' }
+        ],
+        'cohere-crispasr': [
+            { value: 'cohere-asr-ja-v0.1', label: 'Cohere Transcribe ja v0.1 (q8_0), ~2.5 GB VRAM' },
+            { value: 'cohere-asr-ja-v0.1-f16', label: 'Cohere Transcribe ja v0.1 (f16), ~4.1 GB VRAM' },
+            { value: 'cohere-asr-ja', label: 'Cohere ASR ja (q8_0), ~2.5 GB VRAM' },
+            { value: 'cohere-asr-ja-f16', label: 'Cohere ASR ja (f16), ~4.1 GB VRAM' }
+        ],
+        'reazonspeech-crispasr': [
+            { value: 'reazonspeech-nemo-v2-f16', label: 'ReazonSpeech NeMo v2 (f16), ~1.5 GB VRAM' },
+            { value: 'reazonspeech-nemo-v2-q8_0', label: 'ReazonSpeech NeMo v2 (q8_0), ~0.9 GB VRAM' }
+        ],
+        'kotoba-crispasr': [
+            { value: 'kotoba-whisper-v2.0-f16', label: 'Kotoba-Whisper v2.0 (f16), ~1.9 GB VRAM' },
+            { value: 'kotoba-whisper-v2.0-q5_0', label: 'Kotoba-Whisper v2.0 (q5_0), ~0.9 GB VRAM' }
+        ],
+        'whisper-turbo-crispasr': [
+            { value: 'whisper-large-v3-turbo-f16', label: 'Whisper large-v3-turbo (f16), ~2.0 GB VRAM' },
+            { value: 'whisper-large-v3-turbo-q8_0', label: 'Whisper large-v3-turbo (q8_0), ~1.3 GB VRAM' }
+        ],
+        'whisper-large-crispasr': [
+            { value: 'whisper-large-v2-f16', label: 'Whisper large-v2 (f16), ~4.1 GB VRAM' },
+            { value: 'whisper-large-v2-q8_0', label: 'Whisper large-v2 (q8_0), ~2.7 GB VRAM' },
+            { value: 'whisper-large-v3-f16', label: 'Whisper large-v3 (f16), ~4.3 GB VRAM' },
+            { value: 'whisper-large-v3-q5_0', label: 'Whisper large-v3 (q5_0), ~2.2 GB VRAM' }
+        ],
+        'moss-crispasr': [
+            { value: 'moss-transcribe-diarize-0.9b-f16', label: 'MOSS-Transcribe-Diarize 0.9B (f16), ~2.1 GB VRAM' },
+            { value: 'moss-transcribe-diarize-0.9b-q8_0', label: 'MOSS-Transcribe-Diarize 0.9B (q8_0), ~1.7 GB VRAM' }
+        ]
+    },
+    // Each CrispASR pipeline's speech segmenter and sensitivity when a pass names none
+    // (CRISPASR_DEFAULT_SEGMENTERS, CRISPASR_DEFAULT_SENSITIVITY, config/segmenter_presets.py; owner W202 3,
+    // W343, W344, W401); tests/test_gui_crispasr_pipelines.py compares them.
+    crispasrDefaults: {
+        'parakeet-crispasr': { segmenter: 'ten', sensitivity: 'aggressive' },
+        'cohere-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced' },
+        'reazonspeech-crispasr': { segmenter: 'ten', sensitivity: 'aggressive' },
+        'kotoba-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced' },
+        'whisper-turbo-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced' },
+        'whisper-large-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced' },
+        'moss-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced' }
+    },
     // BYOP Faster Whisper XXL (1.10.0, item 5): the model names XXL takes, sent as --passN-model.
     // large-v2 first, the default (owner W24 2; DEFAULT_XXL_MODEL in byop/xxl_runner.py); the
     // list is owner W271 2.
@@ -2074,9 +2114,10 @@ const EnsembleManager = {
         this.updateRowGreyingState('pass2');
     },
 
-    // The two CrispASR pipelines (1.10.0; CRISPASR_PIPELINES in whisperjav/crispasr/manifest.py).
+    // The CrispASR pipelines (1.10.0; 1.10.1, owner W401): the keys of crispasrModels, which are
+    // CRISPASR_PIPELINES in whisperjav/crispasr/manifest.py.
     isCrispasrPipeline(pipeline) {
-        return pipeline === 'parakeet-crispasr' || pipeline === 'cohere-crispasr';
+        return Object.prototype.hasOwnProperty.call(this.crispasrModels, pipeline);
     },
 
     CRISPASR_CJK_NOTE: 'Experimental in 1.10.0 (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).',
@@ -2084,13 +2125,13 @@ const EnsembleManager = {
     // Each CrispASR pipeline's speech segmenter when a pass names none (CRISPASR_DEFAULT_SEGMENTERS,
     // config/segmenter_presets.py; owner W202 3, W344); tests/test_gui_crispasr_pipelines.py compares them.
     crispasrDefaultSegmenter(pipeline) {
-        return pipeline === 'cohere-crispasr' ? 'firered-vad' : 'ten';
+        return this.crispasrDefaults[pipeline].segmenter;
     },
 
     // Each CrispASR pipeline's sensitivity when a pass names none (CRISPASR_DEFAULT_SENSITIVITY,
     // config/segmenter_presets.py; owner W343, W344); tests/test_gui_crispasr_pipelines.py compares them.
     crispasrDefaultSensitivity(pipeline) {
-        return pipeline === 'cohere-crispasr' ? 'balanced' : 'aggressive';
+        return this.crispasrDefaults[pipeline].sensitivity;
     },
 
     // The CrispASR status panel under a pass row (owner W133 2; route B design 12, T16): the model,
@@ -2405,7 +2446,7 @@ const EnsembleManager = {
 
     // Swap model dropdown options based on pipeline type
     // pipelineType: 'legacy' | 'transformers' | 'qwen' | 'anime-whisper' | 'cohere' |
-    //               'parakeet-crispasr' | 'cohere-crispasr' | 'xxl'
+    //               a CrispASR pipeline (isCrispasrPipeline) | 'xxl'
     swapModelOptions(passKey, pipelineType) {
         const modelSelect = document.getElementById(`${passKey}-model`);
         let models;
@@ -2414,7 +2455,9 @@ const EnsembleManager = {
         // wholesale and is not a "dropped selection" worth reporting.
         let narrowedByPipeline = false;
 
-        switch (pipelineType) {
+        if (this.isCrispasrPipeline(pipelineType)) {
+            models = this.crispasrModels[pipelineType];
+        } else switch (pipelineType) {
             case 'transformers':
                 models = this.transformersModels;
                 break;
@@ -2426,12 +2469,6 @@ const EnsembleManager = {
                 break;
             case 'qwen':
                 models = this.qwenModels;
-                break;
-            case 'parakeet-crispasr':
-                models = this.parakeetCrispasrModels;
-                break;
-            case 'cohere-crispasr':
-                models = this.cohereCrispasrModels;
                 break;
             case 'xxl':
                 models = this.xxlModels;
