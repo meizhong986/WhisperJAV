@@ -150,7 +150,7 @@ class TestAPassThatCannotRunIsRefused:
         problem = crispasr_pass_problem(1, "parakeet-crispasr", model=CTC, speech_segmenter=None,
                                         language="japanese")
         assert problem == (f"--pass1-model: '{CTC}' is not a model of parakeet-crispasr; "
-                           f"choose one of: parakeet-tdt-0.6b-ja")
+                           f"choose one of: parakeet-tdt-0.6b-ja, parakeet-tdt-0.6b-ja-f16")
 
     @pytest.mark.parametrize("pipeline", manifest.CRISPASR_PIPELINES)
     def test_no_model_named_runs_the_default(self, pipeline):
@@ -248,12 +248,13 @@ class TestComputeType:
 
     def test_the_warning(self):
         assert ignored_hardware_message("Cohere-CrispASR", ["--compute-type int8"]) == (
-            "Cohere-CrispASR ignores --compute-type int8: CrispASR's model files come in one number "
-            "format (8-bit).")
+            "Cohere-CrispASR ignores --compute-type int8: each model file has its own number format (f16, q8_0, "
+            "...); choose the file with --passN-model.")
 
-    def test_the_8_bit_in_the_warning_is_true_of_every_model_file(self):
-        names = {name for models in manifest.PIPELINE_MODELS.values() for name in models}
-        assert names and all(manifest.MODELS[name].filename.endswith("-q8_0.gguf") for name in names)
+    def test_the_menus_offer_more_than_one_number_format(self):
+        # 1.10.1 (W400, W401): the 1.10.0 warning said every file was 8-bit; f16 and q5_0 files are offered now
+        labels = {manifest.MODELS[name].label for models in manifest.PIPELINE_MODELS.values() for name in models}
+        assert any("(f16)" in label for label in labels) and any("(q8_0)" in label for label in labels)
 
 
 class TestTheModelHelp:
@@ -279,7 +280,8 @@ class TestTheCommandLine:
         result = _cli("--help")
         assert result.returncode == 0, result.stderr[-600:]
         text = " ".join(result.stdout.split())
-        assert "parakeet-crispasr" in text and "cohere-crispasr" in text
+        for pipeline in manifest.CRISPASR_PIPELINES:
+            assert pipeline in text
         for models in manifest.PIPELINE_MODELS.values():
             for model in models:
                 assert model in text
@@ -293,7 +295,8 @@ class TestTheCommandLine:
         # T2 (design 22.10, owner W237 1): --device for every pipeline; the GGUF pipelines' builds.
         assert "Where this run's ASR and other models run, for every pipeline." in text
         assert "the GPU through Vulkan on Windows (Vulkan build, experimental)" in text
-        assert "ten for parakeet-crispasr and firered-vad for cohere-crispasr" in text   # W344
+        assert ("for the GGUF pipelines, which do not accept none: ten for parakeet-crispasr and "   # W344, W401
+                "reazonspeech-crispasr, firered-vad for the others.") in text
         assert "CrispASR's own program" not in text
         assert "--crispasr-exe" not in text and "--crispasr-backend" not in text
         assert "--crispasr-args" not in text
@@ -318,7 +321,8 @@ class TestTheCommandLine:
          + ", ".join(manifest.PIPELINE_MODELS["parakeet-crispasr"])),
         # not offered (W129 2): not on the command line
         (["--pass1-pipeline", "parakeet-crispasr", "--pass1-model", CTC],
-         f"error: --pass1-model: '{CTC}' is not a model of parakeet-crispasr; choose one of: parakeet-tdt-0.6b-ja"),
+         f"error: --pass1-model: '{CTC}' is not a model of parakeet-crispasr; choose one of: "
+         + ", ".join(manifest.PIPELINE_MODELS["parakeet-crispasr"])),
         (["--pass1-pipeline", "parakeet-crispasr", "--language", "english"],
          "error: --pass1-pipeline parakeet-crispasr transcribes Japanese only"),
         (["--pass1-pipeline", "parakeet-crispasr", "--pass1-speech-segmenter", "none"],
