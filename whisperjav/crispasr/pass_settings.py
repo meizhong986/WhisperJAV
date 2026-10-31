@@ -1,7 +1,8 @@
-"""What an Ensemble pass running a CrispASR pipeline accepts, refuses and uses (1.10.0).
+"""What an Ensemble pass running a CrispASR pipeline accepts, refuses and uses (1.10.0; 1.10.1).
 
-The CrispASR pipelines (parakeet-crispasr, cohere-crispasr) are Ensemble passes only, with no --mode
-value (owner W118 2). Of a pass's settings they use: the model (--passN-model, a short name from the
+The CrispASR pipelines (manifest.CRISPASR_PIPELINES: parakeet-crispasr, cohere-crispasr and, since 1.10.1,
+reazonspeech-crispasr, kotoba-crispasr, whisper-turbo-crispasr, whisper-large-crispasr, moss-crispasr) are
+Ensemble passes only, with no --mode value (owner W118 2). Of a pass's settings they use: the model (--passN-model, a short name from the
 manifest), the speech segmenter (--passN-speech-segmenter), the sensitivity (--passN-sensitivity),
 --passN-vad-threshold and --passN-speech-pad-ms (owner W208), the source language (--language),
 --device, and since design 22.9.1 (owner W212 D3, W214 2, W232 8) the scene detector
@@ -12,6 +13,8 @@ Only --passN-hf-params and --passN-qwen-params, the transformers and ChronosJAV 
 The speech segmenter settings follow the pipelines the owner named (W199 DIR1: "For cohere, uses
 similar presets and settings as qwenasr. And for prakeet use similar settings and presets as fidelity
 whisper pipeline"; W202): ``segmenter_settings()`` resolves them through those pipelines' own functions.
+The 1.10.1 pipelines (W401, pre-approved choices of step 2) take Cohere's settings, except ReazonSpeech-CrispASR,
+whose model is a transducer like Parakeet's and takes Parakeet's.
 
 Used by three callers, so the rules have one home:
   - whisperjav/main.py refuses a pass that cannot run (validate_crispasr_passes), as a usage error
@@ -48,7 +51,8 @@ SEGMENTER_NONE_PROBLEM = ("--pass{n}-speech-segmenter none is not available when
 UNUSED_SETTINGS_MESSAGE = "{label} does not use: {flags}"
 
 # One warning from the pass worker, e.g. "Parakeet-CrispASR ignores --compute-type int8: ...".
-IGNORED_HARDWARE_MESSAGE = "{label} ignores {flags}: CrispASR's model files come in one number format (8-bit)."
+IGNORED_HARDWARE_MESSAGE = ("{label} ignores {flags}: each model file has its own number format (f16, q8_0, ...); "
+                            "choose the file with --passN-model.")
 
 # The model short names in --passN-model's help, e.g.
 # "parakeet-crispasr: parakeet-tdt-0.6b-ja (default); cohere-crispasr: cohere-asr-ja-v0.1 (default), cohere-asr-ja".
@@ -57,7 +61,9 @@ MODELS_HELP_DEFAULT = " (default)"
 # --- The speech segmenter settings (W199 DIR1, W202) ----------------------------------------------
 
 # Which pipeline's presets each CrispASR pipeline takes.
-SEGMENTER_STYLE = {"parakeet-crispasr": "fidelity", "cohere-crispasr": "qwen"}
+SEGMENTER_STYLE = {"parakeet-crispasr": "fidelity", "cohere-crispasr": "qwen",
+                   "reazonspeech-crispasr": "fidelity", "kotoba-crispasr": "qwen", "whisper-turbo-crispasr": "qwen",
+                   "whisper-large-crispasr": "qwen", "moss-crispasr": "qwen"}
 # Parakeet-CrispASR's longest VAD group and longest speech segment, at every sensitivity (W193 CLA3,
 # W194 2 "(a)", confirmed by W202 1 "1-a").
 PARAKEET_LONGEST_S = 6.0
