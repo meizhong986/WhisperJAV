@@ -5,10 +5,12 @@ What is pinned here:
     Backend or Extra Args fields, no "External (CrispASR)" choice, no file dialog or saved preferences for it, and no
     CrispASR key in the shipped asr_config.json (W118: "Delete the old ... panel text fields ... from the GUI completely");
   - Parakeet-CrispASR and Cohere-CrispASR are offered in the Ensemble tab only, in the Pass 1 and Pass 2 menus, under
-    the group "GGUF via crispasr", named "parakeet" and "cohere" (W343; "GGUF" W195 I2 until then);
+    the group "GGUF via crispasr", named "parakeet" and "cohere" (W343; "GGUF" W195 I2 until then); since 1.10.1 the
+    five new pipelines with them (W397, W401), named the same way;
   - the Ensemble tab opens on cohere / balanced / FireRedVAD in pass 1 and parakeet / aggressive / TEN VAD in pass 2,
     and picking either pipeline sets its own sensitivity and segmenter, as the command line does (W343, W344);
-  - the model menus in app.js are the manifest's offered models, the default first;
+  - the model menus in app.js are the manifest's offered models, the default first, each named by the manifest's
+    menu_label: its quantization and the GPU memory it needs (W400);
   - each pipeline's default speech segmenter in app.js is the command line's (W202 2-3); the GGUF pipelines carry
     the CJK folder-name note (W203 O14, T24); a status panel under each pass row shows the model and the device
     (W133 2, T16), asked from api.get_crispasr_status, which never downloads;
@@ -25,14 +27,18 @@ from pathlib import Path
 
 import pytest
 
-from whisperjav.crispasr.manifest import CRISPASR_PIPELINES, PIPELINE_DEFAULT_MODEL, PIPELINE_MODELS
+from whisperjav.crispasr.manifest import (CRISPASR_PIPELINES, MODELS, PIPELINE_DEFAULT_MODEL, PIPELINE_MODELS,
+                                          menu_label)
 from whisperjav.webview_gui.api import WhisperJAVAPI
 
 ROOT = Path(__file__).resolve().parent.parent
 ASSETS = ROOT / "whisperjav" / "webview_gui" / "assets"
 HTML = (ASSETS / "index.html").read_text(encoding="utf-8")
 JS = (ASSETS / "app.js").read_text(encoding="utf-8")
-LABELS = {"parakeet-crispasr": "parakeet", "cohere-crispasr": "cohere"}   # W343
+LABELS = {"parakeet-crispasr": "parakeet", "cohere-crispasr": "cohere",   # W343
+          "reazonspeech-crispasr": "reazonspeech", "kotoba-crispasr": "kotoba",  # W401
+          "whisper-turbo-crispasr": "whisper-turbo", "whisper-large-crispasr": "whisper-large",
+          "moss-crispasr": "moss"}
 GROUP = "GGUF via crispasr"                                                # W343
 
 
@@ -118,13 +124,26 @@ def test_the_ensemble_tab_opens_on_cohere_and_parakeet(pass_key, pipeline, sensi
     assert f"speechSegmenter: '{segmenter}'" in block and "isCrispasr: true" in block
 
 
-@pytest.mark.parametrize("pipeline, list_name", [("parakeet-crispasr", "parakeetCrispasrModels"),
-                                                 ("cohere-crispasr", "cohereCrispasrModels")])
-def test_model_menus_are_the_manifests_offered_models_default_first(pipeline, list_name):
-    block = re.search(re.escape(list_name) + r":\s*\[(.*?)\]", JS, re.S).group(1)
-    values = re.findall(r"value:\s*'([^']+)'", block)
+def _crispasr_menus():
+    block = re.search(r"\n    crispasrModels: \{(.*?)\n    \},", JS, re.S).group(1)
+    return {p: re.findall(r"\{ value: '([^']+)', label: '([^']+)' \}", body)
+            for p, body in re.findall(r"'([a-z-]+)': \[(.*?)\]", block, re.S)}
+
+
+def test_every_crispasr_pipeline_has_a_model_menu():
+    assert list(_crispasr_menus()) == list(CRISPASR_PIPELINES)
+
+
+@pytest.mark.parametrize("pipeline", CRISPASR_PIPELINES)
+def test_model_menus_are_the_manifests_offered_models_default_first(pipeline):
+    menu = _crispasr_menus()[pipeline]
+    values = [value for value, _ in menu]
     assert set(values) == set(PIPELINE_MODELS[pipeline])
     assert values[0] == PIPELINE_DEFAULT_MODEL[pipeline]
+    # W400: each name says the quantization and the GPU memory
+    assert [label for _, label in menu] == [menu_label(MODELS[v]) for v in values]
+    for _, label in menu:
+        assert re.fullmatch(r".+ \((f16|q8_0|q5_0)\), ~\d+\.\d GB VRAM", label), label
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -191,12 +210,21 @@ def test_whisperjav_accepts_the_command_line_the_gui_builds(api, tmp_path):
 def test_the_default_segmenters_in_app_js_are_the_command_lines():
     from whisperjav.config.segmenter_presets import CRISPASR_DEFAULT_SEGMENTERS, CRISPASR_DEFAULT_SENSITIVITY
 
-    body = re.search(r"crispasrDefaultSegmenter\(pipeline\) \{(.*?)\n    \},", JS, re.S).group(1)
-    assert "pipeline === 'cohere-crispasr' ? 'firered-vad' : 'ten'" in body
-    assert CRISPASR_DEFAULT_SEGMENTERS == {"parakeet-crispasr": "ten", "cohere-crispasr": "firered-vad"}   # W344
-    body = re.search(r"crispasrDefaultSensitivity\(pipeline\) \{(.*?)\n    \},", JS, re.S).group(1)
-    assert "pipeline === 'cohere-crispasr' ? 'balanced' : 'aggressive'" in body
-    assert CRISPASR_DEFAULT_SENSITIVITY == {"parakeet-crispasr": "aggressive", "cohere-crispasr": "balanced"}
+    block = re.search(r"\n    crispasrDefaults: \{(.*?)\n    \},", JS, re.S).group(1)
+    in_js = {p: (seg, sens) for p, seg, sens in
+             re.findall(r"'([a-z-]+)': \{ segmenter: '([^']+)', sensitivity: '([^']+)' \}", block)}
+    assert in_js == {p: (CRISPASR_DEFAULT_SEGMENTERS[p], CRISPASR_DEFAULT_SENSITIVITY[p]) for p in CRISPASR_PIPELINES}
+    assert "return this.crispasrDefaults[pipeline].segmenter;" in JS
+    assert "return this.crispasrDefaults[pipeline].sensitivity;" in JS
+    # W344, and the 1.10.1 pipelines as Parakeet (ReazonSpeech) or Cohere (the others) (W401)
+    assert CRISPASR_DEFAULT_SEGMENTERS == {"parakeet-crispasr": "ten", "cohere-crispasr": "firered-vad",
+                                           "reazonspeech-crispasr": "ten", "kotoba-crispasr": "firered-vad",
+                                           "whisper-turbo-crispasr": "firered-vad",
+                                           "whisper-large-crispasr": "firered-vad", "moss-crispasr": "firered-vad"}
+    assert CRISPASR_DEFAULT_SENSITIVITY == {"parakeet-crispasr": "aggressive", "cohere-crispasr": "balanced",
+                                            "reazonspeech-crispasr": "aggressive", "kotoba-crispasr": "balanced",
+                                            "whisper-turbo-crispasr": "balanced",
+                                            "whisper-large-crispasr": "balanced", "moss-crispasr": "balanced"}
 
 
 @pytest.mark.parametrize("select_id", ["pass1-pipeline", "pass2-pipeline"])
@@ -206,7 +234,7 @@ def test_the_gguf_pipelines_carry_the_cjk_note(select_id):
             "folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a "
             "plain-named folder (the original stays where it is).")
     group = re.search(r'<optgroup label="%s">(.*?)</optgroup>' % GROUP, _select(HTML, select_id), re.S).group(1)
-    assert group.count(f'title="{note}"') == 2
+    assert group.count(f'title="{note}"') == len(CRISPASR_PIPELINES)
     # and on the Pipeline dropdown itself while a GGUF pipeline is selected
     assert f"CRISPASR_CJK_NOTE: '{note}'" in JS
     assert "pipelineSelect.title = passState.isCrispasr ? this.CRISPASR_CJK_NOTE : '';" in JS
