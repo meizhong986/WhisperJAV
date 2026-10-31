@@ -402,6 +402,60 @@ class TestTheTwoPipelines:
 # The whole chain
 # ---------------------------------------------------------------------------------------------------
 
+class TestThe1101Pipelines:
+    """The five pipelines of 1.10.1 (owner W397, W401; step 2 choices pre-approved): the shared chain, each with
+    Parakeet's (ReazonSpeech) or Cohere's (the others) speech segmenter settings, all aligned by wav2vec2-ja."""
+
+    NEW = {"reazonspeech-crispasr": ("ReazonSpeech-CrispASR", "fidelity", "aggressive", "ten"),
+           "kotoba-crispasr": ("Kotoba-CrispASR", "qwen", "balanced", "firered-vad"),
+           "whisper-turbo-crispasr": ("Whisper-Turbo-CrispASR", "qwen", "balanced", "firered-vad"),
+           "whisper-large-crispasr": ("Whisper-Large-CrispASR", "qwen", "balanced", "firered-vad"),
+           "moss-crispasr": ("MOSS-CrispASR", "qwen", "balanced", "firered-vad")}
+
+    @staticmethod
+    def classes():
+        # the pass worker's own table, read from its source so the worker (and its ASR imports) is not loaded
+        import importlib
+        tree = ast.parse((REPO / "whisperjav" / "ensemble" / "pass_worker.py").read_text(encoding="utf-8"))
+        imports = {a.asname or a.name: node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)
+                   and node.module and node.module.startswith("whisperjav.pipelines.") for a in node.names}
+        table = next(node.value for node in tree.body if isinstance(node, ast.Assign)
+                     and getattr(node.targets[0], "id", "") == "PIPELINE_CLASSES")
+        return {k.value: getattr(importlib.import_module(imports[v.id]), v.id)
+                for k, v in zip(table.keys, table.values) if k.value.endswith("-crispasr")}
+
+    def test_the_pass_worker_runs_every_crispasr_pipeline(self):
+        from whisperjav.crispasr.manifest import CRISPASR_PIPELINES
+        classes = self.classes()
+        assert tuple(classes) == CRISPASR_PIPELINES
+        for name, cls in classes.items():
+            assert cls.PIPELINE_NAME == name
+            assert cls.__mro__[1] is CrispASRPipeline
+            assert set(vars(cls)) <= {"PIPELINE_NAME", "LABEL", "ENGINE", "__module__", "__doc__", "__qualname__",
+                                      "__firstlineno__", "__static_attributes__", "_abc_impl", "__abstractmethods__"}
+
+    def test_the_aligned_pipelines_are_the_manifests(self):
+        from whisperjav.crispasr.manifest import ALIGNED_PIPELINES
+        classes = self.classes()
+        assert {name for name, cls in classes.items() if cls.ENGINE.aligner} == ALIGNED_PIPELINES
+        for name in ALIGNED_PIPELINES:
+            assert classes[name].ENGINE == chain.EngineRow("group", audio_analytics=True, aligner="wav2vec2-ja")
+
+    @pytest.mark.parametrize("pipeline", sorted(NEW))
+    def test_labels_settings_and_defaults(self, tmp_path, pipeline):
+        from whisperjav.crispasr.manifest import PIPELINE_DEFAULT_MODEL
+        from whisperjav.crispasr.pass_settings import SEGMENTER_STYLE
+        label, style, sensitivity, segmenter = self.NEW[pipeline]
+        cls = self.classes()[pipeline]
+        assert cls.LABEL == label
+        assert SEGMENTER_STYLE[pipeline] == style
+        pipe = make(cls, tmp_path)
+        assert pipe.model.name == PIPELINE_DEFAULT_MODEL[pipeline]
+        assert (pipe.sensitivity, pipe.speech_segmenter) == (sensitivity, segmenter)
+        like = "parakeet-crispasr" if style == "fidelity" else "cohere-crispasr"
+        assert pipe.segmenter == segmenter_settings(like, segmenter, sensitivity)
+
+
 class TestParakeetEndToEnd:
     def test_tokens_become_subtitles_in_media_file_time(self, stage, tmp_path):
         stage.answers = [
