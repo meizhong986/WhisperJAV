@@ -3023,8 +3023,9 @@ class WhisperJAVAPI:
                 lines = [self.CRISPASR_MODEL_DOWNLOADED.format(label=m.label)]
             else:
                 lines = [self.CRISPASR_MODEL_MISSING.format(label=m.label, size=install.mb(m.size))]
-            # Cohere-CrispASR aligns its text with the default aligner, always (item 12; W248 3, Q7).
-            if pipeline == "cohere-crispasr":
+            # Cohere-CrispASR aligns its text with the default aligner, always (item 12; W248 3, Q7); since
+            # 1.10.1 so does every CrispASR pipeline but Parakeet-CrispASR (manifest.ALIGNED_PIPELINES).
+            if pipeline in manifest.ALIGNED_PIPELINES:
                 lines.append(self._crispasr_part_line(
                     install, self.CRISPASR_PART_ALIGNER, manifest.aligner_model_for(None)))
             return self._with_crispasr_runtime(lines)
