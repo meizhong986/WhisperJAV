@@ -10,6 +10,8 @@ Route B: CrispASR's Python binding, ``crispasr.Session`` (0.8.44). The model is 
 the pass. ``crispasr`` is imported only when an engine opens, so importing this module stays light.
 """
 
+import codecs
+import math
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,6 +24,8 @@ from whisperjav.crispasr.errors import CrispASRRunError, CrispASRSetupError
 
 SAMPLE_RATE = 16000
 LANGUAGE = "ja"
+# The fewest tokens a call may write when a pipeline sets a token limit per second of audio (owner W406 i1).
+MIN_NEW_TOKENS = 32
 
 
 @dataclass(frozen=True)
@@ -69,15 +73,53 @@ def default_threads() -> int:
     return max(1, min(8, os.cpu_count() or 4))
 
 
+def _confidence(t) -> Optional[float]:
+    return None if t.confidence is None or t.confidence < 0 else float(t.confidence)
+
+
+def tokens_from_binding(binding_tokens: Sequence) -> Tuple[CrispToken, ...]:
+    """The binding's ``SessionToken``s as ``CrispToken``s, with whole characters.
+
+    A byte-level BPE token (Whisper) can split one UTF-8 character over two tokens; the binding's ``text`` then
+    shows "\\ufffd" for each half, and ``raw_text`` holds the bytes (its SessionToken docstring). The bytes are
+    decoded in order: a token carries the characters that are complete at its end. A character begun in one
+    token and finished in the next goes with the next, which starts where the first ended. A token with no
+    complete character is dropped. Without ``raw_text`` the token's ``text`` is kept as given."""
+    decoder = codecs.getincrementaldecoder("utf-8")("replace")
+    out: List[CrispToken] = []
+    held_from: Optional[float] = None  # where a character carried over from an earlier token began
+    for t in binding_tokens:
+        raw = getattr(t, "raw_text", b"") or b""
+        if not raw:
+            tail = decoder.decode(b"", final=True)
+            if tail:
+                out.append(CrispToken(tail, held_from, held_from, None))
+            decoder.reset()
+            held_from = None
+            out.append(CrispToken(str(t.text), t.start, t.end, _confidence(t)))
+            continue
+        text = decoder.decode(bytes(raw))
+        pending = bool(decoder.getstate()[0])
+        if text:
+            start = held_from if held_from is not None else t.start
+            out.append(CrispToken(text, start, t.end, _confidence(t)))
+            held_from = None
+        if pending and held_from is None:
+            held_from = t.end if t.end is not None else t.start
+    tail = decoder.decode(b"", final=True)
+    if tail:
+        out.append(CrispToken(tail, held_from, held_from, None))
+    return tuple(out)
+
+
 def segments_from_binding(session_segments: Sequence) -> List[CrispSegment]:
     """The binding's ``SessionSegment`` list as WhisperJAV's types. Nothing is dropped or cleaned here:
-    text as given, a missing time stays None, confidence as given (a token's -1.0 becomes None)."""
+    text as given, a missing time stays None, confidence as given (a token's -1.0 becomes None); a token's
+    text is rebuilt from its bytes where one character spans two tokens (tokens_from_binding)."""
     out = []
     for seg in session_segments:
         words = tuple(CrispWord(str(w.text), w.start, w.end, float(w.confidence)) for w in (seg.words or ()))
-        tokens = tuple(CrispToken(str(t.text), t.start, t.end,
-                                  None if t.confidence is None or t.confidence < 0 else float(t.confidence))
-                       for t in (getattr(seg, "tokens", None) or ()))
+        tokens = tokens_from_binding(getattr(seg, "tokens", None) or ())
         out.append(CrispSegment(str(seg.text or ""), float(seg.start), float(seg.end), words, tokens))
     return out
 
@@ -86,13 +128,22 @@ class BindingEngine:
     """Route B: one ``crispasr.Session`` for one model."""
 
     def __init__(self, model_path: Path, backend: str, use_gpu: bool, n_threads: Optional[int] = None,
-                 label: str = ""):
+                 label: str = "", tokens_per_second: Optional[float] = None):
         self.model_path = Path(model_path)
         self.backend = backend      # what the opened session must report (manifest ModelFile.backend)
         self.use_gpu = bool(use_gpu)
         self.n_threads = n_threads or default_threads()
         self.label = label or self.model_path.name
+        # None: the model's own limit. Otherwise each call may write at most
+        # max(MIN_NEW_TOKENS, ceil(tokens_per_second x the audio's seconds)) tokens (EngineRow.tokens_per_second).
+        self.tokens_per_second = tokens_per_second
         self._session = None
+
+    def token_limit(self, n_samples: int) -> Optional[int]:
+        """The token limit for one call on ``n_samples`` of 16 kHz audio, or None for the model's own."""
+        if not self.tokens_per_second:
+            return None
+        return max(MIN_NEW_TOKENS, math.ceil(self.tokens_per_second * n_samples / SAMPLE_RATE))
 
     @property
     def is_open(self) -> bool:
@@ -128,6 +179,9 @@ class BindingEngine:
             # The binding would pass a closed session's null handle straight to the library.
             raise CrispASRRunError("the CrispASR model is not open")
         try:
+            limit = self.token_limit(len(audio))
+            if limit is not None:
+                self._session.set_max_new_tokens(limit)   # per call: the limit follows the VAD group's length
             result = self._session.transcribe(audio, sample_rate=SAMPLE_RATE, language=LANGUAGE)
         except (RuntimeError, ValueError) as e:
             raise CrispASRRunError(str(e)) from e
