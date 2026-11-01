@@ -144,6 +144,7 @@ from whisperjav.config.segmenter_presets import (
     ENSEMBLE_DEFAULT_SENSITIVITY,
     ENSEMBLE_PASS_DEFAULTS,
     FIDELITY_DEFAULT_SEGMENTER,
+    SEGMENTER_PARAMS as SEGMENTER_PARAM_KEYS,
     SINGLE_PASS_EXTERNAL_OK,
     effective_segmenter_for_pass,
     resolve_segmenter_sensitivity,
@@ -154,7 +155,9 @@ from whisperjav.crispasr.manifest import CRISPASR_PIPELINES, model_for as crispa
 from whisperjav.crispasr.manifest import (WORD_TIMESTAMPS as CRISPASR_WORD_TIMESTAMPS,
                                           word_timestamps_for as crispasr_word_timestamps_for)
 from whisperjav.crispasr.pass_settings import (models_help as crispasr_models_help, segmenter_settings as
-                                               crispasr_segmenter_settings, validate_crispasr_passes)
+                                               crispasr_segmenter_settings, validate_crispasr_passes,
+                                               scene_detector_for as crispasr_scene_detector_for)
+from whisperjav.crispasr.moss_prompt import MossSettings, help_text as moss_params_help
 from whisperjav.crispasr.errors import FAILURE_PREFIX as CRISPASR_FAILURE_PREFIX
 from whisperjav.__version__ import __version__, __version_display__
 
@@ -211,11 +214,12 @@ FFMPEG_DSP_EFFECTS = ["loudnorm", "normalize", "compress", "denoise",
 
 
 def _word_timestamps_help(whose: str) -> str:
-    """--passN-word-timestamps' help; text approved by the owner (W413 1). ``whose`` is "pass 1's" or "pass 2's"."""
+    """--passN-word-timestamps' help; text approved by the owner (W413 1), changed for MOSS's own segment times in
+    1.10.1 (W426; drafted under W428 I2, to be shown to him). ``whose`` is "pass 1's" or "pass 2's"."""
     return (f"Where {whose} subtitle times come from, for the CrispASR pipelines. model = the ASR model's own "
-            "word times (default for parakeet, reazonspeech, kotoba, whisper-turbo and whisper-large); aligner = "
-            "the CrispASR aligner wav2vec2-ja (232 MB, downloaded on first use; default for cohere and moss). "
-            "MOSS gives no word times: with model, each VAD group becomes one subtitle at its edges.")
+            "word times (default for parakeet, reazonspeech, kotoba, whisper-turbo and whisper-large; for moss its "
+            "own segment times); aligner = the CrispASR aligner wav2vec2-ja (232 MB, downloaded on first use; "
+            "default for cohere).")
 
 
 def speech_enhancer_spec(value: str) -> str:
@@ -420,16 +424,17 @@ def parse_arguments():
     twopass_group.add_argument("--pass1-overrides", default=None,
                                help="JSON string of parameter overrides for pass 1 (deprecated)")
     twopass_group.add_argument("--pass1-params", default=None,
-                               help="JSON string of full parameters for pass 1 (custom mode)")
+                               help="JSON string of full parameters for pass 1 (custom mode). "
+                                    + moss_params_help())
     twopass_group.add_argument("--pass1-hf-params", default=None,
                                help="JSON string of HuggingFace Transformers parameters for pass 1 (when pipeline=transformers)")
     twopass_group.add_argument("--pass1-qwen-params", default=None,
                                help="JSON string of Qwen3-ASR parameters for pass 1 (when pipeline=qwen)")
     twopass_group.add_argument("--pass1-scene-detector", default=None,
                                choices=["auditok", "silero", "semantic", "none"],
-                               help="Scene detection method for pass 1 (default: semantic since v1.9.2)")
+                               help="Scene detection method for pass 1 (default: semantic since v1.9.2; silero for moss-crispasr)")
     twopass_group.add_argument("--pass1-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none). Default: firered-vad when pass 1 is Qwen3-ASR; for the GGUF pipelines, which do not accept none: ten for parakeet-crispasr and reazonspeech-crispasr, firered-vad for the others. Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
+                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none). Default: firered-vad when pass 1 is Qwen3-ASR; for the GGUF pipelines, which do not accept none: ten for parakeet-crispasr and reazonspeech-crispasr, silero-v6.2 for moss-crispasr, firered-vad for the others. Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
     twopass_group.add_argument("--pass1-vad-version", default=None,
                                choices=list(VAD_VERSIONS),
                                help="Silero VAD build for pass 1 when --pass1-pipeline is balanced "
@@ -484,16 +489,17 @@ def parse_arguments():
     twopass_group.add_argument("--pass2-overrides", default=None,
                                help="JSON string of parameter overrides for pass 2 (deprecated)")
     twopass_group.add_argument("--pass2-params", default=None,
-                               help="JSON string of full parameters for pass 2 (custom mode)")
+                               help="JSON string of full parameters for pass 2 (custom mode). "
+                                    + moss_params_help())
     twopass_group.add_argument("--pass2-hf-params", default=None,
                                help="JSON string of HuggingFace Transformers parameters for pass 2 (when pipeline=transformers)")
     twopass_group.add_argument("--pass2-qwen-params", default=None,
                                help="JSON string of Qwen3-ASR parameters for pass 2 (when pipeline=qwen)")
     twopass_group.add_argument("--pass2-scene-detector", default=None,
                                choices=["auditok", "silero", "semantic", "none"],
-                               help="Scene detection method for pass 2 (default: semantic since v1.9.2)")
+                               help="Scene detection method for pass 2 (default: semantic since v1.9.2; silero for moss-crispasr)")
     twopass_group.add_argument("--pass2-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Default: ten when pass 2 is anime-whisper; for the GGUF pipelines, which do not accept none: ten for parakeet-crispasr and reazonspeech-crispasr, firered-vad for the others. Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
+                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Default: ten when pass 2 is anime-whisper; for the GGUF pipelines, which do not accept none: ten for parakeet-crispasr and reazonspeech-crispasr, silero-v6.2 for moss-crispasr, firered-vad for the others. Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
     twopass_group.add_argument("--pass2-vad-version", default=None,
                                choices=list(VAD_VERSIONS),
                                help="Silero VAD build for pass 2 when --pass2-pipeline is balanced "
@@ -3263,23 +3269,38 @@ def main():
                     _model = f"(refused: {_refused})"
                 _segmenter = effective_segmenter_for_pass(_p["pipeline"], _p.get("speech_segmenter"))
                 _sensitivity = _p.get("sensitivity") or CRISPASR_DEFAULT_SENSITIVITY[_p["pipeline"]]
+                # The pass's Customize values (--passN-params), as the pipeline applies them on top (1.10.1).
+                try:
+                    _pass_params = json.loads(getattr(args, f"{_key}_params", None) or "{}")
+                except ValueError:
+                    _pass_params = {}
+                if not isinstance(_pass_params, dict):
+                    _pass_params = {}
+                _seg_settings = crispasr_segmenter_settings(
+                    _p["pipeline"], _segmenter, _sensitivity, vad_threshold=_p.get("vad_threshold"),
+                    speech_pad_ms=_p.get("speech_pad_ms")).as_dict()
+                _seg_settings.update({k: v for k, v in _pass_params.items() if k in SEGMENTER_PARAM_KEYS})
                 _p["crispasr_effective"] = {
                     "model": _model,
                     "speech_segmenter": _segmenter,
                     "sensitivity": _sensitivity,
-                    # --passN-vad-threshold and --passN-speech-pad-ms are used (W208).
-                    "speech_segmenter_settings": crispasr_segmenter_settings(
-                        _p["pipeline"], _segmenter, _sensitivity, vad_threshold=_p.get("vad_threshold"),
-                        speech_pad_ms=_p.get("speech_pad_ms")).as_dict(),
+                    # --passN-vad-threshold and --passN-speech-pad-ms are used (W208); the Customize Segmenter
+                    # values from --passN-params on top.
+                    "speech_segmenter_settings": _seg_settings,
                     "device": _p.get("device"),
                     # design 22.9.1 (T17): the scene detector and speech enhancer the pass runs with.
-                    "scene_detector": _p.get("scene_detector") or "semantic",
+                    "scene_detector": _p.get("scene_detector") or crispasr_scene_detector_for(_p["pipeline"]),
                     "speech_enhancer": _p.get("speech_enhancer") or "none",
                     "enhance_for_vad": bool(_p.get("enhance_for_vad")),
                     # 1.10.1 (Part B; W411-W414): where the pass's subtitle times come from.
                     "word_timestamps": crispasr_word_timestamps_for(_p["pipeline"], _p.get("word_timestamps")),
                     "not_used": ["hf_params", "qwen_params", "compute_type"],
                 }
+                if _p["pipeline"] == "moss-crispasr":
+                    # 1.10.1 (W428 I1 4): MOSS's settings and the instruction it is given (crispasr/moss_prompt.py),
+                    # from --passN-params (checked before the dump by validate_crispasr_passes).
+                    _moss = MossSettings.from_params(_pass_params)
+                    _p["crispasr_effective"]["moss_settings"] = {**_moss.as_dict(), "instruction": _moss.prompt()}
             dump_data["ensemble_config"] = ensemble_dump
         try:
             with open(args.dump_params, 'w', encoding='utf-8') as f:
