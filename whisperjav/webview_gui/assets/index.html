@@ -1357,6 +1357,8 @@
                     <button class="modal-tab" data-tab="enhancer">Enhancer</button>
                     <button class="modal-tab" data-tab="scene">Scene</button>
                     <button class="modal-tab" data-tab="context" style="display: none;">Context</button>
+                    <!-- 1.10.1 (owner W413 2): shown only for a CrispASR pass (openCrispasrCustomize) -->
+                    <button class="modal-tab" data-tab="timing" style="display: none;">Timing</button>
                 </div>
                 <!-- Tab Panels -->
                 <div class="modal-tab-content">
@@ -1377,6 +1379,9 @@
                     </div>
                     <div id="tab-context" class="modal-tab-panel">
                         <!-- Context hints and generation safety (Qwen only) -->
+                    </div>
+                    <div id="tab-timing" class="modal-tab-panel">
+                        <!-- Word timestamps of a CrispASR pass: from the model or from the aligner (1.10.1) -->
                     </div>
                 </div>
             </div>
