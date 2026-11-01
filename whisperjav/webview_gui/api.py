@@ -3012,9 +3012,12 @@ class WhisperJAVAPI:
         self._crispasr_runtime_cache = json.loads(line[len("RESULT="):])
         return self._crispasr_runtime_cache
 
-    def get_crispasr_status(self, pipeline: str, model: Optional[str] = None) -> Dict[str, Any]:
-        """The lines of the CrispASR status panel for a pass: the model, downloaded or not, and where
-        CrispASR runs, or why it cannot run here. Reads files only; never downloads."""
+    def get_crispasr_status(self, pipeline: str, model: Optional[str] = None,
+                            word_timestamps: Optional[str] = None) -> Dict[str, Any]:
+        """The lines of the CrispASR status panel for a pass: the model, downloaded or not, the aligner when the
+        pass uses it, and where CrispASR runs, or why it cannot run here. ``word_timestamps`` is the pass's
+        Timing tab choice ("model", "aligner"; None or "" = the pipeline's default). Reads files only; never
+        downloads."""
         try:
             from whisperjav.crispasr import install, manifest
 
@@ -3023,9 +3026,10 @@ class WhisperJAVAPI:
                 lines = [self.CRISPASR_MODEL_DOWNLOADED.format(label=m.label)]
             else:
                 lines = [self.CRISPASR_MODEL_MISSING.format(label=m.label, size=install.mb(m.size))]
-            # Cohere-CrispASR aligns its text with the default aligner, always (item 12; W248 3, Q7); since
-            # 1.10.1 so does MOSS-CrispASR (manifest.ALIGNED_PIPELINES; owner W411, W412).
-            if pipeline in manifest.ALIGNED_PIPELINES:
+            # Cohere-CrispASR aligns its text with the default aligner (item 12; W248 3, Q7); since 1.10.1 so
+            # does MOSS-CrispASR (manifest.ALIGNED_PIPELINES; owner W411, W412), and the pass's Timing tab can
+            # switch it on or off for any CrispASR pipeline (manifest.word_timestamps_for; W413 2).
+            if manifest.word_timestamps_for(pipeline, word_timestamps or None) == "aligner":
                 lines.append(self._crispasr_part_line(
                     install, self.CRISPASR_PART_ALIGNER, manifest.aligner_model_for(None)))
             return self._with_crispasr_runtime(lines)
@@ -3117,6 +3121,10 @@ class WhisperJAVAPI:
                 args += [f"--pass{n}-enhance-for-vad"]
         if pass_config.get('customized') and pass_config.get('params'):
             args += [f"--pass{n}-params", json.dumps(pass_config['params'])]
+        # The Customize Timing tab (1.10.1; owner W413 2): sent only when it differs from the pipeline's default.
+        word_timestamps = pass_config.get('wordTimestamps')
+        if word_timestamps in ('model', 'aligner'):
+            args += [f"--pass{n}-word-timestamps", word_timestamps]
         return args
 
     def _build_twopass_args(self, config: Dict[str, Any]) -> List[str]:
