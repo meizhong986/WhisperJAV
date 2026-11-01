@@ -41,6 +41,7 @@ from whisperjav.crispasr.pass_settings import (
     ignored_hardware_settings,
     models_help,
     segmenter_settings,
+    unused_by_other_pipelines,
     unused_pass_settings,
     unused_settings_message,
     validate_crispasr_passes,
@@ -232,6 +233,28 @@ class TestTheSettingsAPassDoesNotUse:
     def test_sensitivity_is_used_so_never_named(self, sensitivity):
         assert unused_pass_settings({"pipeline": "cohere-crispasr", "sensitivity": sensitivity}, 1) == []
 
+    # 1.10.1 (Part B; owner W413): --passN-word-timestamps is the CrispASR pipelines' only
+    @pytest.mark.parametrize("pipeline", ["balanced", "fidelity", "qwen", "transformers", "xxl"])
+    def test_word_timestamps_on_another_pipeline_is_named(self, pipeline):
+        config = {"pipeline": pipeline, "word_timestamps": "aligner"}
+        assert unused_by_other_pipelines(config, 2) == ["--pass2-word-timestamps"]
+        assert unused_settings_message(f"The {pipeline} pipeline", unused_by_other_pipelines(config, 2)) == \
+            f"The {pipeline} pipeline does not use: --pass2-word-timestamps"
+
+    @pytest.mark.parametrize("pipeline", manifest.CRISPASR_PIPELINES)
+    def test_word_timestamps_on_a_crispasr_pipeline_is_used(self, pipeline):
+        config = {"pipeline": pipeline, "word_timestamps": "model"}
+        assert unused_by_other_pipelines(config, 1) == [] and unused_pass_settings(config, 1) == []
+
+    def test_word_timestamps_left_out_is_never_named(self):
+        assert unused_by_other_pipelines({"pipeline": "balanced", "word_timestamps": None}, 1) == []
+
+    def test_the_pass_worker_names_it_before_any_pipeline_is_built(self):
+        source = (REPO / "whisperjav" / "ensemble" / "pass_worker.py").read_text(encoding="utf-8")
+        at = source.index("_other_unused = unused_by_other_pipelines(pass_config, pass_number)")
+        assert at < source.index('if pass_config.get("pipeline") == "xxl":')   # XXL too
+        assert '"word_timestamps": pass_config.get("word_timestamps") or None,' in source
+
 
 class TestComputeType:
     """--compute-type is not used, with a logged warning; --device is used (W194 1). Left out or auto,
@@ -301,6 +324,19 @@ class TestTheCommandLine:
         assert "--crispasr-exe" not in text and "--crispasr-backend" not in text
         assert "--crispasr-args" not in text
         assert "{fidelity,balanced,fast,faster,transformers,qwen}" in text   # --mode has no crispasr
+        # 1.10.1 (Part B): --passN-word-timestamps and its help text, approved by the owner (W413 1)
+        for n in (1, 2):
+            assert f"--pass{n}-word-timestamps {{model,aligner}}" in text
+            assert (f"Where pass {n}'s subtitle times come from, for the CrispASR pipelines. model = the ASR model's "
+                    "own word times (default for parakeet, reazonspeech, kotoba, whisper-turbo and whisper-large); "
+                    "aligner = the CrispASR aligner wav2vec2-ja (232 MB, downloaded on first use; default for cohere "
+                    "and moss). MOSS gives no word times: with model, each VAD group becomes one subtitle at its "
+                    "edges.") in text
+
+    def test_an_unknown_word_timestamps_value_is_a_usage_error(self):
+        result = _cli("x.mp4", "--ensemble", "--pass1-pipeline", "kotoba-crispasr", "--pass1-word-timestamps", "dtw",
+                      "--dump-params", os.devnull)
+        assert result.returncode == 2 and "invalid choice: 'dtw'" in result.stderr
 
     @pytest.mark.parametrize("argv,used", [
         (["--mode", "crispasr", "x.mp4"], "--mode crispasr"),
@@ -376,6 +412,7 @@ class TestTheCommandLine:
             "scene_detector": "semantic",                                     # none named: semantic (W214 2)
             "speech_enhancer": "none",
             "enhance_for_vad": False,
+            "word_timestamps": "model",                                       # 1.10.1: Parakeet's own (W411)
             "not_used": not_used,
         }
         s1 = p1["speech_segmenter_settings"]
@@ -388,6 +425,7 @@ class TestTheCommandLine:
         assert (s2["max_group_duration_s"], s2["chunk_threshold_s"], s2["max_speech_duration_s"],
                 s2["start_pad_ms"], s2["end_pad_ms"]) == (3.0, 0.3, 4.0, 100, 100)  # the qwen pipeline's
         assert s2["threshold"] == 0.42                                        # TEN's conservative preset (W202 4)
+        assert p2["word_timestamps"] == "aligner"                             # 1.10.1: Cohere's own (W411, W412)
 
     def test_the_dump_shows_the_vad_threshold_and_speech_pad_flags_at_work(self, tmp_path):
         # W208 "make the flags work": Parakeet as fidelity, Cohere as the qwen pipeline.
@@ -523,6 +561,7 @@ class TestThePassWorkerBuildsThem:
             "speech_enhancer_model": None,
             "segmenter_overrides": {},           # beam_size is neither a segmenter nor a scene setting
             "scene_params": {},
+            "word_timestamps": None,             # 1.10.1 (Part B): none named, the pipeline's own default
         }
         assert not [l for l in built["log"] if "ignores --" in l], built["log"]
         assert not [l for l in built["log"] if "speech pad of" in l], built["log"]
