@@ -263,9 +263,32 @@ def test_a_loaded_preset_sets_the_crispasr_mark_and_the_timing_tab_by_its_pipeli
     # Found by the call-chain review (2026-11-01): a preset of another pipeline left the tab and the choice stale
     loader = re.search(r"\n    async loadPresetIntoModal\(name\) \{(.*?)\n    \},", JS, re.S).group(1)
     assert "passState.isCrispasr = this.isCrispasrPipeline(passState.pipeline);" in loader
-    assert "if (passState.pipeline !== pipelineBefore || !passState.isCrispasr) passState.wordTimestamps = null;" \
-        in loader
     assert "this.generateCrispasrTimingTab(passKey);" in loader and "this.showTimingTab(false);" in loader
+
+
+def test_a_preset_keeps_the_timing_value():
+    # owner W418 3: "saved presets should save the value for timing"
+    collect = re.search(r"\n    _collectPresetData\(\) \{(.*?)\n    \},", JS, re.S).group(1)
+    assert "wordTimestamps: this._timingForPreset(passState)," in collect
+    helper = re.search(r"\n    _timingForPreset\(passState\) \{(.*?)\n    \},", JS, re.S).group(1)
+    assert "if (!passState.isCrispasr) return null;" in helper
+    assert "document.getElementById('crispasrWordTimestamps')" in helper     # as the window shows it
+    loader = re.search(r"\n    async loadPresetIntoModal\(name\) \{(.*?)\n    \},", JS, re.S).group(1)
+    assert "const savedTiming = preset.wordTimestamps;" in loader
+    assert ("passState.wordTimestamps = (passState.isCrispasr && (savedTiming === 'model' || savedTiming === "
+            "'aligner'))") in loader
+    assert "this.updateCrispasrStatus(passKey);   // the aligner line follows the loaded value" in loader
+
+
+def test_the_timing_value_survives_the_preset_files_round_trip(api, monkeypatch, tmp_path):
+    from whisperjav.settings import presets
+
+    monkeypatch.setattr(presets, "get_presets_dir", lambda: tmp_path)
+    data = {"pipeline": "kotoba-crispasr", "customized": True, "params": {}, "wordTimestamps": "aligner"}
+    assert api.save_preset("k", data)["success"]
+    stored = json.loads(next(tmp_path.glob("*.json")).read_text(encoding="utf-8"))
+    assert stored["word_timestamps"] == "aligner"                              # snake_case on disk, as the others
+    assert api.load_preset("k")["preset"]["wordTimestamps"] == "aligner"
 
 
 def test_the_choice_is_kept_apart_from_the_params_and_reset_with_the_pipeline():
