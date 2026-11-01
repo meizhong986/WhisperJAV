@@ -184,12 +184,12 @@ PIPELINE_DEFAULT_MODEL = {
 }
 CRISPASR_PIPELINES = tuple(PIPELINE_MODELS)
 # The pipelines whose text the CrispASR aligner times (wav2vec2-ja, DEFAULT_ALIGNER) by default: Cohere-CrispASR
-# (item 12; W248 3, Q7) and MOSS-CrispASR, whose model gives no word times. The others use their models' own
-# token times (owner W411, W412): Parakeet, Kotoba, Whisper-Turbo, Whisper-Large starts and ends; ReazonSpeech
-# starts only, its ends at the VAD group's end. --passN-word-timestamps changes it per pass (word_timestamps_for,
-# below). Each pipeline class's ENGINE.aligner says the same
+# (item 12; W248 3, Q7). The others use their models' own times (owner W411, W412): Parakeet, Kotoba,
+# Whisper-Turbo, Whisper-Large token starts and ends; ReazonSpeech starts only, its ends at the VAD group's end;
+# MOSS its own segment starts and ends (1.10.1, W426). --passN-word-timestamps changes it per pass
+# (word_timestamps_for, below). Each pipeline class's ENGINE.aligner says the same
 # (tests/test_crispasr_pipelines.py); the GUI's status panel reads it here.
-ALIGNED_PIPELINES = frozenset({"cohere-crispasr", "moss-crispasr"})
+ALIGNED_PIPELINES = frozenset({"cohere-crispasr"})
 
 # Where a pass's subtitle times come from (--passN-word-timestamps; owner W411-W413): "model" = the ASR model's
 # own word times, "aligner" = the CrispASR aligner DEFAULT_ALIGNER. The default is the pipeline's own
