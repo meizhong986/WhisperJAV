@@ -7,7 +7,8 @@ manifest), the speech segmenter (--passN-speech-segmenter), the sensitivity (--p
 --passN-vad-threshold and --passN-speech-pad-ms (owner W208), the source language (--language),
 --device, and since design 22.9.1 (owner W212 D3, W214 2, W232 8) the scene detector
 (--passN-scene-detector, semantic by default), the speech enhancer (--passN-speech-enhancer),
---passN-enhance-for-vad and the Customize values of the Segmenter and Scene tabs (--passN-params).
+--passN-enhance-for-vad and the Customize values of the Segmenter and Scene tabs (--passN-params), and since
+1.10.1 --passN-word-timestamps (owner W411-W414; used by these pipelines only).
 Only --passN-hf-params and --passN-qwen-params, the transformers and ChronosJAV settings, are not used.
 
 The speech segmenter settings follow the pipelines the owner named (W199 DIR1: "For cohere, uses
@@ -211,6 +212,19 @@ def unused_pass_settings(pass_config: Mapping[str, Any], pass_number: int) -> Li
         if pass_config.get(key):
             unused.append(f"--pass{n}-{flag}")
     return unused
+
+
+def unused_by_other_pipelines(pass_config: Mapping[str, Any], pass_number: int) -> List[str]:
+    """The CrispASR-only flags the user set on a pass whose pipeline is not a CrispASR pipeline.
+
+    Today --passN-word-timestamps (1.10.1, Part B; owner W413): only the CrispASR pipelines use it; the pass
+    worker names it in the same "does not use" line (unused_settings_message) for every other pipeline.
+    """
+    if pass_config.get("pipeline") in CRISPASR_PIPELINES:
+        return []
+    if pass_config.get("word_timestamps"):
+        return [f"--pass{pass_number}-word-timestamps"]
+    return []
 
 
 def unused_settings_message(label: str, flags: List[str]) -> str:
