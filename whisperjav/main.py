@@ -151,6 +151,8 @@ from whisperjav.config.segmenter_presets import (
 )
 # The CrispASR Ensemble passes (1.10.0): their names, model list and usage checks. Light modules.
 from whisperjav.crispasr.manifest import CRISPASR_PIPELINES, model_for as crispasr_model_for
+from whisperjav.crispasr.manifest import (WORD_TIMESTAMPS as CRISPASR_WORD_TIMESTAMPS,
+                                          word_timestamps_for as crispasr_word_timestamps_for)
 from whisperjav.crispasr.pass_settings import (models_help as crispasr_models_help, segmenter_settings as
                                                crispasr_segmenter_settings, validate_crispasr_passes)
 from whisperjav.crispasr.errors import FAILURE_PREFIX as CRISPASR_FAILURE_PREFIX
@@ -206,6 +208,14 @@ REMOVED_SPEECH_ENHANCERS = ["clearvoice"]
 # with AVAILABLE_EFFECTS in speech_enhancement/backends/ffmpeg_dsp.py.
 FFMPEG_DSP_EFFECTS = ["loudnorm", "normalize", "compress", "denoise",
                       "highpass", "lowpass", "deess", "amplify"]
+
+
+def _word_timestamps_help(whose: str) -> str:
+    """--passN-word-timestamps' help; text approved by the owner (W413 1). ``whose`` is "pass 1's" or "pass 2's"."""
+    return (f"Where {whose} subtitle times come from, for the CrispASR pipelines. model = the ASR model's own "
+            "word times (default for parakeet, reazonspeech, kotoba, whisper-turbo and whisper-large); aligner = "
+            "the CrispASR aligner wav2vec2-ja (232 MB, downloaded on first use; default for cohere and moss). "
+            "MOSS gives no word times: with model, each VAD group becomes one subtitle at its edges.")
 
 
 def speech_enhancer_spec(value: str) -> str:
@@ -449,6 +459,10 @@ def parse_arguments():
                                     "The CrispASR pipelines take a model short name: "
                                     + crispasr_models_help() + ". "
                                     "For xxl: the Whisper model XXL runs (default large-v2).")
+    # 1.10.1 (Part B): flag and help text approved by the owner (W413 1); the default is each pipeline's own
+    # (crispasr/manifest.py: word_timestamps_for; W411, W412).
+    twopass_group.add_argument("--pass1-word-timestamps", default=None, choices=list(CRISPASR_WORD_TIMESTAMPS),
+                               help=_word_timestamps_help("pass 1's"))
     twopass_group.add_argument("--pass1-vad-threshold", type=float, default=None,
                                help="VAD threshold for pass 1 (0.0-1.0)")
     twopass_group.add_argument("--pass1-speech-pad-ms", type=int, default=None,
@@ -509,6 +523,8 @@ def parse_arguments():
                                     "The CrispASR pipelines take a model short name: "
                                     + crispasr_models_help() + ". "
                                     "For xxl: the Whisper model XXL runs (default large-v2).")
+    twopass_group.add_argument("--pass2-word-timestamps", default=None, choices=list(CRISPASR_WORD_TIMESTAMPS),
+                               help=_word_timestamps_help("pass 2's"))
     twopass_group.add_argument("--pass2-vad-threshold", type=float, default=None,
                                help="VAD threshold for pass 2 (0.0-1.0)")
     twopass_group.add_argument("--pass2-speech-pad-ms", type=int, default=None,
@@ -3167,6 +3183,7 @@ def main():
                         or getattr(args, 'enhance_for_vad', False)
                     ),
                     "model": args.pass1_model,
+                    "word_timestamps": getattr(args, 'pass1_word_timestamps', None),
                     "vad_threshold": args.pass1_vad_threshold,
                     "speech_pad_ms": args.pass1_speech_pad_ms,
                     "params_provided": bool(
@@ -3195,6 +3212,7 @@ def main():
                         or getattr(args, 'enhance_for_vad', False)
                     ),
                     "model": args.pass2_model,
+                    "word_timestamps": getattr(args, 'pass2_word_timestamps', None),
                     "vad_threshold": args.pass2_vad_threshold,
                     "speech_pad_ms": args.pass2_speech_pad_ms,
                     "params_provided": bool(
@@ -3258,6 +3276,8 @@ def main():
                     "scene_detector": _p.get("scene_detector") or "semantic",
                     "speech_enhancer": _p.get("speech_enhancer") or "none",
                     "enhance_for_vad": bool(_p.get("enhance_for_vad")),
+                    # 1.10.1 (Part B; W411-W414): where the pass's subtitle times come from.
+                    "word_timestamps": crispasr_word_timestamps_for(_p["pipeline"], _p.get("word_timestamps")),
                     "not_used": ["hf_params", "qwen_params", "compute_type"],
                 }
             dump_data["ensemble_config"] = ensemble_dump
@@ -3501,6 +3521,7 @@ def main():
                 'speech_enhancer': args.pass1_speech_enhancer,
                 'enhance_for_vad': getattr(args, 'pass1_enhance_for_vad', False) or getattr(args, 'enhance_for_vad', False),
                 'model': args.pass1_model,
+                'word_timestamps': getattr(args, 'pass1_word_timestamps', None),  # CrispASR pipelines only
                 'vad_threshold': args.pass1_vad_threshold,
                 'speech_pad_ms': args.pass1_speech_pad_ms,
                 'params': pass1_params,  # None = use defaults, object = custom
@@ -3530,6 +3551,7 @@ def main():
                     'speech_enhancer': args.pass2_speech_enhancer,
                     'enhance_for_vad': getattr(args, 'pass2_enhance_for_vad', False) or getattr(args, 'enhance_for_vad', False),
                     'model': args.pass2_model,
+                    'word_timestamps': getattr(args, 'pass2_word_timestamps', None),  # CrispASR pipelines only
                     'vad_threshold': args.pass2_vad_threshold,
                     'speech_pad_ms': args.pass2_speech_pad_ms,
                     'params': pass2_params,
