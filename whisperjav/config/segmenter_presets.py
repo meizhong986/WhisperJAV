@@ -41,6 +41,7 @@ SEGMENTER_PARAMS = {
     # Grouping (shared across backends)
     "chunk_threshold_s",
     "max_group_duration_s",
+    "min_group_duration_s",    # 1.10.1 (owner W426 3): the shortest group; silero-v6.2, ten, firered-vad, whisperseg
     # TEN-specific
     "hop_size",
     "start_pad_ms",
@@ -105,6 +106,7 @@ FIDELITY_DEFAULT_SEGMENTER = "firered-vad"
 # groups the speech segmenter finds, so they have no "none" (main.py refuses it: whisperjav/crispasr/pass_settings.py).
 # 1.10.1 (W401, pre-approved choices of step 2): each new pipeline takes the values of the pipeline whose segmenter
 # settings it takes (crispasr/pass_settings.py SEGMENTER_STYLE): ReazonSpeech Parakeet's, the others Cohere's.
+# MOSS-CrispASR (owner W425, W426 1): Silero VAD v6.2, which builds MOSS's 90-120 s stretches that start at speech.
 CRISPASR_DEFAULT_SEGMENTERS = {
     "parakeet-crispasr": "ten",
     "cohere-crispasr": "firered-vad",
@@ -112,7 +114,7 @@ CRISPASR_DEFAULT_SEGMENTERS = {
     "kotoba-crispasr": "firered-vad",
     "whisper-turbo-crispasr": "firered-vad",
     "whisper-large-crispasr": "firered-vad",
-    "moss-crispasr": "firered-vad",
+    "moss-crispasr": "silero-v6.2",
 }
 # Their sensitivity when a pass names none (owner W343, W344): Parakeet-CrispASR aggressive, Cohere-CrispASR
 # balanced. Applied by main.py apply_ensemble_pass_defaults; the GUI Ensemble tab applies the same values
