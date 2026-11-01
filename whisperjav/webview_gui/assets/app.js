@@ -1695,7 +1695,10 @@ const EnsembleManager = {
             isXxl: false,  // Track if using BYOP Faster Whisper XXL (pass 1 too since 1.10.0, item 5)
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
             dspEffects: ['loudnorm'],  // Default FFmpeg DSP effects
-            enhanceForVad: false  // Dual-track: use enhanced audio for VAD only, original for ASR
+            enhanceForVad: false,  // Dual-track: use enhanced audio for VAD only, original for ASR
+            // A CrispASR pass's word timestamps, from its Customize Timing tab (1.10.1; owner W413): 'model',
+            // 'aligner', or null for the pipeline's default (crispasrDefaults). Sent as --passN-word-timestamps.
+            wordTimestamps: null
         },
         pass2: {
             enabled: false,
@@ -1721,7 +1724,10 @@ const EnsembleManager = {
             isXxl: false,  // Track if using BYOP Faster Whisper XXL
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
             dspEffects: ['loudnorm'],  // Default FFmpeg DSP effects
-            enhanceForVad: false  // Dual-track: use enhanced audio for VAD only, original for ASR
+            enhanceForVad: false,  // Dual-track: use enhanced audio for VAD only, original for ASR
+            // A CrispASR pass's word timestamps, from its Customize Timing tab (1.10.1; owner W413): 'model',
+            // 'aligner', or null for the pipeline's default (crispasrDefaults). Sent as --passN-word-timestamps.
+            wordTimestamps: null
         },
         // BYOP Faster Whisper XXL: one program and one Extra Args box for the install, used by
         // whichever pass is XXL -- either or both (1.10.0, item 5; owner W271 3). Each pass sends
@@ -1815,15 +1821,16 @@ const EnsembleManager = {
     },
     // Each CrispASR pipeline's speech segmenter and sensitivity when a pass names none
     // (CRISPASR_DEFAULT_SEGMENTERS, CRISPASR_DEFAULT_SENSITIVITY, config/segmenter_presets.py; owner W202 3,
-    // W343, W344, W401); tests/test_gui_crispasr_pipelines.py compares them.
+    // W343, W344, W401); tests/test_gui_crispasr_pipelines.py compares them. wordTimestamps: where the pass's
+    // subtitle times come from by default (crispasr/manifest.py word_timestamps_for; owner W411-W414).
     crispasrDefaults: {
-        'parakeet-crispasr': { segmenter: 'ten', sensitivity: 'aggressive' },
-        'cohere-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced' },
-        'reazonspeech-crispasr': { segmenter: 'ten', sensitivity: 'aggressive' },
-        'kotoba-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced' },
-        'whisper-turbo-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced' },
-        'whisper-large-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced' },
-        'moss-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced' }
+        'parakeet-crispasr': { segmenter: 'ten', sensitivity: 'aggressive', wordTimestamps: 'model' },
+        'cohere-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'aligner' },
+        'reazonspeech-crispasr': { segmenter: 'ten', sensitivity: 'aggressive', wordTimestamps: 'model' },
+        'kotoba-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'model' },
+        'whisper-turbo-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'model' },
+        'whisper-large-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'model' },
+        'moss-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'aligner' }
     },
     // BYOP Faster Whisper XXL (1.10.0, item 5): the model names XXL takes, sent as --passN-model.
     // large-v2 first, the default (owner W24 2; DEFAULT_XXL_MODEL in byop/xxl_runner.py); the
@@ -2154,6 +2161,8 @@ const EnsembleManager = {
         }
         const pipeline = passState.pipeline;
         const model = passState.model || '';
+        // A CrispASR pass's Timing tab choice (1.10.1): the aligner line follows it; '' = the pipeline's default.
+        const wordTimestamps = passState.wordTimestamps || '';
         // A ChronosJAV pass: the aligner and timing model it will use (QwenManager defaults, or the
         // values applied in its Customize window).
         const chronos = passState.isQwen
@@ -2166,9 +2175,10 @@ const EnsembleManager = {
             const result = chronos
                 ? await pywebview.api.get_chronosjav_crispasr_status(
                     chronos.aligner_backend, chronos.aligner_id, chronos.timing_model, chronos.timestamp_mode)
-                : await pywebview.api.get_crispasr_status(pipeline, model);
+                : await pywebview.api.get_crispasr_status(pipeline, model, wordTimestamps);
             // The pass may have changed while CrispASR was asked.
             if (passState.pipeline !== pipeline || (passState.model || '') !== model
+                || (passState.wordTimestamps || '') !== wordTimestamps
                 || !(passState.isCrispasr || passState.isQwen)) return;
             if (chronos) {
                 const now = { ...QwenManager.defaults, ...((passState.customized && passState.params) || {}) };
@@ -2220,6 +2230,7 @@ const EnsembleManager = {
             // Warn user that custom params will be reset
             if (confirm(I18n.t(`You have custom parameters for ${passKey === 'pass1' ? 'Pass 1' : 'Pass 2'}. Changing the pipeline will reset them. Continue?`))) {
                 passState.pipeline = newValue;
+                passState.wordTimestamps = null;  // the new pipeline's own default (1.10.1)
                 passState.customized = false;
                 passState.params = null;
                 passState.presetName = null;
@@ -2246,6 +2257,7 @@ const EnsembleManager = {
             }
         } else {
             passState.pipeline = newValue;
+            passState.wordTimestamps = null;  // the new pipeline's own default (1.10.1)
             passState.presetName = null;
             passState.isTransformers = isTransformers;
             passState.isQwen = isQwen;
@@ -3028,6 +3040,10 @@ const EnsembleManager = {
         try {
         const passState = this.state[passKey];
 
+        // The Timing tab is a CrispASR pass's only (1.10.1): hidden here for every pipeline, and shown again
+        // by openCrispasrCustomize. Every opener comes through this function.
+        this.showTimingTab(false);
+
         // Route to pipeline-specific handler if applicable
         if (passState.isTransformers) {
             await this.openTransformersCustomize(passKey);
@@ -3278,9 +3294,61 @@ const EnsembleManager = {
         await this.generateSegmenterTab('tab-segmenter', result.segmenter_backend, currentValues, true, sensitivity);
         await this.generateEnhancerTab('tab-enhancer', passState.speechEnhancer || 'none', passState.dspEffects || ['loudnorm']);
         await this.generateSceneTab('tab-scene', sceneBackend, currentValues);
+        this.generateCrispasrTimingTab(passKey);
+        this.showTimingTab(true);
         this.switchModalTab('segmenter');
         await this.refreshPresetList();
         document.getElementById('customizeModal').classList.add('active');
+    },
+
+    // The Timing tab of a CrispASR pass (1.10.1; owner W411-W414, texts W413 2): where the pass's subtitle times
+    // come from, in one dropdown with the pipeline's default (crispasrDefaults) marked. Not a --passN-params
+    // value: Apply stores it in passState.wordTimestamps, sent as --passN-word-timestamps (api._crispasr_pass_args).
+    CRISPASR_WORD_TIMESTAMP_OPTIONS: {
+        model: { text: 'From the model', defaultText: 'From the model (default)' },
+        aligner: { text: 'From the aligner (wav2vec2-ja)', defaultText: 'From the aligner (wav2vec2-ja) (default)' }
+    },
+
+    crispasrDefaultWordTimestamps(pipeline) {
+        const defaults = this.crispasrDefaults[pipeline];
+        return defaults ? defaults.wordTimestamps : null;   // null: not a CrispASR pipeline
+    },
+
+    // Shown only while a CrispASR pass's Customize window is open; openCustomize and closeModal hide it.
+    showTimingTab(show) {
+        const tabBtn = document.querySelector('[data-tab="timing"]');
+        if (tabBtn) tabBtn.style.display = show ? '' : 'none';
+        if (!show) {
+            const panel = document.getElementById('tab-timing');
+            if (panel) panel.innerHTML = '';
+        }
+    },
+
+    generateCrispasrTimingTab(passKey) {
+        const passState = this.state[passKey];
+        const container = document.getElementById('tab-timing');
+        if (!container) return;
+        container.innerHTML = '';
+        const pipelineDefault = this.crispasrDefaultWordTimestamps(passState.pipeline);
+        const current = passState.wordTimestamps || pipelineDefault;
+        const control = document.createElement('div');
+        control.className = 'param-control';
+        const label = document.createElement('label');
+        label.textContent = 'Word timestamps';
+        label.htmlFor = 'crispasrWordTimestamps';
+        control.appendChild(label);
+        const select = document.createElement('select');
+        select.id = 'crispasrWordTimestamps';
+        select.className = 'form-select';
+        for (const [value, texts] of Object.entries(this.CRISPASR_WORD_TIMESTAMP_OPTIONS)) {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = value === pipelineDefault ? texts.defaultText : texts.text;
+            option.selected = value === current;
+            select.appendChild(option);
+        }
+        control.appendChild(select);
+        container.appendChild(control);
     },
 
     generateTabControls(tabId, params, currentValues) {
@@ -5649,6 +5717,19 @@ const EnsembleManager = {
         // A ChronosJAV pass's aligner and timing model may have changed (1.10.0).
         if (passState.isQwen) this.updateCrispasrStatus(passKey);
 
+        // A CrispASR pass's Timing tab (1.10.1; owner W413 2): kept apart from the params (it is sent as
+        // --passN-word-timestamps); null when it names the pipeline's default. The status panel then shows
+        // the aligner line when the aligner is chosen.
+        if (passState.isCrispasr) {
+            const wordTimestamps = document.getElementById('crispasrWordTimestamps');
+            if (wordTimestamps) {
+                passState.wordTimestamps =
+                    wordTimestamps.value === this.crispasrDefaultWordTimestamps(passState.pipeline)
+                        ? null : wordTimestamps.value;
+            }
+            this.updateCrispasrStatus(passKey);
+        }
+
         const paramCount = Object.keys(fullParams).length;
         const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
         ConsoleManager.log(`Saved ${paramCount} parameters for ${passLabel} (Custom)`, 'info');
@@ -5888,6 +5969,13 @@ const EnsembleManager = {
         passState.customized = false;
         passState.presetName = null;
 
+        // A CrispASR pass's Timing tab (1.10.1): back to the pipeline's own word timestamps.
+        if (passState.isCrispasr) {
+            passState.wordTimestamps = null;
+            this.generateCrispasrTimingTab(passKey);
+            this.updateCrispasrStatus(passKey);
+        }
+
         const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
         ConsoleManager.log(`Reset ${passLabel} to defaults`, 'info');
 
@@ -6057,6 +6145,7 @@ const EnsembleManager = {
             if (modal) {
                 modal.classList.remove('active');
             }
+            this.showTimingTab(false);
             this.state.currentCustomize = null;
         } catch (error) {
             ConsoleManager.log(`Close modal failed: ${error.message}`, 'error');
@@ -6243,6 +6332,7 @@ const EnsembleManager = {
             const newType = getPipelineType(presetIsTransformers, presetIsQwen, presetIsAnimeWhisper, presetIsCohere);
 
             // Apply ALL preset fields to state
+            const pipelineBefore = passState.pipeline;
             if (preset.pipeline) passState.pipeline = preset.pipeline;
             if (preset.sensitivity) passState.sensitivity = preset.sensitivity;
             if (preset.sceneDetector) passState.sceneDetector = preset.sceneDetector;
@@ -6265,6 +6355,16 @@ const EnsembleManager = {
             passState.customized = true;
             passState.params = preset.params || null;
             passState.presetName = name;
+            // 1.10.1: the CrispASR mark and the Timing tab follow the preset's pipeline. Presets do not carry the
+            // Timing choice, so a preset of another pipeline starts on that pipeline's own word timestamps.
+            passState.isCrispasr = this.isCrispasrPipeline(passState.pipeline);
+            if (passState.pipeline !== pipelineBefore || !passState.isCrispasr) passState.wordTimestamps = null;
+            if (passState.isCrispasr) {
+                this.generateCrispasrTimingTab(passKey);
+                this.showTimingTab(true);
+            } else {
+                this.showTimingTab(false);
+            }
 
             // Update pass row dropdowns silently (no dispatchEvent to avoid confirm dialogs)
             // v1.9.3: verify the assignment took. Assigning a value a <select> does not
@@ -6434,6 +6534,8 @@ const EnsembleManager = {
                 isXxl: this.state.pass1.isXxl || false,
                 framer: this.state.pass1.isQwen ? this.state.pass1.framer : null,
                 enhanceForVad: this.state.pass1.enhanceForVad || false,
+                // A CrispASR pass's word timestamps (1.10.1); null = the pipeline's default, nothing sent
+                wordTimestamps: this.state.pass1.isCrispasr ? (this.state.pass1.wordTimestamps || null) : null,
                 // BYOP fields (only meaningful when pipeline is 'xxl'; pass 1 since 1.10.0, item 5)
                 xxlExe: this.state.pass1.isXxl ? this.state.xxl.exePath : null,
                 xxlArgs: this.state.pass1.isXxl ? this.state.xxl.extraArgs : null
@@ -6460,6 +6562,8 @@ const EnsembleManager = {
                 isXxl: this.state.pass2.isXxl,
                 framer: this.state.pass2.isQwen ? this.state.pass2.framer : null,
                 enhanceForVad: this.state.pass2.enhanceForVad || false,
+                // A CrispASR pass's word timestamps (1.10.1); null = the pipeline's default, nothing sent
+                wordTimestamps: this.state.pass2.isCrispasr ? (this.state.pass2.wordTimestamps || null) : null,
                 // BYOP fields (only meaningful when pipeline is 'xxl')
                 xxlExe: this.state.pass2.isXxl ? this.state.xxl.exePath : null,
                 xxlArgs: this.state.pass2.isXxl ? this.state.xxl.extraArgs : null
