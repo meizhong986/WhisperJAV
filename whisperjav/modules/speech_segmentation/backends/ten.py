@@ -38,6 +38,7 @@ def group_segments(
     segments: List[SpeechSegment],
     max_group_duration_s: float = 29.0,
     chunk_threshold_s: float = 1.0,
+    min_group_duration_s: Optional[float] = None,
 ) -> List[List[SpeechSegment]]:
     """Group speech segments by time gaps and max duration.
 
@@ -49,10 +50,50 @@ def group_segments(
         segments: List of SpeechSegment objects from VAD.
         max_group_duration_s: Maximum duration for a group in seconds.
         chunk_threshold_s: Gap threshold for splitting groups in seconds.
+        min_group_duration_s: The shortest group (1.10.1; owner W426 3): a group shorter than this
+            joins the next group when the two together, from the first one's start to the next one's
+            end, are not longer than ``max_group_duration_s``. None or 0 = off (the default).
 
     Returns:
         List of groups, where each group is a list of SpeechSegment objects.
     """
+    groups = _group_by_gap_and_length(segments, max_group_duration_s, chunk_threshold_s)
+    if min_group_duration_s:
+        groups = join_short_groups(groups, float(min_group_duration_s), max_group_duration_s)
+    return groups
+
+
+def join_short_groups(
+    groups: List[List[SpeechSegment]],
+    min_group_duration_s: float,
+    max_group_duration_s: float,
+) -> List[List[SpeechSegment]]:
+    """Join each group shorter than ``min_group_duration_s`` with the next group, as long as the joined
+    group is not longer than ``max_group_duration_s`` (1.10.1; owner W426 3). A joined group that is still
+    short goes on joining. The silence between the two stays inside the joined group; no speech is moved
+    or dropped. A group that cannot join (the next would make it too long, or it is the last) stays as it is.
+    """
+    out: List[List[SpeechSegment]] = []
+    for group in groups:
+        if not group:
+            continue
+        if out:
+            last = out[-1]
+            if (last[-1].end_sec - last[0].start_sec < min_group_duration_s
+                    and group[-1].end_sec - last[0].start_sec <= max_group_duration_s):
+                out[-1] = last + group
+                continue
+        out.append(list(group))
+    return out
+
+
+def _group_by_gap_and_length(
+    segments: List[SpeechSegment],
+    max_group_duration_s: float,
+    chunk_threshold_s: float,
+) -> List[List[SpeechSegment]]:
+    """A new group at a gap longer than ``chunk_threshold_s`` or where the group would grow longer than
+    ``max_group_duration_s``."""
     if not segments:
         return []
 
@@ -158,6 +199,8 @@ class TenSpeechSegmenter:
 
         # Maximum group duration - prevents groups from exceeding Whisper's context window
         self.max_group_duration_s = float(max_group_duration_s) if max_group_duration_s is not None else 29.0
+        # The shortest group (1.10.1; owner W426 3; group_segments): 0 = off.
+        self.min_group_duration_s = float(kwargs.get("min_group_duration_s") or 0.0)
 
         # Lazy-loaded model with thread lock
         self._model = None
@@ -562,7 +605,8 @@ class TenSpeechSegmenter:
 
         Delegates to the standalone group_segments() function.
         """
-        return group_segments(segments, self.max_group_duration_s, self.chunk_threshold_s)
+        return group_segments(segments, self.max_group_duration_s, self.chunk_threshold_s,
+                              self.min_group_duration_s)
 
     # ------------------------------------------------------------------
     # Audio utilities
@@ -638,6 +682,7 @@ class TenSpeechSegmenter:
             "max_speech_duration_s": self.max_speech_duration_s,
             "chunk_threshold_s": self.chunk_threshold_s,
             "max_group_duration_s": self.max_group_duration_s,
+            "min_group_duration_s": self.min_group_duration_s,
             "start_pad_ms": self.start_pad_ms,
             "end_pad_ms": self.end_pad_ms,
         }
