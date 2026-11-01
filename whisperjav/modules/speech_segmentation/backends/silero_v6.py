@@ -104,6 +104,8 @@ class SileroV6SpeechSegmenter:
             self.chunk_threshold_s = 1.0
 
         self.max_group_duration_s = float(max_group_duration_s) if max_group_duration_s is not None else 29.0
+        # The shortest group (1.10.1; owner W426 3; ten.group_segments): 0 = off.
+        self.min_group_duration_s = float(kwargs.get("min_group_duration_s") or 0.0)
 
         # max_speech_duration_s: inherit from max_group_duration_s if not explicit
         if max_speech_duration_s is not None:
@@ -299,7 +301,8 @@ class SileroV6SpeechSegmenter:
         Delegates to the standalone group_segments() function from ten.py.
         """
         from .ten import group_segments
-        return group_segments(segments, self.max_group_duration_s, self.chunk_threshold_s)
+        return group_segments(segments, self.max_group_duration_s, self.chunk_threshold_s,
+                              self.min_group_duration_s)
 
     def _get_parameters(self) -> Dict[str, Any]:
         """Return current parameters."""
@@ -313,6 +316,7 @@ class SileroV6SpeechSegmenter:
             "use_max_poss_sil_at_max_speech": self.use_max_poss_sil_at_max_speech,
             "chunk_threshold_s": self.chunk_threshold_s,
             "max_group_duration_s": self.max_group_duration_s,
+            "min_group_duration_s": self.min_group_duration_s,
         }
 
     def cleanup(self) -> None:
