@@ -69,6 +69,7 @@ spec:
   # v1.8.12: tightened 8→6. Typical JA dialogue groups span 2-3 subs over
   # ~6s; this matches the natural distribution.
   max_group_duration_s: 6
+  min_group_duration_s: 0      # 1.10.1 (owner W426 3): the shortest group; 0 = off
 
 # =============================================================================
 # Sensitivity Presets
@@ -166,7 +167,7 @@ gui:
     label: "Group Gap Threshold (s)"
     description: "Maximum gap to group consecutive segments"
     min: 0.5
-    max: 5.0
+    max: 30.0
     step: 0.1
     data_type: float
     group: grouping
@@ -196,8 +197,19 @@ gui:
     label: "Max Group Duration"
     description: "Maximum duration for grouped segments (Whisper 30s context limit)"
     min: 10
-    max: 60
+    max: 420
     step: 1
+    data_type: float
+    unit: "s"
+    group: grouping
+
+  min_group_duration_s:
+    widget: slider
+    label: "Shortest Group (s)"
+    description: "A group shorter than this joins the next group while both together fit within the Max Group Duration. 0 = off."
+    min: 0
+    max: 300
+    step: 5
     data_type: float
     unit: "s"
     group: grouping
