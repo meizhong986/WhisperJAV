@@ -6255,7 +6255,16 @@ const EnsembleManager = {
             framer: passState.isQwen ? (passState.framer || 'vad-grouped') : null,
             dspEffects: passState.dspEffects || null,
             enhanceForVad: passState.enhanceForVad || false,
+            // A CrispASR pass's Timing tab as the window shows it (1.10.1; owner W418 3); null = the pipeline's default.
+            wordTimestamps: this._timingForPreset(passState),
         };
+    },
+
+    _timingForPreset(passState) {
+        if (!passState.isCrispasr) return null;
+        const select = document.getElementById('crispasrWordTimestamps');
+        const value = select ? select.value : passState.wordTimestamps;
+        return (value && value !== this.crispasrDefaultWordTimestamps(passState.pipeline)) ? value : null;
     },
 
     /** Prompt user for a name and save current modal params as a preset. */
@@ -6332,7 +6341,6 @@ const EnsembleManager = {
             const newType = getPipelineType(presetIsTransformers, presetIsQwen, presetIsAnimeWhisper, presetIsCohere);
 
             // Apply ALL preset fields to state
-            const pipelineBefore = passState.pipeline;
             if (preset.pipeline) passState.pipeline = preset.pipeline;
             if (preset.sensitivity) passState.sensitivity = preset.sensitivity;
             if (preset.sceneDetector) passState.sceneDetector = preset.sceneDetector;
@@ -6355,16 +6363,20 @@ const EnsembleManager = {
             passState.customized = true;
             passState.params = preset.params || null;
             passState.presetName = name;
-            // 1.10.1: the CrispASR mark and the Timing tab follow the preset's pipeline. Presets do not carry the
-            // Timing choice, so a preset of another pipeline starts on that pipeline's own word timestamps.
+            // 1.10.1: the CrispASR mark and the Timing tab follow the preset's pipeline. A CrispASR preset brings its
+            // Timing value (owner W418 3); any other preset, or one saved without the value, starts on the
+            // pipeline's own word timestamps.
             passState.isCrispasr = this.isCrispasrPipeline(passState.pipeline);
-            if (passState.pipeline !== pipelineBefore || !passState.isCrispasr) passState.wordTimestamps = null;
+            const savedTiming = preset.wordTimestamps;
+            passState.wordTimestamps = (passState.isCrispasr && (savedTiming === 'model' || savedTiming === 'aligner'))
+                ? savedTiming : null;
             if (passState.isCrispasr) {
                 this.generateCrispasrTimingTab(passKey);
                 this.showTimingTab(true);
             } else {
                 this.showTimingTab(false);
             }
+            this.updateCrispasrStatus(passKey);   // the aligner line follows the loaded value
 
             // Update pass row dropdowns silently (no dispatchEvent to avoid confirm dialogs)
             // v1.9.3: verify the assignment took. Assigning a value a <select> does not
