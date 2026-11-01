@@ -2824,34 +2824,42 @@ class WhisperJAVAPI:
                                         scene_detector: str = None) -> Dict[str, Any]:
         """The values a CrispASR pass runs with, for its Customize window (design 22.9.1; owner W214 2,
         W232 8): the Segmenter tab as segmenter_settings() resolves them, the Scene tab as the pipeline
-        sets its scene detector (semantic 12-48 s; auditok and silero their own minimum and 48 s).
+        sets its scene detector (semantic 12 s minimum; auditok and silero their own minimum; the pipeline's
+        longest scene, 48 s, MOSS-CrispASR 420 s), and for MOSS-CrispASR its MOSS tab (1.10.1, W428 I1 4:
+        crispasr/moss_prompt.py; "model": schema and values; None for the other pipelines).
         Light: no PyTorch, no CrispASR."""
         try:
-            from whisperjav.crispasr.pass_settings import segmenter_settings
+            from whisperjav.crispasr import moss_prompt
+            from whisperjav.crispasr.pass_settings import scene_detector_for, scene_max_s_for, segmenter_settings
             settings = segmenter_settings(pipeline, (segmenter or None), sensitivity or None)
             seg = dict(settings.config)
             if settings.max_group_duration_s is not None:
                 seg["max_group_duration_s"] = settings.max_group_duration_s
             if settings.chunk_threshold_s is not None:
                 seg["chunk_threshold_s"] = settings.chunk_threshold_s
-            method = (scene_detector or "semantic").strip().lower()
+            method = (scene_detector or scene_detector_for(pipeline)).strip().lower()
+            longest = scene_max_s_for(pipeline)
             scene: Dict[str, Any] = {}
             if method == "semantic":
-                scene = {"min_duration": 12, "max_duration": 48}
+                scene = {"min_duration": 12, "max_duration": longest}
             elif method in ("auditok", "silero"):
-                # The detector's own values with the pass's 48 s, as the pipeline builds it, not the
+                # The detector's own values with the pass's longest scene, as the pipeline builds it, not the
                 # YAML spec's: Apply without a change must not change the run (review P7 finding 14).
                 import dataclasses
                 from whisperjav.modules.scene_detection_backends.auditok_backend import AuditokSceneDetector
                 from whisperjav.modules.scene_detection_backends.silero_backend import SileroSceneDetector
                 build = (SileroSceneDetector._build_silero_config if method == "silero"
                          else AuditokSceneDetector._build_config_from_kwargs)
-                for key, value in dataclasses.asdict(build({"max_duration": 48})).items():
+                for key, value in dataclasses.asdict(build({"max_duration": longest})).items():
                     scene[key] = value
                     if not key.endswith("_s"):
                         scene[key + "_s"] = value  # the spelling the Scene tab's controls use
+            model = None
+            if pipeline == "moss-crispasr":
+                model = {"title": "MOSS", "schema": moss_prompt.GUI_SCHEMA,
+                         "defaults": dict(moss_prompt.DEFAULTS)}
             return {"success": True, "segmenter_backend": settings.backend, "segmenter": seg,
-                    "scene_detection_method": method, "scene": scene}
+                    "scene_detection_method": method, "scene": scene, "model": model}
         except Exception as e:  # noqa: BLE001 -- the window says what failed
             return {"success": False, "error": str(e)}
 
@@ -3026,9 +3034,9 @@ class WhisperJAVAPI:
                 lines = [self.CRISPASR_MODEL_DOWNLOADED.format(label=m.label)]
             else:
                 lines = [self.CRISPASR_MODEL_MISSING.format(label=m.label, size=install.mb(m.size))]
-            # Cohere-CrispASR aligns its text with the default aligner (item 12; W248 3, Q7); since 1.10.1 so
-            # does MOSS-CrispASR (manifest.ALIGNED_PIPELINES; owner W411, W412), and the pass's Timing tab can
-            # switch it on or off for any CrispASR pipeline (manifest.word_timestamps_for; W413 2).
+            # Cohere-CrispASR aligns its text with the default aligner (item 12; W248 3, Q7;
+            # manifest.ALIGNED_PIPELINES), and the pass's Timing tab can switch it on or off for any CrispASR
+            # pipeline (manifest.word_timestamps_for; W413 2).
             if manifest.word_timestamps_for(pipeline, word_timestamps or None) == "aligner":
                 lines.append(self._crispasr_part_line(
                     install, self.CRISPASR_PART_ALIGNER, manifest.aligner_model_for(None)))
