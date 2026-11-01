@@ -1,6 +1,6 @@
 """Taking one VAD group's CrispASR result apart and building its subtitles (route B design 4.9, 7).
 
-Two line rules, chosen by the pipeline's row of the per-model table:
+Three line rules, chosen by the pipeline's row of the per-model table:
 
   "tokens" (Parakeet-CrispASR, option P2, owner W175): the group's tokens become one or more subtitles.
       A subtitle is cut only at natural cues (owner W203: "no brute force allowed. Only scientific
@@ -22,10 +22,13 @@ Two line rules, chosen by the pipeline's row of the per-model table:
       (owner W248 3, W249) Cohere-CrispASR's text is first aligned to its audio (whisperjav/crispasr/aligner.py)
       and goes through "tokens" with ``onsets``: cue 1 only, chained ends (W259); "group" is kept for a group the
       aligner gives nothing for.
+  "segments" (MOSS-CrispASR, 1.10.1; owner W411, W426): each segment the model writes is one subtitle at the
+      model's own start and end (segments_rule).
 
 Pure: no ASR import, no stable-ts.
 """
 
+import re
 import unicodedata
 from dataclasses import dataclass, field
 from typing import List, Optional, Sequence, Tuple
@@ -35,7 +38,7 @@ from whisperjav.crispasr.engine import CrispSegment
 # (text, start, end) in media-file time, seconds.
 Subtitle = Tuple[str, float, float]
 
-LINE_RULES = ("tokens", "group")
+LINE_RULES = ("tokens", "group", "segments")
 
 # JapanesePostProcessor's Level 0 sentence-end marks (japanese_postprocessor.py:727), the space left out.
 SENTENCE_END_MARKS = frozenset("。？！…．.?!")
@@ -112,7 +115,8 @@ class _Unit:
 class LineStats:
     clamped_times: int = 0
     units: int = 0
-    fallback_segments: int = 0  # segments read from words or as a whole, because a token time was missing
+    fallback_segments: int = 0  # segments read from words or as a whole, because a token time was missing; for
+                                # the "segments" rule, CrispASR raw-text answers split by WhisperJAV (_moss_pieces)
 
 
 def _is_mark_char(ch: str) -> bool:
@@ -348,6 +352,90 @@ def group_rule(group_start: float, group_end: float, segments: Sequence[CrispSeg
     return [(text, group_start, group_end)] if text else []
 
 
+# MOSS's speaker labels and stray time marks that can stay inside a segment's text ("[S01]", "[12.34]"): the labels
+# are not used in 1.10.x (owner W113 X7), and a time mark is not speech.
+_SPEAKER_LABEL = re.compile(r"\[S\d+\]")
+_TIME_MARK = re.compile(r"\[\d+(?:\.\d+)?\]")
+
+
+def segment_text(text: str) -> str:
+    """A model segment's text without MOSS's speaker labels and time marks."""
+    return _TIME_MARK.sub("", _SPEAKER_LABEL.sub("", text or "")).strip()
+
+
+# MOSS's own segment form, "[start][Sxx]text[end]", as the owner's reference script parses it (its TS_RE).
+_MOSS_SEGMENT = re.compile(r"\[(?P<start>\d+(?:\.\d+)?)\]\s*\[S\d+\](?P<text>.*?)\[(?P<end>\d+(?:\.\d+)?)\]",
+                           re.DOTALL)
+_MOSS_OPEN = re.compile(r"\[(?P<start>\d+(?:\.\d+)?)\]\s*\[S\d+\]")
+
+
+def _moss_pieces(seg: CrispSegment, stats: LineStats) -> List[Tuple[str, float, float]]:
+    """One segment of CrispASR's result as (text, start, end) in group time.
+
+    CrispASR normally returns MOSS's segments already parsed. When its own parser finds none, it returns the raw
+    text as one segment over the whole call (crispasr_backend_moss_transcribe_diarize.cpp); that text still holds
+    MOSS's "[start][Sxx]text[end]" marks, and is split here as the reference script splits it. Text outside a
+    complete mark -- a last segment the token limit cut before its end mark, or text with no marks -- is kept: it
+    runs from its own opening time (or the end of the piece before it) to the segment's end. Nothing is dropped."""
+    text = seg.text or ""
+    matches = list(_MOSS_SEGMENT.finditer(text))
+    if not matches:
+        return [(text, float(seg.start), float(seg.end))]
+    stats.fallback_segments += 1
+    pieces: List[Tuple[str, float, float]] = []
+    cursor, previous_end = 0, float(seg.start)
+    for m in matches:
+        before = text[cursor:m.start()]
+        if segment_text(before):
+            pieces.append((before, previous_end, float(m.group("start"))))
+        pieces.append((m.group("text"), float(m.group("start")), float(m.group("end"))))
+        cursor, previous_end = m.end(), float(m.group("end"))
+    tail = text[cursor:]
+    if segment_text(tail):
+        opening = _MOSS_OPEN.search(tail)
+        pieces.append((tail, float(opening.group("start")) if opening else previous_end, float(seg.end)))
+    return pieces
+
+
+def segments_rule(group_start: float, group_end: float, segments: Sequence[CrispSegment],
+                  stats: Optional[LineStats] = None) -> List[Subtitle]:
+    """MOSS-CrispASR (1.10.1; owner W411, W426): each segment the model writes becomes one subtitle at the model's
+    own start and end, in media-file time (a raw-text answer is split first, _moss_pieces). The subtitles are in
+    order of their starts; the times are clamped to the VAD group; a segment with no text left (empty, or only a
+    speaker label or a time mark) gives no subtitle. A subtitle shorter than 0.1 s is shown for 0.1 s (at the
+    group's end it starts up to 0.1 s earlier). A subtitle that runs into the next one ends where the next starts,
+    unless that would leave it less than 0.1 s: then the two overlap, as the model wrote them (two speakers at
+    once), so neither is lost. No cut by characters or duration (W203)."""
+    stats = stats if stats is not None else LineStats()
+    duration = max(0.0, group_end - group_start)
+    timed: List[Tuple[float, float, str]] = []
+    for seg in segments:
+        for raw, s, e in _moss_pieces(seg, stats):
+            text = segment_text(raw)
+            if not text:
+                continue
+            stats.units += 1
+            times = []
+            for t in (s, e):
+                c = min(max(t, 0.0), duration)
+                if abs(c - t) > CLAMP_TOLERANCE_S:
+                    stats.clamped_times += 1
+                times.append(c)
+            start, end = times[0], max(times[1], times[0])
+            if end - start < MIN_DISPLAY_S:
+                end = min(start + MIN_DISPLAY_S, duration)
+                start = min(start, max(0.0, end - MIN_DISPLAY_S))
+            timed.append((start, end, text))
+    timed.sort(key=lambda x: x[0])
+    subtitles: List[Subtitle] = [(text, group_start + s, group_start + e) for s, e, text in timed]
+    for i in range(len(subtitles) - 1):
+        text, start, end = subtitles[i]
+        next_start = subtitles[i + 1][1]
+        if end > next_start and next_start - start >= MIN_DISPLAY_S:
+            subtitles[i] = (text, start, next_start)
+    return subtitles
+
+
 def build(line_rule: str, group_start: float, group_end: float, segments: Sequence[CrispSegment],
           stats: Optional[LineStats] = None, cues: CueSettings = DEFAULT_CUES, onsets: bool = False,
           cut_at_pauses: bool = True, end_at_group: bool = False) -> List[Subtitle]:
@@ -357,4 +445,6 @@ def build(line_rule: str, group_start: float, group_end: float, segments: Sequen
         return tokens_rule(group_start, group_end, segments, stats, cues, onsets, cut_at_pauses, end_at_group)
     if line_rule == "group":
         return group_rule(group_start, group_end, segments)
+    if line_rule == "segments":
+        return segments_rule(group_start, group_end, segments, stats)
     raise ValueError(f"unknown line rule '{line_rule}' ({', '.join(LINE_RULES)})")
