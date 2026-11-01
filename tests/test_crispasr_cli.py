@@ -319,7 +319,11 @@ class TestTheCommandLine:
         assert "Where this run's ASR and other models run, for every pipeline." in text
         assert "the GPU through Vulkan on Windows (Vulkan build, experimental)" in text
         assert ("for the GGUF pipelines, which do not accept none: ten for parakeet-crispasr and "   # W344, W401
-                "reazonspeech-crispasr, firered-vad for the others.") in text
+                "reazonspeech-crispasr, silero-v6.2 for moss-crispasr, firered-vad for the others.") in text  # W426
+        # the MOSS settings as --passN-params keys (W428 I1 3, I1 4)
+        assert ('For moss-crispasr also its MOSS settings: "prompt_language" (en, the default, or zh), '
+                '"language_hint" (default Japanese), "hotwords" (comma-separated, default none) and '
+                '"max_new_tokens" (0, the default, = by the length of the audio).') in text
         assert "CrispASR's own program" not in text
         assert "--crispasr-exe" not in text and "--crispasr-backend" not in text
         assert "--crispasr-args" not in text
@@ -327,11 +331,11 @@ class TestTheCommandLine:
         # 1.10.1 (Part B): --passN-word-timestamps and its help text, approved by the owner (W413 1)
         for n in (1, 2):
             assert f"--pass{n}-word-timestamps {{model,aligner}}" in text
+            # W413 1's text; 1.10.1 (W426): MOSS uses its own segment times by default
             assert (f"Where pass {n}'s subtitle times come from, for the CrispASR pipelines. model = the ASR model's "
-                    "own word times (default for parakeet, reazonspeech, kotoba, whisper-turbo and whisper-large); "
-                    "aligner = the CrispASR aligner wav2vec2-ja (232 MB, downloaded on first use; default for cohere "
-                    "and moss). MOSS gives no word times: with model, each VAD group becomes one subtitle at its "
-                    "edges.") in text
+                    "own word times (default for parakeet, reazonspeech, kotoba, whisper-turbo and whisper-large; "
+                    "for moss its own segment times); aligner = the CrispASR aligner wav2vec2-ja (232 MB, "
+                    "downloaded on first use; default for cohere).") in text
 
     def test_an_unknown_word_timestamps_value_is_a_usage_error(self):
         result = _cli("x.mp4", "--ensemble", "--pass1-pipeline", "kotoba-crispasr", "--pass1-word-timestamps", "dtw",
@@ -562,6 +566,7 @@ class TestThePassWorkerBuildsThem:
             "segmenter_overrides": {},           # beam_size is neither a segmenter nor a scene setting
             "scene_params": {},
             "word_timestamps": None,             # 1.10.1 (Part B): none named, the pipeline's own default
+            "model_params": {"beam_size": 5},    # 1.10.1: the whole dict; MOSS-CrispASR's MOSS settings come from it
         }
         assert not [l for l in built["log"] if "ignores --" in l], built["log"]
         assert not [l for l in built["log"] if "speech pad of" in l], built["log"]
