@@ -35,7 +35,8 @@ from whisperjav.crispasr.errors import FAILURE_PREFIX as CRISPASR_FAILURE_PREFIX
 from whisperjav.crispasr.manifest import CRISPASR_PIPELINES
 from whisperjav.crispasr.pass_settings import (ignored_hardware_message, ignored_hardware_settings,
                                                speech_pad_ignored as crispasr_speech_pad_ignored,
-                                               unused_pass_settings, unused_settings_message)
+                                               unused_by_other_pipelines, unused_pass_settings,
+                                               unused_settings_message)
 from whisperjav.utils.device_detector import pass_device
 from whisperjav.utils.logger import logger, setup_logger
 from whisperjav.utils.parameter_tracer import create_tracer, NullTracer
@@ -645,6 +646,13 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
         _write_dropbox_and_exit(result_file, {"results": [], "worker_error": None}, tracer, 0)
 
     pass_temp_dir = Path(payload.temp_dir) / f"pass{pass_number}_worker"
+
+    # --passN-word-timestamps is used by the CrispASR pipelines only (1.10.1, Part B; owner W413): for any
+    # other pipeline, XXL included, the same "does not use" line the CrispASR passes log names it.
+    _other_unused = unused_by_other_pipelines(pass_config, pass_number)
+    if _other_unused:
+        # e.g. "The balanced pipeline does not use: --pass1-word-timestamps"
+        logger.info(unused_settings_message(f"The {pass_config.get('pipeline')} pipeline", _other_unused))
 
     # =========================================================================
     # BYOP XXL: External subprocess — bypasses _build_pipeline() entirely.
@@ -1522,6 +1530,9 @@ def _build_pipeline(
             # values of the Segmenter and Scene tabs.
             "scene_detector": pass_config.get("scene_detector") or None,
             "enhance_for_vad": bool(pass_config.get("enhance_for_vad", False)),
+            # --passN-word-timestamps (1.10.1; owner W411-W414): "model", "aligner", or None for the pipeline's
+            # own default (manifest.word_timestamps_for).
+            "word_timestamps": pass_config.get("word_timestamps") or None,
         }
         if pass_config.get("speech_enhancer"):
             enhancer_backend, enhancer_model = _parse_speech_enhancer(pass_config["speech_enhancer"])
