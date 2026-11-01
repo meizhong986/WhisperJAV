@@ -137,8 +137,9 @@ class Stage:
         monkeypatch.setitem(sys.modules, FRAMER_MODULE, types.SimpleNamespace(VadGroupedFramer=Framer))
 
         class Engine:
-            def __init__(self, model_path, backend, use_gpu, n_threads=None, label=""):
+            def __init__(self, model_path, backend, use_gpu, n_threads=None, label="", tokens_per_second=None):
                 self.model_path, self.backend, self.use_gpu = model_path, backend, use_gpu
+                self.tokens_per_second = tokens_per_second
                 self.n_threads = 8
                 self.opened = 0
                 self.closed = 0
@@ -439,7 +440,42 @@ class TestThe1101Pipelines:
         classes = self.classes()
         assert {name for name, cls in classes.items() if cls.ENGINE.aligner} == ALIGNED_PIPELINES
         for name in ALIGNED_PIPELINES:
-            assert classes[name].ENGINE == chain.EngineRow("group", audio_analytics=True, aligner="wav2vec2-ja")
+            # MOSS-CrispASR alone also limits its tokens per second of audio (owner W406 i1).
+            rate = 65536 / 3000 if name == "moss-crispasr" else None
+            assert classes[name].ENGINE == chain.EngineRow("group", audio_analytics=True, aligner="wav2vec2-ja",
+                                                           tokens_per_second=rate)
+
+    def test_the_native_timing_pipelines(self):
+        # Owner W411, W412: the new pipelines whose models give word times use them, no aligner; ReazonSpeech's
+        # tokens carry starts only, so its ends are the VAD group's (onsets).
+        classes = self.classes()
+        for name in ("kotoba-crispasr", "whisper-turbo-crispasr", "whisper-large-crispasr"):
+            # their cutting stays at sentence-end marks only, as before (W401 step 2)
+            assert classes[name].ENGINE == chain.EngineRow("tokens", audio_analytics=True, cut_at_pauses=False)
+        assert classes["reazonspeech-crispasr"].ENGINE == chain.EngineRow("tokens", audio_analytics=True, onsets=True)
+        assert classes["parakeet-crispasr"].ENGINE == chain.EngineRow("tokens", audio_analytics=True)
+
+    def test_reazonspeech_starts_are_its_own_and_its_ends_the_vad_groups(self):
+        # Tokens with start = end, as ReazonSpeech gives them (2026-10-31): two sentences in a 3 s VAD group.
+        from whisperjav.crispasr import lines
+        tok = lambda t, s: CrispToken(t, s, s, 0.99)  # noqa: E731
+        seg = CrispSegment("はい。行きます。", 0.4, 2.0, (), (tok("はい", 0.40), tok("。", 0.72), tok("行き", 1.20),
+                                                         tok("ます", 1.50), tok("。", 1.80)))
+        subs = lines.build("tokens", 10.0, 13.0, [seg], onsets=True, end_at_group=True)
+        assert [(t, round(s, 2), round(e, 2)) for t, s, e in subs] == [("はい。", 10.4, 11.2), ("行きます。", 11.2, 13.0)]
+        # without end_at_group (the aligned path, whose aligner gives the last character the group's end itself)
+        # the last subtitle keeps its own last time
+        assert lines.build("tokens", 10.0, 13.0, [seg], onsets=True)[-1][2] == pytest.approx(11.5)
+
+    def test_sentence_end_cutting_keeps_the_models_own_ends(self):
+        # Kotoba, Whisper-Turbo, Whisper-Large: no cut at a pause, each subtitle ends at its own last token.
+        from whisperjav.crispasr import lines
+        tok = lambda t, s, e: CrispToken(t, s, e, 0.99)  # noqa: E731
+        seg = CrispSegment("そうだね行こう。", 0.2, 2.6, (), (tok("そう", 0.2, 0.5), tok("だね", 0.5, 0.8),
+                                                         tok("行こう", 1.8, 2.3), tok("。", 2.3, 2.3)))
+        assert lines.build("tokens", 5.0, 8.0, [seg]) == [("そうだね", 5.2, 5.8), ("行こう。", 6.8, 7.3)]  # pause cut
+        subs = lines.build("tokens", 5.0, 8.0, [seg], cut_at_pauses=False)
+        assert [(t, round(s, 2), round(e, 2)) for t, s, e in subs] == [("そうだね行こう。", 5.2, 7.3)]
 
     @pytest.mark.parametrize("pipeline", sorted(NEW))
     def test_labels_settings_and_defaults(self, tmp_path, pipeline):
