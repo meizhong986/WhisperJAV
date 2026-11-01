@@ -204,6 +204,80 @@ def test_whisperjav_accepts_the_command_line_the_gui_builds(api, tmp_path):
 
 
 # ---------------------------------------------------------------------------------------------------------------
+# 1.10.1 (Part B; owner W411-W414): the Timing tab and --passN-word-timestamps
+# ---------------------------------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("choice", ["model", "aligner"])
+def test_a_timing_tab_choice_is_sent_as_the_flag(api, tmp_path, choice):
+    pass1 = {"pipeline": "kotoba-crispasr", "isCrispasr": True, "wordTimestamps": choice}
+    pass2 = {"enabled": True, "pipeline": "moss-crispasr", "isCrispasr": True, "wordTimestamps": choice}
+    args = api._build_twopass_args(_twopass(tmp_path, pass1, pass2))
+    assert _value(args, "--pass1-word-timestamps") == choice
+    assert _value(args, "--pass2-word-timestamps") == choice
+
+
+@pytest.mark.parametrize("value", [None, "", "bogus"])
+def test_no_choice_sends_no_flag(api, tmp_path, value):
+    pass1 = {"pipeline": "cohere-crispasr", "isCrispasr": True, "wordTimestamps": value}
+    assert "--pass1-word-timestamps" not in api._build_twopass_args(_twopass(tmp_path, pass1))
+
+
+def test_whisperjav_accepts_the_word_timestamps_the_gui_sends(api, tmp_path):
+    pass1 = {"pipeline": "kotoba-crispasr", "isCrispasr": True, "wordTimestamps": "aligner"}
+    pass2 = {"enabled": True, "pipeline": "cohere-crispasr", "isCrispasr": True, "wordTimestamps": "model"}
+    args = api._build_twopass_args(_twopass(tmp_path, pass1, pass2))
+    dump = tmp_path / "dump.json"
+    p = subprocess.run([sys.executable, "-m", "whisperjav.main", *args, "--dump-params", str(dump)],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300,
+                       cwd=str(ROOT))
+    assert p.returncode == 0, p.stderr[-2000:]
+    ensemble = json.loads(dump.read_text(encoding="utf-8"))["ensemble_config"]
+    assert ensemble["pass1"]["crispasr_effective"]["word_timestamps"] == "aligner"
+    assert ensemble["pass2"]["crispasr_effective"]["word_timestamps"] == "model"
+
+
+def test_the_timing_tab_is_hidden_until_a_crispasr_pass_opens_customize():
+    # owner W413 2: a "Timing" tab in a CrispASR pass's Customize window
+    assert '<button class="modal-tab" data-tab="timing" style="display: none;">Timing</button>' in HTML
+    assert '<div id="tab-timing" class="modal-tab-panel">' in HTML
+    opener = re.search(r"\n    async openCustomize\(passKey\) \{(.*?)\n    \},", JS, re.S).group(1)
+    assert opener.index("this.showTimingTab(false);") < opener.index("this.openTransformersCustomize(passKey)")
+    crispasr = re.search(r"\n    async openCrispasrCustomize\(passKey\) \{(.*?)\n    \},", JS, re.S).group(1)
+    assert "this.generateCrispasrTimingTab(passKey);" in crispasr and "this.showTimingTab(true);" in crispasr
+    close = re.search(r"\n    closeModal\(\) \{(.*?)\n    \},", JS, re.S).group(1)
+    assert "this.showTimingTab(false);" in close
+    # every opener goes through openCustomize
+    for name in ("openTransformersCustomize", "openQwenCustomize", "openCrispasrCustomize"):
+        assert JS.count(f"this.{name}(") == 1
+
+
+def test_the_timing_tab_texts_are_the_approved_ones():
+    # owner W413 2: "Word timestamps": "From the model" / "From the aligner (wav2vec2-ja)", default marked
+    assert "label.textContent = 'Word timestamps';" in JS
+    assert ("model: { text: 'From the model', defaultText: 'From the model (default)' }," in JS)
+    assert ("aligner: { text: 'From the aligner (wav2vec2-ja)', "
+            "defaultText: 'From the aligner (wav2vec2-ja) (default)' }" in JS)
+
+
+def test_a_loaded_preset_sets_the_crispasr_mark_and_the_timing_tab_by_its_pipeline():
+    # Found by the call-chain review (2026-11-01): a preset of another pipeline left the tab and the choice stale
+    loader = re.search(r"\n    async loadPresetIntoModal\(name\) \{(.*?)\n    \},", JS, re.S).group(1)
+    assert "passState.isCrispasr = this.isCrispasrPipeline(passState.pipeline);" in loader
+    assert "if (passState.pipeline !== pipelineBefore || !passState.isCrispasr) passState.wordTimestamps = null;" \
+        in loader
+    assert "this.generateCrispasrTimingTab(passKey);" in loader and "this.showTimingTab(false);" in loader
+
+
+def test_the_choice_is_kept_apart_from_the_params_and_reset_with_the_pipeline():
+    assert JS.count("wordTimestamps: null\n") + JS.count("wordTimestamps: null\r\n") == 2   # both passes start on null
+    assert JS.count("passState.wordTimestamps = null;  // the new pipeline's own default (1.10.1)") == 2
+    for n in (1, 2):
+        assert (f"wordTimestamps: this.state.pass{n}.isCrispasr ? (this.state.pass{n}.wordTimestamps || null) : null,"
+                in JS)
+    assert "await pywebview.api.get_crispasr_status(pipeline, model, wordTimestamps);" in JS
+
+
+# ---------------------------------------------------------------------------------------------------------------
 # Route B (1.10.0): the default speech segmenters, the CJK note, the status panel
 # ---------------------------------------------------------------------------------------------------------------
 
@@ -211,11 +285,17 @@ def test_the_default_segmenters_in_app_js_are_the_command_lines():
     from whisperjav.config.segmenter_presets import CRISPASR_DEFAULT_SEGMENTERS, CRISPASR_DEFAULT_SENSITIVITY
 
     block = re.search(r"\n    crispasrDefaults: \{(.*?)\n    \},", JS, re.S).group(1)
-    in_js = {p: (seg, sens) for p, seg, sens in
-             re.findall(r"'([a-z-]+)': \{ segmenter: '([^']+)', sensitivity: '([^']+)' \}", block)}
-    assert in_js == {p: (CRISPASR_DEFAULT_SEGMENTERS[p], CRISPASR_DEFAULT_SENSITIVITY[p]) for p in CRISPASR_PIPELINES}
+    from whisperjav.crispasr.manifest import word_timestamps_for
+
+    in_js = {p: (seg, sens, wt) for p, seg, sens, wt in
+             re.findall(r"'([a-z-]+)': \{ segmenter: '([^']+)', sensitivity: '([^']+)', "
+                        r"wordTimestamps: '([^']+)' \}", block)}
+    # 1.10.1 (owner W411-W414): each pipeline's default word timestamps, as the command line's
+    assert in_js == {p: (CRISPASR_DEFAULT_SEGMENTERS[p], CRISPASR_DEFAULT_SENSITIVITY[p], word_timestamps_for(p))
+                     for p in CRISPASR_PIPELINES}
     assert "return this.crispasrDefaults[pipeline].segmenter;" in JS
     assert "return this.crispasrDefaults[pipeline].sensitivity;" in JS
+    assert "return defaults ? defaults.wordTimestamps : null;   // null: not a CrispASR pipeline" in JS
     # W344, and the 1.10.1 pipelines as Parakeet (ReazonSpeech) or Cohere (the others) (W401)
     assert CRISPASR_DEFAULT_SEGMENTERS == {"parakeet-crispasr": "ten", "cohere-crispasr": "firered-vad",
                                            "reazonspeech-crispasr": "ten", "kotoba-crispasr": "firered-vad",
@@ -308,6 +388,15 @@ class TestTheStatusPanel:
         assert result["can_run"] is False
         assert result["lines"][1] == ("CrispASR cannot run here: CrispASR is not installed in this WhisperJAV. "
                                       "Run the WhisperJAV installer again.")
+
+    # 1.10.1 (owner W413 2): the aligner line follows the pass's Timing tab choice.
+    @pytest.mark.parametrize("pipeline, choice, aligner_line", [
+        ("kotoba-crispasr", None, False), ("kotoba-crispasr", "", False), ("kotoba-crispasr", "aligner", True),
+        ("parakeet-crispasr", "aligner", True), ("cohere-crispasr", None, True), ("cohere-crispasr", "model", False),
+        ("moss-crispasr", "model", False), ("moss-crispasr", "aligner", True)])
+    def test_the_aligner_line_follows_the_word_timestamps_choice(self, api, stubbed, pipeline, choice, aligner_line):
+        lines = api.get_crispasr_status(pipeline, "", choice)["lines"]
+        assert any(line.startswith("Aligner: wav2vec2") for line in lines) is aligner_line
 
     def test_an_unknown_model_is_an_answer_not_a_crash(self, api, stubbed):
         assert api.get_crispasr_status("parakeet-crispasr", "nope")["success"] is False
