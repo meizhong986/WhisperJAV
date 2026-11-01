@@ -105,8 +105,9 @@ class TestModels:
         assert gb <= shown < gb + 0.1 + 1e-9
 
     def test_the_aligned_pipelines(self):
-        # every pipeline but Parakeet-CrispASR times its text with the CrispASR aligner (1.10.1)
-        assert manifest.ALIGNED_PIPELINES == set(CRISPASR_PIPELINES) - {"parakeet-crispasr"}
+        # Cohere-CrispASR and MOSS-CrispASR time their text with the CrispASR aligner; the others use their
+        # models' own token times (owner W411, W412)
+        assert manifest.ALIGNED_PIPELINES == {"cohere-crispasr", "moss-crispasr"}
 
     def test_nothing_of_the_program_route_is_left(self):
         for name in ("PROGRAM_BUILDS", "CRISPASR_VERSION", "CRISPASR_GIT", "CUDA13_RUNTIME_FILES",
