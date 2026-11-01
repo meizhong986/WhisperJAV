@@ -4144,6 +4144,7 @@ class WhisperJAVAPI:
         "is_cohere":         "isCohere",
         "framer":            "framer",
         "dsp_effects":       "dspEffects",
+        "word_timestamps":   "wordTimestamps",  # a CrispASR pass's Timing tab (1.10.1; owner W418 3)
         "created_at":        "createdAt",
         "updated_at":        "updatedAt",
         "schema_version":    "schemaVersion",
