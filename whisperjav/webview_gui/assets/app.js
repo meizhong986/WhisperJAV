@@ -1822,7 +1822,9 @@ const EnsembleManager = {
     // Each CrispASR pipeline's speech segmenter and sensitivity when a pass names none
     // (CRISPASR_DEFAULT_SEGMENTERS, CRISPASR_DEFAULT_SENSITIVITY, config/segmenter_presets.py; owner W202 3,
     // W343, W344, W401); tests/test_gui_crispasr_pipelines.py compares them. wordTimestamps: where the pass's
-    // subtitle times come from by default (crispasr/manifest.py word_timestamps_for; owner W411-W414).
+    // subtitle times come from by default (crispasr/manifest.py word_timestamps_for; owner W411-W414). scene:
+    // the scene detector a pass starts on (crispasr/pass_settings.py scene_detector_for; semantic when absent;
+    // MOSS-CrispASR silero, owner W426 4).
     crispasrDefaults: {
         'parakeet-crispasr': { segmenter: 'ten', sensitivity: 'aggressive', wordTimestamps: 'model' },
         'cohere-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'aligner' },
@@ -1830,7 +1832,11 @@ const EnsembleManager = {
         'kotoba-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'model' },
         'whisper-turbo-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'model' },
         'whisper-large-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'model' },
-        'moss-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'aligner' }
+        'moss-crispasr': { segmenter: 'silero-v6.2', sensitivity: 'balanced', wordTimestamps: 'model', scene: 'silero' }
+    },
+    crispasrDefaultScene(pipeline) {
+        const defaults = this.crispasrDefaults[pipeline];
+        return (defaults && defaults.scene) || 'semantic';
     },
     // BYOP Faster Whisper XXL (1.10.0, item 5): the model names XXL takes, sent as --passN-model.
     // large-v2 first, the default (owner W24 2; DEFAULT_XXL_MODEL in byop/xxl_runner.py); the
@@ -2347,15 +2353,16 @@ const EnsembleManager = {
         // segmenter and sensitivity are each pipeline's own when a pass names none
         // (CRISPASR_DEFAULT_SEGMENTERS, CRISPASR_DEFAULT_SENSITIVITY, config/segmenter_presets.py:
         // TEN VAD at aggressive for Parakeet, FireRedVAD at balanced for Cohere, owner W343, W344);
-        // the scene detector starts at semantic (CRISPASR_SCENE_DETECTOR, crispasr/pass_settings.py;
-        // owner W214 2), and the user may choose another (design 22.9.1).
+        // the scene detector starts at the pipeline's own (semantic, owner W214 2; silero for MOSS-CrispASR,
+        // W426 4: crispasrDefaultScene), and the user may choose another (design 22.9.1).
         if (this.isCrispasrPipeline(pipelineType)) {
             const segmenter = this.crispasrDefaultSegmenter(pipelineType);
             const sensitivity = this.crispasrDefaultSensitivity(pipelineType);
-            sceneSelect.value = 'semantic';
+            const scene = this.crispasrDefaultScene(pipelineType);
+            sceneSelect.value = scene;
             segmenterSelect.value = segmenter;
             sensitivitySelect.value = sensitivity;
-            this.state[passKey].sceneDetector = 'semantic';
+            this.state[passKey].sceneDetector = scene;
             this.state[passKey].speechSegmenter = segmenter;
             this.state[passKey].sensitivity = sensitivity;
             return;
@@ -3265,15 +3272,18 @@ const EnsembleManager = {
         const passState = this.state[passKey];
         this.state.currentCustomize = passKey;
         const sensitivity = passState.sensitivity || 'balanced';
-        const sceneBackend = passState.sceneDetector || 'semantic';
+        const sceneBackend = passState.sceneDetector || this.crispasrDefaultScene(passState.pipeline);
         const result = await pywebview.api.get_crispasr_customize_defaults(
             passState.pipeline, sensitivity, passState.speechSegmenter || '', sceneBackend);
         if (!result || !result.success) {
             ErrorHandler.show('Error', 'Failed to load the pass settings: ' + (result ? result.error : ''));
             return;
         }
-        const defaults = { ...result.segmenter, scene_detection_method: sceneBackend, ...result.scene };
-        this._currentDefaults = { transcriber: {}, decoder: {}, engine: {}, vad: result.segmenter,
+        // The model's own tab (1.10.1): MOSS-CrispASR's MOSS settings (crispasr/moss_prompt.py); null otherwise.
+        const modelTab = result.model || null;
+        const modelDefaults = modelTab ? modelTab.defaults : {};
+        const defaults = { ...result.segmenter, scene_detection_method: sceneBackend, ...result.scene, ...modelDefaults };
+        this._currentDefaults = { transcriber: {}, decoder: {}, engine: { ...modelDefaults }, vad: result.segmenter,
                                   scene: { scene_detection_method: sceneBackend, ...result.scene } };
         const currentValues = (passState.customized && passState.params)
             ? { ...defaults, ...passState.params } : defaults;
@@ -3294,11 +3304,34 @@ const EnsembleManager = {
         await this.generateSegmenterTab('tab-segmenter', result.segmenter_backend, currentValues, true, sensitivity);
         await this.generateEnhancerTab('tab-enhancer', passState.speechEnhancer || 'none', passState.dspEffects || ['loudnorm']);
         await this.generateSceneTab('tab-scene', sceneBackend, currentValues);
+        if (modelTab) this.generateCrispasrModelTab(modelTab, currentValues);
         this.generateCrispasrTimingTab(passKey);
         this.showTimingTab(true);
         this.switchModalTab('segmenter');
         await this.refreshPresetList();
         document.getElementById('customizeModal').classList.add('active');
+    },
+
+    // The model's own tab of a CrispASR pass (1.10.1): MOSS-CrispASR's MOSS settings, from the owner's reference
+    // command (W428 I1 4; crispasr/moss_prompt.py GUI_SCHEMA). Drawn in the Context panel, which the CrispASR window
+    // does not otherwise use, under the tab name the back end gives ("MOSS"). Its values are --passN-params keys,
+    // collected by applyCustomization with the other tabs'.
+    generateCrispasrModelTab(modelTab, currentValues) {
+        const container = document.getElementById('tab-context');
+        const tabBtn = document.querySelector('[data-tab="context"]');
+        if (!container || !tabBtn) return;
+        container.innerHTML = '';
+        tabBtn.textContent = modelTab.title;
+        tabBtn.style.display = '';
+        const group = document.createElement('div');
+        group.className = 'param-group';
+        for (const [paramName, schema] of Object.entries(modelTab.schema || {})) {
+            const defaultValue = (modelTab.defaults || {})[paramName];
+            const value = currentValues[paramName] !== undefined && currentValues[paramName] !== null
+                ? currentValues[paramName] : defaultValue;
+            group.appendChild(this.generateSchemaControl(paramName, schema, value, defaultValue));
+        }
+        container.appendChild(group);
     },
 
     // The Timing tab of a CrispASR pass (1.10.1; owner W411-W414, texts W413 2): where the pass's subtitle times
@@ -5915,8 +5948,9 @@ const EnsembleManager = {
             ...this._currentDefaults.scene
         };
 
-        // Reset all controls in all tabs (new structure: model, quality, segmenter, enhancer, scene)
-        const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene'];
+        // Reset all controls in all tabs (new structure: model, quality, segmenter, enhancer, scene; context holds
+        // a MOSS-CrispASR pass's MOSS tab, 1.10.1)
+        const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene', 'context'];
         tabs.forEach(tab => {
             const panel = document.getElementById(`tab-${tab}`);
             if (!panel) return;
@@ -5935,8 +5969,11 @@ const EnsembleManager = {
                 if (checkbox) {
                     checkbox.checked = defaultValue;
                 } else if (slider) {
+                    // A schema slider (Segmenter, Scene) has no number box beside it, only its value label.
                     slider.value = defaultValue;
-                    control.querySelector('.param-number').value = defaultValue;
+                    if (number) number.value = defaultValue;
+                    const valueDisplay = control.querySelector('.slider-value');
+                    if (valueDisplay) valueDisplay.textContent = slider.value;
                 } else if (number) {
                     number.value = defaultValue;
                 } else if (text) {
