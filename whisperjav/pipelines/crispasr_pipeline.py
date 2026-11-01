@@ -60,6 +60,17 @@ class EngineRow:
     # group's subtitles are cut by the "tokens" rule for onset times (sentence-end marks only, chained ends;
     # W259), a group the aligner gives nothing for keeps ``line_rule``.
     aligner: Optional[str] = None
+    # The model's own token times are starts only (no end times): the "tokens" rule then cuts at sentence-end
+    # marks only and ends each subtitle where the next starts, the last at the VAD group's end (lines.tokens_rule
+    # onsets=True, end_at_group=True). ReazonSpeech-CrispASR (owner W412: native starts with VAD ends).
+    onsets: bool = False
+    # False: the "tokens" rule cuts at sentence-end marks only, not at pauses (Kotoba, Whisper-Turbo, Whisper-Large
+    # keep W401's cutting with their own times, W412). Parakeet-CrispASR cuts at pauses too (W203, W204).
+    cut_at_pauses: bool = True
+    # A limit on the tokens one call may write, per second of the VAD group's audio (engine.BindingEngine), or
+    # None for the model's own limit. MOSS-CrispASR only (owner W406 i1): without it the model can repeat a line
+    # to its own limit on non-speech.
+    tokens_per_second: Optional[float] = None
 
 
 @dataclass
@@ -303,6 +314,7 @@ class CrispASRPipeline(BasePipeline):
             "config": {"crispasr": {"model": self.model.name, "repo": self.model.repo_id,
                                     "revision": self.model.revision, "backend": self.model.backend,
                                     "line_rule": self.ENGINE.line_rule, "aligner": self.ENGINE.aligner,
+                                    "onsets": self.ENGINE.onsets, "cut_at_pauses": self.ENGINE.cut_at_pauses,
                                     "cues": self.cues.as_dict() if self.ENGINE.line_rule == "tokens" else None,
                                     "speech_segmenter_settings": self.segmenter.as_dict(),
                                     "threads": None}},
@@ -340,7 +352,7 @@ class CrispASRPipeline(BasePipeline):
             raise self._setup_error
         if self.asr is None:
             self.asr = BindingEngine(self._model_path, self.model.backend, self._runtime.use_gpu,
-                                     label=self.model.label)
+                                     label=self.model.label, tokens_per_second=self.ENGINE.tokens_per_second)
         if not self.asr.is_open:
             opened = time.time()
             try:
@@ -648,7 +660,8 @@ class CrispASRPipeline(BasePipeline):
                                    self.cues, onsets=True)
             else:
                 subs = lines.build(self.ENGINE.line_rule, scene.start + g.start, scene.start + g.end, segments,
-                                   stats, self.cues)
+                                   stats, self.cues, onsets=self.ENGINE.onsets,
+                                   cut_at_pauses=self.ENGINE.cut_at_pauses, end_at_group=self.ENGINE.onsets)
             by_scene.setdefault(g.scene, []).extend(subs)
 
         scene_srts_dir = self.temp_dir / "scene_srts"
