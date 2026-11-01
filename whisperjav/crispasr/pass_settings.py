@@ -15,7 +15,8 @@ The speech segmenter settings follow the pipelines the owner named (W199 DIR1: "
 similar presets and settings as qwenasr. And for prakeet use similar settings and presets as fidelity
 whisper pipeline"; W202): ``segmenter_settings()`` resolves them through those pipelines' own functions.
 The 1.10.1 pipelines (W401, pre-approved choices of step 2) take Cohere's settings, except ReazonSpeech-CrispASR,
-whose model is a transducer like Parakeet's and takes Parakeet's.
+whose model is a transducer like Parakeet's and takes Parakeet's, and MOSS-CrispASR, which has its own: Silero VAD
+v6.2 builds 90-120 s stretches that start at speech, in scenes of up to 420 s (owner W425, W426).
 
 Used by three callers, so the rules have one home:
   - whisperjav/main.py refuses a pass that cannot run (validate_crispasr_passes), as a usage error
@@ -34,8 +35,26 @@ from whisperjav.config.segmenter_presets import CRISPASR_DEFAULT_SEGMENTERS, CRI
 from whisperjav.crispasr import manifest
 from whisperjav.crispasr.manifest import CRISPASR_PIPELINES, JAPANESE_NAMES
 
-# The scene detector the CrispASR pipelines run when the pass names none (owner W214 2).
+# The scene detector the CrispASR pipelines run when the pass names none (owner W214 2), and the longest scene.
+# MOSS-CrispASR (owner W426 4): the silero scene detector with its own 420 s maximum; with another scene detector
+# chosen for MOSS, scenes are also at most 420 s. 420 s is a maximum only: the silero detector's first pass (auditok)
+# also ends a scene at a silence of 1.8 s (its pass-1 setting as built, in the run log), and a stretch never crosses a
+# scene, so a short scene gives a stretch
+# shorter than MOSS's 70 s (seen on the Netflix clip, 2026-11-01: 15.4 s and 3.9 s stretches).
 CRISPASR_SCENE_DETECTOR = "semantic"
+CRISPASR_SCENE_MAX_S = 48
+SCENE_DETECTOR_FOR = {"moss-crispasr": "silero"}
+SCENE_MAX_S_FOR = {"moss-crispasr": 420}
+
+
+def scene_detector_for(pipeline: str) -> str:
+    """The scene detector a CrispASR pass runs when it names none."""
+    return SCENE_DETECTOR_FOR.get(pipeline, CRISPASR_SCENE_DETECTOR)
+
+
+def scene_max_s_for(pipeline: str) -> float:
+    """The longest scene of a CrispASR pass (semantic, auditok and silero alike)."""
+    return SCENE_MAX_S_FOR.get(pipeline, CRISPASR_SCENE_MAX_S)
 
 # --- Texts (route B design 12, T11 and T12; W193 5, W203 I2) --------------------------------------
 
@@ -64,7 +83,16 @@ MODELS_HELP_DEFAULT = " (default)"
 # Which pipeline's presets each CrispASR pipeline takes.
 SEGMENTER_STYLE = {"parakeet-crispasr": "fidelity", "cohere-crispasr": "qwen",
                    "reazonspeech-crispasr": "fidelity", "kotoba-crispasr": "qwen", "whisper-turbo-crispasr": "qwen",
-                   "whisper-large-crispasr": "qwen", "moss-crispasr": "qwen"}
+                   "whisper-large-crispasr": "qwen", "moss-crispasr": "moss"}
+# MOSS-CrispASR's stretches (owner W425, W426 1-3): the VAD groups are what MOSS hears in one call, 90-120 s that
+# start at speech. Speech threshold 0.7, up to 5 s of silence inside a stretch (the group gap), longest 120 s,
+# shortest 70 s (a shorter group joins the next while both fit in 120 s). The same at every sensitivity (W428 I1 2);
+# the sensitivity picks the segmenter's other values. --passN-vad-threshold and the Customize Segmenter tab change
+# them for one pass.
+MOSS_THRESHOLD = 0.7
+MOSS_CHUNK_THRESHOLD_S = 5.0
+MOSS_MAX_GROUP_S = 120.0
+MOSS_MIN_GROUP_S = 70.0
 # Parakeet-CrispASR's longest VAD group and longest speech segment, at every sensitivity (W193 CLA3,
 # W194 2 "(a)", confirmed by W202 1 "1-a").
 PARAKEET_LONGEST_S = 6.0
@@ -116,6 +144,14 @@ def segmenter_settings(pipeline: str, backend: Optional[str], sensitivity: Optio
     clamped to 0-1, wins over the preset in both; the pad is the segmenter's speech_pad_ms for Parakeet,
     as fidelity, only when the backend has that setting (speech_pad_ignored() says when it has not),
     and both the start and the end pad for Cohere, as the qwen pipeline.
+
+    moss-crispasr (owner W425, W426, W428 I1 2): the backend's own preset at the sensitivity, then MOSS's stretch
+        values (MOSS_CHUNK_THRESHOLD_S, MOSS_MAX_GROUP_S, MOSS_MIN_GROUP_S, and MOSS_THRESHOLD for a Silero
+        segmenter) at every sensitivity. The shortest group works with the segmenters that use the shared grouping
+        (silero-v6.2, ten, firered-vad, whisperseg).
+        The longest speech segment stays the preset's: a speech segment cut there is followed at once by the next,
+        which the grouping (gaps up to 5 s) puts into the same stretch. --passN-vad-threshold wins over the 0.7;
+        --passN-speech-pad-ms is the segmenter's speech_pad_ms where the backend has that setting.
     """
     backend = (backend or default_segmenter(pipeline)).strip().lower()
     sensitivity = sensitivity or CRISPASR_DEFAULT_SENSITIVITY[pipeline]
@@ -123,6 +159,20 @@ def segmenter_settings(pipeline: str, backend: Optional[str], sensitivity: Optio
     user: Dict[str, Any] = {}
     if vad_threshold is not None:
         user["threshold"] = max(0.0, min(1.0, float(vad_threshold)))
+    if style == "moss":
+        from whisperjav.config.segmenter_presets import resolve_segmenter_sensitivity, segmenter_accepts
+
+        moss = {"max_group_duration_s": MOSS_MAX_GROUP_S, "chunk_threshold_s": MOSS_CHUNK_THRESHOLD_S,
+                "min_group_duration_s": MOSS_MIN_GROUP_S}
+        if backend.startswith("silero"):
+            # 0.7 is a Silero speech probability (W425, W426 2); other segmenters keep their own threshold.
+            moss["threshold"] = MOSS_THRESHOLD
+        if speech_pad_ms is not None and segmenter_accepts(backend, "speech_pad_ms"):
+            user["speech_pad_ms"] = max(0, int(speech_pad_ms))
+        config = dict(resolve_segmenter_sensitivity(backend, sensitivity, {**moss, **user}))
+        max_group = config.pop("max_group_duration_s", MOSS_MAX_GROUP_S)
+        chunk = config.pop("chunk_threshold_s", MOSS_CHUNK_THRESHOLD_S)
+        return SegmenterSettings(backend, sensitivity, max_group, chunk, config)
     if style == "fidelity":
         from whisperjav.config.segmenter_presets import resolve_segmenter_sensitivity
 
@@ -193,9 +243,35 @@ def validate_crispasr_passes(args: Any) -> None:
             model=getattr(args, f"pass{n}_model", None),
             speech_segmenter=getattr(args, f"pass{n}_speech_segmenter", None),
             language=getattr(args, "language", None),
-        )
+        ) or model_params_problem(n, pipeline, getattr(args, f"pass{n}_params", None))
         if problem:
             raise ValueError(problem)
+
+
+MODEL_PARAMS_PROBLEM = "--pass{n}-params: {why}"
+
+
+def model_params_problem(n: int, pipeline: str, params_json: Optional[str]) -> Optional[str]:
+    """Why pass ``n``'s model settings in --passN-params cannot be used (MOSS-CrispASR's MOSS settings,
+    crispasr/moss_prompt.py), in plain words; None when they can, or when the pipeline has none. A JSON error is
+    left to main.py's own check of --passN-params."""
+    if pipeline != "moss-crispasr" or not params_json:
+        return None
+    import json
+
+    from whisperjav.crispasr.moss_prompt import MossSettings
+
+    try:
+        params = json.loads(params_json)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(params, dict):
+        return None
+    try:
+        MossSettings.from_params(params)
+    except ValueError as why:
+        return MODEL_PARAMS_PROBLEM.format(n=n, why=why)
+    return None
 
 
 def unused_pass_settings(pass_config: Mapping[str, Any], pass_number: int) -> List[str]:
