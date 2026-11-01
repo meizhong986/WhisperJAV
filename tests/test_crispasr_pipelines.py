@@ -145,9 +145,11 @@ class Stage:
         monkeypatch.setitem(sys.modules, FRAMER_MODULE, types.SimpleNamespace(VadGroupedFramer=Framer))
 
         class Engine:
-            def __init__(self, model_path, backend, use_gpu, n_threads=None, label="", tokens_per_second=None):
+            def __init__(self, model_path, backend, use_gpu, n_threads=None, label="", tokens_per_second=None,
+                         max_new_tokens=None, ask=None):
                 self.model_path, self.backend, self.use_gpu = model_path, backend, use_gpu
                 self.tokens_per_second = tokens_per_second
+                self.max_new_tokens, self.ask = max_new_tokens, ask
                 self.n_threads = 8
                 self.opened = 0
                 self.closed = 0
@@ -420,7 +422,7 @@ class TestThe1101Pipelines:
            "kotoba-crispasr": ("Kotoba-CrispASR", "qwen", "balanced", "firered-vad"),
            "whisper-turbo-crispasr": ("Whisper-Turbo-CrispASR", "qwen", "balanced", "firered-vad"),
            "whisper-large-crispasr": ("Whisper-Large-CrispASR", "qwen", "balanced", "firered-vad"),
-           "moss-crispasr": ("MOSS-CrispASR", "qwen", "balanced", "firered-vad")}
+           "moss-crispasr": ("MOSS-CrispASR", "moss", "balanced", "silero-v6.2")}
 
     @staticmethod
     def classes():
@@ -441,21 +443,27 @@ class TestThe1101Pipelines:
         for name, cls in classes.items():
             assert cls.PIPELINE_NAME == name
             assert cls.__mro__[1] is CrispASRPipeline
-            assert set(vars(cls)) <= {"PIPELINE_NAME", "LABEL", "ENGINE", "ENGINE_WITHOUT_ALIGNER", "__module__", "__doc__", "__qualname__",
+            assert set(vars(cls)) <= {"PIPELINE_NAME", "LABEL", "ENGINE", "ENGINE_WITHOUT_ALIGNER", "MODEL_SETTINGS",
+                                      "__module__", "__doc__", "__qualname__",
                                       "__firstlineno__", "__static_attributes__", "_abc_impl", "__abstractmethods__"}
 
     def test_the_aligned_pipelines_are_the_manifests(self):
         from whisperjav.crispasr.manifest import ALIGNED_PIPELINES
         classes = self.classes()
-        assert {name for name, cls in classes.items() if cls.ENGINE.aligner} == ALIGNED_PIPELINES
-        for name in ALIGNED_PIPELINES:
-            # MOSS-CrispASR alone also limits its tokens per second of audio (owner W406 i1).
-            rate = 65536 / 3000 if name == "moss-crispasr" else None
-            # 1.10.1 post-processing (W421 i3, W422): MOSS keeps the three earlier filters; Cohere cleans its text
-            extra = ({"cleanup": ("nonverbal", "nonlinguistic", "scene_overlap")} if name == "moss-crispasr"
-                     else {"text_cleanup": ("text_cleaner",)})
-            assert classes[name].ENGINE == chain.EngineRow("group", audio_analytics=True, aligner="wav2vec2-ja",
-                                                           tokens_per_second=rate, **extra)
+        assert {name for name, cls in classes.items() if cls.ENGINE.aligner} == ALIGNED_PIPELINES == {"cohere-crispasr"}
+        # 1.10.1 post-processing (W421 i3, W422): Cohere cleans its text before the aligner
+        assert classes["cohere-crispasr"].ENGINE == chain.EngineRow("group", audio_analytics=True,
+                                                                    aligner="wav2vec2-ja",
+                                                                    text_cleanup=("text_cleaner",))
+
+    def test_moss_row(self):
+        # 1.10.1 (owner W411, W426): the model's own segment times, one subtitle per segment; its token limit per
+        # second of audio (W406 i1); the three earlier filters only (W421 i3); its MOSS settings (W428 I1 4).
+        from whisperjav.crispasr.moss_prompt import MossSettings
+        cls = self.classes()["moss-crispasr"]
+        assert cls.ENGINE == chain.EngineRow("segments", audio_analytics=True, tokens_per_second=65536 / 3000,
+                                             cleanup=("nonverbal", "nonlinguistic", "scene_overlap"))
+        assert cls.MODEL_SETTINGS is MossSettings
 
     def test_the_native_timing_pipelines(self):
         # Owner W411, W412: the new pipelines whose models give word times use them, no aligner; ReazonSpeech's
@@ -500,7 +508,7 @@ class TestThe1101Pipelines:
         pipe = make(cls, tmp_path)
         assert pipe.model.name == PIPELINE_DEFAULT_MODEL[pipeline]
         assert (pipe.sensitivity, pipe.speech_segmenter) == (sensitivity, segmenter)
-        like = "parakeet-crispasr" if style == "fidelity" else "cohere-crispasr"
+        like = {"fidelity": "parakeet-crispasr", "qwen": "cohere-crispasr", "moss": "moss-crispasr"}[style]
         assert pipe.segmenter == segmenter_settings(like, segmenter, sensitivity)
 
 
@@ -650,7 +658,6 @@ class TestWordTimestampsSwitch:
         return TestThe1101Pipelines.classes()
 
     def test_each_pipelines_row_for_each_choice(self):
-        aligned = chain.EngineRow("group", audio_analytics=True, aligner="wav2vec2-ja")
         for name, cls in self.classes().items():
             assert cls.engine_row(None) == cls.ENGINE
             if cls.ENGINE.aligner:
@@ -664,10 +671,8 @@ class TestWordTimestampsSwitch:
         rows = {name: cls.engine_row("model") for name, cls in self.classes().items()}
         # Cohere + model: its own token times cut at sentence-end marks only, as the Whisper pipelines (W414)
         assert rows["cohere-crispasr"] == chain.EngineRow("tokens", audio_analytics=True, cut_at_pauses=False)
-        # MOSS + model: no word times, one subtitle per VAD group at its edges; its token limit stays
-        assert rows["moss-crispasr"] == chain.dataclasses.replace(aligned, aligner=None, tokens_per_second=65536 / 3000,
-                                                                  cleanup=("nonverbal", "nonlinguistic",
-                                                                           "scene_overlap"))
+        # MOSS + model (its own default since 1.10.1, W426): its own segment times, one subtitle per segment
+        assert rows["moss-crispasr"].line_rule == "segments" and rows["moss-crispasr"].aligner is None
 
     def test_an_unknown_choice_is_refused(self, tmp_path):
         with pytest.raises(ValueError, match="word-timestamps"):
@@ -684,13 +689,94 @@ class TestWordTimestampsSwitch:
         config = md["config"]["crispasr"]
         assert (config["word_timestamps"], config["aligner"], config["line_rule"]) == ("model", None, "tokens")
 
-    def test_moss_with_model_times_makes_one_subtitle_per_vad_group(self, stage, tmp_path):
+    def test_moss_with_model_times_makes_one_subtitle_per_model_segment(self, stage, tmp_path):
         from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
 
         stage.answers = [[CrispSegment("本番。いいよ", 0.0, 1.0)], [], []]
         md = make(MossCrispASRPipeline, tmp_path, word_timestamps="model").process(stage.media())
         assert stage.aligners == []
         assert srt_entries(md["output_files"]["final_srt"]) == [("本番。いいよ", 1.0, 2.0)]
+
+
+class TestMoss:
+    """MOSS-CrispASR built after the owner's reference (1.10.1; W425, W426, W428)."""
+
+    def test_by_default_each_model_segment_is_a_subtitle_at_its_own_times(self, stage, tmp_path):
+        from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
+
+        # one VAD group, 1.0-4.0 s of scene 0; MOSS's own times inside it; a label-only and an empty segment give
+        # nothing; a time past the group's end is clamped to it
+        stage.frames = {0: [(1.0, 4.0)], 1: []}
+        stage.answers = [[CrispSegment("[S01]本番。", 0.2, 0.9), CrispSegment("[S02]", 0.9, 1.0),
+                          CrispSegment("", 1.0, 1.1), CrispSegment("[S01]いいよ[12.5]", 1.2, 99.0)]]
+        md = make(MossCrispASRPipeline, tmp_path).process(stage.media())
+        assert stage.aligners == []
+        assert srt_entries(md["output_files"]["final_srt"]) == [("本番。", 1.2, 1.9), ("いいよ", 2.2, 4.0)]
+        assert md["config"]["crispasr"]["word_timestamps"] == "model"
+        assert md["config"]["crispasr"]["line_rule"] == "segments"
+
+    def test_the_reference_instruction_and_the_token_limit_reach_the_engine(self, stage, tmp_path):
+        from whisperjav.crispasr.moss_prompt import PROMPT_EN, TOKENS_PER_SECOND
+        from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
+
+        stage.answers = [[], [], []]
+        make(MossCrispASRPipeline, tmp_path).process(stage.media())
+        engine = stage.engines[0]
+        assert engine.ask == PROMPT_EN + " Language hint: Japanese."
+        assert (engine.tokens_per_second, engine.max_new_tokens) == (TOKENS_PER_SECOND, None)
+
+    def test_its_moss_settings_come_from_the_pass_params(self, stage, tmp_path):
+        from whisperjav.crispasr.moss_prompt import PROMPT_ZH
+        from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
+
+        stage.answers = [[], [], []]
+        params = {"prompt_language": "zh", "hotwords": "監督, 村西", "max_new_tokens": 4000, "threshold": 0.5}
+        md = make(MossCrispASRPipeline, tmp_path, model_params=params).process(stage.media())
+        engine = stage.engines[0]
+        assert engine.ask == PROMPT_ZH + " 语言提示：Japanese 热词提示：監督, 村西"
+        assert engine.max_new_tokens == 4000
+        assert md["config"]["crispasr"]["model_settings"] == {
+            "prompt_language": "zh", "language_hint": "Japanese", "hotwords": "監督, 村西", "max_new_tokens": 4000}
+
+    def test_a_setting_it_cannot_use_is_refused(self, tmp_path):
+        from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
+
+        with pytest.raises(ValueError, match="prompt_language"):
+            make(MossCrispASRPipeline, tmp_path, model_params={"prompt_language": "fr"})
+        with pytest.raises(ValueError, match="max_new_tokens"):
+            make(MossCrispASRPipeline, tmp_path, model_params={"max_new_tokens": -1})
+
+    def test_its_stretches_and_scenes(self, tmp_path):
+        # W426: silero-v6.2 at 0.7, gap 5 s, longest 120 s, shortest 70 s, at every sensitivity (W428 I1 2);
+        # silero scenes of up to 420 s
+        from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
+
+        for sensitivity in ("conservative", "balanced", "aggressive"):
+            pipe = make(MossCrispASRPipeline, tmp_path, sensitivity=sensitivity)
+            s = pipe.segmenter
+            assert (s.backend, s.max_group_duration_s, s.chunk_threshold_s) == ("silero-v6.2", 120.0, 5.0)
+            assert (s.config["threshold"], s.config["min_group_duration_s"]) == (0.7, 70.0)
+            assert pipe.scene_detector_kwargs() == {"method": "silero", "max_duration": 420}
+        pipe = make(MossCrispASRPipeline, tmp_path, scene_detector="semantic")
+        assert pipe.scene_detector_kwargs() == {"method": "semantic", "min_duration": 12, "max_duration": 420}
+        pipe = make(MossCrispASRPipeline, tmp_path, vad_threshold=0.5,
+                    segmenter_overrides={"min_group_duration_s": 90, "max_group_duration_s": 110})
+        assert (pipe.segmenter.config["threshold"], pipe.segmenter.config["min_group_duration_s"],
+                pipe.segmenter.max_group_duration_s) == (0.5, 90, 110)
+
+    def test_the_other_pipelines_keep_their_scenes_and_no_shortest_group(self, tmp_path):
+        pipe = make(CohereCrispASRPipeline, tmp_path)
+        assert pipe.scene_detector_kwargs() == {"method": "semantic", "min_duration": 12, "max_duration": 48}
+        assert not pipe.segmenter.config.get("min_group_duration_s")
+        assert pipe.model_settings is None
+
+    def test_with_the_aligner_the_labels_are_not_aligned(self, stage, tmp_path):
+        from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
+
+        stage.answers = [[CrispSegment("[S01]本番。", 0.2, 0.9)], [], []]
+        stage.alignments = [[]]
+        make(MossCrispASRPipeline, tmp_path, word_timestamps="aligner").process(stage.media())
+        assert [text for _n, text in stage.aligners[0].texts] == ["本番。"]
 
     def test_kotoba_with_the_aligner_aligns_and_cuts_as_cohere(self, stage, tmp_path):
         from whisperjav.pipelines.kotoba_crispasr_pipeline import KotobaCrispASRPipeline
