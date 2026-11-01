@@ -23,8 +23,11 @@ per-model table (ENGINE); everything else is here (route B design, sections 3-4)
      (whisperjav/crispasr/lines.py): Parakeet cut only at natural cues (W203, W204); Cohere's aligned
      groups at sentence-end marks only, with chained ends (W259), a group the aligner gives nothing for
      one subtitle;
-  7. scene SRTs, stitched; the three filters (nonverbal, nonlinguistic, scene overlap; W129 6);
-     <name>.ja.whisperjav.srt.
+  7. scene SRTs, stitched; post-processing by the row's clean-up (whisperjav/crispasr/cleanup.py, 1.10.1; owner
+     W421 i1, W422): a raw copy, fidelity's duplicate merge, hallucination filter and repetition cleaner, then the
+     three filters (nonverbal, nonlinguistic, scene overlap; W129 6), and fidelity's artifacts file; MOSS-CrispASR
+     the three filters only (W421 i3). Cohere-CrispASR's text is cleaned before the aligner (ChronosJAV's text
+     cleaner); <name>.ja.whisperjav.srt.
 
 Times: Parakeet's token times (W93 c5, W116); Cohere's from the aligner's character times, or the VAD group
 edges where there are none (design note docs/plans/design/2026-10-28-chronosjav-timing-c3-c1.md, section 6).
@@ -42,6 +45,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from whisperjav.crispasr import cleanup as crispasr_cleanup
 from whisperjav.crispasr import install, lines, manifest
 from whisperjav.crispasr.aligner import CrispAligner
 from whisperjav.crispasr.engine import SAMPLE_RATE, BindingEngine, CrispSegment, CrispToken
@@ -73,6 +77,10 @@ class EngineRow:
     # None for the model's own limit. MOSS-CrispASR only (owner W406 i1): without it the model can repeat a line
     # to its own limit on non-speech.
     tokens_per_second: Optional[float] = None
+    # Post-processing (1.10.1; owner W421 i1, W422; whisperjav/crispasr/cleanup.py): the stages on the stitched
+    # subtitles, and the stages on each VAD group's text before the aligner (run only while the aligner is on).
+    cleanup: Tuple[str, ...] = crispasr_cleanup.SRT_STAGES
+    text_cleanup: Tuple[str, ...] = ()
 
 
 @dataclass
@@ -222,6 +230,15 @@ class CrispASRPipeline(BasePipeline):
         self._device_line_shown = False
         self.degradations: List[str] = []
         self.notes: List[str] = []
+        # Post-processing (cleanup.py): built once per pass; the text cleaner's changes are kept per file.
+        self._srt_cleanup = crispasr_cleanup.SrtCleanup(self.engine.cleanup, label=self.LABEL)
+        self._text_cleaner: Optional[crispasr_cleanup.TextCleaner] = None
+        self._text_changes: List[crispasr_cleanup.TextChange] = []
+        self._model_texts: Dict[int, str] = {}
+        # Where the raw copy and the artifacts file go, and the pass in their names: set per file by the Ensemble
+        # pass worker (the raw_subs folder beside the pass's subtitle file); None = <output_dir>/raw_subs, no pass.
+        self.raw_subs_dir: Optional[str] = None
+        self.pass_tag: Optional[str] = None
 
         logger.info(f"{self.LABEL} ready: model {self.model.label}, speech segmenter {self.speech_segmenter} "
                     f"({self.sensitivity}), VAD groups of at most {self.segmenter.max_group_duration_s:g} s")
@@ -238,6 +255,8 @@ class CrispASRPipeline(BasePipeline):
         # The worker reuses one pipeline object for every file of the pass.
         self.degradations = []
         self.notes = []
+        self._text_changes = []
+        self._model_texts = {}
         input_file = Path(media_info["path"])
         basename = media_info["basename"]
         md = self._new_metadata(input_file, basename)
@@ -281,6 +300,8 @@ class CrispASRPipeline(BasePipeline):
         try:
             if groups:
                 results = self._transcribe(scenes, groups, md)
+                if self.engine.aligner and self.engine.text_cleanup:
+                    self._clean_texts(scenes, results, md)
                 if self.engine.aligner:
                     aligned = self._align(scenes, results, md)
             else:
@@ -299,7 +320,7 @@ class CrispASRPipeline(BasePipeline):
         stitched, count_raw = self._build_subtitles(scenes, results, basename, md, aligned)
         if self.save_metadata_json:
             self._write_group_record(basename, scenes, results, aligned)
-        stats, count = self._postprocess(stitched, count_raw)
+        stats, count = self._postprocess(stitched, count_raw, basename)
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
         final_srt = self.output_dir / f"{basename}.{self.lang_code}.whisperjav.srt"
@@ -315,7 +336,8 @@ class CrispASRPipeline(BasePipeline):
         md["summary"] = {
             "final_subtitles_refined": count,
             "final_subtitles_raw": count_raw,
-            "quality_metrics": {"hallucinations_removed": 0, "repetitions_removed": 0,
+            "quality_metrics": {"hallucinations_removed": stats.get("hallucinations_removed", 0),
+                                "repetitions_removed": stats.get("repetitions_removed", 0),
                                 "duration_adjustments": stats.get("overlap_shifted", 0),
                                 "empty_removed": stats.get("empty_removed", 0), "cps_filtered": 0,
                                 "logprob_filtered": 0, "nonverbal_filtered": stats.get("nonverbal_dropped", 0)},
@@ -344,6 +366,8 @@ class CrispASRPipeline(BasePipeline):
                                     "word_timestamps": self.word_timestamps,
                                     "line_rule": self.engine.line_rule, "aligner": self.engine.aligner,
                                     "onsets": self.engine.onsets, "cut_at_pauses": self.engine.cut_at_pauses,
+                                    "cleanup": list(self.engine.cleanup),
+                                    "text_cleanup": list(self.engine.text_cleanup) if self.engine.aligner else [],
                                     "cues": self.cues.as_dict() if self.engine.line_rule == "tokens" else None,
                                     "speech_segmenter_settings": self.segmenter.as_dict(),
                                     "threads": None}},
@@ -729,31 +753,45 @@ class CrispASRPipeline(BasePipeline):
             stitched.write_text("", encoding="utf-8")
         return stitched, count
 
-    def _postprocess(self, stitched: Path, count: int) -> Tuple[Dict[str, int], int]:
-        """The three filters, in place: nonverbal, nonlinguistic, scene overlap (W129 6)."""
-        stats: Dict[str, int] = {}
-        if count == 0:
-            return stats, 0
-        from whisperjav.modules.subtitle_pipeline.cleaners.nonlinguistic_utterance_filter import (
-            NonlinguisticUtteranceFilter)
-        from whisperjav.modules.subtitle_pipeline.cleaners.nonverbal_line_filter import NonverbalLineFilter
-        from whisperjav.modules.subtitle_pipeline.cleaners.scene_overlap_resolver import SceneOverlapResolver
+    def _postprocess(self, stitched: Path, count: int, basename: str = "") -> Tuple[Dict[str, Any], int]:
+        """The row's post-processing, in place (whisperjav/crispasr/cleanup.py; owner W421 i1, W422): the raw copy
+        first, then the stages the row names, then the artifacts file. Before 1.10.1 (and MOSS-CrispASR still): the
+        three filters nonverbal, nonlinguistic, scene overlap (W129 6)."""
+        stem = crispasr_cleanup.file_stem(basename or stitched.stem.replace("_stitched", ""), self.PIPELINE_NAME,
+                                          self.pass_tag)
+        raw_dir = Path(self.raw_subs_dir) if self.raw_subs_dir else self.output_dir / crispasr_cleanup.RAW_SUBS
+        return self._srt_cleanup.run(stitched, raw_dir, stem, count, self._text_changes)
 
-        r = NonverbalLineFilter().filter_srt_file(stitched)
-        stats["nonverbal_dropped"] = r.get("dropped_nonverbal", 0)
-        stats["empty_removed"] = r.get("dropped_empty", 0)
-        count = r.get("final_count", count)
-        if count:
-            r = NonlinguisticUtteranceFilter().filter_srt_file(stitched)
-            stats["nonlinguistic_dropped"] = r.get("dropped_nonlinguistic", 0)
-            stats["empty_removed"] += r.get("dropped_empty", 0)
-            count = r.get("final_count", count)
-        if count:
-            r = SceneOverlapResolver().resolve_srt_file(stitched)
-            stats["overlap_nested_dropped"] = r.get("dropped_nested", 0)
-            stats["overlap_shifted"] = r.get("shifted_starts", 0)
-            count = r.get("final_count", count)
-        return stats, count
+    def _clean_texts(self, scenes: List[_Scene], results: List[Tuple[_Group, List[CrispSegment]]],
+                     md: Dict) -> None:
+        """The row's text stages on each VAD group's text before the aligner (Cohere-CrispASR: ChronosJAV's text
+        cleaner, as for Qwen3-ASR). A changed group keeps one segment with the cleaned text, which the aligner then
+        times (or which becomes the group's one subtitle when the aligner gives nothing); a group cleaned to nothing
+        has no text. Every change goes into the artifacts file."""
+        if self._text_cleaner is None:
+            self._text_cleaner = crispasr_cleanup.TextCleaner()
+        scene_of = {sc.index: sc for sc in scenes}
+        with_text = changed = chars_before = chars_after = 0
+        for i, (g, segments) in enumerate(results):
+            text = "".join(seg.text.strip() for seg in segments).strip()
+            if not text:
+                continue
+            with_text += 1
+            cleaned = self._text_cleaner.clean(text).strip()
+            chars_before += len(text)
+            chars_after += len(cleaned)
+            if cleaned == text:
+                continue
+            changed += 1
+            start = scene_of[g.scene].start
+            self._text_changes.append(crispasr_cleanup.TextChange(start + g.start, start + g.end, text, cleaned))
+            self._model_texts[i] = text
+            results[i] = (g, [CrispSegment(cleaned, 0.0, g.end - g.start)] if cleaned else [])
+        md["stages"]["text_cleaner"] = {"groups": with_text, "changed": changed,
+                                        "chars_before": chars_before, "chars_after": chars_after}
+        if changed:
+            logger.info(f"{self.LABEL}: text cleaner changed {changed} of {with_text} VAD groups "
+                        f"({chars_before} -> {chars_after} characters)")
 
     def _write_group_record(self, basename: str, scenes: List[_Scene],
                             results: List[Tuple[_Group, List[CrispSegment]]], aligned: Optional[set] = None) -> None:
@@ -771,9 +809,10 @@ class CrispASRPipeline(BasePipeline):
             with open(folder / f"{basename}.{self.PIPELINE_NAME}.groups.jsonl", "w", encoding="utf-8") as fh:
                 for i, (g, segments) in enumerate(results):
                     scene = scene_of[g.scene]
+                    extra = {"model_text": self._model_texts[i]} if i in self._model_texts else {}
                     fh.write(json.dumps({
                         "scene": g.scene, "start": round(scene.start + g.start, 3),
-                        "end": round(scene.start + g.end, 3), "aligned": i in aligned,
+                        "end": round(scene.start + g.end, 3), "aligned": i in aligned, **extra,
                         "segments": [{"text": s.text, "start": s.start, "end": s.end,
                                       "words": [[w.text, w.start, w.end, w.confidence] for w in s.words],
                                       "tokens": [[t.text, t.start, t.end, t.confidence] for t in s.tokens]}
