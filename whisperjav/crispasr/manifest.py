@@ -183,11 +183,12 @@ PIPELINE_DEFAULT_MODEL = {
     "moss-crispasr": "moss-transcribe-diarize-0.9b-f16",
 }
 CRISPASR_PIPELINES = tuple(PIPELINE_MODELS)
-# The pipelines whose text the CrispASR aligner times (wav2vec2-ja, DEFAULT_ALIGNER): every pipeline but
-# Parakeet-CrispASR, whose model gives each token a start and an end. ReazonSpeech's tokens carry one time
-# each (start = end, 2026-10-31), so it is aligned like the others. Each pipeline class's ENGINE.aligner
-# says the same (tests/test_crispasr_pipelines.py); the GUI's status panel reads it here.
-ALIGNED_PIPELINES = frozenset(p for p in CRISPASR_PIPELINES if p != "parakeet-crispasr")
+# The pipelines whose text the CrispASR aligner times (wav2vec2-ja, DEFAULT_ALIGNER) by default: Cohere-CrispASR
+# (item 12; W248 3, Q7) and MOSS-CrispASR, whose model gives no word times. The others use their models' own
+# token times (owner W411, W412): Parakeet, Kotoba, Whisper-Turbo, Whisper-Large starts and ends; ReazonSpeech
+# starts only, its ends at the VAD group's end. Each pipeline class's ENGINE.aligner says the same
+# (tests/test_crispasr_pipelines.py); the GUI's status panel reads it here.
+ALIGNED_PIPELINES = frozenset({"cohere-crispasr", "moss-crispasr"})
 
 # The aligners: models that time text already written, run by CrispASR's align_words (item 12, C1; design
 # note docs/plans/design/2026-10-28-chronosjav-timing-c3-c1.md section 4). Kept apart from MODELS, which are
