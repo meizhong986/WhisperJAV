@@ -9,7 +9,12 @@ Why the Diarize model (W401, pre-approved choices of step 2): MOSS-Transcribe-pr
 model, is English only (its model card: "Language: English"); on the Netflix reference clip it wrote English for
 81 of 82 VAD groups (2026-10-31). MOSS-Transcribe-Diarize transcribes 50+ languages, Japanese among them. No
 diarization in 1.10.x (W113 X7): its speaker labels are not used ("Speaker labels may be filtered out or omitted").
-Not solved yet: the labels ("[S01]") can stay inside the text, and on non-speech it can repeat a line to its limit.
+Not solved yet: the labels ("[S01]") can stay inside the text.
+
+Token limit (owner W406 i1): each call may write at most 65,536 / 3,000 tokens per second of the VAD group's audio
+(about 21.8; at least 32), the rate of the owner's reference script (65,536 tokens per 50-minute chunk). Without it
+the model repeated a line to its own limit on non-speech (one 4 s group: 517 characters). On the Netflix reference
+clip: character error rate 1.506 -> 0.823, longest call 30.9 s -> 2.6 s (D:\\WJ110_measure\\moss_ref_2026-10-31).
 
 The chain is shared with the other CrispASR pipelines (whisperjav/pipelines/crispasr_pipeline.py). What is its
 own (W401, pre-approved choices of step 2): Cohere-CrispASR's settings -- FireRedVAD at balanced, VAD groups of
@@ -25,4 +30,5 @@ class MossCrispASRPipeline(CrispASRPipeline):
 
     PIPELINE_NAME = "moss-crispasr"
     LABEL = "MOSS-CrispASR"
-    ENGINE = EngineRow(line_rule="group", audio_analytics=True, aligner="wav2vec2-ja")
+    ENGINE = EngineRow(line_rule="group", audio_analytics=True, aligner="wav2vec2-ja",
+                       tokens_per_second=65536 / 3000)
