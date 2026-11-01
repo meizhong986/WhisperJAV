@@ -128,7 +128,8 @@ class BindingEngine:
     """Route B: one ``crispasr.Session`` for one model."""
 
     def __init__(self, model_path: Path, backend: str, use_gpu: bool, n_threads: Optional[int] = None,
-                 label: str = "", tokens_per_second: Optional[float] = None):
+                 label: str = "", tokens_per_second: Optional[float] = None, max_new_tokens: Optional[int] = None,
+                 ask: Optional[str] = None):
         self.model_path = Path(model_path)
         self.backend = backend      # what the opened session must report (manifest ModelFile.backend)
         self.use_gpu = bool(use_gpu)
@@ -137,10 +138,17 @@ class BindingEngine:
         # None: the model's own limit. Otherwise each call may write at most
         # max(MIN_NEW_TOKENS, ceil(tokens_per_second x the audio's seconds)) tokens (EngineRow.tokens_per_second).
         self.tokens_per_second = tokens_per_second
+        # A fixed limit for every call (MOSS-CrispASR's max_new_tokens, moss_prompt.py); wins over tokens_per_second.
+        self.max_new_tokens = max_new_tokens
+        # The whole instruction for the model (Session.set_ask; MOSS-CrispASR, moss_prompt.py), or None for the
+        # model's own. Given before every call, so no state of an earlier call can replace it.
+        self.ask = ask
         self._session = None
 
     def token_limit(self, n_samples: int) -> Optional[int]:
         """The token limit for one call on ``n_samples`` of 16 kHz audio, or None for the model's own."""
+        if self.max_new_tokens:
+            return int(self.max_new_tokens)
         if not self.tokens_per_second:
             return None
         return max(MIN_NEW_TOKENS, math.ceil(self.tokens_per_second * n_samples / SAMPLE_RATE))
@@ -182,6 +190,8 @@ class BindingEngine:
             limit = self.token_limit(len(audio))
             if limit is not None:
                 self._session.set_max_new_tokens(limit)   # per call: the limit follows the VAD group's length
+            if self.ask:
+                self._session.set_ask(self.ask)
             result = self._session.transcribe(audio, sample_rate=SAMPLE_RATE, language=LANGUAGE)
         except (RuntimeError, ValueError) as e:
             raise CrispASRRunError(str(e)) from e
