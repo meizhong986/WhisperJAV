@@ -29,3 +29,6 @@ class CohereCrispASRPipeline(CrispASRPipeline):
     PIPELINE_NAME = "cohere-crispasr"
     LABEL = "Cohere-CrispASR"
     ENGINE = EngineRow(line_rule="group", audio_analytics=True, aligner="wav2vec2-ja")
+    # --passN-word-timestamps model (1.10.1; owner W413, W414): Cohere's own token times (estimated by CrispASR),
+    # cut at sentence-end marks only, as the Whisper pipelines.
+    ENGINE_WITHOUT_ALIGNER = EngineRow(line_rule="tokens", audio_analytics=True, cut_at_pauses=False)
