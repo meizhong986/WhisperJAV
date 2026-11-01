@@ -186,9 +186,28 @@ CRISPASR_PIPELINES = tuple(PIPELINE_MODELS)
 # The pipelines whose text the CrispASR aligner times (wav2vec2-ja, DEFAULT_ALIGNER) by default: Cohere-CrispASR
 # (item 12; W248 3, Q7) and MOSS-CrispASR, whose model gives no word times. The others use their models' own
 # token times (owner W411, W412): Parakeet, Kotoba, Whisper-Turbo, Whisper-Large starts and ends; ReazonSpeech
-# starts only, its ends at the VAD group's end. Each pipeline class's ENGINE.aligner says the same
+# starts only, its ends at the VAD group's end. --passN-word-timestamps changes it per pass (word_timestamps_for,
+# below). Each pipeline class's ENGINE.aligner says the same
 # (tests/test_crispasr_pipelines.py); the GUI's status panel reads it here.
 ALIGNED_PIPELINES = frozenset({"cohere-crispasr", "moss-crispasr"})
+
+# Where a pass's subtitle times come from (--passN-word-timestamps; owner W411-W413): "model" = the ASR model's
+# own word times, "aligner" = the CrispASR aligner DEFAULT_ALIGNER. The default is the pipeline's own
+# (ALIGNED_PIPELINES); the user's choice wins. One rule for main.py (--dump-params), the pipeline and the GUI.
+WORD_TIMESTAMPS = ("model", "aligner")
+
+
+def word_timestamps_for(pipeline: str, choice: Optional[str] = None) -> str:
+    """"model" or "aligner" for this CrispASR pipeline: ``choice`` when given, else the pipeline's default.
+
+    Raises ValueError for a choice that is neither.
+    """
+    if choice:
+        choice = str(choice).strip().lower()
+        if choice not in WORD_TIMESTAMPS:
+            raise ValueError(f"'{choice}' is not a word-timestamps choice; choose one of: {', '.join(WORD_TIMESTAMPS)}")
+        return choice
+    return "aligner" if pipeline in ALIGNED_PIPELINES else "model"
 
 # The aligners: models that time text already written, run by CrispASR's align_words (item 12, C1; design
 # note docs/plans/design/2026-10-28-chronosjav-timing-c3-c1.md section 4). Kept apart from MODELS, which are
