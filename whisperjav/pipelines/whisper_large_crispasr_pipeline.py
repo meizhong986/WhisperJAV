@@ -8,9 +8,10 @@ q8_0). large-v2 is the default: on the Netflix reference clip it wrote fewer inv
 character error rate of the two (2026-10-31; the manifest's PIPELINE_DEFAULT_MODEL).
 
 The chain is shared with the other CrispASR pipelines (whisperjav/pipelines/crispasr_pipeline.py). What is its
-own (W401, pre-approved choices of step 2): Cohere-CrispASR's settings -- FireRedVAD at balanced, VAD groups of
-at most 3.0 s, gap 0.3 s, pads 100/100 ms; each VAD group's text timed by the CrispASR aligner (wav2vec2-ja) and
-cut at sentence-end marks, a group the aligner gives nothing for one subtitle at its edges; the audio analytics.
+own (W401, pre-approved choices of step 2): Cohere-CrispASR's speech segmenter settings -- FireRedVAD at balanced,
+VAD groups of at most 3.0 s, gap 0.3 s, pads 100/100 ms; the audio analytics. Its subtitles take the model's own
+token times, no aligner (owner W411, W412: native word timestamps by default), cut at sentence-end
+marks only, as before (lines.tokens_rule cut_at_pauses=False; W401 step 2).
 """
 
 from whisperjav.pipelines.crispasr_pipeline import CrispASRPipeline, EngineRow
@@ -21,4 +22,4 @@ class WhisperLargeCrispASRPipeline(CrispASRPipeline):
 
     PIPELINE_NAME = "whisper-large-crispasr"
     LABEL = "Whisper-Large-CrispASR"
-    ENGINE = EngineRow(line_rule="group", audio_analytics=True, aligner="wav2vec2-ja")
+    ENGINE = EngineRow(line_rule="tokens", audio_analytics=True, cut_at_pauses=False)
