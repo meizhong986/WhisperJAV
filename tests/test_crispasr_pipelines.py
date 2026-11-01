@@ -247,7 +247,7 @@ class TestTheTwoPipelines:
     def test_both_share_one_chain(self):
         for cls in (ParakeetCrispASRPipeline, CohereCrispASRPipeline):
             assert cls.__mro__[1] is CrispASRPipeline
-            assert set(vars(cls)) <= {"PIPELINE_NAME", "LABEL", "ENGINE", "__module__", "__doc__", "__qualname__",
+            assert set(vars(cls)) <= {"PIPELINE_NAME", "LABEL", "ENGINE", "ENGINE_WITHOUT_ALIGNER", "__module__", "__doc__", "__qualname__",
                                       "__firstlineno__", "__static_attributes__",
                                       "_abc_impl", "__abstractmethods__"}
 
@@ -432,7 +432,7 @@ class TestThe1101Pipelines:
         for name, cls in classes.items():
             assert cls.PIPELINE_NAME == name
             assert cls.__mro__[1] is CrispASRPipeline
-            assert set(vars(cls)) <= {"PIPELINE_NAME", "LABEL", "ENGINE", "__module__", "__doc__", "__qualname__",
+            assert set(vars(cls)) <= {"PIPELINE_NAME", "LABEL", "ENGINE", "ENGINE_WITHOUT_ALIGNER", "__module__", "__doc__", "__qualname__",
                                       "__firstlineno__", "__static_attributes__", "_abc_impl", "__abstractmethods__"}
 
     def test_the_aligned_pipelines_are_the_manifests(self):
@@ -628,6 +628,92 @@ class TestCohereAligned:
         stage.answers = [[parakeet_segment(("はい", 0.1, 0.4))]]
         make(ParakeetCrispASRPipeline, tmp_path).process(stage.media())
         assert stage.aligners == []
+
+
+class TestWordTimestampsSwitch:
+    """--passN-word-timestamps {model,aligner} (1.10.1, Part B; owner W411-W414): the pass's row."""
+
+    @staticmethod
+    def classes():
+        return TestThe1101Pipelines.classes()
+
+    def test_each_pipelines_row_for_each_choice(self):
+        aligned = chain.EngineRow("group", audio_analytics=True, aligner="wav2vec2-ja")
+        for name, cls in self.classes().items():
+            assert cls.engine_row(None) == cls.ENGINE
+            if cls.ENGINE.aligner:
+                # its own default is the aligner
+                assert cls.engine_row("aligner") == cls.ENGINE
+                assert cls.engine_row("model").aligner is None
+            else:
+                # its own default is the model's word times; the aligner is added on request, nothing else changes
+                assert cls.engine_row("model") == cls.ENGINE
+                assert cls.engine_row("aligner") == chain.dataclasses.replace(cls.ENGINE, aligner="wav2vec2-ja")
+        rows = {name: cls.engine_row("model") for name, cls in self.classes().items()}
+        # Cohere + model: its own token times cut at sentence-end marks only, as the Whisper pipelines (W414)
+        assert rows["cohere-crispasr"] == chain.EngineRow("tokens", audio_analytics=True, cut_at_pauses=False)
+        # MOSS + model: no word times, one subtitle per VAD group at its edges; its token limit stays
+        assert rows["moss-crispasr"] == chain.dataclasses.replace(aligned, aligner=None, tokens_per_second=65536 / 3000)
+
+    def test_an_unknown_choice_is_refused(self, tmp_path):
+        with pytest.raises(ValueError, match="word-timestamps"):
+            make(CohereCrispASRPipeline, tmp_path, word_timestamps="dtw")
+
+    def test_cohere_with_model_times_loads_no_aligner_and_cuts_at_sentence_ends(self, stage, tmp_path):
+        stage.answers = [[CrispSegment("本番。いいよ", 0.0, 1.0, (), toks(("本番", 0.1, 0.4), ("。", 0.4, 0.45),
+                                                                     ("いいよ", 0.6, 0.9)))], [], []]
+        md = make(CohereCrispASRPipeline, tmp_path, word_timestamps="model").process(stage.media())
+        assert stage.aligners == []
+        entries = srt_entries(md["output_files"]["final_srt"])
+        assert [text for text, _s, _e in entries] == ["本番。", "いいよ"]
+        assert entries[0][1] == 1.1 and entries[1][1] == 1.6     # the model's own starts, not the group's edge
+        config = md["config"]["crispasr"]
+        assert (config["word_timestamps"], config["aligner"], config["line_rule"]) == ("model", None, "tokens")
+
+    def test_moss_with_model_times_makes_one_subtitle_per_vad_group(self, stage, tmp_path):
+        from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
+
+        stage.answers = [[CrispSegment("本番。いいよ", 0.0, 1.0)], [], []]
+        md = make(MossCrispASRPipeline, tmp_path, word_timestamps="model").process(stage.media())
+        assert stage.aligners == []
+        assert srt_entries(md["output_files"]["final_srt"]) == [("本番。いいよ", 1.0, 2.0)]
+
+    def test_kotoba_with_the_aligner_aligns_and_cuts_as_cohere(self, stage, tmp_path):
+        from whisperjav.pipelines.kotoba_crispasr_pipeline import KotobaCrispASRPipeline
+
+        stage.frames = {0: [(1.0, 4.79)], 1: []}
+        stage.answers = [[CrispSegment(TestCohereAligned.TEXT, 0.0, 3.79)]]
+        stage.alignments = [TestCohereAligned.UNITS]
+        md = make(KotobaCrispASRPipeline, tmp_path, word_timestamps="aligner").process(stage.media())
+        assert srt_entries(md["output_files"]["final_srt"]) == [
+            ("近くのカラオケでそのまま酔っぱらっちゃった。", 1.26, 4.1), ("それで？", 4.1, 4.79)]
+        assert (stage.aligners[0].model_name, stage.aligners[0].label) == ("wav2vec2-ja", "Kotoba-CrispASR")
+        assert md["config"]["crispasr"]["word_timestamps"] == "aligner"
+
+    def test_kotoba_by_default_loads_no_aligner(self, stage, tmp_path):
+        from whisperjav.pipelines.kotoba_crispasr_pipeline import KotobaCrispASRPipeline
+
+        stage.answers = [[parakeet_segment(("はい", 0.1, 0.4))]]
+        md = make(KotobaCrispASRPipeline, tmp_path).process(stage.media())
+        assert stage.aligners == [] and md["config"]["crispasr"]["word_timestamps"] == "model"
+
+    def test_with_the_aligner_a_group_it_gives_nothing_for_keeps_the_models_own_times(self, stage, tmp_path):
+        stage.answers = [[parakeet_segment(("本番", 0.1, 0.4))], [parakeet_segment(("いいよ", 0.2, 0.9))], []]
+        stage.alignments = [[TimedUnit("本", 0.1, 0.2), TimedUnit("番", 0.3, 1.0)], []]
+        md = make(ParakeetCrispASRPipeline, tmp_path, word_timestamps="aligner").process(stage.media())
+        entries = srt_entries(md["output_files"]["final_srt"])
+        assert entries[1][0] == "いいよ" and entries[1][1] == 3.2   # the model's own start, not the group's edge
+        assert md["summary"]["notes"][-1] == (
+            "Parakeet-CrispASR: 1 of 2 VAD group(s) could not be aligned; they keep the model's own word times")
+
+    def test_with_the_aligner_unloadable_the_models_own_times_are_used_and_said(self, stage, tmp_path):
+        stage.aligner_load_error = CrispASRSetupError("Downloading the model wav2vec2 failed: offline")
+        stage.answers = [[parakeet_segment(("監督", 0.1, 0.4))], [], []]
+        md = make(ParakeetCrispASRPipeline, tmp_path, word_timestamps="aligner").process(stage.media())
+        assert srt_entries(md["output_files"]["final_srt"])[0][:2] == ("監督", 1.1)
+        assert md["summary"]["notes"][-1] == (
+            "Parakeet-CrispASR's aligner (wav2vec2-ja) could not be loaded (Downloading the model wav2vec2 failed: "
+            "offline): the model's own word times are used.")
 
 
 class TestOncePerPass:
