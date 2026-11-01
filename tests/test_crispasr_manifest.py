@@ -109,6 +109,18 @@ class TestModels:
         # models' own token times (owner W411, W412)
         assert manifest.ALIGNED_PIPELINES == {"cohere-crispasr", "moss-crispasr"}
 
+    def test_the_word_timestamps_rule(self):
+        # 1.10.1 (Part B; owner W411-W414): the pipeline's default, or the user's choice
+        assert manifest.WORD_TIMESTAMPS == ("model", "aligner")
+        for pipeline in manifest.CRISPASR_PIPELINES:
+            default = "aligner" if pipeline in manifest.ALIGNED_PIPELINES else "model"
+            assert manifest.word_timestamps_for(pipeline) == default
+            assert manifest.word_timestamps_for(pipeline, "") == default
+            assert manifest.word_timestamps_for(pipeline, "model") == "model"
+            assert manifest.word_timestamps_for(pipeline, " Aligner ") == "aligner"
+        with pytest.raises(ValueError, match="choose one of: model, aligner"):
+            manifest.word_timestamps_for("kotoba-crispasr", "dtw")
+
     def test_nothing_of_the_program_route_is_left(self):
         for name in ("PROGRAM_BUILDS", "CRISPASR_VERSION", "CRISPASR_GIT", "CUDA13_RUNTIME_FILES",
                      "MEASUREMENT_MODELS", "builds_for_this_machine"):
