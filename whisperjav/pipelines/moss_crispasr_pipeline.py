@@ -22,6 +22,7 @@ at most 3.0 s, gap 0.3 s, pads 100/100 ms; each VAD group's text timed by the Cr
 cut at sentence-end marks, a group the aligner gives nothing for one subtitle at its edges; the audio analytics.
 """
 
+from whisperjav.crispasr import cleanup as crispasr_cleanup
 from whisperjav.pipelines.crispasr_pipeline import CrispASRPipeline, EngineRow
 
 
@@ -30,5 +31,6 @@ class MossCrispASRPipeline(CrispASRPipeline):
 
     PIPELINE_NAME = "moss-crispasr"
     LABEL = "MOSS-CrispASR"
+    # Post-processing: the three filters of 1.10.0 only, until the pipeline is hardened (owner W421 i3).
     ENGINE = EngineRow(line_rule="group", audio_analytics=True, aligner="wav2vec2-ja",
-                       tokens_per_second=65536 / 3000)
+                       tokens_per_second=65536 / 3000, cleanup=crispasr_cleanup.EARLIER_STAGES)
