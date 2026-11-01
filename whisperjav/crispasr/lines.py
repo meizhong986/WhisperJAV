@@ -288,13 +288,19 @@ def _join(piece: List[_Unit]) -> str:
 
 def tokens_rule(group_start: float, group_end: float, segments: Sequence[CrispSegment],
                 stats: Optional[LineStats] = None, cues: CueSettings = DEFAULT_CUES,
-                onsets: bool = False) -> List[Subtitle]:
+                onsets: bool = False, cut_at_pauses: bool = True, end_at_group: bool = False) -> List[Subtitle]:
     """Parakeet option P2: one group's tokens → one or more subtitles, in media-file time.
 
     ``onsets``: the tokens' times are onsets only (a CTC aligner's characters: Cohere-CrispASR aligned, owner
     W259; design note 2026-10-28, section 6). A gap between two onsets is not a silence (a held sound looks like
     one), so only cue 1, a sentence-end mark, cuts; and each subtitle of the group but the last ends where the
     next starts (rule T6), since its last character's end is not known.
+
+    ``cut_at_pauses``: False cuts at sentence-end marks only (cue 1), with the tokens' own ends kept (Kotoba,
+    Whisper-Turbo, Whisper-Large: the cutting of W401 step 2 kept when their times became their own, W412).
+    ``end_at_group``: the group's last subtitle ends at the VAD group's end (rule T2) -- for a model's own
+    onsets (ReazonSpeech-CrispASR, owner W412: "native starts with VAD ends"); the aligner gives its last
+    character that end itself, so the aligned path does not use it.
     """
     stats = stats if stats is not None else LineStats()
     duration = max(0.0, group_end - group_start)
@@ -303,7 +309,7 @@ def tokens_rule(group_start: float, group_end: float, segments: Sequence[CrispSe
         units.extend(_segment_units(seg, stats))
     stats.units += len(units)
     _clean_times(units, duration, stats)
-    pieces = _pieces(units, cues, marks_only=onsets)
+    pieces = _pieces(units, cues, marks_only=onsets or not cut_at_pauses)
     if pieces:
         # Closing marks before the group's first spoken word close nothing in this group.
         first = pieces[0]
@@ -330,6 +336,9 @@ def tokens_rule(group_start: float, group_end: float, segments: Sequence[CrispSe
         next_start = subtitles[i + 1][1]
         if end > next_start or (onsets and next_start > start):
             subtitles[i] = (text, start, max(start, next_start))
+    if end_at_group and subtitles and group_end > subtitles[-1][1]:
+        text, start, _ = subtitles[-1]
+        subtitles[-1] = (text, start, group_end)
     return subtitles
 
 
@@ -340,11 +349,12 @@ def group_rule(group_start: float, group_end: float, segments: Sequence[CrispSeg
 
 
 def build(line_rule: str, group_start: float, group_end: float, segments: Sequence[CrispSegment],
-          stats: Optional[LineStats] = None, cues: CueSettings = DEFAULT_CUES, onsets: bool = False) -> List[Subtitle]:
-    """The subtitles of one VAD group, by the pipeline's line rule; ``cues`` and ``onsets`` are used by "tokens"
-    only."""
+          stats: Optional[LineStats] = None, cues: CueSettings = DEFAULT_CUES, onsets: bool = False,
+          cut_at_pauses: bool = True, end_at_group: bool = False) -> List[Subtitle]:
+    """The subtitles of one VAD group, by the pipeline's line rule; ``cues``, ``onsets``, ``cut_at_pauses`` and
+    ``end_at_group`` are used by "tokens" only."""
     if line_rule == "tokens":
-        return tokens_rule(group_start, group_end, segments, stats, cues, onsets)
+        return tokens_rule(group_start, group_end, segments, stats, cues, onsets, cut_at_pauses, end_at_group)
     if line_rule == "group":
         return group_rule(group_start, group_end, segments)
     raise ValueError(f"unknown line rule '{line_rule}' ({', '.join(LINE_RULES)})")
