@@ -8,9 +8,10 @@ The chain is shared with the other CrispASR pipelines (whisperjav/pipelines/cris
 ReazonSpeech's own (W401, pre-approved choices of step 2):
   - the speech segmenter settings of Parakeet-CrispASR (TEN VAD at aggressive by default, VAD groups of at most
     6 s): CrispASR opens the model as the parakeet family, and both are transducers;
-  - its text is timed by the CrispASR aligner (wav2vec2-ja) and cut as Cohere-CrispASR's is: its tokens carry
-    one time each (start = end, measured 2026-10-31), so Parakeet's token rule would end each subtitle where
-    its last token starts;
+  - its own token times, no aligner (owner W411, W412: native word timestamps by default; "ReazonSpeech native
+    starts with VAD ends"). Its tokens carry one time each (start = end, measured 2026-10-31), a start only, so
+    they are read as onsets: cut at sentence-end marks only, each subtitle ending where the next starts and the
+    group's last at the VAD group's end (lines.tokens_rule onsets=True, EngineRow.onsets);
   - the audio analytics, as the other CrispASR pipelines.
 """
 
@@ -22,4 +23,4 @@ class ReazonSpeechCrispASRPipeline(CrispASRPipeline):
 
     PIPELINE_NAME = "reazonspeech-crispasr"
     LABEL = "ReazonSpeech-CrispASR"
-    ENGINE = EngineRow(line_rule="group", audio_analytics=True, aligner="wav2vec2-ja")
+    ENGINE = EngineRow(line_rule="tokens", audio_analytics=True, onsets=True)
