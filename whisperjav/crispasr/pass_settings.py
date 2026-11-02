@@ -236,6 +236,10 @@ def validate_crispasr_passes(args: Any) -> None:
     """
     for n in (1, 2):
         pipeline = getattr(args, f"pass{n}_pipeline", None)
+        problem = rscn_problem(n, pipeline, getattr(args, f"pass{n}_scene_detector", None),
+                               getattr(args, f"pass{n}_params", None))
+        if problem:
+            raise ValueError(problem)
         if pipeline not in CRISPASR_PIPELINES:
             continue
         problem = crispasr_pass_problem(
@@ -246,6 +250,48 @@ def validate_crispasr_passes(args: Any) -> None:
         ) or model_params_problem(n, pipeline, getattr(args, f"pass{n}_params", None))
         if problem:
             raise ValueError(problem)
+
+
+# R-SCN (owner W448-W452; docs/plans/design/2026-11-02-rscn-design.md): in this build only for MOSS-CrispASR, whose
+# preset it carries (the other GGUF pipelines keep their decided 48 s scenes, W214 2); its settings are the rscn_
+# keys of --passN-params.
+RSCN_PIPELINES = ("moss-crispasr",)
+RSCN_PIPELINE_PROBLEM = ("--pass{n}-scene-detector rscn is available only when --pass{n}-pipeline is "
+                         "{pipelines}; pass {n} is {pipeline}.")
+RSCN_PARAMS_PROBLEM = "--pass{n}-params: {why}"
+
+
+def rscn_problem(n: int, pipeline: Optional[str], scene_detector: Optional[str],
+                 params_json: Optional[str]) -> Optional[str]:
+    """Why pass ``n`` cannot run the rscn scene detector, in plain words; None when it can or does not name it.
+    The rscn_ settings in --passN-params are checked here (a JSON error is left to main.py's own check)."""
+    if str(scene_detector or "").strip().lower() != "rscn" or not pipeline:
+        return None
+    if pipeline not in RSCN_PIPELINES:
+        return RSCN_PIPELINE_PROBLEM.format(n=n, pipeline=pipeline, pipelines=", ".join(RSCN_PIPELINES))
+    if not params_json:
+        return None
+    import json
+
+    try:
+        params = json.loads(params_json)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(params, dict):
+        return None
+    from whisperjav.modules.scene_detection_backends.rscn.settings import RSCNSettings
+
+    from whisperjav.modules.scene_detection_backends.rscn.speech import known_backend
+
+    try:
+        settings = RSCNSettings.for_pipeline(pipeline, params)
+    except ValueError as why:
+        return RSCN_PARAMS_PROBLEM.format(n=n, why=why)
+    if not known_backend(settings.speech_measure_name):
+        return RSCN_PARAMS_PROBLEM.format(n=n, why=f"rscn_speech_measure '{settings.speech_measure}' is not a "
+                                                f"speech segmenter backend; name one (firered-vad, silero-v6.2, "
+                                                f"ten, ...) or none")
+    return None
 
 
 MODEL_PARAMS_PROBLEM = "--pass{n}-params: {why}"
