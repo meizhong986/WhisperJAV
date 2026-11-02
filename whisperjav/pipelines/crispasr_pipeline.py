@@ -455,15 +455,33 @@ class CrispASRPipeline(BasePipeline):
     def scene_detector_kwargs(self) -> Dict[str, Any]:
         """The scene detector's settings for this pass (design 22.9.1): semantic with ChronosJAV's
         12 s minimum; auditok and silero with their own minimum; the pipeline's longest scene for all three
-        (48 s; MOSS-CrispASR 420 s, W426 4); none, one scene per file. The Customize Scene tab's values on
-        top."""
+        (48 s; MOSS-CrispASR 420 s, W426 4); none, one scene per file; rscn (owner W448-W452), its preset for this
+        pipeline (rscn/settings.py), its own lengths. The Customize Scene tab's values on top (rscn takes only its
+        rscn_ keys)."""
         kwargs: Dict[str, Any] = {"method": self.scene_detector}
         if self.scene_detector == "semantic":
             kwargs.update(min_duration=self.SCENE_MIN_S, max_duration=self.scene_max_s)
         elif self.scene_detector in ("auditok", "silero"):
             kwargs.update(max_duration=self.scene_max_s)
+        elif self.scene_detector == "rscn":
+            kwargs.update(pipeline=self.PIPELINE_NAME)
         kwargs.update(self.scene_params)
         return kwargs
+
+    def _media_record(self, basename: str, md: Dict) -> Optional[Any]:
+        """rscn only (owner W450 2g): the media record of the file being transcribed (modules/media_record.py), saved
+        as <basename>_media.json in the temp folder and passed to the scene detector, which reads the picture from
+        it. None for the other scene detectors, which do not use it."""
+        if self.scene_detector != "rscn" or not md.get("input_file"):
+            return None
+        from whisperjav.modules import media_record
+
+        record = media_record.probe(Path(md["input_file"]))
+        try:
+            md["media_record"] = str(record.save(self.temp_dir / f"{basename}_media.json"))
+        except OSError as e:
+            logger.warning(f"{self.LABEL}: the media record could not be saved ({e})")
+        return record
 
     def _detect_scenes(self, wav: Path, basename: str, md: Dict) -> List[_Scene]:
         """The pass's scenes (scene_detector_kwargs); the audio analytics with semantic scenes."""
@@ -471,14 +489,31 @@ class CrispASRPipeline(BasePipeline):
 
         scenes_dir = self.temp_dir / "scenes"
         scenes_dir.mkdir(parents=True, exist_ok=True)
-        detector = SceneDetectorFactory.safe_create_from_legacy_kwargs(**self.scene_detector_kwargs())
+        if self.scene_detector == "rscn":
+            # No fall-back to auditok when rscn cannot be built (review finding 5; v6 11.6): a fall-back would give MOSS
+            # 29 s scenes with only a warning. Whether a failed scene detector falls back is the owner's decision (D9).
+            kwargs = self.scene_detector_kwargs()
+            kwargs.pop("method")
+            detector = SceneDetectorFactory.create("rscn", **kwargs)
+        else:
+            detector = SceneDetectorFactory.safe_create_from_legacy_kwargs(**self.scene_detector_kwargs())
+        media = self._media_record(basename, md)
+        extra = {"media": media} if media is not None else {}
         try:
-            result = detector.detect_scenes(Path(wav), scenes_dir, basename)
+            result = detector.detect_scenes(Path(wav), scenes_dir, basename, **extra)
             tuples = result.to_legacy_tuples()
             method = getattr(result, "method", self.scene_detector)
         finally:
             detector.cleanup()
         scenes = [_Scene(i, Path(p), float(s), float(e)) for i, (p, s, e, _d) in enumerate(tuples)]
+        if method == "rscn":
+            # The run record (settings in force, cuts, marks) beside the scenes (rscn/backend.py), in the temp folder;
+            # the settings in force and each scene's marks also go into the file's metadata, which outlives it.
+            params = dict(result.parameters or {})
+            md["rscn_record"] = params.pop("record", None)
+            md["rscn"] = {"settings": params,
+                          "scenes": [{"start_s": round(sc.start_sec, 3), "end_s": round(sc.end_sec, 3),
+                                      **sc.metadata} for sc in result.scenes]}
         if self.engine.audio_analytics and self.scene_detector != "semantic":
             # The analytics need the semantic detector's scenes (design 21.4): one line per file (T55).
             logger.info(self.ANALYTICS_NEED_SEMANTIC.format(label=self.LABEL, method=self.scene_detector))
