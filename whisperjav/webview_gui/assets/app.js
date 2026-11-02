@@ -1838,6 +1838,35 @@ const EnsembleManager = {
         const defaults = this.crispasrDefaults[pipeline];
         return (defaults && defaults.scene) || 'semantic';
     },
+    // R-SCN (1.10.1; owner W448-W455; design docs/plans/design/2026-11-02-rscn-design.md section 15): the scene
+    // detector rscn is offered for the pipelines the command line accepts it for (crispasr/pass_settings.py
+    // RSCN_PIPELINES; tests/test_gui_rscn.py compares the two lists): MOSS-CrispASR only in this build. For every
+    // other pipeline the row's option is disabled and the Customize Scene tab does not list it, because main.py would
+    // refuse the run (exit 2).
+    rscnPipelines: ['moss-crispasr'],
+    offersRscn(pipeline) {
+        return this.rscnPipelines.includes(pipeline);
+    },
+    // Enable or disable the rscn option of a pass's Scene Detector dropdown for the pipeline the pass now runs. A pass
+    // that held rscn and moved to a pipeline without it goes back to that pipeline's own scene detector, with one
+    // log-panel line; a saved preset that carries rscn is kept only where the pipeline offers it.
+    updateRscnOption(passKey) {
+        const select = document.getElementById(`${passKey}-scene`);
+        if (!select) return;
+        const passState = this.state[passKey];
+        const offered = this.offersRscn(passState.pipeline);
+        const option = Array.from(select.options).find(o => o.value === 'rscn');
+        if (option) option.disabled = !offered;
+        if (!offered && passState.sceneDetector === 'rscn') {
+            const fallback = this.isCrispasrPipeline(passState.pipeline)
+                ? this.crispasrDefaultScene(passState.pipeline) : 'semantic';
+            passState.sceneDetector = fallback;
+            select.value = fallback;
+            ConsoleManager.log(
+                `${passKey === 'pass1' ? 'Pass 1' : 'Pass 2'}: the R-SCN scene detector is available for MOSS only, ` +
+                `so ${this.pipelineLabel(passKey)} runs with ${fallback}.`, 'warning');
+        }
+    },
     // BYOP Faster Whisper XXL (1.10.0, item 5): the model names XXL takes, sent as --passN-model.
     // large-v2 first, the default (owner W24 2; DEFAULT_XXL_MODEL in byop/xxl_runner.py); the
     // list is owner W271 2.
@@ -1898,6 +1927,9 @@ const EnsembleManager = {
         this.state.pass2.isCohere = this.state.pass2.pipeline === 'cohere';
         this.state.pass2.isCrispasr = this.isCrispasrPipeline(this.state.pass2.pipeline);
         this.state.pass2.isXxl = this.state.pass2.pipeline === 'xxl';
+        // R-SCN (1.10.1): the rscn option follows each pass's pipeline from the start.
+        this.updateRscnOption('pass1');
+        this.updateRscnOption('pass2');
 
         // Load persisted BYOP preferences (XXL exe path, extra args)
         try {
@@ -1980,6 +2012,12 @@ const EnsembleManager = {
 
         // New dropdown event handlers - Pass 1
         document.getElementById('pass1-scene').addEventListener('change', (e) => {
+            // A disabled option (rscn for a pipeline without it, 1.10.1) is not a choice: keep what the pass had.
+            const chosen = e.target.options[e.target.selectedIndex];
+            if (chosen && chosen.disabled) {
+                e.target.value = this.state.pass1.sceneDetector;
+                return;
+            }
             this.state.pass1.sceneDetector = e.target.value;
         });
         document.getElementById('pass1-enhancer').addEventListener('change', (e) => {
@@ -2013,6 +2051,12 @@ const EnsembleManager = {
 
         // New dropdown event handlers - Pass 2
         document.getElementById('pass2-scene').addEventListener('change', (e) => {
+            // A disabled option (rscn for a pipeline without it, 1.10.1) is not a choice: keep what the pass had.
+            const chosen = e.target.options[e.target.selectedIndex];
+            if (chosen && chosen.disabled) {
+                e.target.value = this.state.pass2.sceneDetector;
+                return;
+            }
             this.state.pass2.sceneDetector = e.target.value;
         });
         document.getElementById('pass2-enhancer').addEventListener('change', (e) => {
@@ -2257,6 +2301,7 @@ const EnsembleManager = {
                     this.swapModelOptions(passKey, newType);
                 }
                 this.applyPipelinePresets(passKey, newType);
+                this.updateRscnOption(passKey);
             } else {
                 // Revert selection
                 selectElement.value = passState.pipeline;
@@ -2278,6 +2323,7 @@ const EnsembleManager = {
                 this.swapModelOptions(passKey, newType);
             }
             this.applyPipelinePresets(passKey, newType);
+            this.updateRscnOption(passKey);
             this.updateBadges();
         }
     },
@@ -3789,6 +3835,12 @@ const EnsembleManager = {
                 { value: 'semantic', label: 'Semantic (Texture Clustering)' },
                 { value: 'none', label: 'None (Skip Scene Detection)' }
             ];
+            // R-SCN (1.10.1; owner W448-W455): offered only for a pass whose pipeline accepts it (rscnPipelines; MOSS
+            // in this build), as the row's dropdown does, because main.py refuses it for any other pipeline (exit 2).
+            const customizePass = this.state[this.state.currentCustomize];
+            if (customizePass && this.offersRscn(customizePass.pipeline)) {
+                methodOptions.splice(3, 0, { value: 'rscn', label: 'R-SCN (changes in the sound, picture breaks)' });
+            }
 
             methodOptions.forEach(opt => {
                 const option = document.createElement('option');
@@ -3826,7 +3878,9 @@ const EnsembleManager = {
     async _renderSceneBackendContent(contentDiv, backend, currentValues) {
         contentDiv.innerHTML = '';
 
-        const result = await pywebview.api.get_scene_detector_schema(backend);
+        // The pass's pipeline chooses the rscn preset the tab shows (api.get_scene_detector_schema, 1.10.1).
+        const customizePass = this.state[this.state.currentCustomize];
+        const result = await pywebview.api.get_scene_detector_schema(backend, customizePass ? customizePass.pipeline : '');
 
         if (!result.success) {
             contentDiv.innerHTML = `<p class="tab-error">Failed to load scene detector schema: ${result.error}</p>`;
@@ -6441,6 +6495,7 @@ const EnsembleManager = {
             setSilent(`${prefix}-pipeline`, preset.pipeline);
             setSilent(`${prefix}-sensitivity`, preset.sensitivity);
             setSilent(`${prefix}-scene`, preset.sceneDetector);
+            this.updateRscnOption(passKey);   // a preset's rscn is kept only where the pipeline offers it (1.10.1)
             // The list no longer offers a removed enhancer, so setSilent keeps the
             // current entry and logs its warning naming the preset's value; the pass is
             // then marked. A preset that sets an enhancer the list offers is a choice,
