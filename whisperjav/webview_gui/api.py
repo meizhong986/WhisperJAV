@@ -1523,16 +1523,20 @@ class WhisperJAVAPI:
             "error": f"Unknown enhancer backend: {backend}"
         }
 
-    def get_scene_detector_schema(self, backend: str) -> Dict[str, Any]:
+    def get_scene_detector_schema(self, backend: str, pipeline: str = None) -> Dict[str, Any]:
         """
         Get parameter schema for a scene detector backend.
 
         Args:
-            backend: Detector name (auditok, silero, semantic, none)
+            backend: Detector name (auditok, silero, semantic, none, rscn)
+            pipeline: The pass's pipeline; rscn shows that pipeline's preset (1.10.1). Ignored by the others.
 
         Returns:
             Schema dict with parameters
         """
+        if backend == "rscn":
+            return self._rscn_scene_schema(pipeline)
+
         if backend == "none":
             return {
                 "success": True,
@@ -1574,6 +1578,45 @@ class WhisperJAVAPI:
                 "success": False,
                 "error": str(e)
             }
+
+    # R-SCN (owner W448-W455; docs/plans/design/2026-11-02-rscn-design.md section 15): the Customize Scene tab of a
+    # pass whose scene detector is rscn. The CONTROLS (widget, label, description, group) come from
+    # rscn-scene-detection.yaml like the other detectors'; the DEFAULTS come from the detector's own settings
+    # (rscn/settings.py, the pipeline's preset), never from the YAML, so the tab and the run cannot drift. Each control
+    # is one Customize value rscn_<setting>, sent in --passN-params; a setting without a control stays reachable from
+    # the command line. Light: no model, no CrispASR.
+    RSCN_YAML = "rscn-scene-detection.yaml"
+
+    def _rscn_gui_hints(self) -> Dict[str, Any]:
+        return dict((self._load_tool_yaml(self.RSCN_YAML) or {}).get("gui") or {})
+
+    @staticmethod
+    def _rscn_defaults(pipeline: Optional[str], hints: Dict[str, Any]) -> Dict[str, Any]:
+        """The value of each control for the pipeline's preset, keyed rscn_<setting>."""
+        from whisperjav.modules.scene_detection_backends.rscn.settings import PREFIX, RSCNSettings
+        values = RSCNSettings.for_pipeline(pipeline).as_dict()
+        return {key: values[key[len(PREFIX):]] for key in hints
+                if str(key).startswith(PREFIX) and key[len(PREFIX):] in values}
+
+    def _rscn_scene_schema(self, pipeline: Optional[str] = None) -> Dict[str, Any]:
+        try:
+            config = self._load_tool_yaml(self.RSCN_YAML)
+            hints = config.get("gui") or {}
+            if not hints:
+                return {"success": False, "error": f"Could not load config for rscn ({self.RSCN_YAML})"}
+            defaults = self._rscn_defaults(pipeline, hints)
+            return {
+                "success": True,
+                "backend": "rscn",
+                "display_name": config.get("metadata", {}).get("displayName", "rscn"),
+                "description": config.get("metadata", {}).get("description", ""),
+                "parameters": self._convert_gui_hints_to_schema(hints, defaults),
+                "defaults": defaults,
+                "presets": {},
+                "groups": self._extract_groups(hints),
+            }
+        except Exception as e:  # noqa: BLE001 -- the tab says what failed
+            return {"success": False, "error": str(e)}
 
     def get_available_backends(self) -> Dict[str, Any]:
         """
@@ -2825,7 +2868,8 @@ class WhisperJAVAPI:
         """The values a CrispASR pass runs with, for its Customize window (design 22.9.1; owner W214 2,
         W232 8): the Segmenter tab as segmenter_settings() resolves them, the Scene tab as the pipeline
         sets its scene detector (semantic 12 s minimum; auditok and silero their own minimum; the pipeline's
-        longest scene, 48 s, MOSS-CrispASR 420 s), and for MOSS-CrispASR its MOSS tab (1.10.1, W428 I1 4:
+        longest scene, 48 s, MOSS-CrispASR 420 s; rscn the values of its preset for the tab's controls, 1.10.1,
+        owner W455), and for MOSS-CrispASR its MOSS tab (1.10.1, W428 I1 4:
         crispasr/moss_prompt.py; "model": schema and values; None for the other pipelines).
         Light: no PyTorch, no CrispASR."""
         try:
@@ -2854,6 +2898,10 @@ class WhisperJAVAPI:
                     scene[key] = value
                     if not key.endswith("_s"):
                         scene[key + "_s"] = value  # the spelling the Scene tab's controls use
+            elif method == "rscn":
+                # R-SCN (owner W448-W455): the pipeline's preset, one rscn_<setting> value per control of the Scene tab
+                # (rscn-scene-detection.yaml); Apply without a change sends the preset back, so the run does not change.
+                scene = self._rscn_defaults(pipeline, self._rscn_gui_hints())
             model = None
             if pipeline == "moss-crispasr":
                 model = {"title": "MOSS", "schema": moss_prompt.GUI_SCHEMA,
