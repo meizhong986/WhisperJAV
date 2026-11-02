@@ -431,8 +431,11 @@ def parse_arguments():
     twopass_group.add_argument("--pass1-qwen-params", default=None,
                                help="JSON string of Qwen3-ASR parameters for pass 1 (when pipeline=qwen)")
     twopass_group.add_argument("--pass1-scene-detector", default=None,
-                               choices=["auditok", "silero", "semantic", "none"],
-                               help="Scene detection method for pass 1 (default: semantic since v1.9.2; silero for moss-crispasr)")
+                               choices=["auditok", "silero", "semantic", "none", "rscn"],
+                               help="Scene detection method for pass 1 (default: semantic since v1.9.2; silero for moss-crispasr). "
+                                    "rscn (moss-crispasr only): scenes cut where the sound changes and at confirmed "
+                                    "black picture, 70-420 s, preferably 120-360 s; its settings are rscn_* keys "
+                                    "in --pass1-params.")
     twopass_group.add_argument("--pass1-speech-segmenter", default=None,
                                help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none). Default: firered-vad when pass 1 is Qwen3-ASR; for the GGUF pipelines, which do not accept none: ten for parakeet-crispasr and reazonspeech-crispasr, silero-v6.2 for moss-crispasr, firered-vad for the others. Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
     twopass_group.add_argument("--pass1-vad-version", default=None,
@@ -496,8 +499,11 @@ def parse_arguments():
     twopass_group.add_argument("--pass2-qwen-params", default=None,
                                help="JSON string of Qwen3-ASR parameters for pass 2 (when pipeline=qwen)")
     twopass_group.add_argument("--pass2-scene-detector", default=None,
-                               choices=["auditok", "silero", "semantic", "none"],
-                               help="Scene detection method for pass 2 (default: semantic since v1.9.2; silero for moss-crispasr)")
+                               choices=["auditok", "silero", "semantic", "none", "rscn"],
+                               help="Scene detection method for pass 2 (default: semantic since v1.9.2; silero for moss-crispasr). "
+                                    "rscn (moss-crispasr only): scenes cut where the sound changes and at confirmed "
+                                    "black picture, 70-420 s, preferably 120-360 s; its settings are rscn_* keys "
+                                    "in --pass2-params.")
     twopass_group.add_argument("--pass2-speech-segmenter", default=None,
                                help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Default: ten when pass 2 is anime-whisper; for the GGUF pipelines, which do not accept none: ten for parakeet-crispasr and reazonspeech-crispasr, silero-v6.2 for moss-crispasr, firered-vad for the others. Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
     twopass_group.add_argument("--pass2-vad-version", default=None,
@@ -3301,6 +3307,12 @@ def main():
                     # from --passN-params (checked before the dump by validate_crispasr_passes).
                     _moss = MossSettings.from_params(_pass_params)
                     _p["crispasr_effective"]["moss_settings"] = {**_moss.as_dict(), "instruction": _moss.prompt()}
+                if _p["crispasr_effective"]["scene_detector"] == "rscn":
+                    # R-SCN (owner W448-W452): the settings in force, the pipeline's preset with the rscn_ keys of
+                    # --passN-params (checked before the dump by validate_crispasr_passes).
+                    from whisperjav.modules.scene_detection_backends.rscn.settings import RSCNSettings
+                    _p["crispasr_effective"]["rscn_settings"] = RSCNSettings.for_pipeline(
+                        _p["pipeline"], _pass_params).as_dict()
             dump_data["ensemble_config"] = ensemble_dump
         try:
             with open(args.dump_params, 'w', encoding='utf-8') as f:
