@@ -1,0 +1,241 @@
+# =============================================================================
+# R-SCN Scene Detection -- the Customize Scene tab's controls (1.10.1; owner W448-W455)
+# =============================================================================
+# The scene detector `rscn` (whisperjav/modules/scene_detection_backends/rscn/) cuts scenes where the
+# sound's characteristics change and at black picture confirmed by the sound, 70-420 s long, never
+# dropping audio. Design: docs/plans/design/2026-11-02-rscn-design.md (section 15: the GUI entry).
+#
+# This file holds the CONTROLS only (widget, label, description, group). It has no `spec`: the
+# defaults come from the detector's own settings (rscn/settings.py RSCNSettings, the pipeline's preset),
+# filled in by webview_gui/api.py (_rscn_scene_schema), so the tab and the run cannot drift. Each
+# control is one Customize value `rscn_<setting>` of --passN-params. A setting without a control here
+# stays reachable from the command line. tests/test_gui_rscn.py checks every key against RSCNSettings.
+# =============================================================================
+
+schemaVersion: v1
+kind: Tool
+
+metadata:
+  name: rscn-scene-detection
+  displayName: "R-SCN (changes in the sound, picture breaks)"
+  description: "Scenes cut where the sound's characteristics change and at black picture confirmed by the sound, 70-420 s long, preferably 120-360 s, never dropping audio. Offered for the MOSS pipeline. The values shown are the detector's own settings; a setting without a control is still available on the command line as an rscn_ key of --passN-params."
+  version: "1.0.0"
+  tags:
+    - scene-detection
+    - rscn
+    - sound-change
+    - picture
+
+tool_type: scene_detection
+
+contract:
+  input:
+    audio_path: path
+    media: media_record
+  output:
+    segments: list
+
+gui:
+  # --- Length (owner W451 C2, W450 2e, W426 4) ---
+  rscn_min_scene_s:
+    widget: number
+    label: "Shortest Scene (s)"
+    description: "A scene is never shorter than this, except a whole file or an act that is shorter. MOSS works best from about 70 s."
+    min: 10
+    max: 600
+    step: 1
+    data_type: float
+    group: length
+
+  rscn_preferred_min_s:
+    widget: number
+    label: "Preferred Length From (s)"
+    description: "The detector aims for scenes of at least this length when the sound allows."
+    min: 10
+    max: 600
+    step: 1
+    data_type: float
+    group: length
+
+  rscn_preferred_max_s:
+    widget: number
+    label: "Preferred Length To (s)"
+    description: "The detector aims for scenes of at most this length when the sound allows."
+    min: 10
+    max: 1800
+    step: 1
+    data_type: float
+    group: length
+
+  rscn_max_scene_s:
+    widget: number
+    label: "Longest Scene (s)"
+    description: "A scene is never longer than this; a longer stretch is divided at the strongest change in the sound, in a pause."
+    min: 20
+    max: 1800
+    step: 1
+    data_type: float
+    group: length
+
+  rscn_length_weight:
+    widget: number
+    label: "Length Weight"
+    description: "How much a scene outside the preferred range costs against cutting at a weaker change. Higher keeps scenes closer to the preferred range."
+    min: 0.1
+    max: 100
+    step: 0.1
+    data_type: float
+    group: length
+
+  # --- Change in the sound ---
+  rscn_change_threshold:
+    widget: number
+    label: "Change Threshold"
+    description: "How strong a change in the sound must be to count as a scene change. Lower finds more changes. Not yet tuned: 1.7 is a first value."
+    min: 0.1
+    max: 10
+    step: 0.1
+    data_type: float
+    group: change
+
+  rscn_peak_min_distance_s:
+    widget: number
+    label: "Least Distance Between Changes (s)"
+    description: "Two changes closer than this count as one."
+    min: 0.5
+    max: 60
+    step: 0.5
+    data_type: float
+    group: change
+
+  rscn_peak_prominence:
+    widget: number
+    label: "Change Prominence"
+    description: "How far a change must stand above its surroundings to count. Higher ignores the shoulders of a larger change."
+    min: 0
+    max: 5
+    step: 0.05
+    data_type: float
+    group: change
+
+  # --- Where a cut lands ---
+  rscn_max_cut_shift_s:
+    widget: number
+    label: "Cut Shift (s)"
+    description: "How far a cut may move from the change to land in a pause."
+    min: 0
+    max: 60
+    step: 0.5
+    data_type: float
+    group: cut_placement
+
+  rscn_quiet_min_s:
+    widget: number
+    label: "Shortest Pause (s)"
+    description: "A quiet stretch shorter than this is not a pause a cut can land in."
+    min: 0.05
+    max: 5
+    step: 0.05
+    data_type: float
+    group: cut_placement
+
+  rscn_speech_guard_s:
+    widget: number
+    label: "Speech Guard (s)"
+    description: "A cut stays at least this far from measured speech."
+    min: 0
+    max: 2
+    step: 0.05
+    data_type: float
+    group: cut_placement
+
+  # --- Digital silence (owner W451 C1: every scene goes on) ---
+  rscn_digital_silence_min_s:
+    widget: number
+    label: "Digital Silence From (s)"
+    description: "Exact silence at least this long is a scene of its own, marked, and still handed to the speech segmenter and the model."
+    min: 0.1
+    max: 60
+    step: 0.1
+    data_type: float
+    group: digital_silence
+
+  rscn_tiny_region_s:
+    widget: number
+    label: "Tiny Region (s)"
+    description: "Audio shorter than this next to digital silence joins the silence's scene."
+    min: 0
+    max: 10
+    step: 0.1
+    data_type: float
+    group: digital_silence
+
+  # --- Speech measure (owner W451 C3: a swappable backend) ---
+  rscn_speech_measure:
+    widget: dropdown
+    label: "Speech Measure"
+    description: "The speech segmenter backend that tells the detector where speech is, so that no cut lands in it. none: cuts are placed by the sound level alone."
+    options:
+      - "firered-vad"
+      - "silero-v6.2"
+      - "ten"
+      - "whisperseg"
+      - "none"
+    data_type: str
+    group: speech_measure
+
+  rscn_speech_measure_piece_s:
+    widget: number
+    label: "Speech Measure Piece (s)"
+    description: "The audio is measured for speech in pieces of this length."
+    min: 30
+    max: 1800
+    step: 10
+    data_type: float
+    group: speech_measure
+
+  rscn_little_speech_share:
+    widget: number
+    label: "Little Speech Share"
+    description: "A scene with less speech than this share of its length is marked as having little speech. It still goes to the model."
+    min: 0
+    max: 1
+    step: 0.01
+    data_type: float
+    group: speech_measure
+
+  # --- Picture (owner W450 2g) ---
+  rscn_picture:
+    widget: dropdown
+    label: "Picture"
+    description: "auto: the picture is used when the file has one and FFmpeg can read it, otherwise the sound alone. on: the picture is required, and the file fails without it. off: the sound alone."
+    options:
+      - "auto"
+      - "on"
+      - "off"
+    data_type: str
+    group: picture
+
+  rscn_black_min_s:
+    widget: number
+    label: "Black Picture From (s)"
+    description: "A black picture at least this long is a break when the sound confirms it."
+    min: 0.1
+    max: 30
+    step: 0.1
+    data_type: float
+    group: picture
+
+  rscn_black_confirm_margin_s:
+    widget: number
+    label: "Black Confirmation Margin (s)"
+    description: "How far from the black stretch a change in the sound may lie and still confirm it."
+    min: 0
+    max: 30
+    step: 0.5
+    data_type: float
+    group: picture
+
+provider:
+  module: whisperjav.modules.scene_detection_backends.rscn.backend
+  class: RSCNSceneDetector
