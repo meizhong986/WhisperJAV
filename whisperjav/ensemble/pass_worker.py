@@ -1551,7 +1551,10 @@ def _build_pipeline(
             crispasr_kwargs["speech_enhancer_model"] = enhancer_model
         custom = pass_config.get("params") or {}
         crispasr_kwargs["segmenter_overrides"] = {k: v for k, v in custom.items() if k in SEGMENTER_PARAMS}
-        crispasr_kwargs["scene_params"] = {k: v for k, v in custom.items() if k in SCENE_DETECTION_PARAMS}
+        # R-SCN's settings travel as rscn_<name> keys (owner W450 1; rscn/settings.py); the other scene detectors
+        # do not take them.
+        crispasr_kwargs["scene_params"] = {k: v for k, v in custom.items()
+                                           if k in SCENE_DETECTION_PARAMS or str(k).startswith("rscn_")}
         # The model's own Customize values (1.10.1; MOSS-CrispASR's MOSS tab, owner W428 I1 4): the pipeline's
         # MODEL_SETTINGS takes its keys from the whole dict; a pipeline without it ignores them.
         crispasr_kwargs["model_params"] = dict(custom)
