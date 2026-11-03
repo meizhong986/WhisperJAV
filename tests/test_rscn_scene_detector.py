@@ -472,13 +472,25 @@ def test_other_scene_detectors_get_no_media_record(tmp_path):
     from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
 
     pipe = MossCrispASRPipeline(output_dir=str(tmp_path / "o"), temp_dir=str(tmp_path / "t"))
-    assert pipe.scene_detector == "silero"  # MOSS's default is unchanged (W426 4)
+    assert pipe.scene_detector == "semantic"  # MOSS's default since W482
     assert pipe._media_record("film", {"input_file": "film.mkv"}) is None
 
 
-def test_pass_check_refuses_rscn_outside_the_gguf_pipelines_and_bad_settings():
+def test_rscn_is_not_offered_in_this_version():
+    # W482: R-SCN is not offered in 1.10.1; the command line does not list it and the check refuses it everywhere.
+    from whisperjav.crispasr.pass_settings import RSCN_PIPELINES, rscn_problem
+
+    assert RSCN_PIPELINES == ()
+    assert rscn_problem(1, "moss-crispasr", "rscn", None) == "--pass1-scene-detector rscn is not offered in this version."
+    assert rscn_problem(1, "moss-crispasr", "semantic", None) is None
+
+
+def test_pass_check_refuses_rscn_outside_the_gguf_pipelines_and_bad_settings(monkeypatch):
+    # The check as built for MOSS (W448-W452), kept for R: with MOSS in the list again, as before W482.
+    from whisperjav.crispasr import pass_settings
     from whisperjav.crispasr.pass_settings import rscn_problem
 
+    monkeypatch.setattr(pass_settings, "RSCN_PIPELINES", ("moss-crispasr",))
     assert rscn_problem(1, "moss-crispasr", "rscn", None) is None
     assert rscn_problem(1, "moss-crispasr", "silero", '{"rscn_bogus": 1}') is None
     assert "only when --pass1-pipeline" in rscn_problem(1, "balanced", "rscn", None)
