@@ -393,9 +393,20 @@ class TestTheTwoPipelines:
         with pytest.raises(ValueError, match="Japanese only"):
             make(ParakeetCrispASRPipeline, tmp_path, language="en")
 
-    def test_the_segmenter_none_is_refused(self, tmp_path):
-        with pytest.raises(ValueError, match="needs a speech segmenter"):
-            make(CohereCrispASRPipeline, tmp_path, speech_segmenter="none")
+    def test_the_segmenter_none_sends_each_scene_whole(self, tmp_path):
+        # owner W457, W458: no segmenter is loaded; each scene is one VAD group, start to end; a scene shorter than
+        # 0.1 s is not sent (as a shorter VAD group is not); a scene that cannot be read counts as failed
+        pipe = make(CohereCrispASRPipeline, tmp_path, speech_segmenter="none")
+        assert pipe.speech_segmenter == "none" and pipe.segmenter.max_group_duration_s is None
+        tmp_path.mkdir(exist_ok=True)
+        long_wav, tiny_wav = tmp_path / "s0.wav", tmp_path / "s1.wav"
+        sf.write(str(long_wav), np.zeros(int(2.5 * 16000), dtype=np.float32), 16000)
+        sf.write(str(tiny_wav), np.zeros(800, dtype=np.float32), 16000)
+        scenes = [chain._Scene(0, long_wav, 10.0, 12.5), chain._Scene(1, tiny_wav, 12.5, 12.55),
+                  chain._Scene(2, tmp_path / "missing.wav", 12.55, 20.0)]
+        groups, failed = pipe._speech_groups(scenes)
+        assert [(g.scene, g.start, g.end) for g in groups] == [(0, 0.0, 2.5)]
+        assert failed == 1
 
     def test_a_model_of_another_pipeline_is_refused(self, tmp_path):
         with pytest.raises(ValueError, match="is not a model of parakeet-crispasr"):
