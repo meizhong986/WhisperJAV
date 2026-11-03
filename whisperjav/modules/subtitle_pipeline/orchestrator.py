@@ -23,6 +23,7 @@ VRAM swap pattern:
     → timer.load() → time → timer.unload()
 """
 
+import copy
 import json
 import tempfile
 from dataclasses import asdict
@@ -56,6 +57,7 @@ from whisperjav.modules.subtitle_pipeline.types import (
     TimestampMode,
 )
 from whisperjav.utils.logger import logger
+from whisperjav.modules.model_audio import MIN_MODEL_AUDIO_S
 
 try:
     import soundfile as sf
@@ -101,6 +103,13 @@ TIMING_NOT_LOADED_TEXT = ("ChronosJAV's timing model ({name}) could not be loade
 GROUPS_NOT_ALIGNED_TEXT = ("ChronosJAV's aligner ({name}) gave no times for {n} of {m} VAD group(s): each keeps "
                            "its text as one unsplit subtitle, timed from its VAD group (the timing model may "
                            "still move its start).")
+
+
+def _is_full_scene(frames: list, scene_s: float) -> bool:
+    """True when the scene's one frame covers it whole (the full-scene framer): its audio is the scene's file as it is.
+    A single frame that starts at 0 but ends earlier is cut like any other (owner W461: the model minimum widens a
+    short first VAD group back to 0.0, and before that a VAD group starting at 0.0 was given the whole scene)."""
+    return len(frames) == 1 and frames[0].start <= 0.0 and frames[0].end >= scene_s - 0.01
 
 
 class DecoupledSubtitlePipeline:
@@ -161,6 +170,10 @@ class DecoupledSubtitlePipeline:
         self.context = context
         self.stepdown_config = stepdown_config
         self.timer = timer
+        # The save-points (owner W462, W463 C1): when set, called with the scenes' subtitles as they are and the
+        # stage's name, after the ASR (VAD times) and, with an aligner, after the aligner (before the timing model).
+        # The caller writes them to disk, so a crash in the aligner, the timing model or later keeps the ASR's work.
+        self.save_point: Optional[Callable[[list, str], None]] = None
         self.line_filter = line_filter if line_filter is not None else line_filter_test()
 
         # Sentinel stats accumulated across all scenes
@@ -369,7 +382,23 @@ class DecoupledSubtitlePipeline:
                 vad_audio_paths=vad_audio_paths,
             )
             scene_texts = self._step2_4_generate_and_clean(scene_frames, frame_audio_paths, scene_durations)
+            # Save-points (owner W462, W463 C1), not on a step-down pass, which redoes only the collapsed scenes.
+            save = self.save_point is not None and framer_override_max_group is None
+            if save and self.aligner is not None:
+                # The ASR's text with the VAD groups' times: kept if the aligner (native CrispASR code) stops.
+                self._write_save_point(
+                    scene_frames, scene_texts, None, scene_audio_paths, scene_durations,
+                    frame_speech_regions, scene_speech_regions, frame_speech_starts, stage="after the ASR",
+                )
             scene_alignments = self._step5_7_align(scene_frames, frame_audio_paths, scene_texts, scene_durations)
+            if save and self.timer is not None:
+                self._write_save_point(
+                    scene_frames, scene_texts, scene_alignments, scene_audio_paths, scene_durations,
+                    frame_speech_regions, scene_speech_regions, frame_speech_starts,
+                    # What actually ran (owner W485: the user is told how far the subtitles got).
+                    stage=("after the aligner, before the timing model" if self.aligner is not None
+                           else "after the ASR, before the timing model"),
+                )
             scene_timings = self._step8_time(scene_frames, frame_audio_paths, scene_texts)
             results = self._step9_reconstruct_and_harden(
                 scene_frames, scene_texts, scene_alignments,
@@ -381,6 +410,37 @@ class DecoupledSubtitlePipeline:
         finally:
             self._cleanup_temp_files()
         return results
+
+    def _write_save_point(self, scene_frames, scene_texts, scene_alignments, scene_audio_paths, scene_durations,
+                          frame_speech_regions, scene_speech_regions, frame_speech_starts, stage: str) -> None:
+        """A save-point (owner W462, W463 C1): step 9 without timings (and, after the ASR, without alignments), on
+        copies (step 9 may change what it is given), handed to ``save_point`` with ``stage``. Its log lines are held
+        back (the real step 9 prints them). A failure here is logged and the run goes on: the save-point is a safety
+        copy, not a step."""
+        # Step 9 counts its scenes in sentinel_stats and writes debug artifacts: neither may count twice.
+        saved_stats, saved_artifacts_dir = copy.deepcopy(self.sentinel_stats), self.artifacts_dir
+        self.artifacts_dir = None
+        logger.info("[DecoupledPipeline] Save-point: the subtitles %s", stage)
+        was_disabled, logger.disabled = logger.disabled, True
+        try:
+            draft = self._step9_reconstruct_and_harden(
+                copy.deepcopy(scene_frames), copy.deepcopy(scene_texts), copy.deepcopy(scene_alignments),
+                scene_audio_paths, scene_durations,
+                copy.deepcopy(frame_speech_regions), copy.deepcopy(scene_speech_regions),
+                frame_speech_starts=copy.deepcopy(frame_speech_starts),
+                scene_timings=None,
+            )
+        except Exception:
+            logger.disabled = was_disabled
+            logger.warning("[DecoupledPipeline] Save-point could not be built; the run goes on", exc_info=True)
+            return
+        finally:
+            logger.disabled = was_disabled
+            self.sentinel_stats, self.artifacts_dir = saved_stats, saved_artifacts_dir
+        try:
+            self.save_point(draft, stage)
+        except Exception:
+            logger.warning("[DecoupledPipeline] Save-point could not be written; the run goes on", exc_info=True)
 
     def _run_stepdown_pass(
         self,
@@ -505,7 +565,7 @@ class DecoupledSubtitlePipeline:
                     asr_audio = framing_audio
                 frame_entries: list = []
                 for frame in frames:
-                    if len(frames) == 1 and frame.start == 0.0:
+                    if _is_full_scene(frames, len(framing_audio) / sr):
                         frame_entries.append(asr_audio)  # full-scene frame
                     else:
                         start_sample = int(frame.start * sr)
@@ -516,7 +576,7 @@ class DecoupledSubtitlePipeline:
                 frame_audio_paths.append(frame_entries)
             else:
                 # Load ASR audio (only needed if dual-track and we have frames to slice)
-                if dual_track and not (len(frames) == 1 and frames[0].start == 0.0):
+                if dual_track and not _is_full_scene(frames, len(framing_audio) / sr):
                     asr_audio, sr = self._load_audio(audio_path)
                 else:
                     asr_audio = framing_audio  # same source, no extra load
@@ -524,7 +584,7 @@ class DecoupledSubtitlePipeline:
                 # Slice audio per frame → temp WAV (always from ASR audio)
                 frame_paths = []
                 for frame_idx, frame in enumerate(frames):
-                    if len(frames) == 1 and frame.start == 0.0:
+                    if _is_full_scene(frames, len(framing_audio) / sr):
                         # Full-scene frame — use original ASR audio path (no slicing needed)
                         frame_paths.append(audio_path)
                     else:
@@ -591,6 +651,7 @@ class DecoupledSubtitlePipeline:
 
         # Phase 1: Generation
         scene_raw_texts: list[list[str]] = []
+        self._too_short_frames = 0
 
         if needs_generation:
             self.generator.load()
@@ -612,6 +673,13 @@ class DecoupledSubtitlePipeline:
                 for frame_idx, frame in enumerate(frames):
                     if frame.text is not None:
                         raw_texts.append(frame.text)
+                    elif frame.duration < MIN_MODEL_AUDIO_S:
+                        # The shortest audio a model is given (owner W461; modules/model_audio.py): a frame the
+                        # framer could not widen to 0.2 s is not sent. Its text stays empty, so the aligner and the
+                        # timing model skip it too. Counted, and named once at the end of this step. (A frame that
+                        # carries its own text, from an SRT, keeps it.)
+                        raw_texts.append("")
+                        self._too_short_frames += 1
                     else:
                         raw_texts.append(None)  # placeholder
                         gen_indices.append(frame_idx)
@@ -678,6 +746,12 @@ class DecoupledSubtitlePipeline:
             if needs_generation:
                 self.generator.unload()
                 self._safe_cuda_cleanup()
+
+        if self._too_short_frames:
+            logger.warning(
+                "[DecoupledPipeline] %d VAD group(s) shorter than %.1f s, with no room to widen them, were not "
+                "transcribed", self._too_short_frames, MIN_MODEL_AUDIO_S,
+            )
 
         # Phase 2: Cleaning
         logger.info("[DecoupledPipeline] Cleaning %d scenes", n_scenes)
