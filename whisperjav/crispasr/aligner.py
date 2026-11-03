@@ -25,6 +25,7 @@ import numpy as np
 from whisperjav.crispasr import install, native_log
 from whisperjav.crispasr.engine import SAMPLE_RATE, default_threads
 from whisperjav.crispasr.errors import CrispASRSetupError
+from whisperjav.modules.model_audio import too_short
 from whisperjav.crispasr.manifest import ALIGNER_WARNINGS, ModelFile, aligner_model_for
 from whisperjav.utils.logger import logger
 
@@ -159,7 +160,8 @@ class CrispAligner:
         if self._crispasr is None:
             raise RuntimeError("the CrispASR aligner is not loaded")
         pcm = np.ascontiguousarray(audio, dtype=np.float32)
-        if not text or not text.strip() or pcm.size == 0:
+        # The shortest audio a model is given (owner W461; modules/model_audio.py): nothing aligned under 0.2 s.
+        if not text or not text.strip() or too_short(pcm.size, SAMPLE_RATE):
             return []
         try:
             aligned = self._crispasr.align_words(str(self._path), text, pcm, n_threads=self.n_threads)
