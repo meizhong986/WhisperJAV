@@ -433,7 +433,7 @@ class TestThe1101Pipelines:
            "kotoba-crispasr": ("Kotoba-CrispASR", "qwen", "balanced", "firered-vad"),
            "whisper-turbo-crispasr": ("Whisper-Turbo-CrispASR", "qwen", "balanced", "firered-vad"),
            "whisper-large-crispasr": ("Whisper-Large-CrispASR", "qwen", "balanced", "firered-vad"),
-           "moss-crispasr": ("MOSS-CrispASR", "moss", "balanced", "silero-v6.2")}
+           "moss-crispasr": ("MOSS-CrispASR", "moss", "balanced", "firered-vad")}   # W482
 
     @staticmethod
     def classes():
@@ -757,19 +757,26 @@ class TestMoss:
         with pytest.raises(ValueError, match="max_new_tokens"):
             make(MossCrispASRPipeline, tmp_path, model_params={"max_new_tokens": -1})
 
-    def test_its_stretches_and_scenes(self, tmp_path):
-        # W426: silero-v6.2 at 0.7, gap 5 s, longest 120 s, shortest 70 s, at every sensitivity (W428 I1 2);
-        # silero scenes of up to 420 s
+    def test_its_groups_and_scenes(self, tmp_path):
+        # W482: FireRedVAD with its own threshold; a group ends at a silence over 5 s, at most 240 s, no shortest
+        # group, at every sensitivity (W428 I1 2); semantic scenes of 90-240 s
+        from whisperjav.config.segmenter_presets import resolve_segmenter_sensitivity
         from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
 
         for sensitivity in ("conservative", "balanced", "aggressive"):
             pipe = make(MossCrispASRPipeline, tmp_path, sensitivity=sensitivity)
             s = pipe.segmenter
-            assert (s.backend, s.max_group_duration_s, s.chunk_threshold_s) == ("silero-v6.2", 120.0, 5.0)
-            assert (s.config["threshold"], s.config["min_group_duration_s"]) == (0.7, 70.0)
-            assert pipe.scene_detector_kwargs() == {"method": "silero", "max_duration": 420}
-        pipe = make(MossCrispASRPipeline, tmp_path, scene_detector="semantic")
-        assert pipe.scene_detector_kwargs() == {"method": "semantic", "min_duration": 12, "max_duration": 420}
+            assert (s.backend, s.max_group_duration_s, s.chunk_threshold_s) == ("firered-vad", 240.0, 5.0)
+            assert s.config["min_group_duration_s"] == 0.0
+            assert s.config["threshold"] == resolve_segmenter_sensitivity("firered-vad", sensitivity)["threshold"]
+            assert pipe.scene_detector_kwargs() == {"method": "semantic", "min_duration": 90, "max_duration": 240}
+        # a user who chooses silero (W482: their choice): its own minimum, MOSS's longest scene; Silero's 0.7 (W426 2)
+        pipe = make(MossCrispASRPipeline, tmp_path, scene_detector="silero", speech_segmenter="silero-v6.2")
+        assert pipe.scene_detector_kwargs() == {"method": "silero", "max_duration": 240}
+        assert pipe.segmenter.config["threshold"] == 0.7
+        # the Customize Scene values on top
+        pipe = make(MossCrispASRPipeline, tmp_path, scene_params={"min_duration": 120, "max_duration": 300})
+        assert pipe.scene_detector_kwargs() == {"method": "semantic", "min_duration": 120, "max_duration": 300}
         pipe = make(MossCrispASRPipeline, tmp_path, vad_threshold=0.5,
                     segmenter_overrides={"min_group_duration_s": 90, "max_group_duration_s": 110})
         assert (pipe.segmenter.config["threshold"], pipe.segmenter.config["min_group_duration_s"],
