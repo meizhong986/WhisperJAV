@@ -10,8 +10,9 @@ adjustments"):
   --hotwords "..."                   -> hotwords, default none
   max_new_tokens 65536 per chunk     -> max_new_tokens, default 0 = by the length of the audio, at the reference's
                                         rate (65,536 tokens per 50-minute chunk, about 21.8 a second; owner W406 i1)
-  --chunk-minutes 0                  -> the stretches MOSS hears: the Segmenter tab (silero-v6.2, 0.7, 5 s, 120 s,
-                                        70 s) and the Scene tab (silero, 420 s); crispasr/pass_settings.py (W426)
+  --chunk-minutes 0                  -> the stretches MOSS hears: the Segmenter tab (firered-vad, a group ends at a
+                                        silence over 5 s, at most 240 s, no shortest group) and the Scene tab
+                                        (semantic, 90-240 s); crispasr/pass_settings.py (W482; before it W426)
   include_speaker_labels             -> not used: no diarization in 1.10.x (W113 X7); the labels are dropped
   --do-sample --temperature 0.7      -> not available: CrispASR's MOSS decoder (0.8.44, and its main branch on
                                         2026-11-01) always takes the most likely next token; it has no sampling
