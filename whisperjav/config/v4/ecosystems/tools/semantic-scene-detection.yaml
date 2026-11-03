@@ -116,7 +116,8 @@ gui:
     label: "Min Segment Duration"
     description: "Minimum segment length in seconds. Shorter segments are merged."
     min: 5
-    max: 60
+    max: 600
+    # 1.10.1: 600, not 60 -- a slider clamps to its max on Apply, and MOSS-CrispASR's minimum is 90 s (owner W482)
     step: 1
     data_type: float
     unit: "s"
