@@ -32,6 +32,7 @@ from whisperjav.pipelines.whisper_turbo_crispasr_pipeline import WhisperTurboCri
 from whisperjav.pipelines.whisper_large_crispasr_pipeline import WhisperLargeCrispASRPipeline
 from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
 from whisperjav.crispasr.errors import FAILURE_PREFIX as CRISPASR_FAILURE_PREFIX, CrispASRRunError, CrispASRSetupError
+from whisperjav.modules.qwen_errors import QwenModelUnusable
 from whisperjav.crispasr.manifest import CRISPASR_PIPELINES
 from whisperjav.crispasr.pass_settings import (ignored_hardware_message, ignored_hardware_settings,
                                                speech_pad_ignored as crispasr_speech_pad_ignored,
@@ -866,6 +867,15 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                 # --fail-on suspect: a requested stop, not a crash.
                 logger.error("[Worker %s] Pass %s: %s: %s", os.getpid(), pass_number, basename, stop)
                 results.append(FileResult(basename=basename, status="failed", error=str(stop)))
+            except QwenModelUnusable as stop:
+                # The pass's Qwen3-ASR model cannot give real text for any file (R-QFT, #494; owner W491 2): the pass
+                # stops here, and every file not yet done fails with the same plain reason, without a new load.
+                logger.error("[Worker %s] Pass %s: %s: %s", os.getpid(), pass_number, basename, stop)
+                position = next(k for k, m in enumerate(media_files) if m is media_info)
+                results.extend(FileResult(basename=m["basename"], status="failed", error=str(stop))
+                               for m in media_files[position:])
+                _write_partial_results(result_file, results)
+                break
             except (CrispASRRunError, CrispASRSetupError) as failure:
                 # CrispASR or its model failed, with the reason in plain words: the run summary
                 # shows it, prefixed, instead of a traceback.
