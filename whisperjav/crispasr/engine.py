@@ -21,6 +21,7 @@ import numpy as np
 
 from whisperjav.crispasr import native_log
 from whisperjav.crispasr.errors import CrispASRRunError, CrispASRSetupError
+from whisperjav.modules.model_audio import too_short
 
 SAMPLE_RATE = 16000
 LANGUAGE = "ja"
@@ -186,6 +187,9 @@ class BindingEngine:
         if self._session is None:
             # The binding would pass a closed session's null handle straight to the library.
             raise CrispASRRunError("the CrispASR model is not open")
+        if too_short(len(audio), SAMPLE_RATE):
+            # The shortest audio a model is given (owner W461; modules/model_audio.py): no text under 0.2 s.
+            return []
         try:
             limit = self.token_limit(len(audio))
             if limit is not None:
