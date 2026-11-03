@@ -102,8 +102,9 @@ gui:
     label: "Max Scene Duration"
     description: "Maximum scene duration in seconds"
     min: 10
-    max: 600
-    # 1.10.1: 600, not 120 -- a range slider clamps to its max, and the silero default is 420 s (MOSS-CrispASR, W426 4)
+    max: 1200
+    # 1.10.1: 1200 (was 120, then 600) -- a range slider clamps to its max, and Apply sends it: balanced runs with
+    # 1200 s scenes, which a 600 s maximum turned into 600 s (G1, D:\WJ110_measure\b_2026-11-03\g1_report_before.txt)
     step: 1
     data_type: float
     group: core
