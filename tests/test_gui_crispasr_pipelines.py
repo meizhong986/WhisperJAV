@@ -14,7 +14,8 @@ What is pinned here:
   - each pipeline's default speech segmenter in app.js is the command line's (W202 2-3); the GGUF pipelines carry
     the CJK folder-name note (W203 O14, T24); a status panel under each pass row shows the model and the device
     (W133 2, T16), asked from api.get_crispasr_status, which never downloads;
-  - the command line the GUI builds for such a pass carries the model, the speech segmenter and the sensitivity, and
+  - the command line the GUI builds for such a pass carries the model, the speech segmenter (None included, owner
+    W457, W458: each scene goes to the model whole) and the sensitivity, and
     no scene detector, speech enhancer or 1.9.x flag; and WhisperJAV's own command line accepts it
     (--dump-params, which runs no ASR).
 """
@@ -178,12 +179,21 @@ def test_a_crispasr_pass_sends_model_segmenter_and_sensitivity_only(api, tmp_pat
     assert not [a for a in args if a.startswith("--crispasr")]
 
 
-def test_none_and_missing_values_are_not_sent(api, tmp_path):
+def test_missing_values_are_not_sent_and_the_segmenter_none_is(api, tmp_path):
     pass1 = {"pipeline": "cohere-crispasr", "isCrispasr": True, "speechSegmenter": "none"}
     args = api._build_twopass_args(_twopass(tmp_path, pass1))
     assert _value(args, "--pass1-pipeline") == "cohere-crispasr"
-    for flag in ("--pass1-speech-segmenter", "--pass1-model", "--pass1-sensitivity"):
+    # owner W457, W458: None as the speech segmenter is sent; each scene goes to the model whole
+    assert _value(args, "--pass1-speech-segmenter") == "none"
+    for flag in ("--pass1-model", "--pass1-sensitivity"):
         assert flag not in args
+    args = api._build_twopass_args(_twopass(tmp_path, {"pipeline": "cohere-crispasr", "isCrispasr": True}))
+    assert "--pass1-speech-segmenter" not in args
+
+
+def test_the_segmenter_none_is_not_greyed_for_a_crispasr_pass():
+    assert "if (noneSegmenter) noneSegmenter.disabled = false;" in JS
+    assert "noneSegmenter.disabled = !!passState.isCrispasr" not in JS
 
 
 def test_whisperjav_accepts_the_command_line_the_gui_builds(api, tmp_path):
