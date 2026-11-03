@@ -2655,19 +2655,14 @@ const EnsembleManager = {
         // picks the segmenter's preset, design 4.5), the source language, and since design 22.9.1
         // (owner W212 D3, W214 2, W232 8) the scene detector (semantic by default), the speech
         // enhancer, Enhance for VAD only and Customize (Segmenter, Enhancer, Scene tabs). Nothing is
-        // greyed but "None" as a segmenter: the pipelines need one (main.py refuses it).
+        // greyed: "None" as the speech segmenter sends each scene to the model whole (owner W457, W458).
         const noneSegmenter = segmenterSelect.querySelector('option[value="none"]');
-        if (noneSegmenter) noneSegmenter.disabled = !!passState.isCrispasr;
+        if (noneSegmenter) noneSegmenter.disabled = false;
         if (passState.isCrispasr) {
             sensitivitySelect.disabled = isPass2Disabled;
             sensitivitySelect.title = 'Picks the speech segmenter\'s preset: the detection threshold and related settings';
             segmenterSelect.disabled = isPass2Disabled;
             segmenterSelect.title = '';
-            if (segmenterSelect.value === 'none') {
-                const segmenter = this.crispasrDefaultSegmenter(passState.pipeline);
-                segmenterSelect.value = segmenter;
-                passState.speechSegmenter = segmenter;
-            }
 
             const sceneSelect = document.getElementById(`${passKey}-scene`);
             const enhancerSelect = document.getElementById(`${passKey}-enhancer`);
