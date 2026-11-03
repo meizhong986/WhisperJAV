@@ -1824,7 +1824,7 @@ const EnsembleManager = {
     // W343, W344, W401); tests/test_gui_crispasr_pipelines.py compares them. wordTimestamps: where the pass's
     // subtitle times come from by default (crispasr/manifest.py word_timestamps_for; owner W411-W414). scene:
     // the scene detector a pass starts on (crispasr/pass_settings.py scene_detector_for; semantic when absent;
-    // MOSS-CrispASR silero, owner W426 4).
+    // MOSS-CrispASR semantic too, owner W482; silero before it, W426 4).
     crispasrDefaults: {
         'parakeet-crispasr': { segmenter: 'ten', sensitivity: 'aggressive', wordTimestamps: 'model' },
         'cohere-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'aligner' },
@@ -1832,7 +1832,8 @@ const EnsembleManager = {
         'kotoba-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'model' },
         'whisper-turbo-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'model' },
         'whisper-large-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'model' },
-        'moss-crispasr': { segmenter: 'silero-v6.2', sensitivity: 'balanced', wordTimestamps: 'model', scene: 'silero' }
+        // MOSS-CrispASR (owner W482): semantic scenes of 90-240 s and FireRedVAD (crispasr/pass_settings.py).
+        'moss-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'model', scene: 'semantic' }
     },
     crispasrDefaultScene(pipeline) {
         const defaults = this.crispasrDefaults[pipeline];
@@ -1840,10 +1841,10 @@ const EnsembleManager = {
     },
     // R-SCN (1.10.1; owner W448-W455; design docs/plans/design/2026-11-02-rscn-design.md section 15): the scene
     // detector rscn is offered for the pipelines the command line accepts it for (crispasr/pass_settings.py
-    // RSCN_PIPELINES; tests/test_gui_rscn.py compares the two lists): MOSS-CrispASR only in this build. For every
-    // other pipeline the row's option is disabled and the Customize Scene tab does not list it, because main.py would
-    // refuse the run (exit 2).
-    rscnPipelines: ['moss-crispasr'],
+    // RSCN_PIPELINES; tests/test_gui_rscn.py compares the two lists). Not offered in 1.10.1 (owner W482): the list
+    // is empty, the dropdowns have no rscn option and the Customize Scene tab does not list it; the code stays for
+    // the new scene detector R to replace (W481).
+    rscnPipelines: [],
     offersRscn(pipeline) {
         return this.rscnPipelines.includes(pipeline);
     },
@@ -1858,13 +1859,15 @@ const EnsembleManager = {
         const option = Array.from(select.options).find(o => o.value === 'rscn');
         if (option) option.disabled = !offered;
         if (!offered && passState.sceneDetector === 'rscn') {
-            const fallback = this.isCrispasrPipeline(passState.pipeline)
-                ? this.crispasrDefaultScene(passState.pipeline) : 'semantic';
+            // The row keeps what it shows (a preset's rscn was not taken into it, setSilent); else the pipeline's own.
+            const shown = select.value && select.value !== 'rscn' ? select.value : '';
+            const fallback = shown || (this.isCrispasrPipeline(passState.pipeline)
+                ? this.crispasrDefaultScene(passState.pipeline) : 'semantic');
             passState.sceneDetector = fallback;
             select.value = fallback;
             ConsoleManager.log(
-                `${passKey === 'pass1' ? 'Pass 1' : 'Pass 2'}: the R-SCN scene detector is available for MOSS only, ` +
-                `so ${this.pipelineLabel(passKey)} runs with ${fallback}.`, 'warning');
+                `${passKey === 'pass1' ? 'Pass 1' : 'Pass 2'}: the R-SCN scene detector is not offered in this ` +
+                `version, so ${this.pipelineLabel(passKey)} runs with ${fallback}.`, 'warning');
         }
     },
     // BYOP Faster Whisper XXL (1.10.0, item 5): the model names XXL takes, sent as --passN-model.
@@ -2399,8 +2402,8 @@ const EnsembleManager = {
         // segmenter and sensitivity are each pipeline's own when a pass names none
         // (CRISPASR_DEFAULT_SEGMENTERS, CRISPASR_DEFAULT_SENSITIVITY, config/segmenter_presets.py:
         // TEN VAD at aggressive for Parakeet, FireRedVAD at balanced for Cohere, owner W343, W344);
-        // the scene detector starts at the pipeline's own (semantic, owner W214 2; silero for MOSS-CrispASR,
-        // W426 4: crispasrDefaultScene), and the user may choose another (design 22.9.1).
+        // the scene detector starts at the pipeline's own (semantic, owner W214 2; MOSS-CrispASR semantic too,
+        // W482: crispasrDefaultScene), and the user may choose another (design 22.9.1).
         if (this.isCrispasrPipeline(pipelineType)) {
             const segmenter = this.crispasrDefaultSegmenter(pipelineType);
             const sensitivity = this.crispasrDefaultSensitivity(pipelineType);
