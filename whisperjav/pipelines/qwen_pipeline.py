@@ -640,6 +640,45 @@ class QwenPipeline(BasePipeline):
     # Main processing
     # ------------------------------------------------------------------
 
+    SAVE_POINT_SUFFIX = ".savepoint.srt"
+    SAVE_POINT_STAGE_SUFFIX = ".savepoint.json"   # {"stage": ..., "subtitles": n}, read by the Ensemble
+    # Set by the Ensemble pass worker (owner W462, W463 C1): only an Ensemble pass keeps a failed pass's save-point.
+    save_points = False
+
+    def _clear_save_point(self, media_basename: str) -> None:
+        """No earlier save-point may pass for this run's (a cancelled or crashed run, --keep-temp)."""
+        for suffix in (self.SAVE_POINT_SUFFIX, self.SAVE_POINT_STAGE_SUFFIX):
+            (self.temp_dir / f"{media_basename}{suffix}").unlink(missing_ok=True)
+
+    def _write_save_point(self, draft: list, scene_paths: list, media_basename: str, stage: str) -> None:
+        """The save-point SRT (owner W462, W463 C1): the orchestrator's scene results (``stage``: before the timing
+        model, or after it and before Phases 6-8), as scene SRTs stitched into ``<temp>/<basename>.savepoint.srt``,
+        each replacing the one before. Not cleaned (Phase 8 has not run)."""
+        out_dir = self.temp_dir / "savepoint_srts"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        scene_srt_info: List[Tuple[Path, float]] = []
+        for idx, (result, _diag) in enumerate(draft):
+            if result is None or not result.segments:
+                continue
+            scene_srt_path = out_dir / f"{media_basename}_scene_{idx:04d}.srt"
+            try:
+                result.to_srt_vtt(str(scene_srt_path), word_level=False, segment_level=True, strip=True)
+            except Exception as e:  # noqa: BLE001 -- one scene less in the safety copy
+                logger.debug(f"Save-point: scene {idx + 1} SRT not written: {e}")
+                continue
+            if scene_srt_path.exists() and scene_srt_path.stat().st_size > 0:
+                scene_srt_info.append((scene_srt_path, scene_paths[idx][1]))
+        target = self.temp_dir / f"{media_basename}{self.SAVE_POINT_SUFFIX}"
+        if scene_srt_info:
+            count = self.stitcher.stitch(scene_srt_info, target)
+        else:
+            target.write_text("", encoding="utf-8")
+            count = 0
+        import json as _json
+        (self.temp_dir / f"{media_basename}{self.SAVE_POINT_STAGE_SUFFIX}").write_text(
+            _json.dumps({"stage": stage, "subtitles": count}), encoding="utf-8")
+        logger.info("[QwenPipeline PID %s] Save-point (%s): %d subtitles in %s", os.getpid(), stage, count, target)
+
     def process(self, media_info: Dict) -> Dict:
         """
         Process media file through the 9-phase Qwen pipeline.
@@ -681,6 +720,8 @@ class QwenPipeline(BasePipeline):
         # ==============================================================
         # PHASE 1: AUDIO EXTRACTION
         # ==============================================================
+        if self.save_points:
+            self._clear_save_point(media_basename)
         logger.info("[QwenPipeline PID %s] Phase 1: Extracting audio from %s", os.getpid(), input_file.name)
         phase1_start = time.time()
 
@@ -967,6 +1008,12 @@ class QwenPipeline(BasePipeline):
 
         # Set artifacts directory for debug output
         self._subtitle_pipeline.artifacts_dir = raw_subs_dir
+        # The save-points (owner W462, W463 C1), in an Ensemble pass only (the pass worker sets save_points): the
+        # subtitles after the ASR, after the aligner and after the timing model, each written over the one before as
+        # <temp>/<basename>.savepoint.srt; the Ensemble keeps the last one when this pass does not finish.
+        self._subtitle_pipeline.save_point = (
+            (lambda draft, stage: self._write_save_point(draft, scene_paths, media_basename, stage))
+            if self.save_points else None)
 
         # Prepare orchestrator inputs from scene_paths tuples
         orch_audio_paths = [Path(sp[0]) for sp in scene_paths]
@@ -1008,6 +1055,16 @@ class QwenPipeline(BasePipeline):
         # The same for the timing model (1.10.0, item 12): the subtitles are kept, unsplit.
         if getattr(self._subtitle_pipeline, "timing_unavailable", None):
             self.degradations.append(self._subtitle_pipeline.timing_unavailable)
+
+        # The last save-point (owner W462, W463 C1): the subtitles before the clean-up (Phases 6-8), so a failure
+        # there keeps them too. It replaces the earlier ones.
+        if self.save_points:
+            try:
+                self._write_save_point(orch_results, scene_paths, media_basename,
+                                       stage="before the clean-up" + (", after the timing model"
+                                                                      if self._subtitle_pipeline.timer else ""))
+            except Exception:  # noqa: BLE001 -- a safety copy, never a reason to stop
+                logger.warning("[QwenPipeline] Save-point could not be written; the run goes on", exc_info=True)
 
         # Convert to Phase 6 format: (WhisperResult, scene_idx)
         for idx, (result, _diag) in enumerate(orch_results):
