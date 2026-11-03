@@ -72,7 +72,7 @@ Parakeet-CrispASR uses the speech segmenter settings of the Fidelity pipeline, w
 
 When a pass uses one of these pipelines:
 
-- **Sensitivity**, **Speech Segmenter**, **Model**, **Scene Detector**, **Speech Enhancer** and **Enhance for VAD only** can be set, as for the other passes. **None** cannot be chosen as the speech segmenter: these pipelines transcribe only the speech the speech segmenter finds.
+- **Sensitivity**, **Speech Segmenter**, **Model**, **Scene Detector**, **Speech Enhancer** and **Enhance for VAD only** can be set, as for the other passes. **None** as the speech segmenter skips speech detection: each scene goes to the model whole, so silence and music reach the model too.
 - **Customize Parameters** opens three tabs: **Segmenter**, **Enhancer** and **Scene**. They start from the values the pass runs with.
 - A status panel under the pass row shows the model and where CrispASR will run, for example:
 
@@ -108,7 +108,7 @@ Without `--merge-strategy`, two passes are combined with `pass1_primary` (in the
 | Setting | GUI | Command line | Notes |
 |---|---|---|---|
 | Model | Model | `--pass1-model`, `--pass2-model` | `parakeet-tdt-0.6b-ja`; `cohere-asr-ja-v0.1`, `cohere-asr-ja` |
-| Speech segmenter | Speech Segmenter | `--pass1-speech-segmenter` | any except `none` |
+| Speech segmenter | Speech Segmenter | `--pass1-speech-segmenter` | any; `none` sends each scene to the model whole |
 | Sensitivity | Sensitivity | `--pass1-sensitivity` | `conservative`, `balanced`, `aggressive`; default `aggressive` for Parakeet-CrispASR, `balanced` for Cohere-CrispASR |
 | Scene detector | Scene Detector | `--pass1-scene-detector` | `semantic` (default, scenes of 12 to 48 s), `auditok`, `silero` (scenes of up to 48 s), `none` (one scene per file) |
 | Speech enhancer | Speech Enhancer | `--pass1-speech-enhancer` | `none` (default) or the speech enhancers of the other passes, for example `ffmpeg-dsp`, `zipenhancer` or `htdemucs` |
