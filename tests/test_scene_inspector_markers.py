@@ -24,30 +24,31 @@ def _scene(i, start, end):
     return {"scene_index": i, "start_s": start, "end_s": end, "duration_s": round(end - start, 3)}
 
 
-class TestTheCopiedPipelineValuesStayEqual:
-    """The tool copies two class values of the CrispASR pipeline (importing it would load CrispASR)."""
+class TestTheCopiedPipelineValueStaysEqual:
+    """The tool copies one class value of the CrispASR pipeline (importing it would load CrispASR)."""
 
-    def test_semantic_minimum_and_shortest_group_match_the_pipeline(self):
+    def test_the_shortest_group_matches_the_pipeline(self):
         text = (REPO / "whisperjav" / "pipelines" / "crispasr_pipeline.py").read_text(encoding="utf-8")
-        assert float(re.search(r"^\s*SCENE_MIN_S\s*=\s*([\d.]+)", text, re.M).group(1)) == si.CRISPASR_SEMANTIC_MIN_S
         assert float(re.search(r"^\s*MIN_GROUP_S\s*=\s*([\d.]+)", text, re.M).group(1)) == si.CRISPASR_MIN_GROUP_S
 
 
 class TestThePassSettings:
     def test_moss_semantic_scenes_take_the_pipeline_bounds_then_the_customize_values(self):
         kw = si.pipeline_scene_kwargs("moss-crispasr", "semantic", {})
-        assert kw == {"method": "semantic", "min_duration": 12, "max_duration": 420}
-        kw = si.pipeline_scene_kwargs("moss-crispasr", "semantic", {"min_duration": 90, "max_duration": 240})
-        assert (kw["min_duration"], kw["max_duration"]) == (90, 240)
+        assert kw == {"method": "semantic", "min_duration": 90, "max_duration": 240}   # W482
+        kw = si.pipeline_scene_kwargs("moss-crispasr", "semantic", {"min_duration": 100, "max_duration": 200})
+        assert (kw["min_duration"], kw["max_duration"]) == (100, 200)
+        kw = si.pipeline_scene_kwargs("cohere-crispasr", "semantic", {})
+        assert kw == {"method": "semantic", "min_duration": 12, "max_duration": 48}
 
     def test_silero_and_auditok_get_only_the_longest_scene(self):
-        assert si.pipeline_scene_kwargs("moss-crispasr", "silero", {}) == {"method": "silero", "max_duration": 420}
+        assert si.pipeline_scene_kwargs("moss-crispasr", "silero", {}) == {"method": "silero", "max_duration": 240}
         assert si.pipeline_scene_kwargs("cohere-crispasr", "auditok", {}) == {"method": "auditok", "max_duration": 48}
 
     def test_moss_default_segmenter_and_the_w482_values(self):
         default = si.pipeline_segmenter("moss-crispasr", None, None, {})
-        assert (default.backend, default.max_group_duration_s, default.chunk_threshold_s) == ("silero-v6.2", 120.0, 5.0)
-        assert default.config["min_group_duration_s"] == 70.0
+        assert (default.backend, default.max_group_duration_s, default.chunk_threshold_s) == ("firered-vad", 240.0, 5.0)
+        assert default.config["min_group_duration_s"] == 0.0
         w482 = si.pipeline_segmenter("moss-crispasr", "firered-vad", None,
                                      {"max_group_duration_s": 240, "chunk_threshold_s": 5, "min_group_duration_s": 0})
         assert (w482.backend, w482.max_group_duration_s, w482.chunk_threshold_s) == ("firered-vad", 240, 5)
@@ -172,3 +173,30 @@ class TestCommandLineChecks:
         # The media does not exist: the run stops at the file check, after the settings were resolved.
         assert si.main([str(tmp_path / "film.mkv"), "--pipeline", "moss-crispasr", "--quiet"]) == 1
         assert "not found" in capsys.readouterr().err
+
+
+class TestReferenceLinesAgainstTheCalls:
+    """W487 CA5: where each reference line falls against the calls to the model."""
+
+    def test_sent_partly_not_sent_and_in_no_scene(self):
+        scenes = [_scene(1, 0.0, 50.0), _scene(2, 60.0, 100.0)]
+        calls = [_call("1.1", 1, 10.0, 20.0), _call("2.1", 2, 70.0, 90.0)]
+        entries = [(11.0, 13.0, "a"),      # inside call 1.1
+                   (19.0, 23.0, "b"),      # 1 s of 4 s inside: partly sent
+                   (30.0, 32.0, "c"),      # in scene 1, outside every call
+                   (52.0, 55.0, "d"),      # between the scenes
+                   (69.0, 71.0, "e")]      # half inside call 2.1: sent
+        result = si.place_reference_lines(entries, calls, scenes)
+        assert [r["place"] for r in result["rows"]] == ["sent", "partly sent", "not sent", "in no scene", "sent"]
+        assert (result["lines"], result["sent"], result["partly sent"], result["not sent"], result["in no scene"]) \
+            == (5, 2, 1, 1, 1)
+        assert [r["call_id"] for r in result["rows"]] == ["1.1", "1.1", None, None, "2.1"]
+        assert [c["ref_lines"] for c in calls] == [2, 1]
+        assert result["rows"][1]["share_in_calls"] == 0.25
+
+    def test_a_line_over_two_calls_counts_for_the_one_holding_most(self):
+        scenes = [_scene(1, 0.0, 100.0)]
+        calls = [_call("1.1", 1, 0.0, 10.0), _call("1.2", 1, 11.0, 30.0)]
+        result = si.place_reference_lines([(9.0, 14.0, "x")], calls, scenes)
+        assert result["rows"][0]["place"] == "sent" and result["rows"][0]["call_id"] == "1.2"
+        assert result["rows"][0]["share_in_calls"] == 0.8
