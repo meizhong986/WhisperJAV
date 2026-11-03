@@ -127,9 +127,9 @@ gui:
     widget: slider
     label: "Max Segment Duration"
     description: "Scene ceiling in seconds. The engine clusters at 0.5 s granularity and merges upward, never past this value; a scene can only exceed it if one raw cluster is longer than the ceiling (a warning is logged). Balanced and Fidelity resolve 240 s."
-    min: 60
+    min: 10
     max: 1200
-    step: 10
+    step: 1
     data_type: float
     unit: "s"
     group: core
