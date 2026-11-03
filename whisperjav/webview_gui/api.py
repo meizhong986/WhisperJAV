@@ -3150,8 +3150,8 @@ class WhisperJAVAPI:
 
         A value left out is not sent: main.py and the pass worker then use the pipeline's own
         default (balanced; its default speech segmenter; its default model; semantic scenes; no
-        enhancer). "none" is never sent as the segmenter: the CrispASR pipelines need one, and
-        main.py would stop the run (exit 2). The scene detector "none" is sent: one scene per file.
+        enhancer). The speech segmenter "none" is sent (owner W457, W458): each scene goes to the model
+        whole. The scene detector "none" is sent: one scene per file.
         """
         import json
         args: List[str] = []
@@ -3159,7 +3159,7 @@ class WhisperJAVAPI:
         if sensitivity:
             args += [f"--pass{n}-sensitivity", sensitivity]
         segmenter = pass_config.get('speechSegmenter')
-        if segmenter and segmenter != 'none':
+        if segmenter:
             args += [f"--pass{n}-speech-segmenter", segmenter]
         model = pass_config.get('model')
         if model:
