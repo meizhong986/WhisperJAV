@@ -121,7 +121,7 @@ gui:
     description: "Probability threshold to detect speech (higher = more selective)"
     min: 0.1
     max: 0.9
-    step: 0.05
+    step: 0.01
     data_type: float
     group: detection
 
@@ -170,7 +170,7 @@ gui:
     widget: slider
     label: "Group Gap Threshold (s)"
     description: "Maximum gap to group consecutive segments"
-    min: 0.5
+    min: 0.1
     max: 30.0
     step: 0.1
     data_type: float
@@ -180,7 +180,7 @@ gui:
     widget: slider
     label: "Max Group Duration"
     description: "Maximum duration for grouped segments (pipeline typically overrides)"
-    min: 5
+    min: 1
     max: 420
     step: 1
     data_type: float
