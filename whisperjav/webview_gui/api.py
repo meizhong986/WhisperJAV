@@ -2433,7 +2433,8 @@ class WhisperJAVAPI:
                         "label": "Max Duration",
                         "description": "Maximum scene length (default: 48s)",
                         "group": "scene_bounds",
-                        "min": 20, "max": 300, "step": 5,
+                        # Step 1 so the slider holds 48 s; with step 5 Apply sent 50 s (G1, owner W491).
+                        "min": 20, "max": 300, "step": 1,
                         "default": 48,
                     },
                     "scene_clustering_threshold": {
@@ -2463,7 +2464,9 @@ class WhisperJAVAPI:
                         "label": "VAD Threshold",
                         "description": "Speech detection probability threshold. Overrides sensitivity preset. Lower = more sensitive. JAV default: 0.25.",
                         "group": "vad_settings",
-                        "min": 0.05, "max": 0.80, "step": 0.05,
+                        # Step 0.01 so the slider holds every segmenter's preset (0.12, 0.18, 0.22, 0.32 ...);
+                        # with step 0.05 Apply sent the nearest step instead (G1, owner W491).
+                        "min": 0.05, "max": 0.80, "step": 0.01,
                         "default": 0.25,
                     },
                     "vad_start_pad": {
@@ -2479,7 +2482,8 @@ class WhisperJAVAPI:
                         "label": "VAD End Pad (ms)",
                         "description": "Padding added after each speech segment (ms). The default depends on the model, the sensitivity and the speech segmenter.",
                         "group": "vad_settings",
-                        "min": 0, "max": 800, "step": 50,
+                        # Step 10 so the slider holds anime-whisper's 30 ms; with step 50 Apply sent 50 ms (G1, W491).
+                        "min": 0, "max": 800, "step": 10,
                         "default": 100,
                     },
                     "vad_decoder": {
