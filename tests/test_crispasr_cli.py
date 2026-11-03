@@ -319,8 +319,12 @@ class TestTheCommandLine:
         assert "Where this run's ASR and other models run, for every pipeline." in text
         assert "the GPU through Vulkan on Windows (Vulkan build, experimental)" in text
         assert ("for the GGUF pipelines: ten for parakeet-crispasr and "   # W344, W401
-                "reazonspeech-crispasr, silero-v6.2 for moss-crispasr, firered-vad for the others; "  # W426
+                "reazonspeech-crispasr, firered-vad for the others; "  # W482: MOSS FireRedVAD
                 "none sends each scene to the model whole.") in text  # W457, W458
+        # W482: MOSS-CrispASR's default scenes (review finding 7 of 2026-11-03: the scene detector help was unpinned)
+        for n in (1, 2):
+            assert (f"Scene detection method for pass {n} (default: semantic since v1.9.2; for moss-crispasr "
+                    f"semantic with scenes of normally 90-240 s).") in text
         # the MOSS settings as --passN-params keys (W428 I1 3, I1 4)
         assert ('For moss-crispasr also its MOSS settings: "prompt_language" (en, the default, or zh), '
                 '"language_hint" (default Japanese), "hotwords" (comma-separated, default none) and '
