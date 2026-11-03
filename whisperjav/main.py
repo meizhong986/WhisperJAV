@@ -437,7 +437,7 @@ def parse_arguments():
                                     "black picture, 70-420 s, preferably 120-360 s; its settings are rscn_* keys "
                                     "in --pass1-params.")
     twopass_group.add_argument("--pass1-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none). Default: firered-vad when pass 1 is Qwen3-ASR; for the GGUF pipelines, which do not accept none: ten for parakeet-crispasr and reazonspeech-crispasr, silero-v6.2 for moss-crispasr, firered-vad for the others. Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
+                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none). Default: firered-vad when pass 1 is Qwen3-ASR; for the GGUF pipelines: ten for parakeet-crispasr and reazonspeech-crispasr, silero-v6.2 for moss-crispasr, firered-vad for the others; none sends each scene to the model whole. Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
     twopass_group.add_argument("--pass1-vad-version", default=None,
                                choices=list(VAD_VERSIONS),
                                help="Silero VAD build for pass 1 when --pass1-pipeline is balanced "
@@ -505,7 +505,7 @@ def parse_arguments():
                                     "black picture, 70-420 s, preferably 120-360 s; its settings are rscn_* keys "
                                     "in --pass2-params.")
     twopass_group.add_argument("--pass2-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Default: ten when pass 2 is anime-whisper; for the GGUF pipelines, which do not accept none: ten for parakeet-crispasr and reazonspeech-crispasr, silero-v6.2 for moss-crispasr, firered-vad for the others. Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
+                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Default: ten when pass 2 is anime-whisper; for the GGUF pipelines: ten for parakeet-crispasr and reazonspeech-crispasr, silero-v6.2 for moss-crispasr, firered-vad for the others; none sends each scene to the model whole. Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
     twopass_group.add_argument("--pass2-vad-version", default=None,
                                choices=list(VAD_VERSIONS),
                                help="Silero VAD build for pass 2 when --pass2-pipeline is balanced "
@@ -3697,6 +3697,9 @@ def main():
                     if not _why and (_p1_error.startswith("stopped before transcription")
                                      or _p1_error.startswith(CRISPASR_FAILURE_PREFIX)):
                         _why = _p1_error
+                    # What the pass that did not finish left behind (owner W462, W463 C1), in the file's line.
+                    if result.get('kept_work'):
+                        _why = "; ".join([str(_why or 'ensemble pass failed')] + list(result['kept_work']))
                     outcome = failed_outcome(
                         in_path, str(_why or 'ensemble pass failed'),
                         processing_time_s=_elapsed,
@@ -3719,6 +3722,8 @@ def main():
                             _reasons.append(f"pass 2 failed ({_p2_error}); output is pass 1 alone")
                         else:
                             _reasons.append("pass 2 failed; output is pass 1 alone")
+                        # What pass 2 left behind (owner W462, W463 C1): its last save-point and its working files.
+                        _reasons.extend(result.get('kept_work') or [])
                     _reasons.extend(_summary.get('degradations') or [])
 
                     outcome = classify_output(
