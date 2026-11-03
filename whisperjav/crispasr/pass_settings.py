@@ -15,8 +15,9 @@ The speech segmenter settings follow the pipelines the owner named (W199 DIR1: "
 similar presets and settings as qwenasr. And for prakeet use similar settings and presets as fidelity
 whisper pipeline"; W202): ``segmenter_settings()`` resolves them through those pipelines' own functions.
 The 1.10.1 pipelines (W401, pre-approved choices of step 2) take Cohere's settings, except ReazonSpeech-CrispASR,
-whose model is a transducer like Parakeet's and takes Parakeet's, and MOSS-CrispASR, which has its own: Silero VAD
-v6.2 builds 90-120 s stretches that start at speech, in scenes of up to 420 s (owner W425, W426).
+whose model is a transducer like Parakeet's and takes Parakeet's, and MOSS-CrispASR, which has its own: FireRedVAD
+VAD groups that end at a silence over 5 s and are at most 240 s, in semantic scenes of 90-240 s (owner W482; before it
+Silero VAD v6.2 with 90-120 s stretches in silero scenes of up to 420 s, W425, W426).
 
 Used by three callers, so the rules have one home:
   - whisperjav/main.py refuses a pass that cannot run (validate_crispasr_passes), as a usage error
@@ -35,21 +36,31 @@ from whisperjav.config.segmenter_presets import CRISPASR_DEFAULT_SEGMENTERS, CRI
 from whisperjav.crispasr import manifest
 from whisperjav.crispasr.manifest import CRISPASR_PIPELINES, JAPANESE_NAMES
 
-# The scene detector the CrispASR pipelines run when the pass names none (owner W214 2), and the longest scene.
-# MOSS-CrispASR (owner W426 4): the silero scene detector with its own 420 s maximum; with another scene detector
-# chosen for MOSS, scenes are also at most 420 s. 420 s is a maximum only: the silero detector's first pass (auditok)
-# also ends a scene at a silence of 1.8 s (its pass-1 setting as built, in the run log), and a stretch never crosses a
-# scene, so a short scene gives a stretch
-# shorter than MOSS's 70 s (seen on the Netflix clip, 2026-11-01: 15.4 s and 3.9 s stretches).
+# The scene detector the CrispASR pipelines run when the pass names none (owner W214 2), the shortest semantic scene
+# (ChronosJAV's 12 s, W202 5d) and the longest scene.
+# MOSS-CrispASR (owner W482; docs/plans/design/2026-11-03-moss-default-semantic-firered.md): semantic scenes of 90 to
+# 240 s. The 90 s is semantic's real merge floor (shorter pieces join a neighbour; no audio is dropped); auditok and
+# silero keep their own minimum. The 240 s is the longest scene the pass asks for, whatever scene detector it runs;
+# semantic can pass it when its final clean-up joins a piece shorter than 90 s to a neighbour (it logs a warning). The
+# VAD groups, what MOSS hears, stay at most 240 s (MOSS_MAX_GROUP_S), except with the speech segmenter none. Before W482:
+# silero with a 420 s maximum (W426 4), whose first pass ends a scene at a short silence, so a short scene gave MOSS a
+# short call, and audio between its scenes reached no scene (the Netflix clip, 2026-11-03: 25.9 s of 397 s).
 CRISPASR_SCENE_DETECTOR = "semantic"
+CRISPASR_SCENE_MIN_S = 12
 CRISPASR_SCENE_MAX_S = 48
-SCENE_DETECTOR_FOR = {"moss-crispasr": "silero"}
-SCENE_MAX_S_FOR = {"moss-crispasr": 420}
+SCENE_DETECTOR_FOR = {"moss-crispasr": "semantic"}
+SCENE_MIN_S_FOR = {"moss-crispasr": 90}
+SCENE_MAX_S_FOR = {"moss-crispasr": 240}
 
 
 def scene_detector_for(pipeline: str) -> str:
     """The scene detector a CrispASR pass runs when it names none."""
     return SCENE_DETECTOR_FOR.get(pipeline, CRISPASR_SCENE_DETECTOR)
+
+
+def scene_min_s_for(pipeline: str) -> float:
+    """The shortest semantic scene of a CrispASR pass (auditok and silero keep their own minimum)."""
+    return SCENE_MIN_S_FOR.get(pipeline, CRISPASR_SCENE_MIN_S)
 
 
 def scene_max_s_for(pipeline: str) -> float:
@@ -81,15 +92,17 @@ MODELS_HELP_DEFAULT = " (default)"
 SEGMENTER_STYLE = {"parakeet-crispasr": "fidelity", "cohere-crispasr": "qwen",
                    "reazonspeech-crispasr": "fidelity", "kotoba-crispasr": "qwen", "whisper-turbo-crispasr": "qwen",
                    "whisper-large-crispasr": "qwen", "moss-crispasr": "moss"}
-# MOSS-CrispASR's stretches (owner W425, W426 1-3): the VAD groups are what MOSS hears in one call, 90-120 s that
-# start at speech. Speech threshold 0.7, up to 5 s of silence inside a stretch (the group gap), longest 120 s,
-# shortest 70 s (a shorter group joins the next while both fit in 120 s). The same at every sensitivity (W428 I1 2);
-# the sensitivity picks the segmenter's other values. --passN-vad-threshold and the Customize Segmenter tab change
-# them for one pass.
+# MOSS-CrispASR's VAD groups, what MOSS hears in one call (owner W482): speech segments less than 5 s apart are one
+# group; a silence longer than 5 s marks a change of sequence and ends the group; a group is at most 240 s; a short
+# group followed by a long silence stays alone (no shortest group). The same at every sensitivity (W428 I1 2); the
+# sensitivity picks the segmenter's other values. --passN-vad-threshold and the Customize Segmenter tab change them for
+# one pass. MOSS_THRESHOLD, a Silero speech probability (W426 2), applies only when the user chooses a Silero segmenter
+# for MOSS; the default segmenter is FireRedVAD with its own threshold (CRISPASR_DEFAULT_SEGMENTERS, W482).
+# Before W482 (W426): Silero v6.2 at 0.7, groups of 70-120 s.
 MOSS_THRESHOLD = 0.7
 MOSS_CHUNK_THRESHOLD_S = 5.0
-MOSS_MAX_GROUP_S = 120.0
-MOSS_MIN_GROUP_S = 70.0
+MOSS_MAX_GROUP_S = 240.0
+MOSS_MIN_GROUP_S = 0.0   # off: the shortest-group join (W426 3) is not used by the default
 # Parakeet-CrispASR's longest VAD group and longest speech segment, at every sensitivity (W193 CLA3,
 # W194 2 "(a)", confirmed by W202 1 "1-a").
 PARAKEET_LONGEST_S = 6.0
@@ -147,12 +160,12 @@ def segmenter_settings(pipeline: str, backend: Optional[str], sensitivity: Optio
     as fidelity, only when the backend has that setting (speech_pad_ignored() says when it has not),
     and both the start and the end pad for Cohere, as the qwen pipeline.
 
-    moss-crispasr (owner W425, W426, W428 I1 2): the backend's own preset at the sensitivity, then MOSS's stretch
-        values (MOSS_CHUNK_THRESHOLD_S, MOSS_MAX_GROUP_S, MOSS_MIN_GROUP_S, and MOSS_THRESHOLD for a Silero
-        segmenter) at every sensitivity. The shortest group works with the segmenters that use the shared grouping
-        (silero-v6.2, ten, firered-vad, whisperseg).
+    moss-crispasr (owner W482; before it W425, W426, W428 I1 2): the backend's own preset at the sensitivity, then
+        MOSS's group values (MOSS_CHUNK_THRESHOLD_S, MOSS_MAX_GROUP_S, MOSS_MIN_GROUP_S, and MOSS_THRESHOLD for a
+        Silero segmenter) at every sensitivity. A shortest group, when the user sets one, works with the segmenters
+        that use the shared grouping (silero-v6.2, ten, firered-vad, whisperseg).
         The longest speech segment stays the preset's: a speech segment cut there is followed at once by the next,
-        which the grouping (gaps up to 5 s) puts into the same stretch. --passN-vad-threshold wins over the 0.7;
+        which the grouping (gaps up to 5 s) puts into the same group. --passN-vad-threshold wins over the threshold;
         --passN-speech-pad-ms is the segmenter's speech_pad_ms where the backend has that setting.
     none (owner W457, W458): no segmenter settings at all; the pipeline sends each scene whole.
     """
@@ -257,12 +270,14 @@ def validate_crispasr_passes(args: Any) -> None:
             raise ValueError(problem)
 
 
-# R-SCN (owner W448-W452; docs/plans/design/2026-11-02-rscn-design.md): in this build only for MOSS-CrispASR, whose
-# preset it carries (the other GGUF pipelines keep their decided 48 s scenes, W214 2); its settings are the rscn_
-# keys of --passN-params.
-RSCN_PIPELINES = ("moss-crispasr",)
+# R-SCN (owner W448-W452; docs/plans/design/2026-11-02-rscn-design.md): built for MOSS-CrispASR, but not offered in
+# 1.10.1 (owner W482 Q3): rscn is not among the --passN-scene-detector choices (main.py) nor in the GUI (app.js
+# rscnPipelines, kept equal to this by tests/test_gui_rscn.py). The code stays, unused, until the new scene detector
+# R replaces it (W481). Its settings would be the rscn_ keys of --passN-params.
+RSCN_PIPELINES = ()
 RSCN_PIPELINE_PROBLEM = ("--pass{n}-scene-detector rscn is available only when --pass{n}-pipeline is "
                          "{pipelines}; pass {n} is {pipeline}.")
+RSCN_NOT_OFFERED = "--pass{n}-scene-detector rscn is not offered in this version."
 RSCN_PARAMS_PROBLEM = "--pass{n}-params: {why}"
 
 
@@ -272,6 +287,8 @@ def rscn_problem(n: int, pipeline: Optional[str], scene_detector: Optional[str],
     The rscn_ settings in --passN-params are checked here (a JSON error is left to main.py's own check)."""
     if str(scene_detector or "").strip().lower() != "rscn" or not pipeline:
         return None
+    if not RSCN_PIPELINES:
+        return RSCN_NOT_OFFERED.format(n=n)
     if pipeline not in RSCN_PIPELINES:
         return RSCN_PIPELINE_PROBLEM.format(n=n, pipeline=pipeline, pipelines=", ".join(RSCN_PIPELINES))
     if not params_json:
