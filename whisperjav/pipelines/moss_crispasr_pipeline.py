@@ -15,10 +15,12 @@ design.md, section 9.4). His findings (W425): MOSS works best with longer audio 
 relevant hotwords help; clips of 70 s and more were transcribed very well. So, through the shared chain
 (whisperjav/pipelines/crispasr_pipeline.py):
 
-  - scenes: the silero scene detector, scenes up to 420 s (W426 4; crispasr/pass_settings.py);
-  - the speech segmenter Silero VAD v6.2 builds the stretches MOSS hears, one per call, each starting at speech:
-    threshold 0.7, up to 5 s of silence inside a stretch, longest 120 s, shortest 70 s (a shorter one joins the
-    next while both fit), at every sensitivity (W426 1-3, W428 I1 2); all in the pass's Customize Segmenter tab;
+  - scenes: the semantic scene detector, scenes of 90-240 s (W482; crispasr/pass_settings.py; before it silero
+    scenes up to 420 s, W426 4);
+  - the speech segmenter FireRedVAD builds the VAD groups MOSS hears, one per call, each starting at speech: speech
+    segments less than 5 s apart are one group, a group is at most 240 s, a short group followed by a longer silence
+    stays alone (no shortest group), at every sensitivity (W482, W428 I1 2); all in the pass's Customize Segmenter
+    tab. Before W482: Silero VAD v6.2 at 0.7, groups of 70-120 s (W426 1-3);
   - the reference's instruction (English, "Language hint: Japanese.", the hotwords) through CrispASR's set_ask,
     adjustable in the pass's MOSS tab or --passN-params (W428 I1 4; crispasr/moss_prompt.py);
   - a token limit per call by the stretch's length, at the reference's rate (65,536 tokens per 50 minutes, about
