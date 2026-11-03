@@ -53,7 +53,7 @@ from whisperjav.crispasr.errors import CrispASRRunError, CrispASRSetupError
 from whisperjav.crispasr.manifest import JAPANESE_NAMES, ModelFile, model_for
 from whisperjav.modules.model_audio import MIN_MODEL_AUDIO_S
 from whisperjav.crispasr.pass_settings import (NO_SEGMENTER, SegmenterSettings, scene_detector_for, scene_max_s_for,
-                                               segmenter_settings)
+                                               scene_min_s_for, segmenter_settings)
 from whisperjav.pipelines.base_pipeline import BasePipeline
 from whisperjav.utils.logger import logger
 
@@ -127,12 +127,10 @@ class CrispASRPipeline(BasePipeline):
             return row
         return cls.ENGINE_WITHOUT_ALIGNER or dataclasses.replace(row, aligner=None)
 
-    # ChronosJAV's semantic scenes (qwen_pipeline.py, safe chunking; W202 5d). auditok and silero keep
-    # their own minimum, with the same maximum: a 12 s minimum makes them drop a stretch of speech
-    # shorter than 12 s between long silences (design 22.9.1; owner W232 14). The longest scene and the
-    # default scene detector are the pipeline's (pass_settings.scene_max_s_for, scene_detector_for): 48 s and
-    # semantic, MOSS-CrispASR 420 s and silero (owner W426 4).
-    SCENE_MIN_S = 12
+    # The scenes (pass_settings.scene_detector_for, scene_min_s_for, scene_max_s_for): semantic with ChronosJAV's 12 s
+    # minimum (qwen_pipeline.py, safe chunking; W202 5d) and a 48 s maximum; MOSS-CrispASR semantic with 90-240 s
+    # (owner W482). auditok and silero keep their own minimum, with the same maximum: a 12 s minimum makes them drop a
+    # stretch of speech shorter than 12 s between long silences (design 22.9.1; owner W232 14).
     # The model's own settings from the pass's Customize values (--passN-params), or None: a class with
     # from_params(params), prompt() and fixed_token_limit() (MOSS-CrispASR: crispasr/moss_prompt.MossSettings).
     MODEL_SETTINGS = None
@@ -179,7 +177,7 @@ class CrispASRPipeline(BasePipeline):
                 as fidelity or the qwen pipeline applies them (pass_settings.segmenter_settings).
             cues: the pause values of the "tokens" line rule (W208); None means lines.DEFAULT_CUES.
             scene_detector: auditok, silero, semantic or none; None means the pipeline's own: semantic (design
-                22.9.1, W214 2), silero for MOSS-CrispASR (W426 4).
+                22.9.1, W214 2; MOSS-CrispASR too since W482, before it silero, W426 4).
             speech_enhancer, speech_enhancer_model: the pass's speech enhancer; None or "none" means none.
             enhance_for_vad: the enhanced audio goes to the speech segmenter only, the original to
                 CrispASR (W232 8), as the qwen pipeline's dual track.
@@ -222,6 +220,7 @@ class CrispASRPipeline(BasePipeline):
         self.model_settings = (self.MODEL_SETTINGS.from_params(model_params)
                                if self.MODEL_SETTINGS is not None else None)
         self.scene_detector = str(scene_detector or scene_detector_for(self.PIPELINE_NAME)).strip().lower()
+        self.scene_min_s = scene_min_s_for(self.PIPELINE_NAME)
         self.scene_max_s = scene_max_s_for(self.PIPELINE_NAME)
         self.scene_params: Dict[str, Any] = dict(scene_params or {})
         self.enhancer_backend = str(speech_enhancer or "none").strip().lower()
@@ -460,14 +459,14 @@ class CrispASRPipeline(BasePipeline):
         return Path(wav), float(duration)
 
     def scene_detector_kwargs(self) -> Dict[str, Any]:
-        """The scene detector's settings for this pass (design 22.9.1): semantic with ChronosJAV's
-        12 s minimum; auditok and silero with their own minimum; the pipeline's longest scene for all three
-        (48 s; MOSS-CrispASR 420 s, W426 4); none, one scene per file; rscn (owner W448-W452), its preset for this
-        pipeline (rscn/settings.py), its own lengths. The Customize Scene tab's values on top (rscn takes only its
-        rscn_ keys)."""
+        """The scene detector's settings for this pass (design 22.9.1): semantic with the pipeline's minimum
+        (ChronosJAV's 12 s; MOSS-CrispASR 90 s, owner W482); auditok and silero with their own minimum; the pipeline's
+        longest scene for all three (48 s; MOSS-CrispASR 240 s, W482); none, one scene per file; rscn (owner
+        W448-W452; not offered in 1.10.1, W482), its preset for this pipeline (rscn/settings.py), its own lengths. The
+        Customize Scene tab's values on top (rscn takes only its rscn_ keys)."""
         kwargs: Dict[str, Any] = {"method": self.scene_detector}
         if self.scene_detector == "semantic":
-            kwargs.update(min_duration=self.SCENE_MIN_S, max_duration=self.scene_max_s)
+            kwargs.update(min_duration=self.scene_min_s, max_duration=self.scene_max_s)
         elif self.scene_detector in ("auditok", "silero"):
             kwargs.update(max_duration=self.scene_max_s)
         elif self.scene_detector == "rscn":
