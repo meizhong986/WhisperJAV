@@ -326,18 +326,18 @@ def test_the_default_segmenters_in_app_js_are_the_command_lines():
              re.findall(r"'([a-z-]+)': \{ segmenter: '([^']+)', sensitivity: '([^']+)', "
                         r"wordTimestamps: '([^']+)'(?:, scene: '([^']+)')? \}", block)}
     # 1.10.1 (owner W411-W414): each pipeline's default word timestamps, as the command line's; and its scene
-    # detector (W426 4: silero for MOSS-CrispASR)
+    # detector (semantic for every one; W482 for MOSS-CrispASR)
     assert in_js == {p: (CRISPASR_DEFAULT_SEGMENTERS[p], CRISPASR_DEFAULT_SENSITIVITY[p], word_timestamps_for(p),
                          scene_detector_for(p)) for p in CRISPASR_PIPELINES}
     assert "return (defaults && defaults.scene) || 'semantic';" in JS
     assert "return this.crispasrDefaults[pipeline].segmenter;" in JS
     assert "return this.crispasrDefaults[pipeline].sensitivity;" in JS
     assert "return defaults ? defaults.wordTimestamps : null;   // null: not a CrispASR pipeline" in JS
-    # W344, and the 1.10.1 pipelines as Parakeet (ReazonSpeech) or Cohere (the others) (W401); MOSS Silero v6.2 (W426)
+    # W344, and the 1.10.1 pipelines as Parakeet (ReazonSpeech) or Cohere (the others) (W401); MOSS FireRedVAD (W482)
     assert CRISPASR_DEFAULT_SEGMENTERS == {"parakeet-crispasr": "ten", "cohere-crispasr": "firered-vad",
                                            "reazonspeech-crispasr": "ten", "kotoba-crispasr": "firered-vad",
                                            "whisper-turbo-crispasr": "firered-vad",
-                                           "whisper-large-crispasr": "firered-vad", "moss-crispasr": "silero-v6.2"}
+                                           "whisper-large-crispasr": "firered-vad", "moss-crispasr": "firered-vad"}
     assert CRISPASR_DEFAULT_SENSITIVITY == {"parakeet-crispasr": "aggressive", "cohere-crispasr": "balanced",
                                             "reazonspeech-crispasr": "aggressive", "kotoba-crispasr": "balanced",
                                             "whisper-turbo-crispasr": "balanced",
