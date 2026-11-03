@@ -28,6 +28,7 @@ import stable_whisper
 
 from whisperjav.utils.logger import logger
 from whisperjav.modules.japanese_postprocessor import JapanesePostProcessor
+from whisperjav.modules.qwen_errors import PREFIX as UNUSABLE_PREFIX, QwenModelUnusable
 
 
 def _as_audiolike(entry):
@@ -43,6 +44,46 @@ def _as_audiolike(entry):
     if isinstance(entry, np.ndarray):
         return (entry, 16000)
     return str(entry)
+
+
+# The output layer and the input embeddings of a Qwen3-ASR model, as its model file names them (R-QFT, #494).
+OUTPUT_LAYER = "thinker.lm_head.weight"
+INPUT_EMBEDDINGS = "thinker.model.embed_tokens.weight"
+
+
+def _checkpoint_tensor_names(model_id: str) -> Optional[set]:
+    """The tensor names stored in the model's files, read from their safetensors headers only.
+
+    ``model_id`` is a local folder or a Hugging Face model ID already in this computer's cache (the model has just
+    been loaded from it). ``None`` when the names cannot be read here: no safetensors files, or not in the cache.
+    """
+    root = Path(model_id)
+    if not root.is_dir():
+        try:
+            from huggingface_hub import try_to_load_from_cache
+            config_file = try_to_load_from_cache(model_id, "config.json")
+        except Exception as e:  # noqa: BLE001 -- unknown here means "do as before"
+            logger.debug("Could not find the files of %s in the cache: %s", model_id, e)
+            return None
+        if not isinstance(config_file, str):
+            return None
+        root = Path(config_file).parent
+    try:
+        index = root / "model.safetensors.index.json"
+        if index.is_file():
+            return set(json.loads(index.read_text(encoding="utf-8")).get("weight_map", {}))
+        files = sorted(root.glob("*.safetensors"))
+        if not files:
+            return None
+        from safetensors import safe_open
+        names = set()
+        for f in files:
+            with safe_open(str(f), framework="pt") as handle:
+                names.update(handle.keys())
+        return names
+    except Exception as e:  # noqa: BLE001 -- unknown here means "do as before"
+        logger.debug("Could not read the tensor names of %s: %s", model_id, e)
+        return None
 
 
 
@@ -431,6 +472,63 @@ class QwenASR:
                 e,
             )
 
+    def _ensure_output_layer(self) -> None:
+        """Give the model its output layer when its file stores none (R-QFT, #494); stop when that cannot be done.
+
+        Qwen3-ASR fine-tunes such as jaykwok/Qwen3-ASR-1.7B-JA-Anime-Galgame and neosophie/Qwen3-ASR-1.7B-JA store
+        the input embeddings only; their settings say the output layer is the same matrix (tie_word_embeddings).
+        transformers 4 made that copy when loading (WhisperJAV 1.9.5); transformers 5 with the qwen-asr fork does
+        not, and leaves the output layer filled with random numbers, so the model never stops by itself and writes
+        nonsense. The copy is made here, after loading, on both load paths. The standard Qwen3-ASR models store
+        their output layer (byte for byte equal to their input embeddings) and are left as they are. When the
+        model's files cannot be read here (a model in .bin files, or not in this computer's cache), the copy is made
+        as transformers 4 made it: when the settings say the two are one matrix and they differ. A model with no
+        output layer that cannot take the copy stops the run (owner W491 2): its text would be nonsense.
+        """
+        names = _checkpoint_tensor_names(self.model_id)
+        if names is not None and OUTPUT_LAYER in names:
+            return
+        try:
+            thinker = self.model.model.thinker
+            head = thinker.lm_head.weight
+            embeddings = thinker.get_input_embeddings().weight
+            text_config = getattr(thinker.config, "text_config", None)
+            tied = bool(getattr(text_config, "tie_word_embeddings", True))
+        except AttributeError as e:
+            self._stop(f"{UNUSABLE_PREFIX}{self.model_id} could not be checked: WhisperJAV could not reach its "
+                       f"output layer ({e}). This is a fault in WhisperJAV, not in the model; please report it.")
+        same_shape = tuple(head.shape) == tuple(embeddings.shape)
+        in_memory = not (head.is_meta or embeddings.is_meta)
+        if names is None:
+            if tied and same_shape and in_memory and not torch.equal(head, embeddings):
+                with torch.no_grad():
+                    head.copy_(embeddings)
+                logger.info("  Output layer: made from the model's input embeddings, as its settings say "
+                            "(its files could not be read here)")
+            return
+        if INPUT_EMBEDDINGS not in names:
+            self._stop(self._unusable_text("its file has no input embeddings to make one from"))
+        if not tied:
+            self._stop(self._unusable_text("its settings say the output layer is not the same as the input embeddings"))
+        if not same_shape:
+            self._stop(self._unusable_text(
+                f"its input embeddings ({tuple(embeddings.shape)}) do not fit the output layer ({tuple(head.shape)})"))
+        if not in_memory:
+            self._stop(self._unusable_text("its input embeddings are not in memory"))
+        with torch.no_grad():
+            head.copy_(embeddings)
+        logger.info("  Output layer: not in the model file; made from the model's input embeddings")
+
+    def _unusable_text(self, reason: str) -> str:
+        """The plain message of a model that stops the run (owner W491 2)."""
+        return (f"{UNUSABLE_PREFIX}{self.model_id} cannot be used. Its model file has no output layer and {reason}, "
+                f"so its text would be nonsense. Choose another Qwen3-ASR model, for example Qwen/Qwen3-ASR-1.7B.")
+
+    def _stop(self, text: str) -> None:
+        """Free the model just loaded, then stop the run with ``text`` (owner W491 2)."""
+        self.unload_model()
+        raise QwenModelUnusable(text)
+
     def _compute_dynamic_token_limit(self, audio_duration_sec: float) -> int:
         """
         Compute a dynamic max_new_tokens limit scaled to audio duration.
@@ -636,6 +734,9 @@ class QwenASR:
                 "[QwenASR PID %s] Model loaded successfully: %s in %.1fs",
                 os.getpid(), self.model_id, load_time
             )
+
+            # A fine-tune whose file stores no output layer gets it from the input embeddings (R-QFT, #494).
+            self._ensure_output_layer()
 
             # Apply generation safety controls (v1.8.9+)
             self._apply_generation_config()
@@ -1155,6 +1256,9 @@ class QwenASR:
 
             load_time = time.time() - start_time
             logger.info(f"  Loaded (text-only) in {load_time:.1f}s")
+
+            # A fine-tune whose file stores no output layer gets it from the input embeddings (R-QFT, #494).
+            self._ensure_output_layer()
 
             # Apply generation safety controls (v1.8.9+)
             self._apply_generation_config()
