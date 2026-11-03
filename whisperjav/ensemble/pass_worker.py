@@ -526,6 +526,27 @@ def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
     return params
 
 
+def partial_result_file(result_file: str) -> str:
+    """Where the worker writes the results of the files finished so far (owner W462, W463 step 3)."""
+    return result_file + ".partial"
+
+
+def _write_partial_results(result_file: str, results: List["FileResult"]) -> None:
+    """Each file's result as soon as it is known, so that a crash later in the pass (a native abort, which no
+    Python handler sees) does not lose the files already done. Written whole, then renamed; a failure to write it
+    is logged and changes nothing else."""
+    import pickle
+
+    target = partial_result_file(result_file)
+    try:
+        tmp = target + ".tmp"
+        with open(tmp, "wb") as f:
+            pickle.dump({"results": [r.__dict__ for r in results], "worker_error": None}, f)
+        os.replace(tmp, target)
+    except Exception as e:  # noqa: BLE001 -- a safety copy only
+        logger.debug("[Worker %s] Could not write the per-file results: %s", os.getpid(), e)
+
+
 def _write_dropbox_and_exit(result_file: str, result: Dict[str, Any], tracer, exit_code: int) -> None:
     """
     Write result to Drop-Box file and perform Nuclear Exit.
@@ -740,6 +761,9 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
             # overwrite each other. Pipelines that do not record it ignore it.
             # The CrispASR pipelines' raw copy and artifacts file (1.10.1, R-RAW) go to the same folder.
             _configure_trace(pipeline, pass_number, Path(media_info.get('output_dir', payload.output_dir)))
+            # An Ensemble pass keeps its save-points (owner W462, W463 C1); pipelines without them ignore this.
+            if hasattr(pipeline, "save_points"):
+                pipeline.save_points = True
             _configure_telemetry(
                 pipeline, pass_config, pass_number,
                 Path(media_info.get('output_dir', payload.output_dir)),
@@ -859,6 +883,8 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                         error=traceback.format_exc(),
                     )
                 )
+            # Step 3 (owner W462, W463): this file's result is on disk before the next file starts.
+            _write_partial_results(result_file, results)
     finally:
         # Defensive cleanup: Use BaseException to catch more error types.
         # On Windows, CUDA driver crashes during cleanup can terminate the process
@@ -878,8 +904,10 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                 os.getpid(), e
             )
 
-        # Temp directory cleanup - also make defensive
-        if not payload.keep_temp_files and pass_temp_dir.exists():
+        # Temp directory cleanup - also make defensive. Not when a file failed (owner W462, W463 step 1): the
+        # Ensemble keeps that file's save-point and the pass's working files (ensemble/orchestrator.py).
+        if (not payload.keep_temp_files and pass_temp_dir.exists()
+                and not any(r.status == "failed" for r in results)):
             try:
                 shutil.rmtree(pass_temp_dir, ignore_errors=True)
             except BaseException:
@@ -1496,8 +1524,9 @@ def _build_pipeline(
     # through its Python binding. Built from the pass settings they use -- model, speech
     # segmenter, sensitivity, source language, device -- and returned here, before resolve_legacy_pipeline(),
     # which raises for any name outside LEGACY_PIPELINES (config/legacy.py). main.py has
-    # already refused a model they do not know, a language other than Japanese and the
-    # segmenter "none" (whisperjav/crispasr/pass_settings.py). The pass settings they do
+    # already refused a model they do not know and a language other than Japanese
+    # (whisperjav/crispasr/pass_settings.py); the segmenter "none" is accepted (owner W457, W458:
+    # each scene goes to the model whole). The pass settings they do
     # not use are named in one line and otherwise left alone: the GUI and saved Ensemble
     # presets carry them for every pipeline.
     if is_crispasr:
