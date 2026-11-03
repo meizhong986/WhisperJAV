@@ -31,7 +31,7 @@ by default, for every backend B:
 
 With --pipeline (a CrispASR pipeline, e.g. moss-crispasr) the scenes and the calls are made the way
 an Ensemble pass of that pipeline makes them (owner W482, W483): the pass's scene detector and its
-settings (pass_settings.scene_detector_for / scene_max_s_for, semantic's 12 s minimum), its speech
+settings (pass_settings.scene_detector_for / scene_min_s_for / scene_max_s_for), its speech
 segmenter and VAD groups (pass_settings.segmenter_settings, the VAD-grouped framer), the 0.2 s model
 minimum (modules/model_audio.py); --param and --segmenter-param are the pass's Customize Scene and
 Segmenter values. The speech enhancer is not run.
@@ -100,10 +100,9 @@ BOUNDARY_TOLERANCE_S = 1.0           # two backends "agree" on a cut within this
 SHEET_COLS, SHEET_TILE_W, SHEET_PAGE = 5, 320, 60   # contact sheet layout
 SILENCE_DBFS = -120.0
 
-# --pipeline (owner W482, W483): the values a CrispASR pass uses that live on the pipeline class. Copied, because
-# importing pipelines/crispasr_pipeline.py loads CrispASR; tests/test_scene_inspector_markers.py reads them from that
-# file and keeps them equal.
-CRISPASR_SEMANTIC_MIN_S = 12      # CrispASRPipeline.SCENE_MIN_S: semantic's minimum scene in a CrispASR pass
+# --pipeline (owner W482, W483): a value a CrispASR pass uses that lives on the pipeline class. Copied, because
+# importing pipelines/crispasr_pipeline.py loads CrispASR; tests/test_scene_inspector_markers.py reads it from that file
+# and keeps it equal. The scene bounds come from crispasr/pass_settings.py (light).
 CRISPASR_MIN_GROUP_S = 0.1        # CrispASRPipeline.MIN_GROUP_S: shorter VAD groups are dropped, not counted
 CALL_BUCKETS_S = (10, 30, 70, 120, 240)   # call-length histogram edges (70 s: W425 4)
 # What ended a call (classify_call_ends); the words used in the summary and the on-screen label.
@@ -410,6 +409,51 @@ def read_srt_cues(path: Path) -> List[Tuple[float, float]]:
     return [(s.start.ordinal / 1000.0, s.end.ordinal / 1000.0) for s in subs]
 
 
+def read_srt_entries(path: Path) -> List[Tuple[float, float, str]]:
+    """Start, end and text (lines joined with " / ") of every entry of a subtitle file."""
+    import pysrt
+    subs = pysrt.open(str(path), encoding="utf-8")
+    return [(s.start.ordinal / 1000.0, s.end.ordinal / 1000.0, " / ".join(s.text.splitlines())) for s in subs]
+
+
+# Where a reference line falls against the calls to the ASR model (owner W487 CA5), by the share of its time inside
+# calls: sent (half or more), partly sent (less than half), not sent (no part in a call, its middle in a scene), in no
+# scene (no part in a call, its middle outside every scene).
+LINE_PLACES = ("sent", "partly sent", "not sent", "in no scene")
+
+
+def place_reference_lines(entries: List[Tuple[float, float, str]], calls: List[Dict[str, Any]],
+                          scenes: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """For each reference line (a subtitle of a reference file such as the Netflix one): the share of its time that
+    lies inside the calls, its place (LINE_PLACES) and the call holding most of it; each call gets "ref_lines", the
+    lines whose largest part it holds. This shows where the speech the reference transcribes reaches the model; it
+    says nothing about how well the model then transcribes it."""
+    spans = [(c["start_s"], c["end_s"], c) for c in calls]
+    for c in calls:
+        c["ref_lines"] = 0
+    rows: List[Dict[str, Any]] = []
+    for n, (a, b, text) in enumerate(entries, start=1):
+        overlaps = [(max(0.0, min(b, e) - max(a, s)), c) for s, e, c in spans]
+        covered = sum(o for o, _ in overlaps)
+        share = min(1.0, covered / (b - a)) if b > a else (1.0 if covered > 0 else 0.0)
+        best = max(overlaps, key=lambda oc: oc[0], default=(0.0, None))
+        holder = best[1] if best[0] > 0 else None
+        if holder is not None:
+            holder["ref_lines"] += 1
+        if share >= 0.5:
+            place = "sent"
+        elif share > 0:
+            place = "partly sent"
+        elif any(sc["start_s"] <= (a + b) / 2.0 < sc["end_s"] for sc in scenes):
+            place = "not sent"
+        else:
+            place = "in no scene"
+        rows.append({"line": n, "start_s": round(a, 3), "end_s": round(b, 3), "start_hms": hms(a),
+                     "share_in_calls": round(share, 3), "place": place,
+                     "call_id": holder["call_id"] if holder is not None else None, "text": text})
+    return {"lines": len(rows), **{p: sum(1 for r in rows if r["place"] == p) for p in LINE_PLACES}, "rows": rows}
+
+
 def boundaries_of(scenes: List[Dict[str, Any]]) -> List[float]:
     pts = set()
     for s in scenes:
@@ -441,13 +485,13 @@ def crispasr_pipeline_names() -> Tuple[str, ...]:
 
 def pipeline_scene_kwargs(pipeline: str, backend: str, params: Dict[str, Any]) -> Dict[str, Any]:
     """The scene detector's settings as a CrispASR pass sets them (crispasr_pipeline.scene_detector_kwargs): semantic
-    with the pipeline's 12 s minimum, auditok and silero with their own minimum, the pipeline's longest scene for all
-    three (pass_settings.scene_max_s_for); the --param values on top, as the pass's Customize Scene values. No
-    sensitivity preset: the pass applies none to its scenes."""
-    from whisperjav.crispasr.pass_settings import scene_max_s_for
+    with the pipeline's minimum (pass_settings.scene_min_s_for), auditok and silero with their own minimum, the
+    pipeline's longest scene for all three (pass_settings.scene_max_s_for); the --param values on top, as the pass's
+    Customize Scene values. No sensitivity preset: the pass applies none to its scenes."""
+    from whisperjav.crispasr.pass_settings import scene_max_s_for, scene_min_s_for
     kwargs: Dict[str, Any] = {"method": backend}
     if backend == "semantic":
-        kwargs.update(min_duration=CRISPASR_SEMANTIC_MIN_S, max_duration=scene_max_s_for(pipeline))
+        kwargs.update(min_duration=scene_min_s_for(pipeline), max_duration=scene_max_s_for(pipeline))
     elif backend in ("auditok", "silero"):
         kwargs.update(max_duration=scene_max_s_for(pipeline))
     kwargs.update(params)
@@ -716,6 +760,8 @@ def calls_summary_lines(rec: Dict[str, Any], base: str) -> List[str]:
                f"{str(shortest) + ' s (a shorter group joins the next while both fit)' if shortest else 'off'}")
     lines = [
         "", f"## Calls to the ASR model ({P['name']})",
+        "A call is a VAD group passed to the ASR model (WhisperJAV's term: VAD group; with no speech segmenter, the "
+        "whole scene).",
         f"- Scene settings: {json.dumps(P['scene_settings'])}",
         f"- Speech segmenter: {how}; {P['segmenter_time_s']} s",
         f"- Calls: {C['call_count']}, {C['calls_total_s']} s = {round((C['share_of_media'] or 0) * 100, 1)} % of the media; "
@@ -731,6 +777,22 @@ def calls_summary_lines(rec: Dict[str, Any], base: str) -> List[str]:
         "", "A call ended by the scene cut is one where the next speech came within the group gap: the speech segmenter "
         "alone would have gone on.", f"Every call: `{base}.calls.csv`.",
     ]
+    R = rec["stats"].get("reference_lines")
+    if R:
+        lines += [
+            "", f"## Reference lines ({rec['srt']['name']}) against the calls",
+            f"- {R['lines']} lines: sent {R['sent']}, partly sent {R['partly sent']}, not sent {R['not sent']}, "
+            f"in no scene {R['in no scene']}",
+            "- Sent: half of the line's time or more lies inside calls; partly sent: less than half; not sent: no part "
+            "inside a call, its middle inside a scene; in no scene: no part inside a call, its middle outside every "
+            "scene. A line can count twice where padded scenes overlap (under a second). This shows where the speech "
+            "the reference transcribes reaches the model, not how well the model transcribes it.",
+        ]
+        missing = [r for r in R["rows"] if r["place"] != "sent"]
+        if missing:
+            lines += ["", "| line | start | end s | share in calls | place | call | text |", "|---|---|---|---|---|---|---|"]
+            lines += [f"| {r['line']} | {r['start_hms']} | {r['end_s']} | {r['share_in_calls']} | {r['place']} | "
+                      f"{r['call_id'] or ''} | {r['text'].replace('|', '/')} |" for r in missing]
     return lines
 
 
@@ -740,10 +802,11 @@ def write_outputs(out_dir: Path, base: str, rec: Dict[str, Any]) -> None:
     if rec.get("calls") is not None:
         with open(out_dir / f"{base}.calls.csv", "w", newline="", encoding="utf-8") as fh:
             w = csv.writer(fh)
-            w.writerow(["call_id", "scene_index", "start_hms", "end_hms", "start_s", "end_s", "duration_s", "ended_by"])
+            w.writerow(["call_id", "scene_index", "start_hms", "end_hms", "start_s", "end_s", "duration_s", "ended_by",
+                        "ref_lines"])
             for c in rec["calls"]:
                 w.writerow([c["call_id"], c["scene_index"], c["start_hms"], c["end_hms"], c["start_s"], c["end_s"],
-                            c["duration_s"], c["ended_by"]])
+                            c["duration_s"], c["ended_by"], c.get("ref_lines", "")])
 
     with open(out_dir / f"{base}.scenes.csv", "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
@@ -984,6 +1047,9 @@ def inspect_media(media: Path, backends: List[str], sensitivity: Optional[str], 
             if calls is not None:
                 classify_call_ends(calls, pass_segmenter.chunk_threshold_s if framer is not None else None)
                 stats["calls"] = call_stats(calls, media_duration, len(scenes), not_sent, failed_scenes)
+                if srt_path:
+                    # W487 CA5: where the reference file's lines fall against the calls.
+                    stats["reference_lines"] = place_reference_lines(read_srt_entries(srt_path), calls, scenes)
 
             # 5. Screenshots (P5/P6) and contact sheets (suggestion 4).
             shot_rel = f"{SCREENSHOT_SUBFOLDER}/{backend}"
@@ -1216,6 +1282,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(f"{media.name} [{rec['pipeline']['name']} calls]: {C['call_count']} calls, median "
                       f"{C['duration']['median_s']} s, max {C['duration']['max_s']} s, {C['calls_70s_or_longer']} of 70 s "
                       f"or longer; ended by: {ended}; not sent (under 0.2 s): {C['pieces_not_sent_under_0_2s']}")
+            if "reference_lines" in st:
+                R = st["reference_lines"]
+                print(f"{media.name} [reference lines]: {R['lines']} lines: sent {R['sent']}, partly sent "
+                      f"{R['partly sent']}, not sent {R['not sent']}, in no scene {R['in no scene']}")
             if rec.get("markers"):
                 if rec["markers"].get("error"):
                     print(f"{media.name}: {rec['markers']['error']}", file=sys.stderr)
