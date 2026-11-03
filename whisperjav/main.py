@@ -123,6 +123,7 @@ from whisperjav.utils.run_outcome import (
 )
 from whisperjav.modules.media_discovery import MediaDiscovery
 from whisperjav.modules.audio_integrity import AudioIntegrityStop
+from whisperjav.modules.qwen_errors import PREFIX as QWEN_UNUSABLE_PREFIX, QwenModelUnusable
 from whisperjav.utils.media_leftovers import (
     WHISPERJAV_WORK_DIRS,
     is_whisperjav_temp_file,
@@ -2007,9 +2008,10 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                 
             except Exception as e:
                 progress.show_message(f"Failed: {file_name} - {str(e)}", "error", 3.0)
-                # A stop asked for by --fail-on suspect (damaged audio) is not a crash: no traceback.
+                # A stop asked for by --fail-on suspect (damaged audio) is not a crash: no traceback. Nor is a
+                # Qwen3-ASR model that cannot give real text (R-QFT; owner W491 2).
                 logger.error(f"Failed to process {file_path_str}: {e}",
-                             exc_info=not isinstance(e, AudioIntegrityStop))
+                             exc_info=not isinstance(e, (AudioIntegrityStop, QwenModelUnusable)))
                 failed_files.append(file_path_str)
                 all_stats.append({"file": file_path_str, "status": "failed", "error": str(e)})
                 # One outcome per file: if this file was already classified
@@ -2019,7 +2021,14 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                 else:
                     outcomes.append(failed_outcome(file_path_str, str(e)))
                 progress.update_overall(1)
-                
+                if isinstance(e, QwenModelUnusable):
+                    # The model cannot give real text for any file (R-QFT; owner W491 2): the run stops here.
+                    for rest in media_files[i:]:
+                        outcomes.append(skipped_outcome(
+                            rest.get('path', 'Unknown File'),
+                            "not started: the run stopped because its ASR model cannot be used"))
+                    break
+
     finally:
         # Ensure pipeline cleanup is called even if an exception occurs
         # This releases GPU memory and prevents VRAM leaks
@@ -3714,7 +3723,8 @@ def main():
                     _reasons = []
                     if status == 'degraded':
                         _p2_error = str((result.get('pass2') or {}).get('error') or '')
-                        if _p2_error.startswith(CRISPASR_FAILURE_PREFIX):
+                        if (_p2_error.startswith(CRISPASR_FAILURE_PREFIX)
+                                or _p2_error.startswith(QWEN_UNUSABLE_PREFIX)):
                             _reasons.append(f"pass 2 failed ({_p2_error}); output is pass 1 alone")
                         else:
                             _reasons.append("pass 2 failed; output is pass 1 alone")
