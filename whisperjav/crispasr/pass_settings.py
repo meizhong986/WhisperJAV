@@ -62,9 +62,6 @@ def scene_max_s_for(pipeline: str) -> float:
 MODEL_PROBLEM = "--pass{n}-model: {why}"
 LANGUAGE_PROBLEM = ("--pass{n}-pipeline {pipeline} transcribes Japanese only, and --language is "
                     "{language}. Use --language japanese, or choose another pipeline for pass {n}.")
-SEGMENTER_NONE_PROBLEM = ("--pass{n}-speech-segmenter none is not available when --pass{n}-pipeline is "
-                          "{pipeline}: it transcribes the VAD groups the speech segmenter finds. Leave the "
-                          "flag out to use {default}, or name another speech segmenter.")
 
 # One info line from the pass worker, e.g.
 # "Parakeet-CrispASR does not use: --pass1-scene-detector, --pass1-speech-enhancer".
@@ -126,6 +123,11 @@ def default_segmenter(pipeline: str) -> str:
     return CRISPASR_DEFAULT_SEGMENTERS[pipeline]
 
 
+# The speech segmenter "none" (owner W457, W458): no speech detection; each scene goes to the model whole, as one VAD
+# group, so the scene detector's longest scene is the longest call. No group length, no gap, no settings.
+NO_SEGMENTER = "none"
+
+
 def segmenter_settings(pipeline: str, backend: Optional[str], sensitivity: Optional[str], *,
                        vad_threshold: Optional[float] = None,
                        speech_pad_ms: Optional[int] = None) -> SegmenterSettings:
@@ -152,9 +154,12 @@ def segmenter_settings(pipeline: str, backend: Optional[str], sensitivity: Optio
         The longest speech segment stays the preset's: a speech segment cut there is followed at once by the next,
         which the grouping (gaps up to 5 s) puts into the same stretch. --passN-vad-threshold wins over the 0.7;
         --passN-speech-pad-ms is the segmenter's speech_pad_ms where the backend has that setting.
+    none (owner W457, W458): no segmenter settings at all; the pipeline sends each scene whole.
     """
     backend = (backend or default_segmenter(pipeline)).strip().lower()
     sensitivity = sensitivity or CRISPASR_DEFAULT_SENSITIVITY[pipeline]
+    if backend == NO_SEGMENTER:
+        return SegmenterSettings(NO_SEGMENTER, sensitivity, None, None, {})
     style = SEGMENTER_STYLE[pipeline]
     user: Dict[str, Any] = {}
     if vad_threshold is not None:
@@ -223,8 +228,8 @@ def crispasr_pass_problem(n: int, pipeline: str, *, model: Optional[str],
         manifest.model_for(pipeline, model)
     except ValueError as why:
         return MODEL_PROBLEM.format(n=n, why=why)
-    if speech_segmenter is not None and str(speech_segmenter).strip().lower() == "none":
-        return SEGMENTER_NONE_PROBLEM.format(n=n, pipeline=pipeline, default=default_segmenter(pipeline))
+    # The speech segmenter "none" is accepted (owner W457, W458; it replaced route B's refusal, Q14): each scene goes
+    # to the model whole (segmenter_settings, NO_SEGMENTER).
     return None
 
 
