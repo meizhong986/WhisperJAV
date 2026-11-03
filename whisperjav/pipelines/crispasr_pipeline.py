@@ -51,7 +51,8 @@ from whisperjav.crispasr.aligner import CrispAligner
 from whisperjav.crispasr.engine import SAMPLE_RATE, BindingEngine, CrispSegment, CrispToken
 from whisperjav.crispasr.errors import CrispASRRunError, CrispASRSetupError
 from whisperjav.crispasr.manifest import JAPANESE_NAMES, ModelFile, model_for
-from whisperjav.crispasr.pass_settings import (SegmenterSettings, scene_detector_for, scene_max_s_for,
+from whisperjav.modules.model_audio import MIN_MODEL_AUDIO_S
+from whisperjav.crispasr.pass_settings import (NO_SEGMENTER, SegmenterSettings, scene_detector_for, scene_max_s_for,
                                                segmenter_settings)
 from whisperjav.pipelines.base_pipeline import BasePipeline
 from whisperjav.utils.logger import logger
@@ -167,8 +168,8 @@ class CrispASRPipeline(BasePipeline):
         """
         Args:
             model_name: a short name from the manifest; None means this pipeline's default.
-            speech_segmenter: the speech segmenter; None means this pipeline's default. "none" is
-                refused: the pipeline transcribes the VAD groups the segmenter finds.
+            speech_segmenter: the speech segmenter; None means this pipeline's default. "none" (owner W457,
+                W458): no speech detection; each scene goes to the model whole, as one VAD group.
             language: the source language; Japanese only.
             subs_language: "direct-to-english" still writes Japanese, with one console line.
             sensitivity: the pass's sensitivity; None means the pipeline's own, aggressive for Parakeet and
@@ -206,8 +207,6 @@ class CrispASRPipeline(BasePipeline):
         # The pass's row: ENGINE, or with the aligner switched on or off by --passN-word-timestamps.
         self.word_timestamps: str = manifest.word_timestamps_for(self.PIPELINE_NAME, word_timestamps)
         self.engine: EngineRow = self.engine_row(self.word_timestamps)
-        if speech_segmenter is not None and str(speech_segmenter).strip().lower() == "none":
-            raise ValueError(f"{self.LABEL} needs a speech segmenter: it transcribes the VAD groups it finds.")
         self.segmenter: SegmenterSettings = segmenter_settings(self.PIPELINE_NAME, speech_segmenter, sensitivity,
                                                                vad_threshold=vad_threshold,
                                                                speech_pad_ms=speech_pad_ms)
@@ -252,8 +251,12 @@ class CrispASRPipeline(BasePipeline):
         self.raw_subs_dir: Optional[str] = None
         self.pass_tag: Optional[str] = None
 
-        logger.info(f"{self.LABEL} ready: model {self.model.label}, speech segmenter {self.speech_segmenter} "
-                    f"({self.sensitivity}), VAD groups of at most {self.segmenter.max_group_duration_s:g} s")
+        if self.speech_segmenter == NO_SEGMENTER:
+            logger.info(f"{self.LABEL} ready: model {self.model.label}, no speech segmenter: each scene goes to "
+                        f"the model whole")
+        else:
+            logger.info(f"{self.LABEL} ready: model {self.model.label}, speech segmenter {self.speech_segmenter} "
+                        f"({self.sensitivity}), VAD groups of at most {self.segmenter.max_group_duration_s:g} s")
 
     def get_mode_name(self) -> str:
         return self.PIPELINE_NAME
@@ -303,8 +306,12 @@ class CrispASRPipeline(BasePipeline):
         speech_s = sum(g.end - g.start for g in groups)
         md["stages"]["groups"] = {"count": len(groups), "seconds": round(speech_s, 2),
                                   "failed_scenes": failed_scenes}
-        logger.info(f"{self.LABEL}: {len(groups)} VAD groups over {len(scenes)} scenes, "
-                    f"{speech_s:.0f} s of speech in {duration:.0f} s")
+        if self.speech_segmenter == NO_SEGMENTER:
+            logger.info(f"{self.LABEL}: no speech segmenter: {len(groups)} of {len(scenes)} scenes go to the model "
+                        f"whole, {speech_s:.0f} s of audio in {duration:.0f} s")
+        else:
+            logger.info(f"{self.LABEL}: {len(groups)} VAD groups over {len(scenes)} scenes, "
+                        f"{speech_s:.0f} s of speech in {duration:.0f} s")
 
         self.progress.set_current_step("Transcribing with CrispASR", 5, 6)
         results: List[Tuple[_Group, List[CrispSegment]]] = []
@@ -581,7 +588,10 @@ class CrispASRPipeline(BasePipeline):
         """The VAD groups of every scene, in scene time; the segmenter is released before returning.
 
         Returns the groups and the number of scenes the segmenter failed on.
+        With the speech segmenter "none" (owner W457, W458): each scene is one group, start to end.
         """
+        if self.speech_segmenter == NO_SEGMENTER:
+            return self._whole_scenes(scenes)
         from whisperjav.modules.subtitle_pipeline.framers.vad_grouped import VadGroupedFramer
 
         framer = VadGroupedFramer(segmenter_backend=self.segmenter.backend,
@@ -591,6 +601,7 @@ class CrispASRPipeline(BasePipeline):
                                   segmenter_config=dict(self.segmenter.config))
         groups: List[_Group] = []
         failed = 0
+        too_short = 0
         try:
             for scene in scenes:
                 try:
@@ -609,8 +620,12 @@ class CrispASRPipeline(BasePipeline):
                 clip_end = len(audio) / SAMPLE_RATE
                 for frame in result.frames:
                     start, end = max(0.0, frame.start), min(clip_end, frame.end)
-                    if end - start >= self.MIN_GROUP_S:
+                    if end - start >= MIN_MODEL_AUDIO_S:
                         groups.append(_Group(scene.index, start, end))
+                    elif end - start >= self.MIN_GROUP_S:
+                        # The shortest audio a model is given (owner W461; modules/model_audio.py): the framer
+                        # could not widen it to 0.2 s. Not sent; counted.
+                        too_short += 1
         finally:
             try:
                 framer.cleanup()
@@ -618,7 +633,39 @@ class CrispASRPipeline(BasePipeline):
                 logger.debug(f"{self.LABEL}: segmenter cleanup: {e}")
             del framer
             gc.collect()
+        self._note_too_short(too_short, "VAD group(s)")
         return groups, failed
+
+    def _whole_scenes(self, scenes: List[_Scene]) -> Tuple[List[_Group], int]:
+        """The speech segmenter "none" (owner W457, W458): each scene is one VAD group, from its first sample to its
+        last, so it goes to the model whole. No segmenter is loaded. A scene shorter than MIN_GROUP_S (0.1 s) is not
+        sent, as a shorter VAD group is not; one of 0.1-0.2 s is not sent either (the model minimum, owner W461;
+        modules/model_audio.py) and is counted in a note; a scene whose audio cannot be read counts as failed."""
+        import soundfile as sf
+
+        groups: List[_Group] = []
+        failed = 0
+        too_short = 0
+        for scene in scenes:
+            try:
+                info = sf.info(str(scene.path))
+                length = info.frames / float(info.samplerate)
+            except Exception as e:
+                failed += 1
+                logger.warning(f"{self.LABEL}: the audio of scene {scene.index} could not be read: {e}")
+                continue
+            if length >= MIN_MODEL_AUDIO_S:
+                groups.append(_Group(scene.index, 0.0, length))
+            elif length >= self.MIN_GROUP_S:
+                too_short += 1
+        self._note_too_short(too_short, "scene(s)")
+        return groups, failed
+
+    def _note_too_short(self, count: int, what: str) -> None:
+        """One note per file for the pieces not sent because they are shorter than the model minimum (W461)."""
+        if count:
+            self.notes.append(f"{self.LABEL}: {count} {what} shorter than {MIN_MODEL_AUDIO_S:g} s were not "
+                              f"transcribed (the shortest audio a model is given)")
 
     # -----------------------------------------------------------------------------------------------
     # 5. One CrispASR call per VAD group
