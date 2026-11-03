@@ -103,10 +103,11 @@ FIDELITY_DEFAULT_SEGMENTER = "firered-vad"
 
 # The CrispASR pipelines' speech segmenter when a pass names none (1.10.0; owner W202 3, W343, W344):
 # Parakeet-CrispASR TEN VAD (WhisperSeg until W344), Cohere-CrispASR FireRedVAD. They transcribe the VAD
-# groups the speech segmenter finds, so they have no "none" (main.py refuses it: whisperjav/crispasr/pass_settings.py).
+# groups the speech segmenter finds; "none" (owner W457, W458) sends each scene to the model whole instead.
 # 1.10.1 (W401, pre-approved choices of step 2): each new pipeline takes the values of the pipeline whose segmenter
 # settings it takes (crispasr/pass_settings.py SEGMENTER_STYLE): ReazonSpeech Parakeet's, the others Cohere's.
-# MOSS-CrispASR (owner W425, W426 1): Silero VAD v6.2, which builds MOSS's 90-120 s stretches that start at speech.
+# MOSS-CrispASR (owner W482): FireRedVAD; its VAD groups end at a silence longer than 5 s and are at most 240 s
+# (crispasr/pass_settings.py MOSS_*). Before W482: Silero VAD v6.2 (W425, W426 1).
 CRISPASR_DEFAULT_SEGMENTERS = {
     "parakeet-crispasr": "ten",
     "cohere-crispasr": "firered-vad",
@@ -114,7 +115,7 @@ CRISPASR_DEFAULT_SEGMENTERS = {
     "kotoba-crispasr": "firered-vad",
     "whisper-turbo-crispasr": "firered-vad",
     "whisper-large-crispasr": "firered-vad",
-    "moss-crispasr": "silero-v6.2",
+    "moss-crispasr": "firered-vad",
 }
 # Their sensitivity when a pass names none (owner W343, W344): Parakeet-CrispASR aggressive, Cohere-CrispASR
 # balanced. Applied by main.py apply_ensemble_pass_defaults; the GUI Ensemble tab applies the same values
