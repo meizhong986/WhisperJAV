@@ -27,6 +27,8 @@ python tools/scene_inspector.py MOVIE.mp4 --backend semantic --scene-threshold 1
 python tools/scene_inspector.py MOVIE.mp4 --backend auditok,semantic --speech-ratio --srt MOVIE.ja.whisperjav.srt
 python tools/scene_inspector.py MOVIE.mp4 --sensitivity aggressive --no-screenshots
 python tools/scene_inspector.py --list-params auditok
+python tools/scene_inspector.py MOVIE.mp4 --pipeline moss-crispasr --no-screenshots --markers
+python tools/scene_inspector.py MOVIE.mp4 --pipeline moss-crispasr --backend semantic --param min_duration=90 --param max_duration=240 --speech-segmenter firered-vad --segmenter-param max_group_duration_s=240 --segmenter-param chunk_threshold_s=5 --segmenter-param min_group_duration_s=0 --label w482 --no-screenshots --markers
 ```
 
 ### Arguments
@@ -46,6 +48,13 @@ python tools/scene_inspector.py --list-params auditok
 | `--keep-scene-audio` | off | Also keep the per-scene WAV files the detector writes, in `<target>/<name>.<backend>_scene_audio/` |
 | `--list-params BACKEND` | | Print the parameters a backend accepts, with their YAML defaults and named presets, then exit |
 | `--quiet` | off | Warnings only on the console (the semantic engine still prints its own progress) |
+| `--pipeline NAME` | none | A CrispASR pipeline (`moss-crispasr`, `cohere-crispasr`, ...): make the scenes and the calls to the ASR model as an Ensemble pass of it does. Scenes: the pass's scene detector (`--backend` when given) with the pass's settings (semantic: 12 s minimum; all: the pipeline's longest scene, MOSS-CrispASR 420 s); `--param` values on top, as the pass's Customize Scene values; no sensitivity preset on the scenes, as in the pass. Calls: the pass's speech segmenter at `--sensitivity` through the VAD-grouped framer, one call per VAD group; pieces under 0.2 s are not sent (the model minimum). The speech enhancer is not run; nothing is transcribed |
+| `--speech-segmenter NAME` | the pipeline's own | With `--pipeline`: the pass's speech segmenter; `none` sends each scene to the model whole |
+| `--segmenter-param KEY=VALUE` | none | With `--pipeline`: one Customize Segmenter value of the pass, e.g. `max_group_duration_s=240`, `chunk_threshold_s=5`, `min_group_duration_s=0`; repeatable |
+| `--label TEXT` | the backend | Name of the run in the output files (`<name>.<label>.*`), so runs with different settings do not overwrite each other; one backend only |
+| `--markers` | off | Write PotPlayer markers beside the media file: `<name>.pbf` and `<name>.ass` (below). An existing `.pbf` or `.ass` is never overwritten: nothing is written and the run says so (exit 1). One backend only |
+| `--markers-dir DIR` | beside the media | Write the markers into this folder instead (implies `--markers`) |
+| `--marker-level` | `both` | Bookmarks at scene starts and call starts (`both`), `scenes` only or `calls` only |
 
 ## Outputs (in the target folder, one set per backend B)
 
@@ -58,6 +67,9 @@ python tools/scene_inspector.py --list-params auditok
 | `<name>.B.contact_sheet_pNN.jpg` | The begin frame of every scene, 5 per row, labelled `#index start (duration)`, 60 tiles per page |
 | `screenshots/B/` | `<name>__scene0001__begin__00_12_03.450.jpg`, `...__middle__...`, `...__end__...` per scene. The end frame is taken 0.1 s before the cut. Skipped, with the reason recorded in the JSON, when the input has no video stream |
 | `<name>.compare.md` / `.json` | Only with several backends: per backend the scene count, coverage, median/p90/max duration, scenes over 29 s, gaps over 1 s, detection time, and a pairwise boundary-agreement matrix (share of the row's cuts that the column also has within 1 s) |
+| `<name>.B.calls.csv` | With `--pipeline`: one row per call to the ASR model (`call_id` = scene.call), start and end, length, and what ended it: `silence` (the next call starts more than the group gap later), `length` (the next call is in the same scene within the gap: the group reached its longest length), `scene cut` (the next call is in the next scene within the gap: the scene cut ended the call where the speech segmenter alone would have gone on), `end of file`. The gap is measured between the calls' edges, which include the speech padding. The summary adds the call count, lengths, a histogram (0.2-10, 10-30, 30-70, 70-120, 120-240, over 240 s), the calls of 70 s or longer, the endings, pieces not sent and scenes without a call |
+| `<name>.pbf` (with `--markers`) | PotPlayer's bookmark file, UTF-8 with a byte-order mark: the line `[Bookmark]`, then `<n>=<ms>*<name>*` from 0 (format of github.com/fireattack/chapter_converter). One bookmark per scene start (`Scene 3 (98.2 s)`) and call start (`Call 3.2 (84.1 s, ends: silence)`); marks at the same millisecond are one bookmark with both names. PotPlayer lists them by name in its bookmark list |
+| `<name>.ass` (with `--markers`) | An on-screen label, not subtitles: at every moment the scene (number, times, length) and the call to the model (number, length, what ended it) or `Not sent to <pipeline> (no VAD group here)`. If the folder holds other subtitles for the video, choose this one in PotPlayer's subtitle menu |
 
 Statistics use the **extracted audio duration**, which is what the detector saw; the
 container's own duration is reported next to it because re-muxed clips can carry a
