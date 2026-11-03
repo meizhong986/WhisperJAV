@@ -1,15 +1,15 @@
-"""The GUI entry of the rscn scene detector (R-SCN; 1.10.1; owner W448-W455; design
-docs/plans/design/2026-11-02-rscn-design.md section 15).
+"""The rscn scene detector (R-SCN) in the GUI and on the command line (1.10.1; owner W448-W455; design
+docs/plans/design/2026-11-02-rscn-design.md section 15). Not offered in 1.10.1 (owner W482): its code stays, unused,
+until the new scene detector R replaces it (W481).
 
 What is pinned here:
-  - both passes' Scene Detector dropdowns hold an R-SCN option, disabled in the page, which app.js enables only for a
-    pass whose pipeline accepts rscn (EnsembleManager.rscnPipelines), the same list the command line checks
-    (crispasr/pass_settings.py RSCN_PIPELINES: moss-crispasr in this build);
-  - the Customize Scene tab offers R-SCN under the same rule, and draws its controls from the rscn tool YAML with the
-    defaults of the detector's own settings (rscn/settings.py), so the tab, the preset and the run cannot drift;
-  - a MOSS pass with rscn and customized values is sent as --passN-scene-detector rscn with the rscn_ keys in
-    --passN-params, and WhisperJAV's own command line accepts it (--dump-params, which runs no ASR);
-  - the tab is seeded with the preset: Apply without a change changes nothing.
+  - neither pass's Scene Detector dropdown holds an R-SCN option, and app.js offers it for no pipeline
+    (EnsembleManager.rscnPipelines), the same empty list the command line checks (crispasr/pass_settings.py
+    RSCN_PIPELINES);
+  - the command line refuses rscn (not among the --passN-scene-detector choices; rscn_problem refuses it too);
+  - MOSS-CrispASR's default scene detector is semantic (W482);
+  - the code behind the entry still loads: the Customize Scene tab's controls from the rscn tool YAML with the
+    defaults of the detector's own settings (rscn/settings.py), the seed, the command line the GUI back end would build.
 
 Run alone: python -m pytest tests/test_gui_rscn.py
 """
@@ -63,17 +63,16 @@ def _value(args, flag):
 # ---------------------------------------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("select_id", ["pass1-scene", "pass2-scene"])
-def test_both_scene_dropdowns_hold_a_disabled_rscn_option(select_id):
+def test_neither_scene_dropdown_offers_rscn(select_id):
     options = re.findall(r'<option value="([^"]+)"([^>]*)>([^<]+)</option>', _select(HTML, select_id))
-    assert [v for v, _, _ in options] == ["auditok", "silero", "semantic", "rscn", "none"]
-    attrs, text = next((a, t) for v, a, t in options if v == "rscn")
-    assert "disabled" in attrs and f'title="{TOOLTIP}"' in attrs and text == "R-SCN"
+    assert [v for v, _, _ in options] == ["auditok", "silero", "semantic", "none"]
+    assert TOOLTIP not in HTML
 
 
 def test_the_gui_offers_rscn_for_the_pipelines_the_command_line_accepts():
     m = re.search(r"rscnPipelines: \[([^\]]*)\]", JS)
     assert m, "EnsembleManager.rscnPipelines is missing"
-    assert tuple(re.findall(r"'([a-z-]+)'", m.group(1))) == RSCN_PIPELINES == ("moss-crispasr",)
+    assert tuple(re.findall(r"'([a-z-]+)'", m.group(1))) == RSCN_PIPELINES == ()
     assert "updateRscnOption(passKey) {" in JS
     # at start for both passes, after a pipeline change (both branches) and after a preset is loaded
     assert JS.count("this.updateRscnOption(") >= 5
@@ -83,11 +82,12 @@ def test_the_gui_offers_rscn_for_the_pipelines_the_command_line_accepts():
     assert "pywebview.api.get_scene_detector_schema(backend, customizePass ? customizePass.pipeline : '')" in JS
 
 
-def test_moss_s_default_scene_detector_is_still_silero():
-    # D10 (design section 14): the user chooses R-SCN; nothing is changed by default
+def test_moss_s_default_scene_detector_is_semantic():
+    # W482: semantic scenes of 90-240 s and FireRedVAD, the same in the GUI and on the command line
     from whisperjav.crispasr.pass_settings import scene_detector_for
-    assert scene_detector_for("moss-crispasr") == "silero"
-    assert "'moss-crispasr': { segmenter: 'silero-v6.2', sensitivity: 'balanced', wordTimestamps: 'model', scene: 'silero' }" in JS
+    assert scene_detector_for("moss-crispasr") == "semantic"
+    assert ("'moss-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'model', "
+            "scene: 'semantic' }") in JS
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -143,13 +143,11 @@ def test_the_tab_is_seeded_with_the_preset_and_apply_without_a_change_changes_no
     assert r["success"] and r["scene_detection_method"] == "rscn", r
     assert r["scene"] == api.get_scene_detector_schema("rscn", "moss-crispasr")["defaults"]
     assert RSCNSettings.for_pipeline("moss-crispasr", r["scene"]) == RSCNSettings.for_pipeline("moss-crispasr")
-    # what the GUI sends after Apply (segmenter and scene values together) passes the start-of-run check
-    assert rscn_problem(1, "moss-crispasr", "rscn", json.dumps({**r["segmenter"], **r["scene"]})) is None
 
 
 def test_the_other_scene_tabs_are_unchanged(api):
     r = api.get_crispasr_customize_defaults("moss-crispasr", "balanced", "", "silero")
-    assert r["success"] and r["scene"]["max_duration_s"] == 420
+    assert r["success"] and r["scene"]["max_duration_s"] == 240   # MOSS's longest scene (W482)
     assert not any(str(k).startswith(PREFIX) for k in r["scene"])
     assert api.get_scene_detector_schema("silero")["success"]
     assert api.get_scene_detector_schema("none")["parameters"] == {}
@@ -165,32 +163,28 @@ def _moss_rscn_pass(params):
             "customized": True, "params": params}
 
 
-def test_a_moss_pass_with_rscn_sends_the_detector_and_its_values(api, tmp_path):
+def test_the_back_end_would_still_send_the_detector_and_its_values(api, tmp_path):
+    """The code stays (W482): a pass state that named rscn would still be built into a command line."""
     params = {"rscn_min_scene_s": 90, "rscn_picture": "off", "rscn_speech_measure": "none", "silero_threshold": 0.5}
     args = api._build_twopass_args(_twopass(tmp_path, _moss_rscn_pass(params)))
     assert _value(args, "--pass1-pipeline") == "moss-crispasr"
     assert _value(args, "--pass1-scene-detector") == "rscn"
     assert json.loads(_value(args, "--pass1-params")) == params
-    assert rscn_problem(1, "moss-crispasr", "rscn", _value(args, "--pass1-params")) is None
 
 
-def test_the_same_choice_for_another_pipeline_is_refused_which_is_why_the_option_is_greyed():
-    problem = rscn_problem(1, "kotoba-crispasr", "rscn", None)
-    assert problem and "available only when" in problem and "moss-crispasr" in problem
+@pytest.mark.parametrize("pipeline", ["moss-crispasr", "kotoba-crispasr"])
+def test_rscn_is_refused_for_every_pipeline(pipeline):
+    assert rscn_problem(1, pipeline, "rscn", None) == "--pass1-scene-detector rscn is not offered in this version."
 
 
-def test_whisperjav_accepts_the_command_line_the_gui_builds(api, tmp_path):
-    """--dump-params runs main.py's usage checks (validate_crispasr_passes, rscn_problem) and exits 0 without ASR."""
-    params = {"rscn_min_scene_s": 90, "rscn_preferred_min_s": 120, "rscn_picture": "off", "rscn_speech_measure": "none"}
+def test_whisperjav_refuses_rscn_on_the_command_line(api, tmp_path):
+    """--dump-params runs main.py's usage checks without ASR: rscn is not among the scene detector choices (W482)."""
+    params = {"rscn_min_scene_s": 90, "rscn_picture": "off", "rscn_speech_measure": "none"}
     args = api._build_twopass_args(_twopass(tmp_path, _moss_rscn_pass(params)))
     dump = tmp_path / "dump.json"
     p = subprocess.run([sys.executable, "-m", "whisperjav.main", *args, "--dump-params", str(dump)],
                        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300,
                        cwd=str(ROOT))
-    assert p.returncode == 0, p.stderr[-2000:]
-    effective = json.loads(dump.read_text(encoding="utf-8"))["ensemble_config"]["pass1"]["crispasr_effective"]
-    assert effective["scene_detector"] == "rscn"
-    assert effective["rscn_settings"]["min_scene_s"] == 90
-    assert effective["rscn_settings"]["picture"] == "off"
-    assert effective["rscn_settings"]["speech_measure"] == "none"
-    assert effective["rscn_settings"]["max_scene_s"] == 420
+    assert p.returncode == 2, p.stderr[-2000:]
+    assert "--pass1-scene-detector: invalid choice: 'rscn'" in p.stderr
+    assert not dump.exists()
