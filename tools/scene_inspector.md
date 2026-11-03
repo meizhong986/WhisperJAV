@@ -14,6 +14,11 @@ transcription run on it, to explain a subtitle gap ("was that stretch inside a
 scene at all, and was there speech in it?"), or to gather scene statistics across
 a library.
 
+**A word used in this tool: "call".** With `--pipeline`, a *call* is in fact a **VAD group passed to the ASR
+model**: one stretch of audio the model transcribes in one request. WhisperJAV's own term is *VAD group* (document B);
+"call" in the options, the file names (`calls.csv`) and the reports means the same thing. With
+`--speech-segmenter none` the VAD group is the whole scene (owner W489).
+
 ## Script
 
 `tools/scene_inspector.py` (owner request 2026-09-05: P1–P7, then suggestions 1–7 and
@@ -41,14 +46,14 @@ python tools/scene_inspector.py MOVIE.mp4 --pipeline moss-crispasr --backend sem
 | `--scene-threshold FLOAT` | 18 (YAML) | Semantic detector's clustering distance; lower tends to give more, shorter scenes. Shortcut for `--param clustering_threshold=FLOAT`; warns if the semantic backend is not selected |
 | `--param KEY=VALUE` | none | Override any backend parameter; repeatable. Without it the backend runs on its own constructor defaults (P7). Unknown keys are reported and ignored |
 | `--speech-ratio [SEGMENTER]` | off (`firered-vad` when given) | Run a WhisperJAV speech segmenter on every scene's audio and report speech seconds and ratio per scene; `ten`, `silero-v3.1`, `whisperseg` … also work |
-| `--srt FILE` | none | Count the cues of a subtitle file per scene (a cue belongs to the scene holding its midpoint); reports scenes without cues and cues that fell into gaps |
+| `--srt FILE` | none | Count the cues of a subtitle file per scene (a cue belongs to the scene holding its midpoint); reports scenes without cues and cues that fell into gaps. With `--pipeline`, each line is also placed against the calls by the share of its time inside them: sent (half or more), partly sent, not sent (no part in a call, its middle in a scene), in no scene (its middle outside every scene); the summary lists every line not fully sent (partly sent, not sent, in no scene), and `calls.csv` the lines per call (owner W487 CA5). This shows which speech reaches the model, not how well it is transcribed |
 | `--output-dir DIR` | `<media folder>/scenes_info` | Target folder (P2). With several inputs and no `--output-dir`, each file gets the folder next to it |
 | `--no-screenshots` | off | Skip frame extraction and the contact sheet (P6) |
 | `--image-format` | `jpg` | `jpg` or `png` |
 | `--keep-scene-audio` | off | Also keep the per-scene WAV files the detector writes, in `<target>/<name>.<backend>_scene_audio/` |
 | `--list-params BACKEND` | | Print the parameters a backend accepts, with their YAML defaults and named presets, then exit |
 | `--quiet` | off | Warnings only on the console (the semantic engine still prints its own progress) |
-| `--pipeline NAME` | none | A CrispASR pipeline (`moss-crispasr`, `cohere-crispasr`, ...): make the scenes and the calls to the ASR model as an Ensemble pass of it does. Scenes: the pass's scene detector (`--backend` when given) with the pass's settings (semantic: 12 s minimum; all: the pipeline's longest scene, MOSS-CrispASR 420 s); `--param` values on top, as the pass's Customize Scene values; no sensitivity preset on the scenes, as in the pass. Calls: the pass's speech segmenter at `--sensitivity` through the VAD-grouped framer, one call per VAD group; pieces under 0.2 s are not sent (the model minimum). The speech enhancer is not run; nothing is transcribed |
+| `--pipeline NAME` | none | A CrispASR pipeline (`moss-crispasr`, `cohere-crispasr`, ...): make the scenes and the calls to the ASR model as an Ensemble pass of it does. Scenes: the pass's scene detector (`--backend` when given) with the pass's settings (semantic: the pipeline's minimum, 12 s, MOSS-CrispASR 90 s; all: the pipeline's longest scene, 48 s, MOSS-CrispASR 240 s); `--param` values on top, as the pass's Customize Scene values; no sensitivity preset on the scenes, as in the pass. Calls: the pass's speech segmenter at `--sensitivity` through the VAD-grouped framer, one call per VAD group; pieces under 0.2 s are not sent (the model minimum). The speech enhancer is not run; nothing is transcribed |
 | `--speech-segmenter NAME` | the pipeline's own | With `--pipeline`: the pass's speech segmenter; `none` sends each scene to the model whole |
 | `--segmenter-param KEY=VALUE` | none | With `--pipeline`: one Customize Segmenter value of the pass, e.g. `max_group_duration_s=240`, `chunk_threshold_s=5`, `min_group_duration_s=0`; repeatable |
 | `--label TEXT` | the backend | Name of the run in the output files (`<name>.<label>.*`), so runs with different settings do not overwrite each other; one backend only |
