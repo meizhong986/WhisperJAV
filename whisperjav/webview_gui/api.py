@@ -2867,14 +2867,15 @@ class WhisperJAVAPI:
                                         scene_detector: str = None) -> Dict[str, Any]:
         """The values a CrispASR pass runs with, for its Customize window (design 22.9.1; owner W214 2,
         W232 8): the Segmenter tab as segmenter_settings() resolves them, the Scene tab as the pipeline
-        sets its scene detector (semantic 12 s minimum; auditok and silero their own minimum; the pipeline's
-        longest scene, 48 s, MOSS-CrispASR 420 s; rscn the values of its preset for the tab's controls, 1.10.1,
-        owner W455), and for MOSS-CrispASR its MOSS tab (1.10.1, W428 I1 4:
+        sets its scene detector (semantic with the pipeline's minimum, 12 s, MOSS-CrispASR 90 s, W482; auditok and
+        silero their own minimum; the pipeline's longest scene, 48 s, MOSS-CrispASR 240 s; rscn the values of its
+        preset for the tab's controls, 1.10.1, owner W455), and for MOSS-CrispASR its MOSS tab (1.10.1, W428 I1 4:
         crispasr/moss_prompt.py; "model": schema and values; None for the other pipelines).
         Light: no PyTorch, no CrispASR."""
         try:
             from whisperjav.crispasr import moss_prompt
-            from whisperjav.crispasr.pass_settings import scene_detector_for, scene_max_s_for, segmenter_settings
+            from whisperjav.crispasr.pass_settings import (scene_detector_for, scene_max_s_for, scene_min_s_for,
+                                                           segmenter_settings)
             settings = segmenter_settings(pipeline, (segmenter or None), sensitivity or None)
             seg = dict(settings.config)
             if settings.max_group_duration_s is not None:
@@ -2885,7 +2886,7 @@ class WhisperJAVAPI:
             longest = scene_max_s_for(pipeline)
             scene: Dict[str, Any] = {}
             if method == "semantic":
-                scene = {"min_duration": 12, "max_duration": longest}
+                scene = {"min_duration": scene_min_s_for(pipeline), "max_duration": longest}
             elif method in ("auditok", "silero"):
                 # The detector's own values with the pass's longest scene, as the pipeline builds it, not the
                 # YAML spec's: Apply without a change must not change the run (review P7 finding 14).
