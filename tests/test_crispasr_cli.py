@@ -7,7 +7,8 @@ What is pinned here:
     message naming what was typed (owner W118 3, plan 2.5), found in the raw command line;
   - the new Ensemble pass values parakeet-crispasr and cohere-crispasr are in --help, and a pass
     that cannot run (unknown model, no model where there is no default, a language other than
-    Japanese, the speech segmenter "none") is a usage error with exit status 2 (plan 2.4, Q14, Q19);
+    Japanese) is a usage error with exit status 2 (plan 2.4, Q19); the speech segmenter "none" is accepted
+    since owner W457, W458 (each scene goes to the model whole; it replaced Q14's refusal);
   - a CrispASR pass with no speech segmenter named runs its pipeline's default: WhisperSeg for
     Parakeet-CrispASR, FireRedVAD for Cohere-CrispASR (W202 2-3);
   - the pass worker builds the two pipelines from the pass settings they use (--device included,
@@ -164,13 +165,12 @@ class TestAPassThatCannotRunIsRefused:
                                         language=language)
         assert "transcribes Japanese only" in problem and language in problem
 
+    @pytest.mark.parametrize("pipeline", manifest.CRISPASR_PIPELINES)
     @pytest.mark.parametrize("segmenter", ["none", "None", " NONE "])
-    def test_the_segmenter_none_is_refused(self, segmenter):
-        problem = crispasr_pass_problem(2, "parakeet-crispasr", model=None, speech_segmenter=segmenter,
-                                        language="japanese")
-        assert problem.startswith("--pass2-speech-segmenter none is not available")
-        assert CRISPASR_DEFAULT_SEGMENTERS["parakeet-crispasr"] in problem
-        assert "it transcribes the VAD groups the speech segmenter finds" in problem
+    def test_the_segmenter_none_is_accepted(self, segmenter, pipeline):
+        # owner W457, W458: each scene goes to the model whole
+        assert crispasr_pass_problem(2, pipeline, model=None, speech_segmenter=segmenter,
+                                     language="japanese") is None
 
     def test_another_segmenter_is_accepted(self):
         assert crispasr_pass_problem(1, "parakeet-crispasr", model=None, speech_segmenter="ten",
@@ -318,8 +318,9 @@ class TestTheCommandLine:
         # T2 (design 22.10, owner W237 1): --device for every pipeline; the GGUF pipelines' builds.
         assert "Where this run's ASR and other models run, for every pipeline." in text
         assert "the GPU through Vulkan on Windows (Vulkan build, experimental)" in text
-        assert ("for the GGUF pipelines, which do not accept none: ten for parakeet-crispasr and "   # W344, W401
-                "reazonspeech-crispasr, silero-v6.2 for moss-crispasr, firered-vad for the others.") in text  # W426
+        assert ("for the GGUF pipelines: ten for parakeet-crispasr and "   # W344, W401
+                "reazonspeech-crispasr, silero-v6.2 for moss-crispasr, firered-vad for the others; "  # W426
+                "none sends each scene to the model whole.") in text  # W457, W458
         # the MOSS settings as --passN-params keys (W428 I1 3, I1 4)
         assert ('For moss-crispasr also its MOSS settings: "prompt_language" (en, the default, or zh), '
                 '"language_hint" (default Japanese), "hotwords" (comma-separated, default none) and '
@@ -365,8 +366,6 @@ class TestTheCommandLine:
          + ", ".join(manifest.PIPELINE_MODELS["parakeet-crispasr"])),
         (["--pass1-pipeline", "parakeet-crispasr", "--language", "english"],
          "error: --pass1-pipeline parakeet-crispasr transcribes Japanese only"),
-        (["--pass1-pipeline", "parakeet-crispasr", "--pass1-speech-segmenter", "none"],
-         "error: --pass1-speech-segmenter none is not available"),
     ])
     def test_a_pass_that_cannot_run_is_a_usage_error(self, extra, expected, tmp_path):
         # The input does not exist: had the check not stopped the run, media discovery would
@@ -430,6 +429,21 @@ class TestTheCommandLine:
                 s2["start_pad_ms"], s2["end_pad_ms"]) == (3.0, 0.3, 4.0, 100, 100)  # the qwen pipeline's
         assert s2["threshold"] == 0.42                                        # TEN's conservative preset (W202 4)
         assert p2["word_timestamps"] == "aligner"                             # 1.10.1: Cohere's own (W411, W412)
+
+    def test_the_dump_shows_the_segmenter_none(self, tmp_path):
+        # owner W457, W458: accepted for the GGUF pipelines; no segmenter settings, each scene whole
+        dump = tmp_path / "params.json"
+        result = _cli(tmp_path / "x.mp4", "--ensemble",
+                      "--pass1-pipeline", "parakeet-crispasr", "--pass1-speech-segmenter", "none",
+                      "--pass2-pipeline", "moss-crispasr", "--pass2-speech-segmenter", "none",
+                      "--device", "cpu", "--dump-params", dump)
+        assert result.returncode == 0, (result.stdout + result.stderr)[-800:]
+        ensemble = json.loads(dump.read_text(encoding="utf-8"))["ensemble_config"]
+        for p in ("pass1", "pass2"):
+            effective = ensemble[p]["crispasr_effective"]
+            assert effective["speech_segmenter"] == "none"
+            s = effective["speech_segmenter_settings"]
+            assert (s["speech_segmenter"], s["max_group_duration_s"], s["chunk_threshold_s"]) == ("none", None, None)
 
     def test_the_dump_shows_the_vad_threshold_and_speech_pad_flags_at_work(self, tmp_path):
         # W208 "make the flags work": Parakeet as fidelity, Cohere as the qwen pipeline.
