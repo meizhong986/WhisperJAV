@@ -31,25 +31,27 @@ class TestResolveQwenSensitivity:
     def test_balanced_silero_v6(self):
         """Balanced sensitivity for silero-v6.2 returns spec defaults."""
         result = resolve_qwen_sensitivity("silero-v6.2", "balanced")
-        # Balanced preset is empty {} → uses spec defaults
-        assert result["threshold"] == 0.35
+        # Balanced preset is empty {} → uses spec defaults (threshold 0.32 since v1.8.10-hf2,
+        # min_speech_duration_ms 150 since v1.8.10-hf1: silero-v6-speech-segmentation.yaml)
+        assert result["threshold"] == 0.32
         assert result["speech_pad_ms"] == 250
-        assert result["min_speech_duration_ms"] == 100
+        assert result["min_speech_duration_ms"] == 150
 
     def test_aggressive_silero_v6(self):
         """Aggressive sensitivity for silero-v6.2 returns lower thresholds, lower padding."""
         result = resolve_qwen_sensitivity("silero-v6.2", "aggressive")
-        assert result["threshold"] == 0.2
-        assert result["neg_threshold"] == 0.08
-        assert result["min_speech_duration_ms"] == 50
+        assert result["threshold"] == 0.12
+        # neg_threshold is no longer a setting (0e18dbc): silero-vad v6.2 computes it itself.
+        assert "neg_threshold" not in result
+        assert result["min_speech_duration_ms"] == 100
         # O3: Inverted padding — aggressive detects early, needs LESS padding
         assert result["speech_pad_ms"] == 150
 
     def test_conservative_silero_v6(self):
         """Conservative sensitivity for silero-v6.2 returns higher thresholds, higher padding."""
         result = resolve_qwen_sensitivity("silero-v6.2", "conservative")
-        assert result["threshold"] == 0.5
-        assert result["min_speech_duration_ms"] == 150
+        assert result["threshold"] == 0.42
+        assert result["min_speech_duration_ms"] == 200
         # O3: Inverted padding — conservative detects late, needs MORE padding
         assert result["speech_pad_ms"] == 350
 
@@ -58,10 +60,10 @@ class TestResolveQwenSensitivity:
         result = resolve_qwen_sensitivity(
             "silero-v6.2", "aggressive", {"threshold": 0.3}
         )
-        # User override (0.3) should win over aggressive's 0.2
+        # User override (0.3) should win over aggressive's 0.12
         assert result["threshold"] == 0.3
         # Other aggressive values should still be present
-        assert result["neg_threshold"] == 0.08
+        assert result["min_speech_duration_ms"] == 100
 
     def test_none_backend(self):
         """Backend 'none' returns empty dict."""
@@ -113,8 +115,8 @@ class TestUpdatedDefaults:
     """Tests for updated DEFAULT_QWEN_PARAMS."""
 
     def test_default_segmenter(self):
-        """Default segmenter is silero-v6.2."""
-        assert DEFAULT_QWEN_PARAMS["qwen_segmenter"] == "silero-v6.2"
+        """Default segmenter is whisperseg (ChronosJAV's default; --qwen-segmenter, document B)."""
+        assert DEFAULT_QWEN_PARAMS["qwen_segmenter"] == "whisperseg"
 
     def test_default_sensitivity(self):
         """Default sensitivity is balanced."""
@@ -265,7 +267,7 @@ class TestVadSliderOverrides:
         )
         assert result["threshold"] == 0.4
         # Other aggressive values preserved
-        assert result["neg_threshold"] == 0.08
+        assert result["min_speech_duration_ms"] == 100
         assert result["speech_pad_ms"] == 150
 
     def test_padding_override_aggressive(self):
@@ -275,7 +277,7 @@ class TestVadSliderOverrides:
         )
         assert result["speech_pad_ms"] == 300
         # Aggressive threshold preserved
-        assert result["threshold"] == 0.2
+        assert result["threshold"] == 0.12
 
     def test_both_sliders_override(self):
         """Both sliders override simultaneously."""
@@ -286,7 +288,7 @@ class TestVadSliderOverrides:
         assert result["threshold"] == 0.25
         assert result["speech_pad_ms"] == 200
         # Other conservative values preserved
-        assert result["min_speech_duration_ms"] == 150
+        assert result["min_speech_duration_ms"] == 200
 
     def test_no_override_preserves_preset(self):
         """Without overrides, sensitivity preset values are unchanged."""
