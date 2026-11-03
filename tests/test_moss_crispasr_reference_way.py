@@ -101,9 +101,9 @@ class TestSchemaFiles:
         gui = doc["gui"]
         assert gui["min_group_duration_s"]["label"] == "Shortest Group (s)"
         assert gui["min_group_duration_s"]["group"] == "grouping"
-        assert gui["max_group_duration_s"]["max"] >= 120     # MOSS's longest stretch (a slider clamps to its max)
+        assert gui["max_group_duration_s"]["max"] >= 240     # MOSS's longest group, W482 (a slider clamps to its max)
         assert gui["chunk_threshold_s"]["max"] >= 5.0        # MOSS's 5 s of silence
-        assert gui["min_group_duration_s"]["max"] >= 70      # MOSS's shortest stretch
+        assert gui["min_group_duration_s"]["min"] == 0       # MOSS has no shortest group (W482): 0 is in range
 
 
 class TestReferenceInstruction:
@@ -214,7 +214,7 @@ class TestMossSegmenterValues:
         from whisperjav.config.segmenter_presets import resolve_segmenter_sensitivity
         s = segmenter_settings("moss-crispasr", "firered-vad", "balanced")
         assert s.config["threshold"] == resolve_segmenter_sensitivity("firered-vad", "balanced")["threshold"]
-        assert (s.max_group_duration_s, s.chunk_threshold_s, s.config["min_group_duration_s"]) == (120.0, 5.0, 70.0)
+        assert (s.max_group_duration_s, s.chunk_threshold_s, s.config["min_group_duration_s"]) == (240.0, 5.0, 0.0)
         assert segmenter_settings("moss-crispasr", "silero-v6.2", "aggressive").config["threshold"] == 0.7
 
 
@@ -258,12 +258,14 @@ class TestGuiBackEnd:
         from whisperjav.webview_gui.api import WhisperJAVAPI
         r = WhisperJAVAPI.get_crispasr_customize_defaults(object.__new__(WhisperJAVAPI), "moss-crispasr", "balanced")
         assert r["success"], r
-        assert r["segmenter_backend"] == "silero-v6.2"
+        assert r["segmenter_backend"] == "firered-vad"   # W482
         seg = r["segmenter"]
+        from whisperjav.config.segmenter_presets import resolve_segmenter_sensitivity
         assert (seg["threshold"], seg["chunk_threshold_s"], seg["max_group_duration_s"],
-                seg["min_group_duration_s"]) == (0.7, 5.0, 120.0, 70.0)
-        assert r["scene_detection_method"] == "silero"
-        assert r["scene"]["max_duration"] == 420 and r["scene"]["max_duration_s"] == 420
+                seg["min_group_duration_s"]) == (resolve_segmenter_sensitivity("firered-vad", "balanced")["threshold"],
+                                                 5.0, 240.0, 0.0)
+        assert r["scene_detection_method"] == "semantic"
+        assert r["scene"] == {"min_duration": 90, "max_duration": 240}
         assert r["model"]["title"] == "MOSS"
         assert r["model"]["defaults"] == moss_prompt.DEFAULTS
         assert r["model"]["schema"] == moss_prompt.GUI_SCHEMA
@@ -306,7 +308,7 @@ class TestCommandLine:
         assert r.returncode == 0, r.stderr[-2000:]
         eff = json.loads(out.read_text(encoding="utf-8"))["ensemble_config"]["pass1"]["crispasr_effective"]
         assert (eff["speech_segmenter"], eff["scene_detector"], eff["word_timestamps"]) == \
-            ("silero-v6.2", "silero", "model")
+            ("firered-vad", "semantic", "model")   # W482
         assert eff["moss_settings"]["instruction"] == PROMPT_EN + " Language hint: Japanese. Hotwords: 監督"
 
     def test_dump_params_shows_the_pass_s_own_segmenter_values(self, tmp_path):
