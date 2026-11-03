@@ -103,13 +103,17 @@ class MockQwen3ASRModel:
 
 
 @pytest.fixture
-def mock_qwen_asr_module():
-    """Create a mock qwen_asr module and patch it into sys.modules."""
+def mock_qwen_asr_module(monkeypatch):
+    """Create a mock qwen_asr module and patch it into sys.modules.
+
+    Only the 'qwen_asr' key is replaced and put back. patch.dict(sys.modules) put back the whole table, which
+    dropped every module imported during the test, among them librosa's native soxr extension; its second import
+    in the next test stopped the whole test process (Fatal Python error: Aborted)."""
     mock_module = MagicMock()
     mock_module.Qwen3ASRModel = MockQwen3ASRModel
 
-    with patch.dict(sys.modules, {'qwen_asr': mock_module}):
-        yield mock_module
+    monkeypatch.setitem(sys.modules, 'qwen_asr', mock_module)
+    yield mock_module
 
 
 @pytest.fixture
