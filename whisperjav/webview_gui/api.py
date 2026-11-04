@@ -2419,7 +2419,7 @@ class WhisperJAVAPI:
                     "safe_chunking": {
                         "type": "checkbox",
                         "label": "Safe Chunking",
-                        "description": "Enforce scene boundaries for ForcedAligner 180s limit",
+                        "description": "Gives the scene detector Min Duration and Max Duration (12 s and 48 s by default) as the shortest and longest scene. Off: the scene detector's own lengths.",
                         "default": True,
                     },
                     "scene_min_duration": {
