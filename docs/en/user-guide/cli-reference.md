@@ -35,7 +35,7 @@ whisperjav [OPTIONS] INPUT [INPUT...]
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--ensemble` | Off | Enable ensemble mode |
-| `--ensemble-serial` | Off | Complete each file fully before starting the next |
+| `--ensemble-serial` | On | Complete each file fully before starting the next; `--no-ensemble-serial` runs Pass 1 on all files, then Pass 2, each pass starting once for all files |
 | `--pass1-pipeline` | `balanced` | Pipeline for first pass; also `parakeet-crispasr`, `cohere-crispasr` (GGUF, see [Parakeet-CrispASR and Cohere-CrispASR](../pipelines/crispasr.md)) and `xxl` (your own Faster Whisper XXL, see [BYOP: XXL Faster Whisper](../pipelines/ensemble.md#byop-xxl-faster-whisper-v189-pass-1-since-1100)) |
 | `--pass2-pipeline` | (none) | Pipeline for second pass, the same choices; giving it turns pass 2 on |
 | `--xxl-exe` | (none) | Path to `faster-whisper-xxl.exe`; required when either pass is `xxl`. `--pass1-model` / `--pass2-model` pick the model XXL runs (default `large-v2`) |
@@ -45,12 +45,12 @@ whisperjav [OPTIONS] INPUT [INPUT...]
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--qwen-aligner` | `wav2vec2-ja` | The aligner that times the ASR model's text: `wav2vec2-ja` (232 MB), `qwen3-fa-gguf` (529 MB), `parakeet-ctc-ja` (not recommended: its times came back evenly spread in our tests), all run by CrispASR; or a PyTorch model ID such as `Qwen/Qwen3-ForcedAligner-0.6B` |
-| `--qwen-timestamp-mode` | `aligner_vad_fallback` | Default: the aligner times the text; a piece of speech it cannot time keeps the speech segmenter's times. `vad_only` loads no aligner: each subtitle takes its piece of speech's times (the timing model can still move the start) |
-| `--qwen-timing-model` | `whisper-small` | Whisper small (488 MB; its text is not used) moves each subtitle's start later to where speech starts, and splits a piece of speech at a punctuation mark or space near where a new sentence starts. `none` turns it off |
-| `--qwen-stepdown` | Off | Retry a scene whose alignment collapses, with pieces of speech up to 6 s. When off (the default), such a scene takes the times of its pieces of speech |
+| `--qwen-aligner` | `wav2vec2-ja` (in an aligner mode) | The aligner an aligner timestamp mode uses to time the ASR model's text: `wav2vec2-ja` (232 MB), `qwen3-fa-gguf` (529 MB), `parakeet-ctc-ja` (not recommended: its times came back evenly spread in our tests), all run by CrispASR; or a PyTorch model ID such as `Qwen/Qwen3-ForcedAligner-0.6B`. Given without `--qwen-timestamp-mode`, it turns on `aligner_vad_fallback` |
+| `--qwen-timestamp-mode` | `vad_only` | Default since 1.10.1: no aligner is loaded; each subtitle takes its piece of speech's times (the timing model, if chosen, can still move the start). `aligner_vad_fallback` (1.10.0's default): the aligner times the text; a piece of speech it cannot time keeps the speech segmenter's times |
+| `--qwen-timing-model` | `none` | `whisper-small` (488 MB; its text is not used) moves a subtitle's start later, to where speech starts, where the aligner gave no time; where the aligner timed a piece of speech, it splits it at a punctuation mark or space near where a new sentence starts. `none` (default since 1.10.1) leaves it off |
+| `--qwen-stepdown` | Off | Retry a scene whose alignment collapses, with pieces of speech up to 6 s. When off (the default), such a scene takes the times of its pieces of speech with `aligner_vad_fallback` |
 
-The aligner and the timing model are new in 1.10.0, are downloaded on first use, and run where the install's CrispASR runs; `--device cpu` does not hold them on the CPU. See [Subtitle timing](../pipelines/chronosjav.md#subtitle-timing-1100). In an Ensemble pass, give them in `--pass1-qwen-params`, for example `'{"aligner_id": "qwen3-fa-gguf", "timing_model": "none"}'`.
+The aligner and the timing model are new in 1.10.0 and off by default since 1.10.1; they are downloaded the first time a run uses them, and run where the install's CrispASR runs; `--device cpu` does not hold them on the CPU. See [Subtitle timing](../pipelines/chronosjav.md#subtitle-timing-1100). In an Ensemble pass, give them in `--pass1-qwen-params`, for example `'{"timestamp_mode": "aligner_vad_fallback", "timing_model": "whisper-small"}'`.
 
 ### Processing Options
 
@@ -71,7 +71,7 @@ whisperjav video.mp4
 # Fast mode with conservative sensitivity
 whisperjav video.mp4 --mode faster --sensitivity conservative
 
-# Ensemble with serial mode
+# Ensemble with serial mode (the default since 1.10.1; the flag can be left out)
 whisperjav *.mp4 --ensemble --ensemble-serial --merge-strategy smart_merge
 
 # VTT output
@@ -83,8 +83,8 @@ whisperjav video.mp4 --output-dir ./subtitles/
 # This run on the CPU (not accelerated)
 whisperjav video.mp4 --mode faster --device cpu
 
-# ChronosJAV without the timing model
-whisperjav video.mp4 --mode qwen --qwen-timing-model none
+# ChronosJAV with 1.10.0's timing (the aligner and the timing model)
+whisperjav video.mp4 --mode qwen --qwen-timestamp-mode aligner_vad_fallback --qwen-timing-model whisper-small
 
 # Parakeet-CrispASR as one Ensemble pass
 whisperjav video.mp4 --ensemble --pass1-pipeline parakeet-crispasr
