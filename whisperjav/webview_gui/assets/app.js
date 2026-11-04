@@ -593,13 +593,14 @@ const QwenManager = {
         repetition_penalty: 1.1,
         max_tokens_per_audio_second: 20.0,
         // Alignment
-        // 1.10.0 (item 12): the CrispASR aligner (wav2vec2-ja) and the Whisper small
-        // timing model are the default for every ChronosJAV model; vad_only loads no aligner.
+        // 1.10.1 (owner W498 D1): VAD Only and no timing model are the default for Qwen3-ASR and
+        // anime-whisper -- no aligner is loaded, each subtitle takes its VAD group's edges. The
+        // aligner choice below is what an aligner mode uses when the user picks one (1.10.0, item 12).
         aligner_backend: 'crispasr',
         aligner_id: 'wav2vec2-ja',
-        timing_model: 'whisper-small',
+        timing_model: 'none',
         assembly_cleaner: 'qwen3',
-        timestamp_mode: 'aligner_vad_fallback',
+        timestamp_mode: 'vad_only',
         stepdown: false,  // 1.10.0 (owner W266 1): a collapsed scene takes its VAD groups' times
         stepdown_initial_group: 6.0,
         stepdown_fallback_group: 6.0,
@@ -2180,7 +2181,7 @@ const EnsembleManager = {
         return Object.prototype.hasOwnProperty.call(this.crispasrModels, pipeline);
     },
 
-    CRISPASR_CJK_NOTE: 'Experimental in 1.10.0 (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).',
+    CRISPASR_CJK_NOTE: 'Experimental (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).',
 
     // Each CrispASR pipeline's speech segmenter when a pass names none (CRISPASR_DEFAULT_SEGMENTERS,
     // config/segmenter_presets.py; owner W202 3, W344); tests/test_gui_crispasr_pipelines.py compares them.
@@ -9114,6 +9115,8 @@ const SettingsPersistence = {
         'pass2-segmenter':  { key: 'pass2SpeechSegmenter',prop: 'value' },
         'pass2-model':      { key: 'pass2Model',          prop: 'value' },
         'merge-strategy':   { key: 'mergeStrategy',       prop: 'value' },
+        // 1.10.1 (owner W501): "Finish each file" is remembered like the merge strategy beside it.
+        'ensemble-serial':  { key: 'ensembleSerial',      prop: 'checked' },
     },
     _saveTimer: null,
     enabled: false,
