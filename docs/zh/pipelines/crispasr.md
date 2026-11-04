@@ -36,10 +36,10 @@ Parakeet-CrispASR 和 Cohere-CrispASR 是两个处理管线，使用 GGUF 格式
 每一轮开始时，日志会说明请求 CrispASR 在哪里运行，例如：
 
 ```
-Parakeet-CrispASR asks CrispASR to use the NVIDIA GPU (CUDA) (CrispASR 0.8.44+cuda).
+Parakeet-CrispASR asks CrispASR to use the NVIDIA GPU (CUDA) (CrispASR 0.8.50+cuda).
 ```
 
-使用 Vulkan 版时为："Parakeet-CrispASR asks CrispASR's Vulkan build to use this PC's GPU (CrispASR 0.8.44+vulkan). GPUs through Vulkan are experimental in 1.10.0 and have not been tested on AMD or Intel graphics cards."（意思是：通过 Vulkan 使用 GPU 在 1.10.0 中为实验性，尚未在 AMD 或 Intel 显卡上测试。）WhisperJAV 目前无法读取 CrispASR 实际使用的设备，这一行只说明它请求了什么。
+使用 Vulkan 版时为："Parakeet-CrispASR asks CrispASR's Vulkan build to use this PC's GPU (CrispASR 0.8.50+vulkan). GPUs through Vulkan are experimental and have not been tested on AMD or Intel graphics cards."（意思是：通过 Vulkan 使用 GPU 为实验性，尚未在 AMD 或 Intel 显卡上测试。）WhisperJAV 目前无法读取 CrispASR 实际使用的设备，这一行只说明它请求了什么。
 
 ---
 
@@ -198,7 +198,7 @@ whisperjav --ensemble --pass1-pipeline parakeet-crispasr --dump-params settings.
 | `parakeet-tdt-0.6b-ja` | `cstr/parakeet-tdt-0.6b-ja-GGUF` | `parakeet-tdt-0.6b-ja-q8_0.gguf` |
 | `cohere-asr-ja-v0.1` | `TransWithAI/cohere-transcribe-ja-v0.1-GGUF` | `cohere-asr-ja-v0.1-q8_0.gguf` |
 | `cohere-asr-ja` | `CKHO/cohere-asr-ja-GGUF` | `cohere-asr-ja-q8_0.gguf` |
-| 对齐器 `wav2vec2-ja`（Cohere-CrispASR；也是 ChronosJAV 的默认对齐器） | `cstr/wav2vec2-large-xlsr-53-japanese-GGUF` | `wav2vec2-large-xlsr-53-japanese-q4_k.gguf` |
+| 对齐器 `wav2vec2-ja`（Cohere-CrispASR；也是 ChronosJAV 对齐器模式默认使用的对齐器） | `cstr/wav2vec2-large-xlsr-53-japanese-GGUF` | `wav2vec2-large-xlsr-53-japanese-q4_k.gguf` |
 
 Cohere-CrispASR 的对齐器（232 MB）在这一轮第一次使用时下载，下载发生在这一轮内部，而不是运行开始之前。如果下载失败，这一轮会在没有对齐器的情况下继续：每个 VAD 组成为一条字幕，时间为该组的起止位置（见[字幕是怎样生成的](#how-the-subtitles-are-made)）。ChronosJAV 的其他对齐器和时间模型会在 `whisperjav --check` 中列出，也见 [ChronosJAV 页面](chronosjav.md#subtitle-timing-1100)。
 
@@ -217,7 +217,7 @@ Cohere-CrispASR 的对齐器（232 MB）在这一轮第一次使用时下载，�
 `whisperjav --check` 会列出 CrispASR 及其模型。在一切就绪的 NVIDIA GPU（CUDA）安装上显示：
 
 ```
-✓ CrispASR: 0.8.44+cuda (CUDA build), GGUF pipelines: asks for the NVIDIA GPU (CUDA)
+✓ CrispASR: 0.8.50+cuda (CUDA build), GGUF pipelines: asks for the NVIDIA GPU (CUDA)
 ✓ CrispASR model parakeet-tdt-0.6b-ja: Parakeet TDT 0.6B ja (q8_0), for parakeet-crispasr: downloaded
 ✓ CrispASR model cohere-asr-ja-v0.1: Cohere Transcribe ja v0.1 (q8_0), for cohere-crispasr: downloaded
 ✓ CrispASR model cohere-asr-ja: Cohere ASR ja (q8_0), for cohere-crispasr: downloaded
