@@ -25,12 +25,17 @@ folder is the one beside the pass's subtitle file (the pass worker sets it, as f
 names because both passes of an Ensemble run share the media file's name. Cohere-CrispASR's raw copy already holds
 the text cleaner's text; the model's own text of each changed VAD group is in the artifacts file.
 
-MOSS-CrispASR keeps the three earlier filters only and writes no trace files (W421 i3: left out until the pipeline is
-hardened).
+MOSS-CrispASR (owner W505 2 b-d; before it the three earlier filters only, without trace files, W421 i3): the
+sequential duplicate merge, the three filters, then its interjection rules (INTERJECTIONS, below); not the
+hallucination filter or the repetition cleaner, which remove real lines in MOSS's text ("痛い。" x8, "ちょっと。") and
+delete 笑 inside words. Measured on his SSNI-939 MOSS file (docs/plans/design/2026-11-04-moss-token-limits-loops-
+cleanup.md section 5): 1,981 lines -> 1,340, runs of 3+ identical lines 37 -> 9. The trace is kept as for the other
+pipelines.
 """
 
 import copy
 import dataclasses
+import re
 import shutil
 import time
 from pathlib import Path
@@ -45,10 +50,37 @@ REPETITION = "repetition"
 NONVERBAL = "nonverbal"
 NONLINGUISTIC = "nonlinguistic"
 SCENE_OVERLAP = "scene_overlap"
-SRT_STAGES = (DUPLICATES, HALLUCINATION, REPETITION, NONVERBAL, NONLINGUISTIC, SCENE_OVERLAP)
+SRT_STAGES = (DUPLICATES, HALLUCINATION, REPETITION, NONVERBAL, NONLINGUISTIC, SCENE_OVERLAP)  # the GGUF pipelines'
 SANITIZER_STAGES = (DUPLICATES, HALLUCINATION, REPETITION)
-# The clean-up before 1.10.1, kept by MOSS-CrispASR (W421 i3).
+# The clean-up before 1.10.1 (the three filters; MOSS-CrispASR's until W505).
 EARLIER_STAGES = (NONVERBAL, NONLINGUISTIC, SCENE_OVERLAP)
+# MOSS-CrispASR's interjection rules (owner W501 M3, W505 2 c, 2 d), last, as measured.
+INTERJECTIONS = "interjections"
+ORDER = SRT_STAGES + (INTERJECTIONS,)
+MOSS_STAGES = (DUPLICATES, NONVERBAL, NONLINGUISTIC, SCENE_OVERLAP, INTERJECTIONS)
+
+# The interjection rules, as measured (token_caps\m3_test.py, 2026-11-04). The text without spaces and punctuation:
+_KANA = re.compile(r"[぀-ヿ]")
+_PUNCT = re.compile(r"[\s。、！？!?.,…‥・ー〜～「」『』（）()\-—~♪]+")
+# (b) a line with no kana that is one interjection, Latin or Chinese: Ah, Ahh, Oh, Uh, Um, Umm, Uum, Mm, Hmm, Eh, Ha
+# (Haha) and 啊 嗯 哦 呃 唔 哈 嘿 呀 哎 噢 喔 嗷; keeps "Honey.", "No!", "Oh, cute." (W505 2 c).
+_LATIN_INTERJECTION = re.compile(r"^(?:a+h+|o+h+|u+h+|u*m+|h+m+|e+h+|ha(?:ha)*|ah+a*)$", re.I)
+_CHINESE_INTERJECTION = re.compile(r"^[啊嗯哦呃唔哈嘿呀哎噢喔嗷]+$")
+# (c) a line made only of ああ / あっ / うん / えっ, all such lines (W501 M3, W505 2 d; the Netflix reference, a
+# drama, has 7 such lines of 68).
+_JAPANESE_INTERJECTIONS = re.compile(r"^(?:あ+っ?|うん|えっ)+$")
+
+
+def is_interjection_line(text: str) -> bool:
+    """True for a line MOSS-CrispASR's interjection rules drop: rule (b) or rule (c)."""
+    core = _PUNCT.sub("", text or "")
+    if not core:
+        return False
+    if _JAPANESE_INTERJECTIONS.match(core):
+        return True
+    if _KANA.search(text):
+        return False
+    return bool(_LATIN_INTERJECTION.match(core) or _CHINESE_INTERJECTION.match(core))
 
 # Text-level stage.
 TEXT_CLEANER = "text_cleaner"
@@ -86,14 +118,25 @@ class TextCleaner:
         return cleaned
 
 
-def make_sanitizer(language: str = "ja"):
-    """Fidelity's sanitizer with its hallucination lists, and a repetition cleaner without the 200-character cut."""
+def make_sanitizer(language: str = "ja", hallucination: bool = True):
+    """Fidelity's sanitizer with its hallucination lists, and a repetition cleaner without the 200-character cut.
+
+    hallucination=False (a clean-up without the hallucination filter: MOSS-CrispASR, owner W505 2 b): the
+    sanitizer's records and constants only -- its hallucination lists are not loaded or fetched, so no
+    "Hallucination filter: ... loaded" line suggests a filter that does not run."""
     from whisperjav.config.sanitization_config import SanitizationConfig
     from whisperjav.modules.repetition_cleaner import RepetitionCleaner
     from whisperjav.modules.subtitle_sanitizer import SubtitleSanitizer
 
-    sanitizer = SubtitleSanitizer(SanitizationConfig(primary_language=language, enable_exact_matching=True,
-                                                     enable_repetition_cleaning=True))
+    class _WithoutLists(SubtitleSanitizer):
+        def _init_processors(self):
+            self.hallucination_remover = None
+            self.repetition_cleaner = RepetitionCleaner(self.constants["repetition"])
+            self.timing_adjuster = None   # the CrispASR clean-up changes no times (W203, W411)
+
+    kind = SubtitleSanitizer if hallucination else _WithoutLists
+    sanitizer = kind(SanitizationConfig(primary_language=language, enable_exact_matching=True,
+                                        enable_repetition_cleaning=True))
     sanitizer.repetition_cleaner = RepetitionCleaner(
         dataclasses.replace(sanitizer.constants["repetition"], MAX_SUBTITLE_TEXT_LENGTH=NO_CUT))
     return sanitizer
@@ -108,10 +151,10 @@ class SrtCleanup:
     """The SRT-level clean-up of one pass; the sanitizer (and its lists) is built once, on first use."""
 
     def __init__(self, stages: Sequence[str], language: str = "ja", label: str = ""):
-        unknown = [s for s in stages if s not in SRT_STAGES]
+        unknown = [s for s in stages if s not in ORDER]
         if unknown:
             raise ValueError(f"unknown clean-up stage(s): {', '.join(unknown)}")
-        self.stages = tuple(s for s in SRT_STAGES if s in stages)  # always in the order above
+        self.stages = tuple(s for s in ORDER if s in stages)  # always in the order above
         self.language = language
         self.label = label
         self._sanitizer = None
@@ -122,14 +165,14 @@ class SrtCleanup:
 
     def _get_sanitizer(self):
         if self._sanitizer is None:
-            self._sanitizer = make_sanitizer(self.language)
+            self._sanitizer = make_sanitizer(self.language, hallucination=HALLUCINATION in self.stages)
         return self._sanitizer
 
     def run(self, stitched: Path, raw_dir: Path, stem: str, count: int,
             text_changes: Sequence[TextChange] = ()) -> Tuple[Dict[str, Any], int]:
         """Clean ``stitched`` in place. Returns the counts and the number of subtitles left.
 
-        With the sanitizer stages (every CrispASR pipeline but MOSS-CrispASR, W421 i3) the trace is kept: the raw
+        With a sanitizer stage (every CrispASR pipeline; MOSS-CrispASR since W505 2 b) the trace is kept: the raw
         copy first, then every removal and change of every stage -- the three filters' drops and moved starts too --
         in the artifacts file. An earlier run's trace files of the same name are removed first, so the two files
         always describe this run.
@@ -191,6 +234,19 @@ class SrtCleanup:
             count = r.get("final_count", count)
             if trace:
                 self._record_filter(sanitizer, before, self._read(stitched), "scene_overlap")
+        if count and INTERJECTIONS in self.stages:
+            before = self._read(stitched)
+            kept = [s for s in before if not is_interjection_line(s.text)]
+            stats["interjections_dropped"] = len(before) - len(kept)
+            if len(kept) != len(before):
+                import pysrt
+                for n, sub in enumerate(kept, 1):
+                    sub.index = n
+                pysrt.SubRipFile(kept).save(str(stitched), encoding="utf-8")
+            count = len(kept)
+            logger.info(f"Post-processing: dropped {stats['interjections_dropped']} interjection-only lines")
+            if trace:
+                self._record_filter(sanitizer, before, self._read(stitched), "interjection_line")
 
         if sanitizer is not None and sanitizer.artifact_entries:
             artifacts = raw_dir / f"{stem}.artifacts.srt"
