@@ -234,11 +234,11 @@ WhisperJAV 接受 FFmpeg 支持的任何格式的视频和音频文件（MP4、M
 |---|---|---|
 | **Aligner Backend** | CrispASR (GGUF, recommended)、Qwen3 ForcedAligner (PyTorch)、None (no aligner) | CrispASR |
 | **Aligner Model** | 所选后端的模型：`wav2vec2-ja`（推荐）、`parakeet-ctc-ja`（不推荐）、`qwen3-fa-gguf`；或 Qwen3-ForcedAligner-0.6B (PyTorch) | `wav2vec2-ja` |
-| **Timestamp Mode** | Aligner + VAD Fallback (recommended)、Aligner + Interpolation、Aligner Only (no recovery on collapse)、VAD Only (no aligner loaded) | Aligner + VAD Fallback |
-| **Timing Model (Whisper)** | Whisper small (recommended)、None (no timing model) | Whisper small |
+| **Timestamp Mode** | Aligner + VAD Fallback、Aligner + Interpolation、Aligner Only (no recovery on collapse)、VAD Only (no aligner loaded) | VAD Only |
+| **Timing Model (Whisper)** | Whisper small、None (no timing model) | None |
 | **Adaptive Step-Down** | 勾选框 | 不勾选 |
 
-Aligner Backend 选 **None** 时，无论另外两个控件显示什么，运行都使用 VAD Only 并关闭 Step-Down。ChronosJAV 处理管线一行下方的状态面板会显示对齐器和时间模型（是否已下载）以及 CrispASR 在哪里运行它们。从 1.10.0 起，Alignment 标签页的值以及从中保存的预设会用于运行；从 1.8.10.post3 到 1.9.5，它们被忽略。
+从 1.10.1 起，默认是 VAD Only 且不用时间模型，即 1.9.5 的 ChronosJAV 时间方式：不加载对齐器，在选择对齐器模式之前，Aligner Backend、Aligner Model 和 Adaptive Step-Down 控件是隐藏的。Aligner Backend 选 **None** 时，无论 Timestamp Mode 和 Adaptive Step-Down 显示什么，运行都使用 VAD Only 并关闭 Step-Down。ChronosJAV 处理管线一行下方的状态面板会在这一轮使用 CrispASR 对齐器和时间模型时显示它们（是否已下载）以及 CrispASR 在哪里运行它们。从 1.10.0 起，Alignment 标签页的值以及从中保存的预设会用于运行；从 1.8.10.post3 到 1.9.5，它们被忽略。
 
 使用 **Save Preset** 保存配置以便重用，或使用 **Load Preset** 恢复已保存的配置。预设在会话间持久保存。
 
@@ -299,7 +299,7 @@ Aligner Backend 选 **None** 时，无论另外两个控件显示什么，运行
 
 ### 串行模式
 
-勾选 **"Finish each file"** 以在处理多个文件时，先完整处理每个文件（第一轮 → 第二轮 → 合并），再处理下一个。这样可以在结果出来时立即查看，而不必等待整个批次完成。
+**"Finish each file"** 默认勾选：每个文件完整处理完毕（第一轮 → 第二轮 → 合并）后再开始下一个，因此一个文件处理完时它的字幕就已就绪，某个文件崩溃也不会丢失其他文件。取消勾选则先对所有文件运行第一轮，再运行第二轮：每一轮只为全部文件启动一次，而不是每个文件启动一次。开启 **Remember settings** 时，这个勾选框的状态会保留到下次启动。
 
 ### 内联 AI 翻译（专家模式）
 
