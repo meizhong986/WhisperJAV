@@ -180,7 +180,8 @@ class TestReferenceInstruction:
                                             ({"temperature": True}, "temperature"),
                                             ({"top_k": -1}, "top_k"), ({"seed": -1}, "seed"),
                                             ({"seed": 2 ** 31}, "seed"), ({"beam_size": 0}, "beam_size"),
-                                            ({"beam_size": 9}, "beam_size"), ({"beam_size": 2.5}, "beam_size"),
+                                            ({"beam_size": 9}, "beam_size"), ({"beam_size": 5}, "beam_size"),
+                                            ({"beam_size": 2.5}, "beam_size"),
                                             ({"do_sample": "maybe"}, "do_sample")])
     def test_a_decoding_value_it_cannot_use_is_refused(self, params, key):
         with pytest.raises(ValueError, match=key):
@@ -189,7 +190,7 @@ class TestReferenceInstruction:
     def test_the_decoding_controls(self):
         g = moss_prompt.GUI_SCHEMA
         assert g["do_sample"]["type"] == "toggle" and g["do_sample"]["label"] == "Sampling"
-        assert (g["beam_size"]["min"], g["beam_size"]["max"]) == (1, moss_prompt.MAX_BEAM)
+        assert (g["beam_size"]["min"], g["beam_size"]["max"]) == (1, moss_prompt.MAX_BEAM) == (1, 4)   # W505 4
         for key in moss_prompt.DECODING:
             default = moss_prompt.DEFAULTS[key]
             if g[key]["type"] == "number":
@@ -274,13 +275,17 @@ class TestEngine:
         e._session = self.Session()
         return e
 
-    def test_the_instruction_and_the_limit_are_given_before_every_call(self):
+    def test_the_instruction_and_the_limit_are_given_before_every_call(self, monkeypatch):
         import numpy as np
-        e = self.engine(tokens_per_second=moss_prompt.TOKENS_PER_SECOND, ask="ASK")
+        for name in ("CRISPASR_SESSION_AUTOCHUNK", "CRISPASR_SESSION_CHUNK_SECONDS"):
+            monkeypatch.delenv(name, raising=False)
+        e = self.engine(tokens_per_second=moss_prompt.TOKENS_PER_SECOND, token_floor=moss_prompt.TOKEN_FLOOR,
+                        ask="ASK")
         e.transcribe(np.zeros(16000 * 120, dtype=np.float32))
-        e.transcribe(np.zeros(16000 * 60, dtype=np.float32))
-        assert e._session.calls == [("tokens", 2622), ("ask", "ASK"), ("transcribe", 16000 * 120),
-                                    ("tokens", 1311), ("ask", "ASK"), ("transcribe", 16000 * 60)]
+        e.transcribe(np.zeros(16000 * 4, dtype=np.float32))
+        # W505 2 a: 20 a second counting at most CrispASR's 30 s piece; at least 128
+        assert e._session.calls == [("tokens", 600), ("ask", "ASK"), ("transcribe", 16000 * 120),
+                                    ("tokens", 128), ("ask", "ASK"), ("transcribe", 16000 * 4)]
 
     def test_a_fixed_limit_wins_and_no_instruction_means_the_models_own(self):
         import numpy as np
