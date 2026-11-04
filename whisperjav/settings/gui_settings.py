@@ -78,6 +78,7 @@ DEFAULT_GUI_SETTINGS = {
     "pass2_speech_segmenter": "ten",
     "pass2_model": "litagin/anime-whisper",
     "merge_strategy": "pass1_primary",
+    "ensemble_serial": True,      # "Finish each file", ticked in index.html (owner W493 1, W501)
     "pass1_preset": "",
     "pass2_preset": "",
 
