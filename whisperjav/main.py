@@ -955,7 +955,8 @@ def parse_arguments():
                            help="Scene detection method (default: semantic)")
     qwen_audio_group.add_argument("--qwen-safe-chunking", dest="qwen_safe_chunking",
                            action="store_true", default=True,
-                           help="Enforce scene boundaries for ForcedAligner 180s limit (default: enabled)")
+                           help="Give the scene detector --qwen-scene-min-duration and --qwen-scene-max-duration "
+                                "(12 s and 48 s unless set) as its shortest and longest scene (default: enabled)")
     qwen_audio_group.add_argument("--no-qwen-safe-chunking", dest="qwen_safe_chunking",
                            action="store_false",
                            help="Disable safe chunking, allow longer scenes")
