@@ -78,9 +78,11 @@ GUI_SCHEMA: Dict[str, Dict[str, Any]] = {
                  "description": "Names and words MOSS should expect, separated by commas. Added to the instruction "
                                 "(\"Hotwords: ...\"; in Chinese \"热词提示：...\"). Empty = none.",
                  "original_type": "str"},
-    "max_new_tokens": {"type": "number", "label": "Token limit per call", "min": 0, "max": 65536, "step": 1,
-                       "description": "The most tokens MOSS may write for one stretch. 0 = by the length of the "
-                                      "audio: 20 tokens a second, counting at most 30 seconds, and at least 128.",
+    # Texts: owner W509 (the W505 note section 4 item 1): CrispASR applies the limit to each piece of up to 30 s.
+    "max_new_tokens": {"type": "number", "label": "Token limit per piece", "min": 0, "max": 65536, "step": 1,
+                       "description": "The most tokens MOSS may write for each piece of up to 30 seconds that "
+                                      "CrispASR decodes; a longer stretch is decoded in such pieces. 0 = 20 tokens "
+                                      "a second, counting at most 30 seconds, and at least 128.",
                        "original_type": "int"},
     # The decoding (owner W501 M1, W502; texts drafted with the step budget after W501).
     "do_sample": {"type": "toggle", "label": "Sampling",
