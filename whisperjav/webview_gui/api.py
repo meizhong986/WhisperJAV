@@ -2293,16 +2293,18 @@ class WhisperJAVAPI:
             "timing_model": {
                 "type": "dropdown",
                 "label": "Timing Model (Whisper)",
-                "description": ("Finds where a new sentence starts inside each VAD group, so two sentences "
-                                "can become two subtitles; where the aligner gave no times, it also moves the "
-                                "start to where speech starts. Its text is not used. "
+                # 1.10.1 (owner W498 D1, W501 5): off by default; it splits only where an aligner timed the group.
+                "description": ("Finds where speech starts and where a new sentence starts inside each VAD group; "
+                                "its text is not used. Where no aligner gave a time, it moves the subtitle's start "
+                                "to where speech starts; only where an aligner timed the group can two sentences "
+                                "become two subtitles. "
                                 f"{timing.label}, {install.mb(timing.size)}, downloaded on first use; "
                                 f"{self.TIMING_MODEL_NEW}."),
                 "options": [
-                    {"value": timing.name, "label": f"{timing.label} (recommended)"},
+                    {"value": timing.name, "label": timing.label},
                     {"value": "none", "label": "None (no timing model)"},
                 ],
-                "default": manifest.DEFAULT_TIMING_MODEL,
+                "default": "none",   # 1.10.1: off by default (owner W498 D1)
             },
         }
 
@@ -2579,12 +2581,12 @@ class WhisperJAVAPI:
                         "label": "Timestamp Mode",
                         "description": "How subtitle timestamps are resolved (VAD frames or the aligner)",
                         "options": [
-                            {"value": "aligner_vad_fallback", "label": "Aligner + VAD Fallback (recommended)"},
+                            {"value": "aligner_vad_fallback", "label": "Aligner + VAD Fallback"},
                             {"value": "aligner_interpolation", "label": "Aligner + Interpolation"},
                             {"value": "aligner_only", "label": "Aligner Only (no recovery on collapse)"},
                             {"value": "vad_only", "label": "VAD Only (no aligner loaded)"},
                         ],
-                        "default": "aligner_vad_fallback",
+                        "default": "vad_only",   # 1.10.1 (owner W498 D1); 1.10.0: aligner_vad_fallback
                     },
                     "stepdown": {
                         "type": "checkbox",
@@ -3132,13 +3134,13 @@ class WhisperJAVAPI:
             from whisperjav.crispasr import install, manifest
 
             lines = []
-            uses_aligner = (timestamp_mode or "aligner_vad_fallback") != "vad_only"
+            uses_aligner = (timestamp_mode or "vad_only") != "vad_only"   # default vad_only since W498 D1
             backend = aligner_backend or "crispasr"
             if uses_aligner and backend == "crispasr":
                 name = aligner if aligner in manifest.ALIGNER_MODELS else None
                 lines.append(self._crispasr_part_line(install, self.CRISPASR_PART_ALIGNER,
                                                       manifest.aligner_model_for(name)))
-            if (timing_model or manifest.DEFAULT_TIMING_MODEL) != "none":
+            if (timing_model or "none") != "none":   # off by default since W498 D1
                 lines.append(self._crispasr_part_line(install, self.CRISPASR_PART_TIMING,
                                                       manifest.timing_model_for(timing_model or None)))
             if not lines:
@@ -3225,9 +3227,9 @@ class WhisperJAVAPI:
         # Enable ensemble mode
         args.append("--ensemble")
 
-        # Serial mode: finish each file before starting the next
-        if config.get('serial_mode', False):
-            args.append("--ensemble-serial")
+        # "Finish each file": each file is finished before the next starts. On by default in the GUI and on the
+        # command line (owner W493 1, W501), so an unticked box sends the off switch.
+        args.append("--ensemble-serial" if config.get('serial_mode', True) else "--no-ensemble-serial")
 
         # Pass 1 configuration
         pass1 = config.get('pass1', {})
@@ -3273,8 +3275,9 @@ class WhisperJAVAPI:
             if pass1.get('framer'):
                 qwen1_params['framer'] = pass1['framer']
             if pass1.get('isAnimeWhisper'):
-                # 1.10.0: anime-whisper takes the aligner and timing model like Qwen3-ASR
-                # (no longer vad_only with step-down off; design note 2026-10-28 section 7).
+                # anime-whisper takes the same timing defaults as Qwen3-ASR: since 1.10.1 VAD Only and no
+                # timing model (owner W498 D1; in 1.10.0 the aligner and timing model, design note 2026-10-28
+                # section 7). Its step-down rule of before 1.10.0 is gone.
                 qwen1_params['generator_backend'] = 'anime-whisper'
                 qwen1_params.setdefault('assembly_cleaner', 'passthrough')
             elif pass1.get('isCohere'):
@@ -4095,6 +4098,7 @@ class WhisperJAVAPI:
         "pass2_speech_segmenter":    "pass2SpeechSegmenter",
         "pass2_model":               "pass2Model",
         "merge_strategy":            "mergeStrategy",
+        "ensemble_serial":           "ensembleSerial",   # "Finish each file" (owner W501)
         "pass1_preset":              "pass1Preset",
         "pass2_preset":              "pass2Preset",
         # 1.10.0 (item 6): read and saved through get_ui_language / set_ui_language, not
