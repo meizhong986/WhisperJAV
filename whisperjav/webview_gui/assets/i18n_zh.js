@@ -293,7 +293,7 @@ window.WJ_I18N_ZH = {
   "Hotwords": "热词",
   "Names and words MOSS should expect, separated by commas. Added to the instruction (\"Hotwords: ...\"; in Chinese \"热词提示：...\"). Empty = none.": "MOSS 应当留意的人名和词语，用逗号分隔。加入指令（英文为“Hotwords: ...”；中文为“热词提示：...”）。留空 = 不加。",
   "Token limit per call": "每次调用的 token 上限",
-  "The most tokens MOSS may write for one stretch. 0 = by the stretch's length (about 22 a second, the reference's rate).": "MOSS 为一段音频最多可写出的 token 数。0 = 按该段音频的长度（约每秒 22 个，参考脚本的比率）。",
+  "The most tokens MOSS may write for one stretch. 0 = by the length of the audio: 20 tokens a second, counting at most 30 seconds, and at least 128.": "MOSS 为一段音频最多可写出的 token 数。0 = 按音频长度：每秒 20 个 token，最多按 30 秒计算，至少 128 个。",
   "Sampling": "采样",
   "On: MOSS picks each next piece of text from the likely ones (temperature 0.7, top-k 50, as the reference script). Repeats become shorter and rarer. Off: MOSS always takes the most likely piece (greedy).": "开启：MOSS 从可能性较高的候选中选取下一段文字（温度 0.7、top-k 50，与参考脚本相同），重复会变短、变少。关闭：MOSS 总是选取可能性最高的一段（贪心）。",
   "How freely MOSS picks. Lower stays closer to the most likely text. Used only when Sampling is on.": "MOSS 选取的自由程度。越低越接近可能性最高的文字。仅在开启采样时使用。",
