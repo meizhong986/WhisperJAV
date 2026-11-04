@@ -201,7 +201,7 @@ The pipeline dropdown groups options by backend:
 - **Whisper-Based**: Balanced, Fast, Faster, Fidelity
 - **HuggingFace**: Transformers
 - **ChronosJAV**: Qwen3-ASR, Anime-Whisper
-- **GGUF**: Parakeet-CrispASR, Cohere-CrispASR — Japanese, experimental in 1.10.0 (see [Parakeet-CrispASR and Cohere-CrispASR](../pipelines/crispasr.md))
+- **GGUF via crispasr**: parakeet (Parakeet-CrispASR), cohere (Cohere-CrispASR), reazonspeech (ReazonSpeech-CrispASR), kotoba (Kotoba-CrispASR), whisper-turbo (Whisper-Turbo-CrispASR), whisper-large (Whisper-Large-CrispASR), moss (MOSS-CrispASR) — Japanese only, all experimental; parakeet and cohere since 1.10.0, the other five new in 1.10.1 (for parakeet and cohere see [Parakeet-CrispASR and Cohere-CrispASR](../pipelines/crispasr.md))
 - **External (BYOP)**: XXL Faster Whisper (Pass 1, Pass 2 or both)
 
 ### Customize Parameters
@@ -210,11 +210,11 @@ Click the **Customize** button on a pass to open the parameter tuning modal. Thi
 
 ![Customize Parameters modal — Quality tab](images/gui-tab3-customize-modal.png){ loading=lazy }
 
-The modal has tabs for **Model**, **Quality**, **Segmenter**, **Enhancer**, and **Scene** settings. A badge shows **DEFAULT** or **CUSTOM** to indicate whether parameters have been modified.
+The tabs depend on the pass's pipeline: **Model**, **Quality**, **Segmenter**, **Enhancer** and **Scene** for Balanced, Fast, Faster and Fidelity; **Model**, **Quality**, **Chunking**, **Enhancer** and **Scene** for Transformers; **Model**, **Audio**, **Generation**, **Alignment** and **Output** for Qwen3-ASR and Anime-Whisper; the GGUF passes are described below. For XXL Faster Whisper the button is greyed out: XXL uses its own settings. A badge shows **DEFAULT** or **CUSTOM** to indicate whether parameters have been modified.
 
 The **Model** tab has a **Device** menu: **Auto (the GPU when one can be used, else the CPU)** (the default), **NVIDIA GPU (CUDA)** or **CPU (not accelerated)**.
 
-For a GGUF pass (Parakeet-CrispASR, Cohere-CrispASR), the modal has three tabs: **Segmenter**, **Enhancer** and **Scene**. They start from the values the pass runs with. A status panel under the pass row shows the model (downloaded or not) and where CrispASR will run, for example "GPU: asks for the NVIDIA GPU (CUDA)". For Cohere-CrispASR it also lists the aligner that times its text.
+For a GGUF pass (any pipeline under **GGUF via crispasr**), the modal has four tabs: **Segmenter**, **Enhancer**, **Scene** and **Timing**; for **moss** (MOSS-CrispASR) it also has a **MOSS** tab. They start from the values the pass runs with. A status panel under the pass row shows the model (downloaded or not) and where CrispASR will run, for example "GPU: asks for the NVIDIA GPU (CUDA)". For Cohere-CrispASR it also lists the aligner that times its text.
 
 For a ChronosJAV pass (Qwen3-ASR, Anime-Whisper), the **Alignment** tab sets the subtitle timing (see [Subtitle timing](../pipelines/chronosjav.md#subtitle-timing-1100)):
 
