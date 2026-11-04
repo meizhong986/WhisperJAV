@@ -123,7 +123,11 @@ from whisperjav.utils.run_outcome import (
 )
 from whisperjav.modules.media_discovery import MediaDiscovery
 from whisperjav.modules.audio_integrity import AudioIntegrityStop
-from whisperjav.modules.qwen_errors import PREFIX as QWEN_UNUSABLE_PREFIX, QwenModelUnusable
+from whisperjav.modules.qwen_errors import (
+    NOT_STARTED as QWEN_NOT_STARTED,
+    PREFIX as QWEN_UNUSABLE_PREFIX,
+    QwenModelUnusable,
+)
 from whisperjav.utils.media_leftovers import (
     WHISPERJAV_WORK_DIRS,
     is_whisperjav_temp_file,
@@ -416,7 +420,8 @@ def parse_arguments():
                                     + ", ".join(CRISPASR_PIPELINES) + ") run through CrispASR, "
                                     "installed with WhisperJAV; their model is downloaded the first time "
                                     "it is needed; Japanese only. --pass1-model picks their model. "
-                                    "Experimental in 1.10.0 (early release). "
+                                    "Experimental (early release): parakeet-crispasr and cohere-crispasr "
+                                    "since 1.10.0, the others new in 1.10.1. "
                                     "The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).")
     twopass_group.add_argument("--pass1-sensitivity", default=None,
                                choices=["conservative", "balanced", "aggressive"],
@@ -482,7 +487,8 @@ def parse_arguments():
                                     + ", ".join(CRISPASR_PIPELINES) + ") run through CrispASR, "
                                     "installed with WhisperJAV; their model is downloaded the first time "
                                     "it is needed; Japanese only. --pass2-model picks their model. "
-                                    "Experimental in 1.10.0 (early release). "
+                                    "Experimental (early release): parakeet-crispasr and cohere-crispasr "
+                                    "since 1.10.0, the others new in 1.10.1. "
                                     "The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).")
     twopass_group.add_argument("--pass2-sensitivity", default=None,
                                choices=["conservative", "balanced", "aggressive"],
@@ -541,9 +547,13 @@ def parse_arguments():
     twopass_group.add_argument("--merge-strategy", default="pass1_primary",
                                choices=["pass1_primary", "pass2_primary", "smart_merge", "full_merge", "pass1_overlap", "pass2_overlap", "longest"],
                                help="Merge strategy for two-pass results (default: pass1_primary)")
-    twopass_group.add_argument("--ensemble-serial", action="store_true",
-                               help="Complete each file (Pass1+Pass2+Merge) before starting the next. "
-                                    "Slower (reloads models per file) but delivers results incrementally.")
+    # 1.10.1 (owner W493 1, W501): on by default on the command line too, as the GUI's "Finish each file" box.
+    twopass_group.add_argument("--ensemble-serial", action=argparse.BooleanOptionalAction, default=True,
+                               help="Finish each file (Pass 1, Pass 2, merge) before the next one starts "
+                                    "(default: on). A file's subtitles are ready as soon as it is done, and a "
+                                    "crash in one file does not lose the others; each pass's models are loaded "
+                                    "again for every file. --no-ensemble-serial runs Pass 1 on all files, then "
+                                    "Pass 2; each pass then starts once for all files.")
 
     # BYOP (Bring Your Own Provider) — external ASR tool integration
     byop_group = parser.add_argument_group("BYOP — Bring Your Own Provider")
@@ -1047,37 +1057,48 @@ def parse_arguments():
     qwen_align_group = parser.add_argument_group("Qwen3-ASR: Alignment")
     qwen_align_group.add_argument("--qwen-timestamps", type=str, default="word",
                            choices=["word", "none"],
-                           help="Timestamp granularity: 'word' (the aligner) or 'none' (no aligner) "
-                                "(default: word). Not used with --qwen-timestamp-mode vad_only.")
-    # Help text approved by the owner as drafted (W268); design note 2026-10-28 sections 8-9, Q10.
+                           help="Timestamp granularity of an aligner mode: 'word' (the aligner) or 'none' (no "
+                                "aligner) (default: word). Not used with --qwen-timestamp-mode vad_only, the "
+                                "default.")
+    # Help text approved by the owner as drafted (W268); design note 2026-10-28 sections 8-9, Q10. Reworded for the
+    # 1.10.1 default (owner W498 D1) and the rule that a named aligner brings the aligner mode (W501 1, 5).
+    # default None = not given (config/chronosjav_timing.py); the aligner an aligner mode uses is then wav2vec2-ja.
     qwen_align_group.add_argument("--qwen-aligner", type=str,
-                           default="wav2vec2-ja",
-                           help="Aligner that times the text of the ASR model: wav2vec2-ja (default, "
-                                "232 MB, run by CrispASR, downloaded on first use), qwen3-fa-gguf (CrispASR), "
-                                "parakeet-ctc-ja (CrispASR; its times came back evenly spread in "
-                                "WhisperJAV's tests; not recommended), or a PyTorch model ID such as "
-                                "Qwen/Qwen3-ForcedAligner-0.6B. The CrispASR aligners are new in 1.10.0 and "
-                                "not yet measured against reference subtitles; they run where this install's "
-                                "CrispASR runs, and --device cpu does not hold them on the CPU. Not loaded with "
-                                "--qwen-timestamp-mode vad_only.")
+                           default=None,
+                           help="Aligner that an aligner timestamp mode uses to time the text of the ASR model: "
+                                "wav2vec2-ja (used when none is named; 232 MB, run by CrispASR, downloaded on "
+                                "first use), qwen3-fa-gguf (CrispASR), parakeet-ctc-ja (CrispASR; its times came "
+                                "back evenly spread in WhisperJAV's tests; not recommended), or a PyTorch model "
+                                "ID such as Qwen/Qwen3-ForcedAligner-0.6B. Given without --qwen-timestamp-mode, "
+                                "it turns on aligner_vad_fallback (the default, vad_only, loads no aligner). The "
+                                "CrispASR aligners are new in 1.10.0 and not yet measured against reference "
+                                "subtitles; they run where this install's CrispASR runs, and --device cpu does "
+                                "not hold them on the CPU.")
     qwen_align_group.add_argument("--qwen-assembly-cleaner", dest="qwen_assembly_cleaner",
                            action="store_true", default=True,
                            help="Enable pre-alignment text cleaning (default: enabled)")
     qwen_align_group.add_argument("--no-qwen-assembly-cleaner", dest="qwen_assembly_cleaner",
                            action="store_false",
                            help="Disable pre-alignment text cleaning")
-    qwen_align_group.add_argument("--qwen-timestamp-mode", type=str, default="aligner_vad_fallback",
+    # 1.10.1 (owner W498 D1): vad_only is the default for Qwen3-ASR and anime-whisper (no aligner, no timing model).
+    # default None = not given: vad_only, or aligner_vad_fallback with --qwen-aligner (owner W501 1;
+    # config/chronosjav_timing.py, one rule with the Ensemble pass worker).
+    qwen_align_group.add_argument("--qwen-timestamp-mode", type=str, default=None,
                            choices=["aligner_interpolation", "aligner_vad_fallback", "aligner_only", "vad_only"],
-                           help="Timestamp resolution mode (default: aligner_vad_fallback — the aligner "
-                                "times the text; a VAD group it cannot align keeps its VAD times). "
-                                "vad_only loads no aligner: each subtitle takes its VAD group's edges "
-                                "(the timing model can still move the start).")
-    # Help text approved by the owner as drafted (W268); design note 2026-10-28 sections 8-9, Q3, Q10.
-    qwen_align_group.add_argument("--qwen-timing-model", type=str, default="whisper-small",
+                           help="Timestamp resolution mode (default: vad_only — no aligner is loaded: each "
+                                "subtitle takes its VAD group's edges; the timing model, if chosen, can still "
+                                "move the start; with --qwen-aligner and no mode: aligner_vad_fallback). "
+                                "aligner_vad_fallback: the aligner times the text; a VAD group it cannot align "
+                                "keeps its VAD times.")
+    # Help text approved by the owner as drafted (W268); design note 2026-10-28 sections 8-9, Q3, Q10. Since W498 D1
+    # the "(default)" mark sits on none instead of whisper-small; the owner agreed the reworded texts (W501 5).
+    qwen_align_group.add_argument("--qwen-timing-model", type=str, default="none",
                            choices=["whisper-small", "none"],
                            help="Whisper model that finds where speech starts and where a new sentence "
-                                "starts inside each VAD group; its text is not used. whisper-small (default, "
-                                "488 MB, run by CrispASR, downloaded on first use), none. New in 1.10.0, not "
+                                "starts inside each VAD group; its text is not used. It moves a subtitle's start "
+                                "where the aligner gave none, and splits a VAD group at a sentence mark only "
+                                "where an aligner timed that group. whisper-small (488 MB, run by CrispASR, "
+                                "downloaded on first use), none (default). New in 1.10.0, not "
                                 "yet measured against reference subtitles. It runs where this install's "
                                 "CrispASR runs, and --device cpu does not hold it on the CPU; how long it "
                                 "takes on a computer without a GPU has not been measured.")
@@ -1099,9 +1120,10 @@ def parse_arguments():
     qwen_output_group = parser.add_argument_group("Qwen3-ASR: Output")
     qwen_output_group.add_argument("--qwen-regroup", type=str, default="off",
                            choices=["standard", "sentence_only", "off"],
-                           help="Subtitle regrouping mode: 'off' (frame-native: one subtitle per frame, "
-                                "split only where the timing model finds a new sentence at a mark), "
-                                "'standard' (full REGROUP_JAV), 'sentence_only' (punctuation + caps only)")
+                           help="Subtitle regrouping mode: 'off' (default; frame-native: one subtitle per "
+                                "frame, split only where the timing model, if chosen, finds a new sentence at a "
+                                "mark in a frame the aligner timed), 'standard' (full REGROUP_JAV), "
+                                "'sentence_only' (punctuation + caps only)")
     qwen_output_group.add_argument("--qwen-postprocess-preset", type=str, default="high_moan",
                            choices=["default", "high_moan", "narrative"],
                            help="Subtitle regrouping preset (default: high_moan for JAV)")
@@ -1698,6 +1720,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         # v1.9.4), WhisperSeg only; for TEN and FireRedVAD the longest segment
         # 4.0 s only (owner, 2026-10-08). User values kept.
         from whisperjav.config.chronosjav_vad import apply_chronosjav_segmenter_defaults
+        from whisperjav.config.chronosjav_timing import aligner_named, timestamp_mode_for
         apply_chronosjav_segmenter_defaults(
             _user_vad_overrides, _gen_backend_early, _qwen_segmenter, _qwen_sensitivity)
         # v1.9.0: VAD padding routed to pipeline scalars (segmenter_start/end_pad_ms)
@@ -1750,13 +1773,16 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             "max_new_tokens": getattr(args, 'qwen_max_tokens', 4096),
             "language": (lambda _l: None if _l in (None, "auto", "") else _l)(getattr(args, 'qwen_language', 'Japanese')),
             "timestamps": getattr(args, 'qwen_timestamps', 'word'),
-            "aligner_id": getattr(args, 'qwen_aligner', 'wav2vec2-ja'),
-            "timing_model": getattr(args, 'qwen_timing_model', 'whisper-small'),
+            # None = not given: the aligner an aligner mode uses is then wav2vec2-ja (config/chronosjav_timing.py)
+            "aligner_id": getattr(args, 'qwen_aligner', None) or 'wav2vec2-ja',
+            "timing_model": getattr(args, 'qwen_timing_model', 'none'),
             "context": getattr(args, 'qwen_context', ''),
             "context_file": getattr(args, 'qwen_context_file', None),
             "attn_implementation": getattr(args, 'qwen_attn', 'auto'),
-            # Timestamp resolution (1.10.0 default: aligner_vad_fallback with the CrispASR aligner)
-            "timestamp_mode": getattr(args, 'qwen_timestamp_mode', 'aligner_vad_fallback'),
+            # Timestamp resolution (1.10.1 default: vad_only, no aligner; owner W498 D1). --qwen-aligner without
+            # --qwen-timestamp-mode brings aligner_vad_fallback (owner W501 1); one rule with the pass worker.
+            "timestamp_mode": timestamp_mode_for(getattr(args, 'qwen_timestamp_mode', None),
+                                                 aligner_named(getattr(args, 'qwen_aligner', None))),
             # Japanese post-processing
             "japanese_postprocess": getattr(args, 'qwen_japanese_postprocess', False),
             "postprocess_preset": getattr(args, 'qwen_postprocess_preset', 'high_moan'),
@@ -1814,8 +1840,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             _aw_vad = anime_whisperseg_defaults(_qwen_sensitivity)
             if not any(a.startswith('--qwen-model-id') for a in sys.argv):
                 qwen_kwargs["model_id"] = "litagin/anime-whisper"
-            # 1.10.0: no longer vad_only with step-down off; the aligner and timing model
-            # apply as for Qwen3-ASR (design note 2026-10-28 section 7, owner W254 Q6).
+            # The timestamp mode and timing model follow the same defaults as Qwen3-ASR (since 1.10.1
+            # vad_only and none, owner W498 D1; in 1.10.0 the aligner and timing model, W254 Q6).
             if not any(a.startswith('--qwen-assembly-cleaner') for a in sys.argv):
                 qwen_kwargs["assembly_cleaner"] = False
             if not any(a.startswith('--qwen-chunk-threshold') for a in sys.argv):
@@ -2024,9 +2050,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                 if isinstance(e, QwenModelUnusable):
                     # The model cannot give real text for any file (R-QFT; owner W491 2): the run stops here.
                     for rest in media_files[i:]:
-                        outcomes.append(skipped_outcome(
-                            rest.get('path', 'Unknown File'),
-                            "not started: the run stopped because its ASR model cannot be used"))
+                        outcomes.append(skipped_outcome(rest.get('path', 'Unknown File'), QWEN_NOT_STARTED))
                     break
 
     finally:
@@ -3187,7 +3211,7 @@ def main():
         if args.ensemble:
             ensemble_dump = {
                 "merge_strategy": args.merge_strategy,
-                "ensemble_serial": getattr(args, 'ensemble_serial', False),
+                "ensemble_serial": getattr(args, 'ensemble_serial', True),
                 "pass1": {
                     "pipeline": args.pass1_pipeline,
                     "sensitivity": args.pass1_sensitivity,
@@ -3656,7 +3680,7 @@ def main():
                 subs_language=args.subs_language,
                 parameter_tracer=tracer,
                 log_level=log_level,
-                serial_file_processing=getattr(args, 'ensemble_serial', False),
+                serial_file_processing=getattr(args, 'ensemble_serial', True),
                 # v1.9.2 (CFF1): rides worker_kwargs into every pass pipeline's
                 # constructor; Balanced/Fidelity honour it, the others ignore it.
                 model_refresh_audio_minutes=getattr(args, 'model_refresh_audio_minutes', DEFAULT_MODEL_REFRESH_AUDIO_MINUTES),
@@ -3691,6 +3715,13 @@ def main():
                 status = result.get('status', 'unknown')
                 _summary = result.get('summary', {}) or {}
                 _elapsed = _summary.get('total_processing_time_seconds')
+                if status == 'skipped':
+                    # Not started: an earlier file's pass stopped because its ASR model cannot be used (owner W501).
+                    outcome = skipped_outcome(in_path, str(result.get('error') or QWEN_NOT_STARTED))
+                    outcomes.append(outcome)
+                    _outcome_by_input[str(in_path)] = outcome
+                    log_outcome(outcome)
+                    continue
                 if result.get('error') or status == 'failed':
                     failed_files.append(basename)
                     _why = result.get('error')
