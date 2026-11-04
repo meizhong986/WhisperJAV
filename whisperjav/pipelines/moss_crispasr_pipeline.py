@@ -23,11 +23,18 @@ relevant hotwords help; clips of 70 s and more were transcribed very well. So, t
     tab. Before W482: Silero VAD v6.2 at 0.7, groups of 70-120 s (W426 1-3);
   - the reference's instruction (English, "Language hint: Japanese.", the hotwords) through CrispASR's set_ask,
     adjustable in the pass's MOSS tab or --passN-params (W428 I1 4; crispasr/moss_prompt.py);
-  - a token limit per call by the stretch's length, at the reference's rate (65,536 tokens per 50 minutes, about
-    21.8 a second; owner W406 i1): without it the model can repeat a line to its limit on non-speech;
+  - a token limit per call by the stretch's length (owner W406 i1): without it the model can repeat a line to its
+    limit on non-speech. Since W505 2 a: 20 tokens a second, counting at most 30 s, at least 128, because CrispASR
+    decodes a call's audio in pieces of at most 30 s and applies the call's limit to each piece (crispasr/engine.py
+    session_piece_seconds); before it the reference's rate (65,536 tokens per 50 minutes, about 21.8 a second of the
+    whole VAD group);
   - the model's own segment times (W411): each segment MOSS writes is one subtitle (the "segments" line rule),
     speaker labels dropped; --passN-word-timestamps aligner re-times them with the CrispASR aligner on request;
-  - post-processing: the three filters of 1.10.0 only (owner W421 i3).
+  - post-processing (owner W505 2 b-d; before it the three filters of 1.10.0 only, W421 i3): fidelity's sequential
+    duplicate merge, the three filters (non-verbal, non-linguistic, scene overlap), then MOSS's interjection rules
+    (crispasr/cleanup.py INTERJECTIONS); not the hallucination filter or the repetition cleaner, which remove real
+    lines and delete 笑 inside words in MOSS's text. With the duplicate merge the trace of R-RAW is kept, as for
+    the other CrispASR pipelines (the raw copy and the artifacts file in raw_subs).
 
 The reference's sampling (--do-sample --temperature 0.7) is the preset since 1.10.1 with crispasr 0.8.50: sampling
 on, temperature 0.7, top-k 50, seed 42; greedy and beam size are choices in the MOSS tab (owner W492 M1, W501, W502;
@@ -37,7 +44,7 @@ on loop-prone JAV audio sampling cut the call time by 74-85 % against greedy; on
 """
 
 from whisperjav.crispasr import cleanup as crispasr_cleanup
-from whisperjav.crispasr.moss_prompt import TOKENS_PER_SECOND, MossSettings
+from whisperjav.crispasr.moss_prompt import TOKEN_FLOOR, TOKENS_PER_SECOND, MossSettings
 from whisperjav.pipelines.crispasr_pipeline import CrispASRPipeline, EngineRow
 
 
@@ -47,6 +54,6 @@ class MossCrispASRPipeline(CrispASRPipeline):
     PIPELINE_NAME = "moss-crispasr"
     LABEL = "MOSS-CrispASR"
     MODEL_SETTINGS = MossSettings
-    # Post-processing: the three filters of 1.10.0 only, until the pipeline is hardened (owner W421 i3).
+    # Post-processing: MOSS's own set (owner W505 2 b-d; before it the three filters of 1.10.0, W421 i3).
     ENGINE = EngineRow(line_rule="segments", audio_analytics=True, tokens_per_second=TOKENS_PER_SECOND,
-                       cleanup=crispasr_cleanup.EARLIER_STAGES)
+                       token_floor=TOKEN_FLOOR, cleanup=crispasr_cleanup.MOSS_STAGES)
