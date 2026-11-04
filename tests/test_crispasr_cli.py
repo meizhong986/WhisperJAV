@@ -311,7 +311,8 @@ class TestTheCommandLine:
         assert CTC not in text   # not offered (W129 2)
         # T1, T2, T24 (route B design 12)
         assert "run through CrispASR, installed with WhisperJAV" in text
-        assert ("Experimental in 1.10.0 (early release). "   # owner W212 D4 1
+        assert ("Experimental (early release): parakeet-crispasr and cohere-crispasr since 1.10.0, the others "
+                "new in 1.10.1. "   # owner W212 D4 1; versions corrected W501 4
                 "The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user "
                 "folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a "
                 "plain-named folder (the original stays where it is).") in text
@@ -326,9 +327,10 @@ class TestTheCommandLine:
             assert (f"Scene detection method for pass {n} (default: semantic since v1.9.2; for moss-crispasr "
                     f"semantic with scenes of normally 90-240 s).") in text
         # the MOSS settings as --passN-params keys (W428 I1 3, I1 4)
-        assert ('For moss-crispasr also its MOSS settings: "prompt_language" (en, the default, or zh), '
-                '"language_hint" (default Japanese), "hotwords" (comma-separated, default none) and '
-                '"max_new_tokens" (0, the default, = by the length of the audio).') in text
+        from whisperjav.crispasr.moss_prompt import help_text as moss_help
+        assert " ".join(moss_help().split()) in text
+        assert ('"do_sample" (true, the default; false = greedy), "temperature" (0.7), "top_k" (50; 0 = no limit), '
+                '"seed" (42; 0 = a new seed each run) and "beam_size" (1 = off;') in text   # W492 M1, W502
         assert "CrispASR's own program" not in text
         assert "--crispasr-exe" not in text and "--crispasr-backend" not in text
         assert "--crispasr-args" not in text
