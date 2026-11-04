@@ -97,10 +97,10 @@ When processing multiple files in ensemble mode:
 
 | Mode | Behavior |
 |------|----------|
-| **Parallel** (default) | All Pass 1 jobs run first, then all Pass 2, then all merges |
-| **Serial** | Each file completes fully (Pass 1 → Pass 2 → Merge) before the next starts |
+| **Parallel** | All Pass 1 jobs run first, then all Pass 2, then all merges; each pass starts once for all files |
+| **Serial** (default) | Each file completes fully (Pass 1 → Pass 2 → Merge) before the next starts |
 
-**Serial mode** is useful when you want to see results as they finish. Enable it with the **Serial** checkbox in the GUI or `--ensemble-serial` in CLI.
+**Serial mode** is the default since 1.10.1, in the GUI and on the command line: a file's subtitles are ready as soon as it is done, and a crash in one file does not lose the others. In the GUI the **Finish each file** box (ticked by default) turns it on; untick it, or use `--no-ensemble-serial` on the command line, for parallel mode.
 
 ---
 
