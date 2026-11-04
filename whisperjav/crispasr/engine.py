@@ -5,7 +5,7 @@ types: segments, words and tokens, with times measured from the start of the aud
 never sees CrispASR's objects, so a later change of route or of CrispASR's result changes this
 module only (route B design 5).
 
-Route B: CrispASR's Python binding, ``crispasr.Session`` (0.8.44). The model is opened once per pass
+Route B: CrispASR's Python binding, ``crispasr.Session`` (0.8.50 since 1.10.1; 0.8.44 in 1.10.0). The model is opened once per pass
 (owner W202 5a) and closed by ``cleanup()``, which ``BasePipeline.cleanup()`` calls at the end of
 the pass. ``crispasr`` is imported only when an engine opens, so importing this module stays light.
 """
@@ -15,7 +15,7 @@ import math
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Protocol, Sequence, Tuple
+from typing import Any, List, Mapping, Optional, Protocol, Sequence, Tuple
 
 import numpy as np
 
@@ -130,7 +130,7 @@ class BindingEngine:
 
     def __init__(self, model_path: Path, backend: str, use_gpu: bool, n_threads: Optional[int] = None,
                  label: str = "", tokens_per_second: Optional[float] = None, max_new_tokens: Optional[int] = None,
-                 ask: Optional[str] = None):
+                 ask: Optional[str] = None, decoding: Optional[Mapping[str, Any]] = None):
         self.model_path = Path(model_path)
         self.backend = backend      # what the opened session must report (manifest ModelFile.backend)
         self.use_gpu = bool(use_gpu)
@@ -144,6 +144,9 @@ class BindingEngine:
         # The whole instruction for the model (Session.set_ask; MOSS-CrispASR, moss_prompt.py), or None for the
         # model's own. Given before every call, so no state of an earlier call can replace it.
         self.ask = ask
+        # How the model picks its next token (MOSS-CrispASR: moss_prompt.MossSettings.decoding(); owner W492 M1,
+        # W501), set on the session once it is open; None = CrispASR's own (greedy).
+        self.decoding = dict(decoding) if decoding else None
         self._session = None
 
     def token_limit(self, n_samples: int) -> Optional[int]:
@@ -181,7 +184,31 @@ class BindingEngine:
                 pass
             raise CrispASRSetupError(f"The model {self.label} could not be opened ({self.model_path}): "
                                      f"CrispASR read it as '{found}', not '{self.backend}'")
+        if self.decoding:
+            try:
+                self._set_decoding(session, self.decoding)
+            except CrispASRSetupError:
+                try:
+                    session.close()
+                except Exception:
+                    pass
+                raise
         self._session = session
+
+    @staticmethod
+    def _set_decoding(session, decoding: Mapping[str, Any]) -> None:
+        """Sampling and beam size on the session (CrispASR 0.8.50, #564: honoured by MOSS's decoder; older builds
+        accept the calls and ignore them). Beam size above 1 runs beam search, which does not sample."""
+        try:
+            session.set_beam_size(max(1, int(decoding.get("beam_size") or 1)))
+            if decoding.get("do_sample"):
+                session.set_temperature(float(decoding["temperature"]), int(decoding.get("seed") or 0))
+                session.set_top_k(int(decoding.get("top_k") or 0))
+                session.set_do_sample(True)
+            else:
+                session.set_do_sample(False)
+        except (RuntimeError, ValueError, AttributeError) as e:
+            raise CrispASRSetupError(f"CrispASR could not take the decoding settings {dict(decoding)}: {e}") from e
 
     def transcribe(self, audio: np.ndarray) -> List[CrispSegment]:
         if self._session is None:
