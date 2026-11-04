@@ -213,7 +213,7 @@ WhisperJAV 接受 FFmpeg 支持的任何格式的视频和音频文件（MP4、M
 - **基于 Whisper**：Balanced、Fast、Faster、Fidelity
 - **HuggingFace**：Transformers
 - **ChronosJAV**：Qwen3-ASR、Anime-Whisper
-- **GGUF**：Parakeet-CrispASR、Cohere-CrispASR——日语，1.10.0 中为实验性（见 [Parakeet-CrispASR 与 Cohere-CrispASR](../pipelines/crispasr.md)）
+- **GGUF via crispasr**：parakeet（Parakeet-CrispASR）、cohere（Cohere-CrispASR）、reazonspeech（ReazonSpeech-CrispASR）、kotoba（Kotoba-CrispASR）、whisper-turbo（Whisper-Turbo-CrispASR）、whisper-large（Whisper-Large-CrispASR）、moss（MOSS-CrispASR）——只处理日语，全部为实验性；parakeet 和 cohere 从 1.10.0 起提供，其他五个为 1.10.1 新增（parakeet 和 cohere 见 [Parakeet-CrispASR 与 Cohere-CrispASR](../pipelines/crispasr.md)）
 - **外部 (BYOP)**：XXL Faster Whisper（第一轮、第二轮或两者）
 
 ### 自定义参数
@@ -222,23 +222,23 @@ WhisperJAV 接受 FFmpeg 支持的任何格式的视频和音频文件（MP4、M
 
 ![自定义参数弹窗 — 质量标签页](images/gui-tab3-customize-modal.png){ loading=lazy }
 
-弹窗包含 **Model**、**Quality**、**Segmenter**、**Enhancer** 和 **Scene** 设置标签页。徽标显示 **DEFAULT** 或 **CUSTOM** 表示参数是否已修改。
+弹窗的标签页取决于这一轮的处理管线：Balanced、Fast、Faster 和 Fidelity 为 **模型**（Model）、**质量**（Quality）、**分割器**（Segmenter）、**增强器**（Enhancer）和 **场景**（Scene）；Transformers 为 **模型**、**质量**、**分块**（Chunking）、**增强器** 和 **场景**；Qwen3-ASR 和 Anime-Whisper 为 **模型**、**音频**（Audio）、**生成**（Generation）、**对齐**（Alignment）和 **输出**（Output）；GGUF 处理管线见下文。XXL Faster Whisper 的这个按钮是灰色的：XXL 使用它自己的设置。徽标显示 **默认**（DEFAULT）或 **自定义**（CUSTOM），表示参数是否已修改。
 
 **Model** 标签页有一个 **Device** 菜单：**Auto (the GPU when one can be used, else the CPU)**（默认，有可用 GPU 时用 GPU，否则用 CPU）、**NVIDIA GPU (CUDA)** 或 **CPU (not accelerated)**（CPU，不加速）。
 
-对于 GGUF 处理管线（Parakeet-CrispASR、Cohere-CrispASR），弹窗有三个标签页：**Segmenter**、**Enhancer** 和 **Scene**，初始值就是这一轮实际使用的值。这一轮那一行下方的状态面板会显示模型（是否已下载）以及 CrispASR 将在哪里运行，例如“GPU：请求使用 NVIDIA GPU（CUDA）”（英文界面为 "GPU: asks for the NVIDIA GPU (CUDA)"）。对 Cohere-CrispASR，面板还会列出为其文字标出时间的对齐器。
+对于 GGUF 处理管线（**GGUF via crispasr** 组中的任一处理管线），弹窗有四个标签页：**分割器**（Segmenter）、**增强器**（Enhancer）、**场景**（Scene）和 **计时**（Timing）；**moss**（MOSS-CrispASR）还有一个 **MOSS** 标签页。初始值就是这一轮实际使用的值。这一轮那一行下方的状态面板会显示模型（是否已下载）以及 CrispASR 将在哪里运行，例如“GPU：请求使用 NVIDIA GPU（CUDA）”（英文界面为 "GPU: asks for the NVIDIA GPU (CUDA)"）。对 Cohere-CrispASR，面板还会列出为其文字标出时间的对齐器。
 
-对于 ChronosJAV 处理管线（Qwen3-ASR、Anime-Whisper），**Alignment** 标签页设置字幕时间（见[字幕时间](../pipelines/chronosjav.md#subtitle-timing-1100)）：
+对于 ChronosJAV 处理管线（Qwen3-ASR、Anime-Whisper），**对齐**（Alignment）标签页设置字幕时间（见[字幕时间](../pipelines/chronosjav.md#subtitle-timing-1100)）：
 
 | 控件 | 选项 | 默认值 |
 |---|---|---|
-| **Aligner Backend** | CrispASR (GGUF, recommended)、Qwen3 ForcedAligner (PyTorch)、None (no aligner) | CrispASR |
-| **Aligner Model** | 所选后端的模型：`wav2vec2-ja`（推荐）、`parakeet-ctc-ja`（不推荐）、`qwen3-fa-gguf`；或 Qwen3-ForcedAligner-0.6B (PyTorch) | `wav2vec2-ja` |
-| **Timestamp Mode** | Aligner + VAD Fallback、Aligner + Interpolation、Aligner Only (no recovery on collapse)、VAD Only (no aligner loaded) | VAD Only |
-| **Timing Model (Whisper)** | Whisper small、None (no timing model) | None |
-| **Adaptive Step-Down** | 勾选框 | 不勾选 |
+| **对齐器后端**（Aligner Backend） | CrispASR（GGUF，推荐）、Qwen3 ForcedAligner（PyTorch）、无（不用对齐器）（None (no aligner)） | CrispASR |
+| **对齐模型**（Aligner Model） | 所选后端的模型：`wav2vec2-ja`（推荐）、`parakeet-ctc-ja`（不推荐）、`qwen3-fa-gguf`；或 Qwen3-ForcedAligner-0.6B (PyTorch) | `wav2vec2-ja` |
+| **时间戳模式**（Timestamp Mode） | 对齐器 + VAD 回退（Aligner + VAD Fallback）、对齐器 + 插值（Aligner + Interpolation）、仅对齐器（塌缩时不恢复）（Aligner Only (no recovery on collapse)）、仅 VAD（不加载对齐器）（VAD Only (no aligner loaded)） | 仅 VAD（VAD Only） |
+| **计时模型（Whisper）**（Timing Model (Whisper)） | Whisper small、无（不用计时模型）（None (no timing model)） | 无（None） |
+| **自适应逐级缩小**（Adaptive Step-Down） | 勾选框 | 不勾选 |
 
-从 1.10.1 起，默认是 VAD Only 且不用时间模型，即 1.9.5 的 ChronosJAV 时间方式：不加载对齐器，在选择对齐器模式之前，Aligner Backend、Aligner Model 和 Adaptive Step-Down 控件是隐藏的。Aligner Backend 选 **None** 时，无论 Timestamp Mode 和 Adaptive Step-Down 显示什么，运行都使用 VAD Only 并关闭 Step-Down。ChronosJAV 处理管线一行下方的状态面板会在这一轮使用 CrispASR 对齐器和时间模型时显示它们（是否已下载）以及 CrispASR 在哪里运行它们。从 1.10.0 起，Alignment 标签页的值以及从中保存的预设会用于运行；从 1.8.10.post3 到 1.9.5，它们被忽略。
+从 1.10.1 起，默认是 **仅 VAD**（VAD Only）且不用时间模型，即 1.9.5 的 ChronosJAV 时间方式：不加载对齐器，在选择对齐器模式之前，**对齐器后端**（Aligner Backend）、**对齐模型**（Aligner Model）和 **自适应逐级缩小**（Adaptive Step-Down）控件是隐藏的。**对齐器后端** 选 **无**（None）时，无论 **时间戳模式**（Timestamp Mode）和 **自适应逐级缩小** 显示什么，运行都使用仅 VAD 并关闭 Step-Down。ChronosJAV 处理管线一行下方的状态面板会在这一轮使用 CrispASR 对齐器和时间模型时显示它们（是否已下载）以及 CrispASR 在哪里运行它们。从 1.10.0 起，**对齐**（Alignment）标签页的值以及从中保存的预设会用于运行；从 1.8.10.post3 到 1.9.5，它们被忽略。
 
 使用 **Save Preset** 保存配置以便重用，或使用 **Load Preset** 恢复已保存的配置。预设在会话间持久保存。
 
@@ -299,7 +299,7 @@ WhisperJAV 接受 FFmpeg 支持的任何格式的视频和音频文件（MP4、M
 
 ### 串行模式
 
-**"Finish each file"** 默认勾选：每个文件完整处理完毕（第一轮 → 第二轮 → 合并）后再开始下一个，因此一个文件处理完时它的字幕就已就绪，某个文件崩溃也不会丢失其他文件。取消勾选则先对所有文件运行第一轮，再运行第二轮：每一轮只为全部文件启动一次，而不是每个文件启动一次。开启 **Remember settings** 时，这个勾选框的状态会保留到下次启动。
+**逐个完成文件**（Finish each file）默认勾选：每个文件完整处理完毕（第一轮 → 第二轮 → 合并）后再开始下一个，因此一个文件处理完时它的字幕就已就绪，某个文件崩溃也不会丢失其他文件。取消勾选则先对所有文件运行第一轮，再运行第二轮：每一轮只为全部文件启动一次，而不是每个文件启动一次。开启 **记住设置**（Remember settings）时，这个勾选框的状态会保留到下次启动。
 
 ### 内联 AI 翻译（专家模式）
 
