@@ -104,7 +104,7 @@ chmod +x installer/install_mac.sh
 | **fidelity** | 向 PyTorch 请求使用 Apple GPU（Metal）；尚未在 Mac 上测试。如果失败，请使用 transformers 处理管线。 |
 | **Parakeet-CrispASR、Cohere-CrispASR**（GGUF） | 请求使用 Apple GPU（Metal）；尚未在 Mac 上测试 |
 | **balanced、fast、faster** | CPU（不加速），慢好几倍：它们的引擎（CTranslate2）无法使用 Apple GPU |
-| **ChronosJAV**（Qwen3-ASR、anime-whisper） | 在 1.10.0 中为 CPU（不加速）：其 ASR 模型尚不使用 Apple GPU |
+| **ChronosJAV**（Qwen3-ASR、anime-whisper） | 在 1.10 中为 CPU（不加速）：其 ASR 模型尚不使用 Apple GPU |
 | WhisperSeg 语音分割器 | CPU，所有安装中都是 |
 
 Apple GPU 可用时，运行开始时不显示任何内容；每个处理管线启动时会在控制台中说明自己在哪里运行（例如 balanced、fast 和 faster 会说明它们在 CPU 上运行）。如果 Apple GPU 不可用，运行开始时会有一个框说明各部分在哪里运行。安装脚本结束时会显示：
