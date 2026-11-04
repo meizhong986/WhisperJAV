@@ -3716,7 +3716,7 @@ def main():
                 _summary = result.get('summary', {}) or {}
                 _elapsed = _summary.get('total_processing_time_seconds')
                 if status == 'skipped':
-                    # Not started: an earlier file's pass stopped because its ASR model cannot be used (owner W501).
+                    # Not started: an earlier file's pass 1 stopped because its ASR model cannot be used (owner W501, W505 1).
                     outcome = skipped_outcome(in_path, str(result.get('error') or QWEN_NOT_STARTED))
                     outcomes.append(outcome)
                     _outcome_by_input[str(in_path)] = outcome
