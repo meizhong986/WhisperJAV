@@ -29,8 +29,11 @@ relevant hotwords help; clips of 70 s and more were transcribed very well. So, t
     speaker labels dropped; --passN-word-timestamps aligner re-times them with the CrispASR aligner on request;
   - post-processing: the three filters of 1.10.0 only (owner W421 i3).
 
-Not available through CrispASR: the reference's sampling (--do-sample --temperature 0.7). CrispASR's MOSS decoder
-always takes the most likely next token (0.8.44, and its main branch on 2026-11-01).
+The reference's sampling (--do-sample --temperature 0.7) is the preset since 1.10.1 with crispasr 0.8.50: sampling
+on, temperature 0.7, top-k 50, seed 42; greedy and beam size are choices in the MOSS tab (owner W492 M1, W501, W502;
+crispasr/moss_prompt.py). Measured on 2026-11-04 (docs/plans/design/2026-11-03-moss-m1-m3-research.md section 6):
+on loop-prone JAV audio sampling cut the call time by 74-85 % against greedy; on the Netflix clip its text was
+0.015-0.050 worse in plain CER.
 """
 
 from whisperjav.crispasr import cleanup as crispasr_cleanup
