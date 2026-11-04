@@ -399,7 +399,10 @@ DEFAULT_QWEN_PARAMS = {
     "qwen_language": "Japanese",  # WhisperJAV is purpose-built for Japanese
     "qwen_timestamps": "word",
     "qwen_aligner": "wav2vec2-ja",  # 1.10.0: the CrispASR aligner (design note 2026-10-28)
-    "qwen_timing_model": "whisper-small",  # 1.10.0: the CrispASR timing model, step 8
+    # The timing model and timestamp mode below are the shared 1.10.0 values (owner W254), still taken by the dormant
+    # Cohere-in-ChronosJAV branch, which this change leaves as it was. Qwen3-ASR and anime-whisper default to no
+    # timing model and vad_only since 1.10.1 (owner W498 D1): set in their branches of _build_pipeline.
+    "qwen_timing_model": "whisper-small",  # the CrispASR timing model, step 8
     "qwen_scene": "semantic",
     "qwen_context": "",
     "qwen_context_file": None,
@@ -413,7 +416,7 @@ DEFAULT_QWEN_PARAMS = {
     "qwen_input_mode": "assembly",
     "qwen_framer": "vad-grouped",  # Preserve previous VAD_SLICING behavior for ensemble
     "qwen_safe_chunking": True,
-    "qwen_timestamp_mode": "aligner_vad_fallback",  # 1.10.0: the aligner times the text (owner W254)
+    "qwen_timestamp_mode": "aligner_vad_fallback",  # see the note above qwen_timing_model
     "qwen_assembly_cleaner": True,
     "qwen_repetition_penalty": 1.1,
     "qwen_max_tokens_per_second": 20.0,
@@ -1416,6 +1419,18 @@ def _build_pipeline(
         # When anime-whisper generator is selected, override model defaults
         # unless ensemble config explicitly set them
         _gen_backend = qwen_pipeline_params.get("generator_backend", "qwen3")
+        if _gen_backend in ("qwen3", "anime-whisper"):
+            # 1.10.1 (owner W498 D1): Qwen3-ASR and anime-whisper default to VAD Only with no timing model -- no
+            # aligner, no timing model -- unless the pass names a timestamp mode or a timing model itself. A pass
+            # that names an aligner but no timestamp mode gets aligner_vad_fallback (owner W501 1). One rule with
+            # main.py: config/chronosjav_timing.py.
+            from whisperjav.config.chronosjav_timing import DEFAULT_TIMING_MODEL, timestamp_mode_for_pass
+            _named = pass_config.get("qwen_params") or {}
+            _mode = timestamp_mode_for_pass(_named)
+            if _mode is not None:
+                qwen_pipeline_params["timestamp_mode"] = _mode
+            if "timing_model" not in _named and "qwen_timing_model" not in _named:
+                qwen_pipeline_params["timing_model"] = DEFAULT_TIMING_MODEL
         if _gen_backend == "anime-whisper":
             _user_qwen = pass_config.get("qwen_params") or {}
             # v1.9.0: per-sensitivity WhisperSeg VAD defaults (owner table, single
@@ -1425,8 +1440,8 @@ def _build_pipeline(
             _aw_vad = anime_whisperseg_defaults(qwen_sensitivity)
             if "model_id" not in _user_qwen and not pass_config.get("model"):
                 qwen_pipeline_params["model_id"] = "litagin/anime-whisper"
-            # 1.10.0: no longer vad_only with step-down off; the aligner and timing model
-            # apply as for Qwen3-ASR (design note 2026-10-28 section 7, owner W254 Q6).
+            # The timestamp mode and timing model follow the same defaults as Qwen3-ASR (since 1.10.1
+            # vad_only and none, owner W498 D1; in 1.10.0 the aligner and timing model, W254 Q6).
             if "assembly_cleaner" not in _user_qwen:
                 qwen_pipeline_params["assembly_cleaner"] = False
             if "chunk_threshold" not in _user_qwen:
