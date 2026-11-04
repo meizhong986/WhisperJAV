@@ -165,7 +165,7 @@ gui:
   max_group_duration_s:
     widget: slider
     label: "Max Group Duration (s)"
-    description: "Maximum duration for a segment group (prevents exceeding Whisper's 30s context window)"
+    description: "The longest a group of speech segments may be; each group goes to the ASR model in one call."
     min: 1.0
     max: 420
     step: 1.0
