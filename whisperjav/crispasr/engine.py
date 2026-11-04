@@ -22,11 +22,67 @@ import numpy as np
 from whisperjav.crispasr import native_log
 from whisperjav.crispasr.errors import CrispASRRunError, CrispASRSetupError
 from whisperjav.modules.model_audio import too_short
+from whisperjav.utils.logger import logger
 
 SAMPLE_RATE = 16000
 LANGUAGE = "ja"
-# The fewest tokens a call may write when a pipeline sets a token limit per second of audio (owner W406 i1).
+# The fewest tokens a call may write when a pipeline sets a token limit per second of audio (owner W406 i1); a
+# pipeline's row can set its own (EngineRow.token_floor; MOSS-CrispASR 128, owner W505 2 a).
 MIN_NEW_TOKENS = 32
+
+# CrispASR's session cuts a call's audio longer than its window into pieces of at most that length at quiet points
+# and decodes each piece on its own, with the call's token limit for each piece (crispasr_c_api.cpp
+# transcribe_autochunk and session_autochunk.h, the same in 0.8.44 and 0.8.50): a window of 30 s, or
+# CRISPASR_SESSION_CHUNK_SECONDS (at least 5); no cutting with CRISPASR_SESSION_AUTOCHUNK=0, nor for the backends
+# that cut their audio themselves.
+SESSION_PIECE_SECONDS = 30
+_SELF_CHUNKING = ("parakeet", "reazonspeech", "index-echo")
+# The first CrispASR that applies sampling and beam size to MOSS's decoder (#564); older builds accept the calls and
+# ignore them (owner W505 3: a line says so).
+DECODING_SINCE = (0, 8, 50)
+_LINES_SHOWN: set = set()
+
+
+def _atoi(text: str) -> int:
+    """C's atoi, as CrispASR reads its switches: the leading whole number, else 0."""
+    import re
+
+    m = re.match(r"\s*([+-]?\d+)", text or "")
+    return int(m.group(1)) if m else 0
+
+
+def session_piece_seconds(backend: str = "") -> Optional[float]:
+    """The longest piece of audio CrispASR's session decodes on its own, or None when it does not cut."""
+    if backend in _SELF_CHUNKING:
+        return None
+    switch = os.environ.get("CRISPASR_SESSION_AUTOCHUNK")
+    if switch is not None and _atoi(switch) == 0:
+        return None
+    window = os.environ.get("CRISPASR_SESSION_CHUNK_SECONDS")
+    return float(max(5, _atoi(window))) if window is not None else float(SESSION_PIECE_SECONDS)
+
+
+def installed_version() -> Optional[Tuple[int, int, int]]:
+    """The installed crispasr package's version as (major, minor, patch), or None when it cannot be read."""
+    import re
+    try:
+        from importlib.metadata import version
+        text = version("crispasr")
+    except Exception:
+        return None
+    m = re.match(r"(\d+)\.(\d+)\.(\d+)", text)
+    return (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else None
+
+
+def older_decoding_line(decoding: Optional[Mapping[str, Any]],
+                        found: Optional[Tuple[int, int, int]]) -> Optional[str]:
+    """The line for a MOSS pass that asks for sampling or beam search on a CrispASR older than 0.8.50 (owner W505
+    3), or None."""
+    if not decoding or found is None or found >= DECODING_SINCE:
+        return None
+    if not (decoding.get("do_sample") or int(decoding.get("beam_size") or 1) > 1):
+        return None   # greedy is what the older builds do
+    return f"CrispASR {'.'.join(map(str, found))} is older than 0.8.50: sampling and beam size are not applied."
 
 
 @dataclass(frozen=True)
@@ -130,15 +186,19 @@ class BindingEngine:
 
     def __init__(self, model_path: Path, backend: str, use_gpu: bool, n_threads: Optional[int] = None,
                  label: str = "", tokens_per_second: Optional[float] = None, max_new_tokens: Optional[int] = None,
-                 ask: Optional[str] = None, decoding: Optional[Mapping[str, Any]] = None):
+                 ask: Optional[str] = None, decoding: Optional[Mapping[str, Any]] = None,
+                 token_floor: int = MIN_NEW_TOKENS):
         self.model_path = Path(model_path)
         self.backend = backend      # what the opened session must report (manifest ModelFile.backend)
         self.use_gpu = bool(use_gpu)
         self.n_threads = n_threads or default_threads()
         self.label = label or self.model_path.name
         # None: the model's own limit. Otherwise each call may write at most
-        # max(MIN_NEW_TOKENS, ceil(tokens_per_second x the audio's seconds)) tokens (EngineRow.tokens_per_second).
+        # max(token_floor, ceil(tokens_per_second x the seconds of the longest piece CrispASR decodes)) tokens:
+        # the audio's seconds, counting at most CrispASR's piece (session_piece_seconds; 30 s), because CrispASR
+        # applies the call's limit to each piece (EngineRow.tokens_per_second, EngineRow.token_floor; owner W505 2 a).
         self.tokens_per_second = tokens_per_second
+        self.token_floor = int(token_floor)
         # A fixed limit for every call (MOSS-CrispASR's max_new_tokens, moss_prompt.py); wins over tokens_per_second.
         self.max_new_tokens = max_new_tokens
         # The whole instruction for the model (Session.set_ask; MOSS-CrispASR, moss_prompt.py), or None for the
@@ -155,7 +215,11 @@ class BindingEngine:
             return int(self.max_new_tokens)
         if not self.tokens_per_second:
             return None
-        return max(MIN_NEW_TOKENS, math.ceil(self.tokens_per_second * n_samples / SAMPLE_RATE))
+        seconds = n_samples / SAMPLE_RATE
+        piece = session_piece_seconds(self.backend)
+        if piece is not None:
+            seconds = min(seconds, piece)
+        return max(self.token_floor, math.ceil(self.tokens_per_second * seconds))
 
     @property
     def is_open(self) -> bool:
@@ -193,6 +257,12 @@ class BindingEngine:
                 except Exception:
                     pass
                 raise
+            line = older_decoding_line(self.decoding, installed_version())
+            if line and line not in _LINES_SHOWN:
+                # Once per process: a pass with a speech enhancer reopens the model for each file. With "Finish
+                # each file" each file's pass runs in its own process, so the line comes once per file there.
+                _LINES_SHOWN.add(line)
+                logger.warning(line)
         self._session = session
 
     @staticmethod
