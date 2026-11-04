@@ -157,7 +157,43 @@ class TestReferenceInstruction:
             MossSettings.from_params(params)
 
     def test_other_keys_are_ignored(self):
-        assert MossSettings.from_params({"threshold": 0.5, "beam_size": 5}) == MossSettings()
+        assert MossSettings.from_params({"threshold": 0.5, "max_speech_duration_s": 5}) == MossSettings()
+
+    # 1.10.1 (owner W492 M1, W501, W502): the decoding preset and beam size
+    def test_the_decoding_preset(self):
+        assert MossSettings().decoding() == {"do_sample": True, "temperature": 0.7, "top_k": 50, "seed": 42,
+                                             "beam_size": 1}
+        assert moss_prompt.DEFAULTS["do_sample"] is True and moss_prompt.DEFAULTS["seed"] == 42
+
+    def test_decoding_values_from_the_tab(self):
+        s = MossSettings.from_params({"do_sample": False, "temperature": "0.5", "top_k": 0, "seed": 0,
+                                      "beam_size": 4})
+        assert s.decoding() == {"do_sample": False, "temperature": 0.5, "top_k": 0, "seed": 0, "beam_size": 4}
+        assert MossSettings.from_params({"do_sample": "false"}).do_sample is False
+        # temperature counts only with sampling on (review piece 5, finding 6)
+        assert MossSettings.from_params({"do_sample": False, "temperature": 0}).do_sample is False
+        # the GUI's shared limits hold temperature at 1.0 at most on Apply (app.js), so the tab does too
+        assert moss_prompt.GUI_SCHEMA["temperature"]["max"] == moss_prompt.MAX_TEMPERATURE == 1.0
+        assert set(moss_prompt.DECODING) <= set(s.as_dict())
+
+    @pytest.mark.parametrize("params,key", [({"temperature": 0}, "temperature"), ({"temperature": 1.2}, "temperature"),
+                                            ({"temperature": True}, "temperature"),
+                                            ({"top_k": -1}, "top_k"), ({"seed": -1}, "seed"),
+                                            ({"seed": 2 ** 31}, "seed"), ({"beam_size": 0}, "beam_size"),
+                                            ({"beam_size": 9}, "beam_size"), ({"beam_size": 2.5}, "beam_size"),
+                                            ({"do_sample": "maybe"}, "do_sample")])
+    def test_a_decoding_value_it_cannot_use_is_refused(self, params, key):
+        with pytest.raises(ValueError, match=key):
+            MossSettings.from_params(params)
+
+    def test_the_decoding_controls(self):
+        g = moss_prompt.GUI_SCHEMA
+        assert g["do_sample"]["type"] == "toggle" and g["do_sample"]["label"] == "Sampling"
+        assert (g["beam_size"]["min"], g["beam_size"]["max"]) == (1, moss_prompt.MAX_BEAM)
+        for key in moss_prompt.DECODING:
+            default = moss_prompt.DEFAULTS[key]
+            if g[key]["type"] == "number":
+                assert g[key]["min"] <= default <= g[key]["max"], key
 
     def test_the_gui_tab_has_one_control_per_setting(self):
         assert set(moss_prompt.GUI_SCHEMA) == set(moss_prompt.DEFAULTS) == set(moss_prompt.PARAMS)
@@ -252,6 +288,67 @@ class TestEngine:
         e.transcribe(np.zeros(16000, dtype=np.float32))
         assert e._session.calls == [("tokens", 65536), ("transcribe", 16000)]
 
+    class DecodingSession(Session):
+        backend = "moss-diarize"
+
+        def set_beam_size(self, n):
+            self.calls.append(("beam", n))
+
+        def set_temperature(self, t, seed=0):
+            self.calls.append(("temperature", t, seed))
+
+        def set_top_k(self, k):
+            self.calls.append(("top_k", k))
+
+        def set_do_sample(self, on):
+            self.calls.append(("do_sample", on))
+
+    def opened(self, monkeypatch, decoding):
+        import types
+        made = self.DecodingSession()
+        fake = types.SimpleNamespace(Session=lambda *a, **k: made)
+        monkeypatch.setitem(sys.modules, "crispasr", fake)
+        monkeypatch.setattr("whisperjav.crispasr.engine.native_log.quiet_debug_lines", lambda lib: None)
+        e = BindingEngine(Path("m.gguf"), "moss-diarize", True, decoding=decoding)
+        e.open()
+        return made.calls
+
+    def test_the_preset_is_set_on_the_session_once_it_is_open(self, monkeypatch):
+        assert self.opened(monkeypatch, MossSettings().decoding()) == [
+            ("beam", 1), ("temperature", 0.7, 42), ("top_k", 50), ("do_sample", True)]
+
+    def test_greedy_and_beam_search(self, monkeypatch):
+        calls = self.opened(monkeypatch, MossSettings.from_params({"do_sample": False, "beam_size": 3}).decoding())
+        assert calls == [("beam", 3), ("do_sample", False)]
+
+    def test_no_decoding_leaves_the_session_as_it_is(self, monkeypatch):
+        assert self.opened(monkeypatch, None) == []
+
+    def test_a_failed_decoding_setup_closes_the_session(self, monkeypatch):
+        import types
+        from whisperjav.crispasr.errors import CrispASRSetupError
+
+        class Broken(self.DecodingSession):
+            closed = False
+
+            def set_beam_size(self, n):
+                raise RuntimeError("set_beam_size failed (rc=-1)")
+
+            def close(self):
+                Broken.closed = True
+
+        made = Broken()
+        monkeypatch.setitem(sys.modules, "crispasr", types.SimpleNamespace(Session=lambda *a, **k: made))
+        monkeypatch.setattr("whisperjav.crispasr.engine.native_log.quiet_debug_lines", lambda lib: None)
+        e = BindingEngine(Path("m.gguf"), "moss-diarize", True, decoding=MossSettings().decoding())
+        with pytest.raises(CrispASRSetupError):
+            e.open()
+        assert Broken.closed and not e.is_open
+
+    def test_the_pipeline_hands_moss_s_decoding_to_the_engine(self):
+        src = (REPO / "whisperjav" / "pipelines" / "crispasr_pipeline.py").read_text(encoding="utf-8")
+        assert "decoding=(settings.decoding() if settings is not None" in src
+
 
 class TestGuiBackEnd:
     def test_moss_customize_values(self):
@@ -310,6 +407,8 @@ class TestCommandLine:
         assert (eff["speech_segmenter"], eff["scene_detector"], eff["word_timestamps"]) == \
             ("firered-vad", "semantic", "model")   # W482
         assert eff["moss_settings"]["instruction"] == PROMPT_EN + " Language hint: Japanese. Hotwords: 監督"
+        # the decoding preset (W492 M1, W502)
+        assert {k: eff["moss_settings"][k] for k in moss_prompt.DECODING} == MossSettings().decoding()
 
     def test_dump_params_shows_the_pass_s_own_segmenter_values(self, tmp_path):
         # review finding 8: the run uses --passN-params' Segmenter values; the dump shows them too
