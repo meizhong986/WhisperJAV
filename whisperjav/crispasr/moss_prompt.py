@@ -8,8 +8,10 @@ adjustments"):
   prompt_lang "en" (jav-optimized)   -> prompt_language, default "en"
   --language-hint Japanese           -> language_hint, default "Japanese"
   --hotwords "..."                   -> hotwords, default none
-  max_new_tokens 65536 per chunk     -> max_new_tokens, default 0 = by the length of the audio, at the reference's
-                                        rate (65,536 tokens per 50-minute chunk, about 21.8 a second; owner W406 i1)
+  max_new_tokens 65536 per chunk     -> max_new_tokens, default 0 = by the length of the audio: 20 tokens a second,
+                                        counting at most the 30 s piece CrispASR decodes at a time, and at least 128
+                                        (owner W505 2 a; before it the reference's rate, 65,536 tokens per 50-minute
+                                        chunk, about 21.8 a second of the whole VAD group, at least 32; W406 i1)
   --chunk-minutes 0                  -> the stretches MOSS hears: the Segmenter tab (firered-vad, a group ends at a
                                         silence over 5 s, at most 240 s, no shortest group) and the Scene tab
                                         (semantic, 90-240 s); crispasr/pass_settings.py (W482; before it W426)
@@ -40,15 +42,23 @@ PROMPT_ZH = ("请将音频转写为文本，每一段需以起始时间戳和说
              "并在段末标注结束时间戳，以清晰标明该段语音范围。")
 PROMPT_LANGUAGES = ("en", "zh")
 
-# The reference's rate: 65,536 tokens per 50-minute chunk (owner W406 i1).
-TOKENS_PER_SECOND = 65536 / 3000
+# The token limit per call when max_new_tokens is 0 (owner W505 2 a; docs/plans/design/2026-11-04-moss-token-limits-
+# loops-cleanup.md section 6 item 2): 20 tokens a second of the audio, counting at most the piece CrispASR decodes at a
+# time (30 s, crispasr/engine.py session_piece_seconds: CrispASR applies the call's limit to each piece), and at least
+# 128. Measured on his SSNI-939 groups: the loop groups' decode time -73 %, the dialogue groups' lines unchanged; the
+# densest real speech measured was 14.3 tokens a second. Before W505: 65,536 tokens per 50-minute chunk (the
+# reference's rate, about 21.8 a second of the whole VAD group; owner W406 i1), at least 32.
+TOKENS_PER_SECOND = 20.0
+TOKEN_FLOOR = 128
 
 DEFAULTS: Dict[str, Any] = {"prompt_language": "en", "language_hint": "Japanese", "hotwords": "", "max_new_tokens": 0,
                             # The decoding (owner W492 M1: "do_sample=True, temperature=0.7, top_k=50"; W502: seed 42)
                             "do_sample": True, "temperature": 0.7, "top_k": 50, "seed": 42, "beam_size": 1}
 PARAMS = tuple(DEFAULTS)
 DECODING = ("do_sample", "temperature", "top_k", "seed", "beam_size")
-MAX_BEAM = 8
+# Beam size at most 4 (owner W505 4): on the Netflix clip beam 2 gave the best text at 5.5 times the time, beam 4
+# worse text at 16 times; above 4 not measured.
+MAX_BEAM = 4
 MAX_SEED = 2 ** 31 - 1
 MAX_TEMPERATURE = 1.0
 
@@ -69,8 +79,8 @@ GUI_SCHEMA: Dict[str, Dict[str, Any]] = {
                                 "(\"Hotwords: ...\"; in Chinese \"热词提示：...\"). Empty = none.",
                  "original_type": "str"},
     "max_new_tokens": {"type": "number", "label": "Token limit per call", "min": 0, "max": 65536, "step": 1,
-                       "description": "The most tokens MOSS may write for one stretch. 0 = by the stretch's length "
-                                      "(about 22 a second, the reference's rate).",
+                       "description": "The most tokens MOSS may write for one stretch. 0 = by the length of the "
+                                      "audio: 20 tokens a second, counting at most 30 seconds, and at least 128.",
                        "original_type": "int"},
     # The decoding (owner W501 M1, W502; texts drafted with the step budget after W501).
     "do_sample": {"type": "toggle", "label": "Sampling",
@@ -159,7 +169,8 @@ class MossSettings:
 
     def fixed_token_limit(self) -> Optional[int]:
         """A fixed token limit for every call, or None: the limit then follows the audio's length at
-        TOKENS_PER_SECOND (the pipeline's row, EngineRow.tokens_per_second)."""
+        TOKENS_PER_SECOND, counting at most CrispASR's 30 s piece, at least TOKEN_FLOOR (the pipeline's row,
+        EngineRow.tokens_per_second and token_floor)."""
         return self.max_new_tokens or None
 
     def decoding(self) -> Dict[str, Any]:
