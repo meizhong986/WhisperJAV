@@ -51,3 +51,40 @@ def test_the_collapse_rate_counts_the_collapsed_scenes():
     metrics = _compute_alignment_metrics(scenes)
     assert metrics["collapse_rate"] == 0.25 and metrics["total_collapsed"] == 1
     assert _compute_alignment_metrics([asdict(SceneDiagnostics())])["collapse_rate"] == 0.0
+
+
+# --- owner W501 2: no red aligner mark when the run loads no aligner (ChronosJAV's VAD Only default) -----------
+
+def _health(timestamp_mode):
+    from whisperjav.modules.pipeline_analytics import _compute_health_scorecard
+
+    alignment = {"collapse_rate": 0.0}
+    timing = _compute_timing_metrics([{"timing_sources": {"aligner_native": 0, "vad_fallback": 10,
+                                                          "interpolated": 0, "total_segments": 10}}])
+    subtitle = {"max_gap_sec": 3.0, "large_gaps": [], "short_subs_pct": 5.0}
+    scene = {"speech_ratio": 0.5}
+    return _compute_health_scorecard(alignment, timing, subtitle, scene, timestamp_mode)
+
+
+def test_vad_only_says_the_aligner_is_not_used():
+    lines = {i["name"]: i for i in _health("vad_only")}
+    assert "Aligner native" not in lines
+    assert lines["Aligner"]["value"] == "not used (VAD Only)" and lines["Aligner"]["level"] == "OFF"
+
+
+def test_an_aligner_mode_still_flags_a_low_share():
+    lines = {i["name"]: i for i in _health("aligner_vad_fallback")}
+    assert lines["Aligner native"]["value"] == "0.0%" and lines["Aligner native"]["level"] == "RED"
+    assert {i["name"]: i for i in _health(None)}["Aligner native"]["level"] == "RED"   # not known: as before
+
+
+def test_the_console_line_under_vad_only(caplog):
+    import logging
+    from whisperjav.modules import pipeline_analytics as pa
+
+    analytics = {"scene": {}, "alignment": {}, "subtitle": {}, "timing": {},
+                 "health": [{"name": "Aligner", "value": pa.ALIGNER_NOT_USED, "level": "OFF"}]}
+    with caplog.at_level(logging.INFO, logger=pa.logger.name):
+        pa.print_summary(analytics, title="t")
+    assert " [-] Aligner: not used (VAD Only)" in caplog.text
+    assert "[!] Aligner" not in caplog.text
