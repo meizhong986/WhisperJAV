@@ -1,7 +1,8 @@
-"""The Ensemble stop (owner W501): once a pass stops because its ASR model cannot be used (R-QFT, #494), pass 2 is
+"""The Ensemble stop (owner W501): once pass 1 stops because its ASR model cannot be used (R-QFT, #494), pass 2 is
 skipped for that file and no further file starts -- in the normal mode and with "Finish each file"
 (--ensemble-serial). The files not started show as "skipped" with the same reason as a single-pass run
-(``qwen_errors.NOT_STARTED``; decision 2, W501).
+(``qwen_errors.NOT_STARTED``; decision 2, W501). Once pass 2 stops for that reason, every file keeps its pass-1
+subtitles in both modes; with "Finish each file" the later files get pass 1 alone (owner W505 1).
 
 No worker process starts: ``_run_pass_in_subprocess`` is replaced by a stand-in that answers as the pass worker does
 (the stopping file and every later file of its list fail with the same message, pass_worker.py). Run alone:
@@ -67,14 +68,45 @@ def test_pass_1_stops_pass_2_is_skipped_and_no_further_file_starts(tmp_path, ser
         assert not r.get("kept_work")
 
 
-def test_finish_each_file_pass_2_stops_the_file_keeps_pass_1_and_no_further_file_starts(tmp_path):
+def test_finish_each_file_pass_2_stops_the_later_files_get_pass_1_alone(tmp_path):
+    """Owner W505 1: as with the box unticked -- every file keeps its pass-1 subtitles, marked with pass 2's reason;
+    pass 2 is not tried again on the later files."""
     calls = []
     orch = _orchestrator(tmp_path, True, 2, calls)
     results = orch.process_batch(_media(tmp_path), P1, P2, "pass1_primary")
-    assert calls == [(1, ["a"]), (2, ["a"])]
+    assert calls == [(1, ["a"]), (2, ["a"]), (1, ["b"]), (1, ["c"])]
     assert [(r["input"]["basename"], r["status"]) for r in results] == [
-        ("a", "degraded"), ("b", "skipped"), ("c", "skipped")]
-    assert results[0]["summary"]["final_output"].endswith("a.ja.pass1.srt")   # finished work kept
+        ("a", "degraded"), ("b", "degraded"), ("c", "degraded")]
+    for r in results:
+        assert r["summary"]["final_output"].endswith(f"{r['input']['basename']}.ja.pass1.srt")
+        assert r["pass2"]["error"] == MESSAGE
+        assert r["merge"]["status"] == "skipped"
+
+
+def test_both_modes_end_alike_when_pass_2_stops(tmp_path):
+    """The same states, reasons and outputs with and without "Finish each file" (owner W505 1)."""
+    seen = {}
+    for serial in (False, True):
+        results = _orchestrator(tmp_path / str(serial), serial, 2, []).process_batch(
+            _media(tmp_path / str(serial)), P1, P2, "pass1_primary")
+        seen[serial] = [(r["input"]["basename"], r["status"], r["pass2"].get("error"),
+                         r["summary"]["final_output"].rsplit("\\", 1)[-1].rsplit("/", 1)[-1]) for r in results]
+    assert seen[True] == seen[False]
+
+
+def test_the_run_summary_marks_a_pass_2_stop_suspect_and_exits_0(tmp_path):
+    """main.py's line for a degraded Ensemble file names pass 2's reason; the file is "suspect", which fails a run
+    only with --fail-on suspect (utils/run_outcome.py exit_status)."""
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parents[1] / "whisperjav" / "main.py").read_text(encoding="utf-8")
+    assert 'f"pass 2 failed ({_p2_error}); output is pass 1 alone"' in src
+    assert "_p2_error.startswith(QWEN_UNUSABLE_PREFIX)" in src
+    from whisperjav.utils.run_outcome import FileOutcome, exit_status
+
+    suspect = [FileOutcome(path=str(tmp_path / f"{n}.mp4"), state="suspect") for n in "abc"]
+    assert exit_status(suspect) == 0
+    assert exit_status(suspect, fail_on=("suspect",)) == 1
 
 
 def test_normal_mode_pass_2_stops_every_file_keeps_its_pass_1(tmp_path):
