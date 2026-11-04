@@ -83,7 +83,7 @@ whisperjav-gui
 | **ChronosJAV** | 专用管线，搭配 anime-whisper 和 Kotoba 模型，适合动漫/JAV 内容 |
 | **Qwen3-ASR** | 替代ASR 引擎，日语表现出色 |
 | **AI 翻译** | 使用 Ollama（本地）、DeepSeek、Gemini、Claude、GPT 等提供商翻译字幕 |
-| **GGUF 处理管线** | Parakeet-CrispASR 和 Cohere-CrispASR，通过 CrispASR 在专家模式中运行（日语，1.10.0 中为实验性） |
+| **GGUF 处理管线** | 七个由 CrispASR 运行的处理管线，在专家模式中使用，只处理日语，全部为实验性：Parakeet-CrispASR 和 Cohere-CrispASR（从 1.10.0 起）；ReazonSpeech-CrispASR、Kotoba-CrispASR、Whisper-Turbo-CrispASR、Whisper-Large-CrispASR 和 MOSS-CrispASR（1.10.1 新增） |
 | **每个安装一种加速器** | NVIDIA GPU（CUDA）、通过 Vulkan 使用 GPU（Windows）、Apple GPU（Metal）、你自己的 PyTorch 或仅 CPU——在安装时选择（[是否加速](getting-started/index.md#accelerated-or-not)） |
 | **语音增强** | ZipEnhancer 降噪、htdemucs 人声分离、FFmpeg DSP 链 |
 | **场景检测** | Auditok、Silero、Semantic——分割长音频以提高准确度 |
