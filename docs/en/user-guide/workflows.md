@@ -93,7 +93,7 @@ Process an entire folder of videos at once.
 Files are processed sequentially. Each output SRT is saved next to its source video (or to your chosen output directory).
 
 !!! tip "Serial Ensemble Mode"
-    In Ensemble mode, enable **Serial** mode to complete each file fully (Pass 1 → Pass 2 → Merge) before starting the next. This lets you see results as they finish instead of waiting for the entire batch.
+    In Ensemble mode, **Finish each file** (ticked by default) completes each file fully (Pass 1 → Pass 2 → Merge) before starting the next. This lets you see results as they finish instead of waiting for the entire batch.
 
 ---
 
