@@ -50,6 +50,10 @@ def test_the_stage_lists():
     assert cleanup.SRT_STAGES == ("duplicates", "hallucination", "repetition", "nonverbal", "nonlinguistic",
                                   "scene_overlap")
     assert cleanup.EARLIER_STAGES == ("nonverbal", "nonlinguistic", "scene_overlap")
+    # MOSS-CrispASR (owner W505 2 b-d): the duplicate merge, the three filters, then the interjection rules
+    assert cleanup.MOSS_STAGES == ("duplicates", "nonverbal", "nonlinguistic", "scene_overlap", "interjections")
+    assert cleanup.INTERJECTIONS not in cleanup.SRT_STAGES     # the other pipelines do not get them
+    assert cleanup.SrtCleanup(cleanup.MOSS_STAGES[::-1]).stages == cleanup.MOSS_STAGES
     with pytest.raises(ValueError, match="unknown clean-up stage"):
         cleanup.SrtCleanup(("cps",))
     assert cleanup.file_stem("film", "cohere-crispasr") == "film.cohere-crispasr_stitched"
@@ -169,3 +173,49 @@ def test_nothing_to_do_on_an_empty_file(tmp_path):
     stitched.write_text("", encoding="utf-8")
     assert cleanup.SrtCleanup(cleanup.SRT_STAGES).run(stitched, tmp_path / "raw_subs", "x", 0) == ({}, 0)
     assert not (tmp_path / "raw_subs").exists()
+
+
+@pytest.mark.parametrize("text", [
+    # rule (b): no kana, one interjection, Latin or Chinese (W505 2 c)
+    "Ah.", "Ahh!", "Oh.", "Uh...", "Um.", "Umm.", "Uum.", "Mm.", "Hmm...", "Eh?", "Ha.", "Haha!", "AH!",
+    "嗯。", "啊。", "哦", "呃。", "唔", "哈哈", "嘿", "呀", "哎呀。", "噢", "喔", "嗷",
+    # rule (c): only ああ / あっ / うん / えっ, all such lines (W501 M3, W505 2 d)
+    "ああ", "ああ。", "あ。", "あっ、", "あっ…", "ああっ ああっ！", "ああああああ", "うん", "うんうん", "えっ？", "あっあっ"])
+def test_the_interjection_rules_drop(text):
+    assert cleanup.is_interjection_line(text)
+
+
+@pytest.mark.parametrize("text", [
+    "Honey.", "No!", "Oh, cute.", "Ayak.", "OK", "Hello", "あっ、監督", "うん、いいよ", "えっ、本当？", "痛い。", "笑",
+    "ちょっと。", "すみません", "はい", "ええ", "あれ", "嗯，好的。", "", "。", "  "])
+def test_the_interjection_rules_keep(text):
+    assert not cleanup.is_interjection_line(text)
+
+
+def test_the_interjection_stage_drops_and_lists_them(tmp_path):
+    entries = [("Ah.", 1.0, 1.5), ("監督、本番です。", 2.0, 3.0), ("ああああ", 3.5, 4.0), ("Honey.", 4.5, 5.0)]
+    stitched, stats, count = run(tmp_path, entries, stages=cleanup.MOSS_STAGES)
+    assert [s.text for s in pysrt.open(str(stitched), encoding="utf-8")] == ["監督、本番です。", "Honey."]
+    assert stats["interjections_dropped"] == 2 and count == 2
+    artifacts = (tmp_path / "raw_subs" / "film.kotoba-crispasr_stitched.artifacts.srt").read_text(encoding="utf-8")
+    assert artifacts.count("[REMOVED - Interjection Line]") == 2
+
+
+def test_without_the_hallucination_stage_its_lists_are_not_loaded(monkeypatch):
+    """MOSS-CrispASR (owner W505 2 b): no hallucination filter, so its lists are neither loaded nor fetched and no
+    "Hallucination filter: ... loaded" line appears; the other GGUF pipelines' clean-up still loads them."""
+    import whisperjav.modules.hallucination_remover as hr
+
+    made = []
+    real = hr.HallucinationRemover.__init__
+
+    def counting(self, *a, **k):
+        made.append(1)
+        real(self, *a, **k)
+
+    monkeypatch.setattr(hr.HallucinationRemover, "__init__", counting)
+    moss = cleanup.SrtCleanup(cleanup.MOSS_STAGES)._get_sanitizer()
+    assert moss.hallucination_remover is None and moss.timing_adjuster is None and made == []
+    assert moss.repetition_cleaner is not None and moss.constants["cross_subtitle"].DEDUP_THRESHOLD == 3
+    other = cleanup.SrtCleanup(cleanup.SRT_STAGES)._get_sanitizer()
+    assert other.hallucination_remover is not None and made == [1]
