@@ -1737,7 +1737,7 @@ const EnsembleManager = {
             extraArgs: '--verbose True --standard_asia'  // Default XXL args (model flows via the Model column)
         },
         mergeStrategy: 'pass1_primary',
-        serialMode: false,
+        serialMode: true,  // 1.10.1: "Finish each file" ticked by default (owner W493 1)
         currentCustomize: null  // 'pass1' or 'pass2'
     },
 
