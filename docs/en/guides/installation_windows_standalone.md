@@ -100,7 +100,7 @@ When the installer finds no NVIDIA GPU that 1.10 supports, a window titled **"Wh
 
 The window explains:
 
-> With an AMD, Intel or older NVIDIA card, the GGUF pipelines (Parakeet-CrispASR and Cohere-CrispASR) ask for your graphics card through Vulkan. This is experimental in 1.10.0: it has not been tested on AMD or Intel graphics cards, and we would like to hear how it works for you. All other pipelines run on the CPU (not accelerated), several times slower than on a supported NVIDIA GPU. With your own PyTorch, WhisperJAV installs everything except PyTorch, and you add your PyTorch build afterwards (the command is shown at the end). With the CPU only, every pipeline runs on the CPU.
+> With an AMD, Intel or older NVIDIA card, the GGUF pipelines (run by CrispASR) ask for your graphics card through Vulkan. This is experimental: it has not been tested on AMD or Intel graphics cards, and we would like to hear how it works for you. All other pipelines run on the CPU (not accelerated), several times slower than on a supported NVIDIA GPU. With your own PyTorch, WhisperJAV installs everything except PyTorch, and you add your PyTorch build afterwards (the command is shown at the end). With the CPU only, every pipeline runs on the CPU.
 
 Without an answer, the CPU-only version is installed after 20 seconds. **Stop** ends the installer without installing anything.
 
@@ -165,7 +165,7 @@ It lists Python, PyTorch, the accelerator of the install, where each part runs, 
 
 ```
 ✓ PyTorch: PyTorch 2.11.0+cu130: NVIDIA GPU (CUDA 13.0), NVIDIA GeForce RTX 3060
-✓ CrispASR: 0.8.44+cuda (CUDA build), GGUF pipelines: asks for the NVIDIA GPU (CUDA)
+✓ CrispASR: 0.8.50+cuda (CUDA build), GGUF pipelines: asks for the NVIDIA GPU (CUDA)
 ℹ Accelerator: Accelerator of this install: NVIDIA GPU (CUDA 13.0).
 ℹ CTranslate2: CTranslate2 (balanced, fast, faster): NVIDIA GPU (CUDA)
 ```
