@@ -634,9 +634,13 @@ class EnsembleOrchestrator:
 
         all_metadata: List[Dict[str, Any]] = []
         table_rows: List[Dict[str, str]] = []
-        # The Ensemble stop (owner W501): once a pass stops because its ASR model cannot be used, no further file
+        # The Ensemble stop (owner W501): once pass 1 stops because its ASR model cannot be used, no further file
         # starts; the later files show as "skipped" (not started).
         run_stopped = False
+        # Once pass 2 stops because its ASR model cannot be used (owner W505 1): the later files get pass 1 alone,
+        # pass 2 is not tried again, and each is marked as with the box unticked -- pass 2 failed with this reason,
+        # output pass 1 alone (state "suspect"; the exit status is not changed by it).
+        pass2_stop: Optional[str] = None
 
         for file_idx, media_info in enumerate(serialized_media, 1):
             basename = media_info['basename']
@@ -668,10 +672,17 @@ class EnsembleOrchestrator:
 
             # --- Pass 2 (if enabled; skipped when pass 1's ASR model cannot be used, owner W501) ---
             pass2_results: Dict[str, Dict[str, Any]] = {}
+            pass2_ran = False
             if pass2_config and pass1_stopped:
                 logger.warning("[%d/%d] %s — Pass 2 skipped: pass 1's ASR model cannot be used",
                                file_idx, total_files, basename)
+            elif pass2_config and pass2_stop is not None:
+                # The same result the pass worker gives the files after its stop in the normal mode.
+                logger.warning("[%d/%d] %s — Pass 2 not run: its ASR model cannot be used; output is pass 1 alone",
+                               file_idx, total_files, basename)
+                pass2_results = {basename: {'status': 'failed', 'error': pass2_stop}}
             elif pass2_config:
+                pass2_ran = True
                 logger.info(
                     "[%d/%d] %s — Pass 2 (%s)...",
                     file_idx, total_files, basename, pass2_config['pipeline'],
@@ -684,7 +695,7 @@ class EnsembleOrchestrator:
                 )
 
             # --- Merge + metadata (reuses shared method) ---
-            if pass2_config and not pass1_stopped:
+            if pass2_ran:
                 logger.info(
                     "[%d/%d] %s — Merge (%s)...",
                     file_idx, total_files, basename, merge_strategy,
@@ -695,11 +706,16 @@ class EnsembleOrchestrator:
             )
             all_metadata.append(metadata)
             table_rows.append(row)
-            if pass1_stopped or _model_unusable(pass2_results.get(basename)):
+            if pass1_stopped:
                 run_stopped = True
                 if file_idx < total_files:
-                    logger.warning("Pass %d stopped on %s: its ASR model cannot be used. The %d file(s) after it "
-                                   "are not started.", 1 if pass1_stopped else 2, basename, total_files - file_idx)
+                    logger.warning("Pass 1 stopped on %s: its ASR model cannot be used. The %d file(s) after it "
+                                   "are not started.", basename, total_files - file_idx)
+            elif pass2_ran and _model_unusable(pass2_results.get(basename)):
+                pass2_stop = str(pass2_results[basename].get('error') or '')
+                if file_idx < total_files:
+                    logger.warning("Pass 2 stopped on %s: its ASR model cannot be used. The %d file(s) after it "
+                                   "get pass 1 alone.", basename, total_files - file_idx)
 
             # --- Per-file cleanup ---
             if not self.keep_temp_files:
