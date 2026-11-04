@@ -241,7 +241,7 @@ Each stage has several interchangeable providers — the full menu, with strengt
 
 ### ChronosJAV
 
-Some of the best recognizers for this domain (anime-whisper, Qwen3-ASR and its Japanese finetunes) don't produce reliable timestamps on their own. ChronosJAV runs text generation and timing as separate stages: the VAD provides the time skeleton, the model provides the words. Since v1.9, timestamps come from the VAD frames by default (no aligner model loaded, ~1 GB less VRAM); a Qwen forced-aligner mode remains available in the settings for word-level alignment.
+Some of the best ASR models for this material (anime-whisper, Qwen3-ASR and its Japanese fine-tunes) do not give reliable times on their own. ChronosJAV therefore takes the text from the ASR model and the times from a separate step. By default each subtitle takes the start and end of the piece of speech (VAD group) the speech segmenter found, and no aligner is loaded — as in 1.9.x, and again since 1.10.1 (1.10.0 timed the text with an aligner and a timing model by default). Both remain choices in the settings: an aligner mode (CrispASR's aligners such as `wav2vec2-ja`, or the PyTorch Qwen3 forced aligner) and the Whisper small timing model.
 
 The same decoupled design is why new models can be added without rebuilding the pipeline — anything that turns audio into text can be slotted in.
 
@@ -261,7 +261,7 @@ whisperjav video.mp4 --ensemble \
 
 - **Merge strategies:** `pass1_primary` / `pass2_primary` (one pass leads, the other fills gaps), `smart_merge`, `full_merge`, `pass1_overlap` / `pass2_overlap`, `longest`
 - **Presets:** save and reload named ensemble configurations from the GUI
-- **Serial mode** (`--ensemble-serial`): finish each file completely before starting the next, so results appear as they're done
+- **Serial mode** ("Finish each file", `--ensemble-serial`, on by default since 1.10.1; `--no-ensemble-serial` turns it off): finish each file completely before starting the next, so results appear as they're done
 - **Bring your own pass 1, pass 2 or both:** [PurfView's Faster-Whisper XXL](https://github.com/Purfview/whisper-standalone-win) (`--pass1-pipeline xxl` and/or `--pass2-pipeline xxl`, with `--xxl-exe ...`; the model with `--pass1-model` / `--pass2-model`, default `large-v2`)
 
 ---
