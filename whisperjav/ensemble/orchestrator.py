@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from whisperjav.modules.qwen_errors import NOT_STARTED, PREFIX as UNUSABLE_PREFIX
 from whisperjav.utils.logger import logger
 from whisperjav.utils.metadata_manager import MetadataManager
 from whisperjav.utils.parameter_tracer import NullTracer
@@ -21,6 +22,22 @@ from .utils import resolve_language_code
 
 
 _KEPT_KEYS = ('savepoint_srt', 'savepoint_stage', 'savepoint_subtitles', 'kept_dir', 'save_points')
+
+
+def _model_unusable(result: Optional[Dict[str, Any]]) -> bool:
+    """A pass result that stopped because the pass's ASR model cannot be used (R-QFT, #494; modules/qwen_errors.py)."""
+    return bool(result) and str(result.get('error') or '').startswith(UNUSABLE_PREFIX)
+
+
+def _first_unusable(media_files: List[Dict[str, Any]], results: Dict[str, Dict[str, Any]]) -> Optional[int]:
+    """The position of the first file whose pass stopped because its ASR model cannot be used, or None. The pass
+    worker stops on that file and gives every later file of its list the same message without starting it."""
+    return next((k for k, info in enumerate(media_files) if _model_unusable(results.get(info['basename']))), None)
+
+
+def _not_started() -> Dict[str, Any]:
+    """The result of a file no pass started after the stop (owner W501: shown as "skipped")."""
+    return {'status': 'skipped', 'error': NOT_STARTED}
 
 
 def _kept_work(result: Optional[Dict[str, Any]]) -> Dict[str, Any]:
@@ -235,8 +252,23 @@ class EnsembleOrchestrator:
             pass1_completed, len(pass1_results), pass1_subs
         )
 
+        # The Ensemble stop (owner W501): once pass 1 stops because its ASR model cannot be used, pass 2 is skipped
+        # for that file and no further file starts; the later files show as "skipped" (not started).
+        pass2_media = serialized_media
+        stop_at = _first_unusable(serialized_media, pass1_results)
+        if stop_at is not None:
+            stopped = serialized_media[stop_at]['basename']
+            for info in serialized_media[stop_at + 1:]:
+                pass1_results[info['basename']] = _not_started()
+            pass2_media = serialized_media[:stop_at]
+            later = len(serialized_media) - stop_at - 1
+            logger.warning(
+                "Pass 1 stopped on %s: its ASR model cannot be used.%s%s", stopped,
+                " Pass 2 is skipped for it." if pass2_config else "",
+                f" The {later} file(s) after it are not started." if later else "")
+
         pass2_results: Dict[str, Dict[str, Any]] = {}
-        if pass2_config:
+        if pass2_config and pass2_media:
             logger.info(
                 "Pass 2 is enabled (%s). Launching worker...",
                 pass2_config['pipeline'],
@@ -251,13 +283,13 @@ class EnsembleOrchestrator:
 
             logger.debug(
                 "Starting Pass 2 for %d files with pipeline=%s, sensitivity=%s",
-                len(serialized_media),
+                len(pass2_media),
                 pass2_config.get('pipeline'), pass2_config.get('sensitivity')
             )
 
             pass2_results = self._run_pass_in_subprocess(
                 pass_number=2,
-                media_files=serialized_media,
+                media_files=pass2_media,
                 pass_config=pass2_config,
                 language_code=pass_languages[2],
             )
@@ -315,6 +347,7 @@ class EnsembleOrchestrator:
             "completed": completed_count,
             "degraded": degraded_count,
             "failed": failed_count,
+            "skipped": sum(1 for m in all_metadata if m.get('status') == 'skipped'),
             "total_duration_seconds": round(batch_duration, 2),
             "summary_path": str(summary_path) if summary_path else None,
         })
@@ -355,6 +388,18 @@ class EnsembleOrchestrator:
             'final': f"{basename}: missing",
         }
 
+        if pass1 and pass1.get('status') == 'skipped':
+            # Not started (owner W501): an earlier file's pass stopped because its ASR model cannot be used.
+            ensemble_metadata['pass1'] = dict(pass1)
+            ensemble_metadata['pass2'] = {'status': 'skipped'}
+            ensemble_metadata['merge'] = {'status': 'skipped'}
+            ensemble_metadata['status'] = 'skipped'
+            ensemble_metadata['error'] = pass1.get('error') or NOT_STARTED
+            row_display['pass2'] = 'skipped' if pass2_config else 'n/a'
+            row_display['merge'] = 'n/a'
+            row_display['final'] = f"{basename}: not started"
+            return ensemble_metadata, row_display
+
         if not pass1 or pass1['status'] != 'completed':
             error_msg = pass1.get('error') if pass1 else 'Pass 1 worker returned no result'
             ensemble_metadata['pass1'] = {'status': 'failed', 'error': error_msg,
@@ -368,6 +413,8 @@ class EnsembleOrchestrator:
                 ensemble_metadata['pass2'] = (
                     pass2 if pass2 else {'status': 'skipped', 'error': 'Pass 2 not executed'}
                 )
+                if not pass2:
+                    row_display['pass2'] = 'skipped'
             else:
                 ensemble_metadata['pass2'] = {'status': 'skipped'}
             ensemble_metadata['status'] = 'failed'
@@ -587,10 +634,24 @@ class EnsembleOrchestrator:
 
         all_metadata: List[Dict[str, Any]] = []
         table_rows: List[Dict[str, str]] = []
+        # The Ensemble stop (owner W501): once a pass stops because its ASR model cannot be used, no further file
+        # starts; the later files show as "skipped" (not started).
+        run_stopped = False
 
         for file_idx, media_info in enumerate(serialized_media, 1):
             basename = media_info['basename']
             file_start = time.time()
+
+            if run_stopped:
+                metadata, row = self._process_single_file_merge(
+                    media_info, {basename: _not_started()}, {},
+                    pass1_config, pass2_config, merge_strategy, pass_languages,
+                )
+                all_metadata.append(metadata)
+                table_rows.append(row)
+                logger.warning("[%d/%d] NOT STARTED: %s — the run stopped because its ASR model cannot be used",
+                               file_idx, total_files, basename)
+                continue
 
             # --- Pass 1 ---
             logger.info(
@@ -603,10 +664,14 @@ class EnsembleOrchestrator:
                 pass_config=pass1_config,
                 language_code=pass_languages[1],
             )
+            pass1_stopped = _model_unusable(pass1_results.get(basename))
 
-            # --- Pass 2 (if enabled) ---
+            # --- Pass 2 (if enabled; skipped when pass 1's ASR model cannot be used, owner W501) ---
             pass2_results: Dict[str, Dict[str, Any]] = {}
-            if pass2_config:
+            if pass2_config and pass1_stopped:
+                logger.warning("[%d/%d] %s — Pass 2 skipped: pass 1's ASR model cannot be used",
+                               file_idx, total_files, basename)
+            elif pass2_config:
                 logger.info(
                     "[%d/%d] %s — Pass 2 (%s)...",
                     file_idx, total_files, basename, pass2_config['pipeline'],
@@ -619,7 +684,7 @@ class EnsembleOrchestrator:
                 )
 
             # --- Merge + metadata (reuses shared method) ---
-            if pass2_config:
+            if pass2_config and not pass1_stopped:
                 logger.info(
                     "[%d/%d] %s — Merge (%s)...",
                     file_idx, total_files, basename, merge_strategy,
@@ -630,6 +695,11 @@ class EnsembleOrchestrator:
             )
             all_metadata.append(metadata)
             table_rows.append(row)
+            if pass1_stopped or _model_unusable(pass2_results.get(basename)):
+                run_stopped = True
+                if file_idx < total_files:
+                    logger.warning("Pass %d stopped on %s: its ASR model cannot be used. The %d file(s) after it "
+                                   "are not started.", 1 if pass1_stopped else 2, basename, total_files - file_idx)
 
             # --- Per-file cleanup ---
             if not self.keep_temp_files:
@@ -676,6 +746,7 @@ class EnsembleOrchestrator:
             "completed": completed_count,
             "degraded": degraded_count,
             "failed": failed_count,
+            "skipped": sum(1 for m in all_metadata if m.get('status') == 'skipped'),
             "total_duration_seconds": round(batch_duration, 2),
             "summary_path": str(summary_path) if summary_path else None,
             "serial_mode": True,
@@ -851,6 +922,12 @@ class EnsembleOrchestrator:
         ``savepoint_stage``, ``kept_dir``, ``save_points``) for the run summary, and in a warning now."""
         failed = [info for info in media_files
                   if (results.get(info['basename']) or {}).get('status') != 'completed']
+        # After a stop because the pass's ASR model cannot be used, the worker started no later file of its list
+        # (owner W501): those have no work to keep and get no "stopped before any subtitles" warning.
+        stop_at = _first_unusable(media_files, results)
+        if stop_at is not None:
+            never_started = {info['basename'] for info in media_files[stop_at + 1:]}
+            failed = [info for info in failed if info['basename'] not in never_started]
         if not failed:
             return
         work_dir = self.temp_dir / f"pass{pass_number}_worker"
