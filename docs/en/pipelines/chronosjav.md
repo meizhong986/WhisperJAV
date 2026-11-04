@@ -8,15 +8,23 @@ Inspired by the temporal-awareness approach in [ChronusOmni](https://arxiv.org/a
 
 ## Available Models
 
-| Model | Size | Strengths |
+In the **Ensemble Mode** tab, the **Pipeline** menu's **ChronosJAV** group has two pipelines, **Qwen3-ASR** and **Anime-Whisper**. The pass's **Model** menu then offers:
+
+| Pipeline | Model menu entry | GPU memory, as the menu gives it |
 |-------|------|-----------|
-| **anime-whisper** | ~4 GB | Best quality for anime/JAV dialogue. Fine-tuned Whisper large-v3. |
-| **Kotoba v2.1** | ~2 GB | Lighter weight with punctuation support. Good balance of speed and quality. |
-| **Kotoba v2.0** | ~2 GB | Lighter weight, no punctuation. Fastest of the three. |
-| **Cohere-Transcribe** *(deferred to v1.9.0)* | ~4-8 GB | Cohere Labs 2B Conformer ASR. **Currently disabled in the GUI dropdown** — the model requires transformers ≥ 5.4.0 which conflicts with the bundled Qwen3-ASR fork. v1.9.0 will land a coordinated transformers upgrade and ship Cohere alongside the existing generators. See the [FAQ](../faq.md#cohere-transcribe-preview-deferred-to-v190) for the current status. |
+| **Qwen3-ASR** | Qwen3-ASR-1.7B (the default) | 8 GB |
+| | Qwen3-ASR-0.6B | 4 GB |
+| | JA Anime-Galgame 1.7B (jaykwok's fine-tune) | 8 GB |
+| | JA-tuned 1.7B (neosophie) | 8 GB |
+| **Anime-Whisper** | anime-whisper (the default) | ~4 GB |
+| | efwkjn/whisper-ja-anime-v0.3 (experimental, #232) | ~3 GB |
+| | Kotoba v2.0 | ~2 GB |
+| | Kotoba v2.1 | ~2 GB |
+
+The group's third entry, **Cohere-Transcribe (not available yet)**, is greyed out and cannot be chosen; see the [FAQ](../faq.md#cohere-transcribe-not-available-yet).
 
 !!! tip
-    Start with **anime-whisper** for best results. Switch to Kotoba if you need faster processing or have limited GPU memory. Cohere-Transcribe is targeted for v1.9.0; the dropdown entry is visible but greyed out in v1.8.14 as a forward-reference signpost.
+    If your graphics card has less than 8 GB of memory, choose a model the menu lists with less: Qwen3-ASR-0.6B (4 GB) or an Anime-Whisper model (2 to 4 GB).
 
 ---
 
@@ -46,11 +54,11 @@ ChronosJAV uses different defaults than the standard Whisper pipelines:
 | Setting | ChronosJAV Default | Standard Default |
 |---------|-------------------|-----------------|
 | **Decoding** | Greedy (beam=1) | Beam search (beam=5) |
-| **Speech Segmenter** | TEN VAD | Silero v6.2 |
+| **Speech Segmenter** | FireRedVAD, TEN VAD or WhisperSeg, by pass (see below) | differs by pipeline |
 | **Timestamp Mode** | VAD only (since 1.10.1, as in 1.9.5; 1.10.0: Aligner + VAD fallback) | Full alignment |
 | **Cleaner** | Passthrough | Standard sanitizer |
 
-These defaults are optimized for anime/JAV content. The greedy decoding with TEN VAD segmentation produces tighter subtitle timing and eliminates oversized subtitle blocks.
+The speech segmenter a ChronosJAV pass starts with: in the **Ensemble Mode** tab, FireRedVAD for Qwen3-ASR as Pass 1, WhisperSeg for Anime-Whisper as Pass 1, and TEN VAD for either as Pass 2. On the command line: WhisperSeg for `--mode qwen`; in an Ensemble run the same as in the GUI, except that Qwen3-ASR as pass 2 gets WhisperSeg. The pass's **Speech Segmenter** menu, `--pass1-speech-segmenter` / `--pass2-speech-segmenter` or `--qwen-segmenter` changes it.
 
 ---
 
