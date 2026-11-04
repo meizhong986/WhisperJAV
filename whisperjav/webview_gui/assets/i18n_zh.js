@@ -694,7 +694,7 @@ window.WJ_I18N_ZH = {
   "Full Scene": "整个场景",
   "SRT Source": "SRT 来源",
   "Safe Chunking": "安全分块",
-  "Enforce scene boundaries for ForcedAligner 180s limit": "为 ForcedAligner 的 180 秒上限强制场景边界",
+  "Gives the scene detector Min Duration and Max Duration (12 s and 48 s by default) as the shortest and longest scene. Off: the scene detector's own lengths.": "把最短时长和最长时长（默认 12 秒和 48 秒）作为最短和最长场景交给场景检测器。关闭：使用场景检测器自己的长度。",
   "Min Duration": "最短时长",
   "Minimum scene length (default: 12s)": "最短场景长度（默认：12 秒）",
   "Max Duration": "最长时长",
