@@ -66,7 +66,7 @@ Parakeet-CrispASR 使用 Fidelity 处理管线的语音分割器设置，另加 
 
 ### GUI
 
-1. 打开 **专家模式**（Ensemble Mode）选项卡。打开时 **第一轮**（Pass 1）为 **cohere**（Balanced，FireRedVAD），**第二轮**（Pass 2）为 **parakeet**（Aggressive，TEN VAD）；第二轮在勾选之前不运行。如果开启了 **Remember settings**，选项卡打开时显示的是你保存的设置。
+1. 打开 **专家模式**（Ensemble Mode）选项卡。打开时 **第一轮**（Pass 1）为 **cohere**（Balanced，FireRedVAD），**第二轮**（Pass 2）为 **parakeet**（Aggressive，TEN VAD）；第二轮在勾选之前不运行。如果开启了 **记住设置**（Remember settings），选项卡打开时显示的是你保存的设置。
 2. 要为某一轮换处理管线，打开它的 **Pipeline** 菜单：**parakeet** 和 **cohere** 在 **GGUF via crispasr** 分组下。选择其中之一时，会同时设好它自己的灵敏度和语音分割器（见上表）。
 3. 如果选的是 cohere，可在 **Model** 列选择模型（默认 `cohere-asr-ja-v0.1`）。
 4. 如需第二轮，勾选 **第二轮**（Pass 2），确认其处理管线，并在 **Merge** 中选择两者的合并方式。
