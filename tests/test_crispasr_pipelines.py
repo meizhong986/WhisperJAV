@@ -146,9 +146,9 @@ class Stage:
 
         class Engine:
             def __init__(self, model_path, backend, use_gpu, n_threads=None, label="", tokens_per_second=None,
-                         max_new_tokens=None, ask=None, decoding=None):
+                         max_new_tokens=None, ask=None, decoding=None, token_floor=32):
                 self.model_path, self.backend, self.use_gpu = model_path, backend, use_gpu
-                self.tokens_per_second = tokens_per_second
+                self.tokens_per_second, self.token_floor = tokens_per_second, token_floor
                 self.max_new_tokens, self.ask = max_new_tokens, ask
                 self.decoding = decoding
                 self.n_threads = 8
@@ -470,11 +470,14 @@ class TestThe1101Pipelines:
 
     def test_moss_row(self):
         # 1.10.1 (owner W411, W426): the model's own segment times, one subtitle per segment; its token limit per
-        # second of audio (W406 i1); the three earlier filters only (W421 i3); its MOSS settings (W428 I1 4).
+        # second of audio (W406 i1; W505 2 a: 20 a second, at least 128); its clean-up (W505 2 b-d: the duplicate
+        # merge, the three filters, the interjection rules); its MOSS settings (W428 I1 4).
         from whisperjav.crispasr.moss_prompt import MossSettings
         cls = self.classes()["moss-crispasr"]
-        assert cls.ENGINE == chain.EngineRow("segments", audio_analytics=True, tokens_per_second=65536 / 3000,
-                                             cleanup=("nonverbal", "nonlinguistic", "scene_overlap"))
+        assert cls.ENGINE == chain.EngineRow("segments", audio_analytics=True, tokens_per_second=20.0,
+                                             token_floor=128,
+                                             cleanup=("duplicates", "nonverbal", "nonlinguistic", "scene_overlap",
+                                                      "interjections"))
         assert cls.MODEL_SETTINGS is MossSettings
 
     def test_the_native_timing_pipelines(self):
@@ -736,6 +739,7 @@ class TestMoss:
         engine = stage.engines[0]
         assert engine.ask == PROMPT_EN + " Language hint: Japanese."
         assert (engine.tokens_per_second, engine.max_new_tokens) == (TOKENS_PER_SECOND, None)
+        assert engine.token_floor == 128
 
     def test_its_moss_settings_come_from_the_pass_params(self, stage, tmp_path):
         from whisperjav.crispasr.moss_prompt import PROMPT_ZH
@@ -839,14 +843,15 @@ class TestMoss:
 
 
 class TestPostProcessing:
-    """Option B (owner W421 i1, W422): each pipeline's clean-up; MOSS keeps the three earlier filters (W421 i3)."""
+    """Option B (owner W421 i1, W422): each pipeline's clean-up; MOSS its own set (W505 2 b-d; before it the three
+    earlier filters, W421 i3)."""
 
     CLOSING = "ご視聴ありがとうございました"   # removed by the hallucination filter's built-in closing-phrase pattern
 
     def test_which_pipeline_gets_which_stages(self):
         from whisperjav.crispasr import cleanup
         for name, cls in TestThe1101Pipelines.classes().items():
-            expected = cleanup.EARLIER_STAGES if name == "moss-crispasr" else cleanup.SRT_STAGES
+            expected = cleanup.MOSS_STAGES if name == "moss-crispasr" else cleanup.SRT_STAGES
             assert cls.ENGINE.cleanup == expected, name
             for choice in ("model", "aligner"):
                 assert cls.engine_row(choice).cleanup == expected, (name, choice)
@@ -869,13 +874,25 @@ class TestPostProcessing:
         assert md["config"]["crispasr"]["cleanup"] == ["duplicates", "hallucination", "repetition", "nonverbal",
                                                       "nonlinguistic", "scene_overlap"]
 
-    def test_moss_keeps_the_earlier_filters_only(self, stage, tmp_path):
+    def test_moss_clean_up(self, stage, tmp_path):
+        """W505 2 b-d: the duplicate merge, the three filters, the interjection rules; no hallucination filter (a
+        closing phrase stays); the trace of R-RAW is kept as for the other pipelines."""
         from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
 
-        stage.answers = [[CrispSegment(self.CLOSING, 0.0, 1.0)], [], []]
+        stage.frames = {0: [(0.0, 10.0)], 1: []}   # one VAD group of 10 s holds every line
+        stage.answers = [[CrispSegment(self.CLOSING, 0.0, 1.0), CrispSegment("痛い。", 1.1, 1.5),
+                          CrispSegment("痛い。", 1.6, 2.0), CrispSegment("痛い。", 2.1, 2.5),
+                          CrispSegment("Ah.", 3.0, 3.5), CrispSegment("嗯。", 4.0, 4.5),
+                          CrispSegment("ああああ", 5.0, 5.5), CrispSegment("うん。", 6.0, 6.5),
+                          CrispSegment("Honey.", 7.0, 7.5), CrispSegment("あっ、監督", 8.0, 8.5)]]
         md = make(MossCrispASRPipeline, tmp_path, word_timestamps="model").process(stage.media())
-        assert [t for t, _s, _e in srt_entries(md["output_files"]["final_srt"])] == [self.CLOSING]
-        assert not (tmp_path / "out" / "raw_subs").exists()   # MOSS left out: no new files either (W421 i3)
+        assert [t for t, _s, _e in srt_entries(md["output_files"]["final_srt"])] == [
+            self.CLOSING, "痛い。", "Honey.", "あっ、監督"]
+        names = sorted(q.name for q in (tmp_path / "out" / "raw_subs").iterdir())
+        assert names == ["film.moss-crispasr_stitched.artifacts.srt", "film.moss-crispasr_stitched.original.srt"]
+        artifacts = (tmp_path / "out" / "raw_subs" / names[0]).read_text(encoding="utf-8")
+        # "うん。" goes by the non-verbal filter first; "Ah.", "嗯。", "ああああ" by the interjection rules
+        assert artifacts.count("Category: interjection_line") == 3 and "[MODIFIED - Sequential Duplicates Merged]" in artifacts
 
     def test_in_an_ensemble_pass_the_trace_goes_beside_the_pass_file_named_with_the_pass(self, stage, tmp_path):
         # what the pass worker sets per file (pass_worker._configure_trace): in --output-dir source mode the
