@@ -508,7 +508,7 @@ def parse_arguments():
                                help="Scene detection method for pass 2 (default: semantic since v1.9.2; for "
                                     "moss-crispasr semantic with scenes of normally 90-240 s).")
     twopass_group.add_argument("--pass2-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Default: ten when pass 2 is anime-whisper; for the GGUF pipelines: ten for parakeet-crispasr and reazonspeech-crispasr, firered-vad for the others; none sends each scene to the model whole. Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
+                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Default: ten when pass 2 is Qwen3-ASR or anime-whisper; for the GGUF pipelines: ten for parakeet-crispasr and reazonspeech-crispasr, firered-vad for the others; none sends each scene to the model whole. Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
     twopass_group.add_argument("--pass2-vad-version", default=None,
                                choices=list(VAD_VERSIONS),
                                help="Silero VAD build for pass 2 when --pass2-pipeline is balanced "
@@ -2443,7 +2443,8 @@ def apply_ensemble_pass_defaults(args) -> None:
     """
     Fill in the Ensemble defaults the user did not set (owner, 2026-10-12, v1.9.5):
     pass 1 Qwen3-ASR runs FireRedVAD at aggressive, pass 2 anime-whisper runs TEN VAD
-    at aggressive (ENSEMBLE_PASS_DEFAULTS). Only for a pass that IS that pipeline,
+    at aggressive, pass 2 Qwen3-ASR TEN VAD at balanced since 1.10.1 (owner W509)
+    (ENSEMBLE_PASS_DEFAULTS). Only for a pass that IS that pipeline,
     and only for what the command line left out; no pipeline default changes. A
     Parakeet-CrispASR pass runs at aggressive, a Cohere-CrispASR pass at balanced
     (CRISPASR_DEFAULT_SENSITIVITY, owner W344). Every other pass keeps sensitivity
@@ -2464,7 +2465,9 @@ def apply_ensemble_pass_defaults(args) -> None:
                     pass  # a malformed value is reported where the pass is built
             if not isinstance(qwen_params, dict):
                 qwen_params = {}
-            generator = qwen_params.get("generator_backend", "qwen3")
+            # Both key forms, as the pass worker takes them (pass_worker.py: qwen_generator_backend); with only
+            # one read, {"qwen_generator_backend": "cohere"} got Qwen3-ASR's defaults (W509 item 7 review).
+            generator = qwen_params.get("generator_backend", qwen_params.get("qwen_generator_backend", "qwen3"))
             defaults = dict(ENSEMBLE_PASS_DEFAULTS.get((n, generator), {}))
             # A segmenter named inside the JSON (qwen_segmenter) is the user's
             # choice too; filling --passN-speech-segmenter would override it
