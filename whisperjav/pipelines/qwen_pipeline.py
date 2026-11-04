@@ -140,16 +140,22 @@ class QwenPipeline(BasePipeline):
         # from the value ("crispasr" / "qwen3"); "none" loads no aligner.
         aligner_id: str = "wav2vec2-ja",
         aligner_backend: Optional[str] = None,
-        # 1.10.0 (item 12, C3): Whisper small through CrispASR, step 8 of the orchestrator; "none" = off.
+        # Whisper small through CrispASR, step 8 of the orchestrator (1.10.0, item 12, C3); "none" = off.
+        # The run's value always comes from the caller: main.py and ensemble/pass_worker.py pass it (since 1.10.1
+        # "none" for Qwen3-ASR and anime-whisper, owner W498 D1). This constructor default is read by no caller;
+        # it stays at 1.10.0's value, with which tests/test_cohere_generator.py builds the pipeline directly.
         timing_model: str = "whisper-small",
         context: str = "",
         context_file: Optional[str] = None,
         attn_implementation: str = "auto",
 
         # Timestamp resolution (bridges Phase 4 VAD and Phase 5 ASR)
-        # 1.10.0 (item 12, design note 2026-10-28 section 7, owner W254 Q6): aligner_vad_fallback is the
-        # default for every ChronosJAV model — the 230 MB CrispASR aligner times the text; a VAD group it
-        # cannot align keeps its VAD times. Matches the CLI default in main.py. vad_only loads no aligner.
+        # 1.10.0 (item 12, design note 2026-10-28 section 7, owner W254 Q6): aligner_vad_fallback — the 230 MB
+        # CrispASR aligner times the text; a VAD group it cannot align keeps its VAD times. The run's value always
+        # comes from the caller: main.py and ensemble/pass_worker.py pass it (since 1.10.1 vad_only for Qwen3-ASR
+        # and anime-whisper, owner W498 D1: no aligner, no timing model). This constructor default is read by no
+        # caller; it stays at 1.10.0's value, with which tests/test_cohere_generator.py builds the pipeline
+        # directly. vad_only loads no aligner.
         timestamp_mode: str = "aligner_vad_fallback",
 
         # Japanese post-processing — DISABLED for Qwen3 (C2 fix, ADR-006).
@@ -1382,6 +1388,7 @@ class QwenPipeline(BasePipeline):
             )
             analytics = compute_analytics(
                 raw_subs_dir, final_srt_path, title=media_basename,
+                timestamp_mode=getattr(self.timestamp_mode, "value", self.timestamp_mode),
             )
             print_summary(analytics, title=media_basename)
 
