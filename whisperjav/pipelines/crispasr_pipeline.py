@@ -428,7 +428,9 @@ class CrispASRPipeline(BasePipeline):
             self.asr = BindingEngine(self._model_path, self.model.backend, self._runtime.use_gpu,
                                      label=self.model.label, tokens_per_second=self.engine.tokens_per_second,
                                      max_new_tokens=settings.fixed_token_limit() if settings is not None else None,
-                                     ask=settings.prompt() if settings is not None else None)
+                                     ask=settings.prompt() if settings is not None else None,
+                                     decoding=(settings.decoding() if settings is not None
+                                               and hasattr(settings, "decoding") else None))
         if not self.asr.is_open:
             opened = time.time()
             try:
