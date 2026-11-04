@@ -138,8 +138,12 @@ CRISPASR_DEFAULT_SENSITIVITY = {
 # (main.py apply_ensemble_pass_defaults); no pipeline default changes. The GUI
 # Ensemble tab applies the same values when the pipeline is picked (assets/app.js
 # applyPipelinePresets and the EnsembleManager start-up state). Keep them in step.
+# 1.10.1 (owner W509, the W505 note section 4 item 7: "TEN VAD for both"): pass 2 Qwen3-ASR runs TEN VAD at
+# balanced on the command line too, as the GUI Ensemble tab has started it since v1.9.0 (before: WhisperSeg,
+# pass_worker.py DEFAULT_QWEN_PARAMS). Keyed by generator, so the dormant Cohere-in-ChronosJAV pass is not reached.
 ENSEMBLE_PASS_DEFAULTS = {
     ("1", "qwen3"): {"speech_segmenter": "firered-vad", "sensitivity": "aggressive"},
+    ("2", "qwen3"): {"speech_segmenter": "ten", "sensitivity": "balanced"},
     ("2", "anime-whisper"): {"speech_segmenter": "ten", "sensitivity": "aggressive"},
 }
 # Every other pass keeps the sensitivity it had before v1.9.5.
