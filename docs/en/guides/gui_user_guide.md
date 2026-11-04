@@ -222,11 +222,11 @@ For a ChronosJAV pass (Qwen3-ASR, Anime-Whisper), the **Alignment** tab sets the
 |---|---|---|
 | **Aligner Backend** | CrispASR (GGUF, recommended), Qwen3 ForcedAligner (PyTorch), None (no aligner) | CrispASR |
 | **Aligner Model** | the models of the chosen backend: `wav2vec2-ja` (recommended), `parakeet-ctc-ja` (not recommended), `qwen3-fa-gguf`; or Qwen3-ForcedAligner-0.6B (PyTorch) | `wav2vec2-ja` |
-| **Timestamp Mode** | Aligner + VAD Fallback (recommended), Aligner + Interpolation, Aligner Only (no recovery on collapse), VAD Only (no aligner loaded) | Aligner + VAD Fallback |
-| **Timing Model (Whisper)** | Whisper small (recommended), None (no timing model) | Whisper small |
+| **Timestamp Mode** | Aligner + VAD Fallback, Aligner + Interpolation, Aligner Only (no recovery on collapse), VAD Only (no aligner loaded) | VAD Only |
+| **Timing Model (Whisper)** | Whisper small, None (no timing model) | None |
 | **Adaptive Step-Down** | a tick box | not ticked |
 
-With Aligner Backend **None**, the run uses VAD Only with Step-Down off, whatever those two controls show. A status panel under a ChronosJAV pass row shows the aligner and the timing model (downloaded or not) and where CrispASR runs them. Since 1.10.0 the Alignment tab's values, and a preset saved from it, reach the run; from 1.8.10.post3 to 1.9.5 they were ignored.
+Since 1.10.1 the default is VAD Only with no timing model, ChronosJAV's timing of 1.9.5: no aligner is loaded, and the Aligner Backend, Aligner Model and Adaptive Step-Down controls are hidden until an aligner mode is chosen. With Aligner Backend **None**, the run uses VAD Only with Step-Down off, whatever Timestamp Mode and Adaptive Step-Down show. A status panel under a ChronosJAV pass row shows the CrispASR aligner and the timing model when the pass uses them (downloaded or not) and where CrispASR runs them. Since 1.10.0 the Alignment tab's values, and a preset saved from it, reach the run; from 1.8.10.post3 to 1.9.5 they were ignored.
 
 Use **Save Preset** to save your configuration for reuse, or **Load Preset** to restore a saved configuration. Presets persist across sessions.
 
@@ -295,7 +295,7 @@ When Pass 2 is enabled, choose how the two outputs are combined:
 
 ### Serial Mode
 
-Check **"Finish each file"** to complete each file fully (Pass 1 → Pass 2 → Merge) before starting the next. Useful when processing multiple files — you see results as they finish instead of waiting for the entire batch.
+**Finish each file** is ticked by default: each file is finished (Pass 1 → Pass 2 → Merge) before the next one starts, so a file's subtitles are ready as soon as it is done and a crash in one file does not lose the others. Untick it to run Pass 1 on all files, then Pass 2: each pass then starts once for all the files instead of once per file. With **Remember settings** on, the box keeps its state for the next start.
 
 ### Inline AI Translation (Ensemble)
 
