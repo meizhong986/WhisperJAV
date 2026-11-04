@@ -58,7 +58,7 @@ ChronosJAV uses different defaults than the standard Whisper pipelines:
 | **Timestamp Mode** | VAD only (since 1.10.1, as in 1.9.5; 1.10.0: Aligner + VAD fallback) | Full alignment |
 | **Cleaner** | Passthrough | Standard sanitizer |
 
-The speech segmenter a ChronosJAV pass starts with: in the **Ensemble Mode** tab, FireRedVAD for Qwen3-ASR as Pass 1, WhisperSeg for Anime-Whisper as Pass 1, and TEN VAD for either as Pass 2. On the command line: WhisperSeg for `--mode qwen`; in an Ensemble run the same as in the GUI, except that Qwen3-ASR as pass 2 gets WhisperSeg. The pass's **Speech Segmenter** menu, `--pass1-speech-segmenter` / `--pass2-speech-segmenter` or `--qwen-segmenter` changes it.
+The speech segmenter a ChronosJAV pass starts with: in the **Ensemble Mode** tab, FireRedVAD for Qwen3-ASR as Pass 1, WhisperSeg for Anime-Whisper as Pass 1, and TEN VAD for either as Pass 2. On the command line: WhisperSeg for `--mode qwen`; in an Ensemble run the same as in the GUI. The pass's **Speech Segmenter** menu, `--pass1-speech-segmenter` / `--pass2-speech-segmenter` or `--qwen-segmenter` changes it.
 
 ---
 
