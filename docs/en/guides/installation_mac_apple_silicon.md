@@ -102,7 +102,7 @@ The install's accelerator is recorded in `whisperjav_stack.txt` in the environme
 | **fidelity** | asks PyTorch for the Apple GPU (Metal); not yet tested on a Mac. If it fails, use the transformers pipeline. |
 | **Parakeet-CrispASR, Cohere-CrispASR** (GGUF) | ask for the Apple GPU (Metal); not yet tested on a Mac |
 | **balanced, fast, faster** | the CPU (not accelerated), several times slower: their engine (CTranslate2) cannot use the Apple GPU |
-| **ChronosJAV** (Qwen3-ASR, anime-whisper) | the CPU (not accelerated) in 1.10.0: its ASR model does not use the Apple GPU yet |
+| **ChronosJAV** (Qwen3-ASR, anime-whisper) | the CPU (not accelerated) in 1.10: its ASR model does not use the Apple GPU yet |
 | WhisperSeg speech segmenter | the CPU, in every install |
 
 When the Apple GPU can be used, nothing is shown at the start of a run; each pipeline says in the console where it runs as it starts (for example, balanced, fast and faster say they run on the CPU). If the Apple GPU cannot be used, a box at the start says where each part runs. The installer ends with:
