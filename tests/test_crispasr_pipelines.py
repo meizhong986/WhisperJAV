@@ -146,10 +146,11 @@ class Stage:
 
         class Engine:
             def __init__(self, model_path, backend, use_gpu, n_threads=None, label="", tokens_per_second=None,
-                         max_new_tokens=None, ask=None):
+                         max_new_tokens=None, ask=None, decoding=None):
                 self.model_path, self.backend, self.use_gpu = model_path, backend, use_gpu
                 self.tokens_per_second = tokens_per_second
                 self.max_new_tokens, self.ask = max_new_tokens, ask
+                self.decoding = decoding
                 self.n_threads = 8
                 self.opened = 0
                 self.closed = 0
@@ -747,7 +748,10 @@ class TestMoss:
         assert engine.ask == PROMPT_ZH + " 语言提示：Japanese 热词提示：監督, 村西"
         assert engine.max_new_tokens == 4000
         assert md["config"]["crispasr"]["model_settings"] == {
-            "prompt_language": "zh", "language_hint": "Japanese", "hotwords": "監督, 村西", "max_new_tokens": 4000}
+            "prompt_language": "zh", "language_hint": "Japanese", "hotwords": "監督, 村西", "max_new_tokens": 4000,
+            # the decoding preset (owner W492 M1, W502), handed to the engine
+            "do_sample": True, "temperature": 0.7, "top_k": 50, "seed": 42, "beam_size": 1}
+        assert engine.decoding == {"do_sample": True, "temperature": 0.7, "top_k": 50, "seed": 42, "beam_size": 1}
 
     def test_a_setting_it_cannot_use_is_refused(self, tmp_path):
         from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
