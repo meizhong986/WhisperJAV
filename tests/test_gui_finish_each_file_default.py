@@ -1,8 +1,10 @@
-"""1.10.1 (owner W493 1): the Ensemble option "Finish each file" is ticked by default in the GUI.
+"""1.10.1 (owner W493 1, W501): the Ensemble option "Finish each file" is on by default, in the GUI and on the command
+line.
 
-Three hops: the checkbox starts ticked (index.html), the page's state starts true (app.js, the value sent as
-``serial_mode`` when the run starts), and the API turns ``serial_mode`` into ``--ensemble-serial``. Unticked, nothing is
-sent. The command line's own default is not changed here (open for the owner). Light: no window, no model.
+Hops: the checkbox starts ticked (index.html), the page's state starts true (app.js, the value sent as ``serial_mode``
+when the run starts), the API turns ``serial_mode`` into ``--ensemble-serial`` and an unticked box into
+``--no-ensemble-serial`` (the command line's default is on since W501), and "Remember settings" keeps the box (W501).
+Light: no window, no model.
 """
 import re
 from pathlib import Path
@@ -36,10 +38,50 @@ def test_label_and_tooltip_unchanged():
             'results incrementally."') in html
 
 
-@pytest.mark.parametrize("serial, expected", [(True, True), (False, False)])
-def test_api_sends_the_flag_only_when_ticked(serial, expected):
+@pytest.mark.parametrize("serial, sent, not_sent", [(True, "--ensemble-serial", "--no-ensemble-serial"),
+                                                    (False, "--no-ensemble-serial", "--ensemble-serial")])
+def test_api_sends_on_or_off(serial, sent, not_sent):
     config = {"inputs": [r"C:\media\a.mp4"], "pass1": {"pipeline": "balanced", "sensitivity": "balanced"},
               "pass2": {"enabled": False}, "merge_strategy": "pass1_primary", "serial_mode": serial}
     args = WhisperJAVAPI()._build_twopass_args(config)
-    assert ("--ensemble-serial" in args) is expected
+    assert sent in args and not_sent not in args
     assert "--ensemble" in args
+
+
+@pytest.mark.parametrize("argv, expected", [([], True), (["--ensemble-serial"], True),
+                                            (["--no-ensemble-serial"], False)])
+def test_the_command_line_default_is_on(monkeypatch, argv, expected):
+    from whisperjav import main as wj_main
+
+    monkeypatch.setattr("sys.argv", ["whisperjav", "a.mp4", "--ensemble", *argv])
+    assert wj_main.parse_arguments().ensemble_serial is expected
+
+
+def test_the_command_line_help_names_both():
+    import subprocess
+    import sys
+
+    done = subprocess.run([sys.executable, "-m", "whisperjav.main", "--help"], capture_output=True, text=True,
+                          encoding="utf-8", errors="replace", timeout=300)
+    assert done.returncode == 0
+    out = " ".join(done.stdout.split())
+    assert "--ensemble-serial, --no-ensemble-serial" in out
+    assert "before the next one starts (default: on)" in out
+
+
+def test_remember_settings_keeps_the_box():
+    """W501: the box is a remembered field (page side), mapped in the API, with a default that matches the page."""
+    from whisperjav.settings.gui_settings import DEFAULT_GUI_SETTINGS
+
+    js = (ASSETS / "app.js").read_text(encoding="utf-8")
+    assert "'ensemble-serial':  { key: 'ensembleSerial',      prop: 'checked' }," in js
+    assert WhisperJAVAPI._GUI_SETTINGS_MAP["ensemble_serial"] == "ensembleSerial"
+    assert DEFAULT_GUI_SETTINGS["ensemble_serial"] is True
+
+
+def test_a_saved_unticked_box_comes_back_unticked(tmp_path, monkeypatch):
+    from whisperjav.settings import gui_settings
+
+    monkeypatch.setattr(gui_settings, "get_gui_settings_path", lambda: tmp_path / "gui_settings.json")
+    assert gui_settings.save_gui_settings({"ensemble_serial": False, "remember_settings": True})
+    assert gui_settings.load_gui_settings()["ensemble_serial"] is False
