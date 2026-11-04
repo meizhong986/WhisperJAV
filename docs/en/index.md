@@ -71,7 +71,7 @@ That's it. For more control, see the [GUI User Guide](guides/gui_user_guide.md).
 | Feature | Description |
 |---------|-------------|
 | **Multiple pipelines** | Balanced, Fast, Faster, Fidelity, Transformers — trade speed for accuracy |
-| **GGUF pipelines** | Parakeet-CrispASR and Cohere-CrispASR, through CrispASR, in Ensemble mode (Japanese, experimental in 1.10.0) |
+| **GGUF pipelines** | Seven pipelines run by CrispASR, in Ensemble mode, Japanese only, all experimental: Parakeet-CrispASR and Cohere-CrispASR (since 1.10.0); ReazonSpeech-CrispASR, Kotoba-CrispASR, Whisper-Turbo-CrispASR, Whisper-Large-CrispASR and MOSS-CrispASR (new in 1.10.1) |
 | **One accelerator per install** | NVIDIA GPU (CUDA), GPU through Vulkan (Windows), Apple GPU (Metal), your own PyTorch, or CPU only — chosen when you install ([Accelerated or not](getting-started/index.md#accelerated-or-not)) |
 | **Ensemble mode** | Run two passes with different backends, merge for best results |
 | **BYOP XXL** | Bring Your Own Pipeline — use Faster Whisper XXL as Pass 1, Pass 2 or both in ensemble mode |
