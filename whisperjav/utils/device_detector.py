@@ -285,7 +285,7 @@ APPLE_SILICON_FIDELITY_TEXT = (  # T52
     "Fidelity asks PyTorch for the Apple GPU (Metal, through MPS); this has not been tested on a Mac. If it "
     "fails, use the transformers pipeline.")
 APPLE_SILICON_CHRONOSJAV_TEXT = (  # T51
-    "ChronosJAV does not use the Apple GPU (Metal) in 1.10.0: its ASR model runs on the CPU (not "
+    "ChronosJAV does not use the Apple GPU (Metal) in 1.10: its ASR model runs on the CPU (not "
     "accelerated), several times slower than on a GPU.")
 
 # T67 (design 22.10), only on an Own PyTorch install.
