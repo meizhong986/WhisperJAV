@@ -26,8 +26,9 @@ per-model table (ENGINE); everything else is here (route B design, sections 3-4)
   7. scene SRTs, stitched; post-processing by the row's clean-up (whisperjav/crispasr/cleanup.py, 1.10.1; owner
      W421 i1, W422): a raw copy, fidelity's duplicate merge, hallucination filter and repetition cleaner, then the
      three filters (nonverbal, nonlinguistic, scene overlap; W129 6), and fidelity's artifacts file; MOSS-CrispASR
-     the three filters only (W421 i3). Cohere-CrispASR's text is cleaned before the aligner (ChronosJAV's text
-     cleaner); <name>.ja.whisperjav.srt.
+     the duplicate merge, the three filters and its interjection rules (W505 2 b-d; before it the three filters
+     only, W421 i3). Cohere-CrispASR's text is cleaned before the aligner (ChronosJAV's text cleaner);
+     <name>.ja.whisperjav.srt.
 
 Times: Parakeet's token times (W93 c5, W116); Cohere's from the aligner's character times, or the VAD group
 edges where there are none (design note docs/plans/design/2026-10-28-chronosjav-timing-c3-c1.md, section 6).
@@ -48,7 +49,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from whisperjav.crispasr import cleanup as crispasr_cleanup
 from whisperjav.crispasr import install, lines, manifest
 from whisperjav.crispasr.aligner import CrispAligner
-from whisperjav.crispasr.engine import SAMPLE_RATE, BindingEngine, CrispSegment, CrispToken
+from whisperjav.crispasr.engine import MIN_NEW_TOKENS, SAMPLE_RATE, BindingEngine, CrispSegment, CrispToken
 from whisperjav.crispasr.errors import CrispASRRunError, CrispASRSetupError
 from whisperjav.crispasr.manifest import JAPANESE_NAMES, ModelFile, model_for
 from whisperjav.modules.model_audio import MIN_MODEL_AUDIO_S
@@ -75,10 +76,12 @@ class EngineRow:
     # False: the "tokens" rule cuts at sentence-end marks only, not at pauses (Kotoba, Whisper-Turbo, Whisper-Large
     # keep W401's cutting with their own times, W412). Parakeet-CrispASR cuts at pauses too (W203, W204).
     cut_at_pauses: bool = True
-    # A limit on the tokens one call may write, per second of the VAD group's audio (engine.BindingEngine), or
-    # None for the model's own limit. MOSS-CrispASR only (owner W406 i1): without it the model can repeat a line
-    # to its own limit on non-speech.
+    # A limit on the tokens one call may write, per second of the VAD group's audio counting at most the piece
+    # CrispASR decodes at a time (30 s; engine.BindingEngine.token_limit), and the fewest it may write; None for the
+    # model's own limit. MOSS-CrispASR only (owner W406 i1; W505 2 a: 20 a second, at least 128): without it the
+    # model can repeat a line to its own limit on non-speech.
     tokens_per_second: Optional[float] = None
+    token_floor: int = MIN_NEW_TOKENS
     # Post-processing (1.10.1; owner W421 i1, W422; whisperjav/crispasr/cleanup.py): the stages on the stitched
     # subtitles, and the stages on each VAD group's text before the aligner (run only while the aligner is on).
     cleanup: Tuple[str, ...] = crispasr_cleanup.SRT_STAGES
@@ -427,6 +430,7 @@ class CrispASRPipeline(BasePipeline):
             settings = self.model_settings
             self.asr = BindingEngine(self._model_path, self.model.backend, self._runtime.use_gpu,
                                      label=self.model.label, tokens_per_second=self.engine.tokens_per_second,
+                                     token_floor=self.engine.token_floor,
                                      max_new_tokens=settings.fixed_token_limit() if settings is not None else None,
                                      ask=settings.prompt() if settings is not None else None,
                                      decoding=(settings.decoding() if settings is not None
@@ -877,8 +881,8 @@ class CrispASRPipeline(BasePipeline):
 
     def _postprocess(self, stitched: Path, count: int, basename: str = "") -> Tuple[Dict[str, Any], int]:
         """The row's post-processing, in place (whisperjav/crispasr/cleanup.py; owner W421 i1, W422): the raw copy
-        first, then the stages the row names, then the artifacts file. Before 1.10.1 (and MOSS-CrispASR still): the
-        three filters nonverbal, nonlinguistic, scene overlap (W129 6)."""
+        first, then the stages the row names, then the artifacts file. Before 1.10.1: the three filters nonverbal,
+        nonlinguistic, scene overlap (W129 6)."""
         stem = crispasr_cleanup.file_stem(basename or stitched.stem.replace("_stitched", ""), self.PIPELINE_NAME,
                                           self.pass_tag)
         raw_dir = Path(self.raw_subs_dir) if self.raw_subs_dir else self.output_dir / crispasr_cleanup.RAW_SUBS
