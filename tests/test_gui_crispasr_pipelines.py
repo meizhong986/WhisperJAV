@@ -346,12 +346,17 @@ def test_the_default_segmenters_in_app_js_are_the_command_lines():
 
 @pytest.mark.parametrize("select_id", ["pass1-pipeline", "pass2-pipeline"])
 def test_the_gguf_pipelines_carry_the_cjk_note(select_id):
-    note = ("Experimental in 1.10.0 (early release). "   # owner W212 D4 1
-            "The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user "
+    tail = ("The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user "
             "folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a "
             "plain-named folder (the original stays where it is).")
+    note = "Experimental (early release). " + tail                    # owner W212 D4 1; versions W501 4
+    new_note = "New in 1.10.1, experimental (early release). " + tail  # the five pipelines new in 1.10.1
     group = re.search(r'<optgroup label="%s">(.*?)</optgroup>' % GROUP, _select(HTML, select_id), re.S).group(1)
-    assert group.count(f'title="{note}"') == len(CRISPASR_PIPELINES)
+    first_two = ("parakeet-crispasr", "cohere-crispasr")
+    for pipeline in CRISPASR_PIPELINES:
+        option = re.search(r'<option value="%s"[^>]*>' % pipeline, group).group(0)
+        assert f'title="{note if pipeline in first_two else new_note}"' in option, option
+    assert "Experimental in 1.10.0" not in HTML
     # and on the Pipeline dropdown itself while a GGUF pipeline is selected
     assert f"CRISPASR_CJK_NOTE: '{note}'" in JS
     assert "pipelineSelect.title = passState.isCrispasr ? this.CRISPASR_CJK_NOTE : '';" in JS
