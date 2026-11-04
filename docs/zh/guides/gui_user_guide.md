@@ -238,7 +238,7 @@ WhisperJAV 接受 FFmpeg 支持的任何格式的视频和音频文件（MP4、M
 | **计时模型（Whisper）**（Timing Model (Whisper)） | Whisper small、无（不用计时模型）（None (no timing model)） | 无（None） |
 | **自适应逐级缩小**（Adaptive Step-Down） | 勾选框 | 不勾选 |
 
-从 1.10.1 起，默认是 **仅 VAD**（VAD Only）且不用时间模型，即 1.9.5 的 ChronosJAV 时间方式：不加载对齐器，在选择对齐器模式之前，**对齐器后端**（Aligner Backend）、**对齐模型**（Aligner Model）和 **自适应逐级缩小**（Adaptive Step-Down）控件是隐藏的。**对齐器后端** 选 **无**（None）时，无论 **时间戳模式**（Timestamp Mode）和 **自适应逐级缩小** 显示什么，运行都使用仅 VAD 并关闭 Step-Down。ChronosJAV 处理管线一行下方的状态面板会在这一轮使用 CrispASR 对齐器和时间模型时显示它们（是否已下载）以及 CrispASR 在哪里运行它们。从 1.10.0 起，**对齐**（Alignment）标签页的值以及从中保存的预设会用于运行；从 1.8.10.post3 到 1.9.5，它们被忽略。
+从 1.10.1 起，默认是 **仅 VAD**（VAD Only）且不用计时模型，即 1.9.5 的 ChronosJAV 时间方式：不加载对齐器，在选择对齐器模式之前，**对齐器后端**（Aligner Backend）、**对齐模型**（Aligner Model）和 **自适应逐级缩小**（Adaptive Step-Down）控件是隐藏的。**对齐器后端** 选 **无**（None）时，无论 **时间戳模式**（Timestamp Mode）和 **自适应逐级缩小** 显示什么，运行都使用仅 VAD 并关闭 Step-Down。ChronosJAV 处理管线一行下方的状态面板会在这一轮使用 CrispASR 对齐器和计时模型时显示它们（是否已下载）以及 CrispASR 在哪里运行它们。从 1.10.0 起，**对齐**（Alignment）标签页的值以及从中保存的预设会用于运行；从 1.8.10.post3 到 1.9.5，它们被忽略。
 
 使用 **Save Preset** 保存配置以便重用，或使用 **Load Preset** 恢复已保存的配置。预设在会话间持久保存。
 
