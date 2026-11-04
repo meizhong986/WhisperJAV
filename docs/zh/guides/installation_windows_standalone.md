@@ -100,7 +100,7 @@
 | I have my own PyTorch for my GPU (advanced)（我有适合自己 GPU 的 PyTorch，进阶） | 自己的 PyTorch |
 | None, or use the CPU only（没有，或仅使用 CPU） | 仅 CPU（不加速） |
 
-窗口中的说明（意思）：使用 AMD、Intel 或较旧的 NVIDIA 显卡时，GGUF 处理管线（Parakeet-CrispASR 和 Cohere-CrispASR）请求通过 Vulkan 使用你的显卡。这在 1.10.0 中是实验性功能：尚未在 AMD 或 Intel 显卡上测试，我们希望听到它在你电脑上的表现。其他所有处理管线在 CPU 上运行（不加速），比在受支持的 NVIDIA GPU 上慢好几倍。选择自己的 PyTorch 时，WhisperJAV 安装除 PyTorch 以外的一切，之后由你添加自己的 PyTorch 版本（安装结束时会显示命令）。选择仅 CPU 时，所有处理管线都在 CPU 上运行。
+窗口中的说明（意思）：使用 AMD、Intel 或较旧的 NVIDIA 显卡时，GGUF 处理管线（由 CrispASR 运行）请求通过 Vulkan 使用你的显卡。这是实验性功能：尚未在 AMD 或 Intel 显卡上测试，我们希望听到它在你电脑上的表现。其他所有处理管线在 CPU 上运行（不加速），比在受支持的 NVIDIA GPU 上慢好几倍。选择自己的 PyTorch 时，WhisperJAV 安装除 PyTorch 以外的一切，之后由你添加自己的 PyTorch 版本（安装结束时会显示命令）。选择仅 CPU 时，所有处理管线都在 CPU 上运行。
 
 如果 20 秒内没有回答，会安装仅 CPU 版本。**Stop** 会结束安装程序，不安装任何内容。
 
@@ -165,7 +165,7 @@ Scripts\whisperjav.exe --check
 
 ```
 ✓ PyTorch: PyTorch 2.11.0+cu130: NVIDIA GPU (CUDA 13.0), NVIDIA GeForce RTX 3060
-✓ CrispASR: 0.8.44+cuda (CUDA build), GGUF pipelines: asks for the NVIDIA GPU (CUDA)
+✓ CrispASR: 0.8.50+cuda (CUDA build), GGUF pipelines: asks for the NVIDIA GPU (CUDA)
 ℹ Accelerator: Accelerator of this install: NVIDIA GPU (CUDA 13.0).
 ℹ CTranslate2: CTranslate2 (balanced, fast, faster): NVIDIA GPU (CUDA)
 ```
