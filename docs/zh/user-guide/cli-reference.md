@@ -46,11 +46,11 @@ whisperjav [OPTIONS] INPUT [INPUT...]
 | 选项 | 默认值 | 说明 |
 |------|--------|------|
 | `--qwen-aligner` | `wav2vec2-ja`（对齐器模式下） | 对齐器时间戳模式用来为 ASR 模型的文字标出时间的对齐器：`wav2vec2-ja`（232 MB）、`qwen3-fa-gguf`（529 MB）、`parakeet-ctc-ja`（不推荐：在我们的测试中它给出的时间是均匀分布的），均由 CrispASR 运行；或 PyTorch 模型 ID，例如 `Qwen/Qwen3-ForcedAligner-0.6B`。不给 `--qwen-timestamp-mode` 而只给它时，会开启 `aligner_vad_fallback` |
-| `--qwen-timestamp-mode` | `vad_only` | 从 1.10.1 起的默认值：不加载对齐器；每条字幕采用其 VAD 组的时间（若选用时间模型，它仍可能移动开始时间）。`aligner_vad_fallback`（1.10.0 的默认值）：对齐器为文字标出时间；它无法标出时间的 VAD 组保留语音分割器给出的时间 |
+| `--qwen-timestamp-mode` | `vad_only` | 从 1.10.1 起的默认值：不加载对齐器；每条字幕采用其 VAD 组的时间（若选用计时模型，它仍可能移动开始时间）。`aligner_vad_fallback`（1.10.0 的默认值）：对齐器为文字标出时间；它无法标出时间的 VAD 组保留语音分割器给出的时间 |
 | `--qwen-timing-model` | `none` | `whisper-small`（488 MB；不使用它写出的文字）在对齐器没有给出时间的地方，把字幕的开始时间往后移到语音开始处；在对齐器标出时间的 VAD 组里，在新句子开始处附近的标点或空格处切分。`none`（从 1.10.1 起的默认值）不使用它 |
 | `--qwen-stepdown` | 关闭 | 用最长 6 秒的 VAD 组重新处理对齐坍塌的场景。关闭时（默认），在 `aligner_vad_fallback` 下，这样的场景采用其 VAD 组的时间 |
 
-对齐器和时间模型是 1.10.0 新增的，从 1.10.1 起默认关闭；在运行第一次使用它们时下载，在本安装的 CrispASR 运行的地方运行；`--device cpu` 不能把它们限制在 CPU 上。见[字幕时间](../pipelines/chronosjav.md#subtitle-timing-1100)。在专家模式的每一轮中，把它们写在 `--pass1-qwen-params` 里，例如 `'{"timestamp_mode": "aligner_vad_fallback", "timing_model": "whisper-small"}'`。
+对齐器和计时模型是 1.10.0 新增的，从 1.10.1 起默认关闭；在运行第一次使用它们时下载，在本安装的 CrispASR 运行的地方运行；`--device cpu` 不能把它们限制在 CPU 上。见[字幕时间](../pipelines/chronosjav.md#subtitle-timing-1100)。在专家模式的每一轮中，把它们写在 `--pass1-qwen-params` 里，例如 `'{"timestamp_mode": "aligner_vad_fallback", "timing_model": "whisper-small"}'`。
 
 ### 处理选项
 
@@ -83,7 +83,7 @@ whisperjav video.mp4 --output-dir ./subtitles/
 # 这次在 CPU 上运行（不加速）
 whisperjav video.mp4 --mode faster --device cpu
 
-# 使用 1.10.0 时间方式（对齐器和时间模型）的 ChronosJAV
+# 使用 1.10.0 时间方式（对齐器和计时模型）的 ChronosJAV
 whisperjav video.mp4 --mode qwen --qwen-timestamp-mode aligner_vad_fallback --qwen-timing-model whisper-small
 
 # Parakeet-CrispASR 作为专家模式中的一轮
