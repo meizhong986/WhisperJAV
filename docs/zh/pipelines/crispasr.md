@@ -200,7 +200,7 @@ whisperjav --ensemble --pass1-pipeline parakeet-crispasr --dump-params settings.
 | `cohere-asr-ja` | `CKHO/cohere-asr-ja-GGUF` | `cohere-asr-ja-q8_0.gguf` |
 | 对齐器 `wav2vec2-ja`（Cohere-CrispASR；也是 ChronosJAV 对齐器模式默认使用的对齐器） | `cstr/wav2vec2-large-xlsr-53-japanese-GGUF` | `wav2vec2-large-xlsr-53-japanese-q4_k.gguf` |
 
-Cohere-CrispASR 的对齐器（232 MB）在这一轮第一次使用时下载，下载发生在这一轮内部，而不是运行开始之前。如果下载失败，这一轮会在没有对齐器的情况下继续：每个 VAD 组成为一条字幕，时间为该组的起止位置（见[字幕是怎样生成的](#how-the-subtitles-are-made)）。ChronosJAV 的其他对齐器和时间模型会在 `whisperjav --check` 中列出，也见 [ChronosJAV 页面](chronosjav.md#subtitle-timing-1100)。
+Cohere-CrispASR 的对齐器（232 MB）在这一轮第一次使用时下载，下载发生在这一轮内部，而不是运行开始之前。如果下载失败，这一轮会在没有对齐器的情况下继续：每个 VAD 组成为一条字幕，时间为该组的起止位置（见[字幕是怎样生成的](#how-the-subtitles-are-made)）。ChronosJAV 的其他对齐器和计时模型会在 `whisperjav --check` 中列出，也见 [ChronosJAV 页面](chronosjav.md#subtitle-timing-1100)。
 
 - 文件保存在你的 Hugging Face 缓存文件夹中（Windows 默认 `C:\Users\<你的用户名>\.cache\huggingface\`，macOS 和 Linux 默认 `~/.cache/huggingface/`），之后的运行会直接使用。
 - 首次使用前，WhisperJAV 会核对文件是否为它所需的版本。下载损坏的文件会被删除并重新下载一次。
