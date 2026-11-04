@@ -34,10 +34,10 @@ The processor must support AVX2 (Intel processors since 2013, AMD since 2015). W
 At the start of each pass, the log says where CrispASR is asked to run, for example:
 
 ```
-Parakeet-CrispASR asks CrispASR to use the NVIDIA GPU (CUDA) (CrispASR 0.8.44+cuda).
+Parakeet-CrispASR asks CrispASR to use the NVIDIA GPU (CUDA) (CrispASR 0.8.50+cuda).
 ```
 
-With the Vulkan build: "Parakeet-CrispASR asks CrispASR's Vulkan build to use this PC's GPU (CrispASR 0.8.44+vulkan). GPUs through Vulkan are experimental in 1.10.0 and have not been tested on AMD or Intel graphics cards." WhisperJAV cannot yet read which device CrispASR actually used; the line states what it asked for.
+With the Vulkan build: "Parakeet-CrispASR asks CrispASR's Vulkan build to use this PC's GPU (CrispASR 0.8.50+vulkan). GPUs through Vulkan are experimental and have not been tested on AMD or Intel graphics cards." WhisperJAV cannot yet read which device CrispASR actually used; the line states what it asked for.
 
 ---
 
@@ -196,7 +196,7 @@ If the aligner gives no times for a VAD group, that group stays one subtitle fro
 | `parakeet-tdt-0.6b-ja` | `cstr/parakeet-tdt-0.6b-ja-GGUF` | `parakeet-tdt-0.6b-ja-q8_0.gguf` |
 | `cohere-asr-ja-v0.1` | `TransWithAI/cohere-transcribe-ja-v0.1-GGUF` | `cohere-asr-ja-v0.1-q8_0.gguf` |
 | `cohere-asr-ja` | `CKHO/cohere-asr-ja-GGUF` | `cohere-asr-ja-q8_0.gguf` |
-| aligner `wav2vec2-ja` (Cohere-CrispASR, and ChronosJAV by default) | `cstr/wav2vec2-large-xlsr-53-japanese-GGUF` | `wav2vec2-large-xlsr-53-japanese-q4_k.gguf` |
+| aligner `wav2vec2-ja` (Cohere-CrispASR; and ChronosJAV's aligner modes when no other aligner is named) | `cstr/wav2vec2-large-xlsr-53-japanese-GGUF` | `wav2vec2-large-xlsr-53-japanese-q4_k.gguf` |
 
 Cohere-CrispASR's aligner (232 MB) is downloaded the first time the pass uses it, inside the pass, not before the run. If that download fails, the pass goes on without it: each VAD group becomes one subtitle at the group's edges (see [How the subtitles are made](#how-the-subtitles-are-made)). ChronosJAV's other aligners and its timing model are listed in `whisperjav --check` and on the [ChronosJAV page](chronosjav.md#subtitle-timing-1100).
 
@@ -215,7 +215,7 @@ Cohere-CrispASR's aligner (232 MB) is downloaded the first time the pass uses it
 `whisperjav --check` lists CrispASR and its models. On a PC with the NVIDIA GPU (CUDA) install where everything is ready:
 
 ```
-✓ CrispASR: 0.8.44+cuda (CUDA build), GGUF pipelines: asks for the NVIDIA GPU (CUDA)
+✓ CrispASR: 0.8.50+cuda (CUDA build), GGUF pipelines: asks for the NVIDIA GPU (CUDA)
 ✓ CrispASR model parakeet-tdt-0.6b-ja: Parakeet TDT 0.6B ja (q8_0), for parakeet-crispasr: downloaded
 ✓ CrispASR model cohere-asr-ja-v0.1: Cohere Transcribe ja v0.1 (q8_0), for cohere-crispasr: downloaded
 ✓ CrispASR model cohere-asr-ja: Cohere ASR ja (q8_0), for cohere-crispasr: downloaded
