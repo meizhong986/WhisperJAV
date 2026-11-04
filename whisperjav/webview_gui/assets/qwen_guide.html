@@ -634,13 +634,15 @@
     <span class="param-name">Safe Chunking</span>
     <span class="param-default">On</span>
     <div class="param-desc">
-      Enforces scene boundaries so no audio segment exceeds the ForcedAligner's 180-second (3-minute)
-      processing limit. When enabled, any scene longer than 180s is automatically re-split at silence
-      boundaries. Disabling this risks aligner failures on long scenes.
+      Gives the scene detector Min Duration and Max Duration (under Custom Scene Bounds; 12 s and
+      48 s unless you change them) as the shortest and longest scene to make. Off: the scene
+      detector uses its own lengths, and Min Duration and Max Duration are not used; for Semantic,
+      the default scene detector, these are 20 s and 420 s. Semantic can in rare cases make a scene
+      longer than the longest; the log then says so.
     </div>
     <div class="param-when">
-      <strong>When to change:</strong> Only disable if you've also disabled the ForcedAligner entirely
-      (Aligner Backend = None). Otherwise, always keep this on.
+      <strong>When to change:</strong> Turn it off if you want the scene detector's own, longer
+      scenes.
     </div>
   </div>
 
