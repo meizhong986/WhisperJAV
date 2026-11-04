@@ -203,7 +203,7 @@ OWN_PYTORCH_NEXT_STEP = (                                                       
 OWN_PYTORCH_NEXT_STEP_FILE = "OWN_PYTORCH_NEXT_STEP.txt"
 OWN_PYTORCH_NONE_TEXT = ("--accelerator own-pytorch needs your PyTorch and torchaudio already installed in "  # T42c
                          "this Python environment; none was found. Nothing was installed.")
-OWN_PYTORCH_OTHER_VERSION = ("This environment has PyTorch {version}. WhisperJAV 1.10.0 is built for "
+OWN_PYTORCH_OTHER_VERSION = ("This environment has PyTorch {version}. WhisperJAV 1.10 is built for "
                              "PyTorch 2.11; other versions have not been tested.")
 OWN_PYTORCH_DONE = ("Installed without PyTorch: WhisperJAV uses your PyTorch {version} ({where}). "
                     "whisperjav-upgrade will keep it.")
