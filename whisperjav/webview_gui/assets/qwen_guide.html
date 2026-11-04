@@ -869,30 +869,30 @@
 
   <div class="param">
     <span class="param-name">Aligner Backend</span>
-    <span class="param-default">Qwen3 ForcedAligner</span>
+    <span class="param-default">CrispASR (GGUF)</span>
     <div class="param-desc">
-      The ForcedAligner takes the generated text and the original audio, then produces precise
-      word-level timestamps. This is what makes subtitles appear at the right moment. Disabling it
-      (None) falls back to VAD-based timing, which is less precise. When set to None, the aligner
-      model is not loaded at all, saving ~2GB VRAM.
+      Which aligner times the text when the Timestamp Mode is one of the aligner modes: CrispASR
+      (GGUF models, run by CrispASR), Qwen3 ForcedAligner (PyTorch), or None. The aligner takes the
+      text of the ASR model and the audio of each VAD group and times the text inside the group.
+      With the default Timestamp Mode, VAD Only, no aligner is loaded and this setting is not used.
     </div>
     <div class="param-when">
-      <strong>When to change:</strong> Set to None if you have severe VRAM constraints (the aligner
-      loads a separate 0.6B model) or if alignment is consistently failing on your content.
-      Selecting None automatically switches timestamp mode to VAD Only.
+      <strong>When to change:</strong> Only together with an aligner Timestamp Mode. With None, the run
+      uses VAD Only with Step-Down off, whatever the Timestamp Mode shows.
     </div>
   </div>
 
   <div class="param">
     <span class="param-name">Aligner Model</span>
-    <span class="param-default">Qwen3-ForcedAligner-0.6B</span>
+    <span class="param-default">wav2vec2-ja</span>
     <div class="param-desc">
-      The model used for forced alignment. Currently only the 0.6B variant is available.
-      It has a hard processing limit of 180 seconds per segment (enforced by Safe Chunking
-      in the Audio tab).
+      The aligner model. With CrispASR: wav2vec2-ja (232 MB, downloaded on first use), qwen3-fa-gguf,
+      or parakeet-ctc-ja (its times came back evenly spread in WhisperJAV's tests; not recommended).
+      With PyTorch: Qwen3-ForcedAligner-0.6B, which takes at most 180 seconds of audio at a time
+      (enforced by Safe Chunking in the Audio tab).
     </div>
     <div class="param-when">
-      <strong>When to change:</strong> No alternative currently available. Leave as-is.
+      <strong>When to change:</strong> Only together with an aligner Timestamp Mode.
     </div>
   </div>
 
@@ -916,28 +916,50 @@
 
   <div class="param">
     <span class="param-name">Timestamp Mode</span>
-    <span class="param-default">Aligner + VAD Fallback</span>
+    <span class="param-default">VAD Only</span>
     <div class="param-desc">
-      How word timestamps are resolved from the aligner's output. The four modes offer different
-      tradeoffs between precision and coverage:
+      Where the subtitle times come from. Since 1.10.1 the default is VAD Only, ChronosJAV's timing
+      of 1.9.5; in 1.10.0 it was Aligner + VAD Fallback.
     </div>
     <div class="param-desc" style="margin-top: 8px; padding-left: 12px;">
-      <strong>Aligner + VAD Fallback</strong> (recommended) &mdash; Uses aligner timestamps when available;
+      <strong>VAD Only</strong> (default) &mdash; No aligner is loaded. Each subtitle takes the start and
+      end of its VAD group, with Subtitle Regrouping Off, the default (the Timing Model, if chosen, can still move
+      the start).<br>
+      <strong>Aligner + VAD Fallback</strong> &mdash; Uses aligner timestamps when available;
       for words the aligner couldn't place, falls back to VAD segment boundaries with speech-aware
-      gap filling. Best overall accuracy and coverage.<br>
+      gap filling.<br>
       <strong>Aligner + Interpolation</strong> &mdash; Uses aligner timestamps, fills gaps by
       interpolating evenly between placed words. Better for sparse aligner output where VAD regions
       aren't available.<br>
       <strong>Aligner Only</strong> &mdash; Uses raw aligner timestamps with no recovery. If the
       aligner collapses, subtitles may have timing issues. Useful for studying raw aligner quality.<br>
-      <strong>VAD Only</strong> &mdash; Skips the aligner entirely (not loaded, saves VRAM). All word
-      timestamps come from VAD frame boundaries. Fastest but least precise. Use when aligner is
-      disabled or VRAM is critical.
     </div>
     <div class="param-when">
-      <strong>When to change:</strong> Leave on Aligner + VAD Fallback for best results. Try
-      Aligner + Interpolation if you see subtitle lines with jagged timing. Use VAD Only if you've
-      disabled the aligner backend or need to minimize VRAM usage.
+      <strong>When to change:</strong> Choose an aligner mode to have the aligner time the text inside
+      each VAD group; the Aligner Backend and Aligner Model then apply. Try Aligner + Interpolation if
+      you see subtitle lines with jagged timing.
+    </div>
+  </div>
+
+  <p class="group-header">Timing Model</p>
+
+  <div class="param">
+    <span class="param-name">Timing Model (Whisper)</span>
+    <span class="param-default">None</span>
+    <div class="param-desc">
+      Whisper small (488 MB, run by CrispASR, downloaded on first use) finds where speech starts and
+      where a new sentence starts inside each VAD group; its text is not used. Where no aligner gave a
+      time, it moves the subtitle's start to where speech starts. Only where an aligner timed the group
+      can it split the group into two subtitles, at a punctuation mark or space near where a new
+      sentence starts. Off by default since 1.10.1; on by default in 1.10.0.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Together with an aligner mode, so that two sentences in one VAD
+      group can become two subtitles. It runs where this install's CrispASR runs; --device cpu does not
+      hold it on the CPU.
+    </div>
+    <div class="param-cli">
+      <strong>CLI:</strong> <code>--qwen-timing-model whisper-small</code>
     </div>
   </div>
 
@@ -945,16 +967,16 @@
 
   <div class="param">
     <span class="param-name">Adaptive Step-Down</span>
-    <span class="param-default">On</span>
+    <span class="param-default">Off</span>
     <div class="param-desc">
-      When alignment fails for a scene (all word timestamps collapse to a single point), step-down
-      automatically retries the scene with tighter framing &mdash; breaking the audio into smaller
-      segments and re-running generation + alignment. This recovers most collapsed scenes without
-      user intervention. Hidden when timestamp mode is VAD Only (not applicable).
+      When the aligner piles a scene's words together (the collapse check), step-down retries the
+      scene with VAD groups up to the Tier 2 duration (6 s by default). Off by default since 1.10.0:
+      with Aligner + VAD Fallback a collapsed scene then takes its VAD groups' times. Hidden when
+      Timestamp Mode is VAD Only.
     </div>
     <div class="param-when">
-      <strong>When to change:</strong> Disable only for debugging, or if step-down retries are making
-      processing unacceptably slow on very long videos.
+      <strong>When to change:</strong> Turn it on to retry collapsed scenes in an aligner mode; each
+      retry runs the ASR model and the aligner on that scene again.
     </div>
   </div>
 
