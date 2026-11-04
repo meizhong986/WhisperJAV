@@ -84,7 +84,7 @@ def test_every_locked_file_holds_one_crispasr_line_per_platform():
                  if l.startswith("crispasr")]
         assert len(lines) == len(expected[extra]), (extra, lines)
     vulkan = (locked / "requirements_vulkan.txt").read_text(encoding="utf-8")
-    assert "crispasr-0.8.44%2Bvulkan-py3-none-win_amd64.whl" in vulkan and "+cpu" not in vulkan.split("torch==")[0]
+    assert "crispasr-0.8.50%2Bvulkan-py3-none-win_amd64.whl" in vulkan and "+cpu" not in vulkan.split("torch==")[0]
 
 
 # --- the supported-computers check -------------------------------------------------
