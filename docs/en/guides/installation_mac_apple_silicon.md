@@ -145,7 +145,7 @@ A 1.9.x environment cannot be updated to 1.10: 1.10 needs Python 3.13. Make a ne
 
 ## 7. Troubleshooting
 
-**"WhisperJAV 1.10.0 does not support Intel Macs" / "does not support macOS …".** The Mac is outside the supported list; nothing was installed.
+**"WhisperJAV 1.10 does not support Intel Macs" / "does not support macOS …".** The Mac is outside the supported list; nothing was installed.
 
 **"Python 3.x is not supported".** Activate the Python 3.13 environment (section 3) and run the script again.
 
