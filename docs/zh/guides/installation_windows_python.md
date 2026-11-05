@@ -1,4 +1,4 @@
-# WhisperJAV 1.10.0 — 在 Windows 上从源码安装（Python）
+# WhisperJAV 1.10.1 — 在 Windows 上从源码安装（Python）
 
 本指南把 WhisperJAV 从源码安装到你自己管理的 Python 环境中。如果只想开箱即用，请改用 [Windows 安装程序](installation_windows_standalone.md)。
 
@@ -47,7 +47,7 @@ nvidia-smi
 ## 2. 获取源码 {#2-get-the-source-code}
 
 ```cmd
-git clone --branch v1.10.0 https://github.com/meizhong986/WhisperJAV.git
+git clone --branch v1.10.1 https://github.com/meizhong986/WhisperJAV.git
 cd WhisperJAV
 ```
 
