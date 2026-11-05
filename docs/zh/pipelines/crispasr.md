@@ -62,19 +62,19 @@ Parakeet-CrispASR 使用 Fidelity 处理管线的语音分割器设置，另加 
 
 ## 1.10.1 新增的五个处理管线
 
-| GUI（在 **GGUF via crispasr** 分组下） | 命令行 | 模型（第一个为默认） | 说明 |
+| GUI（在 **实验性，欢迎反馈** 分组下） | 命令行 | 模型（第一个为默认） | 说明 |
 |---|---|---|---|
 | **reazonspeech** | `reazonspeech-crispasr` | `reazonspeech-nemo-v2-f16`（1,240 MB）、`reazonspeech-nemo-v2-q8_0`（667 MB） | ReazonSpeech 的日语模型 reazonspeech-nemo-v2 |
 | **kotoba** | `kotoba-crispasr` | `kotoba-whisper-v2.0-f16`（1,520 MB）、`kotoba-whisper-v2.0-q5_0`（538 MB） | Kotoba-Whisper v2.0，为日语缩小（"蒸馏"）的 Whisper 模型 |
 | **whisper-turbo** | `whisper-turbo-crispasr` | `whisper-large-v3-turbo-f16`（1,625 MB）、`whisper-large-v3-turbo-q8_0`（874 MB） | OpenAI Whisper large-v3-turbo |
 | **whisper-large** | `whisper-large-crispasr` | `whisper-large-v2-f16`（3,095 MB）、`whisper-large-v2-q8_0`（1,656 MB）、`whisper-large-v3-f16`（3,095 MB）、`whisper-large-v3-q5_0`（1,081 MB） | OpenAI Whisper large-v2 或 large-v3 |
-| **moss** | `moss-crispasr` | `moss-transcribe-diarize-0.9b-f16`（1,823 MB）、`moss-transcribe-diarize-0.9b-q8_0`（1,410 MB） | OpenMOSS 的 MOSS-Transcribe-Diarize 0.9B；WhisperJAV 不使用其说话人标签 |
+| **MOSS** | `moss-crispasr` | `moss-transcribe-diarize-0.9b-f16`（1,823 MB）、`moss-transcribe-diarize-0.9b-q8_0`（1,410 MB） | OpenMOSS 的 MOSS-Transcribe-Diarize 0.9B；WhisperJAV 不使用其说话人标签 |
 
 与上面两个处理管线的不同之处：
 
 - **reazonspeech** 使用 Parakeet-CrispASR 的语音分割器设置（TEN VAD、高灵敏、VAD 组最长 6 秒）。字幕时间来自模型，模型只给每个词一个开始时间：只在句末之后开始新的一条字幕，每条在下一条开始处结束，最后一条在其 VAD 组结束处结束。
 - **kotoba**、**whisper-turbo** 和 **whisper-large** 使用 Cohere-CrispASR 的语音分割器设置（FireRedVAD、中灵敏、VAD 组最长 3 秒）。字幕时间来自模型；只在句末之后开始新的一条字幕。
-- **moss** 处理较长的片段：Semantic 场景 90 到 240 秒；FireRedVAD（中灵敏）的 VAD 组在超过 5 秒的静音处结束，最长 240 秒。MOSS 写出的每一段为一条字幕，使用 MOSS 自己的时间。它的 **自定义参数**（Customize Parameters）窗口另有 **MOSS** 选项卡，清理步骤也不同（见[字幕是怎样生成的](#how-the-subtitles-are-made)）。
+- **MOSS** 处理较长的片段：Semantic 场景 90 到 240 秒；FireRedVAD（中灵敏）的 VAD 组在超过 5 秒的静音处结束，最长 240 秒。MOSS 写出的每一段为一条字幕，使用 MOSS 自己的时间。它的 **自定义参数**（Customize Parameters）窗口另有 **MOSS** 选项卡，清理步骤也不同（见[字幕是怎样生成的](#how-the-subtitles-are-made)）。
 
 ---
 
@@ -83,7 +83,7 @@ Parakeet-CrispASR 使用 Fidelity 处理管线的语音分割器设置，另加 
 ### GUI
 
 1. 打开 **专家模式**（Ensemble Mode）选项卡。打开时 **第一轮**（Pass 1）为 **cohere**（Balanced，FireRedVAD），**第二轮**（Pass 2）为 **parakeet**（Aggressive，TEN VAD）；第二轮在勾选之前不运行。如果开启了 **记住设置**（Remember settings），选项卡打开时显示的是你保存的设置。
-2. 要为某一轮换处理管线，打开它的 **处理管线**（Pipeline）菜单：七个 GGUF 处理管线都在 **GGUF via crispasr** 分组下（parakeet、cohere、reazonspeech、kotoba、whisper-turbo、whisper-large、moss）。选择其中之一时，会同时设好它自己的灵敏度、语音分割器和场景检测器（见上面的表）。
+2. 要为某一轮换处理管线，打开它的 **处理管线**（Pipeline）菜单：parakeet 和 cohere 在 **GGUF via crispasr** 分组下；分隔线下方，1.10.1 新增的五个在 **实验性，欢迎反馈** 分组下（reazonspeech、kotoba、whisper-turbo、whisper-large、MOSS）。选择其中之一时，会同时设好它自己的灵敏度、语音分割器和场景检测器（见上面的表）。
 3. 在 **模型**（Model）列选择模型。每一项都写明文件的数值格式和所需显存，例如 "Parakeet TDT 0.6B ja (q8_0), ~0.9 GB VRAM"；处理管线的默认模型排在第一个。
 4. 如需第二轮，勾选 **第二轮**（Pass 2），确认其处理管线，并在 **Merge** 中选择两者的合并方式。
 5. 点击 **Start**。
@@ -91,7 +91,7 @@ Parakeet-CrispASR 使用 Fidelity 处理管线的语音分割器设置，另加 
 当某一轮使用这两个处理管线之一时：
 
 - **Sensitivity**、**Speech Segmenter**、**Model**、**Scene Detector**、**Speech Enhancer** 和 **Enhance for VAD only** 都可以设置，与其他 Pass 相同。语音分割器选 **无**（None）时不做语音检测：每个场景整段交给模型，因此静音和音乐也会交给模型。
-- **自定义参数**（Customize Parameters）打开四个选项卡：**分割器**（Segmenter）、**增强器**（Enhancer）、**场景**（Scene）和 **计时**（Timing；只有一个菜单 **词级时间戳来源**（Word timestamps）：**来自模型**（From the model）或 **来自对齐器（wav2vec2-ja）**，处理管线的默认项标有（默认））；moss 另有 **MOSS** 选项卡。初始值就是这一轮实际使用的值。
+- **自定义参数**（Customize Parameters）打开四个选项卡：**分割器**（Segmenter）、**增强器**（Enhancer）、**场景**（Scene）和 **计时**（Timing；只有一个菜单 **词级时间戳来源**（Word timestamps）：**来自模型**（From the model）或 **来自对齐器（wav2vec2-ja）**，处理管线的默认项标有（默认））；MOSS 另有 **MOSS** 选项卡。初始值就是这一轮实际使用的值。
 - 这一轮一行下方会显示一个状态面板，说明模型和 CrispASR 将在哪里运行，例如：
 
   ```
