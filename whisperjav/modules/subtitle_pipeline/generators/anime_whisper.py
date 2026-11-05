@@ -30,7 +30,7 @@ from typing import Any, Optional, Union
 import numpy as np
 
 from whisperjav.modules.subtitle_pipeline.types import TranscriptionResult
-from whisperjav.utils.logger import logger
+from whisperjav.utils.logger import hide_weight_loading_bar, logger
 
 
 class AnimeWhisperGenerator:
@@ -149,6 +149,7 @@ class AnimeWhisperGenerator:
         import torch
         from transformers import WhisperProcessor, WhisperForConditionalGeneration
 
+        hide_weight_loading_bar()   # owner W509, console item 3: the "Loading weights" bar only with --debug
         cfg = self._config
         device = self._detect_device(cfg["device"])
         dtype = self._detect_dtype(device, cfg["dtype"])
