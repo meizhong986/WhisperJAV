@@ -6,7 +6,9 @@ What is pinned here:
     CrispASR key in the shipped asr_config.json (W118: "Delete the old ... panel text fields ... from the GUI completely");
   - Parakeet-CrispASR and Cohere-CrispASR are offered in the Ensemble tab only, in the Pass 1 and Pass 2 menus, under
     the group "GGUF via crispasr", named "parakeet" and "cohere" (W343; "GGUF" W195 I2 until then); since 1.10.1 the
-    five new pipelines with them (W397, W401), named the same way;
+    five new pipelines (W397, W401) below a divider line, in their own group "Experimental, open to feedback", MOSS's
+    name in capitals (owner W520 CLA2 S1-S2, W521); the greyed-out "Cohere-Transcribe (not available yet)" entry is
+    gone (W520 S3);
   - the Ensemble tab opens on cohere / balanced / FireRedVAD in pass 1 and parakeet / aggressive / TEN VAD in pass 2,
     and picking either pipeline sets its own sensitivity and segmenter, as the command line does (W343, W344);
   - the model menus in app.js are the manifest's offered models, the default first, each named by the manifest's
@@ -39,8 +41,10 @@ JS = (ASSETS / "app.js").read_text(encoding="utf-8")
 LABELS = {"parakeet-crispasr": "parakeet", "cohere-crispasr": "cohere",   # W343
           "reazonspeech-crispasr": "reazonspeech", "kotoba-crispasr": "kotoba",  # W401
           "whisper-turbo-crispasr": "whisper-turbo", "whisper-large-crispasr": "whisper-large",
-          "moss-crispasr": "moss"}
+          "moss-crispasr": "MOSS"}                                             # W520 S2
 GROUP = "GGUF via crispasr"                                                # W343
+NEW_GROUP = "Experimental, open to feedback"                               # W520 CLA2 S1, W521
+FIRST_TWO = ("parakeet-crispasr", "cohere-crispasr")                        # 1.10.0's; the other five new in 1.10.1
 
 
 @pytest.fixture
@@ -103,10 +107,14 @@ def test_the_transcription_mode_tab_offers_no_crispasr():
 
 @pytest.mark.parametrize("select_id", ["pass1-pipeline", "pass2-pipeline"])
 def test_both_passes_offer_both_pipelines_under_gguf(select_id):
-    group = re.search(r'<optgroup label="%s">(.*?)</optgroup>' % GROUP, _select(HTML, select_id), re.S)
-    assert group, f"{select_id} has no {GROUP} group"
-    options = re.findall(r'<option value="([^"]+)"[^>]*>([^<]+)</option>', group.group(1))
-    assert options == [(p, LABELS[p]) for p in CRISPASR_PIPELINES]
+    menu = _select(HTML, select_id)
+    groups = re.search(r'<optgroup label="%s">(.*?)</optgroup>\s*(?:<!--.*?-->\s*)?<hr>\s*'
+                       r'<optgroup label="%s">(.*?)</optgroup>' % (GROUP, NEW_GROUP), menu, re.S)
+    assert groups, f"{select_id} has no {GROUP} group, divider line and {NEW_GROUP} group in a row"
+    options = [re.findall(r'<option value="([^"]+)"[^>]*>([^<]+)</option>', g) for g in groups.groups()]
+    assert options[0] == [(p, LABELS[p]) for p in CRISPASR_PIPELINES if p in FIRST_TWO]
+    assert options[1] == [(p, LABELS[p]) for p in CRISPASR_PIPELINES if p not in FIRST_TWO]
+    assert "Cohere-Transcribe (not available yet)" not in menu and 'value="cohere"' not in menu   # W520 S3
 
 
 @pytest.mark.parametrize("pass_key, pipeline, sensitivity, segmenter",
@@ -351,11 +359,12 @@ def test_the_gguf_pipelines_carry_the_cjk_note(select_id):
             "plain-named folder (the original stays where it is).")
     note = "Experimental (early release). " + tail                    # owner W212 D4 1; versions W501 4
     new_note = "New in 1.10.1, experimental (early release). " + tail  # the five pipelines new in 1.10.1
-    group = re.search(r'<optgroup label="%s">(.*?)</optgroup>' % GROUP, _select(HTML, select_id), re.S).group(1)
-    first_two = ("parakeet-crispasr", "cohere-crispasr")
+    menu = _select(HTML, select_id)
     for pipeline in CRISPASR_PIPELINES:
-        option = re.search(r'<option value="%s"[^>]*>' % pipeline, group).group(0)
-        assert f'title="{note if pipeline in first_two else new_note}"' in option, option
+        group = GROUP if pipeline in FIRST_TWO else NEW_GROUP
+        options = re.search(r'<optgroup label="%s">(.*?)</optgroup>' % group, menu, re.S).group(1)
+        option = re.search(r'<option value="%s"[^>]*>' % pipeline, options).group(0)
+        assert f'title="{note if pipeline in FIRST_TWO else new_note}"' in option, option
     assert "Experimental in 1.10.0" not in HTML
     # and on the Pipeline dropdown itself while a GGUF pipeline is selected
     assert f"CRISPASR_CJK_NOTE: '{note}'" in JS
