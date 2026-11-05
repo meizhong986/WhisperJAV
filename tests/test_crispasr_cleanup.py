@@ -219,3 +219,20 @@ def test_without_the_hallucination_stage_its_lists_are_not_loaded(monkeypatch):
     assert moss.repetition_cleaner is not None and moss.constants["cross_subtitle"].DEDUP_THRESHOLD == 3
     other = cleanup.SrtCleanup(cleanup.SRT_STAGES)._get_sanitizer()
     assert other.hallucination_remover is not None and made == [1]
+
+
+def test_the_non_linguistic_count_line_stays_on_the_console_also_for_0(tmp_path, caplog):
+    """#372: this step rewrites the file in place and its filter's own line shows only when it drops something;
+    the clean-up's count line is INFO (console review F7, 2026-11-04)."""
+    import logging
+
+    lg = logging.getLogger("whisperjav")
+    caplog.set_level(logging.DEBUG, logger="whisperjav")
+    lg.addHandler(caplog.handler)
+    try:
+        run(tmp_path, [("こんにちは", 1.0, 2.0), ("ありがとう", 3.0, 4.0)], stages=(cleanup.NONLINGUISTIC,))
+    finally:
+        lg.removeHandler(caplog.handler)
+    lines = [(r.levelno, r.getMessage()) for r in caplog.records if "non-linguistic" in r.getMessage()]
+    assert (logging.INFO, "Post-processing: dropped 0 non-linguistic lines") in lines
+    assert (logging.DEBUG, "Post-processing: looking for non-linguistic lines") in lines
