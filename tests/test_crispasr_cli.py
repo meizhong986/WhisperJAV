@@ -117,7 +117,9 @@ class TestTheOldModeIsFound:
         assert message.startswith("--crispasr-exe is no longer available")
         assert "Ensemble Mode" in message
         assert "--ensemble --pass1-pipeline parakeet-crispasr" in message
-        assert "Parakeet-CrispASR" in message and "Cohere-CrispASR" in message
+        from whisperjav.crispasr.manifest import CRISPASR_PIPELINES      # all seven (1.10.1; owner W525 2B b)
+        assert all(p in message for p in CRISPASR_PIPELINES), message
+        assert "two pipelines" not in message
 
 
 # ===========================================================================
