@@ -1,0 +1,2227 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Japanese Adult Video Subtitle Generator with AI-powered transcription">
+      
+      
+        <meta name="author" content="MeiZhong">
+      
+      
+        <link rel="canonical" href="https://meizhong986.github.io/WhisperJAV/CHANGELOG_v1.10.0/">
+      
+      
+      
+      
+        
+          <link rel="alternate" href="./" hreflang="en">
+        
+          <link rel="alternate" href="../zh/CHANGELOG_v1.10.0/" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>WhisperJAV v1.10.0 — Development Change Log - WhisperJAV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#whisperjav-v1100-development-change-log" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="WhisperJAV Documentation" class="md-header__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WhisperJAV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              WhisperJAV v1.10.0 — Development Change Log
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Select language">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="../zh/CHANGELOG_v1.10.0/" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="WhisperJAV Documentation" class="md-nav__button md-logo" aria-label="WhisperJAV Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WhisperJAV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/meizhong986/whisperjav" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    meizhong986/whisperjav
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/installation_windows_standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Installer)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/installation_windows_python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/installation_mac_apple_silicon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS (Apple Silicon)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/installation_linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/gui_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/output-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Formats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../pipelines/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipelines/ensemble/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ensemble Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipelines/chronosjav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChronosJAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipelines/qwen3-asr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qwen3-ASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipelines/crispasr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GGUF (CrispASR)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upgrading
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../UPGRADE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WhisperJAV Upgrade Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../UPGRADE_TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../MANUAL_ROLLBACK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Rollback
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/CONFIG_SOURCES_HIERARCHY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-001-yaml-config-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-002-batched-transcription-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 Batched Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/ADR-003-qwen3-asr-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 Qwen3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/ADR-004-dedicated-qwen-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Dedicated Qwen Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#release-wide-facts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Release-wide facts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#item-1-195-baseline-and-build-hygiene-req1-n1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Item 1 — 1.9.5 baseline and build hygiene (REQ1, N1)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#item-2a2b-the-new-stack-python-313-pytorch-2110-for-cuda-13-req2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Item 2a/2b — the new stack: Python 3.13, PyTorch 2.11.0 for CUDA 13 (REQ2)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#item-2c-local-translation-through-ollama-only-llama-cpp-removed-req2-texts-w43" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Item 2c — local translation through Ollama only; llama-cpp removed (REQ2; texts W43)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#item-2d-ctranslate2-483-459" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Item 2d — CTranslate2 4.8.3 (#459)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#item-2e-whisperjav-upgrade-stays-within-110x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Item 2e — whisperjav-upgrade stays within 1.10.x
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#item-2f-every-install-gets-the-tested-package-versions-w55" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Item 2f — every install gets the tested package versions (W55)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#item-3-transformers-5-qwen3-asr-through-the-whisperjav-fork-of-qwen-asr-clearvoice-and-the-kotoba-pipeline-removed-req3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Item 3 — transformers 5, Qwen3-ASR through the WhisperJAV fork of qwen-asr; ClearVoice and the Kotoba pipeline removed (REQ3)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#item-4-crispasr-the-gguf-pipelines-parakeet-crispasr-and-cohere-crispasr-owner-w118-w176-route-b" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Item 4 — CrispASR: the GGUF pipelines Parakeet-CrispASR and Cohere-CrispASR (owner W118, W176 route B)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-accelerators-one-accelerator-per-install-owner-w212-d1-w217-w232w234-design-section-22-v2-w238" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The accelerators — one accelerator per install (owner W212 D1, W217, W232–W234; design section 22 v2, W238)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#item-12-chronosjav-timing-the-crispasr-aligner-and-a-small-whisper-timing-model-cohere-crispasr-aligned-owner-w245w266" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Item 12 — ChronosJAV timing: the CrispASR aligner and a small Whisper timing model; Cohere-CrispASR aligned (owner W245–W266)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tuning-plan-step-6-1100-measured-against-195-chronosjavs-start-rule-the-run-summary-owner-w293w301" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tuning (plan step 6) — 1.10.0 measured against 1.9.5; ChronosJAV's start rule; the run summary (owner W293–W301)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#item-5-faster-whisper-xxl-as-pass-1-the-chosen-xxl-model-reaches-xxl-req5-449-451-452-owner-w19-2-w24-2-w92-w271w273" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Item 5 — Faster Whisper XXL as pass 1; the chosen XXL model reaches XXL (REQ5; #449, #451, #452; owner W19 2, W24 2, W92, W271–W273)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#item-11c-answer-format-labels-in-translated-subtitles-460-owner-w279" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Item 11c — answer-format labels in translated subtitles (#460; owner W279)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#item-6-the-gui-in-simplified-chinese-448-req6-owner-w283-w286w288" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Item 6 — the GUI in Simplified Chinese (#448; REQ6; owner W283, W286–W288)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#r-nv-and-the-ensemble-defaults-owner-w334-d3-w339w345" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R-NV and the Ensemble defaults (owner W334 D3, W339–W345)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#found-during-the-work-not-fixed-in-1100-requirements-5-places-as-decided-or-proposed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Found during the work, not fixed in 1.10.0 (requirements §5; places as decided or proposed)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#for-the-release-notes-still-to-be-written-or-decided" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        For the release notes — still to be written or decided
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/meizhong986/whisperjav/edit/main/docs/en/CHANGELOG_v1.10.0.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="whisperjav-v1100-development-change-log">WhisperJAV v1.10.0 — Development Change Log<a class="headerlink" href="#whisperjav-v1100-development-change-log" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p>Developer-facing record of what changed on branch <code>v1.10.0</code> since the 1.9.5 release (<code>8917f5a</code>, tag <code>v1.9.5</code>), why, and how it
+was checked. It is the source for the 1.10.0 release notes; it is not itself a user text.
+Ordered by requirement item (<code>docs/requirements/v1.10.x/2026-10-13-release-1.10.0-requirements.md</code>), not by date. Each entry says
+what the user sees, the commits, the owner's decisions (W-numbers in <code>docs/plans/OWNER_WORDS_V110_CYCLE.md</code>), how it was checked, and
+what was found and left open. Specs: <code>docs/requirements/v1.10.x/specs/</code>. Both folders are git-ignored.</p>
+<p><strong>State, 2026-10-30 (release):</strong> every item in this log is done and committed: items 1, 2a–2f, 3, 4, the
+accelerators, 12, tuning, 5, 11c, 6, R-NV and the Ensemble defaults; F7 (ChronosJAV's scene records keep the
+VAD-group times) committed on 2026-10-29 (<code>0568cac</code>, <code>14af1fa</code>, <code>606eea8</code>). Installer built on 2026-10-29 from
+<code>606eea8</code>: <code>WhisperJAV-1.10.0-Windows-x86_64.exe</code>, 351,195,281 bytes, SHA-256
+<code>5000FBC98D93C85D9BC466F2120D16F6B14429C00A022C2C3753B2D28E68CDE1</code>; installed and checked on an NVIDIA PC
+(evidence <code>D:\WJ110_measure\build_2026-10-29\</code>). After it, two release edits: this paragraph, and the GitHub
+check <code>automated-execution.yml</code> on Python 3.13 (was 3.12). Nothing pushed; every push on the owner's word.</p>
+<p><strong>State, 2026-10-27:</strong> items 1, 2a–2f, 3 and 4 (CrispASR, as the GGUF pipelines) done, and the accelerator
+redesign (one accelerator per install, owner W234, design section 22 v2 approved W238); branch at <code>f9950dd</code>, 349
+commits ahead of <code>main</code>, nothing pushed. No installer has been built since 2026-10-17. The branch has no commits yet for items 12, 5, 10, 11a–c
+and 6 (their place in 1.10.0 is the owner's decision).</p>
+<p><strong>State, 2026-10-17:</strong> items 1, 2a–2f and 3 done; branch at <code>69c1308</code>, 128 commits ahead of <code>origin/main</code>, nothing pushed.
+Installer built from <code>69c1308</code>: <code>WhisperJAV-1.10.0-Windows-x86_64.exe</code>, 350,890,544 bytes, SHA-256
+<code>7B87D977F28C64478FC52C4442E976503CF7AA3654003345C15CB9FBA2245CB7</code>. Remaining 1.10.0 work in the owner's order (W91): CrispASR
+(item 4) → alignment option (12) → XXL as pass 1 (5) → Tools tab (10) → hardening (11a–c) → Chinese GUI (6). Items 7, 8, 9 moved to
+1.10.1 (W91).</p>
+</blockquote>
+<hr />
+<h2 id="release-wide-facts">Release-wide facts<a class="headerlink" href="#release-wide-facts" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Fresh install only.</strong> 1.10.0 needs Python 3.13 (<code>requires-python = "&gt;=3.13,&lt;3.14"</code>, <code>d8618cb</code>). A 1.9.x install cannot upgrade:
+  1.9.5's <code>whisperjav-upgrade</code> installs from GitHub <code>main</code>, and pip refuses 1.10.0 on its Python 3.10. There is no 1.9.6 (W26).
+  The release-note sentence telling 1.9 users this is the owner's wording, not yet written.</li>
+<li><strong>Colab is not supported in 1.10.0 (W42 (3)).</strong> The expert notebook keeps installing <code>v1.9.5</code>; it was not changed.</li>
+<li><strong>Version 1.10.0:</strong> <code>installer/VERSION</code> and <code>whisperjav/__version__.py</code> set by the owner (<code>4d890bc</code>, <code>00a2a62</code>); the 1.9.5 files
+  in <code>installer/generated/</code> were removed from git (<code>491dd91</code>).</li>
+</ul>
+<hr />
+<h2 id="item-1-195-baseline-and-build-hygiene-req1-n1">Item 1 — 1.9.5 baseline and build hygiene (REQ1, N1)<a class="headerlink" href="#item-1-195-baseline-and-build-hygiene-req1-n1" title="Permanent link">&para;</a></h2>
+<p><strong>What the user sees.</strong> Nothing on screen. The 1.10.0 wheel no longer carries the developer's config backup files: the 1.9.5 wheel
+held 50 <code>asr_config.backup.*.json</code> files with local program paths.</p>
+<p><strong>Changes.</strong>
+- Config backups (written when BYOP or CrispASR choices are saved in the GUI) go to the user settings folder,
+  <code>%APPDATA%\WhisperJAV\config_backups\</code> on Windows (<code>~/Library/Application Support/WhisperJAV/…</code> on macOS, <code>~/.config/WhisperJAV/…</code>
+  on Linux), no longer into the package folder (<code>879c000</code>; test <code>c8b4854</code>).
+- The wheel names its six config JSON files one by one instead of <code>config/*.json</code> (<code>4eba9ca</code>).
+- <code>build_release.py</code> stops on uncommitted or untracked files and on any wheel file git does not track; it deletes stale <code>build/</code> and
+  <code>whisperjav.egg-info/</code> first, which had carried the backups into a fresh wheel by a second route. <code>--check-tree</code> and
+  <code>--check-wheel &lt;wheel&gt;</code> run the checks alone (<code>9a84a07</code>).
+- Measurement tools committed (W28, W31: tools in git, documents private): <code>subeval/</code> (<code>b85fb2d</code>); the 1.9.4 scripts moved to
+  <code>scripts/measure/v1.9.4/</code> (<code>f2eb87f</code>); call tracer (<code>b44d700</code>); ChronosJAV reference runner options (<code>1b4bf5d</code>); the baseline runner
+  <code>run_f0_baseline.py</code> (<code>4abace4</code>) and <code>summarize_f0.py</code> (<code>1f1360a</code>). <code>docs/measurements/</code> is no longer tracked; files kept on disk
+  (<code>780f745</code>, <code>840301f</code>; W30 (2), W40).</p>
+<p><strong>Checked.</strong> Baseline: six pipelines (Balanced, Fast, Faster, Fidelity, ChronosJAV Qwen3-ASR, ChronosJAV anime-whisper) on the two
+reference films, run on the owner's fresh 1.9.5 install <code>D:\195</code>, scored with subeval: <code>D:\WJ110_measure\F0_195\</code>. Build checks H1–H3
+passed (spec item 1).</p>
+<hr />
+<h2 id="item-2a2b-the-new-stack-python-313-pytorch-2110-for-cuda-13-req2">Item 2a/2b — the new stack: Python 3.13, PyTorch 2.11.0 for CUDA 13 (REQ2)<a class="headerlink" href="#item-2a2b-the-new-stack-python-313-pytorch-2110-for-cuda-13-req2" title="Permanent link">&para;</a></h2>
+<p><strong>What the user sees.</strong>
+- The Windows installer brings Python 3.13.16 (<code>00cc4a3</code>) and PyTorch 2.11.0 for CUDA 13.0, which needs NVIDIA driver 580 or newer
+  (<code>4bf02c8</code>, <code>366c64d</code>, <code>0321f53</code>, <code>ee1d444</code>).
+- <strong>Older cards stop before anything is installed.</strong> A card below compute capability 7.5 (GTX 900/1000 series, V100) gets the owner's
+  warning and three typed choices: 1 = card identified wrongly (issues link, then stop), 2 = install for the CPU only, 3 = stop (with
+  the 1.9.5 download link). No time limit on the answer (W36 (1), W37, W43).
+- <strong>An older driver stops</strong> with the owner's text naming the driver version and the 580 floor, before PyTorch is installed. In 1.9.5
+  such a PC silently got the CPU build (W36 (2)).
+- <strong>Balanced, Fast and Faster keep the GPU</strong> on the CUDA 13 install: the installer places NVIDIA's CUDA 12 cuBLAS (<code>nvidia-cublas-cu12
+  12.8.4.1</code>) in the <code>ctranslate2</code> folder, because CTranslate2 still needs <code>cublas64_12.dll</code> (<code>a528d23</code>). If this PC cannot load that
+  file, the installer shows a framed warning that waits for Enter and installs the CUDA 12.8 build instead (W37 (3), W42 (4)). The build
+  used is written to <code>whisperjav_stack.txt</code>; <code>whisperjav --check</code> prints one line on a CUDA 12.8 PC and names missing cuBLAS files
+  (<code>df0a44f</code>, <code>a3e5f9e</code>).
+- The start-up message for an unsupported card now says 1.10 does not support it and 1.9.5 does, with the link.
+- <strong>Linux stays on CUDA 12.8</strong> in 1.10.0, driver floor 570 (W45): on Linux pip-installed cuBLAS 12 is found only with
+  <code>LD_LIBRARY_PATH</code> set before Python starts. Not tested on a Linux PC.
+- Source installers (<code>install.py</code>, Linux, macOS and Windows scripts) ask for Python 3.13 (<code>babbab0</code>, <code>544502e</code>, <code>c348b6e</code>, <code>ca8edd9</code>).</p>
+<p><strong>Versions.</strong> numpy 2.5.x (W44; the upper bound follows numba). On Python 3.13 several packages move a major step from 1.9.5:
+librosa 0.11 → 1.0.0, pandas 2.3 → 3.0, av 17 → 19, scipy 1.15 → 1.18, scikit-learn 1.7 → 1.9, onnxruntime 1.23 → 1.31 (later
+1.29.0 in the lock). Every librosa call WhisperJAV makes was run on 1.0.0.</p>
+<p><strong>Checked.</strong> S1 (WJ110 on the stack), S2–S4 (fresh install, clean-environment run, forced cuBLAS failure → CUDA 12.8): the owner,
+"All S1 - S4 passed" (W63). S5 (card and driver decisions with fake <code>nvidia-smi</code> output) in tests <code>e60fc47</code>. One
+<code>assessment-adversary</code> review (2026-10-14): a failed cuBLAS download now stops the install instead of moving to CUDA 12.8; the fallback
+replaces only the PyTorch packages; test switches <code>WHISPERJAV_TEST_FORCE_COMPUTE_CAP</code>, <code>WHISPERJAV_TEST_FORCE_DRIVER</code>,
+<code>WHISPERJAV_TEST_FORCE_CUBLAS12_FAIL</code>.</p>
+<hr />
+<h2 id="item-2c-local-translation-through-ollama-only-llama-cpp-removed-req2-texts-w43">Item 2c — local translation through Ollama only; llama-cpp removed (REQ2; texts W43)<a class="headerlink" href="#item-2c-local-translation-through-ollama-only-llama-cpp-removed-req2-texts-w43" title="Permanent link">&para;</a></h2>
+<p><strong>What the user sees.</strong> The <code>local</code> (llama-cpp) translation provider is gone. Ollama is the only local translator; the cloud providers
+stay. A saved llama-cpp choice opens as Ollama, with one console line: "Local translation with llama-cpp was removed in 1.10; your
+saved choice now uses Ollama." A llama-cpp model saved with it is dropped; Ollama's default is used.
+<code>--provider local</code> (whisperjav-translate) and <code>--translate-provider local</code> (whisperjav) stop with exit 1 and "Error: --provider local
+(llama-cpp) was removed in WhisperJAV 1.10. Use --provider ollama for local translation." (the flag named is the one typed).
+The GUI's llama-cpp model lists and notices, the installer's <code>/InstallLocalLLM</code> option and the <code>llm</code> extra are gone.
+<code>--translate-gpu-layers</code> and <code>install.py --local-llm*</code> are still accepted, hidden from <code>--help</code>, with no effect.</p>
+<p><strong>Code (2026-10-14).</strong> Translate: <code>3a2173d</code>, <code>4ac2c59</code>, <code>b54f756</code>, <code>d82abb7</code>, <code>7505a47</code>. Four modules deleted: <code>69c9293</code>,
+<code>9a32285</code>, <code>47bd5c9</code>, <code>15afeff</code>. CLI <code>d532a38</code>. GUI <code>19426ba</code>, <code>6d0e20e</code>, <code>6273ff4</code>, <code>c60fedc</code>. Installer <code>35b23ba</code>, <code>ee1d444</code>,
+<code>babbab0</code>, <code>4c36b41</code>, <code>3eb1605</code>. Package docstring <code>fc97457</code>.</p>
+<p><strong>Checked.</strong> Tests <code>6acae80</code>: a saved <code>local</code> becomes Ollama with one line; a typed <code>local</code> exits 1 with that error. S7: the owner
+opened the GUI with a saved <code>local</code> and saw Ollama (W69). Removing llama-cpp also removes one GitHub fetch (JamePeng's wheels).</p>
+<hr />
+<h2 id="item-2d-ctranslate2-483-459">Item 2d — CTranslate2 4.8.3 (#459)<a class="headerlink" href="#item-2d-ctranslate2-483-459" title="Permanent link">&para;</a></h2>
+<p><strong>What the user sees.</strong> Balanced, Fast and Faster run on CTranslate2 4.8.3 (was 4.8.1), which #459 asked for.
+<strong>Checked.</strong> S6 (2026-10-16): the six baseline pipelines rerun on the new stack (<code>F1_stack</code>) and compared with <code>F0_195</code>. Five
+unchanged; Balanced changed on film 2 (11 fewer character errors, 2 more missed lines, 1 more misheard line, start timing closer),
+the same in reruns on each stack. The owner accepted it as the effect of the CTranslate2 and onnxruntime versions (W66 I1, I2).
+<strong>Noted (W66 I3):</strong> fundamental improvement of Balanced and its ASR (faster-whisper today) is for a later 1.10.x; not scheduled.</p>
+<hr />
+<h2 id="item-2e-whisperjav-upgrade-stays-within-110x">Item 2e — <code>whisperjav-upgrade</code> stays within 1.10.x<a class="headerlink" href="#item-2e-whisperjav-upgrade-stays-within-110x" title="Permanent link">&para;</a></h2>
+<p><strong>What the user sees.</strong> <code>whisperjav-upgrade</code> installs the newest release of its own series (<code>v1.10.*</code>, from GitHub's releases list),
+never GitHub <code>main</code>, and keeps the PC's PyTorch build (<code>bb4dee2</code>; tests <code>fb2118a</code>, S8). <code>WHISPERJAV_UPGRADE_REPO</code> still overrides.
+<code>tests/test_upgrade_cli.py</code> no longer runs a real <code>git pull</code> in the repository (<code>ef9083b</code>).
+<strong>Open (owner):</strong> a source install (git clone) still upgrades by <code>git pull</code> on its own branch, so the "never main" rule does not
+apply to it.</p>
+<hr />
+<h2 id="item-2f-every-install-gets-the-tested-package-versions-w55">Item 2f — every install gets the tested package versions (W55)<a class="headerlink" href="#item-2f-every-install-gets-the-tested-package-versions-w55" title="Permanent link">&para;</a></h2>
+<p><strong>What the user sees.</strong> Every 1.10.0 install — from the <code>.exe</code>, from source, or by <code>whisperjav-upgrade</code> — gets exactly the package
+versions tested in development, for its PyTorch build (CUDA 13.0, CUDA 12.8 or CPU). In 1.9.5 the installer list had 67 entries, 4
+exact. Console lines (owner's wording, W56): "Installing release-pinned dependencies (CUDA 13.0)..." and "Upgrading with
+release-pinned dependencies (CUDA 13.0)...", naming the build actually selected.</p>
+<p><strong>Changes.</strong>
+- One source of truth: <code>pyproject.toml</code> (intent) → <code>uv.lock</code> (exact versions), with three conflicting extras <code>cu130</code>, <code>cu128</code>, <code>cpu</code>
+  (<code>a7a25e6</code>, <code>11d875f</code>). <code>build_release.py</code> exports the lock per build without hashes to <code>whisperjav/installer/locked/</code> (<code>c655d3b</code>,
+  <code>2095781</code>); the files ship in the <code>.exe</code> and inside the wheel (C1). The old requirements template is gone (<code>09ff54e</code>).
+- Installer order: PyTorch build chosen (phase 3) → the locked file minus PyTorch's lines, <code>--no-deps</code> (phase 4) → PyTorch (4.5) →
+  the wheel (5) (<code>1a6ea08</code>). The git packages come from the locked file at fixed commits.
+- conda's part of the installer pinned exactly: python 3.13.16, openssl 3.6.2, pip 26.2.1, git 2.56.0, ffmpeg 7.1.1, menuinst 2.5.2
+  (<code>7547445</code>). A Python package both conda and the lock hold (today only packaging 26.3) is compared by its dist-info name and
+  version: same → kept and logged; different → the install stops (W57 D1; <code>c759541</code>). Installer-only tools pinned in the installer,
+  not the lock: <code>lief==1.0.0</code>, <code>nvidia-ml-py==13.615.71</code> (W57 D2).
+- Source installs: <code>uv sync --frozen --extra &lt;build&gt;</code>; <code>uv.lock</code> is never rewritten by an install (<code>e76b536</code>). Unsupported
+  combinations stop with a message: Linux with CUDA 13.0, macOS with a CUDA build, a PC for which the lock has no PyTorch wheel (Intel
+  Mac, Windows on ARM) (W57 D3; <code>f3b5ae6</code>).
+- Upgrades on installer installs: the new release's wheel and its locked file for the recorded build, <code>--no-deps</code>; a pre-check
+  dry-runs exactly those lines before anything changes; <code>--extras</code> applies to source installs only (W57 D4, D5; <code>3d371e7</code>, <code>41db557</code>).
+  The ten console texts were approved as written (W58), seven more (W61).
+- Build: environment A, <code>WJ110_build</code>, from <code>installer/build_env.yml</code> (constructor 3.17.3, uv 0.9.26) (<code>07b4743</code>); the build bat runs
+  only there and never builds a wheel itself (<code>8eecd2d</code>). The NSIS template was ported to constructor 3.17.3 (<code>2d0b017</code>); post-install
+  runs in its own console window with its exit code passed on.
+- <strong>A deliberate stop</strong> (old card answered 1 or 3, old driver) exits cleanly and the installer shows one closing dialog: "WhisperJAV
+  was not installed." pointing back to the message the user just read, instead of "Failed to run post install script" and wrong advice
+  (<code>35b23ba</code>; approach approved W46).
+- <code>installer/README_INSTALLER</code> names Python 3.13.16 (<code>79013a1</code>, W60).</p>
+<p><strong>Checked.</strong> WJ110 recreated from the lock: installed = the lock's 219 entries for this PC + nvidia-cublas-cu12; <code>uv pip check</code> clean;
+<code>whisperjav --check</code> all passed. One <code>assessment-adversary</code> review (2026-10-14) refuted "every path installs exactly uv.lock"; its
+findings became D1–D5 (W57). A second review on the 3.17.3 port found post-install running hidden; fixed. S2–S4 passed (W63).</p>
+<hr />
+<h2 id="item-3-transformers-5-qwen3-asr-through-the-whisperjav-fork-of-qwen-asr-clearvoice-and-the-kotoba-pipeline-removed-req3">Item 3 — transformers 5, Qwen3-ASR through the WhisperJAV fork of <code>qwen-asr</code>; ClearVoice and the Kotoba pipeline removed (REQ3)<a class="headerlink" href="#item-3-transformers-5-qwen3-asr-through-the-whisperjav-fork-of-qwen-asr-clearvoice-and-the-kotoba-pipeline-removed-req3" title="Permanent link">&para;</a></h2>
+<p><strong>What the user sees.</strong>
+- Qwen3-ASR and its ForcedAligner run on transformers 5.20.1 with the same results as before (G4). transformers 5.20 also holds what
+  later 1.10.x engines need (the jaykwok Qwen3-ASR fine-tune for REQ12, Cohere, VibeVoice ASR, Parakeet, Canary, MOSS-Transcribe).
+- <code>qwen-asr</code> now comes from the fork <code>meizhong986/Qwen3-ASR</code> (branch <code>whisperjav-tf5</code>, commit <code>10cfb32</code>, version 0.0.6.post1), a
+  GitHub fork of QwenLM/Qwen3-ASR with upstream PR #125, a fix for issue #218 and two further fixes found by running both checkpoints
+  (sub-configs set before <code>PretrainedConfig.__init__</code>; the audio encoder's position table rebuilt in <code>_init_weights</code> — without it
+  transformers 5 left it empty and a test clip gave 1 character instead of 35). The fork's README is the owner's text M5 (W76).
+- <strong>ClearVoice is no longer included</strong> (W73). A ClearVoice value stops the run before any audio is read: on the command line
+  (<code>--pass1-speech-enhancer</code>, <code>--pass2-speech-enhancer</code>, <code>--qwen-enhancer</code>, and inside <code>--passN-*-params</code>) with text M1 and exit 2; in
+  the GUI, a remembered or preset ClearVoice choice marks the pass, the list shows a disabled "ClearVoice (no longer included)" entry,
+  and Start shows M2 until another enhancer is chosen (W75, W79, W85).
+- The hidden, dormant Kotoba faster-whisper pipeline is removed (W73). Transformers mode and its Kotoba models are unchanged. The two
+  Kotoba CTranslate2 models leave the GUI with the pipeline; <code>--model</code> stays free text.
+- Fewer packages: gradio, flask, sox, qwen-omni-utils (with the fork); clearvoice, gdown, python-speech-features, scenedetect,
+  torchinfo, yamlargparse, opencv-python, torchvision (with ClearVoice). <code>audioop-lts</code> added to the <code>cli</code> extra beside pydub (Python
+  3.13 has no <code>audioop</code>; it came only through gradio before) (W85). Still five GitHub fetches at install: clearvoice left, the fork came
+  in.</p>
+<p><strong>Code (2026-10-17).</strong> Versions: <code>ffae784</code>, <code>24e38f5</code>, lock <code>62be5c3</code>, locked files <code>4ab8f05</code>. ClearVoice: <code>7dc9f0e</code>, <code>efc53d8</code>,
+<code>b52db5c</code>, <code>ef3fe8f</code>, <code>28b64ee</code>, <code>3277aec</code>, <code>0b90aec</code>, <code>9da9f72</code>, <code>32a927f</code>, <code>1755fd5</code>, <code>aadfc27</code>, <code>f2bfdca</code>, <code>3bb6e17</code>, <code>797ad56</code>.
+Kotoba pipeline: <code>7b2575e</code>, <code>db4d38e</code>, <code>6aad815</code>, <code>b021c54</code>, <code>9e1374e</code>, <code>0704bc2</code>. hub 1.x: <code>88df648</code> (stable-ts <code>resume_download</code>).
+Deleted unused AkitoP classifier: <code>d94aea3</code> (W79 C4). Tests: <code>4d700b3</code>, <code>019ea95</code>, <code>e02d1a1</code>, <code>d729599</code>, <code>fcdd3f5</code>, <code>69c1308</code>.
+Measurement tools: <code>a867d37</code>, <code>d7b858c</code>.</p>
+<p><strong>Checked.</strong> G1: both checkpoints on transformers 5.20, text identical to the reference, installed files byte-identical to the tested
+fork. G2: new <code>tests/test_clearvoice_removed_v110.py</code> (28 tests) and the dependency and installer tests pass; 19 suite files fail with
+the same counts on the pre-item-3 code (pre-existing). G3: network faults still counted as network faults (<code>model_loader.py</code>
+unchanged). G4: six baseline pipelines identical to <code>F1_stack</code> line by line; extras identical except htdemucs (random offset, F4).
+G5 (GUI) and G6 (fresh install from the 2026-10-17 <code>.exe</code>; ChronosJAV Qwen3-ASR, anime-whisper, Transformers mode, ZipEnhancer on one
+file): the owner, "Both G5 and G6 passed." (W90). One <code>assessment-adversary</code> review of the spec (nine findings, all taken in).</p>
+<hr />
+<h2 id="item-4-crispasr-the-gguf-pipelines-parakeet-crispasr-and-cohere-crispasr-owner-w118-w176-route-b">Item 4 — CrispASR: the GGUF pipelines Parakeet-CrispASR and Cohere-CrispASR (owner W118, W176 route B)<a class="headerlink" href="#item-4-crispasr-the-gguf-pipelines-parakeet-crispasr-and-cohere-crispasr-owner-w118-w176-route-b" title="Permanent link">&para;</a></h2>
+<p><strong>What the user sees.</strong>
+- Two Ensemble pass pipelines for Japanese, under <strong>GGUF</strong> in the Pass 1 / Pass 2 menus: <strong>Parakeet-CrispASR</strong>
+  (<code>parakeet-tdt-0.6b-ja</code>, 674 MB) and <strong>Cohere-CrispASR</strong> (<code>cohere-asr-ja-v0.1</code> by default, or <code>cohere-asr-ja</code>, 2,424 MB
+  each). Experimental in 1.10.0 (early release) — tooltip and <code>--help</code> say so (W212 D4 1). (Cohere-CrispASR's line rule
+  changed in item 12: aligned, cut at sentence ends.)
+- CrispASR comes with WhisperJAV as a Python package (<code>crispasr 0.8.44</code>), in the build of the install's accelerator: the CUDA
+  build (NVIDIA), the Vulkan build (GPU through Vulkan and Own PyTorch on Windows), the macOS build (Apple GPU), the CPU build
+  otherwise. WhisperJAV downloads the model on first use, pinned by commit and SHA-256 (<code>crispasr/manifest.py</code>).
+- Parakeet-CrispASR cuts subtitles only at natural cues — sentence-end marks, a pause of 0.6 s, or 、/space followed by
+  0.4 s — never by characters or duration, with times from the model's tokens (W203, W204). Cohere-CrispASR makes one
+  subtitle per VAD group. Parakeet uses fidelity's speech segmenter settings with 6 s groups, Cohere the qwen pipeline's
+  (W199 DIR1, W202). Both print the audio analytics with semantic scenes (W211 C2).
+- The pass's scene detector (semantic, 12–48 s, by default), speech enhancer, Enhance for VAD only and Customize (Segmenter,
+  Enhancer, Scene tabs) work as for the other passes (W212 D3, W214 2, W232 8). With an enhancer, the model is opened per
+  file and closed after it, so the two never hold GPU memory together (W217 19).
+- A status panel under a GGUF pass: the model (downloaded or not) and where CrispASR runs. <code>whisperjav --check</code> lists
+  CrispASR's version, build and device and the three models.
+- The folder-name note (T24, agreed wording, D-H): "The GGUF (CrispASR) pipelines need folder names in plain Western letters
+  (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a
+  plain-named folder (the original stays where it is)." The clause about installing WhisperJAV itself in such a folder was
+  dropped after the check of plan step 3 (CrispASR loads and transcribes from a folder with Japanese characters).
+- The 1.9.x bring-your-own CrispASR mode is removed: <code>--mode crispasr</code>, the pass value <code>crispasr</code>, <code>--crispasr-exe</code>,
+  <code>--crispasr-backend</code>, <code>--crispasr-args</code> stop with exit 2 and a message naming the new pipelines (W118 3).</p>
+<p><strong>Checked.</strong> End-to-end runs on WJ110 (NVIDIA GPU): Parakeet GGUF on the GPU, 57 subtitles; Parakeet with auditok,
+ffmpeg-dsp and Enhance for VAD only, 62; Cohere with <code>--device cpu</code>, 76; a GGUF pass with ZipEnhancer and <code>--device cpu</code>
+loaded the enhancer on the CPU (<code>D:\WJ110_measure\step3_2026-10-27\e2e\</code>). The Vulkan build loaded and transcribed on this
+PC's NVIDIA card through Vulkan; no AMD or Intel GPU has been tried. Design and decisions:
+<code>docs/plans/design/2026-10-25-crispasr-route-b-design.md</code> (v3 and section 22 v2), decision record <code>…-decision-record.md</code>.</p>
+<hr />
+<h2 id="the-accelerators-one-accelerator-per-install-owner-w212-d1-w217-w232w234-design-section-22-v2-w238">The accelerators — one accelerator per install (owner W212 D1, W217, W232–W234; design section 22 v2, W238)<a class="headerlink" href="#the-accelerators-one-accelerator-per-install-owner-w212-d1-w217-w232w234-design-section-22-v2-w238" title="Permanent link">&para;</a></h2>
+<p><strong>What the user sees.</strong>
+- Every install is made for one accelerator, chosen once at install and recorded in <code>whisperjav_stack.txt</code>: NVIDIA GPU
+  (CUDA), GPU through Vulkan (AMD, Intel or older NVIDIA card; Windows), Apple GPU (Metal), Own PyTorch, CPU only (not
+  accelerated). Every run and <code>whisperjav-upgrade</code> follow the record; a second run of an installer offers it as the default.
+- <strong>No run-time question any more.</strong> The GUI box "Accept CPU-only mode" is removed; <code>--accept-cpu-mode</code>, <code>--hf-device</code> and
+  <code>--qwen-device</code> are still accepted but hidden (the last two as names for <code>--device</code>). <code>--device auto|cuda|cpu</code> governs every
+  pipeline, the speech enhancers included; <code>--device cpu</code> is absolute.
+- At the start of a run: an NVIDIA install whose GPU is usable is silent; one whose GPU cannot be used now is the one stop
+  (exit 3; the GUI offers "Run on the CPU this time"); every other install shows a box of where each part runs and goes on.
+  PyTorch missing or damaged: exit 4 with the command that fixes it. The GUI shows "The run did not start" (exit 2, 4) and
+  "The run ended without a run summary" instead of "Finished with failures".
+- Windows installer: with no supported NVIDIA GPU, a window asks what the install is made for (CPU only after 20 s without an
+  answer; Stop pre-selected with no time limit when an NVIDIA GPU 1.10 cannot use is found, with the reason first). Own
+  PyTorch installs everything except PyTorch and shows the one command to add it (also saved in <code>OWN_PYTORCH_NEXT_STEP.txt</code>).
+- Source installs: <code>install.py --accelerator nvidia|vulkan|own-pytorch|cpu</code>; without it, a supported NVIDIA GPU or an Apple
+  silicon Mac is chosen by itself, otherwise the same question in the console. <code>--cpu-only</code>, <code>--cuda</code>, <code>--force-cuda</code> still work
+  (hidden). A chosen Stop exits 0 (W241 Q3).
+- Unsupported computers are refused before anything is installed, in the owner's form: Windows on ARM and before Windows 10;
+  Linux with glibc below 2.35; Intel Macs and macOS before 14; Python under Rosetta; Colab and Kaggle (W233 R6, D-F).
+- balanced, fast and faster use the GPU only when CTranslate2 itself sees an NVIDIA GPU (a ROCm PyTorch no longer sends them
+  to a GPU they cannot use). On an Apple silicon Mac each pipeline says where it runs (T51–T53).
+- Lock: a fourth extra <code>vulkan</code>; CrispASR on every platform of each extra (PyPI CPU builds, the <code>+cuda</code> and <code>+vulkan</code> wheels
+  by URL and SHA-256). Only two packages were added to <code>uv.lock</code> (253 → 255); no other version changed.</p>
+<p><strong>Checked.</strong> Plan step 3 P8 (<code>D:\WJ110_measure\step3_2026-10-27\</code>): WJ110 runs above; a CPU-only source install into a scratch
+environment (exit 0, record <code>cpu</code>, <code>--check</code> exit 0); the Vulkan load check; the Japanese install folder. One
+<code>assessment-adversary</code> review of P2–P6, 17 findings, each checked; fixed with tests or answered (decision record §14.12);
+20 test files after the fixes, all passed (<code>p7_fix_tests.log</code>). Not checked: any AMD or Intel GPU; a real Own PyTorch install
+over another torch; the Windows installer window in a real install (plan step 5); anything on a Mac or a Linux PC.</p>
+<hr />
+<h2 id="item-12-chronosjav-timing-the-crispasr-aligner-and-a-small-whisper-timing-model-cohere-crispasr-aligned-owner-w245w266">Item 12 — ChronosJAV timing: the CrispASR aligner and a small Whisper timing model; Cohere-CrispASR aligned (owner W245–W266)<a class="headerlink" href="#item-12-chronosjav-timing-the-crispasr-aligner-and-a-small-whisper-timing-model-cohere-crispasr-aligned-owner-w245w266" title="Permanent link">&para;</a></h2>
+<p><strong>Why.</strong> "the accuracy of chronosjav has been a big pain point of the users" (W245 C3g): ChronosJAV's subtitles started and
+ended at the VAD group's edges, and two sentences (often two speakers) in one VAD group came out as one subtitle.</p>
+<p><strong>What the user sees.</strong>
+- <strong>Every ChronosJAV model</strong> (Qwen3-ASR, anime-whisper; also Cohere in ChronosJAV, which 1.10.0 does not offer in the GUI
+  or through <code>--qwen-generator</code>, and which was not run) now times its text with an <strong>aligner run by
+  CrispASR</strong> (<code>crispasr.align_words</code>), timestamp mode <code>aligner_vad_fallback</code> by default (was <code>vad_only</code>). Aligners:
+  <code>wav2vec2-ja</code> (default, 232 MB), <code>qwen3-fa-gguf</code> (529 MB), <code>parakeet-ctc-ja</code> (1,137 MB; offered with a warning: its times
+  came back evenly spread in WhisperJAV's tests, W255). The PyTorch Qwen3-ForcedAligner stays a choice (its model ID); <code>vad_only</code>
+  loads no aligner. anime-whisper is no longer forced to <code>vad_only</code> with step-down off (W254 Q6).
+- <strong>A timing model</strong>, Whisper small through CrispASR's DTW class (488 MB; W255), runs as orchestrator step 8 after the aligner
+  is unloaded. Whisper's text is thrown away. It splits a VAD group in two at a mark of the text (。？！… 、 a closing mark,
+  a space) near where Whisper starts a new segment (T4); no mark, no split; no number of characters or seconds decides a cut
+  (W203). Each subtitle starts at its first character's aligner time; only where there is no aligner time (a frame without
+  word times, a collapsed scene, no aligner) does the start move later, to the first onset Whisper counts as speech (rule T2
+  as changed in tuning, W296 1; see "Tuning" below). <code>--qwen-timing-model none</code> turns it off; without an aligner it moves
+  starts only (T5).
+- <strong>Step-down is off by default</strong> for every ChronosJAV model (W266 1). Under <code>aligner_vad_fallback</code> with regrouping off, a
+  scene the collapse check flags takes the aligner-free times (VAD-group edges, start moved by the timing model, no splits).
+  Step-down stays a setting; its retry uses groups up to 6 s (the design note had said "shorter", corrected in v3).
+- <strong>Cohere-CrispASR</strong> aligns each VAD group's text with <code>wav2vec2-ja</code> after transcription (W248 3) and cuts aligned groups
+  only at 。？！…?! (W259, W266 3), each subtitle ending where the next starts; a group the aligner gives nothing keeps one
+  subtitle at the VAD group's edges. Parakeet-CrispASR is unchanged.
+- <strong>The text is kept</strong> on every failure: an aligner or timing model that cannot be loaded, a VAD group the aligner gives no
+  times (now counted and noted), a collapsed scene. Each is one line in the run summary (DRAFT texts).
+- New <code>--qwen-timing-model {whisper-small,none}</code>; <code>--qwen-aligner</code> takes the short names; ensemble <code>qwen_params</code> keys
+  <code>aligner_backend</code> (<code>crispasr</code>/<code>qwen3</code>/<code>none</code>), <code>aligner_id</code>, <code>timing_model</code>. GUI, Customize → Alignment: Aligner Backend
+  (CrispASR / Qwen3 ForcedAligner (PyTorch) / None), Aligner Model following the backend, Timing Model (Whisper). "None"
+  switches all three ChronosJAV models to VAD-only with step-down off. The CrispASR status panel also shows under ChronosJAV
+  passes (aligner and timing model), and under Cohere-CrispASR passes it lists the aligner.
+- <strong>Fixed on the way:</strong> since a0eb82e (2026-04-02; releases 1.8.10.post3 to 1.9.5) a ChronosJAV pass's Customize →
+  Alignment values (and a saved preset's) never reached the run; they do now.
+- Where it runs: both parts run where the install's CrispASR build runs, so on Vulkan and Apple installs this part of
+  ChronosJAV asks for the GPU. <code>--device cpu</code> cannot hold them on the CPU; the run-start box and the log say so where the
+  build would use a GPU. <code>--check</code> lists the three aligner files and the timing-model file. Models are downloaded at first
+  use, inside the pass, pinned by commit and SHA-256 (<code>crispasr/manifest.py</code>).</p>
+<p><strong>Checked.</strong> Unit tests (new: <code>test_crispasr_aligner.py</code>, <code>test_crispasr_timer.py</code>, <code>test_timing_rules.py</code>,
+<code>test_subtitle_pipeline_timer.py</code>, <code>test_chronosjav_timing_wiring.py</code>) and the affected files, one per process. Real runs on
+The Naked Director S02E02 Scene 5 (<code>D:\WJ110_measure\timing_design_2026-10-27\s5_qwen_default\</code>, <code>…\s6\</code>): Qwen3-ASR with each
+aligner and the PyTorch one, timing model off, <code>vad_only</code>, anime-whisper — all exit 0; the two-speaker VAD group split at the
+speaker change. The owner's GUI click passed (W264). One <code>assessment-adversary</code> review; its findings fixed or decided (W266;
+design note v3 §15). Not run: a real step-down retry, a real load failure, <code>--device cpu</code>, Cohere inside ChronosJAV (gated
+model; skipped, W265). Not measured against the reference subtitles; the start rule T2 is to be judged from the owner's
+manual tests (W266 2). Design: <code>docs/plans/design/2026-10-28-chronosjav-timing-c3-c1.md</code> v3.</p>
+<hr />
+<h2 id="tuning-plan-step-6-1100-measured-against-195-chronosjavs-start-rule-the-run-summary-owner-w293w301">Tuning (plan step 6) — 1.10.0 measured against 1.9.5; ChronosJAV's start rule; the run summary (owner W293–W301)<a class="headerlink" href="#tuning-plan-step-6-1100-measured-against-195-chronosjavs-start-rule-the-run-summary-owner-w293w301" title="Permanent link">&para;</a></h2>
+<p><strong>Why.</strong> W293: measure 1.10.0 against 1.9.5 on the 7 Netflix scenes of The Naked Director (subeval, Netflix's Japanese
+subtitles as the reference, W94–W95) before release; W266 Q2 had left ChronosJAV's start rule T2 to this measurement.</p>
+<p><strong>Step 1 findings</strong> (report <code>docs/plans/design/2026-10-28-tuning-step1-report.md</code> v2, after one <code>assessment-adversary</code>
+review). The Whisper pipelines score as in 1.9.5. ChronosJAV's T2 (start at the timing model's first onset) made starts late:
+aligner only → shipped, 125 of 146 paired starts later, none earlier, median +0.14 s, worse on 6 of 6 scenes for Qwen3-ASR.
+T4's splits mostly fall on the reference's line breaks. One split cost text: anime-whisper's "はぁはぁ…" in S02E02 Scene 5 went
+onto its own subtitle and the non-linguistic utterance filter deleted it. The run summary said "Aligner native: 0.0%" on
+every ChronosJAV run.</p>
+<p><strong>What changed.</strong>
+- <strong>T2</strong> (W296 1): each subtitle starts where the aligner puts its first character; the onset start remains only where
+  there is no aligner time (<code>timing_rules.pieces(aligner_start=...)</code>; the collapsed-scene call passes False). The timing
+  model and its T4 splits stay. With regrouping on (T7), the start is the aligner's and the timing model moves only the
+  start of a frame without word times; it still runs (W300 4, documented on the ChronosJAV page).
+- <strong>T9, new</strong> (W296 2, W300 3): a split never leaves a part that a line filter the run applies afterwards would remove —
+  anime-whisper's ellipsis filter (anime-whisper only), the non-verbal line filter with its punctuation-only rule (when
+  <code>drop_nonverbal_lines</code> is on, the default) and the non-linguistic utterance filter; such a part stays with its neighbour,
+  so a lone はい。 or うん。 is not split off (as in 1.9.5). <code>orchestrator.line_filter_test()</code>, passed by <code>qwen_pipeline</code>.
+  To be reopened if user feedback asks for it. Not covered: the scene-overlap resolver, which drops a subtitle by its times.
+- <strong>The run summary</strong> (W296 4, W300 1): "Aligner native" counts the subtitles timed by the aligner (not an aligner-free
+  scene, a collapsed scene, a text-only frame, or one hardening had to time); "Collapse rate" is the scenes the collapse
+  check flagged out of the scenes it checked (<code>pipeline_analytics.scene_timing_sources</code>, <code>_compute_alignment_metrics</code>).
+- <strong>Batch</strong> (W300 2): each file writes its scene records into <code>raw_subs/&lt;name&gt;/</code> in the temp folder, so its run summary
+  counts only its own scenes; since 1.9.5 the second and later files of a batch also counted the earlier files' scenes.
+- The benchmark tools (<code>whisperjav/bench/provenance.py</code>, <code>report.py</code>) still read the older nested record; not changed.</p>
+<p><strong>Measured</strong> (<code>D:\WJ110_measure\tune_2026-10-28\</code>, <code>compare_t2a.py</code>, <code>compare_w300.py</code>; 7 scenes, Japanese audio):</p>
+<table>
+<thead>
+<tr>
+<th>ChronosJAV</th>
+<th>starts within 0.5 s: 1.9.5 / shipped / now</th>
+<th>median start error</th>
+<th>typical start (signed)</th>
+<th>CER</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Qwen3-ASR</td>
+<td>74.9% / 78.3% / 78.0%</td>
+<td>0.153 / 0.278 / 0.138 s</td>
+<td>−0.10 / +0.26 / +0.06 s</td>
+<td>42.7% / 43.0% / 42.7%</td>
+</tr>
+<tr>
+<td>anime-whisper</td>
+<td>63.3% / 71.7% / 76.7%</td>
+<td>0.233 / 0.298 / 0.176 s</td>
+<td>−0.01 / +0.27 / +0.09 s</td>
+<td>45.9% / 46.0% / 45.9%</td>
+</tr>
+</tbody>
+</table>
+<p>On lines both runs time, starts equal the aligner-only run's; the splits are kept (misplaced edges as shipped). "はぁはぁ…他には"
+is kept (it is not in the reference, and that subtitle starts 1.5 s before the reference line). The run after the review gave
+the same subtitles as the run before it, line for line.</p>
+<p><strong>Checked.</strong> One <code>assessment-adversary</code> review of the code and the re-measure; its findings fixed (the count, the batch, T9
+following the run's filters, tests of the collapsed arm and the regrouping path) or decided (W300). Tests, one file per
+process: <code>test_timing_rules.py</code> 28, <code>test_subtitle_pipeline_timer.py</code> 22, <code>test_pipeline_analytics_timing.py</code> 5 (new) and 14
+neighbouring files passed; each of the five fixed lines, broken on purpose, fails a test. <code>test_anime_whisper.py</code> (2) and
+<code>test_subtitle_pipeline_pathless.py</code> (4) fail the same way on the code before this change. Real runs on the 7 scenes:
+Qwen3-ASR S01E03 Scene 3 reports "Collapse rate 6.2%" and "Aligner native 95.2%" (one collapsed scene of 16); VAD-only
+reports "Aligner native 0.0%"; each file reports its own scene count.</p>
+<hr />
+<h2 id="item-5-faster-whisper-xxl-as-pass-1-the-chosen-xxl-model-reaches-xxl-req5-449-451-452-owner-w19-2-w24-2-w92-w271w273">Item 5 — Faster Whisper XXL as pass 1; the chosen XXL model reaches XXL (REQ5; #449, #451, #452; owner W19 2, W24 2, W92, W271–W273)<a class="headerlink" href="#item-5-faster-whisper-xxl-as-pass-1-the-chosen-xxl-model-reaches-xxl-req5-449-451-452-owner-w19-2-w24-2-w92-w271w273" title="Permanent link">&para;</a></h2>
+<p><strong>Why.</strong> #449: "已经设置使用v2模型的，但执行的时候还是会下载v3" — with XXL as pass 2, <code>--model large-v2</code> typed into Extra Args was
+removed without a word (<code>byop/xxl_runner.py</code>, #272) and the GUI sent no model, so XXL ran large-v3. #451 and #452 asked for XXL as
+pass 1; the owner said in #449 he would try to add it in the next release.</p>
+<p><strong>What the user sees.</strong>
+- XXL Faster Whisper can be pass 1, pass 2 or both (W271 3): <code>--pass1-pipeline xxl</code>; in the GUI, the pass 1 menu's group
+  External (BYOP). One program (<code>--xxl-exe</code>, the Executable field) and one Extra Args box serve both passes; each pass has its model.
+- The model reaches XXL: an XXL pass's Model column is no longer greyed and offers Large V2 (default), Large V3, Large V3 Turbo,
+  Medium (W271 2); the GUI sends it as <code>--passN-model</code>. With no model named, XXL runs <code>large-v2</code> (W24 2; was <code>large-v3</code>;
+  <code>DEFAULT_XXL_MODEL</code> in <code>byop/xxl_runner.py</code>).
+- Extra Args: the box starts as <code>--verbose True --standard_asia</code> (was <code>--model large-v3 --verbose True --standard_asia</code>).
+  A model in the extra arguments (<code>--model X</code>, <code>--model=X</code>, <code>-m X</code>, <code>-mX</code>, a bare <code>--model</code>) is still removed (#272), now
+  argument by argument (a quoted value is never cut; 1.9.5 cut the raw text), also from the undocumented side file
+  <code>whisperjav_xxl.txt</code> next to the program (which until now could override the chosen model), and reported in the console once
+  per pass worker — once per pass, or once per file and pass with <code>--ensemble-serial</code> (W271 4; DRAFT text).
+- An XXL failure is stated in one console line naming the pass, the file and the reason (XXL's exit code and its last error line)
+  (W92; DRAFT text). A failed pass 1 still fails the file (W271 1; the orchestrator is unchanged); for pass 2 the line says the
+  file keeps pass 1's subtitles "if pass 1 made them" — pass 2 runs even for a file whose pass 1 failed. The Ensemble summary's
+  pass column now begins with XXL's exit code instead of "Traceback" (cut at 37 characters); the RUN SUMMARY still says
+  "ensemble pass failed".
+- <strong>Fixed on the way:</strong> the shipped <code>whisperjav/config/asr_config.json</code> held the developer's XXL path and <code>--model large-v2</code> in
+  Extra Args (in 1.9.5 too); now only <code>--verbose True --standard_asia</code>. The developer's GUI writes into that file (WJ110 runs
+  WhisperJAV from the repo), so <code>installer/build_release.py</code> now stops a release build when it holds an XXL path or any
+  absolute path in <code>ui_preferences</code> (step "Check shipped settings"; alone: <code>--check-settings</code>; owner W275). The GUI's late reload of the XXL settings wrote into
+  <code>AppState.state</code>, which does not exist, so it always failed; it now loads into the Ensemble tab's state.
+- Docs: the published example <code>whisperjav video.mp4 --pass2-pipeline xxl --xxl-exe …</code> lacked <code>--ensemble</code> and ran a single
+  Balanced pass (checked with <code>--dump-params</code>); the examples now carry <code>--ensemble</code>. <code>README.md</code> said "Bring your own pass 2".</p>
+<p><strong>Checked.</strong> New <code>tests/test_xxl_pass1.py</code> (27 passed), including two end-to-end runs through <code>main.py</code>, the ensemble and the pass
+worker with a stand-in XXL program (a script that records its arguments): XXL as pass 1 gets its model, the extra arguments, and
+the side-file warning; a failing XXL in both passes gives both lines. With pass 1's XXL settings removed from <code>main.py</code>, the first
+fails (<code>s6_mutation_check.py</code>). 17 related test files, one per process: all passed except one <code>test_htdemucs_enhancer.py</code> check of
+the installer build script, which this item does not touch. Real runs on The Naked Director S02E02 Scene 5 with the local XXL
+r245.2 (<code>D:\WJ110_measure\xxl_pass1_2026-10-27\s3\</code>): XXL large-v2 → Qwen3-ASR, Qwen3-ASR → XXL large-v2, XXL large-v2 → XXL
+large-v3, XXL with no model (ran large-v2) — all exit 0, XXL's log naming the model it loaded; a failing XXL as pass 1 (d3) and in
+both passes (f) — exit 1 with the plain lines. The owner's GUI click passed (W273). One <code>assessment-adversary</code> review; its findings
+fixed or brought to the owner. Not run: Large V3 Turbo and Medium with the real XXL (they would download); the Extra Args warning
+with the real XXL (end-to-end with the stand-in only).</p>
+<hr />
+<h2 id="item-11c-answer-format-labels-in-translated-subtitles-460-owner-w279">Item 11c — answer-format labels in translated subtitles (#460; owner W279)<a class="headerlink" href="#item-11c-answer-format-labels-in-translated-subtitles-460-owner-w279" title="Permanent link">&para;</a></h2>
+<p><strong>Why.</strong> #460 (Ollama, <code>huihui_ai/qwen2.5-abliterate:7b</code>, Japanese → Chinese): <code>Translation&gt;</code> and repeated lines stayed in the
+translated SRT — 6 of 397 batches, 45 of 2,596 subtitles; reproduced by the reporter on 1.9.5 / PySubtrans 1.6.0 by replaying
+saved answers. The reporter's script, run in WJ110 (PySubtrans 1.6.0): as whole answers, four of the five malformed forms give a
+subtitle holding the label and no error from PySubtrans's check, so PySubtrans's own retry (<code>retry_on_error</code>, on by default) does
+not run. Inside a batch of correct entries (review probe), only the two forms with a trailing <code>Translation&gt;</code> stay silent; the
+other two leave the line unmatched, which PySubtrans already retried. The fifth form (four numbered lines inside
+<code>&lt;Translation&gt;…&lt;/Translation&gt;</code>) already failed the newline and unmatched-line checks and was retried; the retry's broken text was
+kept. The reporter's six batches were not seen, so which of these happened there is not known.</p>
+<p><strong>What the user sees.</strong>
+- A translated subtitle whose text holds <code>Translation&gt;</code> or <code>Original&gt;</code> at the start of a row, a <code>&lt;Translation&gt;</code> / <code>&lt;/Translation&gt;</code>
+  tag, or a row that is only <code>#number</code> (ASCII digits; Windows line ends allowed), is an error in PySubtrans's check, for every
+  provider (W279 1; <code>core.py: apply_format_marker_check()</code>, which wraps <code>client.GetParser</code>; the label word follows PySubtrans's
+  task type, <code>Translation</code> unless an instruction file sets another). With PySubtrans's defaults (<code>RETRY_ON_ERROR</code> on,
+  <code>AUTOSPLIT_ON_ERROR</code> off) it then asks once more for that batch, with its retry instructions (its own default text when the
+  instruction file has none) and the error text naming the subtitles. Nothing is cut or rewritten by WhisperJAV; PySubtrans's
+  own post-processing (line breaks, an unclosed <code>&lt;summary&gt;</code> cut) runs as before.
+- If the saved SRT still holds labels (the retry failed, or a resumed batch kept them), the subtitles are kept and one console
+  line names their entry numbers, read from the file actually written — PySubtrans numbers the SRT again, so its own line
+  numbers differ once an earlier line is untranslated (found by the review) (W279 2; text approved by the owner as drafted, W280): "[TRANSLATE] WARNING: {n}
+  translated subtitles still contain answer-format labels (Translation&gt;, Original&gt; or a #number line): #21, #34 — check them in
+  {output file}" (at most 20 numbers). Not checked when the run stops with an error before the save.
+- Not caught: a label in the middle of a row ("Hello. Translation&gt; Hello."), a lowercase <code>translation&gt;</code>. A translated row that is
+  only <code>#1</code> (a ranking, a hashtag) is taken as a label: one extra request and a console line.
+- The #455 context-tag filter is unchanged (Ollama only).</p>
+<p><strong>Checked.</strong> New <code>tests/test_translation_format_markers.py</code> (7 passed): the reporter's six answers (the normal one gives no error,
+each malformed one an error naming its subtitle); ordinary text with <code>#</code> or <code>&gt;</code> is not flagged; Windows line ends and another
+task type; three end-to-end runs of <code>translate_subtitle()</code> through the real PySubtrans against a stand-in OpenAI-compatible
+server — an answer with labels and then a clean one (2 requests, the second carries the error text, clean SRT); labels twice
+(2 requests, text kept, the console line names #1, the SRT entry that holds the label); the first line never translated (the
+console line names entry 1 of the saved file, where the model's #2 landed). With the call in <code>translate_subtitle()</code> removed, the
+first two fail (<code>s11c_mutation_check.py</code>). 11 translation test files, one per process: all passed. One <code>assessment-adversary</code>
+review: the console line's numbers (fixed: read from the saved SRT), the cause stated too broadly, a wrong code comment, Windows
+line ends and the task type (fixed), the limits above (written here). Real run: <code>whisperjav-translate --provider
+ollama --model qwen2.5:7b -t chinese</code> on the seven Netflix reference SRTs (<code>D:\WJ110_measure\translate_460_2026-10-27\</code>), twice:
+before the review (<code>run1_before_review\</code>) 39 batches, 2 retried; on the final code 39 batches, 3 retried — every retry passed
+validation (the log does not say which check failed), exit 0, no label in any output, no warning line. Not seen: a real model
+writing labels (the reporter's model was not run).</p>
+<h2 id="item-6-the-gui-in-simplified-chinese-448-req6-owner-w283-w286w288">Item 6 — the GUI in Simplified Chinese (#448; REQ6; owner W283, W286–W288)<a class="headerlink" href="#item-6-the-gui-in-simplified-chinese-448-req6-owner-w283-w286w288" title="Permanent link">&para;</a></h2>
+<p>Texts approved by the owner as drafted (W290; the release notes with a Key points line).</p>
+<p><strong>Why.</strong> Roadmap R01: "The option for users to switch UI language between English and Chinese… For 1.10.0 the scope can be UI
+only. The program outputs and docstrings and such can stay as is." In #448, users translated 1.9.3, 1.9.4 and 1.9.5 by hand
+with an AI tool; every update brought the English back.</p>
+<p><strong>What the user sees.</strong>
+- A <strong>中文</strong> / <strong>English</strong> button in the header (next to the theme button) switches the window at once; the file list and a
+  running job are not touched. In Chinese: the window, dialogs, tooltips, placeholders, status texts, confirm boxes, and the
+  Customize Parameters labels and descriptions (W283 2). Stays English: the console (the GUI's own log lines too), file names,
+  messages from the program (also inside Chinese pop-up boxes), the Parameter Guide page (<code>qwen_guide.html</code>), the Windows file
+  dialogs' filter names, the window title.
+- The choice is saved in <code>gui_settings.json</code> (<code>ui_language</code>) and kept whatever <strong>Remember settings</strong> is (W283 3). Until the user
+  first switches, the GUI follows the display language: Windows <code>GetUserDefaultUILanguage()</code> (any Chinese → Chinese; Traditional
+  Chinese Windows gets Simplified), elsewhere the locale (<code>LANG</code>); so a 1.9.x user on Chinese Windows sees Chinese at the first
+  1.10.0 start. A Mac app started from Finder often has no Chinese locale set and then starts in English.
+- Simplified Chinese only (W283 1). Terms, by the owner (W286–W288): Ensemble tab 专家模式, Transcription Mode tab 基础模式,
+  the second tab 高级选项, Pass 第一轮 / 第二轮, Aggressive / Balanced / Conservative 高灵敏 / 中灵敏 / 低灵敏, transcription
+  转写 (translation 翻译), making subtitles 生成字幕, translating subtitle files AI 字幕翻译 with the provider area naming
+  大语言模型. Other terms follow docs/zh; pipeline, model and program names stay as they are. "Recognizer" in an English
+  tooltip is "ASR 模型" (W10); the GPU status lines say 请求使用 ("asks for"), as the English does.
+- docs/zh takes the same terms (W288): 14 pages, about 175 lines (集成模式 → 专家模式, 通道 → 轮, 激进 / 均衡 / 保守 → 高 / 中 /
+  低灵敏, 转录 → 转写, 语音识别 → ASR); the GUI guides (English and Chinese) get a section on the switch, the Chinese one a
+  table of the main control names in both languages.</p>
+<p><strong>How it works.</strong> One catalogue, <code>webview_gui/assets/i18n_zh.js</code> (818 texts, 78 kept as they are), keyed by the English text.
+<code>I18n</code> in <code>app.js</code> translates what the window shows, and a MutationObserver translates what <code>app.js</code> and the Python schemas add
+later, so <code>api.py</code>, the YAML files and the English HTML stay as they are. A key may hold computed parts (<code>{name}</code>); a part that
+is itself a catalogue text is translated too, a part named <code>raw_…</code> (a preset name, a file, a message from the program) never.
+Switching back restores the English kept per node. Code that reads shown text back (<code>pipelineLabel</code>, the " (N/A)" menu marks,
+the Apply / Test Connection buttons, the saved Balanced segmenter list) reads the English. "Balanced" is translated as a
+sensitivity only inside the pass sensitivity menus (it stays as the pipeline name). The ClearVoice warning was rebuilt from
+whole sentences; its English is unchanged. Saving <code>gui_settings.json</code> now holds a lock (the language switch and the form save
+run on separate threads).</p>
+<p><strong>Checked.</strong> New <code>tests/test_gui_i18n_zh.py</code> (14 passed): every text from <code>index.html</code>, the <code>app.js</code> literals that reach the
+window or a pop-up box, the Customize schemas and the CrispASR panel lines in <code>api.py</code> and <code>accelerators.py</code>, the tool YAML
+<code>gui</code> sections, the Hugging Face model list and the labels <code>app.js</code> builds from parameter and group names must have a Chinese
+entry or be listed as kept; the catalogue's form; one Chinese text per English text (except AI 字幕翻译, the owner's choice for
+both the tab and the tick box); no 识别 and none of the replaced terms; the saved language (first start Chinese / English,
+kept with Remember settings off, a bad value refused). <code>tests/test_gui_settings.py</code> (56 passed; 36 keys now). The other GUI
+test files, one per process: all passed. 18 lookup checks in Node (<code>node_lookup_check.js</code>). The real GUI driven by a script
+(<code>drive_gui.py</code>, settings file in a temporary folder) through the button, every tab, every pass-1 pipeline's Customize window
+and tabs, pass 2, Translation Settings and About: no errors; the click saved <code>zh-CN</code>, then <code>en</code>; left in English only preset
+names and model names; after switching back, no Chinese left. One <code>assessment-adversary</code> review: the GPU lines said "uses"
+(fixed: 请求使用), one 识别 (fixed), a preset named "Default" shown as 默认 (fixed: data parts never translated, the preset
+badge skipped), the Apply / Test Connection text in the old language after a quick switch (fixed), a possible lost save
+(fixed: lock); it could not refute the rest (no runaway work with 3,000 console lines, values and typed text untouched, the
+saved language through restart and Remember settings on/off).</p>
+<p><strong>Limits.</strong> The window shows English for under a second at start-up, before the saved language is applied. Text split by
+inline tags is translated in pieces ("将要下载 4.7 GB."). The owner's click test of the final build is still to come.</p>
+<hr />
+<h2 id="r-nv-and-the-ensemble-defaults-owner-w334-d3-w339w345">R-NV and the Ensemble defaults (owner W334 D3, W339–W345)<a class="headerlink" href="#r-nv-and-the-ensemble-defaults-owner-w334-d3-w339w345" title="Permanent link">&para;</a></h2>
+<p><strong>R-NV (owner W334 D3, W339–W342):</strong> the non-verbal line filter (ChronosJAV, Parakeet-CrispASR, Cohere-CrispASR) removes all
+punctuation before it checks whether a subtitle is one listed token (つ ふ ふっ 切 は え あ ん はい うん), so 「うん!」, 「うん......」,
+「え?」 and 「あ！」 are removed like 「あ。」; 「あっ!」 and repeats stay. Checked on copies of the 30 T1 raw SRTs: 5 more subtitles
+removed in the CrispASR runs (0–1 per run), none in ChronosJAV; <code>tests/test_nonverbal_line_filter.py</code> 69 passed.</p>
+<p><strong>The Ensemble tab and the Parakeet-CrispASR default (owner W343, W344).</strong> In both Pass menus the group "GGUF" is now
+"GGUF via crispasr" and the entries are named "cohere" and "parakeet". The tab opens on cohere / Balanced / FireRedVAD in pass 1
+and parakeet / Aggressive / TEN VAD in pass 2 (off until ticked; was Qwen3-ASR / aggressive / FireRedVAD and Anime-Whisper /
+aggressive / TEN VAD); picking cohere sets Balanced and FireRedVAD, picking parakeet Aggressive and TEN VAD. The command line
+follows (W344): a <code>parakeet-crispasr</code> pass naming no speech segmenter or sensitivity runs TEN VAD at aggressive (was WhisperSeg at
+balanced; <code>CRISPASR_DEFAULT_SEGMENTERS</code>, new <code>CRISPASR_DEFAULT_SENSITIVITY</code> in <code>config/segmenter_presets.py</code>); <code>--passN-speech-pad-ms</code>
+is then ignored with the existing warning (TEN VAD has no speech-pad setting). The <code>--help</code> segmenter lines and the exit-2 message
+for the removed 1.9.x CrispASR mode name the new menu entries. Checked: <code>--help</code> exit 0; <code>--dump-params</code> for
+<code>--pass1-pipeline cohere-crispasr --pass2-pipeline parakeet-crispasr</code> gives firered-vad/balanced and ten/aggressive; tests
+<code>test_gui_crispasr_pipelines.py</code> 51, <code>test_gui_i18n_zh.py</code> 14, <code>test_crispasr_cli.py</code> 83, <code>test_crispasr_pipelines.py</code> 114,
+<code>test_balanced_defaults_v192.py</code> 50, <code>test_crispasr_d3_v110.py</code> 18 passed. The owner's GUI click test is still to come.</p>
+<p><strong>Console: CrispASR's debug lines and the per-scene framer line only with <code>--debug</code> (owner W349, W350).</strong> In the owner's
+four-file Ensemble run (cohere + parakeet), 35,520 of the console's 39,479 lines were CrispASR's GPU library's "CUDA graph
+warmup complete / reset" and 2,712 were the per-scene <code>[VadGroupedFramer]</code> line. New <code>whisperjav/crispasr/native_log.py</code>
+registers a handler through ggml's <code>ggml_log_set</code> (in the crispasr package's <code>ggml-base</code> library) after each <code>import crispasr</code>
+(engine, aligner, timing model): without <code>--debug</code> it drops ggml's DEBUG messages (and their continuations) and passes INFO,
+WARN and ERROR unchanged; with <code>--debug</code> (log level DEBUG) everything, as before; if the library or symbol is missing,
+ggml's own logger stays. The framer line is now a debug line (it also showed for ChronosJAV). Not changed: lines CrispASR
+writes straight to the error output, which the probe showed bypass ggml's logger — the aligner's "crispasr[aligner]:
+WARNING: alignment collapse suspected …" (warnings stay, W350) and "[wav2vec2] vocab=…". FFmpeg stays 7.1.1 in 1.10.0
+(W350 1). Checked: probe (<code>ggml_log_probe2.py</code>, 40 pieces of S01E04 Scene 4: 71 warmup lines reached the handler at DEBUG,
+the aligner lines bypassed it); <code>test_crispasr_native_log.py</code> 15 passed, the aligner, timer, engine and pipeline test files
+passed; one Cohere pass on S01E04 Scene 4 without / with <code>--debug</code> (<code>D:\WJ110_measure\console_quiet_2026-10-29\</code>): exit 0
+both, 106 / 183 console lines, warmup 0 / 8, framer 0 / 10, the same subtitles byte for byte. Not run: a ChronosJAV run (its
+timing model registers the same handler), any build other than CUDA.</p>
+<hr />
+<h2 id="found-during-the-work-not-fixed-in-1100-requirements-5-places-as-decided-or-proposed">Found during the work, not fixed in 1.10.0 (requirements §5; places as decided or proposed)<a class="headerlink" href="#found-during-the-work-not-fixed-in-1100-requirements-5-places-as-decided-or-proposed" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Finding</th>
+<th>Place</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F1</td>
+<td>BS-RoFormer cannot start (<code>unexpected keyword argument 'device'</code>); the run goes on with the original audio and a log WARNING only. CLI only — the GUI shows it as "Coming Soon"</td>
+<td>1.10.1 (W88)</td>
+</tr>
+<tr>
+<td>F2</td>
+<td>ZipEnhancer fails on the second file of a run (PyTorch thread setting allowed once per process); later files get no enhancement, log WARNING only</td>
+<td>1.10.1 (W88)</td>
+</tr>
+<tr>
+<td>F3</td>
+<td><code>zipenhancer:onnx</code> memory runaway (62 GB observed)</td>
+<td>item 9 spec (1.10.1, W91)</td>
+</tr>
+<tr>
+<td>F4</td>
+<td>htdemucs output not repeatable (random time offset)</td>
+<td>item 9 spec (1.10.1, W91)</td>
+</tr>
+<tr>
+<td>F5</td>
+<td>an upgrade does not remove packages the lock dropped</td>
+<td>1.10.1 (proposed)</td>
+</tr>
+<tr>
+<td>F6</td>
+<td><code>docs/architecture/DEPENDENCY_CROSS_MATCH.md</code> out of date</td>
+<td>1.10.1 (proposed)</td>
+</tr>
+</tbody>
+</table>
+<p>F1 and F2 go against the owner's rule of 2026-09-17: "A clean-up the user SELECTED that cannot install or cannot start stops the run."
+Also known, not fixed: the launcher-icon step (<code>embed_icon_in_exe</code>) fails with lief 1.0.0, as in 1.9.5, not fatal (owner's call);
+constructor 3.17.3 removes the Users group's write permission on the install folder (left as stock, noted for the owner).</p>
+<h2 id="for-the-release-notes-still-to-be-written-or-decided">For the release notes — still to be written or decided<a class="headerlink" href="#for-the-release-notes-still-to-be-written-or-decided" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Owner's wording: 1.10 is a fresh install for 1.9 users; Colab stays on 1.9.5; ClearVoice removed (M3: "ClearVoice speech
+  enhancement is no longer included. If you used it, choose ZipEnhancer, Vocals or None."); the statement for users in China who reach
+  GitHub through a VPN (M4).</li>
+<li>Settled 2026-10-17 (W93): the six item 2 console texts drafted while coding (item 2 spec, "Changes found while coding" 11 (a)–(f))
+  approved (c1); the closing dialog of a deliberate installer stop reworded, pre-approved (c2): "WhisperJAV was not installed. / The
+  installer stopped for the reason shown in its console window. / That reason is saved in this file: / <path>" (template change not
+  yet committed; the installer built 2026-10-17 has the earlier wording).</li>
+<li>Public docs: rewritten for 1.10.0 in plan step 4 (2026-10-27) in English — getting started, the four install guides, the
+  GGUF page, GUI guide, CLI reference, FAQ, translation, workflows, upgrade pages, <code>README.md</code>; Chinese pages to follow.
+  Earlier list, for the record: llama-cpp pages (translation, GUI, install guides, en and zh); ClearVoice mentions in <code>README.md</code> and
+  <code>docs/en</code>; <code>docs/en/guides/installation_windows_standalone.md:177</code> ("Phase 3.5"); the installer readme template's Local LLM step and
+  driver table (listed 2026-10-14, not re-checked since).</li>
+<li>Issues the release touches: #459 (CTranslate2 4.8.3). Whether any reporter is told "fixed" is the owner's decision.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 MeiZhong — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/meizhong986/whisperjav" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+    
+  </body>
+</html>
