@@ -26,7 +26,7 @@ import numpy as np
 import torch
 import stable_whisper
 
-from whisperjav.utils.logger import logger
+from whisperjav.utils.logger import console_shows_debug, hide_weight_loading_bar, keep_root_logger, logger
 from whisperjav.modules.japanese_postprocessor import JapanesePostProcessor
 from whisperjav.modules.qwen_errors import PREFIX as UNUSABLE_PREFIX, QwenModelUnusable
 
@@ -461,7 +461,7 @@ class QwenASR:
         try:
             gen_config = self.model.model.thinker.generation_config
             gen_config.repetition_penalty = self.repetition_penalty
-            logger.info(
+            logger.debug(
                 "  Generation safety: repetition_penalty=%.2f applied to thinker",
                 self.repetition_penalty,
             )
@@ -677,15 +677,15 @@ class QwenASR:
         # Detect attention implementation
         attn_impl = self._detect_attn_implementation()
 
-        logger.info("Loading Qwen3-ASR model...")
-        logger.info(f"  Model:    {self.model_id}")
-        logger.info(f"  Device:   {self._device}")
-        logger.info(f"  Dtype:    {self._dtype}")
-        logger.info(f"  Batch:    {self.batch_size}")
-        logger.info(f"  Attention: {attn_impl}")
-        logger.info(f"  Aligner:  {self.aligner_id if self.use_aligner else 'disabled'}")
+        logger.debug("Loading Qwen3-ASR model...")
+        logger.debug(f"  Model:    {self.model_id}")
+        logger.debug(f"  Device:   {self._device}")
+        logger.debug(f"  Dtype:    {self._dtype}")
+        logger.debug(f"  Batch:    {self.batch_size}")
+        logger.debug(f"  Attention: {attn_impl}")
+        logger.debug(f"  Aligner:  {self.aligner_id if self.use_aligner else 'disabled'}")
         if self.context:
-            logger.info(f"  Context:  '{self.context[:50]}{'...' if len(self.context) > 50 else ''}'")
+            logger.debug(f"  Context:  '{self.context[:50]}{'...' if len(self.context) > 50 else ''}'")
 
         # Diagnostic logging
         logger.debug(
@@ -696,7 +696,9 @@ class QwenASR:
         start_time = time.time()
 
         try:
-            from qwen_asr import Qwen3ASRModel
+            with keep_root_logger():   # nagisa's root handler undone (review F3)
+                from qwen_asr import Qwen3ASRModel
+            hide_weight_loading_bar()   # owner W509, console item 3
 
             # Build model kwargs
             model_kwargs = {
@@ -729,7 +731,7 @@ class QwenASR:
             )
 
             load_time = time.time() - start_time
-            logger.info(f"  Loaded in {load_time:.1f}s")
+            logger.info(f"Qwen3-ASR loaded: {self.model_id} on {self._device} ({load_time:.1f} s)")
             logger.debug(
                 "[QwenASR PID %s] Model loaded successfully: %s in %.1fs",
                 os.getpid(), self.model_id, load_time
@@ -1227,17 +1229,19 @@ class QwenASR:
         self._dtype = self._detect_dtype(self._device)
         attn_impl = self._detect_attn_implementation()
 
-        logger.info("Loading Qwen3-ASR model (text-only, no aligner)...")
-        logger.info(f"  Model:    {self.model_id}")
-        logger.info(f"  Device:   {self._device}")
-        logger.info(f"  Dtype:    {self._dtype}")
-        logger.info(f"  Batch:    {self.batch_size}")
-        logger.info(f"  Attention: {attn_impl}")
+        logger.debug("Loading Qwen3-ASR model (text-only, no aligner)...")
+        logger.debug(f"  Model:    {self.model_id}")
+        logger.debug(f"  Device:   {self._device}")
+        logger.debug(f"  Dtype:    {self._dtype}")
+        logger.debug(f"  Batch:    {self.batch_size}")
+        logger.debug(f"  Attention: {attn_impl}")
 
         start_time = time.time()
 
         try:
-            from qwen_asr import Qwen3ASRModel
+            with keep_root_logger():   # nagisa's root handler undone (review F3)
+                from qwen_asr import Qwen3ASRModel
+            hide_weight_loading_bar()   # owner W509, console item 3
 
             model_kwargs = {
                 "dtype": self._dtype,
@@ -1255,7 +1259,7 @@ class QwenASR:
             )
 
             load_time = time.time() - start_time
-            logger.info(f"  Loaded (text-only) in {load_time:.1f}s")
+            logger.info(f"Qwen3-ASR loaded (text only): {self.model_id} on {self._device} ({load_time:.1f} s)")
 
             # A fine-tune whose file stores no output layer gets it from the input embeddings (R-QFT, #494).
             self._ensure_output_layer()
@@ -1294,15 +1298,17 @@ class QwenASR:
         if self._dtype is None:
             self._dtype = self._detect_dtype(self._device)
 
-        logger.info("Loading standalone ForcedAligner...")
-        logger.info(f"  Aligner:  {self.aligner_id}")
-        logger.info(f"  Device:   {self._device}")
-        logger.info(f"  Dtype:    {self._dtype}")
+        logger.debug("Loading standalone ForcedAligner...")
+        logger.debug(f"  Aligner:  {self.aligner_id}")
+        logger.debug(f"  Device:   {self._device}")
+        logger.debug(f"  Dtype:    {self._dtype}")
 
         start_time = time.time()
 
         try:
-            from qwen_asr.inference.qwen3_forced_aligner import Qwen3ForcedAligner
+            with keep_root_logger():   # nagisa's root handler undone (review F3)
+                from qwen_asr.inference.qwen3_forced_aligner import Qwen3ForcedAligner
+            hide_weight_loading_bar()   # owner W509, console item 3
 
             self._standalone_aligner = Qwen3ForcedAligner.from_pretrained(
                 self.aligner_id,
@@ -1311,7 +1317,7 @@ class QwenASR:
             )
 
             load_time = time.time() - start_time
-            logger.info(f"  Aligner loaded in {load_time:.1f}s")
+            logger.info(f"Qwen3 ForcedAligner loaded: {self.aligner_id} on {self._device} ({load_time:.1f} s)")
 
         except ImportError as e:
             raise ImportError(
@@ -1377,7 +1383,7 @@ class QwenASR:
         # for in-memory frame audio (v1.9.0 pathless mode).
         audio_inputs = [_as_audiolike(p) for p in audio_paths]
 
-        logger.info(
+        logger.debug(
             "Assembly: Text generation — %d scenes, language=%s",
             n, qwen_language or "auto",
         )
@@ -1388,6 +1394,7 @@ class QwenASR:
         with tqdm(
             total=n,
             desc="ASR Text Gen",
+            disable=not console_shows_debug(),   # one line per redraw in the GUI (owner W509, item 3)
             unit="scene",
             bar_format="{desc} {bar} {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
         ) as pbar:
@@ -1419,7 +1426,7 @@ class QwenASR:
                 chars = len(text)
                 speed = chars / scene_elapsed if scene_elapsed > 0 else 0
                 budget_info = f", budget={scene_token_limit}" if scene_token_limit != self.max_new_tokens else ""
-                logger.info(
+                logger.debug(
                     "  Scene %d/%d: %d chars in %.1fs (%.1f chars/s) | audio=%s%s",
                     i + 1, n, chars, scene_elapsed, speed, dur_str, budget_info,
                 )
@@ -1435,7 +1442,7 @@ class QwenASR:
 
         elapsed = time.time() - batch_start
         avg = elapsed / n if n > 0 else 0
-        logger.info(
+        logger.debug(
             "Assembly: Text generation complete — %d scenes in %.1fs (avg %.1fs/scene)",
             n, elapsed, avg,
         )
@@ -1498,7 +1505,7 @@ class QwenASR:
                 to_align_text.append(text)
 
         n_with_text = len(to_align_indices)
-        logger.info(
+        logger.debug(
             "Assembly: Alignment — %d/%d scenes with text, language=%s",
             n_with_text, n, qwen_language,
         )
@@ -1507,7 +1514,7 @@ class QwenASR:
         results: List[Optional[Any]] = [None] * n
 
         if not to_align_indices:
-            logger.info("Assembly: No scenes with text to align")
+            logger.debug("Assembly: No scenes with text to align")
             return results
 
         batch_start = time.time()
@@ -1515,6 +1522,7 @@ class QwenASR:
         with tqdm(
             total=n_with_text,
             desc="Aligning",
+            disable=not console_shows_debug(),   # one line per redraw in the GUI (owner W509, item 3)
             unit="scene",
             bar_format="{desc} {bar} {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
         ) as pbar:
@@ -1538,7 +1546,7 @@ class QwenASR:
                 results[idx] = align_result[0]
 
                 # Per-scene log line
-                logger.info(
+                logger.debug(
                     "  Scene %d/%d: aligned in %.1fs | audio=%s, %d chars",
                     idx + 1, n, scene_elapsed, dur_str, chars,
                 )
@@ -1547,7 +1555,7 @@ class QwenASR:
 
         elapsed = time.time() - batch_start
         avg = elapsed / n_with_text if n_with_text > 0 else 0
-        logger.info(
+        logger.debug(
             "Assembly: Alignment complete — %d scenes in %.1fs (avg %.1fs/scene)",
             n_with_text, elapsed, avg,
         )
