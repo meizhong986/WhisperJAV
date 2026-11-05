@@ -1,6 +1,6 @@
 # WhisperJAV Linux 安装指南
 
-**版本：** 1.10.0
+**版本：** 1.10.1
 
 项目中还没有人在 Linux 上运行过 WhisperJAV 1.10.0。请告诉我们它在你的电脑上表现如何：https://github.com/meizhong986/WhisperJAV/issues
 
@@ -139,7 +139,7 @@ nvidia-smi          # 显示驱动版本；没有驱动时会失败
 在激活虚拟环境后：
 
 ```bash
-git clone --branch v1.10.0 https://github.com/meizhong986/WhisperJAV.git
+git clone --branch v1.10.1 https://github.com/meizhong986/WhisperJAV.git
 cd WhisperJAV
 chmod +x installer/install_linux.sh
 ./installer/install_linux.sh
