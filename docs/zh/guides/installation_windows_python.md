@@ -159,7 +159,7 @@ python install.py
 
 ## 8. 故障排除 {#8-troubleshooting}
 
-**"WhisperJAV 1.10.0 does not support …"。** 电脑不在[受支持列表](../getting-started/index.md#supported-computers)中；提示会说明原因。没有安装任何内容。
+**"WhisperJAV 1.10 does not support …"。** 电脑不在[受支持列表](../getting-started/index.md#supported-computers)中；提示会说明原因。没有安装任何内容。
 
 **安装程序拒绝你的 Python。** WhisperJAV 1.10.0 需要 Python 3.13。请创建一个 3.13 环境（第 3 节）。
 
