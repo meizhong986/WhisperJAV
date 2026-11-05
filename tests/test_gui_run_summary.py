@@ -6,8 +6,11 @@ Guards three things:
    same ``--fail-on`` flag the CLI takes, so GUI and CLI runs obey one rule.
 2. When the process exits, the API reads the manifest the CLI wrote for *this*
    run (not a previous run's), and reports the five-state tally.
-3. The closing console line says the run finished and gives the tally; it
+3. The closing console line says the run finished and gives the exit status
+   (the tally is the RUN SUMMARY's, just above it, and the status bar's); it
    never re-derives success from anything but the CLI's exit status.
+4. Every GUI run writes its log file into raw_subs beside the run manifest
+   (owner W511 2, W512 c), replacing the last run's.
 """
 
 import json
@@ -287,7 +290,9 @@ class TestStatusOnExit:
         assert st["status"] == "completed" and st["exit_code"] == 0
         assert st["run_summary"]["counts"]["empty"] == 1
         line = _drain(api)
-        assert "[FINISHED] done 1 · empty 1 · suspect 0 · failed 0 · skipped 0 (exit status 0)" in line
+        # The counts are in the RUN SUMMARY the CLI printed just above and in the status bar, not repeated in
+        # this line (owner W509 item 2, W512 d).
+        assert "[FINISHED] exit status 0" in line and "done 1" not in line
         assert "SUCCESS" not in line
 
     def test_finished_with_failures_on_exit_one(self, api, tmp_path):
@@ -298,7 +303,7 @@ class TestStatusOnExit:
         api.status = "running"
         st = api.get_process_status()
         assert st["status"] == "error"
-        assert "[FINISHED WITH FAILURES] done 1 · empty 0 · suspect 0 · failed 1 · skipped 0 (exit status 1" in _drain(api)
+        assert "[FINISHED WITH FAILURES] exit status 1; a run fails on: failed" in _drain(api)
 
     def test_stopped_run_shows_the_note(self, api, tmp_path):
         api._run_options = _base_options(tmp_path)
@@ -309,7 +314,8 @@ class TestStatusOnExit:
         api.status = "running"
         st = api.get_process_status()
         assert st["status"] == "error"
-        assert "[STOPPED] Interrupted by user" in _drain(api)
+        line = _drain(api)
+        assert "[STOPPED] Interrupted by user" in line and "(exit status 1)" in line and "done 1" not in line
 
     def test_no_manifest_still_reports_the_exit_status(self, api, tmp_path):
         api._run_options = _base_options(tmp_path)
@@ -331,3 +337,88 @@ class TestStatusOnExit:
         st = api.get_process_status()
         assert st["status"] == "completed"
         assert st["run_summary"]["tally"].startswith("done 0 · empty 2")
+
+
+# ---------------------------------------------------------------------------
+# 4. The GUI run's log file (owner W511 2, W512 c)
+# ---------------------------------------------------------------------------
+
+class _FakePopen:
+    """Stands in for the CLI process: records the command, ends at once."""
+    last = None
+
+    def __init__(self, cmd, **kwargs):
+        _FakePopen.last = cmd
+        self.stdout = None
+        self.returncode = 0
+        self.pid = 1
+
+    def poll(self):
+        return 0
+
+
+def _log_arg(cmd):
+    return cmd[cmd.index("--log-file") + 1] if "--log-file" in cmd else None
+
+
+class TestGuiLogFile:
+    @pytest.fixture
+    def launched(self, api, monkeypatch):
+        import subprocess
+        import threading
+
+        monkeypatch.setattr(subprocess, "Popen", _FakePopen)
+        monkeypatch.setattr(threading.Thread, "start", lambda self: None)
+        return api
+
+    def test_beside_the_manifest_in_raw_subs(self, launched, tmp_path):
+        from whisperjav.webview_gui.api import gui_log_file
+
+        opts = _base_options(tmp_path)
+        assert launched.start_process(opts)["success"]
+        path = _log_arg(_FakePopen.last)
+        assert path == str(tmp_path / "out" / "raw_subs" / "whisperjav_run.log")
+        assert gui_log_file(opts["output_dir"], opts["inputs"]).parent.parent == tmp_path / "out"
+
+    def test_source_output_dir_beside_the_first_input(self, tmp_path):
+        from whisperjav.webview_gui.api import gui_log_file
+
+        inp = tmp_path / "films" / "a.mp4"
+        inp.parent.mkdir()
+        inp.write_bytes(b"x")
+        assert gui_log_file("source", [str(inp)]) == tmp_path / "films" / "raw_subs" / "whisperjav_run.log"
+        assert gui_log_file("source", [str(inp.parent)]) == tmp_path / "films" / "raw_subs" / "whisperjav_run.log"
+        assert gui_log_file("source", []) is None
+
+    def test_the_last_runs_files_are_replaced_and_nothing_else(self, launched, tmp_path):
+        raw = tmp_path / "out" / "raw_subs"
+        raw.mkdir(parents=True)
+        for name in ("whisperjav_run.log", "whisperjav_run.pass1.log", "whisperjav_run.pass2.log",
+                     "film.ja.pass1.srt", "whisperjav_run.notes.log", "my_run.log"):
+            (raw / name).write_text("old", encoding="utf-8")
+        assert launched.start_process(_base_options(tmp_path))["success"]
+        left = sorted(p.name for p in raw.iterdir())
+        assert left == ["film.ja.pass1.srt", "my_run.log", "whisperjav_run.notes.log"]
+
+    def test_the_twopass_run_gets_it_too(self, launched, tmp_path):
+        inp = tmp_path / "a.mp4"
+        inp.write_bytes(b"x")
+        config = {"inputs": [str(inp)], "output_dir": str(tmp_path / "out"),
+                  "pass1": {"pipeline": "balanced", "sensitivity": "balanced"},
+                  "pass2": {"enabled": False}}
+        result = launched.start_ensemble_twopass(config)
+        assert result["success"], result
+        assert _log_arg(_FakePopen.last) == str(tmp_path / "out" / "raw_subs" / "whisperjav_run.log")
+
+    def test_not_for_check_nor_over_the_users_own(self, api, tmp_path):
+        assert api._with_log_file(["--check", "--check-verbose"], {}) == ["--check", "--check-verbose"]
+        own = ["a.mp4", "--log-file", "D:/mine.log"]
+        assert api._with_log_file(list(own), _base_options(tmp_path)) == own
+
+    def test_run_on_the_cpu_this_time_restarts_the_console(self):
+        from pathlib import Path
+
+        js = (Path(__file__).resolve().parents[1] / "whisperjav" / "webview_gui" / "assets" / "app.js").read_text(
+            encoding="utf-8")
+        body = js.split("async runOnCpu()")[1].split("\n    }\n")[0]
+        assert "ProcessManager.startLogPolling();" in body
