@@ -1,192 +1,43 @@
-# 升级故障排除指南
+# 升级故障排除
 
-本指南帮助你解决 WhisperJAV 升级过程中的常见问题。
+本页适用于用 Windows 安装程序制作的安装。
 
-## 预检失败
+## 升级后 WhisperJAV 无法启动
 
-### "磁盘空间不足"
+例如升级的最后几行显示 "Rollback failed - installation may be in inconsistent state"，或者运行 `"%LOCALAPPDATA%\WhisperJAV\Scripts\whisperjav.exe" --version` 时以 `ModuleNotFoundError: No module named 'whisperjav'` 结尾。请卸载 WhisperJAV，再用安装程序安装最新版本：参见[修复或回到旧版本](MANUAL_ROLLBACK.md)。
 
-**错误信息：** `Disk space: X.X GB available, need 5 GB`
+## 升级时出现 "[WinError 5] Access is denied"
 
-**解决方案：**
-1. 释放 WhisperJAV 所在磁盘的空间
-2. 删除旧文件：`%TEMP%\*`、浏览器缓存、旧下载文件
-3. 运行磁盘清理：`cleanmgr`
+WhisperJAV 安装在与 Windows 临时文件夹（通常在 C 盘）不同的盘上，而升级替换安装文件夹 `Scripts` 中的程序时，其中某个程序正在运行：用 `whisperjav-upgrade.exe` 启动升级时就是它本身，也可能是另一个 WhisperJAV 窗口。升级会在中途停止，之后 WhisperJAV 通常无法启动：请按上一节修复。同一条信息中 pip 的建议（"Consider using the `--user` option or check the permissions."）不适用。下次请先关闭所有 WhisperJAV 窗口，并用安装文件夹中的 `python.exe` 启动升级。
 
-### "检测到错误的 Python 环境"
+## "No internet connection" 或 "Cannot upgrade: GitHub's releases list could not be read"
 
-**错误信息：**
-```
-Running from: C:\some\other\python
-Expected:     C:\Users\...\AppData\Local\WhisperJAV
-```
+升级会先检查能否访问 github.com，然后读取 GitHub 上的版本列表。没有做任何更改。请检查网络连接后重试。升级会从 GitHub、PyPI 和 download.pytorch.org 下载；中国用户请在整个升级过程中保持 VPN 开启。
 
-**解决方案：**
-使用 WhisperJAV 自带的 Python 运行升级脚本：
-```cmd
-%LOCALAPPDATA%\WhisperJAV\python.exe upgrade_whisperjav.py
-```
+## "Upgrade stopped before any change: …"
 
-### "WhisperJAV GUI 正在运行"
+没有做任何更改。信息的其余部分说明了原因：无法读取新版本的软件包列表（请检查网络连接后重试；在中国请保持 VPN 开启），新版本的某个软件包没有适用于你电脑的版本，或者检查超时。如果再次出现，请附上完整输出提交问题（见下文）。
 
-**错误信息：** `GUI check failed: WhisperJAV GUI is running`
+## "Stopped: conda installed …, but this release is pinned to …"
 
-**解决方案：**
-1. 关闭 WhisperJAV GUI 窗口
-2. 如果无法正常关闭，打开任务管理器并结束以下进程：
-   - `pythonw.exe`（WhisperJAV GUI）
-   - `WhisperJAV-GUI.exe`
-3. 重新尝试升级
+没有做任何更改。请用提示信息中给出的链接报告此问题。
 
-### "无网络连接"
-
-**错误信息：** `Network: no connection to GitHub`
-
-**解决方案：**
-1. 检查网络连接
-2. 尝试在浏览器中访问 https://github.com
-3. 如果处于企业防火墙/代理环境：
-   ```cmd
-   set HTTPS_PROXY=http://your-proxy:port
-   python.exe upgrade_whisperjav.py
-   ```
-
-## 升级执行失败
-
-### "软件包升级失败"
-
-**症状：** 升级在 "Upgrading WhisperJAV package..." 阶段停止
-
-**可能原因：**
-- 网络超时
-- GitHub 暂时不可用
-- pip 缓存损坏
-
-**解决方案：**
-
-1. **重试升级：**
-   ```cmd
-   python.exe upgrade_whisperjav.py
-   ```
-
-2. **清除 pip 缓存后重试：**
-   ```cmd
-   python.exe -m pip cache purge
-   python.exe upgrade_whisperjav.py
-   ```
-
-3. **使用热补丁模式**（如果只需要最新代码）：
-   ```cmd
-   python.exe upgrade_whisperjav.py --wheel-only
-   ```
-
-### "依赖安装失败"
-
-**症状：** 依赖安装阶段部分软件包安装失败
-
-**解决方案：**
-
-1. **继续操作** - 大多数依赖安装失败不是致命错误
-2. **手动安装：**
-   ```cmd
-   python.exe -m pip install <package-name>
-   ```
-
-### "权限被拒绝" / "访问被拒绝"
-
-**症状：** 文件操作失败
-
-**解决方案：**
-1. 关闭所有 WhisperJAV 窗口
-2. 以管理员权限运行命令提示符
-3. 临时关闭杀毒软件的实时防护
-
-### "无法更新启动器"
-
-**症状：** 桌面快捷方式未更新
-
-**这不是致命错误。** WhisperJAV 仍可正常使用。手动修复方法：
-1. 右键点击桌面快捷方式
-2. 点击"属性"
-3. 更新目标路径
-
-## 升级后问题
-
-### 升级后出现 "Import error"
-
-**症状：** WhisperJAV 无法启动，显示导入错误
-
-**解决方案：**
-
-1. **重新安装（含依赖）：**
-   ```cmd
-   python.exe -m pip install --force-reinstall git+https://github.com/meizhong986/whisperjav.git@main
-   ```
-
-2. **检查软件包冲突：**
-   ```cmd
-   python.exe -m pip check
-   ```
-
-### 升级后 "CUDA not available"
-
-**症状：** GPU 加速不再可用
+## 升级后提示 "CUDA not available"
 
 **原因：** 通常是 CPU 版 PyTorch 覆盖了 CUDA 版本（例如普通的 `pip install` 造成的），或 NVIDIA 驱动发生了变化。
 
-**解决方案：**
-1. 运行 `whisperjav --check`：它会说明安装的加速器以及 PyTorch 能使用什么。
+1. 运行 `"%LOCALAPPDATA%\WhisperJAV\Scripts\whisperjav.exe" --check`：它会说明安装的加速器以及 PyTorch 能使用什么。
 2. 用 `nvidia-smi` 检查驱动（Windows 580 或更新，Linux 570 或更新）。
 3. 再次运行 WhisperJAV 安装程序：它会保留安装的加速器，并恢复与之对应的 PyTorch 版本。
 
-### 升级后版本未变化
+## 不要用 pip 修复
 
-**症状：** `--version` 仍显示旧版本
+不要运行 `pip install -U whisperjav` 或 `pip install git+https://github.com/…`：在 Windows 上，PyPI 提供的是仅 CPU 版的 PyTorch，可能会替换你的 GPU 版本，其他软件包也可能不是 WhisperJAV 测试过的版本。
 
-**解决方案：**
-1. 清除 Python 的导入缓存：
-   ```cmd
-   python.exe -c "import whisperjav; print(whisperjav.__file__)"
-   ```
-2. 重新安装：
-   ```cmd
-   python.exe -m pip install --force-reinstall --no-cache-dir git+https://github.com/meizhong986/whisperjav.git@main
-   ```
+## 报告问题 {#reporting-issues}
 
-## 高级选项
+请在 [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) 提交问题，并附上：
 
-### 跳过预检
-
-**请谨慎使用** —— 仅在你清楚自己在做什么时使用：
-```cmd
-python.exe upgrade_whisperjav.py --skip-preflight
-```
-
-### 热补丁模式
-
-仅更新 WhisperJAV 代码，跳过所有依赖：
-```cmd
-python.exe upgrade_whisperjav.py --wheel-only
-```
-
-### 非交互模式
-
-用于脚本化升级：
-```cmd
-python.exe upgrade_whisperjav.py --yes
-```
-
-## 以上方法都无效时
-
-请参阅[手动回滚指南](MANUAL_ROLLBACK.md)了解完整的恢复方案。
-
-## 报告问题
-
-如果你遇到本指南未涵盖的问题：
-
-1. 前往 [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) 提交问题
-2. 请附上以下信息：
-   - 升级过程中的完整控制台输出
-   - Windows 版本（`winver`）
-   - Python 版本（`python.exe --version`）
-   - 当前 WhisperJAV 版本（如果已知）
+- 升级命令的完整输出（全部内容，而不只是最后几行）；
+- 如果 WhisperJAV 仍能启动，运行 `"%LOCALAPPDATA%\WhisperJAV\Scripts\whisperjav.exe" --check` 的输出；
+- WhisperJAV 所在的盘，以及你的 Windows 版本（`winver`）。
