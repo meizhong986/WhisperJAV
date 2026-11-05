@@ -76,19 +76,23 @@ class TestNothingLeaksToTheUser:
         assert offenders == [], f"maintainer notes reached the user: {offenders}"
 
     def test_the_readme_does_not_still_advertise_the_old_release(self):
-        readme = next(GENERATED.glob("README_INSTALLER_v*.txt"), None)
+        # The newest generated readme: an older version's file can still lie in generated/.
+        readme = max(GENERATED.glob("README_INSTALLER_v*.txt"), key=lambda p: p.stat().st_mtime, default=None)
         if readme is None:
             pytest.skip("no generated installer README; run build_release.py first")
         text = readme.read_text(encoding="utf-8", errors="replace")
 
         start = text.index("WHAT'S NEW IN v")
-        end = text.index("WHAT THIS INSTALLER DOES", start)
+        end = text.index("WHAT THIS INSTALL IS MADE FOR", start)
         whats_new = text[start:end]
 
         # The v1.9.0 headings that were still being sold as new in v1.9.2.
         for stale in ("QWEN3-ASR PIPELINE (NEW)",
                       "ADAPTIVE STEP-DOWN ARCHITECTURE (NEW)",
-                      "ALIGNMENT SENTINEL (NEW)"):
+                      "ALIGNMENT SENTINEL (NEW)",
+                      # v1.9.5's text, which v1.10.0 shipped as its own.
+                      "SAVED OUTPUT FOLDER (GUI)",
+                      "1.9.5 changes no library"):
             assert stale not in whats_new, (
                 f"the installer README still advertises {stale!r} as new")
 
