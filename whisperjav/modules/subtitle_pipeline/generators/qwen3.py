@@ -110,7 +110,7 @@ class Qwen3TextGenerator:
         )
         self._asr.load_model_text_only()
         self._loaded = True
-        logger.info("[Qwen3TextGenerator] Model loaded (text-only)")
+        logger.debug("[Qwen3TextGenerator] Model loaded (text-only)")
 
     def unload(self) -> None:
         """
@@ -129,7 +129,7 @@ class Qwen3TextGenerator:
 
         safe_cuda_cleanup()
         self._loaded = False
-        logger.info("[Qwen3TextGenerator] Model unloaded")
+        logger.debug("[Qwen3TextGenerator] Model unloaded")
 
     def generate(
         self,
