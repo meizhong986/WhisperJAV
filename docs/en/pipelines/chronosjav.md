@@ -21,8 +21,6 @@ In the **Ensemble Mode** tab, the **Pipeline** menu's **ChronosJAV** group has t
 | | Kotoba v2.0 | ~2 GB |
 | | Kotoba v2.1 | ~2 GB |
 
-The group's third entry, **Cohere-Transcribe (not available yet)**, is greyed out and cannot be chosen; see the [FAQ](../faq.md#cohere-transcribe-not-available-yet).
-
 !!! tip
     If your graphics card has less than 8 GB of memory, choose a model the menu lists with less: Qwen3-ASR-0.6B (4 GB) or an Anime-Whisper model (2 to 4 GB).
 
