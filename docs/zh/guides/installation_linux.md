@@ -34,7 +34,7 @@
 
 **不支持**（安装程序会说明原因，不安装任何内容）：glibc 早于 2.35——Ubuntu 20.04、Debian 11、openSUSE Leap 15.5（glibc 2.31）；Red Hat Enterprise Linux 9、Rocky Linux 9、AlmaLinux 9（glibc 2.34）。查看 glibc 版本：`ldd --version`。
 
-**Linux 上的 AMD 和 Intel GPU：** 在 1.10.0 中，GGUF 处理管线（Parakeet-CrispASR、Cohere-CrispASR）在 Linux 上运行于 CPU，因为 CrispASR 尚未发布适用于 AMD 或 Intel 的 Linux GPU 软件包。使用适合你 GPU 的自有 PyTorch 版本（例如 AMD GPU 的 ROCm 版）时，PyTorch 处理管线可以请求使用它——见[自己的 PyTorch](#own-pytorch)。
+**Linux 上的 AMD 和 Intel GPU：** 在 1.10 中，GGUF 处理管线在 Linux 上运行于 CPU，因为 CrispASR 尚未发布适用于 AMD 或 Intel 的 Linux GPU 软件包。使用适合你 GPU 的自有 PyTorch 版本（例如 AMD GPU 的 ROCm 版）时，PyTorch 处理管线可以请求使用它——见[自己的 PyTorch](#own-pytorch)。
 
 ---
 
@@ -231,7 +231,7 @@ python3 install.py
 
 ## 故障排除 {#troubleshooting}
 
-**"WhisperJAV 1.10.0 does not support this Linux"。** 它的 glibc 早于 2.35；提示会写出版本。没有安装任何内容。请使用较新的发行版版本。
+**"WhisperJAV 1.10 does not support this Linux"。** 它的 glibc 早于 2.35；提示会写出版本。没有安装任何内容。请使用较新的发行版版本。
 
 **运行停止："THE NVIDIA GPU CANNOT BE USED"。** 安装为 NVIDIA GPU 制作，而 GPU 现在不可用。框中会说明原因（例如驱动）和解决办法；`--device cpu` 让这一次在 CPU 上运行。`nvidia-smi` 会显示驱动是否已加载。
 
