@@ -1,6 +1,6 @@
 # 专家模式
 
-专家模式在同一视频上运行两个不同的ASR 处理管线，并合并其输出以获得更高的准确率。这是 WhisperJAV 最强大的转写模式。
+专家模式在同一视频上先后运行一个或两个处理管线。勾选 **第二轮**（Pass 2）时，它按你选择的合并策略把两轮的字幕合并成一个文件。
 
 ---
 
@@ -12,18 +12,13 @@ Video → Pass 1 (Pipeline A) → SRT₁ ─┐
 Video → Pass 2 (Pipeline B) → SRT₂ ─┘
 ```
 
-每个处理管线都有不同的优势。例如：
-
-- **Whisper**（Balanced 模式）：出色的时间轴，良好的文本质量
-- **Qwen3-ASR**：出色的文本质量，不同的时间轴方案
-
-合并可以将两者的优势结合起来。
+每一轮用它自己的处理管线处理整个视频，并写出自己的字幕文件；合并再由这两个文件生成最终的字幕文件。
 
 ---
 
 ## 设置专家模式
 
-1. 进入 **专家模式**（Ensemble）选项卡（第 3 个选项卡）
+1. 打开 **专家模式**（Ensemble Mode）选项卡（第 3 个选项卡）
 2. **第一轮** 始终处于激活状态 — 配置处理管线、灵敏度和选项
 3. 勾选复选框以**启用第二轮**
 4. 为第二轮配置不同的处理管线
@@ -36,36 +31,36 @@ Video → Pass 2 (Pipeline B) → SRT₂ ─┘
 
 | 控件 | 说明 |
 |------|------|
-| **Pipeline** | ASR 后端（Balanced、Fast、Faster、Qwen3-ASR、ChronosJAV 等） |
+| **Pipeline** | 这一轮的处理管线，分为五组：基于 Whisper（Balanced、Fast、Faster、Fidelity）、HuggingFace（Transformers (HF)）、ChronosJAV（Qwen3-ASR、Anime-Whisper）、外部 (BYOP)（XXL Faster Whisper）、GGUF via crispasr（parakeet、cohere、reazonspeech、kotoba、whisper-turbo、whisper-large、moss）。第一轮开始时为 cohere，第二轮为 parakeet。选择处理管线时，这一轮的灵敏度和语音分割器会随之设为它自己的值 |
 | **Sensitivity** | 检测阈值（高灵敏、中灵敏、低灵敏） |
 | **Scene Detector** | 音频场景检测方式（Auditok、Silero、Semantic、None） |
 | **Speech Enhancer** | 音频预处理 / 语音增强（None、FFmpeg DSP、ZipEnhancer、htdemucs） |
-| **Speech Segmenter** | 场景内的语音活动检测 / 语音分割器（Silero、TEN、None） |
+| **Speech Segmenter** | 在每个场景中找出语音：Silero v4.0、Silero v3.1、Silero v6.2、TEN VAD、WhisperSeg (JA-ASMR)、FireRedVAD 或 无（None）。Balanced 时，这个菜单改为列出其内置 VAD 使用的 Silero 版本（内置 FW Silero VAD 3.1、4.0（默认）、6.2）。GGUF 处理管线选 无（None）时，每个场景整段交给模型 |
 | **Model** | 使用的模型（取决于处理管线） |
 
-点击任意 Pass 上的 **Customize** 可进行精细参数调整。
+点击某一轮的 **自定义参数**（Customize Parameters）可修改这一轮的详细设置；XXL Faster Whisper 的这个按钮是灰色的。
 
 ---
 
 ## 合并策略
 
-| 策略 | 适用场景 |
-|------|----------|
-| **Pass 1 Primary** | 当第一轮是可信基线时 — 用第二轮填补空缺 |
-| **Smart Merge** | 通用场景 — 使用质量启发式方法从每一轮中选择最佳字幕 |
-| **Full Merge** | 最大覆盖 — 合并所有字幕，解决重叠 |
-| **Longest** | 当两轮重叠时，选择更长（更详细）的字幕 |
-| **Pass 2 Primary** | 当第二轮是可信基线时 |
-| **Overlap 30%** | 稳妥合并 — 要求 30% 的时间重叠才进行合并 |
+| 策略（GUI） | 命令行 | 作用 |
+|------|------|------|
+| **第一轮 + 用第二轮填补**（Pass 1 + Fill From Pass 2，默认） | `pass1_primary` | 保留第一轮的全部字幕；第二轮的字幕只在不与任何第一轮字幕重叠时加入 |
+| **智能合并（质量最佳）**（Smart Merge (Best Quality)） | `smart_merge` | 把每条第一轮字幕与和它重叠最多的第二轮字幕配对（重叠至少为较短一条的 30%），每对只保留一条：自身长度落在重叠部分里的比例更大的那条；比例相近时取文字更多的那条（由很少几种字符组成的行，如 ああああああああああ，按没有文字计）；再相同时取较短的那条。没有配对的字幕两轮都保留 |
+| **完全合并（全部字幕行）**（Full Merge (All Lines)） | `full_merge` | 两轮的全部字幕按时间排列；重叠的字幕都保留 |
+| **第二轮 + 用第一轮填补**（Pass 2 + Fill From Pass 1） | `pass2_primary` | 同"第一轮 + 用第二轮填补"，两轮互换 |
+| **第一轮 + 填补（30% 重叠）**（Pass 1 + Fill (30% Overlap)） | `pass1_overlap` | 保留第一轮的全部字幕；第二轮的字幕只要与第一轮字幕的重叠不超过那条第一轮字幕长度的 30% 就加入 |
+| **第二轮 + 填补（30% 重叠）**（Pass 2 + Fill (30% Overlap)） | `pass2_overlap` | 同上，两轮互换 |
+| —（仅命令行） | `longest` | 与智能合并一样配对，保留文字更多的那条 |
 
-!!! tip "推荐组合"
-    **Balanced**（第一轮）+ **Qwen3-ASR**（第二轮）+ **Smart Merge** 对大多数内容来说是一个可靠的默认组合。
+无论哪种策略，合并后与前一条文字完全相同的字幕都会被删除。
 
 ---
 
 ## BYOP：XXL Faster Whisper（v1.8.9+；1.10.0 起也可用于第一轮）
 
-选择 **XXL Faster Whisper** 作为第一轮、第二轮或两者的处理管线，即可将 [PurfView 的 Faster Whisper XXL](https://github.com/Purfview/whisper-standalone-win) 作为外部程序使用。这是"自带处理管线"（Bring Your Own Pipeline）— 由你提供可执行文件。
+选择 **XXL Faster Whisper** 作为第一轮、第二轮或两者的处理管线，即可将 [PurfView 的 Faster Whisper XXL](https://github.com/Purfview/whisper-standalone-win) 作为外部程序使用。菜单把它列在 **外部 (BYOP)**（External (BYOP)）组中：XXL 是一个需要你自己下载的独立程序，由 WhisperJAV 运行。
 
 ### 设置方法
 
@@ -106,14 +101,13 @@ whisperjav video.mp4 --ensemble --pass1-pipeline fidelity --pass2-pipeline xxl -
 
 ## 预设
 
-保存你的专家模式配置以便复用：
+一个预设保存一轮的设置：处理管线、灵敏度、场景检测器、语音增强器、语音分割器、模型，以及 **自定义参数**（Customize Parameters）窗口中的值。合并策略和另一轮不在其中。
 
-1. 配置好每一轮、合并策略和参数
-2. 点击 **Save Preset**
-3. 输入名称（例如 "High Quality JAV"、"Quick Anime"）
-4. 之后可从预设下拉菜单中加载
+1. 点击这一轮的 **自定义参数**（Customize Parameters），设好其中的值
+2. 点击窗口底部的 **保存预设**（Save Preset），输入名称
+3. 之后在同一窗口的 **加载预设...**（Load Preset...）菜单中选择它，可载入任一轮
 
-预设会保存所有 Pass 配置、合并策略和自定义参数，并在不同会话间持久化。
+预设会保留到下次启动。
 
 ---
 
