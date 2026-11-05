@@ -60,19 +60,19 @@ Parakeet-CrispASR uses the speech segmenter settings of the Fidelity pipeline, w
 
 ## The five pipelines new in 1.10.1
 
-| GUI (under **GGUF via crispasr**) | Command line | Models (default first) | What it is |
+| GUI (under **Experimental, open to feedback**) | Command line | Models (default first) | What it is |
 |---|---|---|---|
 | **reazonspeech** | `reazonspeech-crispasr` | `reazonspeech-nemo-v2-f16` (1,240 MB), `reazonspeech-nemo-v2-q8_0` (667 MB) | ReazonSpeech's Japanese model, reazonspeech-nemo-v2 |
 | **kotoba** | `kotoba-crispasr` | `kotoba-whisper-v2.0-f16` (1,520 MB), `kotoba-whisper-v2.0-q5_0` (538 MB) | Kotoba-Whisper v2.0, a Whisper model made smaller ("distilled") for Japanese |
 | **whisper-turbo** | `whisper-turbo-crispasr` | `whisper-large-v3-turbo-f16` (1,625 MB), `whisper-large-v3-turbo-q8_0` (874 MB) | OpenAI Whisper large-v3-turbo |
 | **whisper-large** | `whisper-large-crispasr` | `whisper-large-v2-f16` (3,095 MB), `whisper-large-v2-q8_0` (1,656 MB), `whisper-large-v3-f16` (3,095 MB), `whisper-large-v3-q5_0` (1,081 MB) | OpenAI Whisper large-v2 or large-v3 |
-| **moss** | `moss-crispasr` | `moss-transcribe-diarize-0.9b-f16` (1,823 MB), `moss-transcribe-diarize-0.9b-q8_0` (1,410 MB) | OpenMOSS's MOSS-Transcribe-Diarize 0.9B; WhisperJAV does not use its speaker labels |
+| **MOSS** | `moss-crispasr` | `moss-transcribe-diarize-0.9b-f16` (1,823 MB), `moss-transcribe-diarize-0.9b-q8_0` (1,410 MB) | OpenMOSS's MOSS-Transcribe-Diarize 0.9B; WhisperJAV does not use its speaker labels |
 
 How they differ from the two above:
 
 - **reazonspeech** takes Parakeet-CrispASR's speech segmenter settings (TEN VAD, Aggressive, VAD groups up to 6 s). Its times come from the model, which gives each word a start only: a new subtitle starts only after a sentence end, each ends where the next starts, and the last ends where its VAD group ends.
 - **kotoba**, **whisper-turbo** and **whisper-large** take Cohere-CrispASR's speech segmenter settings (FireRedVAD, Balanced, VAD groups up to 3 s). Their times come from the model; a new subtitle starts only after a sentence end.
-- **moss** works on longer stretches: Semantic scenes of 90 to 240 s, and FireRedVAD (Balanced) VAD groups that end at a silence longer than 5 s and are at most 240 s. Each segment MOSS writes is one subtitle, at MOSS's own times. Its **Customize Parameters** window has a **MOSS** tab, and its clean-up differs (see [How the subtitles are made](#how-the-subtitles-are-made)).
+- **MOSS** works on longer stretches: Semantic scenes of 90 to 240 s, and FireRedVAD (Balanced) VAD groups that end at a silence longer than 5 s and are at most 240 s. Each segment MOSS writes is one subtitle, at MOSS's own times. Its **Customize Parameters** window has a **MOSS** tab, and its clean-up differs (see [How the subtitles are made](#how-the-subtitles-are-made)).
 
 ---
 
@@ -81,7 +81,7 @@ How they differ from the two above:
 ### GUI
 
 1. Open the **Ensemble Mode** tab. It opens with **Pass 1** on **cohere** (Balanced, FireRedVAD) and **Pass 2** on **parakeet** (Aggressive, TEN VAD); Pass 2 is off until you tick it. With **Remember settings** on, the tab opens on the passes you saved instead.
-2. To choose another pipeline for a pass, open its **Pipeline** menu: the seven GGUF pipelines are under **GGUF via crispasr** (parakeet, cohere, reazonspeech, kotoba, whisper-turbo, whisper-large, moss). Choosing one sets its own sensitivity, speech segmenter and scene detector, as in the tables above.
+2. To choose another pipeline for a pass, open its **Pipeline** menu: parakeet and cohere are under **GGUF via crispasr**; below a divider line, the five new in 1.10.1 are under **Experimental, open to feedback** (reazonspeech, kotoba, whisper-turbo, whisper-large, MOSS). Choosing one sets its own sensitivity, speech segmenter and scene detector, as in the tables above.
 3. Choose the model in the **Model** column. Each entry names the file's number format and the GPU memory it needs, for example "Parakeet TDT 0.6B ja (q8_0), ~0.9 GB VRAM"; the pipeline's default is first.
 4. If you want a second pass, tick **Pass 2**, check its pipeline, and choose how the two are combined under **Merge**.
 5. Click **Start**.
@@ -89,7 +89,7 @@ How they differ from the two above:
 When a pass uses one of these pipelines:
 
 - **Sensitivity**, **Speech Segmenter**, **Model**, **Scene Detector**, **Speech Enhancer** and **Enhance for VAD only** can be set, as for the other passes. **None** as the speech segmenter skips speech detection: each scene goes to the model whole, so silence and music reach the model too.
-- **Customize Parameters** opens four tabs: **Segmenter**, **Enhancer**, **Scene** and **Timing** (one menu, **Word timestamps**: **From the model** or **From the aligner (wav2vec2-ja)**, the pipeline's default marked "(default)"); for moss also a **MOSS** tab. They start from the values the pass runs with.
+- **Customize Parameters** opens four tabs: **Segmenter**, **Enhancer**, **Scene** and **Timing** (one menu, **Word timestamps**: **From the model** or **From the aligner (wav2vec2-ja)**, the pipeline's default marked "(default)"); for MOSS also a **MOSS** tab. They start from the values the pass runs with.
 - A status panel under the pass row shows the model and where CrispASR will run, for example:
 
   ```
