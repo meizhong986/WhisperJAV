@@ -1,6 +1,6 @@
 # Ensemble Mode
 
-Ensemble mode runs two different ASR pipelines on the same video and merges their output for higher accuracy. This is WhisperJAV's most powerful transcription mode.
+Ensemble mode runs one or two pipelines on the same video, one after the other. With Pass 2 ticked, it merges the two passes' subtitles into one file by the merge strategy you choose.
 
 ---
 
@@ -12,18 +12,13 @@ Video → Pass 1 (Pipeline A) → SRT₁ ─┐
 Video → Pass 2 (Pipeline B) → SRT₂ ─┘
 ```
 
-Each pipeline has different strengths. For example:
-
-- **Whisper** (Balanced): excellent timing, good text
-- **Qwen3-ASR**: excellent text quality, different timing approach
-
-Merging combines the best of both.
+Each pass runs its own pipeline on the whole video and writes its own subtitle file; the merge then builds the final subtitle file from the two.
 
 ---
 
 ## Setting Up Ensemble
 
-1. Go to the **Ensemble** tab (Tab 3)
+1. Open the **Ensemble Mode** tab (the third tab)
 2. **Pass 1** is always active — configure pipeline, sensitivity, and options
 3. **Enable Pass 2** by checking the checkbox
 4. Configure Pass 2 with a different pipeline
@@ -36,36 +31,36 @@ Each pass has identical controls:
 
 | Control | Description |
 |---------|-------------|
-| **Pipeline** | ASR backend (Balanced, Fast, Faster, Qwen3-ASR, ChronosJAV, Parakeet-CrispASR, Cohere-CrispASR, etc.) |
+| **Pipeline** | The pipeline of the pass, in five groups: Whisper-Based (Balanced, Fast, Faster, Fidelity), HuggingFace (Transformers (HF)), ChronosJAV (Qwen3-ASR, Anime-Whisper), External (BYOP) (XXL Faster Whisper) and GGUF via crispasr (parakeet, cohere, reazonspeech, kotoba, whisper-turbo, whisper-large, moss). Pass 1 starts on cohere, Pass 2 on parakeet. Choosing a pipeline sets the sensitivity and speech segmenter the pass starts with |
 | **Sensitivity** | Detection threshold (Aggressive, Balanced, Conservative) |
 | **Scene Detector** | How to split audio into scenes (Auditok, Silero, Semantic, None) |
 | **Speech Enhancer** | Audio preprocessing (None, FFmpeg DSP, ZipEnhancer, htdemucs) |
-| **Speech Segmenter** | Voice activity detection within scenes (Silero, TEN, None) |
+| **Speech Segmenter** | Finds the speech inside each scene: Silero v4.0, Silero v3.1, Silero v6.2, TEN VAD, WhisperSeg (JA-ASMR), FireRedVAD or None. For Balanced the menu lists instead the Silero version its built-in VAD runs (3.1, 4.0 (default), 6.2). For a GGUF pass, None sends each scene to the model whole |
 | **Model** | Which model to use (pipeline-dependent) |
 
-Click **Customize** on any pass for fine-grained parameter control.
+Click **Customize Parameters** on a pass to change its detailed settings; the button is greyed out for XXL Faster Whisper.
 
 ---
 
 ## Merge Strategies
 
-| Strategy | Best For |
-|----------|----------|
-| **Pass 1 Primary** | When Pass 1 is your trusted baseline — fills gaps from Pass 2 |
-| **Smart Merge** | General use — selects the best subtitle from each pass using quality heuristics |
-| **Full Merge** | Maximum coverage — combines all subtitles, resolves overlaps |
-| **Longest** | Picks the longer (more detailed) subtitle when passes overlap |
-| **Pass 2 Primary** | When Pass 2 is your trusted baseline |
-| **Overlap 30%** | Conservative merge — requires 30% time overlap before merging |
+| Strategy (GUI) | Command line | What it does |
+|----------|----------|----------|
+| **Pass 1 + Fill From Pass 2** (default) | `pass1_primary` | Keeps every Pass 1 subtitle; adds a Pass 2 subtitle only where it overlaps no Pass 1 subtitle |
+| **Smart Merge (Best Quality)** | `smart_merge` | Pairs each Pass 1 subtitle with the Pass 2 subtitle that overlaps it most, if the overlap is at least 30% of the shorter one, and keeps one of the pair: the one with more of its own length inside the overlap; if that is about equal, the one with more text (a line of few different characters, such as ああああああああああ, counts as none); then the shorter one. Subtitles without a partner are kept from both passes |
+| **Full Merge (All Lines)** | `full_merge` | Keeps every subtitle of both passes, in time order; overlapping subtitles stay |
+| **Pass 2 + Fill From Pass 1** | `pass2_primary` | As Pass 1 + Fill From Pass 2, with the passes swapped |
+| **Pass 1 + Fill (30% Overlap)** | `pass1_overlap` | Keeps every Pass 1 subtitle; adds a Pass 2 subtitle unless it overlaps a Pass 1 subtitle by more than 30% of that subtitle's length |
+| **Pass 2 + Fill (30% Overlap)** | `pass2_overlap` | As above, with the passes swapped |
+| — (command line only) | `longest` | Pairs subtitles as Smart Merge does and keeps the one with more text |
 
-!!! tip "Recommended Combo"
-    **Balanced** (Pass 1) + **Qwen3-ASR** (Pass 2) + **Smart Merge** is a strong default for most content.
+With every strategy, a subtitle whose text is the same as the one just before it is then removed.
 
 ---
 
 ## BYOP: XXL Faster Whisper (v1.8.9+; Pass 1 since 1.10.0)
 
-Select **XXL Faster Whisper** as the pipeline of Pass 1, Pass 2 or both to use [PurfView's Faster Whisper XXL](https://github.com/Purfview/whisper-standalone-win) as an external program. This is "Bring Your Own Pipeline" — you supply the executable.
+Select **XXL Faster Whisper** as the pipeline of Pass 1, Pass 2 or both to use [PurfView's Faster Whisper XXL](https://github.com/Purfview/whisper-standalone-win) as an external program. The menu lists it under **External (BYOP)**: XXL is a separate program that you download yourself; WhisperJAV runs it.
 
 ### Setup
 
@@ -106,14 +101,13 @@ When processing multiple files in ensemble mode:
 
 ## Presets
 
-Save your ensemble configuration for reuse:
+A preset holds the settings of one pass: its pipeline, sensitivity, scene detector, speech enhancer, speech segmenter, model and the values of its **Customize Parameters** window. The merge strategy and the other pass are not part of it.
 
-1. Configure your passes, merge strategy, and parameters
-2. Click **Save Preset**
-3. Give it a name (e.g., "High Quality JAV", "Quick Anime")
-4. Load presets later from the preset dropdown
+1. Click **Customize Parameters** on the pass and set its values
+2. Click **Save Preset** at the bottom of the window and give it a name
+3. Later, choose it in the **Load Preset...** menu of the same window, for either pass
 
-Presets save all pass configurations, merge strategy, and custom parameters. They persist across sessions.
+Presets are kept for the next start.
 
 ---
 
