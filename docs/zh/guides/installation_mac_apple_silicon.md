@@ -149,7 +149,7 @@ git checkout v1.10.x      # 你想要的版本
 
 ## 7. 故障排除 {#7-troubleshooting}
 
-**"WhisperJAV 1.10.0 does not support Intel Macs" / "does not support macOS …"。** 这台 Mac 不在受支持列表中；没有安装任何内容。
+**"WhisperJAV 1.10 does not support Intel Macs" / "does not support macOS …"。** 这台 Mac 不在受支持列表中；没有安装任何内容。
 
 **"Python 3.x is not supported"。** 激活 Python 3.13 环境（第 3 节）后再次运行脚本。
 
