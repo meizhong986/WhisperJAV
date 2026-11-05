@@ -666,21 +666,21 @@ Function .onInit
     ${If} ${IsNativeARM64}
         # WhisperJAV v{{VERSION}} (design 22.1.2, owner W233 R6, W234 D-F): Windows on ARM is not
         # supported, and is refused here, before anything is unpacked. The owner's form (T65).
-        ${Print} "::error:: WhisperJAV 1.10.0 does not support Windows on ARM. This is due to its \
+        ${Print} "::error:: WhisperJAV 1.10 does not support Windows on ARM. This is due to its \
                   packages being made for x86-64 Windows only. Nothing was installed."
         MessageBox MB_OK|MB_ICONSTOP \
-            "WhisperJAV 1.10.0 does not support Windows on ARM. This is due to its packages being \
+            "WhisperJAV 1.10 does not support Windows on ARM. This is due to its packages being \
             made for x86-64 Windows only. Nothing was installed." \
             /SD IDOK
         Abort
     ${ElseIfNot} ${AtLeastWin10}
         # WhisperJAV v{{VERSION}} (design 22.1.2; T66): Windows 10 or newer.
-        ${Print} "::error:: WhisperJAV 1.10.0 does not support this version of Windows. This is due \
-                  to Python 3.13, which WhisperJAV 1.10.0 needs: it requires Windows 10 or newer. \
+        ${Print} "::error:: WhisperJAV 1.10 does not support this version of Windows. This is due \
+                  to Python 3.13, which WhisperJAV 1.10 needs: it requires Windows 10 or newer. \
                   Nothing was installed."
         MessageBox MB_OK|MB_ICONSTOP \
-            "WhisperJAV 1.10.0 does not support this version of Windows. This is due to Python 3.13, \
-            which WhisperJAV 1.10.0 needs: it requires Windows 10 or newer. Nothing was installed." \
+            "WhisperJAV 1.10 does not support this version of Windows. This is due to Python 3.13, \
+            which WhisperJAV 1.10 needs: it requires Windows 10 or newer. Nothing was installed." \
             /SD IDOK
         Abort
     ${ElseIfNot} ${RunningX64}
