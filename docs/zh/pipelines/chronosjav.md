@@ -1,6 +1,6 @@
 # ChronosJAV 处理管线
 
-ChronosJAV 是一个专为动漫和 JAV 内容设计的处理管线，基于专门针对日语动漫和成人内容对话训练的语音模型构建。
+ChronosJAV 是一个为动漫和 JAV 内容设计的处理管线，运行两种 ASR 模型：Qwen3-ASR（其模型菜单中另有两个日语微调版本，其中一个用游戏语音微调），以及为动漫和视觉小说对白制作的 anime-whisper。
 
 灵感来自 [ChronusOmni](https://arxiv.org/abs/2512.09841)（Chen 等，2025）的时间感知方法。
 
@@ -32,18 +32,16 @@ ChronosJAV 是一个专为动漫和 JAV 内容设计的处理管线，基于专�
 
 ### GUI
 
-1. 进入 **专家模式**（Ensemble）选项卡
-2. 将 **Pipeline** 设置为 **ChronosJAV**
-3. 从下拉菜单中选择一个**模型**
-4. 点击 **Start**
+1. 打开 **专家模式**（Ensemble Mode）选项卡（**基础模式**（Transcription Mode）选项卡中没有 ChronosJAV）
+2. 在第一轮或第二轮的 **处理管线**（Pipeline）菜单中，选择 **ChronosJAV** 组里的 **Qwen3-ASR** 或 **Anime-Whisper**；这一轮的灵敏度和语音分割器会随之改为该处理管线自己的设置
+3. 在这一轮的 **模型**（Model）菜单中选择模型
+4. 点击 **开始**（Start）
+
+命令行：`whisperjav video.mp4 --mode qwen`（Qwen3-ASR），或 `--mode qwen --qwen-generator anime-whisper`。
 
 ### 作为专家模式的一部分
 
-若要获得最高质量，可将 ChronosJAV 与另一个处理管线组合使用：
-
-1. **第一轮：** ChronosJAV 搭配 anime-whisper
-2. **第二轮：** Qwen3-ASR 或 Balanced
-3. **合并策略：** Smart Merge
+ChronosJAV 可以作为第一轮、第二轮或两轮，另一轮可用任何其他处理管线。勾选 **第二轮**（Pass 2）时，两轮的字幕按 **合并**（Merge）中选择的策略合并（默认 **第一轮 + 用第二轮填补**（Pass 1 + Fill From Pass 2）；见[专家模式](ensemble.md)）。
 
 ---
 
@@ -53,10 +51,11 @@ ChronosJAV 使用与标准 Whisper 处理管线不同的默认设置：
 
 | 设置项 | ChronosJAV 默认值 | 标准默认值 |
 |--------|-------------------|------------|
-| **解码方式** | 贪心解码（beam=1） | 集束搜索（beam=5） |
+| **解码方式** | 贪心解码（beam=1） | 因处理管线而异（Balanced：集束搜索，2 个 beam） |
 | **语音分割器** | FireRedVAD、TEN VAD 或 WhisperSeg，按轮次而定（见下文） | 因处理管线而异 |
-| **时间戳模式** | 仅 VAD（从 1.10.1 起，与 1.9.5 相同；1.10.0：对齐器 + VAD 回退） | 完整对齐 |
-| **清洗器** | 直通（Passthrough） | 标准清洗器 |
+| **时间戳模式** | 仅 VAD（从 1.10.1 起，与 1.9.5 相同；1.10.0：对齐器 + VAD 回退） | Whisper 模型自己给出的时间 |
+| **文本清理器**（Text Cleaner） | Qwen3-ASR：Qwen3 AssemblyTextCleaner；anime-whisper：它自己的文本清理器 | — |
+| **生成字幕后的清理** | ChronosJAV 自己的清理：删除「あ。」这类单独成行的字幕、只有呻吟或呼吸声的字幕，以及两个场景交界处的重叠等；没有幻觉过滤器 | 清洗器（sanitizer），含幻觉过滤器 |
 
 ChronosJAV 的一轮开始时使用的语音分割器：在 **专家模式**（Ensemble Mode）标签页中，Qwen3-ASR 作为第一轮时为 FireRedVAD，Anime-Whisper 作为第一轮时为 WhisperSeg，两者作为第二轮时都为 TEN VAD。在命令行中：`--mode qwen` 为 WhisperSeg；专家模式运行与 GUI 相同。这一轮的 **语音分割器**（Speech Segmenter）菜单、`--pass1-speech-segmenter` / `--pass2-speech-segmenter` 或 `--qwen-segmenter` 可以更改它。
 
