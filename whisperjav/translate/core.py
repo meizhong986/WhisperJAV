@@ -31,8 +31,22 @@ def strip_translation_context_tags(text: str) -> tuple[str, dict[str, str], int]
     return _CONTEXT_TAG_PAIR.sub(remove, text), context, count
 
 
+# Some models (Gemma 3 through Ollama, bug report 2026-11-05) wrap their whole answer in Markdown code fences. The
+# closing fence and the blank lines before it then become part of the last subtitle's text, which fails PySubtrans's
+# check ("One or more lines contain more than 2 newlines"), and the retry often answers the same way. A line that is
+# only a fence (``` with an optional language word) is never subtitle text.
+_CODE_FENCE_LINE = re.compile(r"^[ \t]*```[\w+.-]*[ \t]*\r?$\n?", re.MULTILINE)
+
+
+def strip_code_fences(text: str) -> tuple[str, int]:
+    """Remove the lines that are only a Markdown code fence, and the blank lines this leaves at the start and end."""
+    cleaned, count = _CODE_FENCE_LINE.subn("", text)
+    return (cleaned.strip() if count else text), count
+
+
 def apply_translation_context_filter(translator) -> bool:
-    """Clean provider responses before PySubtrans parses them into subtitle lines."""
+    """Clean provider responses before PySubtrans parses them into subtitle lines: Markdown code-fence lines, and
+    the context tags a model repeats."""
     client = getattr(translator, "client", None)
     if client is None or not hasattr(client, "RequestTranslation"):
         return False
@@ -45,9 +59,12 @@ def apply_translation_context_filter(translator) -> bool:
         if not isinstance(content, dict) or not isinstance(content.get("text"), str):
             return translation
 
-        cleaned_text, context, count = strip_translation_context_tags(content["text"])
-        if not count:
+        unfenced, fences = strip_code_fences(content["text"])
+        cleaned_text, context, count = strip_translation_context_tags(unfenced)
+        if not count and not fences:
             return translation
+        if not count:
+            return translation.__class__({**content, "text": unfenced})
 
         # Rebuild through PySubtrans's own Translation class so its other
         # metadata parsers still run. Restore the extracted context afterwards.
