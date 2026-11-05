@@ -1,133 +1,47 @@
 # WhisperJAV 升级指南
 
-本指南介绍如何将 WhisperJAV 升级到最新版本。
+**从 1.9.x 升级到 1.10：** 请全新安装 1.10。1.10 需要 Python 3.13，而 1.9.x 安装使用的是 Python 3.10，因此它的 `whisperjav-upgrade` 无法安装 1.10。设置会保留。
 
-**从 1.9.x 升级到 1.10.0：** 请全新安装 1.10.0。1.10.0 需要 Python 3.13，而 1.9.x 安装使用的是 Python 3.10，因此它的 `whisperjav-upgrade` 无法安装 1.10.0。设置会保留。从 1.10.0 起，`whisperjav-upgrade` 安装 1.10 系列中最新的版本。
+**在 1.10 内：** 升级会安装 1.10 系列中最新的版本，使用该版本测试过的软件包版本，并保留安装的加速器（安装文件夹中的 `whisperjav_stack.txt`）。在"自己的 PyTorch"安装中，升级从不安装、替换或删除 PyTorch。
 
-**在 1.10 内：** 升级会保留安装的加速器（安装文件夹中的 `whisperjav_stack.txt`），并为它安装新版本测试过的软件包版本。在“自己的 PyTorch”安装中，升级从不安装、替换或删除 PyTorch。
+## Windows 安装程序制作的安装 {#windows-installer-installs}
 
-## GUI 用户（推荐方式）
+GUI 会提示有新版本：顶部栏会出现显示新版本号的提示，顶部栏调色板图标（🎨）中的 **检查更新** 会立即检查。它的按钮会打开 GitHub 上的发布页面；GUI 本身不会升级 WhisperJAV。请在命令提示符中升级：
 
-GUI 启动时会自动检查更新，并在有新版本时显示通知横幅。
+1. 关闭 WhisperJAV（它的所有窗口）。
+2. 打开命令提示符（按"开始"，输入 `cmd`，按 Enter），运行：
+   ```
+   "%LOCALAPPDATA%\WhisperJAV\python.exe" -m whisperjav.upgrade
+   ```
+   如果安装到了其他文件夹，请在这里和下文中用那个文件夹代替 `%LOCALAPPDATA%\WhisperJAV`。
+3. 当它询问 `Continue? [y/N]:` 时，输入 `y` 并按 Enter。
+4. 当它显示 "Upgrade complete!" 时，检查版本：
+   ```
+   "%LOCALAPPDATA%\WhisperJAV\Scripts\whisperjav.exe" --version
+   ```
 
-### 更新提示
+请如上用安装文件夹中的 `python.exe` 启动升级，不要用 `Scripts\whisperjav-upgrade.exe`：当 WhisperJAV 安装在与 Windows 临时文件夹（通常在 C 盘）不同的盘上时，1.10.0 和 1.10.1 的 `whisperjav-upgrade.exe` 会在中途停止，之后 WhisperJAV 无法启动。
 
-当有可用更新时，标题栏会出现一个小图标，显示新版本号（例如 "v1.8.10 available"）。点击可查看更新日志和发布说明。
+同一命令加上一个选项：
 
-仅在**关键**更新时，窗口顶部才会显示醒目的彩色横幅，确保你不会错过。
+| 加上 | 作用 |
+|---|---|
+| `--check` | 显示 GitHub 上是否有比你的版本更新的版本；不做任何更改。它看的是所有版本，而升级只安装 1.10 系列中最新的版本。最后一行会说 "Run 'whisperjav-upgrade' to update."；请改用上面的命令。结果保留 6 小时；再加上 `--force` 可立即重新查询。 |
+| `--yes` | 升级前不再询问。 |
+| `--wheel-only` | 只更新 WhisperJAV 本身；它使用的软件包（CrispASR、PyTorch 等）保持原版本。 |
 
-### 一键更新
+不要用 `pip install -U whisperjav…` 更新：在 Windows 上，PyPI 提供的是仅 CPU 版的 PyTorch，可能会在毫无提示的情况下替换你的 GPU 版本。
 
-1. 点击标题栏中的更新提示（或关键更新的横幅）
-2. 查看更新日志，然后点击 **Update Now**（立即更新）
-3. 在对话框中确认更新
-4. GUI 将自动关闭
-5. 更新在后台运行
-6. 完成后 GUI 自动重新启动
+## 如果升级失败
 
-## CLI 用户
+完整升级在做任何更改之前，升级工具会保存已安装软件包的列表（`--wheel-only` 时不保存），失败后会尝试恢复这个列表。在用 Windows 安装程序制作的安装中，这在 1.10 里不起作用：它会以 "Rollback failed" 停止。升级完成时工具建议的 `--rollback` 同样会报错停止。
 
-使用 `whisperjav-upgrade` 命令进行命令行升级。
+如果升级后 WhisperJAV 无法启动，请卸载它，再用安装程序安装最新版本：参见[修复或回到旧版本](MANUAL_ROLLBACK.md)。升级工具的提示信息请参见[故障排除](UPGRADE_TROUBLESHOOTING.md)。
 
-### 检查更新
+## 源码安装（Windows、macOS、Linux） {#source-installs-windows-macos-linux}
 
-```bash
-whisperjav-upgrade --check
-```
-
-仅显示是否有可用更新，不会执行安装。
-
-### 交互式升级
-
-```bash
-whisperjav-upgrade
-```
-
-升级开始前会提示你进行确认。
-
-### 非交互式升级
-
-```bash
-whisperjav-upgrade --yes
-```
-
-自动确认升级（适用于脚本自动化）。
-
-### 热补丁模式
-
-```bash
-whisperjav-upgrade --wheel-only
-```
-
-仅更新 WhisperJAV 软件包本身，跳过依赖安装。适用于发布后的小补丁（例如 1.7.4 → 1.7.4.post1），速度更快、更安全。
-
-### 显示脚本版本
-
-```bash
-whisperjav-upgrade --version
-```
-
-### 强制检查更新
-
-```bash
-whisperjav-upgrade --check --force
-```
-
-绕过 6 小时的缓存，立即检查更新。
-
-## 更新内容
-
-| 组件 | 完整升级 | 仅更新包 |
-|------|----------|----------|
-| WhisperJAV 代码 | 是 | 是 |
-| 新增依赖 | 是 | 否 |
-| numpy/librosa 修复 | 是 | 否 |
-| 桌面快捷方式 | 是 | 是 |
-| 旧文件清理 | 是 | 否 |
+在 `WhisperJAV` 文件夹中，激活与安装时相同的环境（Windows 上用 `--local` 安装的，先运行 `.venv\Scripts\activate`），运行 `git fetch --tags`，然后 `git checkout v1.10.x`（你要的版本），再像安装时一样运行安装脚本（Windows 上如果当时用了 `--local`，就加上它）。它会把当前安装的加速器作为默认选项。不要在源码安装上使用 `whisperjav-upgrade`：在那个文件夹中它会运行 `git pull`，而这在切换到某个版本标签的克隆上会失败。
 
 ## 保留的内容
 
-升级过程会保留以下内容：
-- AI 模型（`~/.cache/whisper/`、`~/.cache/huggingface/`）
-- 配置文件（`whisperjav_config.json`）
-- 缓存数据（`.whisperjav_cache/`）
-
-## 故障排除
-
-请参阅 [UPGRADE_TROUBLESHOOTING.md](UPGRADE_TROUBLESHOOTING.md) 了解常见问题及解决方案。
-
-## 手动回滚
-
-如果升级失败，请参阅 [MANUAL_ROLLBACK.md](MANUAL_ROLLBACK.md) 了解恢复方法。
-
-## 运行独立升级脚本
-
-如果已安装的升级命令无法使用，你可以下载并运行独立脚本：
-
-```cmd
-cd %LOCALAPPDATA%\WhisperJAV
-curl -O https://raw.githubusercontent.com/meizhong986/whisperjav/main/installer/upgrade_whisperjav.py
-python.exe upgrade_whisperjav.py
-```
-
-## 技术细节
-
-### 版本检查缓存
-
-更新检查结果会缓存 6 小时，以避免频繁调用 API。使用 `--force` 可绕过缓存。
-
-### 更新流程
-
-1. **GUI 检测到更新** → 显示通知横幅
-2. **用户点击 "Update Now"** → 确认对话框
-3. **GUI 启动更新进程** → 后台进程
-4. **GUI 退出** → 释放文件锁
-5. **更新进程等待 GUI** → 确保干净退出
-6. **升级脚本运行** → 更新软件包
-7. **更新进程重启 GUI** → 全新启动
-
-### 创建的文件
-
-- `update.log` - 详细的升级日志（位于安装目录）
-- `.whisperjav_cache/version_check.json` - 缓存的更新检查结果
-- `.whisperjav_cache/update_dismissed.json` - 已忽略的通知记录
+设置（Windows 上为 `%APPDATA%\WhisperJAV`）和已下载的模型（`%USERPROFILE%\.cache`）都在安装文件夹之外。升级不会更改它们，卸载和重新安装也不会。例外是 XXL Faster Whisper 的 **可执行文件** 和 **额外参数** 设置：WhisperJAV 把它们保存在安装文件夹中，升级或重新安装后请重新填写。
