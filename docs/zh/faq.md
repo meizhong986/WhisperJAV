@@ -108,13 +108,17 @@
 
 ### 如何升级？
 
-```bash
-whisperjav-upgrade
+在 1.10 内，用 Windows 安装程序制作的安装：关闭 WhisperJAV，打开命令提示符并运行
+
+```
+"%LOCALAPPDATA%\WhisperJAV\python.exe" -m whisperjav.upgrade
 ```
 
-或仅更新代码（更快）：`whisperjav-upgrade --wheel-only`。它会保留安装的加速器。这适用于用 Windows 安装程序制作的安装。源码安装：运行 `git fetch --tags`，`git checkout` 新版本的标签，然后激活相同的 Python 环境再次运行安装程序。
+（或你的安装文件夹中的 `python.exe`），然后回答 `y`。它会保留安装的加速器。不要用 `Scripts\whisperjav-upgrade.exe` 启动升级（[原因](UPGRADE.md#windows-installer-installs)）。如果升级后 WhisperJAV 无法启动，请卸载它，再用安装程序安装最新版本；设置和已下载的模型会保留（[修复](MANUAL_ROLLBACK.md)）。
 
-从 1.9.x 升级时，请全新安装 1.10.0：1.10.0 需要 Python 3.13，`whisperjav-upgrade` 无法把 1.9.x 安装升级到它。
+源码安装：运行 `git fetch --tags`，`git checkout` 新版本的标签，然后激活相同的 Python 环境再次运行安装程序。
+
+从 1.9.x 升级时，请全新安装最新的 1.10 版本：1.10 需要 Python 3.13，`whisperjav-upgrade` 无法把 1.9.x 安装升级到 1.10。
 
 详情请参阅[升级指南](UPGRADE.md)。
 
