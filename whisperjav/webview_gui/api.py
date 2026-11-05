@@ -9,6 +9,7 @@ Completely decoupled from UI - can be tested standalone.
 import json
 import collections
 import os
+import re
 import sys
 import time
 import queue
@@ -69,6 +70,37 @@ DEFAULT_OUTPUT = _compute_default_output_dir()
 # CPU this time"), 4 PyTorch missing.
 EXIT_NVIDIA_UNUSABLE = 3
 RUN_DID_NOT_START_STATUSES = (2, 3, 4)
+
+
+GUI_LOG_NAME = "whisperjav_run.log"
+_GUI_PASS_LOG = re.compile(r"^whisperjav_run\.pass\d+\.log$")
+
+
+def gui_log_file(output_dir: Any, inputs: List[Any]) -> Optional[Path]:
+    """The log file of a GUI run (owner W511 2, W512 c): raw_subs\\whisperjav_run.log beside the run manifest
+    (whisperjav_run.json, placed by the CLI's own rule, default_manifest_path); an Ensemble pass writes
+    whisperjav_run.pass<N>.log beside it. None when the manifest has no place (no inputs)."""
+    from whisperjav.utils.run_outcome import default_manifest_path
+    manifest = default_manifest_path(str(output_dir), [str(p) for p in inputs or []])
+    if manifest is None:
+        return None
+    return manifest.parent / "raw_subs" / GUI_LOG_NAME
+
+
+def _clear_gui_logs(path: Path) -> None:
+    """Each GUI run replaces the last run's log files (W512 c): only the GUI's own names are removed."""
+    folder = path.parent
+    try:
+        olds = [path] + [p for p in folder.iterdir() if _GUI_PASS_LOG.match(p.name)] if folder.is_dir() else []
+    except OSError:
+        olds = []
+    for old in olds:
+        try:
+            old.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError:   # e.g. still open by a run of another GUI window: the new run adds to it
+            pass
 
 
 def _with_device_cpu(args: List[str]) -> List[str]:
@@ -138,6 +170,21 @@ class WhisperJAVAPI:
         if value is None or not str(value).strip():
             return self.default_output
         return value
+
+    def _with_log_file(self, args: List[str], options: Dict[str, Any]) -> List[str]:
+        """The run's command with --log-file raw_subs\\whisperjav_run.log beside the run manifest (owner W511 2,
+        W512 c), the last run's log files removed first. Not for --check, nor when the command names its own
+        --log-file. Never raises: a run starts without a log file rather than not at all."""
+        if "--check" in args or any(a == "--log-file" or a.startswith("--log-file=") for a in args):
+            return args
+        try:
+            path = gui_log_file(self._output_dir(options), options.get("inputs") or [])
+            if path is None:
+                return args
+            _clear_gui_logs(path)
+        except Exception:  # noqa: BLE001 - a log file must never stop a run from starting
+            return args
+        return args + ["--log-file", str(path)]
 
     # ========================================================================
     # Process Management
@@ -476,6 +523,7 @@ class WhisperJAVAPI:
             args = self.build_args(options)
             if options.get('run_on_cpu'):  # "Run on the CPU this time" (design 22.9.2, D-G)
                 args = _with_device_cpu(args)
+            args = self._with_log_file(args, options)   # owner W511 2: the GUI run's log file
             self._last_start = ("start_process", dict(options))
 
             # Compute expected output files for post-completion use (e.g., translation)
@@ -716,8 +764,10 @@ class WhisperJAVAPI:
         """The console line that ends a run: what happened, in the CLI's words.
 
         "Finished" states the one thing the GUI knows for certain, that the
-        process ended; the tally says what happened to each file, and the exit
-        status is the CLI's decision, repeated rather than re-derived.
+        process ended; the exit status is the CLI's decision, repeated rather
+        than re-derived. The per-file counts are in the RUN SUMMARY the CLI
+        printed just above, so this line does not repeat them (owner W509 item
+        2, W512 d: the end lines once); the status bar still shows them.
         """
         s = self._run_summary
         code = self.exit_code
@@ -728,11 +778,11 @@ class WhisperJAVAPI:
                 return f"[DID NOT START] exit status {code}"
             return f"[ENDED WITHOUT RUN SUMMARY] exit status {code}"
         if s.get("note"):
-            return f"[STOPPED] {s['note']} — {s['tally']} (exit status {code})"
+            return f"[STOPPED] {s['note']} (exit status {code})"
         if code == 0:
-            return f"[FINISHED] {s['tally']} (exit status {code})"
-        return (f"[FINISHED WITH FAILURES] {s['tally']} (exit status {code}; "
-                f"a run fails on: {', '.join(s.get('fails_on') or ['failed'])})")
+            return f"[FINISHED] exit status {code}"
+        return (f"[FINISHED WITH FAILURES] exit status {code}; "
+                f"a run fails on: {', '.join(s.get('fails_on') or ['failed'])}")
 
     def _stream_output(self):
         """
@@ -1826,6 +1876,7 @@ class WhisperJAVAPI:
             args = self._build_ensemble_args(options)
             if options.get('run_on_cpu'):  # "Run on the CPU this time" (design 22.9.2, D-G)
                 args = _with_device_cpu(args)
+            args = self._with_log_file(args, options)   # owner W511 2: the GUI run's log file
             self._last_start = ("start_ensemble_process", dict(options))
 
             # Construct command
@@ -2975,6 +3026,7 @@ class WhisperJAVAPI:
             args = self._build_twopass_args(config)
             if config.get('run_on_cpu'):  # "Run on the CPU this time" (design 22.9.2, D-G)
                 args = _with_device_cpu(args)
+            args = self._with_log_file(args, config)   # owner W511 2: the GUI run's log file
             self._last_start = ("start_ensemble_twopass", dict(config))
 
             # Compute expected output files for post-completion use (e.g., translation)
