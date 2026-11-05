@@ -1,6 +1,6 @@
 # ChronosJAV Pipeline
 
-ChronosJAV is a dedicated pipeline for anime and JAV content, built around speech models specifically trained on Japanese anime and adult content dialogue.
+ChronosJAV is a pipeline for anime and JAV content. It runs two kinds of ASR model: Qwen3-ASR, whose Model menu also has two Japanese fine-tunes (one tuned on game speech), and anime-whisper, made for anime and visual-novel dialogue.
 
 Inspired by the temporal-awareness approach in [ChronusOmni](https://arxiv.org/abs/2512.09841) (Chen et al., 2025).
 
@@ -32,18 +32,16 @@ The group's third entry, **Cohere-Transcribe (not available yet)**, is greyed ou
 
 ### GUI
 
-1. Go to the **Ensemble** tab
-2. Set **Pipeline** to **ChronosJAV**
-3. Select a **Model** from the dropdown
+1. Open the **Ensemble Mode** tab (ChronosJAV is not in the Transcription Mode tab)
+2. In the **Pipeline** menu of Pass 1 or Pass 2, choose **Qwen3-ASR** or **Anime-Whisper** (group **ChronosJAV**); the pass's sensitivity and speech segmenter change to the pipeline's own
+3. Choose a model in the pass's **Model** menu
 4. Click **Start**
+
+On the command line: `whisperjav video.mp4 --mode qwen` (Qwen3-ASR), or `--mode qwen --qwen-generator anime-whisper`.
 
 ### As Part of Ensemble
 
-For maximum quality, combine ChronosJAV with another pipeline:
-
-1. **Pass 1:** ChronosJAV with anime-whisper
-2. **Pass 2:** Qwen3-ASR or Balanced
-3. **Merge Strategy:** Smart Merge
+ChronosJAV can run as Pass 1, Pass 2 or both, with any other pipeline as the other pass. With **Pass 2** ticked, the two passes' subtitles are combined by the strategy chosen under **Merge** (default **Pass 1 + Fill From Pass 2**; see [Merge Strategies](ensemble.md#merge-strategies)).
 
 ---
 
@@ -53,10 +51,11 @@ ChronosJAV uses different defaults than the standard Whisper pipelines:
 
 | Setting | ChronosJAV Default | Standard Default |
 |---------|-------------------|-----------------|
-| **Decoding** | Greedy (beam=1) | Beam search (beam=5) |
+| **Decoding** | Greedy (beam=1) | differs by pipeline (Balanced: beam search with 2 beams) |
 | **Speech Segmenter** | FireRedVAD, TEN VAD or WhisperSeg, by pass (see below) | differs by pipeline |
-| **Timestamp Mode** | VAD only (since 1.10.1, as in 1.9.5; 1.10.0: Aligner + VAD fallback) | Full alignment |
-| **Cleaner** | Passthrough | Standard sanitizer |
+| **Timestamp Mode** | VAD only (since 1.10.1, as in 1.9.5; 1.10.0: Aligner + VAD fallback) | the Whisper model's own times |
+| **Text Cleaner** | Qwen3-ASR: Qwen3 AssemblyTextCleaner; anime-whisper: its own text cleaner | — |
+| **Clean-up after the subtitles are made** | ChronosJAV's own: it removes lone lines such as 「あ。」, lines made only of moaning or breathing sounds, and overlaps where two scenes meet, among other steps; no hallucination filter | the sanitizer, with the hallucination filter |
 
 The speech segmenter a ChronosJAV pass starts with: in the **Ensemble Mode** tab, FireRedVAD for Qwen3-ASR as Pass 1, WhisperSeg for Anime-Whisper as Pass 1, and TEN VAD for either as Pass 2. On the command line: WhisperSeg for `--mode qwen`; in an Ensemble run the same as in the GUI. The pass's **Speech Segmenter** menu, `--pass1-speech-segmenter` / `--pass2-speech-segmenter` or `--qwen-segmenter` changes it.
 
