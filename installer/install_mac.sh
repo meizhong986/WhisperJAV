@@ -48,14 +48,14 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 # dialog first. This is the one place the check exists twice.
 check_supported_mac() {
     if [[ "$(sysctl -n hw.optional.arm64 2>/dev/null)" != "1" ]]; then
-        echo "WhisperJAV 1.10.0 does not support Intel Macs. This is due to PyTorch 2.11, which WhisperJAV 1.10.0 needs, not being made for Intel Macs. Nothing was installed."
+        echo "WhisperJAV 1.10 does not support Intel Macs. This is due to PyTorch 2.11, which WhisperJAV 1.10 needs, not being made for Intel Macs. Nothing was installed."
         exit 1
     fi
     local version major
     version="$(sw_vers -productVersion 2>/dev/null)"
     major="${version%%.*}"
     if [[ -n "$major" && "$major" -lt 14 ]]; then
-        echo "WhisperJAV 1.10.0 does not support macOS $version. This is due to ONNX Runtime 1.29, which WhisperJAV 1.10.0 needs: it requires macOS 14 (Sonoma) or newer. Nothing was installed."
+        echo "WhisperJAV 1.10 does not support macOS $version. This is due to ONNX Runtime 1.29, which WhisperJAV 1.10 needs: it requires macOS 14 (Sonoma) or newer. Nothing was installed."
         exit 1
     fi
 }
