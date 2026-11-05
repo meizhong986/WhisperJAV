@@ -216,12 +216,14 @@ class SrtCleanup:
         if count and NONLINGUISTIC in self.stages:
             from whisperjav.modules.subtitle_pipeline.cleaners.nonlinguistic_utterance_filter import (
                 NonlinguisticUtteranceFilter)
-            logger.info("Post-processing: looking for non-linguistic lines")
+            logger.debug("Post-processing: looking for non-linguistic lines")
             before = self._read(stitched) if trace else None
             r = NonlinguisticUtteranceFilter().filter_srt_file(stitched)
             stats["nonlinguistic_dropped"] = r.get("dropped_nonlinguistic", 0)
             stats["empty_removed"] = stats.get("empty_removed", 0) + r.get("dropped_empty", 0)
             count = r.get("final_count", count)
+            # The count line stays on the console, also for 0: the filter's own line shows only when it drops
+            # something, and this step rewrites the file in place (#372; review F7).
             logger.info(f"Post-processing: dropped {stats['nonlinguistic_dropped']} non-linguistic lines")
             if trace:
                 self._record_filter(sanitizer, before, self._read(stitched), "nonlinguistic_line")
