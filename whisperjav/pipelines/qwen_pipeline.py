@@ -388,6 +388,11 @@ class QwenPipeline(BasePipeline):
         # Output config
         self.subs_language = subs_language
         self.lang_code = normalize_language_code(language or "ja")
+        # The raw copy (requirement R-RAW, owner W334 D1, W514 6): the joined subtitles before Phase 8, kept in
+        # raw_subs/ as the GGUF pipelines keep theirs. An Ensemble pass points both at its own output folder and
+        # names the pass (ensemble/pass_worker.py: _configure_trace).
+        self.raw_subs_dir: Optional[str] = None
+        self.pass_tag: Optional[str] = None
 
         # Shared modules (lightweight, safe to create in __init__)
         # v1.8.5+: Extract at 16kHz when enhancer is "none", 48kHz for real enhancers
@@ -686,6 +691,24 @@ class QwenPipeline(BasePipeline):
         (self.temp_dir / f"{media_basename}{self.SAVE_POINT_STAGE_SUFFIX}").write_text(
             _json.dumps({"stage": stage, "subtitles": count}), encoding="utf-8")
         logger.info("Save-point (%s): %d subtitles in %s", stage, count, target)
+
+    def _keep_raw_copy(self, stitched: Path, media_basename: str) -> Optional[Path]:
+        """Copy the joined subtitles, before Phase 8 cleans them in place, to raw_subs/ (requirement R-RAW, owner
+        W334 D1, W514 6): <name>.qwen_stitched.original.srt, in an Ensemble pass <name>.pass<N>.qwen_stitched
+        .original.srt beside the pass's file -- the GGUF pipelines' names (crispasr/cleanup.py: file_stem). An
+        earlier run's copy of the same name is replaced. A copy that cannot be written never stops the run."""
+        from whisperjav.crispasr.cleanup import RAW_SUBS, file_stem
+
+        folder = Path(self.raw_subs_dir) if self.raw_subs_dir else self.output_dir / RAW_SUBS
+        target = folder / f"{file_stem(media_basename, 'qwen', self.pass_tag)}.original.srt"
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(stitched, target)
+        except OSError as e:
+            logger.warning("Phase 8: the copy of the subtitles before clean-up could not be saved (%s)", e)
+            return None
+        logger.info("Phase 8: saving a copy of the original to %s", target)
+        return target
 
     def process(self, media_info: Dict) -> Dict:
         """
@@ -1186,6 +1209,12 @@ class QwenPipeline(BasePipeline):
             "total_subtitles": num_subtitles,
             "scenes_contributed": len(scene_srt_info),
         }
+
+        # The raw copy before Phase 8 cleans the joined file in place (requirement R-RAW, owner W514 6).
+        if num_subtitles > 0:
+            raw_copy = self._keep_raw_copy(stitched_srt_path, media_basename)
+            if raw_copy:
+                master_metadata["stages"]["stitching"]["original_srt"] = str(raw_copy)
 
         # ==============================================================
         # PHASE 8: SANITISATION
