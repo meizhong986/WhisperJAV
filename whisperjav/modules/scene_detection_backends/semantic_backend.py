@@ -97,7 +97,7 @@ class SemanticSceneDetector:
                 logger_instance=logger,
             )
 
-            logger.info("SemanticSceneDetector initialized")
+            logger.debug("SemanticSceneDetector initialized")
 
         except ImportError as e:
             # Let ImportError propagate naturally so the factory's fallback
