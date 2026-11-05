@@ -74,7 +74,7 @@ class CrispASRTimer:
             return
         self._timer.unload()
         self._timer = None
-        logger.info("[CrispASRTimer] Timing model unloaded")
+        logger.debug("[CrispASRTimer] Timing model unloaded")
 
     def time(self, audio: Union[Path, str, np.ndarray]) -> list[TimedSegment]:
         """The frame's timed segments, onsets in seconds from the frame's start."""
