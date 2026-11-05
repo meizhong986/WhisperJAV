@@ -59,6 +59,40 @@ from whisperjav.modules.subtitle_pipeline.types import (
 from whisperjav.utils.logger import logger
 from whisperjav.modules.model_audio import MIN_MODEL_AUDIO_S
 
+# What one frame is called in the progress lines, by the framer that made it (document B, "frame (ChronosJAV)"): a
+# VAD group with the vad-grouped framer (the default), the whole scene with full-scene, a frame with the others.
+_FRAME_NOUN = {"vad-grouped": "VAD groups", "full-scene": "scenes"}
+
+
+def frame_noun(scene_frames) -> str:
+    """The plural noun for the frames of this run's progress lines (review F4)."""
+    for frames in scene_frames:
+        for frame in frames:
+            return _FRAME_NOUN.get(getattr(frame, "source", ""), "frames")
+    return "frames"
+
+
+class _StepProgress:
+    """One console line at every tenth of a step's frames (owner W509, console item 1), worded as MOSS-CrispASR's
+    progress line ("Text generation: 8 of 77 VAD groups transcribed (10%)"); the lines per scene are DEBUG (kept in
+    the log file). The total counts only the frames the step works on (review F4): for text generation the frames
+    sent to the ASR model, for alignment and the timing model the frames with text."""
+
+    def __init__(self, label: str, verb: str, total: int, noun: str = "VAD groups"):
+        self.label, self.verb, self.total, self.noun = label, verb, total, noun
+        self.done = 0
+        self.next = 10
+
+    def advance(self, n: int) -> None:
+        if self.total <= 0 or self.next > 100 or n <= 0:
+            return
+        self.done = min(self.total, self.done + n)
+        percent = int(self.done * 100 / self.total)
+        if percent >= self.next or self.done >= self.total:
+            logger.info("%s: %d of %d %s %s (%d%%)", self.label, self.done, self.total, self.noun, self.verb,
+                        percent)
+            self.next = 101 if self.done >= self.total else (percent // 10 + 1) * 10
+
 try:
     import soundfile as sf
 except ImportError:
@@ -237,7 +271,7 @@ class DecoupledSubtitlePipeline:
         self.timing_unavailable = None
 
         logger.info(
-            "[DecoupledPipeline] Processing %d scenes (aligner=%s, timer=%s, step-down=%s%s)",
+            "Processing %d scenes (aligner=%s, timer=%s, step-down=%s%s)",
             n_scenes,
             "yes" if self.aligner else "none",
             "yes" if self.timer else "none",
@@ -276,7 +310,7 @@ class DecoupledSubtitlePipeline:
 
         if stepdown_enabled:
             logger.info(
-                "[DecoupledPipeline] Step-down: %d/%d scenes collapsed, "
+                "Step-down: %d/%d scenes collapsed, "
                 "retrying with tighter framing (%.1fs max group)",
                 len(collapsed_indices), n_scenes,
                 self.stepdown_config.fallback_max_group_s,
@@ -315,7 +349,7 @@ class DecoupledSubtitlePipeline:
                 if improved:
                     results[idx] = retry_result
                     logger.info(
-                        "[DecoupledPipeline] Step-down: Scene %d improved (was COLLAPSED → %s)",
+                        "Step-down: Scene %d improved (was COLLAPSED → %s)",
                         idx, _pass2_diag.get("sentinel_status", "?"),
                     )
                 else:
@@ -323,7 +357,7 @@ class DecoupledSubtitlePipeline:
                     # (proportional recovery was already applied in _step9)
                     results[idx] = retry_result
                     logger.warning(
-                        "[DecoupledPipeline] Step-down: Scene %d still collapsed after retry",
+                        "Step-down: Scene %d still collapsed after retry",
                         idx,
                     )
         else:
@@ -335,7 +369,7 @@ class DecoupledSubtitlePipeline:
             else:
                 reason = "not configured"
             logger.warning(
-                "[DecoupledPipeline] %d/%d scenes collapsed but step-down retry is %s. "
+                "%d/%d scenes collapsed but step-down retry is %s. "
                 "Proportional recovery applied.",
                 len(collapsed_indices), n_scenes, reason,
             )
@@ -420,7 +454,7 @@ class DecoupledSubtitlePipeline:
         # Step 9 counts its scenes in sentinel_stats and writes debug artifacts: neither may count twice.
         saved_stats, saved_artifacts_dir = copy.deepcopy(self.sentinel_stats), self.artifacts_dir
         self.artifacts_dir = None
-        logger.info("[DecoupledPipeline] Save-point: the subtitles %s", stage)
+        logger.info("Save-point: the subtitles %s", stage)
         was_disabled, logger.disabled = logger.disabled, True
         try:
             draft = self._step9_reconstruct_and_harden(
@@ -432,7 +466,7 @@ class DecoupledSubtitlePipeline:
             )
         except Exception:
             logger.disabled = was_disabled
-            logger.warning("[DecoupledPipeline] Save-point could not be built; the run goes on", exc_info=True)
+            logger.warning("Save-point could not be built; the run goes on", exc_info=True)
             return
         finally:
             logger.disabled = was_disabled
@@ -440,7 +474,7 @@ class DecoupledSubtitlePipeline:
         try:
             self.save_point(draft, stage)
         except Exception:
-            logger.warning("[DecoupledPipeline] Save-point could not be written; the run goes on", exc_info=True)
+            logger.warning("Save-point could not be written; the run goes on", exc_info=True)
 
     def _run_stepdown_pass(
         self,
@@ -512,7 +546,7 @@ class DecoupledSubtitlePipeline:
         n_scenes = len(scene_audio_paths)
         dual_track = vad_audio_paths is not None
         logger.info(
-            "[DecoupledPipeline] Step 1: Framing %d scenes%s%s", n_scenes,
+            "Step 1: Framing %d scenes%s%s", n_scenes,
             f" (reframe override={framer_override_max_group}s)" if framer_override_max_group else "",
             " (dual-track: enhanced→framer, original→ASR)" if dual_track else "",
         )
@@ -530,8 +564,8 @@ class DecoupledSubtitlePipeline:
             self.aligner is None or getattr(self.aligner, "accepts_array", False)
         ) and (self.timer is None or getattr(self.timer, "accepts_array", False))
         if pathless:
-            logger.info(
-                "[DecoupledPipeline] Step 1: pathless mode — in-memory frame audio, no temp WAVs"
+            logger.debug(
+                "Step 1: pathless mode — in-memory frame audio, no temp WAVs"
             )
 
         for scene_idx, audio_path in enumerate(scene_audio_paths):
@@ -598,7 +632,7 @@ class DecoupledSubtitlePipeline:
                 frame_audio_paths.append(frame_paths)
 
             logger.debug(
-                "[DecoupledPipeline] Scene %d: %d frames (%.1fs)",
+                "Scene %d: %d frames (%.1fs)",
                 scene_idx,
                 len(frames),
                 scene_durations[scene_idx],
@@ -606,7 +640,7 @@ class DecoupledSubtitlePipeline:
 
         total_frames = sum(len(f) for f in scene_frames)
         logger.info(
-            "[DecoupledPipeline] Step 1: Complete — %d scenes, %d total frames",
+            "Step 1: Complete — %d scenes, %d total frames",
             n_scenes, total_frames,
         )
 
@@ -634,7 +668,7 @@ class DecoupledSubtitlePipeline:
 
         n_scenes = len(scene_frames)
         logger.info(
-            "[DecoupledPipeline] Steps 2-4: Generating + cleaning text for %d scenes",
+            "Steps 2-4: Generating + cleaning text for %d scenes",
             n_scenes,
         )
         step24_start = _time.monotonic()
@@ -655,6 +689,13 @@ class DecoupledSubtitlePipeline:
 
         if needs_generation:
             self.generator.load()
+        # Counted: the frames sent to the ASR model -- not those that carry their own text, nor those under
+        # MIN_MODEL_AUDIO_S, which are not sent (review F4).
+        progress = (_StepProgress("Text generation", "transcribed",
+                                  sum(1 for frames in scene_frames for f in frames
+                                      if f.text is None and f.duration >= MIN_MODEL_AUDIO_S),
+                                  frame_noun(scene_frames))
+                    if needs_generation else None)
 
         try:
             for scene_idx in range(n_scenes):
@@ -662,8 +703,8 @@ class DecoupledSubtitlePipeline:
                 audio_paths = frame_audio_paths[scene_idx]
                 raw_texts = []
 
-                logger.info(
-                    "[DecoupledPipeline] Generating scene %d/%d (%.1fs audio)...",
+                logger.debug(
+                    "Generating scene %d/%d (%.1fs audio)...",
                     scene_idx + 1, n_scenes, scene_durations[scene_idx],
                 )
 
@@ -700,7 +741,7 @@ class DecoupledSubtitlePipeline:
                     except Exception:
                         # Batch failed — fall back to per-frame
                         logger.warning(
-                            "[DecoupledPipeline] Batch generation failed for scene %d, falling back to per-frame",
+                            "Batch generation failed for scene %d, falling back to per-frame",
                             scene_idx,
                             exc_info=True,
                         )
@@ -714,7 +755,7 @@ class DecoupledSubtitlePipeline:
                                 raw_texts[gen_idx] = result.text
                             except Exception:
                                 logger.error(
-                                    "[DecoupledPipeline] Generation failed for scene %d frame %d",
+                                    "Generation failed for scene %d frame %d",
                                     scene_idx,
                                     gen_idx,
                                     exc_info=True,
@@ -724,17 +765,19 @@ class DecoupledSubtitlePipeline:
                 # Replace any remaining None with empty string
                 raw_texts = [t if t is not None else "" for t in raw_texts]
                 scene_raw_texts.append(raw_texts)
+                if progress is not None:
+                    progress.advance(len(gen_indices))
 
                 # Per-scene generation result
                 scene_chars = sum(len(t) for t in raw_texts)
                 if scene_chars == 0:
-                    logger.info(
-                        "[DecoupledPipeline]   Scene %d/%d: empty (no text generated)",
+                    logger.debug(
+                        "  Scene %d/%d: empty (no text generated)",
                         scene_idx + 1, n_scenes,
                     )
                 else:
                     logger.debug(
-                        "[DecoupledPipeline]   Scene %d/%d: %d chars",
+                        "  Scene %d/%d: %d chars",
                         scene_idx + 1, n_scenes, scene_chars,
                     )
 
@@ -749,12 +792,12 @@ class DecoupledSubtitlePipeline:
 
         if self._too_short_frames:
             logger.warning(
-                "[DecoupledPipeline] %d VAD group(s) shorter than %.1f s, with no room to widen them, were not "
+                "%d VAD group(s) shorter than %.1f s, with no room to widen them, were not "
                 "transcribed", self._too_short_frames, MIN_MODEL_AUDIO_S,
             )
 
         # Phase 2: Cleaning
-        logger.info("[DecoupledPipeline] Cleaning %d scenes", n_scenes)
+        logger.info("Cleaning %d scenes", n_scenes)
         scene_texts: list[list[str]] = []
         for scene_idx, raw_texts in enumerate(scene_raw_texts):
             clean_texts = self.cleaner.clean_batch(raw_texts)
@@ -770,7 +813,7 @@ class DecoupledSubtitlePipeline:
         n_empty = sum(1 for texts in scene_texts if all(not t.strip() for t in texts))
         elapsed = _time.monotonic() - step24_start
         logger.info(
-            "[DecoupledPipeline] Steps 2-4: Complete — %d scenes, %d chars (%d removed by cleaning), %d empty (%.1fs)",
+            "Steps 2-4: Complete — %d scenes, %d chars (%d removed by cleaning), %d empty (%.1fs)",
             n_scenes, total_clean_chars, total_raw_chars - total_clean_chars, n_empty, elapsed,
         )
 
@@ -804,7 +847,7 @@ class DecoupledSubtitlePipeline:
 
         n_scenes = len(scene_frames)
         logger.info(
-            "[DecoupledPipeline] Steps 5-7: Aligning %d scenes", n_scenes,
+            "Steps 5-7: Aligning %d scenes", n_scenes,
         )
         step57_start = _time.monotonic()
         scene_alignments: list[list[list[dict[str, Any]]]] = []
@@ -822,13 +865,18 @@ class DecoupledSubtitlePipeline:
                 name=getattr(self.aligner, "display_name", "aligner"),
                 error=f"{type(load_err).__name__}: {first_line}",
             )
-            logger.warning("[DecoupledPipeline] %s", self.alignment_unavailable, exc_info=True)
+            logger.warning("%s", self.alignment_unavailable, exc_info=True)
             try:
                 self.aligner.unload()
             except Exception:
                 pass
             self._safe_cuda_cleanup()
             return None
+        # "done", not "aligned": a frame sent to the aligner may come back without times (counted at the end of
+        # this step, "The aligner gave no times for ...") (review F4).
+        progress = _StepProgress("Alignment", "done",
+                                 sum(1 for texts in scene_texts for t in texts if t.strip()),
+                                 frame_noun(scene_frames))
         try:
             for scene_idx in range(n_scenes):
                 frames = scene_frames[scene_idx]
@@ -849,8 +897,8 @@ class DecoupledSubtitlePipeline:
                         batch_durations.append(frame.duration)
 
                 scene_chars = sum(len(t) for t in texts if t.strip())
-                logger.info(
-                    "[DecoupledPipeline] Aligning scene %d/%d (%.1fs audio, %d chars)...",
+                logger.debug(
+                    "Aligning scene %d/%d (%.1fs audio, %d chars)...",
                     scene_idx + 1, n_scenes, scene_durations[scene_idx], scene_chars,
                 )
 
@@ -880,7 +928,7 @@ class DecoupledSubtitlePipeline:
                     except Exception:
                         # Batch failed — fall back to per-frame alignment
                         logger.warning(
-                            "[DecoupledPipeline] Batch alignment failed for scene %d, falling back to per-frame",
+                            "Batch alignment failed for scene %d, falling back to per-frame",
                             scene_idx,
                             exc_info=True,
                         )
@@ -903,7 +951,7 @@ class DecoupledSubtitlePipeline:
                                 frame_alignments[frame_idx] = word_dicts
                             except Exception:
                                 logger.error(
-                                    "[DecoupledPipeline] Alignment failed for scene %d frame %d",
+                                    "Alignment failed for scene %d frame %d",
                                     scene_idx,
                                     frame_idx,
                                     exc_info=True,
@@ -914,11 +962,12 @@ class DecoupledSubtitlePipeline:
                 # library cannot open the model, or the call fails): they keep their text over the
                 # VAD group's time, and the run summary says how many (item 12).
                 frames_with_text += len(batch_indices)
+                progress.advance(len(batch_indices))
                 frames_unaligned += sum(1 for i in batch_indices if not frame_alignments[i])
 
                 scene_words = sum(len(fa) for fa in frame_alignments)
                 logger.debug(
-                    "[DecoupledPipeline]   Scene %d/%d: %d words aligned",
+                    "  Scene %d/%d: %d words aligned",
                     scene_idx + 1, n_scenes, scene_words,
                 )
 
@@ -940,13 +989,13 @@ class DecoupledSubtitlePipeline:
         )
         elapsed = _time.monotonic() - step57_start
         logger.info(
-            "[DecoupledPipeline] Steps 5-7: Complete — %d scenes aligned, %d total words (%.1fs)",
+            "Steps 5-7: Complete — %d scenes aligned, %d total words (%.1fs)",
             n_scenes, total_words, elapsed,
         )
         self._last_align_counts = (frames_with_text, frames_unaligned)
         if frames_unaligned:
             logger.warning(
-                "[DecoupledPipeline] The aligner gave no times for %d of %d VAD group(s)",
+                "The aligner gave no times for %d of %d VAD group(s)",
                 frames_unaligned, frames_with_text,
             )
 
@@ -987,7 +1036,7 @@ class DecoupledSubtitlePipeline:
                 name=getattr(self.timer, "display_name", "timing model"),
                 error=f"{type(load_err).__name__}: {first_line}",
             )
-            logger.warning("[DecoupledPipeline] %s", self.timing_unavailable, exc_info=True)
+            logger.warning("%s", self.timing_unavailable, exc_info=True)
             try:
                 self.timer.unload()
             except Exception:
@@ -995,6 +1044,9 @@ class DecoupledSubtitlePipeline:
             return None
 
         scene_timings: list[list[Optional[list[timing_rules.TimedSegment]]]] = []
+        progress = _StepProgress("Timing model", "done",
+                                 sum(1 for texts in scene_texts for t in texts if t.strip()),
+                                 frame_noun(scene_frames))
         try:
             for scene_idx, frames in enumerate(scene_frames):
                 frame_timings: list[Optional[list[timing_rules.TimedSegment]]] = []
@@ -1006,11 +1058,12 @@ class DecoupledSubtitlePipeline:
                         frame_timings.append(list(self.timer.time(audio)))
                     except Exception:
                         logger.warning(
-                            "[DecoupledPipeline] Timing failed for scene %d frame %d; its times are kept",
+                            "Timing failed for scene %d frame %d; its times are kept",
                             scene_idx, frame_idx, exc_info=True,
                         )
                         frame_timings.append(None)
                 scene_timings.append(frame_timings)
+                progress.advance(sum(1 for t in scene_texts[scene_idx] if t.strip()))
                 if self.artifacts_dir:
                     self._save_artifact(
                         scene_idx,
@@ -1025,7 +1078,7 @@ class DecoupledSubtitlePipeline:
             self.timer.unload()
 
         logger.info(
-            "[DecoupledPipeline] Step 8: Timing model done — %d scenes (%.1fs)",
+            "Step 8: Timing model done — %d scenes (%.1fs)",
             len(scene_timings), _time.monotonic() - step8_start,
         )
         return scene_timings
@@ -1074,7 +1127,7 @@ class DecoupledSubtitlePipeline:
 
         n_scenes = len(scene_frames)
         logger.info(
-            "[DecoupledPipeline] Step 9: Reconstructing %d scenes", n_scenes,
+            "Step 9: Reconstructing %d scenes", n_scenes,
         )
 
         results: list[tuple[Any, dict[str, Any]]] = []
@@ -1293,7 +1346,7 @@ class DecoupledSubtitlePipeline:
                             )
                         except Exception as regroup_err:
                             logger.warning(
-                                "[DecoupledPipeline] Scene %d: regrouping failed (%s), "
+                                "Scene %d: regrouping failed (%s), "
                                 "retrying without regrouping",
                                 scene_idx, regroup_err,
                             )
@@ -1319,8 +1372,8 @@ class DecoupledSubtitlePipeline:
                 total_segments += segment_count
 
                 # Per-scene progress
-                logger.info(
-                    "[DecoupledPipeline] Scene %d/%d: %d words → %d segments (sentinel: %s)",
+                (logger.debug if sentinel_status == "OK" else logger.info)(
+                    "Scene %d/%d: %d words → %d segments (sentinel: %s)",
                     scene_idx + 1, n_scenes, word_count, segment_count, sentinel_status,
                 )
 
@@ -1393,7 +1446,7 @@ class DecoupledSubtitlePipeline:
 
             except Exception as e:
                 logger.error(
-                    "[DecoupledPipeline] Scene %d failed: %s",
+                    "Scene %d failed: %s",
                     scene_idx,
                     e,
                     exc_info=True,
@@ -1406,7 +1459,7 @@ class DecoupledSubtitlePipeline:
                 results.append((None, asdict(error_diag)))
 
         logger.info(
-            "[DecoupledPipeline] Step 9: Complete — %d scenes, %d total segments, %d collapses",
+            "Step 9: Complete — %d scenes, %d total segments, %d collapses",
             n_scenes, total_segments, total_collapses,
         )
 
@@ -1628,7 +1681,7 @@ class DecoupledSubtitlePipeline:
             except OSError:
                 pass
         if cleaned > 0:
-            logger.debug("[DecoupledPipeline] Cleaned %d temp files", cleaned)
+            logger.debug("Cleaned %d temp files", cleaned)
         self._temp_files.clear()
 
     # -----------------------------------------------------------------------
