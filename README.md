@@ -235,7 +235,7 @@ Each stage has several interchangeable providers — the full menu, with strengt
 | **qwen** (ChronosJAV) | Qwen3-ASR | Modern text-first recognizer |
 | **anime-whisper** (ChronosJAV) | anime-whisper | Anime/JAV-tuned dialogue |
 | **transformers** | HuggingFace | Kotoba and other HF Whisper models |
-| **parakeet-crispasr**, **cohere-crispasr** (Ensemble passes) | CrispASR (GGUF models) | Japanese; experimental in 1.10.0 |
+| **parakeet**, **cohere**, **reazonspeech**, **kotoba**, **whisper-turbo**, **whisper-large**, **moss** (`*-crispasr`, Ensemble passes) | CrispASR (GGUF models) | Japanese; experimental (parakeet and cohere since 1.10.0, the others new in 1.10.1) |
 
 **Sensitivity** applies to every mode: **conservative** (fewer false positives, good for noisy content) · **balanced** · **aggressive** (catches more quiet dialogue; good for whisper/ASMR content — and the tuning target of most of our benchmark work).
 
@@ -283,7 +283,7 @@ The recipe that ties the other choices together.
 | **qwen** (ChronosJAV) | Modern text-first recognizer; robust on messy audio | Timestamps come from the VAD, so the segmenter choice matters doubly |
 | **anime-whisper** (ChronosJAV) | Best-in-class on anime-style/JAV dialogue; heavily benchmark-tuned here | Can miss very faint, isolated utterances |
 | **transformers** | Runs any HF Whisper model; best GPU path on Apple Silicon | Uses HF's own chunking — scene/segmenter choices don't apply |
-| **parakeet-crispasr** / **cohere-crispasr** | GGUF models through CrispASR, installed with WhisperJAV; scene detection, enhancement and VAD work as for the other passes | Experimental in 1.10.0; Japanese only |
+| **The seven GGUF pipelines** (`*-crispasr`) | GGUF models through CrispASR, installed with WhisperJAV; scene detection, enhancement and VAD work as for the other passes | Experimental; Japanese only |
 | **xxl** | Bring your own external engine as a pass | Self-contained: WhisperJAV's knobs don't reach inside |
 
 > **Naming note (CLI users).** *ChronosJAV* is one pipeline with interchangeable recognizers, so **qwen** and **anime-whisper** are two backends of it rather than two separate pipelines. The GUI lists them side by side in the pipeline dropdown; on the command line both live under `qwen`, and the backend is chosen inside the params:
@@ -427,9 +427,22 @@ These are starting points, not rules — see [Mix-and-match strategies](#mix-and
 
 ---
 
+## Which pipeline for which computer
+
+You choose your kind of computer once, when you install WhisperJAV.
+
+| Your computer | What uses the graphics card |
+|---|---|
+| NVIDIA graphics card | Every pipeline. |
+| AMD or Intel graphics card, or an older NVIDIA card (Windows) | The GGUF pipelines (Ensemble tab, Pipeline menu group "GGUF via crispasr"), through Vulkan. Experimental, not yet tested. The other pipelines run on the processor, several times slower. |
+| Mac with Apple silicon | transformers asks for the Apple GPU; the GGUF pipelines and fidelity ask for it too (not yet tested on a Mac). balanced, fast, faster and ChronosJAV run on the processor. |
+| No graphics card | None: every pipeline runs on the processor, several times slower than on a graphics card. |
+
+---
+
 ## Installation
 
-> **Already on 1.10?** Windows installer: upgrade with `whisperjav-upgrade`; it keeps the accelerator of your install. Source install: `git fetch --tags`, `git checkout` the new release tag, and run the installer again with the same Python environment active. Rollback is available: `whisperjav-upgrade --rollback`. **On 1.9.x?** Install 1.10.0 fresh: it needs Python 3.13, so `whisperjav-upgrade` cannot take 1.9.x to it.
+> **Already on 1.10?** Windows installer: upgrade with `whisperjav-upgrade`; it keeps the accelerator of your install. Source install: `git fetch --tags`, `git checkout` the new release tag, and run the installer again with the same Python environment active. Rollback is available: `whisperjav-upgrade --rollback`. **On 1.9.x?** Install 1.10 fresh: it needs Python 3.13, so `whisperjav-upgrade` cannot take 1.9.x to it.
 >
 > **Each install is made for one accelerator**, chosen when you install: NVIDIA GPU (CUDA), GPU through Vulkan (AMD, Intel or older NVIDIA card, Windows), Apple GPU (Metal), your own PyTorch, or CPU only. See [Accelerated or not](https://meizhong986.github.io/WhisperJAV/getting-started/#accelerated-or-not).
 
@@ -444,7 +457,7 @@ No Python knowledge needed.
 
 ### Google Colab / Kaggle
 
-Not supported by 1.10.0, which is made and tested for installs on your own computer only. The Colab expert notebook (badge at the top) keeps installing 1.9.5.
+Not supported by 1.10, which is made and tested for installs on your own computer only. The Colab expert notebook (badge at the top) keeps installing 1.9.5.
 
 <details>
 <summary><b>Windows — install from source</b></summary>
@@ -452,7 +465,7 @@ Not supported by 1.10.0, which is made and tested for installs on your own compu
 Prerequisites: Python 3.13, Git, FFmpeg in PATH.
 
 ```batch
-git clone --branch v1.10.0 https://github.com/meizhong986/whisperjav.git
+git clone --branch v1.10.1 https://github.com/meizhong986/whisperjav.git
 cd whisperjav
 installer\install_windows.bat                    :: a supported NVIDIA GPU is used; otherwise it asks
 installer\install_windows.bat --accelerator cpu  :: or choose: nvidia, vulkan, own-pytorch, cpu
@@ -468,13 +481,13 @@ Full guide: [docs/en/guides/installation_windows_python.md](docs/en/guides/insta
 xcode-select --install
 brew install python@3.13 ffmpeg portaudio git
 
-git clone --branch v1.10.0 https://github.com/meizhong986/whisperjav.git
+git clone --branch v1.10.1 https://github.com/meizhong986/whisperjav.git
 cd whisperjav
 python3.13 -m venv ~/venvs/whisperjav && source ~/venvs/whisperjav/bin/activate
 chmod +x installer/install_mac.sh && ./installer/install_mac.sh
 ```
 
-Apple silicon, macOS 14 or newer; the install is made for the Apple GPU (Metal). The transformers pipeline uses the Apple GPU and is recommended on a Mac; fidelity and the GGUF pipelines ask for it (not yet tested on a Mac); balanced, fast, faster and ChronosJAV run on the CPU. Intel Macs are not supported by 1.10.0.
+Apple silicon, macOS 14 or newer; the install is made for the Apple GPU (Metal). The transformers pipeline uses the Apple GPU and is recommended on a Mac; fidelity and the GGUF pipelines ask for it (not yet tested on a Mac); balanced, fast, faster and ChronosJAV run on the CPU. Intel Macs are not supported by 1.10.
 
 Full guide: [docs/en/guides/installation_mac_apple_silicon.md](docs/en/guides/installation_mac_apple_silicon.md)
 </details>
@@ -492,7 +505,7 @@ sudo apt-get install -y python3 python3-pip python3-venv python3-dev \
 Then:
 
 ```bash
-git clone --branch v1.10.0 https://github.com/meizhong986/whisperjav.git
+git clone --branch v1.10.1 https://github.com/meizhong986/whisperjav.git
 cd whisperjav
 chmod +x installer/install_linux.sh && ./installer/install_linux.sh
 ```
@@ -507,13 +520,13 @@ Full guide: [docs/en/guides/installation_linux.md](docs/en/guides/installation_l
 <details>
 <summary><b>Expert: your own Python environment and PyTorch</b></summary>
 
-Every 1.10.0 install gets the package versions this release was tested with: `install.py` installs them from the lock file with `uv sync`. To keep a PyTorch build you already have in your environment (for example ROCm for an AMD GPU), install with:
+Every 1.10 install gets the package versions its release was tested with: `install.py` installs them from the lock file with `uv sync`. To keep a PyTorch build you already have in your environment (for example ROCm for an AMD GPU), install with:
 
 ```bash
 python install.py --accelerator own-pytorch
 ```
 
-WhisperJAV then installs everything except PyTorch and never replaces it (experimental in 1.10.0).
+WhisperJAV then installs everything except PyTorch and never replaces it (experimental).
 </details>
 
 ### System requirements
