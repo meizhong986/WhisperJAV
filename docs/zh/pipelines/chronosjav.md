@@ -21,8 +21,6 @@ ChronosJAV 是一个为动漫和 JAV 内容设计的处理管线，运行两种 
 | | Kotoba v2.0 | ~2 GB |
 | | Kotoba v2.1 | ~2 GB |
 
-该组的第三项 **Cohere-Transcribe（暂不可用）**（Cohere-Transcribe (not available yet)）是灰色的，不能选择；见 [FAQ](../faq.md#cohere-transcribe)。
-
 !!! tip "建议"
     如果显卡显存不足 8 GB，请选择菜单标出显存更少的模型：Qwen3-ASR-0.6B（4 GB）或 Anime-Whisper 的模型（2 到 4 GB）。
 
