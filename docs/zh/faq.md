@@ -122,7 +122,7 @@ whisperjav-upgrade
 
 ## Cohere-Transcribe（尚未提供）
 
-> **状态：** WhisperJAV 尚未提供 Cohere-Transcribe。暂无发布日期。下拉菜单中的入口已置灰。
+> **状态：** WhisperJAV 尚未提供 Cohere-Transcribe。暂无发布日期。
 
 > **关于 transformers：** WhisperJAV 1.10.0 安装 transformers 5.20，以及为它制作的 WhisperJAV 自有版 `qwen-asr`（[meizhong986/Qwen3-ASR](https://github.com/meizhong986/Qwen3-ASR)）。不要把 transformers 降级到 5.0 以下。如果 Qwen3-ASR 无法加载，请再次运行安装程序，它会恢复测试过的版本。
 
