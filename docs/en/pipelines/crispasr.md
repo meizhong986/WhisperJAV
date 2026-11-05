@@ -279,10 +279,10 @@ If CrispASR's Vulkan build cannot load on Windows, the message adds: "With the G
 
   ```
   --mode crispasr is no longer available: WhisperJAV 1.10 removed the "bring your own CrispASR" mode.
-  CrispASR now runs in Ensemble Mode as two pipelines, Parakeet-CrispASR and Cohere-CrispASR, and WhisperJAV installs it itself.
+  CrispASR now runs in Ensemble Mode as the seven GGUF pipelines (parakeet-crispasr, cohere-crispasr, reazonspeech-crispasr, kotoba-crispasr, whisper-turbo-crispasr, whisper-large-crispasr, moss-crispasr), and WhisperJAV installs it itself.
   Example:
       whisperjav --ensemble --pass1-pipeline parakeet-crispasr <your video>
-  In the GUI: open the Ensemble Mode tab and choose parakeet or cohere under GGUF via crispasr in the Pass 1 or Pass 2 menu.
+  In the GUI: open the Ensemble Mode tab and choose one under GGUF via crispasr or Experimental, open to feedback in the Pass 1 or Pass 2 menu.
   ```
 
 - In the GUI, the **crispasr** entry of the Mode menu in the Transcription Mode tab is gone, and so is the old **CrispASR** pipeline with its Backend choice in the Ensemble Mode tab.
