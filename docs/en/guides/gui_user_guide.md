@@ -184,7 +184,7 @@ Always active. Each pass has identical controls:
 
 | Control | Options | Default |
 |---------|---------|---------|
-| **Pipeline** | Whisper-Based: Balanced, Fast, Faster, Fidelity; HuggingFace: Transformers (HF); ChronosJAV: Qwen3-ASR, Anime-Whisper; External (BYOP): XXL Faster Whisper; GGUF via crispasr: parakeet, cohere, reazonspeech, kotoba, whisper-turbo, whisper-large, moss | Pass 1: cohere; Pass 2: parakeet (off until ticked) |
+| **Pipeline** | Whisper-Based: Balanced, Fast, Faster, Fidelity; HuggingFace: Transformers (HF); ChronosJAV: Qwen3-ASR, Anime-Whisper; External (BYOP): XXL Faster Whisper; GGUF via crispasr: parakeet, cohere; Experimental, open to feedback: reazonspeech, kotoba, whisper-turbo, whisper-large, MOSS | Pass 1: cohere; Pass 2: parakeet (off until ticked) |
 | **Sensitivity** | Aggressive, Balanced, Conservative | set when you choose the pipeline: Pass 1 (cohere) Balanced, Pass 2 (parakeet) Aggressive |
 | **Scene Detector** | Auditok, Silero, Semantic, None | Semantic |
 | **Speech Enhancer** | None, FFmpeg DSP, ZipEnhancer, htdemucs (BS-RoFormer and ZipEnhancer ONNX: coming soon) | None |
@@ -200,7 +200,7 @@ The pipeline dropdown groups options by backend:
 - **Whisper-Based**: Balanced, Fast, Faster, Fidelity
 - **HuggingFace**: Transformers
 - **ChronosJAV**: Qwen3-ASR, Anime-Whisper
-- **GGUF via crispasr**: parakeet (Parakeet-CrispASR), cohere (Cohere-CrispASR), reazonspeech (ReazonSpeech-CrispASR), kotoba (Kotoba-CrispASR), whisper-turbo (Whisper-Turbo-CrispASR), whisper-large (Whisper-Large-CrispASR), moss (MOSS-CrispASR) — Japanese only, all experimental; parakeet and cohere since 1.10.0, the other five new in 1.10.1 (see [GGUF pipelines (CrispASR)](../pipelines/crispasr.md))
+- **GGUF via crispasr**: parakeet (Parakeet-CrispASR), cohere (Cohere-CrispASR); below a divider line, **Experimental, open to feedback**: reazonspeech (ReazonSpeech-CrispASR), kotoba (Kotoba-CrispASR), whisper-turbo (Whisper-Turbo-CrispASR), whisper-large (Whisper-Large-CrispASR), MOSS (MOSS-CrispASR) — Japanese only, all experimental; parakeet and cohere since 1.10.0, the other five new in 1.10.1 (see [GGUF pipelines (CrispASR)](../pipelines/crispasr.md))
 - **External (BYOP)**: XXL Faster Whisper (Pass 1, Pass 2 or both)
 
 ### Customize Parameters
@@ -213,7 +213,7 @@ The tabs depend on the pass's pipeline: **Model**, **Quality**, **Segmenter**, *
 
 The **Model** tab has a **Device** menu: **Auto (the GPU when one can be used, else the CPU)** (the default), **NVIDIA GPU (CUDA)** or **CPU (not accelerated)**.
 
-For a GGUF pass (any pipeline under **GGUF via crispasr**), the modal has four tabs: **Segmenter**, **Enhancer**, **Scene** and **Timing**; for **moss** (MOSS-CrispASR) it also has a **MOSS** tab. They start from the values the pass runs with. A status panel under the pass row shows the model (downloaded or not) and where CrispASR will run, for example "GPU: asks for the NVIDIA GPU (CUDA)". The **Timing** tab has one menu, **Word timestamps**: **From the model** or **From the aligner (wav2vec2-ja)**, with the pipeline's default marked "(default)". When the pass's subtitle times come from the aligner (the default for cohere, or any GGUF pass set to From the aligner), the status panel also lists the aligner.
+For a GGUF pass (any pipeline under **GGUF via crispasr** or **Experimental, open to feedback**), the modal has four tabs: **Segmenter**, **Enhancer**, **Scene** and **Timing**; for **MOSS** (MOSS-CrispASR) it also has a **MOSS** tab. They start from the values the pass runs with. A status panel under the pass row shows the model (downloaded or not) and where CrispASR will run, for example "GPU: asks for the NVIDIA GPU (CUDA)". The **Timing** tab has one menu, **Word timestamps**: **From the model** or **From the aligner (wav2vec2-ja)**, with the pipeline's default marked "(default)". When the pass's subtitle times come from the aligner (the default for cohere, or any GGUF pass set to From the aligner), the status panel also lists the aligner.
 
 For a ChronosJAV pass (Qwen3-ASR, Anime-Whisper), the **Alignment** tab sets the subtitle timing (see [Subtitle timing](../pipelines/chronosjav.md#subtitle-timing-1100)):
 
