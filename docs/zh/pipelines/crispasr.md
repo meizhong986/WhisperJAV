@@ -281,10 +281,10 @@ whisperjav --ensemble --pass1-pipeline parakeet-crispasr --dump-params settings.
 
   ```
   --mode crispasr is no longer available: WhisperJAV 1.10 removed the "bring your own CrispASR" mode.
-  CrispASR now runs in Ensemble Mode as two pipelines, Parakeet-CrispASR and Cohere-CrispASR, and WhisperJAV installs it itself.
+  CrispASR now runs in Ensemble Mode as the seven GGUF pipelines (parakeet-crispasr, cohere-crispasr, reazonspeech-crispasr, kotoba-crispasr, whisper-turbo-crispasr, whisper-large-crispasr, moss-crispasr), and WhisperJAV installs it itself.
   Example:
       whisperjav --ensemble --pass1-pipeline parakeet-crispasr <your video>
-  In the GUI: open the Ensemble Mode tab and choose parakeet or cohere under GGUF via crispasr in the Pass 1 or Pass 2 menu.
+  In the GUI: open the Ensemble Mode tab and choose one under GGUF via crispasr or Experimental, open to feedback in the Pass 1 or Pass 2 menu.
   ```
 
 - GUI 中，Transcription Mode 选项卡 Mode 菜单里的 **crispasr** 项已删除，专家模式（Ensemble Mode）选项卡中带 Backend 选项的旧 **CrispASR** 处理管线也已删除。
