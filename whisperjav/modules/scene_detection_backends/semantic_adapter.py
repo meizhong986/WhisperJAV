@@ -31,6 +31,23 @@ import soundfile as sf
 from whisperjav.utils.logger import logger
 
 
+class _EngineLog:
+    """The vendored engine's step and diagnosis lines (added for #267) go to DEBUG, so they are in the log file
+    and on the console with --debug (owner W509, console item 1); its environment warning ("*** WARNING")
+    stays a warning."""
+
+    def __init__(self, target):
+        self.target = target
+
+    def log(self, level, msg, *args, **kwargs):
+        if level <= logging.INFO:
+            level = logging.WARNING if "*** WARNING" in str(msg) else logging.DEBUG
+        self.target.log(level, msg, *args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self.target, name)
+
+
 @dataclass
 class SemanticClusteringConfig:
     """
@@ -223,7 +240,7 @@ class SemanticClusteringAdapter:
             self._engine = process_movie_v7
             self._engine_config_class = SegmentationConfig
 
-            logger.info(
+            logger.debug(
                 f"SemanticAudioClustering engine loaded (v{engine_version})"
             )
 
@@ -271,7 +288,7 @@ class SemanticClusteringAdapter:
             - Saves JSON metadata to temp_dir (or output_dir)
             - Populates self.scenes_detected, self.semantic_metadata, etc.
         """
-        logger.info(f"Starting Semantic Audio Clustering for: {audio_path}")
+        logger.debug(f"Starting Semantic Audio Clustering for: {audio_path}")
 
         # Reset data contract fields
         self.scenes_detected = []
@@ -315,7 +332,7 @@ class SemanticClusteringAdapter:
                 output_path=str(json_output_path),
                 config=engine_config,
                 visualize=self.config.visualize,
-                logger=self.logger,
+                logger=_EngineLog(self.logger) if self.logger is not None else None,
                 progress_callback=self._wrap_progress_callback(0.1, 0.7),
             )
         except Exception as e:
@@ -345,7 +362,7 @@ class SemanticClusteringAdapter:
         if self.progress_callback:
             self.progress_callback(1.0, "Semantic scene detection complete")
 
-        logger.info(
+        logger.debug(
             f"Semantic clustering complete: {len(scene_tuples)} scenes extracted"
         )
 
