@@ -1,6 +1,6 @@
 # WhisperJAV Linux Installation Guide
 
-**Version:** 1.10.0
+**Version:** 1.10.1
 
 Nobody in the project has run WhisperJAV 1.10.0 on Linux yet. Please tell us how it works for you: https://github.com/meizhong986/WhisperJAV/issues
 
@@ -139,7 +139,7 @@ To install the driver:
 With the virtual environment active:
 
 ```bash
-git clone --branch v1.10.0 https://github.com/meizhong986/WhisperJAV.git
+git clone --branch v1.10.1 https://github.com/meizhong986/WhisperJAV.git
 cd WhisperJAV
 chmod +x installer/install_linux.sh
 ./installer/install_linux.sh
