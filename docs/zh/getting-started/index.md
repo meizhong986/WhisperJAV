@@ -11,7 +11,7 @@ WhisperJAV 1.10.0 可在 Windows、Linux 和 Apple silicon Mac 上运行。请�
 | 使用 Apple silicon Mac（M1 或更新） | [macOS 指南](../guides/installation_mac_apple_silicon.md) |
 | 使用 Linux | [Linux 指南](../guides/installation_linux.md) |
 
-**从 1.9.x 升级？** 请全新安装 1.10.0。1.10.0 需要 Python 3.13，因此 `whisperjav-upgrade` 无法把 1.9.x 安装升级到 1.10.0。用户设置文件夹中的设置会保留。
+**从 1.9.x 升级？** 请全新安装最新的 1.10 版本。1.10 需要 Python 3.13，因此 `whisperjav-upgrade` 无法把 1.9.x 安装升级到 1.10。用户设置文件夹中的设置会保留。
 
 **Google Colab 和 Kaggle** 不受 1.10.0 支持：1.10.0 只为在你自己的电脑上安装而制作和测试。Colab 专家版 notebook 继续安装 1.9.5。
 
