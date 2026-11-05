@@ -34,7 +34,7 @@ Nobody in the project has run WhisperJAV 1.10.0 on Linux yet. Please tell us how
 
 **Not supported** (the installer says so and installs nothing): glibc older than 2.35 — Ubuntu 20.04, Debian 11, openSUSE Leap 15.5 (glibc 2.31); Red Hat Enterprise Linux 9, Rocky Linux 9, AlmaLinux 9 (glibc 2.34). To see your glibc version: `ldd --version`.
 
-**AMD and Intel GPUs on Linux:** in 1.10.0, the GGUF pipelines (Parakeet-CrispASR, Cohere-CrispASR) run on the CPU on Linux, because CrispASR publishes no Linux GPU package for AMD or Intel yet. With your own PyTorch build for your GPU (for example ROCm for an AMD GPU), the PyTorch pipelines can ask for it — see [Own PyTorch](#own-pytorch).
+**AMD and Intel GPUs on Linux:** in 1.10, the GGUF pipelines run on the CPU on Linux, because CrispASR publishes no Linux GPU package for AMD or Intel yet. With your own PyTorch build for your GPU (for example ROCm for an AMD GPU), the PyTorch pipelines can ask for it — see [Own PyTorch](#own-pytorch).
 
 ---
 
@@ -231,7 +231,7 @@ A 1.9.x environment cannot be updated to 1.10.0: 1.10.0 needs Python 3.13. Make 
 
 ## Troubleshooting
 
-**"WhisperJAV 1.10.0 does not support this Linux".** Its glibc is older than 2.35; the message names the version. Nothing was installed. Use a newer distribution release.
+**"WhisperJAV 1.10 does not support this Linux".** Its glibc is older than 2.35; the message names the version. Nothing was installed. Use a newer distribution release.
 
 **The run stops: "THE NVIDIA GPU CANNOT BE USED".** The install is made for the NVIDIA GPU and the GPU cannot be used now. The box names the reason (for example the driver) and the fix; `--device cpu` runs that one job on the CPU. `nvidia-smi` shows whether the driver is loaded.
 
