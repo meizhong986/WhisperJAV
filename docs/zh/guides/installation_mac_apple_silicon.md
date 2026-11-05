@@ -102,7 +102,7 @@ chmod +x installer/install_mac.sh
 |---|---|
 | **transformers** | Apple GPU（Metal）——**在 Mac 上推荐** |
 | **fidelity** | 向 PyTorch 请求使用 Apple GPU（Metal）；尚未在 Mac 上测试。如果失败，请使用 transformers 处理管线。 |
-| **GGUF 处理管线**（parakeet、cohere、reazonspeech、kotoba、whisper-turbo、whisper-large、moss） | 请求使用 Apple GPU（Metal）；尚未在 Mac 上测试 |
+| **GGUF 处理管线**（parakeet、cohere、reazonspeech、kotoba、whisper-turbo、whisper-large、MOSS） | 请求使用 Apple GPU（Metal）；尚未在 Mac 上测试 |
 | **balanced、fast、faster** | CPU（不加速），慢好几倍：它们的引擎（CTranslate2）无法使用 Apple GPU |
 | **ChronosJAV**（Qwen3-ASR、anime-whisper） | 在 1.10 中为 CPU（不加速）：其 ASR 模型尚不使用 Apple GPU |
 | WhisperSeg 语音分割器 | CPU，所有安装中都是 |
