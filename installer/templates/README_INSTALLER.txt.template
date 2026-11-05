@@ -3,20 +3,27 @@
                 Japanese AV Subtitle Generator with AI
 ===============================================================================
 
-Thank you for installing WhisperJAV!
+Thank you for installing WhisperJAV.
+
+The full guide for this installer is on the web:
+https://meizhong986.github.io/WhisperJAV/guides/installation_windows_standalone/
 
 -------------------------------------------------------------------------------
 QUICK START
 -------------------------------------------------------------------------------
-1. Double-click the "WhisperJAV v{{VERSION}}" desktop icon
-2. Select your video/audio files using "Add File(s)" or "Add Folder"
-3. Choose processing mode (Balanced recommended for best quality)
-4. Click "Start" to begin processing
-5. Subtitles will be saved next to your media files in an output folder
+1. Double-click the "WhisperJAV v{{VERSION}}" desktop shortcut, or
+   WhisperJAV-GUI.exe in the install folder.
+2. Click "Add File(s)" or "Add Folder" and choose your videos.
+3. In the "Transcription Mode" tab, choose a mode (balanced is a good
+   start). The "Ensemble Mode" tab runs pass 1, and also pass 2 when you
+   tick "Pass 2", then combines the two.
+4. Click "Start". It runs Ensemble Mode when the "Ensemble Mode" tab is
+   open, and Transcription Mode when the "Transcription Mode" tab is open.
+5. The subtitles are written next to each video while "Save next to source
+   video" is ticked (the default), else into the folder you chose.
 
-FIRST RUN NOTE: On your first transcription, AI models will download (~3GB).
-                This is a one-time process that takes 5-10 minutes depending
-                on your internet speed. Progress is shown in the GUI.
+The first time a pipeline needs a model, WhisperJAV downloads it (for
+example about 3 GB for Whisper large-v3). Later runs reuse it.
 
 -------------------------------------------------------------------------------
 WHAT'S NEW IN v{{VERSION}}
@@ -25,340 +32,205 @@ WHAT'S NEW IN v{{VERSION}}
 {{! It is the first thing a user reads after installing, and only the version
 {{! number is substituted -- the words below are not. Up to v1.9.2 this section
 {{! still described the v1.9.0 features as "NEW" under whatever version was
-{{! being built, because nobody rewrote it. Rewrite it or delete it; do not
-{{! leave the previous release's text in place. Lines starting {{! are stripped
-{{! by build_release.py and never reach the user.
-1. SAVED OUTPUT FOLDER (GUI)
-   - With "Remember settings" on, an empty saved output folder sent your
-     subtitles into WhisperJAV's program folder. They now go next to the
-     video, as the "Save next to source video" box shows.
+{{! being built, because nobody rewrote it; v1.10.0 shipped v1.9.5's text.
+{{! Rewrite it or delete it; do not leave the previous release's text in place.
+{{! Lines starting {{! are stripped by build_release.py and never reach the user.
+Compared with 1.10.0, the release before it:
 
-2. TRANSLATION
-   - Ollama: local models sometimes repeat <summary> and <scene> blocks in
-     a reply, and these could end up as subtitle lines. WhisperJAV now
-     removes the repeated blocks before reading the reply. Ollama only.
-   - DeepSeek: the default model is now deepseek-flash, DeepSeek's current
-     name. DeepSeek still accepts the old name, deepseek-v4-flash. If you
-     saved deepseek-v4-flash, it is kept.
+- Five new GGUF pipelines, experimental, in the "Ensemble Mode" tab
+  (Pipeline menu, group "Experimental, open to feedback"): reazonspeech,
+  kotoba, whisper-turbo, whisper-large and MOSS. Japanese only. CrispASR,
+  which runs them, is updated to 0.8.50.
+- ChronosJAV (Qwen3-ASR, anime-whisper) now times each subtitle by its VAD
+  group by default. No aligner and no timing model run unless you choose
+  them under "Customize Parameters".
+- "Finish each file" is on by default: an Ensemble run finishes each file
+  before the next one starts, and loads each pass's models again for every
+  file.
+- Fixed: the Qwen3-ASR fine-tunes JA Anime-Galgame and JA-tuned writing
+  random text (#494). The timing model, when you choose it, is no longer
+  given audio under 0.2 s (#498, #500); a very short stretch inside longer
+  audio can still cause the crash.
+- Fixed in AI translation (#460): answer labels in other languages, such as
+  Chinese, left in the translation. Subtitles the model did not translate
+  are now named by number and the run ends with TRANSLATION INCOMPLETE;
+  they are still left out of the translated file.
+- Each GUI run writes a log file, raw_subs\whisperjav_run.log, in the output
+  folder; while "Save next to source video" is ticked, next to the first
+  item in the file list (inside it, if that item is a folder). Each run
+  replaces the last.
+- Not fixed yet: ZipEnhancer cleans only the first file of a single-pass
+  run, and of an Ensemble run with "Finish each file" unticked. Planned for
+  1.10.2.
 
-3. ENSEMBLE MODE DEFAULTS
-   - Pass 1 now starts as Qwen3-ASR with FireRedVAD, and pass 2 as
-     Anime-Whisper with TEN VAD, both on Aggressive. Pass 2 stays off
-     until you tick it.
-   - With "Remember settings" on, your saved rows are kept until you
-     change them.
-
-4. INSTALLING
-   - On 1.9.3 or 1.9.4, "whisperjav-upgrade --wheel-only" is enough:
-     1.9.5 changes no library underneath WhisperJAV.
-
-For the full release notes, see the v{{VERSION}} release page:
-https://github.com/meizhong986/WhisperJAV/releases
-
--------------------------------------------------------------------------------
-WHAT THIS INSTALLER DOES
--------------------------------------------------------------------------------
-This installer sets up a complete, self-contained WhisperJAV environment:
-
-1. Base Environment Setup (~1-2 minutes)
-   - Python 3.13.16 with conda package manager
-   - FFmpeg for audio/video processing
-   - Git for GitHub package installs
-
-2. Post-Installation Downloads (~8-15 minutes, ~2.5 GB download)
-   - PyTorch with CUDA support (for NVIDIA GPU acceleration)
-     OR CPU-only PyTorch (if no compatible GPU detected)
-   - Python dependencies (Whisper, audio processing, translation)
-   - WhisperJAV application from GitHub
-
-3. Optional: Local LLM Installation (Requires User Acceptance)
-   - You will be prompted to optionally install a local Large Language Model
-   - This enables offline AI-powered features without requiring API keys
-   - Requires additional ~4-8 GB disk space
-   - You can skip this step and install later if needed
-   - NOTE: This step requires user interaction (Yes/No prompt)
-
-4. Setup and Configuration
-   - WhisperJAV-GUI.exe launcher created in installation folder
-   - Desktop shortcut creation (points to WhisperJAV-GUI.exe)
-   - Environment configuration
-   - WebView2 runtime check (required for GUI)
-
-TOTAL INSTALLATION TIME: ~10-20 minutes (depending on internet speed)
-TOTAL DISK SPACE REQUIRED: ~8 GB (install + cache + models)
+Full release notes:
+https://github.com/meizhong986/WhisperJAV/releases/tag/v{{VERSION}}
 
 -------------------------------------------------------------------------------
-SYSTEM REQUIREMENTS
+WHAT THIS INSTALL IS MADE FOR
 -------------------------------------------------------------------------------
-MINIMUM:
-  - Windows 10 (64-bit) or Windows 11
-  - 8 GB RAM (16 GB recommended for large models)
-  - 8 GB free disk space (install + models + cache)
-  - Internet connection (for downloads)
-  - Microsoft Edge WebView2 Runtime (installer will prompt if missing)
+Each install is made for one accelerator, chosen when you install:
 
-RECOMMENDED FOR BEST PERFORMANCE:
-  - NVIDIA GPU with 6+ GB VRAM (RTX 2060 or better)
-  - NVIDIA Driver with CUDA 11.8 or newer (CUDA 12.1+ preferred)
-  - 16 GB RAM
-  - SSD for faster processing
+- NVIDIA GPU (CUDA): chosen without a question on a PC with an NVIDIA card
+  of the GTX 16 series, RTX 20 series or newer, and driver 580 or newer.
+  Every pipeline uses the GPU.
+- GPU through Vulkan: for an AMD, Intel or older NVIDIA card. The GGUF
+  pipelines ask for the card through Vulkan (experimental, not yet tested
+  on AMD or Intel cards); the other pipelines run on the CPU, several times
+  slower. If Vulkan is not found on the PC, the CPU-only version is
+  installed.
+- Own PyTorch (advanced): WhisperJAV installs everything except PyTorch.
+  You add your PyTorch build with the command the installer shows at the
+  end; it is also saved in OWN_PYTORCH_NEXT_STEP.txt in the install folder.
+  Until you have run it, every WhisperJAV command stops and shows it again.
+- CPU only: every pipeline runs on the CPU (not accelerated).
 
-SUPPORTED PLATFORMS (v{{VERSION}}):
-  - Windows: NVIDIA GPU (RTX 20/30/40/50-series) or CPU-only
-  - macOS: Apple Silicon (M1/M2/M3/M4/M5) with native MPS acceleration
-  - macOS: Intel (CPU-only, slower)
-  - Linux: NVIDIA GPU or CPU-only
+The choice is kept in whisperjav_stack.txt in the install folder; every run
+and every upgrade follow it. To change it, run the installer again into the
+same folder: it removes the old install, then asks again. On an Own PyTorch
+install, add your PyTorch again afterwards.
 
-CPU-ONLY MODE:
-  WhisperJAV can run without an NVIDIA GPU using CPU-only mode, but
-  processing will be significantly slower (6-10x slower than GPU mode).
-  Expect 30-60 minutes per hour of video on CPU vs 5-10 minutes on GPU.
-
-CUDA GPU ACCELERATION:
-  The installer automatically detects your NVIDIA driver's CUDA version and
-  installs the best matching PyTorch build for optimal performance:
-
-  - Driver 450+: PyTorch with CUDA 11.8 support (broad compatibility)
-  - Driver 570+: PyTorch with CUDA 12.8 support (RTX 50-series, optimal)
-
-  This ensures you get the best possible GPU acceleration for your hardware
-  while maintaining compatibility with your driver version.
+-------------------------------------------------------------------------------
+YOUR COMPUTER
+-------------------------------------------------------------------------------
+- Windows 10 or 11, 64-bit. Windows on ARM is not supported.
+- 8 GB RAM (16 GB recommended).
+- About 10 GB free disk space, for the install and the models it downloads.
+- Internet while installing, and on the first run of each model.
+- Microsoft Edge WebView2 Runtime, for the GUI (if it is missing, the
+  installer opens its download page).
+- For the GGUF pipelines: a processor with AVX2 (Intel since 2013, AMD since
+  2015).
 
 -------------------------------------------------------------------------------
 AFTER INSTALLATION
 -------------------------------------------------------------------------------
-LAUNCHING THE APPLICATION:
-  - Desktop shortcut: "WhisperJAV v{{VERSION}}.lnk" (double-click to start)
-  - Manual launch: Double-click WhisperJAV-GUI.exe in installation folder
-  - Alternative: Open the installation folder and run:
-    pythonw.exe -m whisperjav.webview_gui.main
+The install folder is C:\Users\<you>\AppData\Local\WhisperJAV by default
+(%LOCALAPPDATA%\WhisperJAV), or the folder you chose.
 
-INSTALLATION LOCATION:
-  - Default: C:\Users\[YourName]\AppData\Local\WhisperJAV
-  - Or custom location chosen during installation
+To check the install, open Command Prompt (press Start, type cmd, press
+Enter) and run:
+  cd /d "%LOCALAPPDATA%\WhisperJAV"
+  Scripts\whisperjav.exe --version
+  Scripts\whisperjav.exe --check
+(If you chose another folder, put it in the first line.)
+The first prints "WhisperJAV {{VERSION}}". The second names the install's
+accelerator and where each part runs.
 
-LOGS AND DIAGNOSTICS:
-  - Installation log: install_log_v{{VERSION}}.txt (in install folder)
-  - Application logs: Shown in GUI console during processing
-  - Failure marker: INSTALLATION_FAILED_v{{VERSION}}.txt (only if install failed)
+Files in the install folder:
+  install_log_v{{VERSION}}.txt              the installation log
+  whisperjav_stack.txt                 what the install is made for
+  OWN_PYTORCH_NEXT_STEP.txt            Own PyTorch only: the command to run
+  INSTALLATION_STOPPED_v{{VERSION}}.txt     only if the installer stopped on
+                                       purpose: the reason
+  INSTALLATION_FAILED_v{{VERSION}}.txt      only if the installation failed:
+                                       the reason
+  WhisperJAV-GUI.exe                   the GUI launcher
 
-OUTPUT FILES:
-  - Subtitles are saved next to your input video/audio files
-  - Format: SRT (SubRip Text) - compatible with most video players
-  - Filename pattern: [original_name]_output/[original_name].srt
-
--------------------------------------------------------------------------------
-FEATURES
--------------------------------------------------------------------------------
-PROCESSING MODES:
-  - Balanced: Best quality, uses scene detection + voice activity detection
-  - Fast: Good quality, faster than balanced, uses scene detection
-  - Faster: Fastest processing, direct transcription without preprocessing
-
-SENSITIVITY LEVELS:
-  - Conservative: Fewer false positives, cleaner output
-  - Balanced: Good balance of detail and accuracy (recommended)
-  - Aggressive: Maximum detail capture, may include more background noise
-
-SOURCE LANGUAGES (NEW in v{{VERSION}}):
-  - Japanese (日本語): Fully optimized, best results
-  - Korean (한국어): Experimental, basic support
-  - Chinese (中文): Experimental, basic support
-  - English: Experimental
-
-OUTPUT LANGUAGES:
-  - Native: Original language transcription (default)
-  - Direct to English: English transcription via Whisper
-
-ADVANCED FEATURES:
-  - Batch processing: Process multiple files sequentially
-  - Model override: Choose specific Whisper models (large-v3, large-v2, turbo)
-  - Opening credits: Add custom credit lines to subtitles
-  - Async processing: Process multiple files simultaneously (experimental)
-  - Translation: Translate subtitles to other languages (via whisperjav-translate)
-  - Resume Translation (NEW): Resume interrupted translations automatically
+Your settings (%APPDATA%\WhisperJAV) and your downloaded models
+(%USERPROFILE%\.cache) are outside the install folder. The exception: the
+XXL Faster Whisper settings "Executable" and "Extra Args" are saved inside
+it, so enter them again after you reinstall.
 
 -------------------------------------------------------------------------------
-TROUBLESHOOTING
+UPGRADING TO A LATER 1.10 RELEASE
 -------------------------------------------------------------------------------
-INSTALLATION ISSUES:
+The GUI tells you when a new version is out; it does not upgrade by itself.
 
-1. "NVIDIA driver not found" or "CUDA version too old":
-   - Download latest driver from: https://www.nvidia.com/drivers
-   - Or accept CPU-only installation when prompted (slower processing)
+1. Close WhisperJAV (every window of it).
+2. Open Command Prompt and run:
+     "%LOCALAPPDATA%\WhisperJAV\python.exe" -m whisperjav.upgrade
+   (if you installed into another folder, use that folder instead).
+3. When it asks "Continue? [y/N]:", type y and press Enter.
+4. When it says "Upgrade complete!", check the version:
+     "%LOCALAPPDATA%\WhisperJAV\Scripts\whisperjav.exe" --version
 
-2. "WebView2 runtime not detected":
-   - The installer will open: https://go.microsoft.com/fwlink/p/?LinkId=2124703
-   - Download and install the "Evergreen Standalone Installer"
-   - Most Windows 10/11 systems have this pre-installed
+Do not start the upgrade with "whisperjav-upgrade" or
+Scripts\whisperjav-upgrade.exe, although the tool's own messages name it:
+when WhisperJAV is installed on another drive than Windows' temporary
+folder (normally drive C:), it stops halfway and WhisperJAV no longer
+starts.
 
-3. "Network connection failed":
-   - Check your internet connection
-   - Disable VPN or proxy temporarily
-   - Check firewall settings (allow Python, pip, git)
+When the upgrade finishes, it suggests "whisperjav-upgrade --rollback". Do
+not use it: on installs made with this installer it stops with an error.
 
-4. "Out of disk space":
-   - Free up at least 8 GB on your system drive
-   - Models are downloaded to C:\Users\[Name]\.cache\whisper (~3 GB)
+If WhisperJAV no longer starts after an upgrade, uninstall it (see below)
+and install the newest release with the installer. Your settings and
+downloaded models stay; enter the XXL Faster Whisper "Executable" and
+"Extra Args" again.
 
-5. "Installation failed after retries":
-   - Check install_log_v{{VERSION}}.txt for specific error messages
-   - Common causes: antivirus blocking downloads, network timeout
-   - Try running the installer as Administrator (right-click > Run as admin)
-
-RUNTIME ISSUES:
-
-1. "GUI won't launch" or "Blank window":
-   - Ensure WebView2 is installed (see issue #2 above)
-   - Try running from command line to see error messages:
-     python.exe -m whisperjav.webview_gui.main
-
-2. "Processing is very slow":
-   - Check if CUDA is enabled: Look for "GPU acceleration: ENABLED" in console
-   - If CPU-only, consider upgrading to an NVIDIA GPU
-   - For large videos, use "faster" mode for quicker results
-
-3. "Model download stuck":
-   - Large models (3GB) can take 10-20 minutes on slow connections
-   - Check your internet speed: https://fast.com
-   - Models are cached, so this only happens once
-
-4. "Subtitles have errors or gibberish":
-   - Try "balanced" mode for better quality
-   - Use "conservative" sensitivity to reduce false positives
-   - Ensure correct source language is selected (NEW in v{{VERSION}})
-   - For non-Japanese audio, try English or other languages
-
-5. "Application crashes during processing":
-   - Check logs in the GUI console
-   - Ensure you have enough RAM (16 GB recommended)
-   - Try processing one file at a time instead of batch
-   - Report crashes at: https://github.com/meizhong986/WhisperJAV/issues
-
-6. "Translation interrupted and lost progress" (FIXED in v{{VERSION}}):
-   - v{{VERSION}} now auto-saves translation progress
-   - Simply re-run the same command to resume from last batch
-   - No more lost work or API costs!
+Do not update with "pip install -U whisperjav": on Windows it can replace
+your GPU build of PyTorch with a CPU-only one.
 
 -------------------------------------------------------------------------------
 UNINSTALLING
 -------------------------------------------------------------------------------
-To completely remove WhisperJAV v{{VERSION}}:
+Open Windows Settings > Apps, find WhisperJAV and choose Uninstall, or
+double-click Uninstall-WhisperJAV.exe in the install folder. After an
+upgrade, the Apps entry still names the version you first installed.
 
-1. Delete the installation directory:
-   C:\Users\[YourName]\AppData\Local\WhisperJAV (or your custom location)
-
-2. Delete the desktop shortcut:
-   Desktop\WhisperJAV v{{VERSION}}.lnk
-
-3. (Optional) Delete cached models to free up ~3 GB:
-   C:\Users\[YourName]\.cache\whisper
-
-4. (Optional) Delete user configuration:
-   [Install Directory]\whisperjav_config.json
-
-NOTE: An automated uninstaller (uninstall_v{{VERSION}}.bat) is included in the
-      installation directory for your convenience.
+The uninstall leaves the desktop shortcut; delete it yourself. Your settings
+(%APPDATA%\WhisperJAV) and downloaded models (%USERPROFILE%\.cache) also
+stay. To free the space, delete %APPDATA%\WhisperJAV, and in
+%USERPROFILE%\.cache the model folders you no longer need; other programs
+may keep files there too.
 
 -------------------------------------------------------------------------------
-PERFORMANCE TIPS
+TROUBLESHOOTING
 -------------------------------------------------------------------------------
-1. GPU Acceleration:
-   - Ensure NVIDIA drivers are up to date
-   - Close other GPU-intensive applications before processing
-   - Verify CUDA is enabled by checking console output
+- The installation failed: install_log_v{{VERSION}}.txt names the phase that
+  failed, and INSTALLATION_FAILED_v{{VERSION}}.txt holds the reason. Run the
+  installer again; it offers to replace the partial install.
+- "no supported NVIDIA GPU found" although you have an NVIDIA card: the
+  window names the reason. For an old driver, or a card WhisperJAV cannot
+  reach: update or repair the driver, restart the PC and run the installer
+  again. For a card older than 1.10 supports, the window names WhisperJAV
+  1.9.5, which still supports it.
+- A run stops with "THE NVIDIA GPU CANNOT BE USED" (in the GUI, a window
+  titled "The NVIDIA GPU cannot be used"): it names the reason and the fix.
+  In the GUI, "Run on the CPU this time" runs that job on the CPU; on the
+  command line, add --device cpu.
+- The GUI does not open, or its window is blank: install WebView2 from
+  https://go.microsoft.com/fwlink/p/?LinkId=2124703
+- Downloads fail or time out: check the connection; behind a firewall,
+  allow python.exe, uv.exe and git.exe. Users in China: keep your VPN on
+  during the whole installation, during an upgrade, and on the first run of
+  each model (models come from huggingface.co).
+- An antivirus program blocks the downloads: add an exclusion for the
+  install folder, or pause real-time scanning while installing.
 
-2. Processing Speed:
-   - "faster" mode: ~5 minutes per hour of video (GPU)
-   - "fast" mode: ~7 minutes per hour of video (GPU)
-   - "balanced" mode: ~10 minutes per hour of video (GPU)
-
-3. Quality vs Speed:
-   - For best accuracy: Use "balanced" mode with "balanced" sensitivity
-   - For speed: Use "faster" mode with "conservative" sensitivity
-   - For maximum detail: Use "balanced" mode with "aggressive" sensitivity
-
-4. Batch Processing:
-   - Process multiple files overnight using batch mode
-   - Use "async processing" (experimental) for parallel execution
-
-5. Translation Tips (v{{VERSION}}):
-   - Enable resume feature for long translations
-   - Progress auto-saved after each batch
-   - Re-run same command to resume interrupted translations
-
--------------------------------------------------------------------------------
-ADVANCED USAGE
--------------------------------------------------------------------------------
-COMMAND-LINE INTERFACE:
-  WhisperJAV also includes a CLI for automation and scripting:
-
-  # Basic transcription
-  whisperjav video.mp4 --mode balanced --sensitivity aggressive
-
-  # With translation
-  whisperjav video.mp4 --translate --target-lang english
-
-  # Batch processing
-  whisperjav folder/*.mp4 --mode fast --workers 2
-
-  Run "whisperjav --help" for full CLI documentation
-
-TRANSLATION:
-  Use whisperjav-translate for AI-powered subtitle translation:
-
-  # Translate Japanese to English
-  whisperjav-translate -i subtitles.srt --target english
-
-  # Use custom instructions
-  whisperjav-translate -i subtitles.srt --custom-gist [URL]
-
-  # Resume interrupted translation (NEW in v{{VERSION}})
-  whisperjav-translate -i subtitles.srt
-  # (Progress auto-saves, just re-run if interrupted)
-
-  See translation documentation for setup and API key configuration
+More help:
+https://meizhong986.github.io/WhisperJAV/guides/installation_windows_standalone/#troubleshooting
 
 -------------------------------------------------------------------------------
-SUPPORT & COMMUNITY
+COMMAND LINE
 -------------------------------------------------------------------------------
-GitHub Repository: https://github.com/meizhong986/WhisperJAV
-Issue Tracker: https://github.com/meizhong986/WhisperJAV/issues
-Documentation: See GitHub README
+The command-line programs are in the Scripts folder of the install folder.
+In Command Prompt, in the install folder:
+  Scripts\whisperjav.exe "D:\Videos\movie.mp4" --mode balanced
+  Scripts\whisperjav.exe --help
+  Scripts\whisperjav-translate.exe --help
+The subtitles are written next to the video.
 
-For bugs, feature requests, or questions, please open an issue on GitHub
-with detailed information about your system and the problem.
+Command-line reference:
+https://meizhong986.github.io/WhisperJAV/user-guide/cli-reference/
 
 -------------------------------------------------------------------------------
-VERSION INFORMATION
+SUPPORT
 -------------------------------------------------------------------------------
-WhisperJAV Version: {{VERSION}}
-Release Date: February 2026
-Installer Version: v{{VERSION}} (conda-constructor)
+Documentation: https://meizhong986.github.io/WhisperJAV/
+GitHub:        https://github.com/meizhong986/WhisperJAV
+Issues:        https://github.com/meizhong986/WhisperJAV/issues
 
-Key Changes in {{VERSION}}:
-  - Qwen3-ASR pipeline (assembly, context-aware, VAD-slicing modes)
-  - Adaptive step-down architecture (Tier 1/Tier 2 grouping with fallback)
-  - Pipeline analytics and health check system
-  - Alignment sentinel for collapse detection and recovery
-  - Ensemble pipeline with multi-pass processing
-
-Previous Major Changes (1.5.1):
-  - Complete PyWebView GUI takeover - modern, responsive web interface
-  - Removed legacy Tkinter GUI components
-  - Enhanced file management and progress tracking
-  - Improved stability and error handling
-  - Better WebView2 detection and installation guidance
-  - CPU-only fallback for systems without NVIDIA GPUs
-
-For full release notes, see RELEASE_NOTES_v{{VERSION}}.md
+When you report a problem, include the output of
+"Scripts\whisperjav.exe --check"; for a problem with a run,
+raw_subs\whisperjav_run.log; for an installation problem,
+install_log_v{{VERSION}}.txt.
 
 -------------------------------------------------------------------------------
 LICENSE
 -------------------------------------------------------------------------------
-WhisperJAV is released under the MIT License.
-See LICENSE.txt in the installation directory for details.
-
-Copyright (c) 2025-2026 MeiZhong and contributors
+WhisperJAV is released under the MIT License. See LICENSE.txt in the install
+folder.
 
 ===============================================================================
