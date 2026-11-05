@@ -15,7 +15,7 @@ WhisperJAV 提供多种处理管线，在速度和准确度之间各有取舍。
 | **Transformers** | HuggingFace | 有 | 有 | 中等 | 良好 | ~4 GB |
 | **Qwen3-ASR** | Qwen3 | Assembly | Assembly | 中等 | 文本质量优秀 | ~4-8 GB |
 | **ChronosJAV** | anime-whisper / Kotoba | TEN VAD | TEN VAD | 中等 | 动漫/JAV 最佳 | ~4-8 GB |
-| **Parakeet-CrispASR / Cohere-CrispASR**（GGUF，仅专家模式） | CrispASR（Parakeet / Cohere 模型） | 是（默认 Semantic） | 是（TEN VAD / FireRedVAD） | 未测量 | 未测量 | 未测量 |
+| **GGUF 处理管线**：parakeet、cohere、reazonspeech、kotoba、whisper-turbo、whisper-large、MOSS（仅专家模式） | CrispASR（Parakeet、Cohere、ReazonSpeech、Kotoba-Whisper、Whisper、MOSS 模型） | 是（默认 Semantic） | 是（TEN VAD / FireRedVAD） | 未测量 | 未测量 | 未测量 |
 
 ---
 
@@ -40,4 +40,4 @@ WhisperJAV 提供多种处理管线，在速度和准确度之间各有取舍。
 
 - [ChronosJAV](chronosjav.md) — 使用 anime-whisper 和 Kotoba 模型，专为动漫/JAV 内容优化
 - [Qwen3-ASR](qwen3-asr.md) — 替代ASR 引擎，日语文本质量出色
-- [Parakeet-CrispASR 与 Cohere-CrispASR](crispasr.md) — 通过随 WhisperJAV 安装的 CrispASR 运行的 GGUF 模型；专家模式、日语、实验性
+- [GGUF 处理管线（CrispASR）](crispasr.md) — 七个处理管线，通过随 WhisperJAV 安装的 CrispASR 运行的 GGUF 模型；专家模式、日语、实验性
