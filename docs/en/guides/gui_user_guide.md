@@ -32,7 +32,7 @@ After installation, launch WhisperJAV from:
 - **Start menu** — search "WhisperJAV"
 - **Command line** — `whisperjav-gui`
 
-On first launch, the app runs a preflight check to verify FFmpeg, CUDA, and Python dependencies are available. Any issues are reported in the console at the bottom of the window.
+When the window opens, WhisperJAV checks only that the GUI's own parts are installed, and on Windows the WebView2 runtime. `whisperjav --check` on the command line checks the rest of the install (Python, PyTorch and the GPU, FFmpeg, CrispASR and its models). The start of every run checks that this install's GPU can be used (see [When a run does not start](#when-a-run-does-not-start)).
 
 ---
 
@@ -42,7 +42,7 @@ The GUI is divided into five areas, top to bottom:
 
 | Area | Purpose |
 |------|---------|
-| **Header bar** | Theme switcher (4 themes), language button (English / 中文) and update check button |
+| **Header bar** | Language button (English / 中文), theme button (4 themes, and **Check for Updates**), and an update notice when a new version is out |
 | **Source** | Add video/audio files to process |
 | **Destination** | Where to save output SRT files |
 | **Options tabs** | Four tabs of configuration (see sections 5–8) |
@@ -50,7 +50,7 @@ The GUI is divided into five areas, top to bottom:
 
 ### Themes
 
-Click the palette icon in the header to cycle through themes:
+Click the palette icon in the header to open the theme menu:
 
 | Theme | Description |
 |-------|-------------|
@@ -73,15 +73,15 @@ reads **English** and switches back. The change is immediate; the file list and 
 
 ## 3. Adding Files
 
-WhisperJAV accepts video and audio files in any format FFmpeg supports (MP4, MKV, AVI, WAV, MP3, FLAC, M4B, etc.).
+WhisperJAV takes video files ending in .mp4, .mkv, .avi, .mov, .wmv, .flv, .webm, .m4v, .mpg or .mpeg, and audio files ending in .mp3, .wav, .flac, .aac, .ogg, .wma, .m4a, .m4b or .opus. Files with other endings are skipped.
 
 ### Adding files
 
 - **Drag and drop** files directly onto the file list area
 - **Add File(s)** button — opens a multi-select file dialog
-- **Add Folder** button — adds all media files from a folder (non-recursive)
+- **Add Folder** button — adds the folder to the list; the run then takes every media file in it and in its sub-folders
 
-Each file appears in the list with its filename and duration.
+Each file or folder appears in the list with its full path.
 
 ### Managing the file list
 
@@ -121,7 +121,7 @@ Selects the processing pipeline. Each mode trades speed for accuracy.
 | **Balanced** (default) | Whisper | Yes | Yes | General use |
 | **Fast** | Whisper | Yes | No | Quick results with scene awareness |
 | **Faster** | Faster-Whisper | No | No | Maximum speed, minimal processing |
-| **Transformers** | HuggingFace | Yes | Yes | Alternative backend |
+| **Transformers** | HuggingFace | No (by default) | No | Alternative backend |
 
 ### Sensitivity
 
@@ -149,25 +149,25 @@ The language spoken in the video. Affects Whisper's language hint and post-proce
 
 ## 6. Advanced Options
 
-The **Advanced** tab (Tab 2) provides additional controls for troubleshooting and fine-tuning.
+The **Transcription Adv. Options** tab (Tab 2) provides additional controls for troubleshooting and fine-tuning.
 
 ![Advanced Options tab](images/gui-tab2-advanced.png){ loading=lazy }
 
 | Option | Default | Description |
 |--------|---------|-------------|
 | **Model override** | Off | When checked, forces a specific Whisper model size instead of the pipeline default |
-| **Model** dropdown | Large V3 | Only visible when model override is checked. Options: Large V2, Large V3, Turbo |
+| **Model** dropdown | large-v2 | Greyed out until **Model override** is ticked. Options: large-v2, large-v3, turbo |
 | **Output format** | SRT | Output format: SRT, VTT, or Both |
 | **Async processing** | Off | Enables asynchronous pipeline execution |
-| **Debug logging** | Off | Writes detailed debug logs to `whisperjav.log` |
+| **Debug logging** | Off | Shows WhisperJAV's debug lines in the console and keeps the metadata files in the temp folder (same as `--debug`) |
 | **Keep temp files** | Off | Preserves intermediate audio chunks and processing artifacts |
-| **Custom temp dir** | System default | When "Keep temp files" is on, optionally choose where to store them |
+| **Temp dir** | System default | Where a run's intermediate files go; they are removed at the end unless **Keep temp files** is ticked |
 
 ---
 
 ## 7. Ensemble Mode (Two-Pass)
 
-The **Ensemble** tab (Tab 3) lets you run two different pipelines and merge their results for higher accuracy. This is the most powerful mode.
+The **Ensemble Mode** tab (Tab 3) runs one or two pipelines on each file; with **Pass 2** ticked, the two passes' subtitles are merged into one file.
 
 ![Ensemble Mode tab overview](images/gui-tab3-ensemble.png){ loading=lazy }
 
@@ -177,7 +177,6 @@ The **Ensemble** tab (Tab 3) lets you run two different pipelines and merge thei
 2. **Pass 2** (optional) processes the same video with a different configuration
 3. The two SRT outputs are **merged** using a configurable strategy
 
-This leverages the strengths of different backends — for example, Whisper for timing accuracy and Qwen3-ASR for text quality.
 
 ### Pass Configuration
 
@@ -185,12 +184,12 @@ Always active. Each pass has identical controls:
 
 | Control | Options | Default |
 |---------|---------|---------|
-| **Pipeline** | Balanced, Fast, Faster, Fidelity, Transformers, Qwen3-ASR, Anime-Whisper, Parakeet-CrispASR, Cohere-CrispASR, XXL Faster Whisper | Balanced |
-| **Sensitivity** | Aggressive, Balanced, Conservative | Aggressive |
+| **Pipeline** | Whisper-Based: Balanced, Fast, Faster, Fidelity; HuggingFace: Transformers (HF); ChronosJAV: Qwen3-ASR, Anime-Whisper; External (BYOP): XXL Faster Whisper; GGUF via crispasr: parakeet, cohere, reazonspeech, kotoba, whisper-turbo, whisper-large, moss | Pass 1: cohere; Pass 2: parakeet (off until ticked) |
+| **Sensitivity** | Aggressive, Balanced, Conservative | set when you choose the pipeline: Pass 1 (cohere) Balanced, Pass 2 (parakeet) Aggressive |
 | **Scene Detector** | Auditok, Silero, Semantic, None | Semantic |
 | **Speech Enhancer** | None, FFmpeg DSP, ZipEnhancer, htdemucs (BS-RoFormer and ZipEnhancer ONNX: coming soon) | None |
-| **Speech Segmenter** | Silero v6.2, v4.0, v3.1, Whisper VAD, TEN, None | Silero v6.2 |
-| **Model** | Depends on pipeline — Large V2/V3/Turbo (Whisper) or 1.7B/0.6B (Qwen) | Pipeline default |
+| **Speech Segmenter** | Silero v4.0, Silero v3.1, Silero v6.2, TEN VAD, WhisperSeg (JA-ASMR), FireRedVAD, None; for Balanced, the Silero version of its built-in VAD: 3.1, 4.0 (default), 6.2; for a GGUF pass, None sends each scene to the model whole | set when you choose the pipeline: Pass 1 (cohere) FireRedVAD, Pass 2 (parakeet) TEN VAD |
+| **Model** | the models of the chosen pipeline | the pipeline's default |
 
 ### Available Pipelines
 
@@ -201,12 +200,12 @@ The pipeline dropdown groups options by backend:
 - **Whisper-Based**: Balanced, Fast, Faster, Fidelity
 - **HuggingFace**: Transformers
 - **ChronosJAV**: Qwen3-ASR, Anime-Whisper
-- **GGUF via crispasr**: parakeet (Parakeet-CrispASR), cohere (Cohere-CrispASR), reazonspeech (ReazonSpeech-CrispASR), kotoba (Kotoba-CrispASR), whisper-turbo (Whisper-Turbo-CrispASR), whisper-large (Whisper-Large-CrispASR), moss (MOSS-CrispASR) — Japanese only, all experimental; parakeet and cohere since 1.10.0, the other five new in 1.10.1 (for parakeet and cohere see [Parakeet-CrispASR and Cohere-CrispASR](../pipelines/crispasr.md))
+- **GGUF via crispasr**: parakeet (Parakeet-CrispASR), cohere (Cohere-CrispASR), reazonspeech (ReazonSpeech-CrispASR), kotoba (Kotoba-CrispASR), whisper-turbo (Whisper-Turbo-CrispASR), whisper-large (Whisper-Large-CrispASR), moss (MOSS-CrispASR) — Japanese only, all experimental; parakeet and cohere since 1.10.0, the other five new in 1.10.1 (see [GGUF pipelines (CrispASR)](../pipelines/crispasr.md))
 - **External (BYOP)**: XXL Faster Whisper (Pass 1, Pass 2 or both)
 
 ### Customize Parameters
 
-Click the **Customize** button on a pass to open the parameter tuning modal. This gives fine-grained control over model, quality, segmenter, enhancer, scene detection, and context parameters.
+Click the **Customize Parameters** button on a pass to open its settings window. Its tabs depend on the pass's pipeline (below).
 
 ![Customize Parameters modal — Quality tab](images/gui-tab3-customize-modal.png){ loading=lazy }
 
@@ -214,7 +213,7 @@ The tabs depend on the pass's pipeline: **Model**, **Quality**, **Segmenter**, *
 
 The **Model** tab has a **Device** menu: **Auto (the GPU when one can be used, else the CPU)** (the default), **NVIDIA GPU (CUDA)** or **CPU (not accelerated)**.
 
-For a GGUF pass (any pipeline under **GGUF via crispasr**), the modal has four tabs: **Segmenter**, **Enhancer**, **Scene** and **Timing**; for **moss** (MOSS-CrispASR) it also has a **MOSS** tab. They start from the values the pass runs with. A status panel under the pass row shows the model (downloaded or not) and where CrispASR will run, for example "GPU: asks for the NVIDIA GPU (CUDA)". For Cohere-CrispASR it also lists the aligner that times its text.
+For a GGUF pass (any pipeline under **GGUF via crispasr**), the modal has four tabs: **Segmenter**, **Enhancer**, **Scene** and **Timing**; for **moss** (MOSS-CrispASR) it also has a **MOSS** tab. They start from the values the pass runs with. A status panel under the pass row shows the model (downloaded or not) and where CrispASR will run, for example "GPU: asks for the NVIDIA GPU (CUDA)". The **Timing** tab has one menu, **Word timestamps**: **From the model** or **From the aligner (wav2vec2-ja)**, with the pipeline's default marked "(default)". When the pass's subtitle times come from the aligner (the default for cohere, or any GGUF pass set to From the aligner), the status panel also lists the aligner.
 
 For a ChronosJAV pass (Qwen3-ASR, Anime-Whisper), the **Alignment** tab sets the subtitle timing (see [Subtitle timing](../pipelines/chronosjav.md#subtitle-timing-1100)):
 
@@ -228,7 +227,7 @@ For a ChronosJAV pass (Qwen3-ASR, Anime-Whisper), the **Alignment** tab sets the
 
 Since 1.10.1 the default is VAD Only with no timing model, ChronosJAV's timing of 1.9.5: no aligner is loaded, and the Aligner Backend, Aligner Model and Adaptive Step-Down controls are hidden until an aligner mode is chosen. With Aligner Backend **None**, the run uses VAD Only with Step-Down off, whatever Timestamp Mode and Adaptive Step-Down show. A status panel under a ChronosJAV pass row shows the CrispASR aligner and the timing model when the pass uses them (downloaded or not) and where CrispASR runs them. Since 1.10.0 the Alignment tab's values, and a preset saved from it, reach the run; from 1.8.10.post3 to 1.9.5 they were ignored.
 
-Use **Save Preset** to save your configuration for reuse, or **Load Preset** to restore a saved configuration. Presets persist across sessions.
+At the bottom of the window, **Save Preset** saves this pass's settings (pipeline, sensitivity, scene detector, speech enhancer, speech segmenter, model and the window's values) under a name, and **Load Preset...** loads one into the pass. Presets are kept for the next start.
 
 ### Pass 2 Configuration
 
@@ -238,7 +237,7 @@ When disabled, the row is greyed out and all controls are inactive.
 
 ### BYOP: XXL Faster Whisper (v1.8.9+; Pass 1 since 1.10.0)
 
-Select **XXL Faster Whisper** as the pipeline of Pass 1, Pass 2 or both to use [PurfView's Faster Whisper XXL](https://github.com/Purfview/whisper-standalone-win) as an external program. This is a "Bring Your Own Pipeline" (BYOP) feature — you supply the executable, WhisperJAV handles integration.
+Select **XXL Faster Whisper** as the pipeline of Pass 1, Pass 2 or both to use [PurfView's Faster Whisper XXL](https://github.com/Purfview/whisper-standalone-win) as an external program. The menu lists it under **External (BYOP)**: XXL is a separate program that you download yourself; WhisperJAV runs it.
 
 ![Ensemble Mode with XXL Faster Whisper as Pass 2](images/gui-tab3-ensemble-xxl.png){ loading=lazy }
 
@@ -275,23 +274,25 @@ When **FFmpeg DSP** is selected as the speech enhancer, an additional panel appe
 
 When a speech enhancer is selected (anything other than "None"), a checkbox appears below the enhancer dropdown:
 
-**Enhance for VAD only** — When checked, the enhanced audio is used only for voice activity detection (VAD). The original unprocessed audio is sent to the ASR model for transcription. This gives you the benefit of better speech boundary detection from enhanced audio while preserving the original audio characteristics that Whisper was trained on.
+**Enhance for VAD only** — When ticked, the enhanced audio is used only to find the speech (VAD). The original audio is sent to the ASR model for transcription.
 
-This option is available for all pipelines. When the enhancer is set to "None", the checkbox is hidden.
+The box is not shown for Balanced and XXL Faster Whisper, nor when the enhancer is "None". It takes effect with Fidelity, Qwen3-ASR, Anime-Whisper and the GGUF pipelines; Fast, Faster and Transformers ignore it, as they run no separate speech segmenter.
 
 ### Merge Strategy
 
 When Pass 2 is enabled, choose how the two outputs are combined:
 
-| Strategy | Description |
-|----------|-------------|
-| **Pass 1 Primary** (default) | Uses Pass 1 as the base, fills gaps from Pass 2 |
-| **Smart Merge** | Intelligently selects the best subtitle from each pass based on quality heuristics |
-| **Full Merge** | Combines all subtitles from both passes, resolving overlaps |
-| **Longest** | Picks the longer (more detailed) subtitle when passes overlap |
-| **Pass 2 Primary** | Uses Pass 2 as the base, fills gaps from Pass 1 |
-| **Pass 1 Overlap (30%)** | Pass 1 base, requires 30% time overlap to merge from Pass 2 |
-| **Pass 2 Overlap (30%)** | Pass 2 base, requires 30% time overlap to merge from Pass 1 |
+| Strategy (GUI) | Command line | What it does |
+|----------|----------|----------|
+| **Pass 1 + Fill From Pass 2** (default) | `pass1_primary` | Keeps every Pass 1 subtitle; adds a Pass 2 subtitle only where it overlaps no Pass 1 subtitle |
+| **Smart Merge (Best Quality)** | `smart_merge` | Pairs each Pass 1 subtitle with the Pass 2 subtitle that overlaps it most, if the overlap is at least 30% of the shorter one, and keeps one of the pair: the one with more of its own length inside the overlap; if that is about equal, the one with more text (a line of few different characters, such as ああああああああああ, counts as none); then the shorter one. Subtitles without a partner are kept from both passes |
+| **Full Merge (All Lines)** | `full_merge` | Keeps every subtitle of both passes, in time order; overlapping subtitles stay |
+| **Pass 2 + Fill From Pass 1** | `pass2_primary` | As Pass 1 + Fill From Pass 2, with the passes swapped |
+| **Pass 1 + Fill (30% Overlap)** | `pass1_overlap` | Keeps every Pass 1 subtitle; adds a Pass 2 subtitle unless it overlaps a Pass 1 subtitle by more than 30% of that subtitle's length |
+| **Pass 2 + Fill (30% Overlap)** | `pass2_overlap` | As above, with the passes swapped |
+| — (command line only) | `longest` | Pairs subtitles as Smart Merge does and keeps the one with more text |
+
+With every strategy, a subtitle whose text is the same as the one just before it is then removed.
 
 ### Serial Mode
 
@@ -325,7 +326,7 @@ Providers are grouped into **Local LLM** and **Cloud AI** in the dropdown.
 | **Groq** | Fast inference cloud provider. |
 | **Custom** | Any OpenAI-compatible endpoint. |
 
-Each provider populates a **Model** dropdown with available models. Use **Custom model override** to specify a model ID not in the list.
+Each provider populates a **Model** dropdown with available models. Use **Override/Custom Model** to specify a model ID not in the list.
 
 ### Ollama Integration (v1.8.10+)
 
@@ -372,11 +373,11 @@ Ollama does not require an API key.
 
 | Setting | Options | Default |
 |---------|---------|---------|
-| **Source Language** | Japanese, Korean, Chinese | Japanese |
-| **Target Language** | English, Chinese, Indonesian, Portuguese, Spanish | English |
-| **Tone/Style** | Standard, Adult-Explicit | Standard |
+| **Source Language** | Japanese, Korean, Chinese, English | Japanese |
+| **Target Language** | English, Chinese, Indonesian, Portuguese, Spanish, French, Italian, Thai, Korean | English |
+| **Tone/Style** | Standard, Adult (contextual), Adult/Explicit | Standard |
 
-**Standard** tone produces clean, natural translations. **Adult-Explicit** uses specialized instructions tuned for JAV dialogue with appropriate vocabulary.
+**Standard** tone produces clean, natural translations. **Adult (contextual)** uses explicit language only where the original line is explicit; neutral dialogue stays neutral. **Adult/Explicit** makes everything explicit, neutral dialogue too.
 
 ### Advanced Settings
 
@@ -385,12 +386,12 @@ Click the collapsible **Advanced Settings** section to reveal additional options
 | Setting | Default | Description |
 |---------|---------|-------------|
 | **Movie Title** | (empty) | Provides context to the AI for better translation |
-| **Actress Names** | (empty) | Helps the AI correctly handle character names |
+| **Names (one per line)** | (empty) | Character or actress names, for the AI to handle correctly |
 | **Plot Summary** | (empty) | Additional context for the AI translator |
 | **Scene Threshold** | 60 sec | How the translator groups subtitles into scenes for batch processing |
 | **Max Batch Size** | 30 | Maximum subtitles per translation batch |
 | **Max Retries** | 3 | Retry count for failed API calls |
-| **Rate Limit** | (provider default) | Requests per minute limit |
+| **Rate Limit (req/min)** | (empty; the field shows "No limit") | Requests per minute limit |
 | **Custom Endpoint** | (empty) | Override the default API endpoint URL |
 
 ### Translation Progress
@@ -407,7 +408,7 @@ Translation has its own progress bar and Start/Cancel buttons at the bottom of T
 2. Configure options on the relevant tab
 3. Click **Start**
 
-The progress bar shows overall completion with a percentage. The status label describes the current stage (e.g., "Extracting audio...", "Transcribing scene 3/12...").
+While a run is going, the progress bar moves without a percentage and the status reads "Running..."; the console shows each step.
 
 ### Cancelling
 
@@ -421,7 +422,7 @@ Click **Cancel** to stop the current job. The process terminates and any partial
 
 ### Completion
 
-When finished, the status shows "Completed" and the SRT file path is printed in the console. The output SRT is ready to use with any media player.
+When the run ends, the status shows "Finished" with the number of files in each state (done, empty, suspect, failed, skipped), from the run summary in `whisperjav_run.json`. The output SRT is ready to use with any media player.
 
 ---
 
@@ -452,13 +453,15 @@ The console at the bottom shows real-time log messages from the processing pipel
 
 Click **Clear** to reset the console output.
 
+Each run started from the Transcription Mode or Ensemble Mode tab also writes a log file, `whisperjav_run.log`, in a `raw_subs` folder next to the run's `whisperjav_run.json`: in the output folder, or, with **Save next to source video**, in the folder of the first file in the list (inside the folder, if the first entry is a folder). It holds WhisperJAV's lines, the debug lines included, and CrispASR's start-up lines. It leaves out the start banner, the RUN SUMMARY table (that is in `whisperjav_run.json`), the total processing time, the translation lines, other libraries' warnings and the lines of the balanced pipeline's ASR worker. Each Ensemble pass writes its own file beside it (`whisperjav_run.pass1.log`, `whisperjav_run.pass2.log`). Each run replaces the last run's log files.
+
 ---
 
 ## 11. Menus & Dialogs
 
 ### About Dialog
 
-Press **F1** or access via the header. Shows version info, feature list, and keyboard shortcuts.
+Press **F1**, or click **About** at the bottom of the window. Shows version info, feature list, and keyboard shortcuts.
 
 ### Update Check
 
@@ -490,20 +493,20 @@ Accessible from the **Translation Settings** button in the Ensemble tab's AI-tra
 
 ## 13. Common Workflows
 
-### Quick Transcription (Fastest)
+### Quick Transcription
 
 1. Drag a video file onto the app
 2. Leave defaults (Balanced mode, Aggressive sensitivity, Japanese)
 3. Click **Start**
 4. SRT appears next to your video file
 
-### High-Quality Transcription (Ensemble)
+### Two-Pass Transcription (Ensemble)
 
 1. Add files
-2. Go to **Ensemble** tab
-3. Pass 1: Balanced pipeline, Semantic scene detection (defaults)
-4. Enable Pass 2: Select **Qwen3-ASR** pipeline
-5. Merge Strategy: **Smart Merge**
+2. Go to the **Ensemble Mode** tab
+3. Pass 1 starts on **cohere** (Balanced, Semantic, FireRedVAD); keep it or choose another pipeline
+4. Tick **Pass 2** and choose its pipeline (it starts on **parakeet**)
+5. Under **Merge**, choose a strategy (default **Pass 1 + Fill From Pass 2**)
 6. Click **Start**
 7. Two passes run sequentially, then results are merged
 
@@ -538,4 +541,4 @@ Accessible from the **Translation Settings** button in the Ensemble tab's AI-tra
 
 ### Without a GPU
 
-On an install made for the CPU only, there is nothing to tick: every run uses the CPU. Use **Faster** mode for the best speed. Processing is several times slower than on a GPU, but works. To run one pass on the CPU on a GPU install, choose **CPU (not accelerated)** as the **Device** in that pass's **Customize** window.
+On an install made for the CPU only, there is nothing to tick: every run uses the CPU. Use **Faster** mode for the best speed. Processing is several times slower than on a GPU, but works. To run one pass on the CPU on a GPU install, choose **CPU (not accelerated)** as the **Device** in the **Model** tab of that pass's **Customize Parameters** window. A GGUF or XXL pass has no Device menu: it follows the whole run's device (`--device` on the command line).
