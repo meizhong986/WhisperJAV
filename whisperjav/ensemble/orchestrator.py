@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from whisperjav.modules.qwen_errors import NOT_STARTED, PREFIX as UNUSABLE_PREFIX
-from whisperjav.utils.logger import logger
+from whisperjav.utils.logger import logger, pass_log_file
 from whisperjav.utils.metadata_manager import MetadataManager
 from whisperjav.utils.parameter_tracer import NullTracer
 
@@ -96,6 +96,7 @@ class EnsembleOrchestrator:
         progress_display=None,
         log_level: str = "INFO",
         serial_file_processing: bool = False,
+        log_file: Optional[str] = None,
         **kwargs
     ):
         """
@@ -130,6 +131,7 @@ class EnsembleOrchestrator:
         self.subs_language = subs_language
         self.progress_display = progress_display
         self.log_level = log_level
+        self.log_file = log_file
         self.serial_file_processing = serial_file_processing
         self.extra_kwargs = kwargs
         self.worker_kwargs = self._filter_picklable_kwargs(kwargs)
@@ -804,6 +806,7 @@ class EnsembleOrchestrator:
             language_code=language_code,
             log_level=self.log_level,
             trace_file_path=trace_file_path,
+            log_file=pass_log_file(self.log_file, pass_number),
         )
 
         # Setup Drop-Box path (unique per pass)
