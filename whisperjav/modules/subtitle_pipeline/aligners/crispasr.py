@@ -108,7 +108,7 @@ class CrispASRAligner:
             self._aligner.unload()
             self._aligner = None
         self._loaded = False
-        logger.info("[CrispASRAligner] Aligner unloaded")
+        logger.debug("[CrispASRAligner] Aligner unloaded")
 
     def align(
         self,
