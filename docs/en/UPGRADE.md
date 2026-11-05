@@ -1,133 +1,47 @@
 # WhisperJAV Upgrade Guide
 
-This guide covers how to upgrade WhisperJAV to the latest version.
+**From 1.9.x to 1.10:** install 1.10 fresh. 1.10 needs Python 3.13, and a 1.9.x install has Python 3.10, so its `whisperjav-upgrade` cannot install 1.10. Your settings are kept.
 
-**From 1.9.x to 1.10.0:** install 1.10.0 fresh. 1.10.0 needs Python 3.13, and a 1.9.x install has Python 3.10, so its `whisperjav-upgrade` cannot install 1.10.0. Your settings are kept. From 1.10.0 on, `whisperjav-upgrade` installs the newest release of the 1.10 series.
+**Within 1.10:** the upgrade installs the newest 1.10 release with the package versions it was tested with, and keeps the accelerator your install is made for (`whisperjav_stack.txt` in the install folder). On an Own PyTorch install it never installs, replaces or removes PyTorch.
 
-**Within 1.10:** the upgrade keeps the accelerator your install is made for (`whisperjav_stack.txt` in the install folder) and installs the package versions the new release was tested with for it. On an Own PyTorch install it never installs, replaces or removes PyTorch.
+## Windows installer installs
 
-## GUI Users (Recommended)
+The GUI tells you when a new version is out: a notice with the new version appears in the header, and **Check for Updates** under the palette icon (🎨) in the header checks at once. Its buttons open the release page on GitHub; the GUI does not upgrade WhisperJAV itself. Upgrade in Command Prompt:
 
-The GUI will automatically check for updates on startup and display a notification banner when a new version is available.
+1. Close WhisperJAV (every window of it).
+2. Open Command Prompt (press Start, type `cmd`, press Enter) and run:
+   ```
+   "%LOCALAPPDATA%\WhisperJAV\python.exe" -m whisperjav.upgrade
+   ```
+   If you installed into another folder, put that folder in place of `%LOCALAPPDATA%\WhisperJAV`, here and below.
+3. When it asks `Continue? [y/N]:`, type `y` and press Enter.
+4. When it says "Upgrade complete!", check the version:
+   ```
+   "%LOCALAPPDATA%\WhisperJAV\Scripts\whisperjav.exe" --version
+   ```
 
-### Update Indicator
+Start the upgrade with the install's `python.exe`, as above, not with `Scripts\whisperjav-upgrade.exe`: when WhisperJAV is installed on another drive than Windows' temporary folder (normally drive C:), `whisperjav-upgrade.exe` of 1.10.0 and 1.10.1 stops halfway and WhisperJAV no longer starts.
 
-When an update is available, a small indicator appears in the header bar showing the new version number (e.g., "v1.8.10 available"). Click it to view the changelog and release notes.
+The same command with one option added:
 
-For **critical** updates only, a full colored banner appears at the top of the window to ensure you see it.
+| Add | What it does |
+|---|---|
+| `--check` | Says whether GitHub has a newer release than yours; changes nothing. It counts every release, while the upgrade installs only the newest 1.10 release. Its last line says "Run 'whisperjav-upgrade' to update."; use the command above instead. The answer is kept for 6 hours; add `--force` as well to ask again at once. |
+| `--yes` | Upgrades without asking first. |
+| `--wheel-only` | Updates WhisperJAV alone; the packages it uses (CrispASR, PyTorch and the others) keep their versions. |
 
-### One-Click Update
+Do not update with `pip install -U whisperjav…`: on Windows, PyPI serves the CPU-only build of PyTorch, so it can replace your GPU build without a word.
 
-1. Click the update indicator in the header (or the banner for critical updates)
-2. View the changelog, then click **Update Now**
-3. Confirm the update in the dialog
-4. The GUI will close automatically
-5. The update runs in the background
-6. The GUI relaunches when complete
+## If the upgrade fails
 
-## CLI Users
+Before a full upgrade changes anything, the upgrade tool saves a list of the installed packages (not with `--wheel-only`), and after a failure it tries to put that list back. On installs made with the Windows installer this does not work in 1.10: it stops with "Rollback failed". `--rollback`, which the tool suggests when it finishes, stops with an error too.
 
-Use the `whisperjav-upgrade` command for command-line upgrades.
+If WhisperJAV no longer starts after an upgrade, uninstall it and install the newest release with the installer: see [Repair or go back](MANUAL_ROLLBACK.md). For the upgrade tool's messages, see [Troubleshooting](UPGRADE_TROUBLESHOOTING.md).
 
-### Check for Updates
+## Source installs (Windows, macOS, Linux)
 
-```bash
-whisperjav-upgrade --check
-```
+In the `WhisperJAV` folder, with the same environment active as at install (for `--local` on Windows, run `.venv\Scripts\activate` first), run `git fetch --tags`, then `git checkout v1.10.x` (the release you want), then the install script again as at install (on Windows with `--local` if you used it). It offers your install's accelerator as the default. Do not use `whisperjav-upgrade` on a source install: in that folder it runs `git pull`, which fails on a clone of a release.
 
-This shows if an update is available without installing it.
+## What stays
 
-### Interactive Upgrade
-
-```bash
-whisperjav-upgrade
-```
-
-You'll be prompted to confirm before the upgrade begins.
-
-### Non-Interactive Upgrade
-
-```bash
-whisperjav-upgrade --yes
-```
-
-Automatically confirms the upgrade (useful for scripts).
-
-### Hot-Patch Mode
-
-```bash
-whisperjav-upgrade --wheel-only
-```
-
-Only updates the WhisperJAV package itself, skipping dependency installation. This is faster and safer for post-release patches (e.g., 1.7.4 → 1.7.4.post1).
-
-### Show Script Version
-
-```bash
-whisperjav-upgrade --version
-```
-
-### Force Update Check
-
-```bash
-whisperjav-upgrade --check --force
-```
-
-Bypasses the 6-hour cache to check for updates immediately.
-
-## What Gets Updated
-
-| Component | Full Upgrade | Wheel-Only |
-|-----------|--------------|------------|
-| WhisperJAV code | Yes | Yes |
-| New dependencies | Yes | No |
-| numpy/librosa fix | Yes | No |
-| Desktop shortcut | Yes | Yes |
-| Old files cleanup | Yes | No |
-
-## What Gets Preserved
-
-The upgrade preserves:
-- AI models (`~/.cache/whisper/`, `~/.cache/huggingface/`)
-- Configuration (`whisperjav_config.json`)
-- Cache data (`.whisperjav_cache/`)
-
-## Troubleshooting
-
-See [UPGRADE_TROUBLESHOOTING.md](UPGRADE_TROUBLESHOOTING.md) for common issues and solutions.
-
-## Manual Rollback
-
-If an upgrade fails, see [MANUAL_ROLLBACK.md](MANUAL_ROLLBACK.md) for recovery options.
-
-## Running Standalone Upgrade Script
-
-If the installed upgrade command doesn't work, you can download and run the standalone script:
-
-```cmd
-cd %LOCALAPPDATA%\WhisperJAV
-curl -O https://raw.githubusercontent.com/meizhong986/whisperjav/main/installer/upgrade_whisperjav.py
-python.exe upgrade_whisperjav.py
-```
-
-## Technical Details
-
-### Version Check Caching
-
-Update checks are cached for 6 hours to avoid excessive API calls. Use `--force` to bypass the cache.
-
-### Update Process Flow
-
-1. **GUI detects update** → Shows notification banner
-2. **User clicks "Update Now"** → Confirmation dialog
-3. **GUI spawns update wrapper** → Background process
-4. **GUI exits** → Releases file locks
-5. **Wrapper waits for GUI** → Ensures clean exit
-6. **Upgrade script runs** → Updates packages
-7. **Wrapper relaunches GUI** → Fresh start
-
-### Files Created
-
-- `update.log` - Detailed upgrade log (in installation directory)
-- `.whisperjav_cache/version_check.json` - Cached update check result
-- `.whisperjav_cache/update_dismissed.json` - Dismissed notification tracking
+Your settings (`%APPDATA%\WhisperJAV` on Windows) and your downloaded models (`%USERPROFILE%\.cache`) are outside the install folder. The upgrade does not change them, and neither does an uninstall or a new install. The XXL Faster Whisper settings **Executable** and **Extra Args** are the exception: WhisperJAV saves them inside the install folder, so enter them again after an upgrade or a new install.
