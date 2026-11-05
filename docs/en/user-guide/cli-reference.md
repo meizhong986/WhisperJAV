@@ -140,18 +140,21 @@ whisperjav-translate [OPTIONS] -i INPUT.srt
 
 ## whisperjav-upgrade
 
-Upgrade WhisperJAV to the latest version.
+Upgrades an install made with the Windows installer to the newest 1.10 release. Run it with the install's `python.exe`:
 
-```bash
-whisperjav-upgrade [OPTIONS]
 ```
+"%LOCALAPPDATA%\WhisperJAV\python.exe" -m whisperjav.upgrade [OPTIONS]
+```
+
+(or the `python.exe` in your install folder). Do not start it with `Scripts\whisperjav-upgrade.exe` ([why](../UPGRADE.md#windows-installer-installs)). Source installs upgrade with git instead ([Upgrade Guide](../UPGRADE.md#source-installs-windows-macos-linux)).
 
 | Option | Description |
 |--------|-------------|
-| `--check` | Check for updates without upgrading |
-| `--wheel-only` | Code-only upgrade (skip dependency reinstall) |
-| `--list-snapshots` | Show available rollback points |
-| `--rollback` | Rollback to previous version |
-| `--extras` | Upgrade specific extras only (e.g., `cli,gui`) |
+| `--check` | Check for a newer release without upgrading (`--force`: ask again at once instead of using the answer kept for 6 hours) |
+| `--yes` | Upgrade without asking first |
+| `--wheel-only` | Update WhisperJAV alone; the packages it uses keep their versions |
+| `--list-snapshots` | List the package lists saved before earlier upgrades |
+| `--rollback` | Put such a list back. Does not work on installs made with the Windows installer in 1.10: it stops with an error ([repair instead](../MANUAL_ROLLBACK.md)) |
+| `--extras` | Not for installs made with the Windows installer: they always get the release's full set of packages, and the tool stops if another value is given |
 
 See [Upgrade Guide](../UPGRADE.md) for details.
