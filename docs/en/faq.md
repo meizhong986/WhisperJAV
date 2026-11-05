@@ -262,7 +262,7 @@ Tips:- Avoid running other GPU-heavy applications simultaneously (Chrome, games,
 
 ## Cohere-Transcribe (not available yet)
 
-> **Status:** Cohere-Transcribe is not available in WhisperJAV yet. No release date is set. The dropdown entry is greyed out. (Not to be confused with Cohere-CrispASR, the GGUF pipeline in Ensemble Mode: see [Parakeet-CrispASR and Cohere-CrispASR](pipelines/crispasr.md).)
+> **Status:** Cohere-Transcribe is not available in WhisperJAV yet. No release date is set. (Not to be confused with Cohere-CrispASR, the GGUF pipeline in Ensemble Mode: see [Parakeet-CrispASR and Cohere-CrispASR](pipelines/crispasr.md).)
 
 > **About transformers:** WhisperJAV 1.10.0 installs transformers 5.20 together with its own build of `qwen-asr` made for it ([meizhong986/Qwen3-ASR](https://github.com/meizhong986/Qwen3-ASR)). Do not downgrade transformers below 5.0. If Qwen3-ASR does not load, run the installer again; it puts back the tested versions.
 
