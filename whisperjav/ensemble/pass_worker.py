@@ -39,7 +39,7 @@ from whisperjav.crispasr.pass_settings import (ignored_hardware_message, ignored
                                                unused_by_other_pipelines, unused_pass_settings,
                                                unused_settings_message)
 from whisperjav.utils.device_detector import pass_device
-from whisperjav.utils.logger import logger, setup_logger
+from whisperjav.utils.logger import logger, quiet_library_loggers, setup_logger
 from whisperjav.utils.parameter_tracer import create_tracer, NullTracer
 
 from .utils import resolve_language_code
@@ -308,6 +308,7 @@ class WorkerPayload:
     language_code: str
     log_level: str = "INFO"  # Propagate log level to subprocess workers
     trace_file_path: Optional[str] = None  # Path for parameter tracer output
+    log_file: Optional[str] = None  # this pass's log file beside the run's --log-file (owner W509, way B)
 
 
 @dataclass
@@ -635,7 +636,8 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
 
     # Reconfigure logger with the log level from main process
     # (subprocess starts fresh with default INFO level due to 'spawn' context)
-    setup_logger("whisperjav", payload.log_level)
+    setup_logger("whisperjav", payload.log_level, payload.log_file)
+    quiet_library_loggers(debug=payload.log_level.upper() == "DEBUG")   # owner W509, console item 4
 
     # Create parameter tracer if trace file path is provided
     # Use append=True since the main process already created the file
@@ -659,8 +661,7 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
     language_code = payload.language_code or resolve_language_code(pass_config, payload.subs_language)
 
     logger.info(
-        "[Worker %s] Starting pass %s for %s file(s)",
-        os.getpid(),
+        "Starting pass %s for %s file(s)",
         pass_number,
         len(media_files),
         extra={'color': 'blue'},
@@ -750,8 +751,7 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
         for media_info in media_files:
             basename = media_info["basename"]
             logger.info(
-                "[Worker %s] Pass %s processing %s",
-                os.getpid(),
+                "Pass %s processing %s",
                 pass_number,
                 basename,
                 extra={'color': 'blue'},
@@ -933,7 +933,7 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
     total_time = sum(r.processing_time for r in results if r.status == 'completed')
 
     if completed_count > 0:
-        logger.info(
+        logger.debug(
             "[Worker %s] Pass %s completed: %d file(s), %d subtitles, %.1fs",
             os.getpid(), pass_number, completed_count, total_subs, total_time
         )
@@ -943,7 +943,7 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
             os.getpid(), pass_number, failed_count
         )
 
-    logger.info("[Worker %s] Worker exiting via Nuclear Exit", os.getpid())
+    logger.debug("[Worker %s] Worker exiting via Nuclear Exit", os.getpid())
 
     # Write result to Drop-Box and Nuclear Exit
     final_result = {"results": [r.__dict__ for r in results], "worker_error": None}
@@ -1003,8 +1003,8 @@ def _run_xxl_pass(
     asr_task = "translate" if payload.subs_language == "direct-to-english" else "transcribe"
 
     logger.info(
-        "[Worker %s] Pass %s: BYOP XXL (exe=%s, model=%s)",
-        os.getpid(), pass_number, xxl_exe, xxl_model,
+        "Pass %s: BYOP XXL (exe=%s, model=%s)",
+        pass_number, xxl_exe, xxl_model,
     )
 
     # A model named in the extra arguments is not used (#272); say so once per pass worker --
@@ -1016,8 +1016,8 @@ def _run_xxl_pass(
     for media_info in media_files:
         basename = media_info["basename"]
         logger.info(
-            "[Worker %s] Pass %s [XXL] processing %s",
-            os.getpid(), pass_number, basename,
+            "Pass %s [XXL] processing %s",
+            pass_number, basename,
             extra={'color': 'blue'},
         )
         file_start = _time.monotonic()
@@ -1064,8 +1064,8 @@ def _run_xxl_pass(
                 )
             )
             logger.info(
-                "[Worker %s] Pass %s [XXL] %s -> %d subtitles in %.1fs",
-                os.getpid(), pass_number, basename, subtitle_count, elapsed,
+                "Pass %s [XXL] %s -> %d subtitles in %.1fs",
+                pass_number, basename, subtitle_count, elapsed,
             )
         except Exception as xxl_error:
             elapsed = _time.monotonic() - file_start
@@ -1097,8 +1097,8 @@ def _run_xxl_pass(
     failed_count = sum(1 for r in results if r.status == 'failed')
     total_subs = sum(r.subtitles for r in results if r.status == 'completed')
     logger.info(
-        "[Worker %s] Pass %s [XXL] done: %d completed, %d failed, %d subtitles",
-        os.getpid(), pass_number, completed_count, failed_count, total_subs,
+        "Pass %s [XXL] done: %d completed, %d failed, %d subtitles",
+        pass_number, completed_count, failed_count, total_subs,
     )
 
     # Write Drop-Box and Nuclear Exit (same pattern as normal passes)
