@@ -196,7 +196,7 @@ WhisperJAV 接受扩展名为 .mp4、.mkv、.avi、.mov、.wmv、.flv、.webm、
 
 | 控制项 | 选项 | 默认值 |
 |--------|------|--------|
-| **处理管线** | 基于 Whisper：Balanced、Fast、Faster、Fidelity；HuggingFace：Transformers (HF)；ChronosJAV：Qwen3-ASR、Anime-Whisper；外部 (BYOP)：XXL Faster Whisper；GGUF via crispasr：parakeet、cohere、reazonspeech、kotoba、whisper-turbo、whisper-large、moss | 第一轮：cohere；第二轮：parakeet（勾选前不运行） |
+| **处理管线** | 基于 Whisper：Balanced、Fast、Faster、Fidelity；HuggingFace：Transformers (HF)；ChronosJAV：Qwen3-ASR、Anime-Whisper；外部 (BYOP)：XXL Faster Whisper；GGUF via crispasr：parakeet、cohere；实验性，欢迎反馈：reazonspeech、kotoba、whisper-turbo、whisper-large、MOSS | 第一轮：cohere；第二轮：parakeet（勾选前不运行） |
 | **灵敏度** | 高灵敏、中灵敏、低灵敏 | 选择处理管线时随之设定：第一轮（cohere）中灵敏，第二轮（parakeet）高灵敏 |
 | **场景检测器** | Auditok、Silero、Semantic、None | Semantic |
 | **语音增强器** | None、FFmpeg DSP、ZipEnhancer、htdemucs（BS-RoFormer 和 ZipEnhancer ONNX：即将推出） | None |
@@ -212,7 +212,7 @@ WhisperJAV 接受扩展名为 .mp4、.mkv、.avi、.mov、.wmv、.flv、.webm、
 - **基于 Whisper**：Balanced、Fast、Faster、Fidelity
 - **HuggingFace**：Transformers
 - **ChronosJAV**：Qwen3-ASR、Anime-Whisper
-- **GGUF via crispasr**：parakeet（Parakeet-CrispASR）、cohere（Cohere-CrispASR）、reazonspeech（ReazonSpeech-CrispASR）、kotoba（Kotoba-CrispASR）、whisper-turbo（Whisper-Turbo-CrispASR）、whisper-large（Whisper-Large-CrispASR）、moss（MOSS-CrispASR）——只处理日语，全部为实验性；parakeet 和 cohere 从 1.10.0 起提供，其他五个为 1.10.1 新增（见 [GGUF 处理管线（CrispASR）](../pipelines/crispasr.md)）
+- **GGUF via crispasr**：parakeet（Parakeet-CrispASR）、cohere（Cohere-CrispASR）；分隔线下方的 **实验性，欢迎反馈**（Experimental, open to feedback）：reazonspeech（ReazonSpeech-CrispASR）、kotoba（Kotoba-CrispASR）、whisper-turbo（Whisper-Turbo-CrispASR）、whisper-large（Whisper-Large-CrispASR）、MOSS（MOSS-CrispASR）——只处理日语，全部为实验性；parakeet 和 cohere 从 1.10.0 起提供，其他五个为 1.10.1 新增（见 [GGUF 处理管线（CrispASR）](../pipelines/crispasr.md)）
 - **外部 (BYOP)**：XXL Faster Whisper（第一轮、第二轮或两者）
 
 ### 自定义参数
@@ -225,7 +225,7 @@ WhisperJAV 接受扩展名为 .mp4、.mkv、.avi、.mov、.wmv、.flv、.webm、
 
 **Model** 标签页有一个 **Device** 菜单：**Auto (the GPU when one can be used, else the CPU)**（默认，有可用 GPU 时用 GPU，否则用 CPU）、**NVIDIA GPU (CUDA)** 或 **CPU (not accelerated)**（CPU，不加速）。
 
-对于 GGUF 处理管线（**GGUF via crispasr** 组中的任一处理管线），弹窗有四个标签页：**分割器**（Segmenter）、**增强器**（Enhancer）、**场景**（Scene）和 **计时**（Timing）；**moss**（MOSS-CrispASR）还有一个 **MOSS** 标签页。初始值就是这一轮实际使用的值。这一轮那一行下方的状态面板会显示模型（是否已下载）以及 CrispASR 将在哪里运行，例如“GPU：请求使用 NVIDIA GPU（CUDA）”（英文界面为 "GPU: asks for the NVIDIA GPU (CUDA)"）。**计时**（Timing）标签页只有一个菜单 **词级时间戳来源**（Word timestamps）：**来自模型**（From the model）或 **来自对齐器（wav2vec2-ja）**（From the aligner (wav2vec2-ja)），处理管线的默认项标有（默认）。字幕时间来自对齐器时（cohere 的默认，或在计时标签页中选了来自对齐器的任一 GGUF 处理管线），状态面板还会列出对齐器。
+对于 GGUF 处理管线（**GGUF via crispasr** 或 **实验性，欢迎反馈** 组中的任一处理管线），弹窗有四个标签页：**分割器**（Segmenter）、**增强器**（Enhancer）、**场景**（Scene）和 **计时**（Timing）；**MOSS**（MOSS-CrispASR）还有一个 **MOSS** 标签页。初始值就是这一轮实际使用的值。这一轮那一行下方的状态面板会显示模型（是否已下载）以及 CrispASR 将在哪里运行，例如“GPU：请求使用 NVIDIA GPU（CUDA）”（英文界面为 "GPU: asks for the NVIDIA GPU (CUDA)"）。**计时**（Timing）标签页只有一个菜单 **词级时间戳来源**（Word timestamps）：**来自模型**（From the model）或 **来自对齐器（wav2vec2-ja）**（From the aligner (wav2vec2-ja)），处理管线的默认项标有（默认）。字幕时间来自对齐器时（cohere 的默认，或在计时标签页中选了来自对齐器的任一 GGUF 处理管线），状态面板还会列出对齐器。
 
 对于 ChronosJAV 处理管线（Qwen3-ASR、Anime-Whisper），**对齐**（Alignment）标签页设置字幕时间（见[字幕时间](../pipelines/chronosjav.md#subtitle-timing-1100)）：
 
