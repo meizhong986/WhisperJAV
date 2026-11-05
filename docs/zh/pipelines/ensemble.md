@@ -31,7 +31,7 @@ Video → Pass 2 (Pipeline B) → SRT₂ ─┘
 
 | 控件 | 说明 |
 |------|------|
-| **Pipeline** | 这一轮的处理管线，分为五组：基于 Whisper（Balanced、Fast、Faster、Fidelity）、HuggingFace（Transformers (HF)）、ChronosJAV（Qwen3-ASR、Anime-Whisper）、外部 (BYOP)（XXL Faster Whisper）、GGUF via crispasr（parakeet、cohere、reazonspeech、kotoba、whisper-turbo、whisper-large、moss）。第一轮开始时为 cohere，第二轮为 parakeet。选择处理管线时，这一轮的灵敏度和语音分割器会随之设为它自己的值 |
+| **Pipeline** | 这一轮的处理管线，分为六组：基于 Whisper（Balanced、Fast、Faster、Fidelity）、HuggingFace（Transformers (HF)）、ChronosJAV（Qwen3-ASR、Anime-Whisper）、外部 (BYOP)（XXL Faster Whisper）、GGUF via crispasr（parakeet、cohere），以及分隔线下方的 实验性，欢迎反馈（reazonspeech、kotoba、whisper-turbo、whisper-large、MOSS）。第一轮开始时为 cohere，第二轮为 parakeet。选择处理管线时，这一轮的灵敏度和语音分割器会随之设为它自己的值 |
 | **Sensitivity** | 检测阈值（高灵敏、中灵敏、低灵敏） |
 | **Scene Detector** | 音频场景检测方式（Auditok、Silero、Semantic、None） |
 | **Speech Enhancer** | 音频预处理 / 语音增强（None、FFmpeg DSP、ZipEnhancer、htdemucs） |
