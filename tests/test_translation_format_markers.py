@@ -94,7 +94,9 @@ def test_labels_are_found_with_windows_line_ends_and_another_task_type():
         SimpleNamespace(number=1, text="Hello.\r\n#12\r\nGood morning."),
         SimpleNamespace(number=2, text="Hello.\nSubtitle>\nHello."),
     ]
-    assert format_marker_lines(lines) == [1]
+    # Since #460's run of 2026-11-02 a line that is one word followed by ">" is a label in any language, so
+    # "Subtitle>" counts whatever the task type.
+    assert format_marker_lines(lines) == [1, 2]
     assert format_marker_lines(lines, "Subtitle") == [1, 2]
 
 
@@ -206,3 +208,45 @@ def test_console_names_the_saved_entry_when_an_earlier_line_is_untranslated(tmp_
     warning = [line for line in capsys.readouterr().err.splitlines() if "still contain answer-format" in line]
     assert len(warning) == 1
     assert ": #1 " in warning[0]
+
+
+# --- #460, 2026-11-02 (the reporter's run on 1.10.0): the labels in Chinese, and subtitles left out unsaid ---
+
+def test_labels_in_another_language_are_found():
+    """The reporter's entry 265: 原题> / 翻译> on lines of their own."""
+    lines = [
+        SimpleNamespace(number=265, text="原题>\n下一个假期，去哪儿玩？\n翻译>\n下一个假期想去哪儿？"),
+        SimpleNamespace(number=1, text="又来了。\n翻译>\n又来了。"),
+        SimpleNamespace(number=2, text="下一个假期想去哪儿？"),
+        SimpleNamespace(number=3, text="A > B\n<i>斜体</i>"),
+    ]
+    assert format_marker_lines(lines) == [265, 1]
+
+
+CHINESE_LABELS = ("#1\n原题>\nこんにちは\n翻译>\nHello.\n\n"
+                  "#2\nTranslation>\nGood morning.\n\n#3\nTranslation>\nThank you.")
+
+
+def test_an_answer_with_chinese_labels_is_retried(tmp_path, capsys):
+    result, output, requests = _translate(tmp_path, [CHINESE_LABELS, CLEAN])
+
+    assert result == output
+    assert len(requests) == 2
+    text = output.read_text(encoding="utf-8")
+    assert "原题>" not in text and "翻译>" not in text
+    err = capsys.readouterr().err
+    assert "TRANSLATION COMPLETE" in err and "INCOMPLETE" not in err
+
+
+def test_subtitles_left_without_translation_are_named_and_the_end_says_so(tmp_path, capsys):
+    # #1 never comes back: PySubtrans leaves it out of the written file.
+    dropped = "#2\nTranslation>\nGood morning.\n\n#3\nTranslation>\nThank you."
+    result, output, requests = _translate(tmp_path, [dropped, dropped])
+
+    assert result == output   # the exit status is not changed (owner's decision)
+    err = capsys.readouterr().err
+    warning = [line for line in err.splitlines() if "have no translation" in line]
+    assert len(warning) == 1
+    assert "1 of 3 subtitles" in warning[0] and ": #1 " in warning[0] and "film.ja.srt" in warning[0]
+    assert "TRANSLATION INCOMPLETE: 1 of 3 subtitles not translated" in err
+    assert "TRANSLATION COMPLETE" not in err
