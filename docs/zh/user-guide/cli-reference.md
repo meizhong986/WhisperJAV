@@ -140,18 +140,21 @@ whisperjav-translate [OPTIONS] -i INPUT.srt
 
 ## whisperjav-upgrade
 
-将 WhisperJAV 升级到最新版本。
+把用 Windows 安装程序制作的安装升级到 1.10 系列中最新的版本。请用安装文件夹中的 `python.exe` 运行：
 
-```bash
-whisperjav-upgrade [OPTIONS]
 ```
+"%LOCALAPPDATA%\WhisperJAV\python.exe" -m whisperjav.upgrade [OPTIONS]
+```
+
+（或你的安装文件夹中的 `python.exe`）。不要用 `Scripts\whisperjav-upgrade.exe` 启动（[原因](../UPGRADE.md#windows-installer-installs)）。源码安装改用 git 升级（[升级指南](../UPGRADE.md#source-installs-windows-macos-linux)）。
 
 | 选项 | 描述 |
 |------|------|
-| `--check` | 检查更新但不升级 |
-| `--wheel-only` | 仅升级代码（跳过依赖重新安装） |
-| `--list-snapshots` | 显示可用的回滚点 |
-| `--rollback` | 回滚到上一版本 |
-| `--extras` | 仅升级指定的 extras（例如 `cli,gui`） |
+| `--check` | 只检查是否有更新的版本，不升级（`--force`：立即重新查询，而不用保留 6 小时的结果） |
+| `--yes` | 升级前不再询问 |
+| `--wheel-only` | 只更新 WhisperJAV 本身；它使用的软件包保持原版本 |
+| `--list-snapshots` | 列出之前升级前保存的软件包列表 |
+| `--rollback` | 恢复这样的列表。在 1.10 中对用 Windows 安装程序制作的安装不起作用：它会报错停止（[请改为修复](../MANUAL_ROLLBACK.md)） |
+| `--extras` | 不用于用 Windows 安装程序制作的安装：它们总是获得该版本的全部软件包，给出其他值时工具会停止 |
 
 详见[升级指南](../UPGRADE.md)。
