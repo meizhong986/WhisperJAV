@@ -1,192 +1,43 @@
-# Upgrade Troubleshooting Guide
+# Upgrade troubleshooting
 
-This guide helps resolve common issues during WhisperJAV upgrades.
+This page is for installs made with the Windows installer.
 
-## Preflight Check Failures
+## WhisperJAV no longer starts after an upgrade
 
-### "Insufficient disk space"
+For example, the upgrade's last lines say "Rollback failed - installation may be in inconsistent state", or `"%LOCALAPPDATA%\WhisperJAV\Scripts\whisperjav.exe" --version` ends with `ModuleNotFoundError: No module named 'whisperjav'`. Uninstall WhisperJAV and install the newest release with the installer: see [Repair or go back](MANUAL_ROLLBACK.md).
 
-**Error:** `Disk space: X.X GB available, need 5 GB`
+## "[WinError 5] Access is denied" during the upgrade
 
-**Solution:**
-1. Free up disk space on the drive where WhisperJAV is installed
-2. Delete old files: `%TEMP%\*`, browser cache, old downloads
-3. Run Disk Cleanup: `cleanmgr`
+WhisperJAV is installed on another drive than Windows' temporary folder (normally drive C:), and a program from the install's `Scripts` folder was running while the upgrade replaced it: `whisperjav-upgrade.exe` itself, when the upgrade was started with it, or another WhisperJAV window. The upgrade stops halfway, and WhisperJAV usually no longer starts: repair it as above. pip's advice in the same message ("Consider using the `--user` option or check the permissions.") does not apply. Next time, close every WhisperJAV window and start the upgrade with the install's `python.exe`.
 
-### "Wrong Python environment detected"
+## "No internet connection" or "Cannot upgrade: GitHub's releases list could not be read"
 
-**Error:**
-```
-Running from: C:\some\other\python
-Expected:     C:\Users\...\AppData\Local\WhisperJAV
-```
+The upgrade first checks that github.com can be reached, then reads GitHub's list of releases. Nothing was changed. Check the connection and try again. The upgrade downloads from GitHub, PyPI and download.pytorch.org; users in China: keep your VPN on during the whole upgrade.
 
-**Solution:**
-Run the upgrade script using WhisperJAV's Python:
-```cmd
-%LOCALAPPDATA%\WhisperJAV\python.exe upgrade_whisperjav.py
-```
+## "Upgrade stopped before any change: …"
 
-### "WhisperJAV GUI is running"
+Nothing was changed. The rest of the message says why: the new release's list of packages could not be read (check the connection and try again; in China, keep your VPN on), a package of the new release is not available for your PC, or the check timed out. If it happens again, open an issue with the whole output (see below).
 
-**Error:** `GUI check failed: WhisperJAV GUI is running`
+## "Stopped: conda installed …, but this release is pinned to …"
 
-**Solution:**
-1. Close the WhisperJAV GUI window
-2. If it doesn't close, open Task Manager and end:
-   - `pythonw.exe` (WhisperJAV GUI)
-   - `WhisperJAV-GUI.exe`
-3. Try the upgrade again
+Nothing was changed. Report it with the link the message gives.
 
-### "No internet connection"
-
-**Error:** `Network: no connection to GitHub`
-
-**Solution:**
-1. Check your internet connection
-2. Try accessing https://github.com in a browser
-3. If behind a corporate firewall/proxy:
-   ```cmd
-   set HTTPS_PROXY=http://your-proxy:port
-   python.exe upgrade_whisperjav.py
-   ```
-
-## Upgrade Execution Failures
-
-### "Package upgrade failed"
-
-**Symptoms:** Upgrade stops during "Upgrading WhisperJAV package..."
-
-**Causes:**
-- Network timeout
-- GitHub temporarily unavailable
-- pip cache corruption
-
-**Solutions:**
-
-1. **Retry the upgrade:**
-   ```cmd
-   python.exe upgrade_whisperjav.py
-   ```
-
-2. **Clear pip cache and retry:**
-   ```cmd
-   python.exe -m pip cache purge
-   python.exe upgrade_whisperjav.py
-   ```
-
-3. **Use wheel-only mode** (if you just need the latest code):
-   ```cmd
-   python.exe upgrade_whisperjav.py --wheel-only
-   ```
-
-### "Dependency installation failed"
-
-**Symptoms:** Some packages fail to install during dependency phase
-
-**Solutions:**
-
-1. **Continue anyway** - Most dependency failures are non-fatal
-2. **Install manually:**
-   ```cmd
-   python.exe -m pip install <package-name>
-   ```
-
-### "Permission denied" / "Access denied"
-
-**Symptoms:** File operations fail
-
-**Solutions:**
-1. Close ALL WhisperJAV windows
-2. Run upgrade from an elevated command prompt (Run as Administrator)
-3. Temporarily disable antivirus real-time protection
-
-### "Could not update launcher"
-
-**Symptoms:** Desktop shortcut not updated
-
-**This is non-fatal.** WhisperJAV still works. To fix manually:
-1. Right-click the desktop shortcut
-2. Click Properties
-3. Update the target path
-
-## Post-Upgrade Issues
-
-### "Import error" after upgrade
-
-**Symptoms:** WhisperJAV won't start, shows import errors
-
-**Solutions:**
-
-1. **Reinstall with dependencies:**
-   ```cmd
-   python.exe -m pip install --force-reinstall git+https://github.com/meizhong986/whisperjav.git@main
-   ```
-
-2. **Check for conflicting packages:**
-   ```cmd
-   python.exe -m pip check
-   ```
-
-### "CUDA not available" after upgrade
-
-**Symptoms:** GPU acceleration stopped working
+## "CUDA not available" after the upgrade
 
 **Cause:** usually a CPU-only PyTorch was installed over the CUDA one (for example by a plain `pip install`), or the NVIDIA driver changed.
 
-**Solution:**
-1. Run `whisperjav --check`: it names the accelerator of the install and what PyTorch can use.
+1. Run `"%LOCALAPPDATA%\WhisperJAV\Scripts\whisperjav.exe" --check`: it names the accelerator of the install and what PyTorch can use.
 2. Check the driver with `nvidia-smi` (580 or newer on Windows, 570 or newer on Linux).
 3. Run the WhisperJAV installer again: it keeps the accelerator of the install and puts back the PyTorch build that belongs to it.
 
-### Version didn't change after upgrade
+## Do not repair with pip
 
-**Symptoms:** `--version` shows old version
+Do not run `pip install -U whisperjav` or `pip install git+https://github.com/…`: on Windows, PyPI serves the CPU-only build of PyTorch, so it can replace your GPU build, and the other packages may not be the versions WhisperJAV was tested with.
 
-**Solutions:**
-1. Clear Python's import cache:
-   ```cmd
-   python.exe -c "import whisperjav; print(whisperjav.__file__)"
-   ```
-2. Reinstall:
-   ```cmd
-   python.exe -m pip install --force-reinstall --no-cache-dir git+https://github.com/meizhong986/whisperjav.git@main
-   ```
+## Reporting issues
 
-## Advanced Options
+Open [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) and include:
 
-### Skip preflight checks
-
-**Use with caution** - only if you know what you're doing:
-```cmd
-python.exe upgrade_whisperjav.py --skip-preflight
-```
-
-### Hot-patch mode
-
-Only updates WhisperJAV code, skips all dependencies:
-```cmd
-python.exe upgrade_whisperjav.py --wheel-only
-```
-
-### Non-interactive mode
-
-For scripted upgrades:
-```cmd
-python.exe upgrade_whisperjav.py --yes
-```
-
-## When All Else Fails
-
-See [Manual Rollback Guide](MANUAL_ROLLBACK.md) for complete recovery options.
-
-## Reporting Issues
-
-If you encounter an issue not covered here:
-
-1. Open [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues)
-2. Include:
-   - Full console output from the upgrade attempt
-   - Windows version (`winver`)
-   - Python version (`python.exe --version`)
-   - Current WhisperJAV version (if known)
+- the whole output of the upgrade command (all of it, not only the last lines);
+- the output of `"%LOCALAPPDATA%\WhisperJAV\Scripts\whisperjav.exe" --check`, if WhisperJAV still starts;
+- the drive WhisperJAV is installed on, and your Windows version (`winver`).
