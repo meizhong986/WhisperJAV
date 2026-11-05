@@ -1238,9 +1238,10 @@ const RunStopDialog = {
             ProcessManager.updateButtonStates();
             ProgressManager.setIndeterminate(true);
             ProgressManager.setStatus('Running on the CPU (not accelerated)...');
-            if (result.command) {
-                ConsoleManager.appendRaw(`\n> ${result.command}\n`);
-            }
+            // The command line is echoed by the API (api.py) into the run's output (owner W509: not twice). The
+            // stopped run ended the log polling; start it again, or this run's console stays empty to the end.
+            ProcessManager.stopLogPolling();
+            ProcessManager.startLogPolling();
             ProcessManager.startStatusMonitoring();
         } else {
             ErrorHandler.show('The run could not start again', (result && result.message) || '');
@@ -1280,7 +1281,7 @@ const ProcessManager = {
 
                 // Log command
                 if (result.command) {
-                    ConsoleManager.appendRaw(`\n> ${result.command}\n`);
+                    // The command line is echoed by the API (api.py) into the run's output; not twice (owner W509).
                 }
 
                 // Start log polling
@@ -1400,19 +1401,24 @@ const ProcessManager = {
                         // For other modes, trigger separate translation subprocess if enabled
                         const isEnsembleMode = AppState.activeTab === 'tab3';
                         const needsALook = summary && (summary.counts.empty > 0 || summary.counts.suspect > 0);
-                        const body = (tally ? `Files: ${tally}.` : 'The run finished.') +
-                            (needsALook ? ' Some files ended empty or suspect (listed below).' : '');
+                        // The tally is in the run summary and in the API's closing line; this line says only
+                        // what they do not (owner W509: the end lines once).
+                        const body = needsALook ? 'Some files ended empty or suspect (listed above).' : '';
                         this.logFileStates(summary);
 
                         if (isEnsembleMode) {
                             // CLI handled everything including translation (if enabled)
-                            ErrorHandler.showSuccess('Finished',
-                                TranslateIntegrationManager.wasEnabledOnStart()
-                                    ? `${body} Translation was run as part of the ensemble.`
-                                    : body);
+                            const note = TranslateIntegrationManager.wasEnabledOnStart()
+                                ? `${body} Translation was run as part of the ensemble.`.trim()
+                                : body;
+                            if (note) {
+                                ErrorHandler.showSuccess('Finished', note);
+                            }
                         } else {
                             // Transcription Mode - translation needs separate subprocess (legacy)
-                            ErrorHandler.showSuccess('Finished', body);
+                            if (body) {
+                                ErrorHandler.showSuccess('Finished', body);
+                            }
 
                             if (TranslateIntegrationManager.wasEnabledOnStart()) {
                                 // Use output_files from API (computed based on mode/language)
@@ -1500,9 +1506,7 @@ const ProcessManager = {
             const level = f.state === 'failed' ? 'error' : (f.state === 'skipped' ? 'info' : 'warning');
             ConsoleManager.log(`${f.state}: ${f.name}${f.detail ? ' — ' + f.detail : ''}`, level);
         }
-        if (summary.manifest_path) {
-            ConsoleManager.log(`Manifest: ${summary.manifest_path}`, 'info');
-        }
+        // The manifest's path is the run summary's last line (owner W509: said once).
     },
 
     formatStatus(status) {
@@ -6764,14 +6768,13 @@ const EnsembleManager = {
 
                 // Log command
                 if (result.command) {
-                    ConsoleManager.appendRaw(`\n> ${result.command}\n`);
+                    // The command line is echoed by the API (api.py) into the run's output; not twice (owner W509).
                 }
 
                 // Start polling
                 ProcessManager.startLogPolling();
                 ProcessManager.startStatusMonitoring();
 
-                ConsoleManager.log('Two-pass ensemble started', 'info');
             } else {
                 ErrorHandler.show('Start Failed', result.message);
             }
