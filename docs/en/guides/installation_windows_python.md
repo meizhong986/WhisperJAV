@@ -159,7 +159,7 @@ Do not update with a plain `pip install -U whisperjav…`: on Windows, PyPI serv
 
 ## 8. Troubleshooting
 
-**"WhisperJAV 1.10.0 does not support …".** The computer is outside the [supported list](../getting-started/index.md#supported-computers); the message says why. Nothing was installed.
+**"WhisperJAV 1.10 does not support …".** The computer is outside the [supported list](../getting-started/index.md#supported-computers); the message says why. Nothing was installed.
 
 **The installer refuses your Python.** WhisperJAV 1.10.0 needs Python 3.13. Make a 3.13 environment (section 3).
 
