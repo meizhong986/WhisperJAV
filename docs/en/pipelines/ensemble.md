@@ -31,7 +31,7 @@ Each pass has identical controls:
 
 | Control | Description |
 |---------|-------------|
-| **Pipeline** | The pipeline of the pass, in five groups: Whisper-Based (Balanced, Fast, Faster, Fidelity), HuggingFace (Transformers (HF)), ChronosJAV (Qwen3-ASR, Anime-Whisper), External (BYOP) (XXL Faster Whisper) and GGUF via crispasr (parakeet, cohere, reazonspeech, kotoba, whisper-turbo, whisper-large, moss). Pass 1 starts on cohere, Pass 2 on parakeet. Choosing a pipeline sets the sensitivity and speech segmenter the pass starts with |
+| **Pipeline** | The pipeline of the pass, in six groups: Whisper-Based (Balanced, Fast, Faster, Fidelity), HuggingFace (Transformers (HF)), ChronosJAV (Qwen3-ASR, Anime-Whisper), External (BYOP) (XXL Faster Whisper), GGUF via crispasr (parakeet, cohere) and, below a divider line, Experimental, open to feedback (reazonspeech, kotoba, whisper-turbo, whisper-large, MOSS). Pass 1 starts on cohere, Pass 2 on parakeet. Choosing a pipeline sets the sensitivity and speech segmenter the pass starts with |
 | **Sensitivity** | Detection threshold (Aggressive, Balanced, Conservative) |
 | **Scene Detector** | How to split audio into scenes (Auditok, Silero, Semantic, None) |
 | **Speech Enhancer** | Audio preprocessing (None, FFmpeg DSP, ZipEnhancer, htdemucs) |
