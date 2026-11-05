@@ -105,7 +105,7 @@ def fix_stdout():
 # Fix stdout before any other imports
 fix_stdout()
 
-from whisperjav.utils.logger import setup_logger, logger
+from whisperjav.utils.logger import setup_logger, logger, quiet_library_loggers
 from whisperjav.utils.device_detector import get_best_device
 from whisperjav.utils.run_outcome import (
     FAIL_ON_CHOICES,
@@ -618,7 +618,14 @@ def parse_arguments():
                            help="Skip files that already have subtitle output (useful for resuming batch processing)")
     path_group.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], 
                            default="INFO", help="Logging level")
-    path_group.add_argument("--log-file", help="Log file path")
+    path_group.add_argument("--log-file", help="Log file path. The file records this run's WhisperJAV lines, the "
+                                               "debug lines included, and CrispASR's start-up details. Not in the "
+                                               "file: the start banner, the RUN SUMMARY table (it is in "
+                                               "whisperjav_run.json), the total processing time, the translation "
+                                               "lines, other libraries' warnings, and the lines of the balanced "
+                                               "pipeline's ASR worker. In an Ensemble run each pass writes its own "
+                                               "file beside it, named after it (run.log -> run.pass1.log, "
+                                               "run.pass2.log). An existing file is added to.")
     path_group.add_argument("--stats-file", help="Save processing statistics to JSON")
     path_group.add_argument("--dump-params", metavar="FILE",
                            help="Dump resolved parameters to JSON file and exit (no processing)")
@@ -2647,6 +2654,7 @@ def main():
     global logger
     log_level = "DEBUG" if args.debug else args.log_level
     logger = setup_logger("whisperjav", log_level, args.log_file)
+    quiet_library_loggers(debug=log_level == "DEBUG")   # libraries' INFO lines only with --debug (owner W509)
 
     # The start of each run, by the install record (design 22.5, owner W234 D-A): silent, a notice
     # of where each part runs, or the one stop (an NVIDIA install whose GPU cannot be used now,
@@ -3684,6 +3692,7 @@ def main():
                 subs_language=args.subs_language,
                 parameter_tracer=tracer,
                 log_level=log_level,
+                log_file=args.log_file,   # each pass writes its own file beside it (owner W509, way B)
                 serial_file_processing=getattr(args, 'ensemble_serial', True),
                 # v1.9.2 (CFF1): rides worker_kwargs into every pass pipeline's
                 # constructor; Balanced/Fidelity honour it, the others ignore it.
