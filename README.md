@@ -235,7 +235,7 @@ Each stage has several interchangeable providers — the full menu, with strengt
 | **qwen** (ChronosJAV) | Qwen3-ASR | Modern text-first recognizer |
 | **anime-whisper** (ChronosJAV) | anime-whisper | Anime/JAV-tuned dialogue |
 | **transformers** | HuggingFace | Kotoba and other HF Whisper models |
-| **parakeet**, **cohere**, **reazonspeech**, **kotoba**, **whisper-turbo**, **whisper-large**, **moss** (`*-crispasr`, Ensemble passes) | CrispASR (GGUF models) | Japanese; experimental (parakeet and cohere since 1.10.0, the others new in 1.10.1) |
+| **parakeet**, **cohere**, **reazonspeech**, **kotoba**, **whisper-turbo**, **whisper-large**, **MOSS** (`*-crispasr`, Ensemble passes) | CrispASR (GGUF models) | Japanese; experimental (parakeet and cohere since 1.10.0, the others new in 1.10.1) |
 
 **Sensitivity** applies to every mode: **conservative** (fewer false positives, good for noisy content) · **balanced** · **aggressive** (catches more quiet dialogue; good for whisper/ASMR content — and the tuning target of most of our benchmark work).
 
@@ -434,7 +434,7 @@ You choose your kind of computer once, when you install WhisperJAV.
 | Your computer | What uses the graphics card |
 |---|---|
 | NVIDIA graphics card | Every pipeline. |
-| AMD or Intel graphics card, or an older NVIDIA card (Windows) | The GGUF pipelines (Ensemble tab, Pipeline menu group "GGUF via crispasr"), through Vulkan. Experimental, not yet tested. The other pipelines run on the processor, several times slower. |
+| AMD or Intel graphics card, or an older NVIDIA card (Windows) | The GGUF pipelines (Ensemble tab, Pipeline menu groups "GGUF via crispasr" and "Experimental, open to feedback"), through Vulkan. Experimental, not yet tested. The other pipelines run on the processor, several times slower. |
 | Mac with Apple silicon | transformers asks for the Apple GPU; the GGUF pipelines and fidelity ask for it too (not yet tested on a Mac). balanced, fast, faster and ChronosJAV run on the processor. |
 | No graphics card | None: every pipeline runs on the processor, several times slower than on a graphics card. |
 
