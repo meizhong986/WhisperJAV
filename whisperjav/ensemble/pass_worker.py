@@ -763,7 +763,8 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
             # #394 per-scene telemetry goes beside this file's pass output,
             # tagged with the pass number so two Balanced passes do not
             # overwrite each other. Pipelines that do not record it ignore it.
-            # The CrispASR pipelines' raw copy and artifacts file (1.10.1, R-RAW) go to the same folder.
+            # The CrispASR pipelines' raw copy and artifacts file, and ChronosJAV's raw copy (1.10.1, R-RAW), go to
+            # the same folder.
             _configure_trace(pipeline, pass_number, Path(media_info.get('output_dir', payload.output_dir)))
             # An Ensemble pass keeps its save-points (owner W462, W463 C1); pipelines without them ignore this.
             if hasattr(pipeline, "save_points"):
@@ -1107,8 +1108,8 @@ def _run_xxl_pass(
 
 
 def _configure_trace(pipeline: Any, pass_number: int, file_output_dir: Path) -> None:
-    """Point a CrispASR pipeline's raw copy and artifacts file (1.10.1, requirement R-RAW; crispasr/cleanup.py) at
-    this file's pass output folder, named with the pass. As for the telemetry below: in ``--output-dir source`` mode
+    """Point a CrispASR pipeline's raw copy and artifacts file, and ChronosJAV's raw copy (1.10.1, requirement R-RAW;
+    crispasr/cleanup.py, qwen_pipeline.py: _keep_raw_copy) at this file's pass output folder, named with the pass. As for the telemetry below: in ``--output-dir source`` mode
     the pipeline's own ``output_dir`` is the temp directory, which is removed. Other pipelines are left alone."""
     if hasattr(pipeline, "raw_subs_dir") and hasattr(pipeline, "pass_tag"):
         pipeline.raw_subs_dir = str(Path(file_output_dir) / "raw_subs")
