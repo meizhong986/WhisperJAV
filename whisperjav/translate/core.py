@@ -31,8 +31,22 @@ def strip_translation_context_tags(text: str) -> tuple[str, dict[str, str], int]
     return _CONTEXT_TAG_PAIR.sub(remove, text), context, count
 
 
+# Some models (Gemma 3 through Ollama, bug report 2026-11-05) wrap their whole answer in Markdown code fences. The
+# closing fence and the blank lines before it then become part of the last subtitle's text, which fails PySubtrans's
+# check ("One or more lines contain more than 2 newlines"), and the retry often answers the same way. A line that is
+# only a fence (``` with an optional language word) is never subtitle text.
+_CODE_FENCE_LINE = re.compile(r"^[ \t]*```[\w+.-]*[ \t]*\r?$\n?", re.MULTILINE)
+
+
+def strip_code_fences(text: str) -> tuple[str, int]:
+    """Remove the lines that are only a Markdown code fence, and the blank lines this leaves at the start and end."""
+    cleaned, count = _CODE_FENCE_LINE.subn("", text)
+    return (cleaned.strip() if count else text), count
+
+
 def apply_translation_context_filter(translator) -> bool:
-    """Clean provider responses before PySubtrans parses them into subtitle lines."""
+    """Clean provider responses before PySubtrans parses them into subtitle lines: Markdown code-fence lines, and
+    the context tags a model repeats."""
     client = getattr(translator, "client", None)
     if client is None or not hasattr(client, "RequestTranslation"):
         return False
@@ -45,9 +59,12 @@ def apply_translation_context_filter(translator) -> bool:
         if not isinstance(content, dict) or not isinstance(content.get("text"), str):
             return translation
 
-        cleaned_text, context, count = strip_translation_context_tags(content["text"])
-        if not count:
+        unfenced, fences = strip_code_fences(content["text"])
+        cleaned_text, context, count = strip_translation_context_tags(unfenced)
+        if not count and not fences:
             return translation
+        if not count:
+            return translation.__class__({**content, "text": unfenced})
 
         # Rebuild through PySubtrans's own Translation class so its other
         # metadata parsers still run. Restore the extracted context afterwards.
@@ -64,12 +81,31 @@ def apply_translation_context_filter(translator) -> bool:
 # PySubtrans keeps a subtitle's text even when the model repeats the answer
 # format inside it, e.g. "Hello.\nTranslation>\nHello." (#460). These labels
 # are never translated text. The label word is PySubtrans's task type.
+# A model may also write the labels in the target language, e.g. "原题>" and
+# "翻译>" on lines of their own (#460, 2026-11-02): a line that is only one
+# short word followed by ">" is never subtitle text either.
+FORMAT_LABELS_TEXT = "Translation>, Original>, the same labels in another language such as 翻译>, or a #number line"
+
+
 def _format_marker(task_type: str = "Translation"):
     word = re.escape(task_type if isinstance(task_type, str) and task_type else "Translation")
     return re.compile(
-        rf"^[ \t]*(?:(?:{word}|Original)>|</?{word}>|#[0-9]+[ \t\r]*$)",
+        rf"^[ \t]*(?:(?:{word}|Original)>|</?{word}>|#[0-9]+[ \t\r]*$|[^\s<>#][^\s<>]{{0,11}}>[ \t\r]*$)",
         re.MULTILINE,
     )
+
+
+def untranslated_numbers(project) -> tuple:
+    """The subtitle numbers (as in the input file) that have no translation, and the number of subtitles.
+
+    PySubtrans leaves a subtitle out of the written file when the model's answer for it was missing or could not be
+    read (#460: "lines go missing while the run says TRANSLATION COMPLETE"); its project knows which ones.
+    """
+    from PySubtrans.SubtitleScene import UnbatchScenes
+
+    scenes = getattr(getattr(project, "subtitles", None), "scenes", None) or []
+    originals, _translated, untranslated = UnbatchScenes(scenes)
+    return [line.number for line in untranslated], len(originals)
 
 
 def format_marker_lines(lines, task_type: str = "Translation") -> list:
@@ -100,8 +136,8 @@ def apply_format_marker_check(translator) -> bool:
                 lines = [line for line in parser.translated if line.number in numbers]
                 errors.append(TranslationValidationError(
                     f"Subtitles {', '.join(f'#{n}' for n in numbers)} contain the answer-format labels "
-                    "(Translation>, Original> or a #number line) inside the translated text. Give each "
-                    "subtitle once, as #number, then Translation>, then only its translation.",
+                    f"({FORMAT_LABELS_TEXT}) inside the translated text. Give each subtitle once, as #number, "
+                    "then Translation>, then only its translation.",
                     lines=lines,
                 ))
             return errors
@@ -1204,15 +1240,32 @@ def translate_subtitle(
             if _marked:
                 _shown = ", ".join(f"#{n}" for n in _marked[:20]) + (", …" if len(_marked) > 20 else "")
                 print(f"[TRANSLATE] WARNING: {len(_marked)} translated subtitles still contain answer-format "
-                      f"labels (Translation>, Original> or a #number line): {_shown} — "
+                      f"labels ({FORMAT_LABELS_TEXT}): {_shown} — "
                       f"check them in {output_path.name}", file=sys.stderr)
+
+        # #460: subtitles without a translation are left out of the written file; say how many and which
+        _missing, _total = [], 0
+        if _translation_success:
+            try:
+                _missing, _total = untranslated_numbers(project)
+            except Exception as _e:
+                print(f"[TRANSLATE]   Warning: Could not count the untranslated subtitles: {_e}", file=sys.stderr)
+            if _missing:
+                _shown = ", ".join(f"#{n}" for n in _missing[:20]) + (", …" if len(_missing) > 20 else "")
+                print(f"[TRANSLATE] WARNING: {len(_missing)} of {_total} subtitles have no translation (the "
+                      f"model's answer for them was missing or could not be read), so {output_path.name} leaves "
+                      f"them out: {_shown} (numbers as in {Path(str(input_path)).name})", file=sys.stderr)
 
         # =========================================================================
         # DIAGNOSTIC: Final Summary — truthful status
         # =========================================================================
         print(f"", file=sys.stderr)
         print(f"[TRANSLATE] " + "=" * 50, file=sys.stderr)
-        if _translation_success:
+        if _translation_success and _missing:
+            print(f"[TRANSLATE]   TRANSLATION INCOMPLETE: {len(_missing)} of {_total} subtitles not translated",
+                  file=sys.stderr)
+            print(f"[TRANSLATE]   Output: {output_path}", file=sys.stderr)
+        elif _translation_success:
             print(f"[TRANSLATE]   TRANSLATION COMPLETE", file=sys.stderr)
             print(f"[TRANSLATE]   Output: {output_path}", file=sys.stderr)
         else:

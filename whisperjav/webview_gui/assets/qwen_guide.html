@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Qwen3-ASR Pipeline — Parameter Guide</title>
+<title>ChronosJAV (Qwen3-ASR, Anime-Whisper) — Parameter Guide</title>
 <style>
   :root {
     --bg: #1a1b2e;
@@ -232,8 +232,8 @@
 </head>
 <body>
 
-<h1>Qwen3-ASR Pipeline &mdash; Parameter Guide</h1>
-<p class="subtitle">Complete reference for all Qwen3-ASR controls: ensemble row dropdowns and the Customize Parameters modal. Defaults work well for most JAV content.</p>
+<h1>ChronosJAV (Qwen3-ASR, Anime-Whisper) &mdash; Parameter Guide</h1>
+<p class="subtitle">The controls of a ChronosJAV pass (Qwen3-ASR or Anime-Whisper): the Ensemble Mode row and the Customize Parameters window.</p>
 
 <!-- Pipeline flow diagram -->
 <div class="flow">
@@ -244,7 +244,7 @@
   <span class="stage">Temporal Framing</span> <span class="arrow">&rarr;</span>
   <span class="stage">Text Generation</span> <span class="arrow">&rarr;</span>
   <span class="stage">Text Cleaning</span> <span class="arrow">&rarr;</span>
-  <span class="stage">Forced Alignment</span> <span class="arrow">&rarr;</span>
+  <span class="stage">Forced Alignment (aligner modes only)</span> <span class="arrow">&rarr;</span>
   <span class="stage">Timestamp Resolution</span> <span class="arrow">&rarr;</span>
   <span class="stage">SRT</span>
 </div>
@@ -266,7 +266,7 @@
     <span class="param-default">Balanced (GUI Ensemble: Aggressive for anime-whisper, and for Qwen3-ASR on pass 1)</span>
     <div class="param-desc">
       Controls how readily the speech segmenter detects voice. What it changes depends on the model.
-      Values below are for the default segmenter, WhisperSeg; other segmenters use their own presets.
+      Values below are for WhisperSeg (the default of --mode qwen, and of Anime-Whisper as pass 1 in the Ensemble Mode tab); other segmenters use their own presets.
       At every sensitivity, the longest segment is 4 s for both Qwen3-ASR and anime-whisper, with WhisperSeg,
       TEN and FireRedVAD.
     </div>
@@ -296,8 +296,8 @@
               Frames: gap 200 ms, up to 2 s.</td>
         </tr>
       </table>
-      Qwen3-ASR's pads (100 / 100 ms) and frames (gap 300 ms, up to 3 s) are the same at every
-      sensitivity.
+      Qwen3-ASR's pads (100 ms before; after: 0 ms with WhisperSeg, 100 ms with other segmenters) and
+      frames (gap 300 ms, up to 3 s) are the same at every sensitivity.
     </div>
     <div class="param-when">
       <strong>When to change:</strong> Start with the default. Switch to Aggressive if subtitles are
@@ -339,9 +339,9 @@
     <div class="param-desc" style="margin-top: 8px; padding-left: 12px;">
       <strong>Semantic</strong> &mdash; Uses audio embeddings and clustering to find natural scene
       transitions. Has true merge logic that guarantees the minimum scene duration is respected.
-      Best for Qwen (default).<br>
+      The default, for every pipeline since v1.9.2.<br>
       <strong>Auditok</strong> &mdash; Energy-based silence detection with a two-pass coarse+fine
-      strategy. Fast and reliable; default for Whisper pipelines.<br>
+      strategy.<br>
       <strong>Silero</strong> &mdash; Uses the Silero VAD model for scene-level silence detection.
       Different from the segmenter &mdash; this runs at scene scale, not frame scale.<br>
       <strong>None</strong> &mdash; No scene splitting. Entire audio is processed as one scene.
@@ -370,14 +370,16 @@
       before it reaches the VAD segmenter and ASR model. Enhancement uses additional VRAM.
     </div>
     <div class="param-desc" style="margin-top: 8px; padding-left: 12px;">
-      <strong>None</strong> &mdash; No enhancement. Raw audio goes directly to segmentation. Recommended
-      for most content as Qwen3-ASR handles noise well on its own.<br>
+      <strong>None</strong> &mdash; No enhancement (the default). Raw audio goes directly to segmentation.<br>
       <strong>FFmpeg DSP</strong> &mdash; Lightweight audio filters (loudnorm, denoise) running in FFmpeg.
       Zero GPU cost. Good for normalizing volume levels.<br>
       <strong>ZipEnhancer (Torch)</strong> &mdash; Neural speech enhancement at 16kHz. Effective but
       adds ~1GB VRAM. Good for noisy recordings.<br>
       <strong>BS-RoFormer</strong> &mdash; Vocal isolation (separates speech from music/background).
-      Not yet available.
+      Not yet available.<br>
+      <strong>htdemucs (Vocals)</strong> &mdash; Isolates the voice from music and effects. Installed
+      with WhisperJAV; its 84 MB model is fetched once on first use, from Meta's site rather than
+      Hugging Face. If it cannot run, the run stops and says so.
     </div>
     <div class="param-when">
       <strong>When to change:</strong> Only enable if the audio has significant background noise,
@@ -438,14 +440,14 @@
       segmenter's own sensitivity preset.
     </div>
     <div class="param-desc" style="margin-top: 8px; padding-left: 12px;">
-      <strong>WhisperSeg</strong> &mdash; Default for Qwen3-ASR and anime-whisper. A Whisper-based
+      <strong>WhisperSeg</strong> &mdash; Default for --mode qwen, and for Anime-Whisper as pass 1. A Whisper-based
       model trained on about 500 hours of Japanese ASMR recordings; good at soft and whispered speech.
       Its <em>VAD Decoder</em> (Customize) is Offline two-level for anime-whisper at aggressive
       sensitivity, and Hysteresis everywhere else.<br>
-      <strong>TEN VAD</strong> &mdash; Default for Qwen3-ASR on pass 2, so that the two passes split
-      the speech differently. A lightweight neural model.<br>
-      <strong>FireRedVAD</strong> &mdash; A tiny multilingual model (about 0.6 million parameters)
-      that runs on the CPU. Installed with WhisperJAV since v1.9.2.<br>
+      <strong>TEN VAD</strong> &mdash; Default for pass 2 (Qwen3-ASR and Anime-Whisper), so that the
+      two passes split the speech differently. A lightweight neural model.<br>
+      <strong>FireRedVAD</strong> &mdash; Default for Qwen3-ASR as pass 1. A tiny multilingual model
+      (about 0.6 million parameters) that runs on the CPU. Installed with WhisperJAV since v1.9.2.<br>
       <strong>Silero v6.2</strong> &mdash; Splits long speech by itself and has a separate
       end-of-speech level (<code>neg_threshold</code>).<br>
       <strong>Silero v4.0 / v3.1</strong> &mdash; Older Silero versions. They do not split long
@@ -508,7 +510,7 @@
     <span class="param-name">ASR Model</span>
     <span class="param-default">Qwen3-ASR-1.7B</span>
     <div class="param-desc">
-      The speech recognition model that converts audio to text. The 1.7B parameter model is more
+      The ASR model that turns speech into text. The 1.7B parameter model is more
       accurate and handles complex speech better. The 0.6B model is faster and uses roughly half
       the VRAM (4GB vs 8GB).
     </div>
@@ -536,7 +538,7 @@
     <span class="param-name">Context Hints</span>
     <span class="param-default">(empty)</span>
     <div class="param-desc">
-      Free-text hints that help the model recognize specific names and terms. The model uses
+      Free-text hints that help the model write specific names and terms. The model uses
       this as context for improved accuracy on proper nouns. Enter actress names, studio names,
       or domain-specific terminology.
     </div>
@@ -552,8 +554,8 @@
     <span class="param-name">Device</span>
     <span class="param-default">Auto</span>
     <div class="param-desc">
-      Where the model runs. Auto detects your GPU; CUDA forces GPU; CPU forces processor-only
-      (much slower). Most users should leave this on Auto.
+      Where the model runs: Auto (the GPU when one can be used, else the CPU), NVIDIA GPU (CUDA), or
+      CPU (not accelerated). Most users should leave this on Auto.
     </div>
     <div class="param-when">
       <strong>When to change:</strong> Force CPU if you encounter CUDA out-of-memory errors and
@@ -634,21 +636,24 @@
     <span class="param-name">Safe Chunking</span>
     <span class="param-default">On</span>
     <div class="param-desc">
-      Enforces scene boundaries so no audio segment exceeds the ForcedAligner's 180-second (3-minute)
-      processing limit. When enabled, any scene longer than 180s is automatically re-split at silence
-      boundaries. Disabling this risks aligner failures on long scenes.
+      Gives the scene detector Min Duration and Max Duration (under Custom Scene Bounds; 12 s and
+      48 s unless you change them) as the shortest and longest scene to make. Off: the scene
+      detector uses its own lengths, and Min Duration and Max Duration are not used; for Semantic,
+      the default scene detector, these are 20 s and 420 s. Semantic can in rare cases make a scene
+      longer than the longest; the log then says so.
     </div>
     <div class="param-when">
-      <strong>When to change:</strong> Only disable if you've also disabled the ForcedAligner entirely
-      (Aligner Backend = None). Otherwise, always keep this on.
+      <strong>When to change:</strong> Turn it off if you want the scene detector's own, longer
+      scenes.
     </div>
   </div>
 
   <div class="param">
-    <span class="param-name">Min Scene Duration</span>
+    <span class="param-name">Min Duration</span>
     <span class="param-default">12s</span>
     <div class="param-desc">
-      Minimum length for a detected scene. Scenes shorter than this are merged with their neighbors.
+      The shortest scene, under Custom Scene Bounds; used only while Safe Chunking is on. With
+      Semantic, the default scene detector, a shorter piece is joined to a neighbouring scene.
       Too low and you get fragmented tiny scenes with lost context. Too high and the detector
       can't split at natural boundaries.
     </div>
@@ -659,15 +664,15 @@
   </div>
 
   <div class="param">
-    <span class="param-name">Max Scene Duration</span>
+    <span class="param-name">Max Duration</span>
     <span class="param-default">48s</span>
     <div class="param-desc">
-      Maximum length for a detected scene. Scenes longer than this are forcibly split. The default
-      of 48s keeps scenes well within the aligner's 180s limit while preserving context.
+      The longest scene, under Custom Scene Bounds; used only while Safe Chunking is on. Semantic
+      can in rare cases make a scene longer than this; the log then says so.
     </div>
     <div class="param-when">
       <strong>When to change:</strong> Increase to 90-120s if you see natural conversations getting
-      cut mid-sentence. Decrease to 30s if scenes feel too long for accurate alignment.
+      cut mid-sentence.
     </div>
   </div>
 
@@ -869,30 +874,29 @@
 
   <div class="param">
     <span class="param-name">Aligner Backend</span>
-    <span class="param-default">Qwen3 ForcedAligner</span>
+    <span class="param-default">CrispASR (GGUF)</span>
     <div class="param-desc">
-      The ForcedAligner takes the generated text and the original audio, then produces precise
-      word-level timestamps. This is what makes subtitles appear at the right moment. Disabling it
-      (None) falls back to VAD-based timing, which is less precise. When set to None, the aligner
-      model is not loaded at all, saving ~2GB VRAM.
+      Which aligner times the text when the Timestamp Mode is one of the aligner modes: CrispASR
+      (GGUF models, run by CrispASR), Qwen3 ForcedAligner (PyTorch), or None. The aligner takes the
+      text of the ASR model and the audio of each VAD group and times the text inside the group.
+      With the default Timestamp Mode, VAD Only, no aligner is loaded and this setting is not used.
     </div>
     <div class="param-when">
-      <strong>When to change:</strong> Set to None if you have severe VRAM constraints (the aligner
-      loads a separate 0.6B model) or if alignment is consistently failing on your content.
-      Selecting None automatically switches timestamp mode to VAD Only.
+      <strong>When to change:</strong> Only together with an aligner Timestamp Mode. With None, the run
+      uses VAD Only with Step-Down off, whatever the Timestamp Mode shows.
     </div>
   </div>
 
   <div class="param">
     <span class="param-name">Aligner Model</span>
-    <span class="param-default">Qwen3-ForcedAligner-0.6B</span>
+    <span class="param-default">wav2vec2-ja</span>
     <div class="param-desc">
-      The model used for forced alignment. Currently only the 0.6B variant is available.
-      It has a hard processing limit of 180 seconds per segment (enforced by Safe Chunking
-      in the Audio tab).
+      The aligner model. With CrispASR: wav2vec2-ja (232 MB, downloaded on first use), qwen3-fa-gguf,
+      or parakeet-ctc-ja (its times came back evenly spread in WhisperJAV's tests; not recommended).
+      With PyTorch: Qwen3-ForcedAligner-0.6B, which takes at most 180 seconds of audio at a time.
     </div>
     <div class="param-when">
-      <strong>When to change:</strong> No alternative currently available. Leave as-is.
+      <strong>When to change:</strong> Only together with an aligner Timestamp Mode.
     </div>
   </div>
 
@@ -916,28 +920,50 @@
 
   <div class="param">
     <span class="param-name">Timestamp Mode</span>
-    <span class="param-default">Aligner + VAD Fallback</span>
+    <span class="param-default">VAD Only</span>
     <div class="param-desc">
-      How word timestamps are resolved from the aligner's output. The four modes offer different
-      tradeoffs between precision and coverage:
+      Where the subtitle times come from. Since 1.10.1 the default is VAD Only, ChronosJAV's timing
+      of 1.9.5; in 1.10.0 it was Aligner + VAD Fallback.
     </div>
     <div class="param-desc" style="margin-top: 8px; padding-left: 12px;">
-      <strong>Aligner + VAD Fallback</strong> (recommended) &mdash; Uses aligner timestamps when available;
+      <strong>VAD Only</strong> (default) &mdash; No aligner is loaded. Each subtitle takes the start and
+      end of its VAD group, with Subtitle Regrouping Off, the default (the Timing Model, if chosen, can still move
+      the start).<br>
+      <strong>Aligner + VAD Fallback</strong> &mdash; Uses aligner timestamps when available;
       for words the aligner couldn't place, falls back to VAD segment boundaries with speech-aware
-      gap filling. Best overall accuracy and coverage.<br>
+      gap filling.<br>
       <strong>Aligner + Interpolation</strong> &mdash; Uses aligner timestamps, fills gaps by
       interpolating evenly between placed words. Better for sparse aligner output where VAD regions
       aren't available.<br>
       <strong>Aligner Only</strong> &mdash; Uses raw aligner timestamps with no recovery. If the
       aligner collapses, subtitles may have timing issues. Useful for studying raw aligner quality.<br>
-      <strong>VAD Only</strong> &mdash; Skips the aligner entirely (not loaded, saves VRAM). All word
-      timestamps come from VAD frame boundaries. Fastest but least precise. Use when aligner is
-      disabled or VRAM is critical.
     </div>
     <div class="param-when">
-      <strong>When to change:</strong> Leave on Aligner + VAD Fallback for best results. Try
-      Aligner + Interpolation if you see subtitle lines with jagged timing. Use VAD Only if you've
-      disabled the aligner backend or need to minimize VRAM usage.
+      <strong>When to change:</strong> Choose an aligner mode to have the aligner time the text inside
+      each VAD group; the Aligner Backend and Aligner Model then apply. Try Aligner + Interpolation if
+      you see subtitle lines with jagged timing.
+    </div>
+  </div>
+
+  <p class="group-header">Timing Model</p>
+
+  <div class="param">
+    <span class="param-name">Timing Model (Whisper)</span>
+    <span class="param-default">None</span>
+    <div class="param-desc">
+      Whisper small (488 MB, run by CrispASR, downloaded on first use) finds where speech starts and
+      where a new sentence starts inside each VAD group; its text is not used. Where no aligner gave a
+      time, it moves the subtitle's start to where speech starts. Only where an aligner timed the group
+      can it split the group into two subtitles, at a punctuation mark or space near where a new
+      sentence starts. Off by default since 1.10.1; on by default in 1.10.0.
+    </div>
+    <div class="param-when">
+      <strong>When to change:</strong> Together with an aligner mode, so that two sentences in one VAD
+      group can become two subtitles. It runs where this install's CrispASR runs; --device cpu does not
+      hold it on the CPU.
+    </div>
+    <div class="param-cli">
+      <strong>CLI:</strong> <code>--qwen-timing-model whisper-small</code>
     </div>
   </div>
 
@@ -945,16 +971,16 @@
 
   <div class="param">
     <span class="param-name">Adaptive Step-Down</span>
-    <span class="param-default">On</span>
+    <span class="param-default">Off</span>
     <div class="param-desc">
-      When alignment fails for a scene (all word timestamps collapse to a single point), step-down
-      automatically retries the scene with tighter framing &mdash; breaking the audio into smaller
-      segments and re-running generation + alignment. This recovers most collapsed scenes without
-      user intervention. Hidden when timestamp mode is VAD Only (not applicable).
+      When the aligner piles a scene's words together (the collapse check), step-down retries the
+      scene with VAD groups up to the Tier 2 duration (6 s by default). Off by default since 1.10.0:
+      with Aligner + VAD Fallback a collapsed scene then takes its VAD groups' times. Hidden when
+      Timestamp Mode is VAD Only.
     </div>
     <div class="param-when">
-      <strong>When to change:</strong> Disable only for debugging, or if step-down retries are making
-      processing unacceptably slow on very long videos.
+      <strong>When to change:</strong> Turn it on to retry collapsed scenes in an aligner mode; each
+      retry runs the ASR model and the aligner on that scene again.
     </div>
   </div>
 
@@ -998,7 +1024,7 @@
     <span class="param-name">Subtitle Regrouping</span>
     <span class="param-default">Off</span>
     <div class="param-desc">
-      Controls how the raw word-level output from the aligner is grouped into subtitle lines. This is
+      Controls how the text of each frame is made into subtitle lines, with or without an aligner. This is
       independent of the Post-processing Preset below, which fine-tunes gap thresholds and merge behavior
       within the selected regrouping mode.
     </div>
@@ -1011,12 +1037,13 @@
       safety caps (80 characters, 8 seconds) without gap heuristics. Use when gap-based splitting
       causes problems like merging separate lines or splitting mid-thought. Natural sentence boundaries
       are preserved.<br>
-      <strong>Off (Recommended)</strong> &mdash; Frame-native output: each temporal frame becomes one
-      subtitle line, preserving natural speech segmentation boundaries. No regrouping, merging, or
-      splitting is applied. Best overall quality in testing.
+      <strong>Off</strong> (the default) &mdash; Frame-native output: each temporal frame becomes one
+      subtitle line, preserving natural speech segmentation boundaries. No regrouping or merging is
+      applied; a frame is split only where a chosen Timing Model finds a new sentence at a mark in a
+      frame the aligner timed.
     </div>
     <div class="param-when">
-      <strong>When to change:</strong> Off is the recommended default. Switch to Standard if you want
+      <strong>When to change:</strong> Off is the default. Switch to Standard if you want
       automatic line-merging and gap-based splitting, or Sentence Only if frame boundaries feel too
       coarse and you prefer punctuation-based splitting.
     </div>
@@ -1049,7 +1076,7 @@
 </div>
 
 <div class="footer">
-  WhisperJAV &mdash; Qwen3-ASR Parameter Guide &mdash; v1.8.5
+  WhisperJAV &mdash; ChronosJAV Parameter Guide &mdash; v1.10.1
 </div>
 
 </body>

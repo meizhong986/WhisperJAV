@@ -105,7 +105,7 @@ def fix_stdout():
 # Fix stdout before any other imports
 fix_stdout()
 
-from whisperjav.utils.logger import setup_logger, logger
+from whisperjav.utils.logger import setup_logger, logger, quiet_library_loggers
 from whisperjav.utils.device_detector import get_best_device
 from whisperjav.utils.run_outcome import (
     FAIL_ON_CHOICES,
@@ -123,6 +123,11 @@ from whisperjav.utils.run_outcome import (
 )
 from whisperjav.modules.media_discovery import MediaDiscovery
 from whisperjav.modules.audio_integrity import AudioIntegrityStop
+from whisperjav.modules.qwen_errors import (
+    NOT_STARTED as QWEN_NOT_STARTED,
+    PREFIX as QWEN_UNUSABLE_PREFIX,
+    QwenModelUnusable,
+)
 from whisperjav.utils.media_leftovers import (
     WHISPERJAV_WORK_DIRS,
     is_whisperjav_temp_file,
@@ -144,6 +149,7 @@ from whisperjav.config.segmenter_presets import (
     ENSEMBLE_DEFAULT_SENSITIVITY,
     ENSEMBLE_PASS_DEFAULTS,
     FIDELITY_DEFAULT_SEGMENTER,
+    SEGMENTER_PARAMS as SEGMENTER_PARAM_KEYS,
     SINGLE_PASS_EXTERNAL_OK,
     effective_segmenter_for_pass,
     resolve_segmenter_sensitivity,
@@ -151,8 +157,12 @@ from whisperjav.config.segmenter_presets import (
 )
 # The CrispASR Ensemble passes (1.10.0): their names, model list and usage checks. Light modules.
 from whisperjav.crispasr.manifest import CRISPASR_PIPELINES, model_for as crispasr_model_for
+from whisperjav.crispasr.manifest import (WORD_TIMESTAMPS as CRISPASR_WORD_TIMESTAMPS,
+                                          word_timestamps_for as crispasr_word_timestamps_for)
 from whisperjav.crispasr.pass_settings import (models_help as crispasr_models_help, segmenter_settings as
-                                               crispasr_segmenter_settings, validate_crispasr_passes)
+                                               crispasr_segmenter_settings, validate_crispasr_passes,
+                                               scene_detector_for as crispasr_scene_detector_for)
+from whisperjav.crispasr.moss_prompt import MossSettings, help_text as moss_params_help
 from whisperjav.crispasr.errors import FAILURE_PREFIX as CRISPASR_FAILURE_PREFIX
 from whisperjav.__version__ import __version__, __version_display__
 
@@ -206,6 +216,15 @@ REMOVED_SPEECH_ENHANCERS = ["clearvoice"]
 # with AVAILABLE_EFFECTS in speech_enhancement/backends/ffmpeg_dsp.py.
 FFMPEG_DSP_EFFECTS = ["loudnorm", "normalize", "compress", "denoise",
                       "highpass", "lowpass", "deess", "amplify"]
+
+
+def _word_timestamps_help(whose: str) -> str:
+    """--passN-word-timestamps' help; text approved by the owner (W413 1), changed for MOSS's own segment times in
+    1.10.1 (W426; drafted under W428 I2, to be shown to him). ``whose`` is "pass 1's" or "pass 2's"."""
+    return (f"Where {whose} subtitle times come from, for the CrispASR pipelines. model = the ASR model's own "
+            "word times (default for parakeet, reazonspeech, kotoba, whisper-turbo and whisper-large; for moss its "
+            "own segment times); aligner = the CrispASR aligner wav2vec2-ja (232 MB, downloaded on first use; "
+            "default for cohere).")
 
 
 def speech_enhancer_spec(value: str) -> str:
@@ -397,11 +416,12 @@ def parse_arguments():
                                         *CRISPASR_PIPELINES],
                                # 1.10.0 (item 5, REQ5): xxl as pass 1. Text H1, approved by the owner as drafted (W275).
                                help="Pipeline for pass 1 (default: balanced). 'xxl' = BYOP XXL Faster Whisper "
-                                    "(requires --xxl-exe). parakeet-crispasr and "
-                                    "cohere-crispasr run through CrispASR, installed with WhisperJAV; "
-                                    "their model is downloaded the first time it is needed; Japanese "
-                                    "only. --pass1-model picks their model. "
-                                    "Experimental in 1.10.0 (early release). "
+                                    "(requires --xxl-exe). The GGUF pipelines ("
+                                    + ", ".join(CRISPASR_PIPELINES) + ") run through CrispASR, "
+                                    "installed with WhisperJAV; their model is downloaded the first time "
+                                    "it is needed; Japanese only. --pass1-model picks their model. "
+                                    "Experimental (early release): parakeet-crispasr and cohere-crispasr "
+                                    "since 1.10.0, the others new in 1.10.1. "
                                     "The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).")
     twopass_group.add_argument("--pass1-sensitivity", default=None,
                                choices=["conservative", "balanced", "aggressive"],
@@ -410,16 +430,18 @@ def parse_arguments():
     twopass_group.add_argument("--pass1-overrides", default=None,
                                help="JSON string of parameter overrides for pass 1 (deprecated)")
     twopass_group.add_argument("--pass1-params", default=None,
-                               help="JSON string of full parameters for pass 1 (custom mode)")
+                               help="JSON string of full parameters for pass 1 (custom mode). "
+                                    + moss_params_help())
     twopass_group.add_argument("--pass1-hf-params", default=None,
                                help="JSON string of HuggingFace Transformers parameters for pass 1 (when pipeline=transformers)")
     twopass_group.add_argument("--pass1-qwen-params", default=None,
                                help="JSON string of Qwen3-ASR parameters for pass 1 (when pipeline=qwen)")
     twopass_group.add_argument("--pass1-scene-detector", default=None,
                                choices=["auditok", "silero", "semantic", "none"],
-                               help="Scene detection method for pass 1 (default: semantic since v1.9.2)")
+                               help="Scene detection method for pass 1 (default: semantic since v1.9.2; for "
+                                    "moss-crispasr semantic with scenes of normally 90-240 s).")
     twopass_group.add_argument("--pass1-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none). Default: firered-vad when pass 1 is Qwen3-ASR; ten for parakeet-crispasr and firered-vad for cohere-crispasr, which do not accept none. Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
+                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none). Default: firered-vad when pass 1 is Qwen3-ASR; for the GGUF pipelines: ten for parakeet-crispasr and reazonspeech-crispasr, firered-vad for the others; none sends each scene to the model whole. Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
     twopass_group.add_argument("--pass1-vad-version", default=None,
                                choices=list(VAD_VERSIONS),
                                help="Silero VAD build for pass 1 when --pass1-pipeline is balanced "
@@ -438,7 +460,7 @@ def parse_arguments():
     twopass_group.add_argument("--pass1-enhance-for-vad", action="store_true", default=False,
                                help="Dual-track mode for pass 1: the cleaned-up audio drives speech "
                                     "detection, the original audio goes to the recogniser. Available "
-                                    "with qwen, fidelity, parakeet-crispasr and cohere-crispasr. NOT "
+                                    "with qwen, fidelity and the GGUF pipelines. NOT "
                                     "accepted when --pass1-pipeline is balanced: balanced finds the "
                                     "speech inside faster-whisper itself, on the same audio it "
                                     "transcribes, so there is nothing to split. fast, faster and "
@@ -449,6 +471,10 @@ def parse_arguments():
                                     "The CrispASR pipelines take a model short name: "
                                     + crispasr_models_help() + ". "
                                     "For xxl: the Whisper model XXL runs (default large-v2).")
+    # 1.10.1 (Part B): flag and help text approved by the owner (W413 1); the default is each pipeline's own
+    # (crispasr/manifest.py: word_timestamps_for; W411, W412).
+    twopass_group.add_argument("--pass1-word-timestamps", default=None, choices=list(CRISPASR_WORD_TIMESTAMPS),
+                               help=_word_timestamps_help("pass 1's"))
     twopass_group.add_argument("--pass1-vad-threshold", type=float, default=None,
                                help="VAD threshold for pass 1 (0.0-1.0)")
     twopass_group.add_argument("--pass1-speech-pad-ms", type=int, default=None,
@@ -457,11 +483,12 @@ def parse_arguments():
                                choices=["balanced", "fast", "faster", "fidelity", "transformers", "qwen", "xxl",
                                         *CRISPASR_PIPELINES],
                                help="Pipeline for pass 2 (enables pass 2). 'xxl' = BYOP XXL Faster Whisper "
-                                    "(requires --xxl-exe). parakeet-crispasr and cohere-crispasr run "
-                                    "through CrispASR, installed with WhisperJAV; their model is "
-                                    "downloaded the first time it is needed; Japanese only. "
-                                    "--pass2-model picks their model. "
-                                    "Experimental in 1.10.0 (early release). "
+                                    "(requires --xxl-exe). The GGUF pipelines ("
+                                    + ", ".join(CRISPASR_PIPELINES) + ") run through CrispASR, "
+                                    "installed with WhisperJAV; their model is downloaded the first time "
+                                    "it is needed; Japanese only. --pass2-model picks their model. "
+                                    "Experimental (early release): parakeet-crispasr and cohere-crispasr "
+                                    "since 1.10.0, the others new in 1.10.1. "
                                     "The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).")
     twopass_group.add_argument("--pass2-sensitivity", default=None,
                                choices=["conservative", "balanced", "aggressive"],
@@ -470,16 +497,18 @@ def parse_arguments():
     twopass_group.add_argument("--pass2-overrides", default=None,
                                help="JSON string of parameter overrides for pass 2 (deprecated)")
     twopass_group.add_argument("--pass2-params", default=None,
-                               help="JSON string of full parameters for pass 2 (custom mode)")
+                               help="JSON string of full parameters for pass 2 (custom mode). "
+                                    + moss_params_help())
     twopass_group.add_argument("--pass2-hf-params", default=None,
                                help="JSON string of HuggingFace Transformers parameters for pass 2 (when pipeline=transformers)")
     twopass_group.add_argument("--pass2-qwen-params", default=None,
                                help="JSON string of Qwen3-ASR parameters for pass 2 (when pipeline=qwen)")
     twopass_group.add_argument("--pass2-scene-detector", default=None,
                                choices=["auditok", "silero", "semantic", "none"],
-                               help="Scene detection method for pass 2 (default: semantic since v1.9.2)")
+                               help="Scene detection method for pass 2 (default: semantic since v1.9.2; for "
+                                    "moss-crispasr semantic with scenes of normally 90-240 s).")
     twopass_group.add_argument("--pass2-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Default: ten when pass 2 is anime-whisper; ten for parakeet-crispasr and firered-vad for cohere-crispasr, which do not accept none. Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
+                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Default: ten when pass 2 is Qwen3-ASR or anime-whisper; for the GGUF pipelines: ten for parakeet-crispasr and reazonspeech-crispasr, firered-vad for the others; none sends each scene to the model whole. Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
     twopass_group.add_argument("--pass2-vad-version", default=None,
                                choices=list(VAD_VERSIONS),
                                help="Silero VAD build for pass 2 when --pass2-pipeline is balanced "
@@ -498,7 +527,7 @@ def parse_arguments():
     twopass_group.add_argument("--pass2-enhance-for-vad", action="store_true", default=False,
                                help="Dual-track mode for pass 2: the cleaned-up audio drives speech "
                                     "detection, the original audio goes to the recogniser. Available "
-                                    "with qwen, fidelity, parakeet-crispasr and cohere-crispasr. NOT "
+                                    "with qwen, fidelity and the GGUF pipelines. NOT "
                                     "accepted when --pass2-pipeline is balanced: balanced finds the "
                                     "speech inside faster-whisper itself, on the same audio it "
                                     "transcribes, so there is nothing to split. fast, faster and "
@@ -509,6 +538,8 @@ def parse_arguments():
                                     "The CrispASR pipelines take a model short name: "
                                     + crispasr_models_help() + ". "
                                     "For xxl: the Whisper model XXL runs (default large-v2).")
+    twopass_group.add_argument("--pass2-word-timestamps", default=None, choices=list(CRISPASR_WORD_TIMESTAMPS),
+                               help=_word_timestamps_help("pass 2's"))
     twopass_group.add_argument("--pass2-vad-threshold", type=float, default=None,
                                help="VAD threshold for pass 2 (0.0-1.0)")
     twopass_group.add_argument("--pass2-speech-pad-ms", type=int, default=None,
@@ -516,9 +547,13 @@ def parse_arguments():
     twopass_group.add_argument("--merge-strategy", default="pass1_primary",
                                choices=["pass1_primary", "pass2_primary", "smart_merge", "full_merge", "pass1_overlap", "pass2_overlap", "longest"],
                                help="Merge strategy for two-pass results (default: pass1_primary)")
-    twopass_group.add_argument("--ensemble-serial", action="store_true",
-                               help="Complete each file (Pass1+Pass2+Merge) before starting the next. "
-                                    "Slower (reloads models per file) but delivers results incrementally.")
+    # 1.10.1 (owner W493 1, W501): on by default on the command line too, as the GUI's "Finish each file" box.
+    twopass_group.add_argument("--ensemble-serial", action=argparse.BooleanOptionalAction, default=True,
+                               help="Finish each file (Pass 1, Pass 2, merge) before the next one starts "
+                                    "(default: on). A file's subtitles are ready as soon as it is done, and a "
+                                    "crash in one file does not lose the others; each pass's models are loaded "
+                                    "again for every file. --no-ensemble-serial runs Pass 1 on all files, then "
+                                    "Pass 2; each pass then starts once for all files.")
 
     # BYOP (Bring Your Own Provider) — external ASR tool integration
     byop_group = parser.add_argument_group("BYOP — Bring Your Own Provider")
@@ -560,7 +595,7 @@ def parse_arguments():
                                     "used, else the CPU (not accelerated); cpu = this run on the CPU (not "
                                     "accelerated); cuda = an NVIDIA GPU is required. balanced, fast and "
                                     "faster use only NVIDIA GPUs (their engine is CTranslate2). For the GGUF "
-                                    "pipelines (parakeet-crispasr, cohere-crispasr), auto asks the installed "
+                                    "pipelines (the *-crispasr pipelines), auto asks the installed "
                                     "CrispASR build for its GPU: the NVIDIA GPU (CUDA build), the GPU through "
                                     "Vulkan on Windows (Vulkan build, experimental) or the Apple GPU (Metal) "
                                     "on an Apple silicon Mac.")
@@ -583,7 +618,14 @@ def parse_arguments():
                            help="Skip files that already have subtitle output (useful for resuming batch processing)")
     path_group.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], 
                            default="INFO", help="Logging level")
-    path_group.add_argument("--log-file", help="Log file path")
+    path_group.add_argument("--log-file", help="Log file path. The file records this run's WhisperJAV lines, the "
+                                               "debug lines included, and CrispASR's start-up details. Not in the "
+                                               "file: the start banner, the RUN SUMMARY table (it is in "
+                                               "whisperjav_run.json), the total processing time, the translation "
+                                               "lines, other libraries' warnings, and the lines of the balanced "
+                                               "pipeline's ASR worker. In an Ensemble run each pass writes its own "
+                                               "file beside it, named after it (run.log -> run.pass1.log, "
+                                               "run.pass2.log). An existing file is added to.")
     path_group.add_argument("--stats-file", help="Save processing statistics to JSON")
     path_group.add_argument("--dump-params", metavar="FILE",
                            help="Dump resolved parameters to JSON file and exit (no processing)")
@@ -920,7 +962,8 @@ def parse_arguments():
                            help="Scene detection method (default: semantic)")
     qwen_audio_group.add_argument("--qwen-safe-chunking", dest="qwen_safe_chunking",
                            action="store_true", default=True,
-                           help="Enforce scene boundaries for ForcedAligner 180s limit (default: enabled)")
+                           help="Give the scene detector --qwen-scene-min-duration and --qwen-scene-max-duration "
+                                "(12 s and 48 s unless set) as its shortest and longest scene (default: enabled)")
     qwen_audio_group.add_argument("--no-qwen-safe-chunking", dest="qwen_safe_chunking",
                            action="store_false",
                            help="Disable safe chunking, allow longer scenes")
@@ -950,7 +993,7 @@ def parse_arguments():
     qwen_audio_group.add_argument("--enhance-for-vad", action="store_true", default=False,
                            help="Dual-track mode: the cleaned-up audio is used to find the speech "
                                 "and the original audio goes to the recogniser. Applies to the "
-                                "qwen, fidelity, decoupled, parakeet-crispasr and cohere-crispasr "
+                                "qwen, fidelity and decoupled pipelines and the GGUF (*-crispasr) "
                                 "pipelines. NOT accepted with balanced, which finds the speech "
                                 "inside faster-whisper itself, on the same audio it transcribes. "
                                 "Accepted but ignored by fast, faster and transformers.")
@@ -1022,37 +1065,48 @@ def parse_arguments():
     qwen_align_group = parser.add_argument_group("Qwen3-ASR: Alignment")
     qwen_align_group.add_argument("--qwen-timestamps", type=str, default="word",
                            choices=["word", "none"],
-                           help="Timestamp granularity: 'word' (the aligner) or 'none' (no aligner) "
-                                "(default: word). Not used with --qwen-timestamp-mode vad_only.")
-    # Help text approved by the owner as drafted (W268); design note 2026-10-28 sections 8-9, Q10.
+                           help="Timestamp granularity of an aligner mode: 'word' (the aligner) or 'none' (no "
+                                "aligner) (default: word). Not used with --qwen-timestamp-mode vad_only, the "
+                                "default.")
+    # Help text approved by the owner as drafted (W268); design note 2026-10-28 sections 8-9, Q10. Reworded for the
+    # 1.10.1 default (owner W498 D1) and the rule that a named aligner brings the aligner mode (W501 1, 5).
+    # default None = not given (config/chronosjav_timing.py); the aligner an aligner mode uses is then wav2vec2-ja.
     qwen_align_group.add_argument("--qwen-aligner", type=str,
-                           default="wav2vec2-ja",
-                           help="Aligner that times the text of the ASR model: wav2vec2-ja (default, "
-                                "232 MB, run by CrispASR, downloaded on first use), qwen3-fa-gguf (CrispASR), "
-                                "parakeet-ctc-ja (CrispASR; its times came back evenly spread in "
-                                "WhisperJAV's tests; not recommended), or a PyTorch model ID such as "
-                                "Qwen/Qwen3-ForcedAligner-0.6B. The CrispASR aligners are new in 1.10.0 and "
-                                "not yet measured against reference subtitles; they run where this install's "
-                                "CrispASR runs, and --device cpu does not hold them on the CPU. Not loaded with "
-                                "--qwen-timestamp-mode vad_only.")
+                           default=None,
+                           help="Aligner that an aligner timestamp mode uses to time the text of the ASR model: "
+                                "wav2vec2-ja (used when none is named; 232 MB, run by CrispASR, downloaded on "
+                                "first use), qwen3-fa-gguf (CrispASR), parakeet-ctc-ja (CrispASR; its times came "
+                                "back evenly spread in WhisperJAV's tests; not recommended), or a PyTorch model "
+                                "ID such as Qwen/Qwen3-ForcedAligner-0.6B. Given without --qwen-timestamp-mode, "
+                                "it turns on aligner_vad_fallback (the default, vad_only, loads no aligner). The "
+                                "CrispASR aligners are new in 1.10.0 and not yet measured against reference "
+                                "subtitles; they run where this install's CrispASR runs, and --device cpu does "
+                                "not hold them on the CPU.")
     qwen_align_group.add_argument("--qwen-assembly-cleaner", dest="qwen_assembly_cleaner",
                            action="store_true", default=True,
                            help="Enable pre-alignment text cleaning (default: enabled)")
     qwen_align_group.add_argument("--no-qwen-assembly-cleaner", dest="qwen_assembly_cleaner",
                            action="store_false",
                            help="Disable pre-alignment text cleaning")
-    qwen_align_group.add_argument("--qwen-timestamp-mode", type=str, default="aligner_vad_fallback",
+    # 1.10.1 (owner W498 D1): vad_only is the default for Qwen3-ASR and anime-whisper (no aligner, no timing model).
+    # default None = not given: vad_only, or aligner_vad_fallback with --qwen-aligner (owner W501 1;
+    # config/chronosjav_timing.py, one rule with the Ensemble pass worker).
+    qwen_align_group.add_argument("--qwen-timestamp-mode", type=str, default=None,
                            choices=["aligner_interpolation", "aligner_vad_fallback", "aligner_only", "vad_only"],
-                           help="Timestamp resolution mode (default: aligner_vad_fallback — the aligner "
-                                "times the text; a VAD group it cannot align keeps its VAD times). "
-                                "vad_only loads no aligner: each subtitle takes its VAD group's edges "
-                                "(the timing model can still move the start).")
-    # Help text approved by the owner as drafted (W268); design note 2026-10-28 sections 8-9, Q3, Q10.
-    qwen_align_group.add_argument("--qwen-timing-model", type=str, default="whisper-small",
+                           help="Timestamp resolution mode (default: vad_only — no aligner is loaded: each "
+                                "subtitle takes its VAD group's edges; the timing model, if chosen, can still "
+                                "move the start; with --qwen-aligner and no mode: aligner_vad_fallback). "
+                                "aligner_vad_fallback: the aligner times the text; a VAD group it cannot align "
+                                "keeps its VAD times.")
+    # Help text approved by the owner as drafted (W268); design note 2026-10-28 sections 8-9, Q3, Q10. Since W498 D1
+    # the "(default)" mark sits on none instead of whisper-small; the owner agreed the reworded texts (W501 5).
+    qwen_align_group.add_argument("--qwen-timing-model", type=str, default="none",
                            choices=["whisper-small", "none"],
                            help="Whisper model that finds where speech starts and where a new sentence "
-                                "starts inside each VAD group; its text is not used. whisper-small (default, "
-                                "488 MB, run by CrispASR, downloaded on first use), none. New in 1.10.0, not "
+                                "starts inside each VAD group; its text is not used. It moves a subtitle's start "
+                                "where the aligner gave none, and splits a VAD group at a sentence mark only "
+                                "where an aligner timed that group. whisper-small (488 MB, run by CrispASR, "
+                                "downloaded on first use), none (default). New in 1.10.0, not "
                                 "yet measured against reference subtitles. It runs where this install's "
                                 "CrispASR runs, and --device cpu does not hold it on the CPU; how long it "
                                 "takes on a computer without a GPU has not been measured.")
@@ -1074,9 +1128,10 @@ def parse_arguments():
     qwen_output_group = parser.add_argument_group("Qwen3-ASR: Output")
     qwen_output_group.add_argument("--qwen-regroup", type=str, default="off",
                            choices=["standard", "sentence_only", "off"],
-                           help="Subtitle regrouping mode: 'off' (frame-native: one subtitle per frame, "
-                                "split only where the timing model finds a new sentence at a mark), "
-                                "'standard' (full REGROUP_JAV), 'sentence_only' (punctuation + caps only)")
+                           help="Subtitle regrouping mode: 'off' (default; frame-native: one subtitle per "
+                                "frame, split only where the timing model, if chosen, finds a new sentence at a "
+                                "mark in a frame the aligner timed), 'standard' (full REGROUP_JAV), "
+                                "'sentence_only' (punctuation + caps only)")
     qwen_output_group.add_argument("--qwen-postprocess-preset", type=str, default="high_moan",
                            choices=["default", "high_moan", "narrative"],
                            help="Subtitle regrouping preset (default: high_moan for JAV)")
@@ -1673,6 +1728,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         # v1.9.4), WhisperSeg only; for TEN and FireRedVAD the longest segment
         # 4.0 s only (owner, 2026-10-08). User values kept.
         from whisperjav.config.chronosjav_vad import apply_chronosjav_segmenter_defaults
+        from whisperjav.config.chronosjav_timing import aligner_named, timestamp_mode_for
         apply_chronosjav_segmenter_defaults(
             _user_vad_overrides, _gen_backend_early, _qwen_segmenter, _qwen_sensitivity)
         # v1.9.0: VAD padding routed to pipeline scalars (segmenter_start/end_pad_ms)
@@ -1725,13 +1781,16 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             "max_new_tokens": getattr(args, 'qwen_max_tokens', 4096),
             "language": (lambda _l: None if _l in (None, "auto", "") else _l)(getattr(args, 'qwen_language', 'Japanese')),
             "timestamps": getattr(args, 'qwen_timestamps', 'word'),
-            "aligner_id": getattr(args, 'qwen_aligner', 'wav2vec2-ja'),
-            "timing_model": getattr(args, 'qwen_timing_model', 'whisper-small'),
+            # None = not given: the aligner an aligner mode uses is then wav2vec2-ja (config/chronosjav_timing.py)
+            "aligner_id": getattr(args, 'qwen_aligner', None) or 'wav2vec2-ja',
+            "timing_model": getattr(args, 'qwen_timing_model', 'none'),
             "context": getattr(args, 'qwen_context', ''),
             "context_file": getattr(args, 'qwen_context_file', None),
             "attn_implementation": getattr(args, 'qwen_attn', 'auto'),
-            # Timestamp resolution (1.10.0 default: aligner_vad_fallback with the CrispASR aligner)
-            "timestamp_mode": getattr(args, 'qwen_timestamp_mode', 'aligner_vad_fallback'),
+            # Timestamp resolution (1.10.1 default: vad_only, no aligner; owner W498 D1). --qwen-aligner without
+            # --qwen-timestamp-mode brings aligner_vad_fallback (owner W501 1); one rule with the pass worker.
+            "timestamp_mode": timestamp_mode_for(getattr(args, 'qwen_timestamp_mode', None),
+                                                 aligner_named(getattr(args, 'qwen_aligner', None))),
             # Japanese post-processing
             "japanese_postprocess": getattr(args, 'qwen_japanese_postprocess', False),
             "postprocess_preset": getattr(args, 'qwen_postprocess_preset', 'high_moan'),
@@ -1789,8 +1848,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             _aw_vad = anime_whisperseg_defaults(_qwen_sensitivity)
             if not any(a.startswith('--qwen-model-id') for a in sys.argv):
                 qwen_kwargs["model_id"] = "litagin/anime-whisper"
-            # 1.10.0: no longer vad_only with step-down off; the aligner and timing model
-            # apply as for Qwen3-ASR (design note 2026-10-28 section 7, owner W254 Q6).
+            # The timestamp mode and timing model follow the same defaults as Qwen3-ASR (since 1.10.1
+            # vad_only and none, owner W498 D1; in 1.10.0 the aligner and timing model, W254 Q6).
             if not any(a.startswith('--qwen-assembly-cleaner') for a in sys.argv):
                 qwen_kwargs["assembly_cleaner"] = False
             if not any(a.startswith('--qwen-chunk-threshold') for a in sys.argv):
@@ -1983,9 +2042,10 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                 
             except Exception as e:
                 progress.show_message(f"Failed: {file_name} - {str(e)}", "error", 3.0)
-                # A stop asked for by --fail-on suspect (damaged audio) is not a crash: no traceback.
+                # A stop asked for by --fail-on suspect (damaged audio) is not a crash: no traceback. Nor is a
+                # Qwen3-ASR model that cannot give real text (R-QFT; owner W491 2).
                 logger.error(f"Failed to process {file_path_str}: {e}",
-                             exc_info=not isinstance(e, AudioIntegrityStop))
+                             exc_info=not isinstance(e, (AudioIntegrityStop, QwenModelUnusable)))
                 failed_files.append(file_path_str)
                 all_stats.append({"file": file_path_str, "status": "failed", "error": str(e)})
                 # One outcome per file: if this file was already classified
@@ -1995,7 +2055,12 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                 else:
                     outcomes.append(failed_outcome(file_path_str, str(e)))
                 progress.update_overall(1)
-                
+                if isinstance(e, QwenModelUnusable):
+                    # The model cannot give real text for any file (R-QFT; owner W491 2): the run stops here.
+                    for rest in media_files[i:]:
+                        outcomes.append(skipped_outcome(rest.get('path', 'Unknown File'), QWEN_NOT_STARTED))
+                    break
+
     finally:
         # Ensure pipeline cleanup is called even if an exception occurs
         # This releases GPU memory and prevents VRAM leaks
@@ -2385,7 +2450,8 @@ def apply_ensemble_pass_defaults(args) -> None:
     """
     Fill in the Ensemble defaults the user did not set (owner, 2026-10-12, v1.9.5):
     pass 1 Qwen3-ASR runs FireRedVAD at aggressive, pass 2 anime-whisper runs TEN VAD
-    at aggressive (ENSEMBLE_PASS_DEFAULTS). Only for a pass that IS that pipeline,
+    at aggressive, pass 2 Qwen3-ASR TEN VAD at balanced since 1.10.1 (owner W509)
+    (ENSEMBLE_PASS_DEFAULTS). Only for a pass that IS that pipeline,
     and only for what the command line left out; no pipeline default changes. A
     Parakeet-CrispASR pass runs at aggressive, a Cohere-CrispASR pass at balanced
     (CRISPASR_DEFAULT_SENSITIVITY, owner W344). Every other pass keeps sensitivity
@@ -2406,7 +2472,9 @@ def apply_ensemble_pass_defaults(args) -> None:
                     pass  # a malformed value is reported where the pass is built
             if not isinstance(qwen_params, dict):
                 qwen_params = {}
-            generator = qwen_params.get("generator_backend", "qwen3")
+            # Both key forms, as the pass worker takes them (pass_worker.py: qwen_generator_backend); with only
+            # one read, {"qwen_generator_backend": "cohere"} got Qwen3-ASR's defaults (W509 item 7 review).
+            generator = qwen_params.get("generator_backend", qwen_params.get("qwen_generator_backend", "qwen3"))
             defaults = dict(ENSEMBLE_PASS_DEFAULTS.get((n, generator), {}))
             # A segmenter named inside the JSON (qwen_segmenter) is the user's
             # choice too; filling --passN-speech-segmenter would override it
@@ -2586,6 +2654,7 @@ def main():
     global logger
     log_level = "DEBUG" if args.debug else args.log_level
     logger = setup_logger("whisperjav", log_level, args.log_file)
+    quiet_library_loggers(debug=log_level == "DEBUG")   # libraries' INFO lines only with --debug (owner W509)
 
     # The start of each run, by the install record (design 22.5, owner W234 D-A): silent, a notice
     # of where each part runs, or the one stop (an NVIDIA install whose GPU cannot be used now,
@@ -3154,7 +3223,7 @@ def main():
         if args.ensemble:
             ensemble_dump = {
                 "merge_strategy": args.merge_strategy,
-                "ensemble_serial": getattr(args, 'ensemble_serial', False),
+                "ensemble_serial": getattr(args, 'ensemble_serial', True),
                 "pass1": {
                     "pipeline": args.pass1_pipeline,
                     "sensitivity": args.pass1_sensitivity,
@@ -3167,6 +3236,7 @@ def main():
                         or getattr(args, 'enhance_for_vad', False)
                     ),
                     "model": args.pass1_model,
+                    "word_timestamps": getattr(args, 'pass1_word_timestamps', None),
                     "vad_threshold": args.pass1_vad_threshold,
                     "speech_pad_ms": args.pass1_speech_pad_ms,
                     "params_provided": bool(
@@ -3195,6 +3265,7 @@ def main():
                         or getattr(args, 'enhance_for_vad', False)
                     ),
                     "model": args.pass2_model,
+                    "word_timestamps": getattr(args, 'pass2_word_timestamps', None),
                     "vad_threshold": args.pass2_vad_threshold,
                     "speech_pad_ms": args.pass2_speech_pad_ms,
                     "params_provided": bool(
@@ -3245,21 +3316,44 @@ def main():
                     _model = f"(refused: {_refused})"
                 _segmenter = effective_segmenter_for_pass(_p["pipeline"], _p.get("speech_segmenter"))
                 _sensitivity = _p.get("sensitivity") or CRISPASR_DEFAULT_SENSITIVITY[_p["pipeline"]]
+                # The pass's Customize values (--passN-params), as the pipeline applies them on top (1.10.1).
+                try:
+                    _pass_params = json.loads(getattr(args, f"{_key}_params", None) or "{}")
+                except ValueError:
+                    _pass_params = {}
+                if not isinstance(_pass_params, dict):
+                    _pass_params = {}
+                _seg_settings = crispasr_segmenter_settings(
+                    _p["pipeline"], _segmenter, _sensitivity, vad_threshold=_p.get("vad_threshold"),
+                    speech_pad_ms=_p.get("speech_pad_ms")).as_dict()
+                _seg_settings.update({k: v for k, v in _pass_params.items() if k in SEGMENTER_PARAM_KEYS})
                 _p["crispasr_effective"] = {
                     "model": _model,
                     "speech_segmenter": _segmenter,
                     "sensitivity": _sensitivity,
-                    # --passN-vad-threshold and --passN-speech-pad-ms are used (W208).
-                    "speech_segmenter_settings": crispasr_segmenter_settings(
-                        _p["pipeline"], _segmenter, _sensitivity, vad_threshold=_p.get("vad_threshold"),
-                        speech_pad_ms=_p.get("speech_pad_ms")).as_dict(),
+                    # --passN-vad-threshold and --passN-speech-pad-ms are used (W208); the Customize Segmenter
+                    # values from --passN-params on top.
+                    "speech_segmenter_settings": _seg_settings,
                     "device": _p.get("device"),
                     # design 22.9.1 (T17): the scene detector and speech enhancer the pass runs with.
-                    "scene_detector": _p.get("scene_detector") or "semantic",
+                    "scene_detector": _p.get("scene_detector") or crispasr_scene_detector_for(_p["pipeline"]),
                     "speech_enhancer": _p.get("speech_enhancer") or "none",
                     "enhance_for_vad": bool(_p.get("enhance_for_vad")),
+                    # 1.10.1 (Part B; W411-W414): where the pass's subtitle times come from.
+                    "word_timestamps": crispasr_word_timestamps_for(_p["pipeline"], _p.get("word_timestamps")),
                     "not_used": ["hf_params", "qwen_params", "compute_type"],
                 }
+                if _p["pipeline"] == "moss-crispasr":
+                    # 1.10.1 (W428 I1 4): MOSS's settings and the instruction it is given (crispasr/moss_prompt.py),
+                    # from --passN-params (checked before the dump by validate_crispasr_passes).
+                    _moss = MossSettings.from_params(_pass_params)
+                    _p["crispasr_effective"]["moss_settings"] = {**_moss.as_dict(), "instruction": _moss.prompt()}
+                if _p["crispasr_effective"]["scene_detector"] == "rscn":
+                    # R-SCN (owner W448-W452): the settings in force, the pipeline's preset with the rscn_ keys of
+                    # --passN-params (checked before the dump by validate_crispasr_passes).
+                    from whisperjav.modules.scene_detection_backends.rscn.settings import RSCNSettings
+                    _p["crispasr_effective"]["rscn_settings"] = RSCNSettings.for_pipeline(
+                        _p["pipeline"], _pass_params).as_dict()
             dump_data["ensemble_config"] = ensemble_dump
         try:
             with open(args.dump_params, 'w', encoding='utf-8') as f:
@@ -3501,6 +3595,7 @@ def main():
                 'speech_enhancer': args.pass1_speech_enhancer,
                 'enhance_for_vad': getattr(args, 'pass1_enhance_for_vad', False) or getattr(args, 'enhance_for_vad', False),
                 'model': args.pass1_model,
+                'word_timestamps': getattr(args, 'pass1_word_timestamps', None),  # CrispASR pipelines only
                 'vad_threshold': args.pass1_vad_threshold,
                 'speech_pad_ms': args.pass1_speech_pad_ms,
                 'params': pass1_params,  # None = use defaults, object = custom
@@ -3530,6 +3625,7 @@ def main():
                     'speech_enhancer': args.pass2_speech_enhancer,
                     'enhance_for_vad': getattr(args, 'pass2_enhance_for_vad', False) or getattr(args, 'enhance_for_vad', False),
                     'model': args.pass2_model,
+                    'word_timestamps': getattr(args, 'pass2_word_timestamps', None),  # CrispASR pipelines only
                     'vad_threshold': args.pass2_vad_threshold,
                     'speech_pad_ms': args.pass2_speech_pad_ms,
                     'params': pass2_params,
@@ -3596,7 +3692,8 @@ def main():
                 subs_language=args.subs_language,
                 parameter_tracer=tracer,
                 log_level=log_level,
-                serial_file_processing=getattr(args, 'ensemble_serial', False),
+                log_file=args.log_file,   # each pass writes its own file beside it (owner W509, way B)
+                serial_file_processing=getattr(args, 'ensemble_serial', True),
                 # v1.9.2 (CFF1): rides worker_kwargs into every pass pipeline's
                 # constructor; Balanced/Fidelity honour it, the others ignore it.
                 model_refresh_audio_minutes=getattr(args, 'model_refresh_audio_minutes', DEFAULT_MODEL_REFRESH_AUDIO_MINUTES),
@@ -3631,6 +3728,13 @@ def main():
                 status = result.get('status', 'unknown')
                 _summary = result.get('summary', {}) or {}
                 _elapsed = _summary.get('total_processing_time_seconds')
+                if status == 'skipped':
+                    # Not started: an earlier file's pass 1 stopped because its ASR model cannot be used (owner W501, W505 1).
+                    outcome = skipped_outcome(in_path, str(result.get('error') or QWEN_NOT_STARTED))
+                    outcomes.append(outcome)
+                    _outcome_by_input[str(in_path)] = outcome
+                    log_outcome(outcome)
+                    continue
                 if result.get('error') or status == 'failed':
                     failed_files.append(basename)
                     _why = result.get('error')
@@ -3642,6 +3746,9 @@ def main():
                     if not _why and (_p1_error.startswith("stopped before transcription")
                                      or _p1_error.startswith(CRISPASR_FAILURE_PREFIX)):
                         _why = _p1_error
+                    # What the pass that did not finish left behind (owner W462, W463 C1), in the file's line.
+                    if result.get('kept_work'):
+                        _why = "; ".join([str(_why or 'ensemble pass failed')] + list(result['kept_work']))
                     outcome = failed_outcome(
                         in_path, str(_why or 'ensemble pass failed'),
                         processing_time_s=_elapsed,
@@ -3660,10 +3767,13 @@ def main():
                     _reasons = []
                     if status == 'degraded':
                         _p2_error = str((result.get('pass2') or {}).get('error') or '')
-                        if _p2_error.startswith(CRISPASR_FAILURE_PREFIX):
+                        if (_p2_error.startswith(CRISPASR_FAILURE_PREFIX)
+                                or _p2_error.startswith(QWEN_UNUSABLE_PREFIX)):
                             _reasons.append(f"pass 2 failed ({_p2_error}); output is pass 1 alone")
                         else:
                             _reasons.append("pass 2 failed; output is pass 1 alone")
+                        # What pass 2 left behind (owner W462, W463 C1): its last save-point and its working files.
+                        _reasons.extend(result.get('kept_work') or [])
                     _reasons.extend(_summary.get('degradations') or [])
 
                     outcome = classify_output(

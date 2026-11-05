@@ -324,12 +324,12 @@ class AssemblyTextCleaner:
             total_removed += stats.get("chars_removed", 0)
 
         if total_removed > 0:
-            logger.info(
+            logger.debug(
                 "AssemblyTextCleaner batch: %d scenes, %d total chars removed",
                 len(texts), total_removed,
             )
         elif self.config.enabled:
-            logger.info(
+            logger.debug(
                 "AssemblyTextCleaner batch: %d scenes, no modifications",
                 len(texts),
             )

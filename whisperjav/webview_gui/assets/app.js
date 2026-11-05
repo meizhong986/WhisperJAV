@@ -593,13 +593,14 @@ const QwenManager = {
         repetition_penalty: 1.1,
         max_tokens_per_audio_second: 20.0,
         // Alignment
-        // 1.10.0 (item 12): the CrispASR aligner (wav2vec2-ja) and the Whisper small
-        // timing model are the default for every ChronosJAV model; vad_only loads no aligner.
+        // 1.10.1 (owner W498 D1): VAD Only and no timing model are the default for Qwen3-ASR and
+        // anime-whisper -- no aligner is loaded, each subtitle takes its VAD group's edges. The
+        // aligner choice below is what an aligner mode uses when the user picks one (1.10.0, item 12).
         aligner_backend: 'crispasr',
         aligner_id: 'wav2vec2-ja',
-        timing_model: 'whisper-small',
+        timing_model: 'none',
         assembly_cleaner: 'qwen3',
-        timestamp_mode: 'aligner_vad_fallback',
+        timestamp_mode: 'vad_only',
         stepdown: false,  // 1.10.0 (owner W266 1): a collapsed scene takes its VAD groups' times
         stepdown_initial_group: 6.0,
         stepdown_fallback_group: 6.0,
@@ -1237,9 +1238,10 @@ const RunStopDialog = {
             ProcessManager.updateButtonStates();
             ProgressManager.setIndeterminate(true);
             ProgressManager.setStatus('Running on the CPU (not accelerated)...');
-            if (result.command) {
-                ConsoleManager.appendRaw(`\n> ${result.command}\n`);
-            }
+            // The command line is echoed by the API (api.py) into the run's output (owner W509: not twice). The
+            // stopped run ended the log polling; start it again, or this run's console stays empty to the end.
+            ProcessManager.stopLogPolling();
+            ProcessManager.startLogPolling();
             ProcessManager.startStatusMonitoring();
         } else {
             ErrorHandler.show('The run could not start again', (result && result.message) || '');
@@ -1279,7 +1281,7 @@ const ProcessManager = {
 
                 // Log command
                 if (result.command) {
-                    ConsoleManager.appendRaw(`\n> ${result.command}\n`);
+                    // The command line is echoed by the API (api.py) into the run's output; not twice (owner W509).
                 }
 
                 // Start log polling
@@ -1399,19 +1401,24 @@ const ProcessManager = {
                         // For other modes, trigger separate translation subprocess if enabled
                         const isEnsembleMode = AppState.activeTab === 'tab3';
                         const needsALook = summary && (summary.counts.empty > 0 || summary.counts.suspect > 0);
-                        const body = (tally ? `Files: ${tally}.` : 'The run finished.') +
-                            (needsALook ? ' Some files ended empty or suspect (listed below).' : '');
+                        // The tally is in the run summary and in the API's closing line; this line says only
+                        // what they do not (owner W509: the end lines once).
+                        const body = needsALook ? 'Some files ended empty or suspect (listed above).' : '';
                         this.logFileStates(summary);
 
                         if (isEnsembleMode) {
                             // CLI handled everything including translation (if enabled)
-                            ErrorHandler.showSuccess('Finished',
-                                TranslateIntegrationManager.wasEnabledOnStart()
-                                    ? `${body} Translation was run as part of the ensemble.`
-                                    : body);
+                            const note = TranslateIntegrationManager.wasEnabledOnStart()
+                                ? `${body} Translation was run as part of the ensemble.`.trim()
+                                : body;
+                            if (note) {
+                                ErrorHandler.showSuccess('Finished', note);
+                            }
                         } else {
                             // Transcription Mode - translation needs separate subprocess (legacy)
-                            ErrorHandler.showSuccess('Finished', body);
+                            if (body) {
+                                ErrorHandler.showSuccess('Finished', body);
+                            }
 
                             if (TranslateIntegrationManager.wasEnabledOnStart()) {
                                 // Use output_files from API (computed based on mode/language)
@@ -1499,9 +1506,7 @@ const ProcessManager = {
             const level = f.state === 'failed' ? 'error' : (f.state === 'skipped' ? 'info' : 'warning');
             ConsoleManager.log(`${f.state}: ${f.name}${f.detail ? ' — ' + f.detail : ''}`, level);
         }
-        if (summary.manifest_path) {
-            ConsoleManager.log(`Manifest: ${summary.manifest_path}`, 'info');
-        }
+        // The manifest's path is the run summary's last line (owner W509: said once).
     },
 
     formatStatus(status) {
@@ -1695,7 +1700,10 @@ const EnsembleManager = {
             isXxl: false,  // Track if using BYOP Faster Whisper XXL (pass 1 too since 1.10.0, item 5)
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
             dspEffects: ['loudnorm'],  // Default FFmpeg DSP effects
-            enhanceForVad: false  // Dual-track: use enhanced audio for VAD only, original for ASR
+            enhanceForVad: false,  // Dual-track: use enhanced audio for VAD only, original for ASR
+            // A CrispASR pass's word timestamps, from its Customize Timing tab (1.10.1; owner W413): 'model',
+            // 'aligner', or null for the pipeline's default (crispasrDefaults). Sent as --passN-word-timestamps.
+            wordTimestamps: null
         },
         pass2: {
             enabled: false,
@@ -1721,7 +1729,10 @@ const EnsembleManager = {
             isXxl: false,  // Track if using BYOP Faster Whisper XXL
             framer: 'vad-grouped',  // Qwen temporal framer (vad-grouped/full-scene)
             dspEffects: ['loudnorm'],  // Default FFmpeg DSP effects
-            enhanceForVad: false  // Dual-track: use enhanced audio for VAD only, original for ASR
+            enhanceForVad: false,  // Dual-track: use enhanced audio for VAD only, original for ASR
+            // A CrispASR pass's word timestamps, from its Customize Timing tab (1.10.1; owner W413): 'model',
+            // 'aligner', or null for the pipeline's default (crispasrDefaults). Sent as --passN-word-timestamps.
+            wordTimestamps: null
         },
         // BYOP Faster Whisper XXL: one program and one Extra Args box for the install, used by
         // whichever pass is XXL -- either or both (1.10.0, item 5; owner W271 3). Each pass sends
@@ -1731,7 +1742,7 @@ const EnsembleManager = {
             extraArgs: '--verbose True --standard_asia'  // Default XXL args (model flows via the Model column)
         },
         mergeStrategy: 'pass1_primary',
-        serialMode: false,
+        serialMode: true,  // 1.10.1: "Finish each file" ticked by default (owner W493 1)
         currentCustomize: null  // 'pass1' or 'pass2'
     },
 
@@ -1775,16 +1786,95 @@ const EnsembleManager = {
         // a quality baseline.
         { value: 'CohereLabs/cohere-transcribe-03-2026', label: 'Cohere-Transcribe-03-2026    ~4-8GB (gated)' }
     ],
-    // The CrispASR pipelines' models (1.10.0): the short names --passN-model takes, the first one the
-    // pipeline's default. Keep in step with whisperjav/crispasr/manifest.py (PIPELINE_MODELS,
-    // PIPELINE_DEFAULT_MODEL); tests/test_gui_crispasr_pipelines.py compares them.
-    parakeetCrispasrModels: [
-        { value: 'parakeet-tdt-0.6b-ja', label: 'parakeet-tdt-0.6b-ja' }
-    ],
-    cohereCrispasrModels: [
-        { value: 'cohere-asr-ja-v0.1', label: 'cohere-asr-ja-v0.1' },
-        { value: 'cohere-asr-ja', label: 'cohere-asr-ja' }
-    ],
+    // The CrispASR pipelines' models (1.10.0; 1.10.1, owner W400, W401): per pipeline, the short names
+    // --passN-model takes, the pipeline's default first, each named by its quantization and the GPU memory
+    // it needs. Keep in step with whisperjav/crispasr/manifest.py (PIPELINE_MODELS, PIPELINE_DEFAULT_MODEL,
+    // menu_label); tests/test_gui_crispasr_pipelines.py compares them.
+    crispasrModels: {
+        'parakeet-crispasr': [
+            { value: 'parakeet-tdt-0.6b-ja', label: 'Parakeet TDT 0.6B ja (q8_0), ~0.9 GB VRAM' },
+            { value: 'parakeet-tdt-0.6b-ja-f16', label: 'Parakeet TDT 0.6B ja (f16), ~1.5 GB VRAM' }
+        ],
+        'cohere-crispasr': [
+            { value: 'cohere-asr-ja-v0.1', label: 'Cohere Transcribe ja v0.1 (q8_0), ~2.5 GB VRAM' },
+            { value: 'cohere-asr-ja-v0.1-f16', label: 'Cohere Transcribe ja v0.1 (f16), ~4.1 GB VRAM' },
+            { value: 'cohere-asr-ja', label: 'Cohere ASR ja (q8_0), ~2.5 GB VRAM' },
+            { value: 'cohere-asr-ja-f16', label: 'Cohere ASR ja (f16), ~4.1 GB VRAM' }
+        ],
+        'reazonspeech-crispasr': [
+            { value: 'reazonspeech-nemo-v2-f16', label: 'ReazonSpeech NeMo v2 (f16), ~1.5 GB VRAM' },
+            { value: 'reazonspeech-nemo-v2-q8_0', label: 'ReazonSpeech NeMo v2 (q8_0), ~0.9 GB VRAM' }
+        ],
+        'kotoba-crispasr': [
+            { value: 'kotoba-whisper-v2.0-f16', label: 'Kotoba-Whisper v2.0 (f16), ~1.9 GB VRAM' },
+            { value: 'kotoba-whisper-v2.0-q5_0', label: 'Kotoba-Whisper v2.0 (q5_0), ~0.9 GB VRAM' }
+        ],
+        'whisper-turbo-crispasr': [
+            { value: 'whisper-large-v3-turbo-f16', label: 'Whisper large-v3-turbo (f16), ~2.0 GB VRAM' },
+            { value: 'whisper-large-v3-turbo-q8_0', label: 'Whisper large-v3-turbo (q8_0), ~1.3 GB VRAM' }
+        ],
+        'whisper-large-crispasr': [
+            { value: 'whisper-large-v2-f16', label: 'Whisper large-v2 (f16), ~4.1 GB VRAM' },
+            { value: 'whisper-large-v2-q8_0', label: 'Whisper large-v2 (q8_0), ~2.7 GB VRAM' },
+            { value: 'whisper-large-v3-f16', label: 'Whisper large-v3 (f16), ~4.3 GB VRAM' },
+            { value: 'whisper-large-v3-q5_0', label: 'Whisper large-v3 (q5_0), ~2.2 GB VRAM' }
+        ],
+        'moss-crispasr': [
+            { value: 'moss-transcribe-diarize-0.9b-f16', label: 'MOSS-Transcribe-Diarize 0.9B (f16), ~2.1 GB VRAM' },
+            { value: 'moss-transcribe-diarize-0.9b-q8_0', label: 'MOSS-Transcribe-Diarize 0.9B (q8_0), ~1.7 GB VRAM' }
+        ]
+    },
+    // Each CrispASR pipeline's speech segmenter and sensitivity when a pass names none
+    // (CRISPASR_DEFAULT_SEGMENTERS, CRISPASR_DEFAULT_SENSITIVITY, config/segmenter_presets.py; owner W202 3,
+    // W343, W344, W401); tests/test_gui_crispasr_pipelines.py compares them. wordTimestamps: where the pass's
+    // subtitle times come from by default (crispasr/manifest.py word_timestamps_for; owner W411-W414). scene:
+    // the scene detector a pass starts on (crispasr/pass_settings.py scene_detector_for; semantic when absent;
+    // MOSS-CrispASR semantic too, owner W482; silero before it, W426 4).
+    crispasrDefaults: {
+        'parakeet-crispasr': { segmenter: 'ten', sensitivity: 'aggressive', wordTimestamps: 'model' },
+        'cohere-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'aligner' },
+        'reazonspeech-crispasr': { segmenter: 'ten', sensitivity: 'aggressive', wordTimestamps: 'model' },
+        'kotoba-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'model' },
+        'whisper-turbo-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'model' },
+        'whisper-large-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'model' },
+        // MOSS-CrispASR (owner W482): semantic scenes of 90-240 s and FireRedVAD (crispasr/pass_settings.py).
+        'moss-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'model', scene: 'semantic' }
+    },
+    crispasrDefaultScene(pipeline) {
+        const defaults = this.crispasrDefaults[pipeline];
+        return (defaults && defaults.scene) || 'semantic';
+    },
+    // R-SCN (1.10.1; owner W448-W455; design docs/plans/design/2026-11-02-rscn-design.md section 15): the scene
+    // detector rscn is offered for the pipelines the command line accepts it for (crispasr/pass_settings.py
+    // RSCN_PIPELINES; tests/test_gui_rscn.py compares the two lists). Not offered in 1.10.1 (owner W482): the list
+    // is empty, the dropdowns have no rscn option and the Customize Scene tab does not list it; the code stays for
+    // the new scene detector R to replace (W481).
+    rscnPipelines: [],
+    offersRscn(pipeline) {
+        return this.rscnPipelines.includes(pipeline);
+    },
+    // Enable or disable the rscn option of a pass's Scene Detector dropdown for the pipeline the pass now runs. A pass
+    // that held rscn and moved to a pipeline without it goes back to that pipeline's own scene detector, with one
+    // log-panel line; a saved preset that carries rscn is kept only where the pipeline offers it.
+    updateRscnOption(passKey) {
+        const select = document.getElementById(`${passKey}-scene`);
+        if (!select) return;
+        const passState = this.state[passKey];
+        const offered = this.offersRscn(passState.pipeline);
+        const option = Array.from(select.options).find(o => o.value === 'rscn');
+        if (option) option.disabled = !offered;
+        if (!offered && passState.sceneDetector === 'rscn') {
+            // The row keeps what it shows (a preset's rscn was not taken into it, setSilent); else the pipeline's own.
+            const shown = select.value && select.value !== 'rscn' ? select.value : '';
+            const fallback = shown || (this.isCrispasrPipeline(passState.pipeline)
+                ? this.crispasrDefaultScene(passState.pipeline) : 'semantic');
+            passState.sceneDetector = fallback;
+            select.value = fallback;
+            ConsoleManager.log(
+                `${passKey === 'pass1' ? 'Pass 1' : 'Pass 2'}: the R-SCN scene detector is not offered in this ` +
+                `version, so ${this.pipelineLabel(passKey)} runs with ${fallback}.`, 'warning');
+        }
+    },
     // BYOP Faster Whisper XXL (1.10.0, item 5): the model names XXL takes, sent as --passN-model.
     // large-v2 first, the default (owner W24 2; DEFAULT_XXL_MODEL in byop/xxl_runner.py); the
     // list is owner W271 2.
@@ -1845,6 +1935,9 @@ const EnsembleManager = {
         this.state.pass2.isCohere = this.state.pass2.pipeline === 'cohere';
         this.state.pass2.isCrispasr = this.isCrispasrPipeline(this.state.pass2.pipeline);
         this.state.pass2.isXxl = this.state.pass2.pipeline === 'xxl';
+        // R-SCN (1.10.1): the rscn option follows each pass's pipeline from the start.
+        this.updateRscnOption('pass1');
+        this.updateRscnOption('pass2');
 
         // Load persisted BYOP preferences (XXL exe path, extra args)
         try {
@@ -1927,6 +2020,12 @@ const EnsembleManager = {
 
         // New dropdown event handlers - Pass 1
         document.getElementById('pass1-scene').addEventListener('change', (e) => {
+            // A disabled option (rscn for a pipeline without it, 1.10.1) is not a choice: keep what the pass had.
+            const chosen = e.target.options[e.target.selectedIndex];
+            if (chosen && chosen.disabled) {
+                e.target.value = this.state.pass1.sceneDetector;
+                return;
+            }
             this.state.pass1.sceneDetector = e.target.value;
         });
         document.getElementById('pass1-enhancer').addEventListener('change', (e) => {
@@ -1960,6 +2059,12 @@ const EnsembleManager = {
 
         // New dropdown event handlers - Pass 2
         document.getElementById('pass2-scene').addEventListener('change', (e) => {
+            // A disabled option (rscn for a pipeline without it, 1.10.1) is not a choice: keep what the pass had.
+            const chosen = e.target.options[e.target.selectedIndex];
+            if (chosen && chosen.disabled) {
+                e.target.value = this.state.pass2.sceneDetector;
+                return;
+            }
             this.state.pass2.sceneDetector = e.target.value;
         });
         document.getElementById('pass2-enhancer').addEventListener('change', (e) => {
@@ -2074,23 +2179,24 @@ const EnsembleManager = {
         this.updateRowGreyingState('pass2');
     },
 
-    // The two CrispASR pipelines (1.10.0; CRISPASR_PIPELINES in whisperjav/crispasr/manifest.py).
+    // The CrispASR pipelines (1.10.0; 1.10.1, owner W401): the keys of crispasrModels, which are
+    // CRISPASR_PIPELINES in whisperjav/crispasr/manifest.py.
     isCrispasrPipeline(pipeline) {
-        return pipeline === 'parakeet-crispasr' || pipeline === 'cohere-crispasr';
+        return Object.prototype.hasOwnProperty.call(this.crispasrModels, pipeline);
     },
 
-    CRISPASR_CJK_NOTE: 'Experimental in 1.10.0 (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).',
+    CRISPASR_CJK_NOTE: 'Experimental (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).',
 
     // Each CrispASR pipeline's speech segmenter when a pass names none (CRISPASR_DEFAULT_SEGMENTERS,
     // config/segmenter_presets.py; owner W202 3, W344); tests/test_gui_crispasr_pipelines.py compares them.
     crispasrDefaultSegmenter(pipeline) {
-        return pipeline === 'cohere-crispasr' ? 'firered-vad' : 'ten';
+        return this.crispasrDefaults[pipeline].segmenter;
     },
 
     // Each CrispASR pipeline's sensitivity when a pass names none (CRISPASR_DEFAULT_SENSITIVITY,
     // config/segmenter_presets.py; owner W343, W344); tests/test_gui_crispasr_pipelines.py compares them.
     crispasrDefaultSensitivity(pipeline) {
-        return pipeline === 'cohere-crispasr' ? 'balanced' : 'aggressive';
+        return this.crispasrDefaults[pipeline].sensitivity;
     },
 
     // The CrispASR status panel under a pass row (owner W133 2; route B design 12, T16): the model,
@@ -2113,6 +2219,8 @@ const EnsembleManager = {
         }
         const pipeline = passState.pipeline;
         const model = passState.model || '';
+        // A CrispASR pass's Timing tab choice (1.10.1): the aligner line follows it; '' = the pipeline's default.
+        const wordTimestamps = passState.wordTimestamps || '';
         // A ChronosJAV pass: the aligner and timing model it will use (QwenManager defaults, or the
         // values applied in its Customize window).
         const chronos = passState.isQwen
@@ -2125,9 +2233,10 @@ const EnsembleManager = {
             const result = chronos
                 ? await pywebview.api.get_chronosjav_crispasr_status(
                     chronos.aligner_backend, chronos.aligner_id, chronos.timing_model, chronos.timestamp_mode)
-                : await pywebview.api.get_crispasr_status(pipeline, model);
+                : await pywebview.api.get_crispasr_status(pipeline, model, wordTimestamps);
             // The pass may have changed while CrispASR was asked.
             if (passState.pipeline !== pipeline || (passState.model || '') !== model
+                || (passState.wordTimestamps || '') !== wordTimestamps
                 || !(passState.isCrispasr || passState.isQwen)) return;
             if (chronos) {
                 const now = { ...QwenManager.defaults, ...((passState.customized && passState.params) || {}) };
@@ -2179,6 +2288,7 @@ const EnsembleManager = {
             // Warn user that custom params will be reset
             if (confirm(I18n.t(`You have custom parameters for ${passKey === 'pass1' ? 'Pass 1' : 'Pass 2'}. Changing the pipeline will reset them. Continue?`))) {
                 passState.pipeline = newValue;
+                passState.wordTimestamps = null;  // the new pipeline's own default (1.10.1)
                 passState.customized = false;
                 passState.params = null;
                 passState.presetName = null;
@@ -2199,12 +2309,14 @@ const EnsembleManager = {
                     this.swapModelOptions(passKey, newType);
                 }
                 this.applyPipelinePresets(passKey, newType);
+                this.updateRscnOption(passKey);
             } else {
                 // Revert selection
                 selectElement.value = passState.pipeline;
             }
         } else {
             passState.pipeline = newValue;
+            passState.wordTimestamps = null;  // the new pipeline's own default (1.10.1)
             passState.presetName = null;
             passState.isTransformers = isTransformers;
             passState.isQwen = isQwen;
@@ -2219,6 +2331,7 @@ const EnsembleManager = {
                 this.swapModelOptions(passKey, newType);
             }
             this.applyPipelinePresets(passKey, newType);
+            this.updateRscnOption(passKey);
             this.updateBadges();
         }
     },
@@ -2294,15 +2407,16 @@ const EnsembleManager = {
         // segmenter and sensitivity are each pipeline's own when a pass names none
         // (CRISPASR_DEFAULT_SEGMENTERS, CRISPASR_DEFAULT_SENSITIVITY, config/segmenter_presets.py:
         // TEN VAD at aggressive for Parakeet, FireRedVAD at balanced for Cohere, owner W343, W344);
-        // the scene detector starts at semantic (CRISPASR_SCENE_DETECTOR, crispasr/pass_settings.py;
-        // owner W214 2), and the user may choose another (design 22.9.1).
+        // the scene detector starts at the pipeline's own (semantic, owner W214 2; MOSS-CrispASR semantic too,
+        // W482: crispasrDefaultScene), and the user may choose another (design 22.9.1).
         if (this.isCrispasrPipeline(pipelineType)) {
             const segmenter = this.crispasrDefaultSegmenter(pipelineType);
             const sensitivity = this.crispasrDefaultSensitivity(pipelineType);
-            sceneSelect.value = 'semantic';
+            const scene = this.crispasrDefaultScene(pipelineType);
+            sceneSelect.value = scene;
             segmenterSelect.value = segmenter;
             sensitivitySelect.value = sensitivity;
-            this.state[passKey].sceneDetector = 'semantic';
+            this.state[passKey].sceneDetector = scene;
             this.state[passKey].speechSegmenter = segmenter;
             this.state[passKey].sensitivity = sensitivity;
             return;
@@ -2405,7 +2519,7 @@ const EnsembleManager = {
 
     // Swap model dropdown options based on pipeline type
     // pipelineType: 'legacy' | 'transformers' | 'qwen' | 'anime-whisper' | 'cohere' |
-    //               'parakeet-crispasr' | 'cohere-crispasr' | 'xxl'
+    //               a CrispASR pipeline (isCrispasrPipeline) | 'xxl'
     swapModelOptions(passKey, pipelineType) {
         const modelSelect = document.getElementById(`${passKey}-model`);
         let models;
@@ -2414,7 +2528,9 @@ const EnsembleManager = {
         // wholesale and is not a "dropped selection" worth reporting.
         let narrowedByPipeline = false;
 
-        switch (pipelineType) {
+        if (this.isCrispasrPipeline(pipelineType)) {
+            models = this.crispasrModels[pipelineType];
+        } else switch (pipelineType) {
             case 'transformers':
                 models = this.transformersModels;
                 break;
@@ -2426,12 +2542,6 @@ const EnsembleManager = {
                 break;
             case 'qwen':
                 models = this.qwenModels;
-                break;
-            case 'parakeet-crispasr':
-                models = this.parakeetCrispasrModels;
-                break;
-            case 'cohere-crispasr':
-                models = this.cohereCrispasrModels;
                 break;
             case 'xxl':
                 models = this.xxlModels;
@@ -2553,19 +2663,14 @@ const EnsembleManager = {
         // picks the segmenter's preset, design 4.5), the source language, and since design 22.9.1
         // (owner W212 D3, W214 2, W232 8) the scene detector (semantic by default), the speech
         // enhancer, Enhance for VAD only and Customize (Segmenter, Enhancer, Scene tabs). Nothing is
-        // greyed but "None" as a segmenter: the pipelines need one (main.py refuses it).
+        // greyed: "None" as the speech segmenter sends each scene to the model whole (owner W457, W458).
         const noneSegmenter = segmenterSelect.querySelector('option[value="none"]');
-        if (noneSegmenter) noneSegmenter.disabled = !!passState.isCrispasr;
+        if (noneSegmenter) noneSegmenter.disabled = false;
         if (passState.isCrispasr) {
             sensitivitySelect.disabled = isPass2Disabled;
             sensitivitySelect.title = 'Picks the speech segmenter\'s preset: the detection threshold and related settings';
             segmenterSelect.disabled = isPass2Disabled;
             segmenterSelect.title = '';
-            if (segmenterSelect.value === 'none') {
-                const segmenter = this.crispasrDefaultSegmenter(passState.pipeline);
-                segmenterSelect.value = segmenter;
-                passState.speechSegmenter = segmenter;
-            }
 
             const sceneSelect = document.getElementById(`${passKey}-scene`);
             const enhancerSelect = document.getElementById(`${passKey}-enhancer`);
@@ -2991,6 +3096,10 @@ const EnsembleManager = {
         try {
         const passState = this.state[passKey];
 
+        // The Timing tab is a CrispASR pass's only (1.10.1): hidden here for every pipeline, and shown again
+        // by openCrispasrCustomize. Every opener comes through this function.
+        this.showTimingTab(false);
+
         // Route to pipeline-specific handler if applicable
         if (passState.isTransformers) {
             await this.openTransformersCustomize(passKey);
@@ -3212,15 +3321,18 @@ const EnsembleManager = {
         const passState = this.state[passKey];
         this.state.currentCustomize = passKey;
         const sensitivity = passState.sensitivity || 'balanced';
-        const sceneBackend = passState.sceneDetector || 'semantic';
+        const sceneBackend = passState.sceneDetector || this.crispasrDefaultScene(passState.pipeline);
         const result = await pywebview.api.get_crispasr_customize_defaults(
             passState.pipeline, sensitivity, passState.speechSegmenter || '', sceneBackend);
         if (!result || !result.success) {
             ErrorHandler.show('Error', 'Failed to load the pass settings: ' + (result ? result.error : ''));
             return;
         }
-        const defaults = { ...result.segmenter, scene_detection_method: sceneBackend, ...result.scene };
-        this._currentDefaults = { transcriber: {}, decoder: {}, engine: {}, vad: result.segmenter,
+        // The model's own tab (1.10.1): MOSS-CrispASR's MOSS settings (crispasr/moss_prompt.py); null otherwise.
+        const modelTab = result.model || null;
+        const modelDefaults = modelTab ? modelTab.defaults : {};
+        const defaults = { ...result.segmenter, scene_detection_method: sceneBackend, ...result.scene, ...modelDefaults };
+        this._currentDefaults = { transcriber: {}, decoder: {}, engine: { ...modelDefaults }, vad: result.segmenter,
                                   scene: { scene_detection_method: sceneBackend, ...result.scene } };
         const currentValues = (passState.customized && passState.params)
             ? { ...defaults, ...passState.params } : defaults;
@@ -3241,9 +3353,84 @@ const EnsembleManager = {
         await this.generateSegmenterTab('tab-segmenter', result.segmenter_backend, currentValues, true, sensitivity);
         await this.generateEnhancerTab('tab-enhancer', passState.speechEnhancer || 'none', passState.dspEffects || ['loudnorm']);
         await this.generateSceneTab('tab-scene', sceneBackend, currentValues);
+        if (modelTab) this.generateCrispasrModelTab(modelTab, currentValues);
+        this.generateCrispasrTimingTab(passKey);
+        this.showTimingTab(true);
         this.switchModalTab('segmenter');
         await this.refreshPresetList();
         document.getElementById('customizeModal').classList.add('active');
+    },
+
+    // The model's own tab of a CrispASR pass (1.10.1): MOSS-CrispASR's MOSS settings, from the owner's reference
+    // command (W428 I1 4; crispasr/moss_prompt.py GUI_SCHEMA). Drawn in the Context panel, which the CrispASR window
+    // does not otherwise use, under the tab name the back end gives ("MOSS"). Its values are --passN-params keys,
+    // collected by applyCustomization with the other tabs'.
+    generateCrispasrModelTab(modelTab, currentValues) {
+        const container = document.getElementById('tab-context');
+        const tabBtn = document.querySelector('[data-tab="context"]');
+        if (!container || !tabBtn) return;
+        container.innerHTML = '';
+        tabBtn.textContent = modelTab.title;
+        tabBtn.style.display = '';
+        const group = document.createElement('div');
+        group.className = 'param-group';
+        for (const [paramName, schema] of Object.entries(modelTab.schema || {})) {
+            const defaultValue = (modelTab.defaults || {})[paramName];
+            const value = currentValues[paramName] !== undefined && currentValues[paramName] !== null
+                ? currentValues[paramName] : defaultValue;
+            group.appendChild(this.generateSchemaControl(paramName, schema, value, defaultValue));
+        }
+        container.appendChild(group);
+    },
+
+    // The Timing tab of a CrispASR pass (1.10.1; owner W411-W414, texts W413 2): where the pass's subtitle times
+    // come from, in one dropdown with the pipeline's default (crispasrDefaults) marked. Not a --passN-params
+    // value: Apply stores it in passState.wordTimestamps, sent as --passN-word-timestamps (api._crispasr_pass_args).
+    CRISPASR_WORD_TIMESTAMP_OPTIONS: {
+        model: { text: 'From the model', defaultText: 'From the model (default)' },
+        aligner: { text: 'From the aligner (wav2vec2-ja)', defaultText: 'From the aligner (wav2vec2-ja) (default)' }
+    },
+
+    crispasrDefaultWordTimestamps(pipeline) {
+        const defaults = this.crispasrDefaults[pipeline];
+        return defaults ? defaults.wordTimestamps : null;   // null: not a CrispASR pipeline
+    },
+
+    // Shown only while a CrispASR pass's Customize window is open; openCustomize and closeModal hide it.
+    showTimingTab(show) {
+        const tabBtn = document.querySelector('[data-tab="timing"]');
+        if (tabBtn) tabBtn.style.display = show ? '' : 'none';
+        if (!show) {
+            const panel = document.getElementById('tab-timing');
+            if (panel) panel.innerHTML = '';
+        }
+    },
+
+    generateCrispasrTimingTab(passKey) {
+        const passState = this.state[passKey];
+        const container = document.getElementById('tab-timing');
+        if (!container) return;
+        container.innerHTML = '';
+        const pipelineDefault = this.crispasrDefaultWordTimestamps(passState.pipeline);
+        const current = passState.wordTimestamps || pipelineDefault;
+        const control = document.createElement('div');
+        control.className = 'param-control';
+        const label = document.createElement('label');
+        label.textContent = 'Word timestamps';
+        label.htmlFor = 'crispasrWordTimestamps';
+        control.appendChild(label);
+        const select = document.createElement('select');
+        select.id = 'crispasrWordTimestamps';
+        select.className = 'form-select';
+        for (const [value, texts] of Object.entries(this.CRISPASR_WORD_TIMESTAMP_OPTIONS)) {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = value === pipelineDefault ? texts.defaultText : texts.text;
+            option.selected = value === current;
+            select.appendChild(option);
+        }
+        control.appendChild(select);
+        container.appendChild(control);
     },
 
     generateTabControls(tabId, params, currentValues) {
@@ -3651,6 +3838,12 @@ const EnsembleManager = {
                 { value: 'semantic', label: 'Semantic (Texture Clustering)' },
                 { value: 'none', label: 'None (Skip Scene Detection)' }
             ];
+            // R-SCN (1.10.1; owner W448-W455): offered only for a pass whose pipeline accepts it (rscnPipelines; MOSS
+            // in this build), as the row's dropdown does, because main.py refuses it for any other pipeline (exit 2).
+            const customizePass = this.state[this.state.currentCustomize];
+            if (customizePass && this.offersRscn(customizePass.pipeline)) {
+                methodOptions.splice(3, 0, { value: 'rscn', label: 'R-SCN (changes in the sound, picture breaks)' });
+            }
 
             methodOptions.forEach(opt => {
                 const option = document.createElement('option');
@@ -3688,7 +3881,9 @@ const EnsembleManager = {
     async _renderSceneBackendContent(contentDiv, backend, currentValues) {
         contentDiv.innerHTML = '';
 
-        const result = await pywebview.api.get_scene_detector_schema(backend);
+        // The pass's pipeline chooses the rscn preset the tab shows (api.get_scene_detector_schema, 1.10.1).
+        const customizePass = this.state[this.state.currentCustomize];
+        const result = await pywebview.api.get_scene_detector_schema(backend, customizePass ? customizePass.pipeline : '');
 
         if (!result.success) {
             contentDiv.innerHTML = `<p class="tab-error">Failed to load scene detector schema: ${result.error}</p>`;
@@ -5612,6 +5807,19 @@ const EnsembleManager = {
         // A ChronosJAV pass's aligner and timing model may have changed (1.10.0).
         if (passState.isQwen) this.updateCrispasrStatus(passKey);
 
+        // A CrispASR pass's Timing tab (1.10.1; owner W413 2): kept apart from the params (it is sent as
+        // --passN-word-timestamps); null when it names the pipeline's default. The status panel then shows
+        // the aligner line when the aligner is chosen.
+        if (passState.isCrispasr) {
+            const wordTimestamps = document.getElementById('crispasrWordTimestamps');
+            if (wordTimestamps) {
+                passState.wordTimestamps =
+                    wordTimestamps.value === this.crispasrDefaultWordTimestamps(passState.pipeline)
+                        ? null : wordTimestamps.value;
+            }
+            this.updateCrispasrStatus(passKey);
+        }
+
         const paramCount = Object.keys(fullParams).length;
         const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
         ConsoleManager.log(`Saved ${paramCount} parameters for ${passLabel} (Custom)`, 'info');
@@ -5797,8 +6005,9 @@ const EnsembleManager = {
             ...this._currentDefaults.scene
         };
 
-        // Reset all controls in all tabs (new structure: model, quality, segmenter, enhancer, scene)
-        const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene'];
+        // Reset all controls in all tabs (new structure: model, quality, segmenter, enhancer, scene; context holds
+        // a MOSS-CrispASR pass's MOSS tab, 1.10.1)
+        const tabs = ['model', 'quality', 'segmenter', 'enhancer', 'scene', 'context'];
         tabs.forEach(tab => {
             const panel = document.getElementById(`tab-${tab}`);
             if (!panel) return;
@@ -5817,8 +6026,11 @@ const EnsembleManager = {
                 if (checkbox) {
                     checkbox.checked = defaultValue;
                 } else if (slider) {
+                    // A schema slider (Segmenter, Scene) has no number box beside it, only its value label.
                     slider.value = defaultValue;
-                    control.querySelector('.param-number').value = defaultValue;
+                    if (number) number.value = defaultValue;
+                    const valueDisplay = control.querySelector('.slider-value');
+                    if (valueDisplay) valueDisplay.textContent = slider.value;
                 } else if (number) {
                     number.value = defaultValue;
                 } else if (text) {
@@ -5850,6 +6062,13 @@ const EnsembleManager = {
         passState.params = null;
         passState.customized = false;
         passState.presetName = null;
+
+        // A CrispASR pass's Timing tab (1.10.1): back to the pipeline's own word timestamps.
+        if (passState.isCrispasr) {
+            passState.wordTimestamps = null;
+            this.generateCrispasrTimingTab(passKey);
+            this.updateCrispasrStatus(passKey);
+        }
 
         const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
         ConsoleManager.log(`Reset ${passLabel} to defaults`, 'info');
@@ -6020,6 +6239,7 @@ const EnsembleManager = {
             if (modal) {
                 modal.classList.remove('active');
             }
+            this.showTimingTab(false);
             this.state.currentCustomize = null;
         } catch (error) {
             ConsoleManager.log(`Close modal failed: ${error.message}`, 'error');
@@ -6129,7 +6349,16 @@ const EnsembleManager = {
             framer: passState.isQwen ? (passState.framer || 'vad-grouped') : null,
             dspEffects: passState.dspEffects || null,
             enhanceForVad: passState.enhanceForVad || false,
+            // A CrispASR pass's Timing tab as the window shows it (1.10.1; owner W418 3); null = the pipeline's default.
+            wordTimestamps: this._timingForPreset(passState),
         };
+    },
+
+    _timingForPreset(passState) {
+        if (!passState.isCrispasr) return null;
+        const select = document.getElementById('crispasrWordTimestamps');
+        const value = select ? select.value : passState.wordTimestamps;
+        return (value && value !== this.crispasrDefaultWordTimestamps(passState.pipeline)) ? value : null;
     },
 
     /** Prompt user for a name and save current modal params as a preset. */
@@ -6228,6 +6457,20 @@ const EnsembleManager = {
             passState.customized = true;
             passState.params = preset.params || null;
             passState.presetName = name;
+            // 1.10.1: the CrispASR mark and the Timing tab follow the preset's pipeline. A CrispASR preset brings its
+            // Timing value (owner W418 3); any other preset, or one saved without the value, starts on the
+            // pipeline's own word timestamps.
+            passState.isCrispasr = this.isCrispasrPipeline(passState.pipeline);
+            const savedTiming = preset.wordTimestamps;
+            passState.wordTimestamps = (passState.isCrispasr && (savedTiming === 'model' || savedTiming === 'aligner'))
+                ? savedTiming : null;
+            if (passState.isCrispasr) {
+                this.generateCrispasrTimingTab(passKey);
+                this.showTimingTab(true);
+            } else {
+                this.showTimingTab(false);
+            }
+            this.updateCrispasrStatus(passKey);   // the aligner line follows the loaded value
 
             // Update pass row dropdowns silently (no dispatchEvent to avoid confirm dialogs)
             // v1.9.3: verify the assignment took. Assigning a value a <select> does not
@@ -6255,6 +6498,7 @@ const EnsembleManager = {
             setSilent(`${prefix}-pipeline`, preset.pipeline);
             setSilent(`${prefix}-sensitivity`, preset.sensitivity);
             setSilent(`${prefix}-scene`, preset.sceneDetector);
+            this.updateRscnOption(passKey);   // a preset's rscn is kept only where the pipeline offers it (1.10.1)
             // The list no longer offers a removed enhancer, so setSilent keeps the
             // current entry and logs its warning naming the preset's value; the pass is
             // then marked. A preset that sets an enhancer the list offers is a choice,
@@ -6397,6 +6641,8 @@ const EnsembleManager = {
                 isXxl: this.state.pass1.isXxl || false,
                 framer: this.state.pass1.isQwen ? this.state.pass1.framer : null,
                 enhanceForVad: this.state.pass1.enhanceForVad || false,
+                // A CrispASR pass's word timestamps (1.10.1); null = the pipeline's default, nothing sent
+                wordTimestamps: this.state.pass1.isCrispasr ? (this.state.pass1.wordTimestamps || null) : null,
                 // BYOP fields (only meaningful when pipeline is 'xxl'; pass 1 since 1.10.0, item 5)
                 xxlExe: this.state.pass1.isXxl ? this.state.xxl.exePath : null,
                 xxlArgs: this.state.pass1.isXxl ? this.state.xxl.extraArgs : null
@@ -6423,6 +6669,8 @@ const EnsembleManager = {
                 isXxl: this.state.pass2.isXxl,
                 framer: this.state.pass2.isQwen ? this.state.pass2.framer : null,
                 enhanceForVad: this.state.pass2.enhanceForVad || false,
+                // A CrispASR pass's word timestamps (1.10.1); null = the pipeline's default, nothing sent
+                wordTimestamps: this.state.pass2.isCrispasr ? (this.state.pass2.wordTimestamps || null) : null,
                 // BYOP fields (only meaningful when pipeline is 'xxl')
                 xxlExe: this.state.pass2.isXxl ? this.state.xxl.exePath : null,
                 xxlArgs: this.state.pass2.isXxl ? this.state.xxl.extraArgs : null
@@ -6520,14 +6768,13 @@ const EnsembleManager = {
 
                 // Log command
                 if (result.command) {
-                    ConsoleManager.appendRaw(`\n> ${result.command}\n`);
+                    // The command line is echoed by the API (api.py) into the run's output; not twice (owner W509).
                 }
 
                 // Start polling
                 ProcessManager.startLogPolling();
                 ProcessManager.startStatusMonitoring();
 
-                ConsoleManager.log('Two-pass ensemble started', 'info');
             } else {
                 ErrorHandler.show('Start Failed', result.message);
             }
@@ -8871,6 +9118,8 @@ const SettingsPersistence = {
         'pass2-segmenter':  { key: 'pass2SpeechSegmenter',prop: 'value' },
         'pass2-model':      { key: 'pass2Model',          prop: 'value' },
         'merge-strategy':   { key: 'mergeStrategy',       prop: 'value' },
+        // 1.10.1 (owner W501): "Finish each file" is remembered like the merge strategy beside it.
+        'ensemble-serial':  { key: 'ensembleSerial',      prop: 'checked' },
     },
     _saveTimer: null,
     enabled: false,

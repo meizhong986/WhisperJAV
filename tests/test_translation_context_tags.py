@@ -66,3 +66,53 @@ def test_resumed_project_lines_are_cleaned_before_they_are_skipped():
     assert translated.text == "Hello"
     assert original.translation == "Hello"
     assert project.needs_writing
+
+
+# --- Markdown code fences around the answer (bug report 2026-11-05: Gemma 3 through Ollama) ---
+
+FENCED = (
+    "```\n"
+    "#1\nTranslation>\nHello.\n\n"
+    "#2\nTranslation>\nGood night, while she sleeps.\n\n\n\n"
+    "```"
+)
+
+
+def _filtered(raw):
+    class Client:
+        def RequestTranslation(self, *args, **kwargs):
+            return Translation({"text": raw, "model": "gemma3:27b"})
+
+    translator = SimpleNamespace(client=Client())
+    assert apply_translation_context_filter(translator)
+    return translator.client.RequestTranslation(object(), streaming_callback=lambda _: None)
+
+
+def test_code_fences_are_removed_before_pysubtrans_parses_cues():
+    result = _filtered(FENCED)
+    assert "```" not in result.text
+    parser = TranslationParser("Translation", Options({}))
+    lines = parser.ProcessTranslation(result)
+    assert [(line.number, line.text) for line in lines] == [(1, "Hello."), (2, "Good night, while she sleeps.")]
+    assert parser.errors == []
+    assert result.content["model"] == "gemma3:27b"
+
+
+def test_without_the_filter_the_fence_fails_the_check():
+    """The reporter's failure, kept as the reason for the filter."""
+    parser = TranslationParser("Translation", Options({}))
+    parser.ProcessTranslation(Translation({"text": FENCED}))
+    assert parser.errors
+
+
+def test_a_fence_with_a_language_word_and_the_tags_are_both_removed():
+    raw = ("```text\n#1\nTranslation>\nHello.\n<summary>S</summary>\n<scene>Sc</scene>\n```\n")
+    result = _filtered(raw)
+    assert "```" not in result.text and "<summary>" not in result.text
+    assert result.summary == "S" and result.scene == "Sc"
+
+
+def test_backticks_inside_a_line_are_kept():
+    raw = "#1\nTranslation>\nHe typed ``` in the chat."
+    result = _filtered(raw)
+    assert result.text == raw

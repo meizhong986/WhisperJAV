@@ -253,6 +253,8 @@ class FireRedVadSpeechSegmenter:
         self.max_group_duration_s = (
             float(max_group_duration_s) if max_group_duration_s is not None else 29.0
         )
+        # The shortest group (1.10.1; owner W426 3; ten.group_segments): 0 = off.
+        self.min_group_duration_s = float(kwargs.get("min_group_duration_s") or 0.0)
         self.start_pad_ms = int(start_pad_ms)
         self.end_pad_ms = int(end_pad_ms)
         self.use_gpu = bool(use_gpu)
@@ -401,7 +403,8 @@ class FireRedVadSpeechSegmenter:
                 error=str(e) or type(e).__name__,
             )
 
-        groups = group_segments(segments, self.max_group_duration_s, self.chunk_threshold_s)
+        groups = group_segments(segments, self.max_group_duration_s, self.chunk_threshold_s,
+                                self.min_group_duration_s)
 
         return SegmentationResult(
             segments=segments,
@@ -567,6 +570,7 @@ class FireRedVadSpeechSegmenter:
             "max_speech_duration_s": self.max_speech_duration_s,
             "chunk_threshold_s": self.chunk_threshold_s,
             "max_group_duration_s": self.max_group_duration_s,
+            "min_group_duration_s": self.min_group_duration_s,
             "start_pad_ms": self.start_pad_ms,
             "end_pad_ms": self.end_pad_ms,
             "use_gpu": self.use_gpu,

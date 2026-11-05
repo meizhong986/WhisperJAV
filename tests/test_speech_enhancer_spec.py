@@ -174,4 +174,4 @@ class TestEnhanceForVadIsIgnoredWhereWeSayItIs:
         help_text = " ".join(result.stdout.split())
         assert "fast, faster and transformers ignore it" in help_text
         assert "Accepted but ignored by fast, faster and transformers." in help_text
-        assert "Available with qwen, fidelity, parakeet-crispasr and cohere-crispasr." in help_text
+        assert "Available with qwen, fidelity and the GGUF pipelines." in help_text   # 1.10.1: seven of them

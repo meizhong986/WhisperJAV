@@ -1,123 +1,26 @@
-# Manual Rollback Guide
+# Repair WhisperJAV or go back to an earlier version
 
-If an upgrade fails or causes issues, follow these steps to restore WhisperJAV to a working state.
+This page is for installs made with the Windows installer. The upgrade tool's own rollback (`--rollback`, and the one it tries after a failed upgrade) does not work on these installs in 1.10: it stops with an error. Use the steps below.
 
-## Quick Reference
+## Repair an install that no longer starts
 
-| Scenario | Solution |
-|----------|----------|
-| Upgrade failed mid-way | [Option A: Reinstall specific version](#option-a-reinstall-specific-version) |
-| New version has bugs | [Option A: Reinstall specific version](#option-a-reinstall-specific-version) |
-| Complete corruption | [Option B: Fresh install](#option-b-fresh-install) |
-| Can't run Python at all | [Option B: Fresh install](#option-b-fresh-install) |
+1. Uninstall WhisperJAV: double-click `Uninstall-WhisperJAV.exe` in the install folder (by default `%LOCALAPPDATA%\WhisperJAV`), or open Windows **Settings > Apps**, find **WhisperJAV** and choose **Uninstall**. After an upgrade, the Apps entry still names the version you first installed.
+2. When the uninstaller has finished, download the installer of the newest release from [WhisperJAV Releases](https://github.com/meizhong986/WhisperJAV/releases) and install it. The uninstall leaves the old desktop icon (for example "WhisperJAV v1.10.0"); delete it and start WhisperJAV from the icon the new install makes.
+3. The installer chooses the accelerator as at your first install: a supported NVIDIA GPU is used without a question; otherwise a window asks. To make the install for another accelerator, run the installer again into the same folder afterwards. On an Own PyTorch install, add your PyTorch again with the command it shows at the end.
 
-## Option A: Reinstall Specific Version
+## Go back to an earlier 1.10 release
 
-Use this if Python still works but WhisperJAV is broken.
+1. Uninstall WhisperJAV as above.
+2. Download the installer of the earlier 1.10 release you want from its page under [WhisperJAV Releases](https://github.com/meizhong986/WhisperJAV/releases) (for example v1.10.0) and install it.
 
-### Step 1: Open Command Prompt
+## What stays
 
-1. Press `Win + R`
-2. Type `cmd` and press Enter
+Your settings (`%APPDATA%\WhisperJAV`) and your downloaded models (`%USERPROFILE%\.cache`) are outside the install folder: the uninstall and the new install leave them as they are. The XXL Faster Whisper settings **Executable** and **Extra Args** are the exception: WhisperJAV saves them inside the install folder, so enter them again after a new install.
 
-### Step 2: Navigate to WhisperJAV
+## Do not repair with pip
 
-```cmd
-cd %LOCALAPPDATA%\WhisperJAV
-```
+Do not run `pip install --force-reinstall git+https://github.com/…` or `pip install -U whisperjav`: on Windows, PyPI serves the CPU-only build of PyTorch, so it can replace your GPU build, and the other packages may not be the versions WhisperJAV was tested with.
 
-### Step 3: Reinstall the version you want
+## Getting help
 
-**To reinstall latest stable:**
-```cmd
-python.exe -m pip install --force-reinstall git+https://github.com/meizhong986/whisperjav.git@main
-```
-
-**To install a specific version (e.g., v1.7.3):**
-```cmd
-python.exe -m pip install --force-reinstall git+https://github.com/meizhong986/whisperjav.git@v1.7.3
-```
-
-**Available version tags:**
-- `v1.7.4` - Latest
-- `v1.7.3` - Previous stable
-- `v1.7.2`, `v1.7.1`, `v1.7.0` - Older versions
-
-### Step 4: Verify installation
-
-```cmd
-python.exe -c "from whisperjav import __version__; print(__version__)"
-```
-
-## Option B: Fresh Install
-
-Use this if the Python environment is completely broken.
-
-### Step 1: Uninstall WhisperJAV
-
-1. Open **Settings** → **Apps** → **Apps & features**
-2. Search for "WhisperJAV"
-3. Click **Uninstall**
-
-Or manually delete:
-```cmd
-rmdir /s /q "%LOCALAPPDATA%\WhisperJAV"
-```
-
-### Step 2: Download fresh installer
-
-Go to [WhisperJAV Releases](https://github.com/meizhong986/WhisperJAV/releases) and download the latest `.exe` installer.
-
-### Step 3: Run the installer
-
-The installer will create a fresh environment with all dependencies.
-
-## Preserving Your Data
-
-Your AI models and cache are stored separately and survive reinstallation:
-
-| Data | Location | Preserved? |
-|------|----------|------------|
-| Whisper models | `~/.cache/whisper/` | Yes |
-| HuggingFace models | `~/.cache/huggingface/` | Yes |
-| WhisperJAV config | `%LOCALAPPDATA%\WhisperJAV\whisperjav_config.json` | Deleted on uninstall |
-
-**To preserve config before uninstall:**
-```cmd
-copy "%LOCALAPPDATA%\WhisperJAV\whisperjav_config.json" "%USERPROFILE%\Desktop\"
-```
-
-## Common Issues
-
-### "pip is not recognized"
-
-Your PATH is not set correctly. Use the full path:
-```cmd
-%LOCALAPPDATA%\WhisperJAV\python.exe -m pip install ...
-```
-
-### "Permission denied"
-
-Close all WhisperJAV windows and try again. If still failing:
-1. Open Task Manager (`Ctrl+Shift+Esc`)
-2. End any `python.exe` or `pythonw.exe` processes from WhisperJAV
-3. Try the command again
-
-### "Network error"
-
-Check your internet connection. If behind a proxy:
-```cmd
-set HTTPS_PROXY=http://your-proxy:port
-python.exe -m pip install ...
-```
-
-## Getting Help
-
-If none of the above works:
-
-1. Open an issue at [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues)
-2. Include:
-   - What you were doing when it broke
-   - Error messages (screenshot or copy-paste)
-   - Windows version
-   - Output of: `python.exe --version`
+See [Reporting issues](UPGRADE_TROUBLESHOOTING.md#reporting-issues).

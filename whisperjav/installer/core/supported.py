@@ -30,26 +30,26 @@ MIN_WINDOWS_MAJOR = 10
 NOTHING = "Nothing was installed."
 
 # The owner's form (W232 7). Texts: design 22.10, T62-T66, T69.
-LINUX_GLIBC_TEXT = ("WhisperJAV 1.10.0 does not support this Linux. This is due to its system library glibc "
-                    "{version}: WhisperJAV 1.10.0 needs glibc 2.35 or newer (Ubuntu 22.04, Debian 12, Fedora 36 "
+LINUX_GLIBC_TEXT = ("WhisperJAV 1.10 does not support this Linux. This is due to its system library glibc "
+                    "{version}: WhisperJAV 1.10 needs glibc 2.35 or newer (Ubuntu 22.04, Debian 12, Fedora 36 "
                     "or newer). " + NOTHING)
-LINUX_NO_GLIBC_TEXT = ("WhisperJAV 1.10.0 does not support this Linux. This is due to its system library: it has "
-                       "no glibc, and WhisperJAV 1.10.0 needs glibc 2.35 or newer (Ubuntu 22.04, Debian 12, "
+LINUX_NO_GLIBC_TEXT = ("WhisperJAV 1.10 does not support this Linux. This is due to its system library: it has "
+                       "no glibc, and WhisperJAV 1.10 needs glibc 2.35 or newer (Ubuntu 22.04, Debian 12, "
                        "Fedora 36 or newer). " + NOTHING)
-MACHINE_TEXT = ("WhisperJAV 1.10.0 does not support this computer ({system}, {machine}). This is due to its "
+MACHINE_TEXT = ("WhisperJAV 1.10 does not support this computer ({system}, {machine}). This is due to its "
                 "packages being made for x86-64 and ARM64 processors only. " + NOTHING)
-INTEL_MAC_TEXT = ("WhisperJAV 1.10.0 does not support Intel Macs. This is due to PyTorch 2.11, which WhisperJAV "
-                  "1.10.0 needs, not being made for Intel Macs. " + NOTHING)
-ROSETTA_TEXT = ("WhisperJAV 1.10.0 does not support this Python on an Apple silicon Mac. This is due to the "
-                "Python running under Rosetta (as an Intel program): WhisperJAV 1.10.0 needs an Apple silicon "
+INTEL_MAC_TEXT = ("WhisperJAV 1.10 does not support Intel Macs. This is due to PyTorch 2.11, which WhisperJAV "
+                  "1.10 needs, not being made for Intel Macs. " + NOTHING)
+ROSETTA_TEXT = ("WhisperJAV 1.10 does not support this Python on an Apple silicon Mac. This is due to the "
+                "Python running under Rosetta (as an Intel program): WhisperJAV 1.10 needs an Apple silicon "
                 "(arm64) Python 3.13, for example from Homebrew. " + NOTHING)
-OLD_MACOS_TEXT = ("WhisperJAV 1.10.0 does not support macOS {version}. This is due to ONNX Runtime 1.29, which "
-                  "WhisperJAV 1.10.0 needs: it requires macOS 14 (Sonoma) or newer. " + NOTHING)
-WINDOWS_ARM_TEXT = ("WhisperJAV 1.10.0 does not support Windows on ARM. This is due to its packages being made "
+OLD_MACOS_TEXT = ("WhisperJAV 1.10 does not support macOS {version}. This is due to ONNX Runtime 1.29, which "
+                  "WhisperJAV 1.10 needs: it requires macOS 14 (Sonoma) or newer. " + NOTHING)
+WINDOWS_ARM_TEXT = ("WhisperJAV 1.10 does not support Windows on ARM. This is due to its packages being made "
                     "for x86-64 Windows only. " + NOTHING)
-OLD_WINDOWS_TEXT = ("WhisperJAV 1.10.0 does not support this version of Windows. This is due to Python 3.13, "
-                    "which WhisperJAV 1.10.0 needs: it requires Windows 10 or newer. " + NOTHING)
-NOTEBOOK_TEXT = ("WhisperJAV 1.10.0 does not support Google Colab or Kaggle notebooks. This is due to 1.10.0 "
+OLD_WINDOWS_TEXT = ("WhisperJAV 1.10 does not support this version of Windows. This is due to Python 3.13, "
+                    "which WhisperJAV 1.10 needs: it requires Windows 10 or newer. " + NOTHING)
+NOTEBOOK_TEXT = ("WhisperJAV 1.10 does not support Google Colab or Kaggle notebooks. This is due to 1.10 "
                  "being made and tested for installs on your own computer only. " + NOTHING)
 
 

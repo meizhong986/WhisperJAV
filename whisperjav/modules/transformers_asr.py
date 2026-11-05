@@ -22,7 +22,7 @@ import time
 
 import torch
 
-from whisperjav.utils.logger import logger
+from whisperjav.utils.logger import hide_weight_loading_bar, logger
 
 # Suppress specific transformers warnings that are informational only
 warnings.filterwarnings("ignore", message=".*chunk_length_s.*is very experimental.*")
@@ -162,6 +162,8 @@ class TransformersASR:
 
         import os
         from transformers import pipeline
+
+        hide_weight_loading_bar()   # owner W509, console item 3: the "Loading weights" bar only with --debug
 
         # Detect device and dtype
         self._device = self._detect_device()

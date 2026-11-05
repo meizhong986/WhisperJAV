@@ -1,4 +1,4 @@
-# WhisperJAV 1.10.0 — Windows Installation from Source (Python)
+# WhisperJAV 1.10.1 — Windows Installation from Source (Python)
 
 This guide installs WhisperJAV from its source code into a Python environment you manage. If you just want it to work, use the [Windows Installer](installation_windows_standalone.md) instead.
 
@@ -47,7 +47,7 @@ Users in China: the installer downloads from GitHub, PyPI, download.pytorch.org 
 ## 2. Get the source code
 
 ```cmd
-git clone --branch v1.10.0 https://github.com/meizhong986/WhisperJAV.git
+git clone --branch v1.10.1 https://github.com/meizhong986/WhisperJAV.git
 cd WhisperJAV
 ```
 
@@ -159,7 +159,7 @@ Do not update with a plain `pip install -U whisperjav…`: on Windows, PyPI serv
 
 ## 8. Troubleshooting
 
-**"WhisperJAV 1.10.0 does not support …".** The computer is outside the [supported list](../getting-started/index.md#supported-computers); the message says why. Nothing was installed.
+**"WhisperJAV 1.10 does not support …".** The computer is outside the [supported list](../getting-started/index.md#supported-computers); the message says why. Nothing was installed.
 
 **The installer refuses your Python.** WhisperJAV 1.10.0 needs Python 3.13. Make a 3.13 environment (section 3).
 

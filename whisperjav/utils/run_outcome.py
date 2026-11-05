@@ -19,7 +19,8 @@ The vocabulary
 ``failed``   an error: an exception, a crash, a requested step (translation)
              that raised, or a subtitle file the pipeline reported writing that
              does not exist
-``skipped``  nothing was attempted: the output already existed
+``skipped``  nothing was attempted: the output already existed, or an earlier file's ASR model could not be
+             used and the run stopped ("not started: ...", owner W491 2, W501)
 
 Mileage is reported alongside the state as ``ok``, ``low`` or
 ``not assessed`` (unknown duration, media shorter than the assessable minimum,

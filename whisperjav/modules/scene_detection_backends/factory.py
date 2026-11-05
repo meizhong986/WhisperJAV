@@ -26,6 +26,8 @@ _BACKEND_REGISTRY: Dict[str, str] = {
     "silero": "whisperjav.modules.scene_detection_backends.silero_backend.SileroSceneDetector",
     "semantic": "whisperjav.modules.scene_detection_backends.semantic_backend.SemanticSceneDetector",
     "none": "whisperjav.modules.scene_detection_backends.none_backend.NullSceneDetector",
+    # R-SCN (owner W448-W452; docs/plans/design/2026-11-02-rscn-design.md): cuts where the sound changes.
+    "rscn": "whisperjav.modules.scene_detection_backends.rscn.backend.RSCNSceneDetector",
 }
 
 # Cache for loaded backend classes (avoid repeated imports)
@@ -51,6 +53,11 @@ _BACKEND_DEPENDENCIES: Dict[str, Dict[str, Any]] = {
     "none": {
         "packages": [],
         "install_hint": "",
+        "always_available": True,
+    },
+    "rscn": {
+        "packages": ["numpy", "scipy"],
+        "install_hint": "numpy and scipy are already required by WhisperJAV",
         "always_available": True,
     },
 }
@@ -123,6 +130,7 @@ class SceneDetectorFactory:
             "silero": "Silero VAD (Two-Pass)",
             "semantic": "Semantic Audio Clustering",
             "none": "None (Skip Detection)",
+            "rscn": "R-SCN (changes in the sound, picture breaks)",
         }
 
         backends = []

@@ -36,7 +36,7 @@ LLAMA_CPP_VERSION="0.3.21"
 case "$WHISPERJAV_BRANCH" in
     v1.[0-9].*|1.[0-9].*) ;;
     *)
-        echo "WhisperJAV 1.10.0 does not support Google Colab or Kaggle notebooks. This is due to 1.10.0 being made and tested for installs on your own computer only. Nothing was installed."
+        echo "WhisperJAV 1.10 does not support Google Colab or Kaggle notebooks. This is due to 1.10 being made and tested for installs on your own computer only. Nothing was installed."
         exit 1
         ;;
 esac

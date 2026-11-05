@@ -41,6 +41,7 @@ SEGMENTER_PARAMS = {
     # Grouping (shared across backends)
     "chunk_threshold_s",
     "max_group_duration_s",
+    "min_group_duration_s",    # 1.10.1 (owner W426 3): the shortest group; silero-v6.2, ten, firered-vad, whisperseg
     # TEN-specific
     "hop_size",
     "start_pad_ms",
@@ -102,10 +103,19 @@ FIDELITY_DEFAULT_SEGMENTER = "firered-vad"
 
 # The CrispASR pipelines' speech segmenter when a pass names none (1.10.0; owner W202 3, W343, W344):
 # Parakeet-CrispASR TEN VAD (WhisperSeg until W344), Cohere-CrispASR FireRedVAD. They transcribe the VAD
-# groups the speech segmenter finds, so they have no "none" (main.py refuses it: whisperjav/crispasr/pass_settings.py).
+# groups the speech segmenter finds; "none" (owner W457, W458) sends each scene to the model whole instead.
+# 1.10.1 (W401, pre-approved choices of step 2): each new pipeline takes the values of the pipeline whose segmenter
+# settings it takes (crispasr/pass_settings.py SEGMENTER_STYLE): ReazonSpeech Parakeet's, the others Cohere's.
+# MOSS-CrispASR (owner W482): FireRedVAD; its VAD groups end at a silence longer than 5 s and are at most 240 s
+# (crispasr/pass_settings.py MOSS_*). Before W482: Silero VAD v6.2 (W425, W426 1).
 CRISPASR_DEFAULT_SEGMENTERS = {
     "parakeet-crispasr": "ten",
     "cohere-crispasr": "firered-vad",
+    "reazonspeech-crispasr": "ten",
+    "kotoba-crispasr": "firered-vad",
+    "whisper-turbo-crispasr": "firered-vad",
+    "whisper-large-crispasr": "firered-vad",
+    "moss-crispasr": "firered-vad",
 }
 # Their sensitivity when a pass names none (owner W343, W344): Parakeet-CrispASR aggressive, Cohere-CrispASR
 # balanced. Applied by main.py apply_ensemble_pass_defaults; the GUI Ensemble tab applies the same values
@@ -113,6 +123,11 @@ CRISPASR_DEFAULT_SEGMENTERS = {
 CRISPASR_DEFAULT_SENSITIVITY = {
     "parakeet-crispasr": "aggressive",
     "cohere-crispasr": "balanced",
+    "reazonspeech-crispasr": "aggressive",
+    "kotoba-crispasr": "balanced",
+    "whisper-turbo-crispasr": "balanced",
+    "whisper-large-crispasr": "balanced",
+    "moss-crispasr": "balanced",
 }
 
 # Owner, 2026-10-12 (v1.9.5): the Ensemble defaults are pass 1 Qwen3-ASR with
@@ -123,8 +138,12 @@ CRISPASR_DEFAULT_SENSITIVITY = {
 # (main.py apply_ensemble_pass_defaults); no pipeline default changes. The GUI
 # Ensemble tab applies the same values when the pipeline is picked (assets/app.js
 # applyPipelinePresets and the EnsembleManager start-up state). Keep them in step.
+# 1.10.1 (owner W509, the W505 note section 4 item 7: "TEN VAD for both"): pass 2 Qwen3-ASR runs TEN VAD at
+# balanced on the command line too, as the GUI Ensemble tab has started it since v1.9.0 (before: WhisperSeg,
+# pass_worker.py DEFAULT_QWEN_PARAMS). Keyed by generator, so the dormant Cohere-in-ChronosJAV pass is not reached.
 ENSEMBLE_PASS_DEFAULTS = {
     ("1", "qwen3"): {"speech_segmenter": "firered-vad", "sensitivity": "aggressive"},
+    ("2", "qwen3"): {"speech_segmenter": "ten", "sensitivity": "balanced"},
     ("2", "anime-whisper"): {"speech_segmenter": "ten", "sensitivity": "aggressive"},
 }
 # Every other pass keeps the sensitivity it had before v1.9.5.

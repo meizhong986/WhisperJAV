@@ -84,7 +84,7 @@ def test_every_locked_file_holds_one_crispasr_line_per_platform():
                  if l.startswith("crispasr")]
         assert len(lines) == len(expected[extra]), (extra, lines)
     vulkan = (locked / "requirements_vulkan.txt").read_text(encoding="utf-8")
-    assert "crispasr-0.8.44%2Bvulkan-py3-none-win_amd64.whl" in vulkan and "+cpu" not in vulkan.split("torch==")[0]
+    assert "crispasr-0.8.50%2Bvulkan-py3-none-win_amd64.whl" in vulkan and "+cpu" not in vulkan.split("torch==")[0]
 
 
 # --- the supported-computers check -------------------------------------------------
@@ -96,16 +96,16 @@ def _refusal(**kw):
 
 
 @pytest.mark.parametrize("kw,text_start", [
-    (dict(system="linux", machine="x86_64", glibc="2.31"), "WhisperJAV 1.10.0 does not support this Linux. This is due to its system library glibc 2.31"),
-    (dict(system="linux", machine="x86_64", glibc="2.34"), "WhisperJAV 1.10.0 does not support this Linux. This is due to its system library glibc 2.34"),
-    (dict(system="linux", machine="aarch64", glibc=""), "WhisperJAV 1.10.0 does not support this Linux. This is due to its system library: it has no glibc"),
-    (dict(system="linux", machine="armv7l", glibc="2.39"), "WhisperJAV 1.10.0 does not support this computer (Linux, armv7l)"),
-    (dict(system="darwin", machine="x86_64"), "WhisperJAV 1.10.0 does not support Intel Macs."),
-    (dict(system="darwin", machine="x86_64", rosetta=True), "WhisperJAV 1.10.0 does not support this Python on an Apple silicon Mac."),
-    (dict(system="darwin", machine="arm64", mac_version="13.6.1"), "WhisperJAV 1.10.0 does not support macOS 13.6.1."),
-    (dict(system="win32", machine="AMD64", windows_major=10, windows_arm=True), "WhisperJAV 1.10.0 does not support Windows on ARM."),
-    (dict(system="win32", machine="AMD64", windows_major=6), "WhisperJAV 1.10.0 does not support this version of Windows."),
-    (dict(system="linux", machine="x86_64", glibc="2.39", notebook=True), "WhisperJAV 1.10.0 does not support Google Colab or Kaggle notebooks."),
+    (dict(system="linux", machine="x86_64", glibc="2.31"), "WhisperJAV 1.10 does not support this Linux. This is due to its system library glibc 2.31"),
+    (dict(system="linux", machine="x86_64", glibc="2.34"), "WhisperJAV 1.10 does not support this Linux. This is due to its system library glibc 2.34"),
+    (dict(system="linux", machine="aarch64", glibc=""), "WhisperJAV 1.10 does not support this Linux. This is due to its system library: it has no glibc"),
+    (dict(system="linux", machine="armv7l", glibc="2.39"), "WhisperJAV 1.10 does not support this computer (Linux, armv7l)"),
+    (dict(system="darwin", machine="x86_64"), "WhisperJAV 1.10 does not support Intel Macs."),
+    (dict(system="darwin", machine="x86_64", rosetta=True), "WhisperJAV 1.10 does not support this Python on an Apple silicon Mac."),
+    (dict(system="darwin", machine="arm64", mac_version="13.6.1"), "WhisperJAV 1.10 does not support macOS 13.6.1."),
+    (dict(system="win32", machine="AMD64", windows_major=10, windows_arm=True), "WhisperJAV 1.10 does not support Windows on ARM."),
+    (dict(system="win32", machine="AMD64", windows_major=6), "WhisperJAV 1.10 does not support this version of Windows."),
+    (dict(system="linux", machine="x86_64", glibc="2.39", notebook=True), "WhisperJAV 1.10 does not support Google Colab or Kaggle notebooks."),
 ])
 def test_refused_computers_in_the_owners_form(kw, text_start):
     text = _refusal(**kw)

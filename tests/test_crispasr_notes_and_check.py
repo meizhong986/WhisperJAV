@@ -583,7 +583,7 @@ class TestMainMakesCrispASRReadyAtStartUp:
         return _printed(_probe(STARTUP_PROBE, tmp_path_factory.mktemp("startup")).stdout, "RESULT")
 
     def test_the_crispasr_pass_is_made_ready_after_its_segmenter_is_checked(self, result):
-        assert result["order"][:3] == [["segmenter package", "whisperseg"], ["segmenter model", "whisperseg"],
+        assert result["order"][:3] == [["segmenter package", "ten"], ["segmenter model", "ten"],
                                        ["crispasr", [[1, "parakeet-crispasr", None]]]]
 
     def test_a_failure_there_stops_the_run_before_media_discovery(self, result):

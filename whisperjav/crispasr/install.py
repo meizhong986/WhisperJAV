@@ -79,7 +79,7 @@ DEVICE_LINE_NVIDIA = "{label} asks CrispASR to use the NVIDIA GPU (CUDA) (CrispA
 DEVICE_LINE_METAL = ("{label} asks CrispASR to use the Apple GPU (Metal) (CrispASR {version}); "
                      "not yet tested on a Mac.")
 DEVICE_LINE_VULKAN = ("{label} asks CrispASR's Vulkan build to use this PC's GPU (CrispASR {version}). "
-                      "GPUs through Vulkan are experimental in 1.10.0 and have not been tested on AMD or Intel "
+                      "GPUs through Vulkan are experimental and have not been tested on AMD or Intel "
                       "graphics cards.")
 DEVICE_LINE_CPU = "{label} runs on the CPU (not accelerated), several times slower than on a GPU: {reason}."
 REASON_NO_NVIDIA = "no NVIDIA GPU was found"

@@ -11,7 +11,7 @@ WhisperJAV 1.10.0 可在 Windows、Linux 和 Apple silicon Mac 上运行。请�
 | 使用 Apple silicon Mac（M1 或更新） | [macOS 指南](../guides/installation_mac_apple_silicon.md) |
 | 使用 Linux | [Linux 指南](../guides/installation_linux.md) |
 
-**从 1.9.x 升级？** 请全新安装 1.10.0。1.10.0 需要 Python 3.13，因此 `whisperjav-upgrade` 无法把 1.9.x 安装升级到 1.10.0。用户设置文件夹中的设置会保留。
+**从 1.9.x 升级？** 请全新安装最新的 1.10 版本。1.10 需要 Python 3.13，因此 `whisperjav-upgrade` 无法把 1.9.x 安装升级到 1.10。用户设置文件夹中的设置会保留。
 
 **Google Colab 和 Kaggle** 不受 1.10.0 支持：1.10.0 只为在你自己的电脑上安装而制作和测试。Colab 专家版 notebook 继续安装 1.9.5。
 
@@ -21,7 +21,7 @@ GPU——显卡，或 Apple 芯片内置的 GPU——承担把语音转成文字
 
 每种电脑得到的安装：
 
-| 你的电脑 | 安装为哪种加速器制作 | GGUF 处理管线（Parakeet-CrispASR、Cohere-CrispASR） | 其他所有处理管线 |
+| 你的电脑 | 安装为哪种加速器制作 | GGUF 处理管线（由 CrispASR 运行的七个） | 其他所有处理管线 |
 |---|---|---|---|
 | Windows 电脑，带 1.10 支持的 NVIDIA GPU（GTX 16 / RTX 20 或更新），驱动 580 或更新 | NVIDIA GPU（CUDA），自动选择 | NVIDIA GPU（CUDA） | NVIDIA GPU（CUDA） |
 | Windows 电脑，带 AMD 或 Intel 显卡，或比 1.10 支持范围更旧的 NVIDIA 显卡 | 通过 Vulkan 使用 GPU、你自己的 PyTorch 或仅 CPU——安装程序会询问 | 通过 Vulkan：使用你的显卡（实验性，未经测试） | CPU（不加速），慢好几倍 |
@@ -37,7 +37,7 @@ WhisperSeg 语音分割器在所有安装中都在 CPU 上运行。
 
 **某一次运行改用 CPU：** 在那次运行中加上 `--device cpu`。在 GUI 中，专家模式中每一轮的 Customize 窗口有一个 Device 菜单；选 "CPU (not accelerated)" 会让这一轮使用 CPU（GGUF 处理管线不提供此项）。当 NVIDIA GPU 安装的 GPU 无法使用时，GUI 会提供 "Run on the CPU this time"（这次在 CPU 上运行）。
 
-**WhisperJAV 1.10.0 中的 Intel GPU：** 在 Windows 上，GGUF 处理管线（Parakeet-CrispASR 和 Cohere-CrispASR）可以通过 Vulkan 使用 Intel GPU——实验性，未经测试。WhisperJAV 1.10.0 不通过 PyTorch（Intel 的 XPU 版本）使用 Intel GPU：使用这种 PyTorch 时，其他处理管线在 CPU 上运行。通过 PyTorch 支持 Intel GPU 计划在 1.10.1 中研究。
+**WhisperJAV 1.10.0 中的 Intel GPU：** 在 Windows 上，GGUF 处理管线可以通过 Vulkan 使用 Intel GPU——实验性，未经测试。WhisperJAV 1.10.0 不通过 PyTorch（Intel 的 XPU 版本）使用 Intel GPU：使用这种 PyTorch 时，其他处理管线在 CPU 上运行。通过 PyTorch 支持 Intel GPU 计划在 1.10.1 中研究。
 
 **实验性：** 在 WhisperJAV 1.10.0 中，Windows 上通过 Vulkan 使用 GPU，以及你自己的 PyTorch，都属于实验性功能：我们已尽一切努力让它们可用，但无法在 AMD 或 Intel 显卡上测试。请告诉我们它们在你的电脑上表现如何：https://github.com/meizhong986/WhisperJAV/issues
 
@@ -54,7 +54,7 @@ WhisperSeg 语音分割器在所有安装中都在 CPU 上运行。
 | Python（源码安装） | 3.13 | 其他版本 |
 | 托管 notebook | — | Google Colab、Kaggle |
 
-GGUF 处理管线（Parakeet-CrispASR、Cohere-CrispASR）需要支持 AVX2 的处理器（Intel 2013 年以后、AMD 2015 年以后）；其他所有处理管线不需要。
+GGUF 处理管线（全部七个）需要支持 AVX2 的处理器（Intel 2013 年以后、AMD 2015 年以后）；其他所有处理管线不需要。
 
 其他要求：8 GB 内存（推荐 16 GB）；约 10 GB 可用磁盘空间，用于安装和首次使用时下载的模型；FFmpeg（Windows 安装程序已附带）；安装时以及每个模型首次运行时需要联网。
 

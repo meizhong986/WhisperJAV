@@ -23,11 +23,17 @@ per-model table (ENGINE); everything else is here (route B design, sections 3-4)
      (whisperjav/crispasr/lines.py): Parakeet cut only at natural cues (W203, W204); Cohere's aligned
      groups at sentence-end marks only, with chained ends (W259), a group the aligner gives nothing for
      one subtitle;
-  7. scene SRTs, stitched; the three filters (nonverbal, nonlinguistic, scene overlap; W129 6);
+  7. scene SRTs, stitched; post-processing by the row's clean-up (whisperjav/crispasr/cleanup.py, 1.10.1; owner
+     W421 i1, W422): a raw copy, fidelity's duplicate merge, hallucination filter and repetition cleaner, then the
+     three filters (nonverbal, nonlinguistic, scene overlap; W129 6), and fidelity's artifacts file; MOSS-CrispASR
+     the duplicate merge, the three filters and its interjection rules (W505 2 b-d; before it the three filters
+     only, W421 i3). Cohere-CrispASR's text is cleaned before the aligner (ChronosJAV's text cleaner);
      <name>.ja.whisperjav.srt.
 
 Times: Parakeet's token times (W93 c5, W116); Cohere's from the aligner's character times, or the VAD group
 edges where there are none (design note docs/plans/design/2026-10-28-chronosjav-timing-c3-c1.md, section 6).
+Since 1.10.1 --passN-word-timestamps {model,aligner} switches the aligner on or off for one pass (owner W411-W414;
+CrispASRPipeline.engine_row); the default is each pipeline's own (manifest.word_timestamps_for).
 """
 
 import dataclasses
@@ -40,12 +46,15 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from whisperjav.crispasr import install, lines
+from whisperjav.crispasr import cleanup as crispasr_cleanup
+from whisperjav.crispasr import install, lines, manifest
 from whisperjav.crispasr.aligner import CrispAligner
-from whisperjav.crispasr.engine import SAMPLE_RATE, BindingEngine, CrispSegment, CrispToken
+from whisperjav.crispasr.engine import MIN_NEW_TOKENS, SAMPLE_RATE, BindingEngine, CrispSegment, CrispToken
 from whisperjav.crispasr.errors import CrispASRRunError, CrispASRSetupError
 from whisperjav.crispasr.manifest import JAPANESE_NAMES, ModelFile, model_for
-from whisperjav.crispasr.pass_settings import SegmenterSettings, segmenter_settings
+from whisperjav.modules.model_audio import MIN_MODEL_AUDIO_S
+from whisperjav.crispasr.pass_settings import (NO_SEGMENTER, SegmenterSettings, scene_detector_for, scene_max_s_for,
+                                               scene_min_s_for, segmenter_settings)
 from whisperjav.pipelines.base_pipeline import BasePipeline
 from whisperjav.utils.logger import logger
 
@@ -53,13 +62,30 @@ from whisperjav.utils.logger import logger
 @dataclass(frozen=True)
 class EngineRow:
     """A pipeline's row of the per-model table (route B design 6)."""
-    line_rule: str          # lines.LINE_RULES: "tokens" (Parakeet, P2) or "group" (Cohere, C1)
+    line_rule: str          # lines.LINE_RULES: "tokens" (Parakeet, P2), "group" (Cohere, C1), "segments" (MOSS)
     audio_analytics: bool   # both pipelines today (Cohere W202 5b, Parakeet W211 C2)
     # The CrispASR aligner that times the model's text after the ASR step (manifest.ALIGNER_MODELS short name),
     # or None. Cohere-CrispASR: wav2vec2-ja (owner W248 3, W249; design note 2026-10-28, section 6); an aligned
     # group's subtitles are cut by the "tokens" rule for onset times (sentence-end marks only, chained ends;
     # W259), a group the aligner gives nothing for keeps ``line_rule``.
     aligner: Optional[str] = None
+    # The model's own token times are starts only (no end times): the "tokens" rule then cuts at sentence-end
+    # marks only and ends each subtitle where the next starts, the last at the VAD group's end (lines.tokens_rule
+    # onsets=True, end_at_group=True). ReazonSpeech-CrispASR (owner W412: native starts with VAD ends).
+    onsets: bool = False
+    # False: the "tokens" rule cuts at sentence-end marks only, not at pauses (Kotoba, Whisper-Turbo, Whisper-Large
+    # keep W401's cutting with their own times, W412). Parakeet-CrispASR cuts at pauses too (W203, W204).
+    cut_at_pauses: bool = True
+    # A limit on the tokens one call may write, per second of the VAD group's audio counting at most the piece
+    # CrispASR decodes at a time (30 s; engine.BindingEngine.token_limit), and the fewest it may write; None for the
+    # model's own limit. MOSS-CrispASR only (owner W406 i1; W505 2 a: 20 a second, at least 128): without it the
+    # model can repeat a line to its own limit on non-speech.
+    tokens_per_second: Optional[float] = None
+    token_floor: int = MIN_NEW_TOKENS
+    # Post-processing (1.10.1; owner W421 i1, W422; whisperjav/crispasr/cleanup.py): the stages on the stitched
+    # subtitles, and the stages on each VAD group's text before the aligner (run only while the aligner is on).
+    cleanup: Tuple[str, ...] = crispasr_cleanup.SRT_STAGES
+    text_cleanup: Tuple[str, ...] = ()
 
 
 @dataclass
@@ -83,13 +109,34 @@ class CrispASRPipeline(BasePipeline):
     PIPELINE_NAME = ""
     LABEL = ""
     ENGINE: EngineRow = EngineRow("group", False)
+    # The row with --passN-word-timestamps model, for a pipeline whose ENGINE has an aligner; None means ENGINE
+    # without the aligner. Cohere-CrispASR sets its own: its token times, cut at sentence-end marks only (owner
+    # W413, W414).
+    ENGINE_WITHOUT_ALIGNER: Optional[EngineRow] = None
 
-    # ChronosJAV's semantic scenes (qwen_pipeline.py, safe chunking; W202 5d). auditok and silero keep
-    # their own minimum, with the same maximum: a 12 s minimum makes them drop a stretch of speech
-    # shorter than 12 s between long silences (design 22.9.1; owner W232 14).
-    SCENE_MIN_S = 12
-    SCENE_MAX_S = 48
-    SCENE_DETECTOR = "semantic"  # the default (owner W214 2)
+    @classmethod
+    def engine_row(cls, word_timestamps: Optional[str] = None) -> EngineRow:
+        """This pipeline's row for --passN-word-timestamps (None: the pipeline's default, ENGINE).
+
+        "aligner" on a pipeline without one adds the default aligner: a group the aligner times is cut as
+        Cohere-CrispASR's aligned groups are; a group it gives nothing for keeps the pipeline's own rule.
+        "model" on a pipeline with an aligner gives ENGINE_WITHOUT_ALIGNER.
+        """
+        choice = manifest.word_timestamps_for(cls.PIPELINE_NAME, word_timestamps)
+        row = cls.ENGINE
+        if choice == "aligner":
+            return row if row.aligner else dataclasses.replace(row, aligner=manifest.DEFAULT_ALIGNER)
+        if not row.aligner:
+            return row
+        return cls.ENGINE_WITHOUT_ALIGNER or dataclasses.replace(row, aligner=None)
+
+    # The scenes (pass_settings.scene_detector_for, scene_min_s_for, scene_max_s_for): semantic with ChronosJAV's 12 s
+    # minimum (qwen_pipeline.py, safe chunking; W202 5d) and a 48 s maximum; MOSS-CrispASR semantic with 90-240 s
+    # (owner W482). auditok and silero keep their own minimum, with the same maximum: a 12 s minimum makes them drop a
+    # stretch of speech shorter than 12 s between long silences (design 22.9.1; owner W232 14).
+    # The model's own settings from the pass's Customize values (--passN-params), or None: a class with
+    # from_params(params), prompt() and fixed_token_limit() (MOSS-CrispASR: crispasr/moss_prompt.MossSettings).
+    MODEL_SETTINGS = None
     # T55 (design 22.10).
     ANALYTICS_NEED_SEMANTIC = ("{label}: audio analytics need the semantic scene detector; this pass uses "
                                "{method}, so they are not made.")
@@ -116,12 +163,14 @@ class CrispASRPipeline(BasePipeline):
                  enhance_for_vad: bool = False,
                  scene_params: Optional[Dict[str, Any]] = None,
                  segmenter_overrides: Optional[Dict[str, Any]] = None,
+                 word_timestamps: Optional[str] = None,
+                 model_params: Optional[Dict[str, Any]] = None,
                  **kwargs):
         """
         Args:
             model_name: a short name from the manifest; None means this pipeline's default.
-            speech_segmenter: the speech segmenter; None means this pipeline's default. "none" is
-                refused: the pipeline transcribes the VAD groups the segmenter finds.
+            speech_segmenter: the speech segmenter; None means this pipeline's default. "none" (owner W457,
+                W458): no speech detection; each scene goes to the model whole, as one VAD group.
             language: the source language; Japanese only.
             subs_language: "direct-to-english" still writes Japanese, with one console line.
             sensitivity: the pass's sensitivity; None means the pipeline's own, aggressive for Parakeet and
@@ -130,11 +179,17 @@ class CrispASRPipeline(BasePipeline):
             vad_threshold, speech_pad_ms: --passN-vad-threshold and --passN-speech-pad-ms (W208), applied
                 as fidelity or the qwen pipeline applies them (pass_settings.segmenter_settings).
             cues: the pause values of the "tokens" line rule (W208); None means lines.DEFAULT_CUES.
-            scene_detector: auditok, silero, semantic or none; None means semantic (design 22.9.1, W214 2).
+            scene_detector: auditok, silero, semantic or none; None means the pipeline's own: semantic (design
+                22.9.1, W214 2; MOSS-CrispASR too since W482, before it silero, W426 4).
             speech_enhancer, speech_enhancer_model: the pass's speech enhancer; None or "none" means none.
             enhance_for_vad: the enhanced audio goes to the speech segmenter only, the original to
                 CrispASR (W232 8), as the qwen pipeline's dual track.
             scene_params, segmenter_overrides: the pass's Customize values (Scene and Segmenter tabs).
+            word_timestamps: --passN-word-timestamps, "model" or "aligner"; None means the pipeline's default
+                (manifest.word_timestamps_for; owner W411-W414). Picks the pass's row (engine_row).
+            model_params: the pass's Customize values for the model (MODEL_SETTINGS; MOSS-CrispASR's MOSS tab,
+                owner W428 I1 4); ignored by a pipeline without MODEL_SETTINGS. A value that cannot be used raises
+                ValueError, naming the key.
             **kwargs: pass settings this pipeline does not use arrive here and are not used.
         """
         super().__init__(output_dir=output_dir, temp_dir=temp_dir, keep_temp_files=keep_temp_files,
@@ -150,8 +205,9 @@ class CrispASRPipeline(BasePipeline):
             logger.warning(f"{self.LABEL} cannot translate: it writes Japanese subtitles. Translate them "
                            f"afterwards with --translate or whisperjav-translate.")
         self.model: ModelFile = model_for(self.PIPELINE_NAME, model_name)
-        if speech_segmenter is not None and str(speech_segmenter).strip().lower() == "none":
-            raise ValueError(f"{self.LABEL} needs a speech segmenter: it transcribes the VAD groups it finds.")
+        # The pass's row: ENGINE, or with the aligner switched on or off by --passN-word-timestamps.
+        self.word_timestamps: str = manifest.word_timestamps_for(self.PIPELINE_NAME, word_timestamps)
+        self.engine: EngineRow = self.engine_row(self.word_timestamps)
         self.segmenter: SegmenterSettings = segmenter_settings(self.PIPELINE_NAME, speech_segmenter, sensitivity,
                                                                vad_threshold=vad_threshold,
                                                                speech_pad_ms=speech_pad_ms)
@@ -164,7 +220,11 @@ class CrispASRPipeline(BasePipeline):
                 chunk_threshold_s=overrides.pop("chunk_threshold_s", self.segmenter.chunk_threshold_s),
                 config={**self.segmenter.config, **overrides})
         self.speech_segmenter = self.segmenter.backend
-        self.scene_detector = str(scene_detector or self.SCENE_DETECTOR).strip().lower()
+        self.model_settings = (self.MODEL_SETTINGS.from_params(model_params)
+                               if self.MODEL_SETTINGS is not None else None)
+        self.scene_detector = str(scene_detector or scene_detector_for(self.PIPELINE_NAME)).strip().lower()
+        self.scene_min_s = scene_min_s_for(self.PIPELINE_NAME)
+        self.scene_max_s = scene_max_s_for(self.PIPELINE_NAME)
         self.scene_params: Dict[str, Any] = dict(scene_params or {})
         self.enhancer_backend = str(speech_enhancer or "none").strip().lower()
         self.enhancer_model = speech_enhancer_model
@@ -183,9 +243,22 @@ class CrispASRPipeline(BasePipeline):
         self._device_line_shown = False
         self.degradations: List[str] = []
         self.notes: List[str] = []
+        # Post-processing (cleanup.py): built once per pass; the text cleaner's changes are kept per file.
+        self._srt_cleanup = crispasr_cleanup.SrtCleanup(self.engine.cleanup, label=self.LABEL)
+        self._text_cleaner: Optional[crispasr_cleanup.TextCleaner] = None
+        self._text_changes: List[crispasr_cleanup.TextChange] = []
+        self._model_texts: Dict[int, str] = {}
+        # Where the raw copy and the artifacts file go, and the pass in their names: set per file by the Ensemble
+        # pass worker (the raw_subs folder beside the pass's subtitle file); None = <output_dir>/raw_subs, no pass.
+        self.raw_subs_dir: Optional[str] = None
+        self.pass_tag: Optional[str] = None
 
-        logger.info(f"{self.LABEL} ready: model {self.model.label}, speech segmenter {self.speech_segmenter} "
-                    f"({self.sensitivity}), VAD groups of at most {self.segmenter.max_group_duration_s:g} s")
+        if self.speech_segmenter == NO_SEGMENTER:
+            logger.info(f"{self.LABEL} ready: model {self.model.label}, no speech segmenter: each scene goes to "
+                        f"the model whole")
+        else:
+            logger.info(f"{self.LABEL} ready: model {self.model.label}, speech segmenter {self.speech_segmenter} "
+                        f"({self.sensitivity}), VAD groups of at most {self.segmenter.max_group_duration_s:g} s")
 
     def get_mode_name(self) -> str:
         return self.PIPELINE_NAME
@@ -199,6 +272,8 @@ class CrispASRPipeline(BasePipeline):
         # The worker reuses one pipeline object for every file of the pass.
         self.degradations = []
         self.notes = []
+        self._text_changes = []
+        self._model_texts = {}
         input_file = Path(media_info["path"])
         basename = media_info["basename"]
         md = self._new_metadata(input_file, basename)
@@ -233,8 +308,12 @@ class CrispASRPipeline(BasePipeline):
         speech_s = sum(g.end - g.start for g in groups)
         md["stages"]["groups"] = {"count": len(groups), "seconds": round(speech_s, 2),
                                   "failed_scenes": failed_scenes}
-        logger.info(f"{self.LABEL}: {len(groups)} VAD groups over {len(scenes)} scenes, "
-                    f"{speech_s:.0f} s of speech in {duration:.0f} s")
+        if self.speech_segmenter == NO_SEGMENTER:
+            logger.info(f"{self.LABEL}: no speech segmenter: {len(groups)} of {len(scenes)} scenes go to the model "
+                        f"whole, {speech_s:.0f} s of audio in {duration:.0f} s")
+        else:
+            logger.info(f"{self.LABEL}: {len(groups)} VAD groups over {len(scenes)} scenes, "
+                        f"{speech_s:.0f} s of speech in {duration:.0f} s")
 
         self.progress.set_current_step("Transcribing with CrispASR", 5, 6)
         results: List[Tuple[_Group, List[CrispSegment]]] = []
@@ -242,7 +321,9 @@ class CrispASRPipeline(BasePipeline):
         try:
             if groups:
                 results = self._transcribe(scenes, groups, md)
-                if self.ENGINE.aligner:
+                if self.engine.aligner and self.engine.text_cleanup:
+                    self._clean_texts(scenes, results, md)
+                if self.engine.aligner:
                     aligned = self._align(scenes, results, md)
             else:
                 logger.info(f"{self.LABEL}: no speech was found in {basename}")
@@ -260,7 +341,7 @@ class CrispASRPipeline(BasePipeline):
         stitched, count_raw = self._build_subtitles(scenes, results, basename, md, aligned)
         if self.save_metadata_json:
             self._write_group_record(basename, scenes, results, aligned)
-        stats, count = self._postprocess(stitched, count_raw)
+        stats, count = self._postprocess(stitched, count_raw, basename)
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
         final_srt = self.output_dir / f"{basename}.{self.lang_code}.whisperjav.srt"
@@ -276,7 +357,8 @@ class CrispASRPipeline(BasePipeline):
         md["summary"] = {
             "final_subtitles_refined": count,
             "final_subtitles_raw": count_raw,
-            "quality_metrics": {"hallucinations_removed": 0, "repetitions_removed": 0,
+            "quality_metrics": {"hallucinations_removed": stats.get("hallucinations_removed", 0),
+                                "repetitions_removed": stats.get("repetitions_removed", 0),
                                 "duration_adjustments": stats.get("overlap_shifted", 0),
                                 "empty_removed": stats.get("empty_removed", 0), "cps_filtered": 0,
                                 "logprob_filtered": 0, "nonverbal_filtered": stats.get("nonverbal_dropped", 0)},
@@ -302,9 +384,15 @@ class CrispASRPipeline(BasePipeline):
             "pipeline": self.PIPELINE_NAME,
             "config": {"crispasr": {"model": self.model.name, "repo": self.model.repo_id,
                                     "revision": self.model.revision, "backend": self.model.backend,
-                                    "line_rule": self.ENGINE.line_rule, "aligner": self.ENGINE.aligner,
-                                    "cues": self.cues.as_dict() if self.ENGINE.line_rule == "tokens" else None,
+                                    "word_timestamps": self.word_timestamps,
+                                    "line_rule": self.engine.line_rule, "aligner": self.engine.aligner,
+                                    "onsets": self.engine.onsets, "cut_at_pauses": self.engine.cut_at_pauses,
+                                    "cleanup": list(self.engine.cleanup),
+                                    "text_cleanup": list(self.engine.text_cleanup) if self.engine.aligner else [],
+                                    "cues": self.cues.as_dict() if self.engine.line_rule == "tokens" else None,
                                     "speech_segmenter_settings": self.segmenter.as_dict(),
+                                    "model_settings": (self.model_settings.as_dict()
+                                                       if self.model_settings is not None else None),
                                     "threads": None}},
             "stages": {},
             "output_files": {},
@@ -339,8 +427,14 @@ class CrispASRPipeline(BasePipeline):
         if self._setup_error is not None:
             raise self._setup_error
         if self.asr is None:
+            settings = self.model_settings
             self.asr = BindingEngine(self._model_path, self.model.backend, self._runtime.use_gpu,
-                                     label=self.model.label)
+                                     label=self.model.label, tokens_per_second=self.engine.tokens_per_second,
+                                     token_floor=self.engine.token_floor,
+                                     max_new_tokens=settings.fixed_token_limit() if settings is not None else None,
+                                     ask=settings.prompt() if settings is not None else None,
+                                     decoding=(settings.decoding() if settings is not None
+                                               and hasattr(settings, "decoding") else None))
         if not self.asr.is_open:
             opened = time.time()
             try:
@@ -371,16 +465,35 @@ class CrispASRPipeline(BasePipeline):
         return Path(wav), float(duration)
 
     def scene_detector_kwargs(self) -> Dict[str, Any]:
-        """The scene detector's settings for this pass (design 22.9.1): semantic with ChronosJAV's
-        12-48 s; auditok and silero with their own minimum and 48 s; none, one scene per file. The
-        Customize Scene tab's values on top."""
+        """The scene detector's settings for this pass (design 22.9.1): semantic with the pipeline's minimum
+        (ChronosJAV's 12 s; MOSS-CrispASR 90 s, owner W482); auditok and silero with their own minimum; the pipeline's
+        longest scene for all three (48 s; MOSS-CrispASR 240 s, W482); none, one scene per file; rscn (owner
+        W448-W452; not offered in 1.10.1, W482), its preset for this pipeline (rscn/settings.py), its own lengths. The
+        Customize Scene tab's values on top (rscn takes only its rscn_ keys)."""
         kwargs: Dict[str, Any] = {"method": self.scene_detector}
         if self.scene_detector == "semantic":
-            kwargs.update(min_duration=self.SCENE_MIN_S, max_duration=self.SCENE_MAX_S)
+            kwargs.update(min_duration=self.scene_min_s, max_duration=self.scene_max_s)
         elif self.scene_detector in ("auditok", "silero"):
-            kwargs.update(max_duration=self.SCENE_MAX_S)
+            kwargs.update(max_duration=self.scene_max_s)
+        elif self.scene_detector == "rscn":
+            kwargs.update(pipeline=self.PIPELINE_NAME)
         kwargs.update(self.scene_params)
         return kwargs
+
+    def _media_record(self, basename: str, md: Dict) -> Optional[Any]:
+        """rscn only (owner W450 2g): the media record of the file being transcribed (modules/media_record.py), saved
+        as <basename>_media.json in the temp folder and passed to the scene detector, which reads the picture from
+        it. None for the other scene detectors, which do not use it."""
+        if self.scene_detector != "rscn" or not md.get("input_file"):
+            return None
+        from whisperjav.modules import media_record
+
+        record = media_record.probe(Path(md["input_file"]))
+        try:
+            md["media_record"] = str(record.save(self.temp_dir / f"{basename}_media.json"))
+        except OSError as e:
+            logger.warning(f"{self.LABEL}: the media record could not be saved ({e})")
+        return record
 
     def _detect_scenes(self, wav: Path, basename: str, md: Dict) -> List[_Scene]:
         """The pass's scenes (scene_detector_kwargs); the audio analytics with semantic scenes."""
@@ -388,18 +501,35 @@ class CrispASRPipeline(BasePipeline):
 
         scenes_dir = self.temp_dir / "scenes"
         scenes_dir.mkdir(parents=True, exist_ok=True)
-        detector = SceneDetectorFactory.safe_create_from_legacy_kwargs(**self.scene_detector_kwargs())
+        if self.scene_detector == "rscn":
+            # No fall-back to auditok when rscn cannot be built (review finding 5; v6 11.6): a fall-back would give MOSS
+            # 29 s scenes with only a warning. Whether a failed scene detector falls back is the owner's decision (D9).
+            kwargs = self.scene_detector_kwargs()
+            kwargs.pop("method")
+            detector = SceneDetectorFactory.create("rscn", **kwargs)
+        else:
+            detector = SceneDetectorFactory.safe_create_from_legacy_kwargs(**self.scene_detector_kwargs())
+        media = self._media_record(basename, md)
+        extra = {"media": media} if media is not None else {}
         try:
-            result = detector.detect_scenes(Path(wav), scenes_dir, basename)
+            result = detector.detect_scenes(Path(wav), scenes_dir, basename, **extra)
             tuples = result.to_legacy_tuples()
             method = getattr(result, "method", self.scene_detector)
         finally:
             detector.cleanup()
         scenes = [_Scene(i, Path(p), float(s), float(e)) for i, (p, s, e, _d) in enumerate(tuples)]
-        if self.ENGINE.audio_analytics and self.scene_detector != "semantic":
+        if method == "rscn":
+            # The run record (settings in force, cuts, marks) beside the scenes (rscn/backend.py), in the temp folder;
+            # the settings in force and each scene's marks also go into the file's metadata, which outlives it.
+            params = dict(result.parameters or {})
+            md["rscn_record"] = params.pop("record", None)
+            md["rscn"] = {"settings": params,
+                          "scenes": [{"start_s": round(sc.start_sec, 3), "end_s": round(sc.end_sec, 3),
+                                      **sc.metadata} for sc in result.scenes]}
+        if self.engine.audio_analytics and self.scene_detector != "semantic":
             # The analytics need the semantic detector's scenes (design 21.4): one line per file (T55).
             logger.info(self.ANALYTICS_NEED_SEMANTIC.format(label=self.LABEL, method=self.scene_detector))
-        elif self.ENGINE.audio_analytics:
+        elif self.engine.audio_analytics:
             # As the qwen pipeline: which scenes look acoustically difficult. Prints only; never raises.
             from whisperjav.modules.analytics import report as report_audio_analytics
 
@@ -463,7 +593,10 @@ class CrispASRPipeline(BasePipeline):
         """The VAD groups of every scene, in scene time; the segmenter is released before returning.
 
         Returns the groups and the number of scenes the segmenter failed on.
+        With the speech segmenter "none" (owner W457, W458): each scene is one group, start to end.
         """
+        if self.speech_segmenter == NO_SEGMENTER:
+            return self._whole_scenes(scenes)
         from whisperjav.modules.subtitle_pipeline.framers.vad_grouped import VadGroupedFramer
 
         framer = VadGroupedFramer(segmenter_backend=self.segmenter.backend,
@@ -473,6 +606,7 @@ class CrispASRPipeline(BasePipeline):
                                   segmenter_config=dict(self.segmenter.config))
         groups: List[_Group] = []
         failed = 0
+        too_short = 0
         try:
             for scene in scenes:
                 try:
@@ -491,8 +625,12 @@ class CrispASRPipeline(BasePipeline):
                 clip_end = len(audio) / SAMPLE_RATE
                 for frame in result.frames:
                     start, end = max(0.0, frame.start), min(clip_end, frame.end)
-                    if end - start >= self.MIN_GROUP_S:
+                    if end - start >= MIN_MODEL_AUDIO_S:
                         groups.append(_Group(scene.index, start, end))
+                    elif end - start >= self.MIN_GROUP_S:
+                        # The shortest audio a model is given (owner W461; modules/model_audio.py): the framer
+                        # could not widen it to 0.2 s. Not sent; counted.
+                        too_short += 1
         finally:
             try:
                 framer.cleanup()
@@ -500,7 +638,39 @@ class CrispASRPipeline(BasePipeline):
                 logger.debug(f"{self.LABEL}: segmenter cleanup: {e}")
             del framer
             gc.collect()
+        self._note_too_short(too_short, "VAD group(s)")
         return groups, failed
+
+    def _whole_scenes(self, scenes: List[_Scene]) -> Tuple[List[_Group], int]:
+        """The speech segmenter "none" (owner W457, W458): each scene is one VAD group, from its first sample to its
+        last, so it goes to the model whole. No segmenter is loaded. A scene shorter than MIN_GROUP_S (0.1 s) is not
+        sent, as a shorter VAD group is not; one of 0.1-0.2 s is not sent either (the model minimum, owner W461;
+        modules/model_audio.py) and is counted in a note; a scene whose audio cannot be read counts as failed."""
+        import soundfile as sf
+
+        groups: List[_Group] = []
+        failed = 0
+        too_short = 0
+        for scene in scenes:
+            try:
+                info = sf.info(str(scene.path))
+                length = info.frames / float(info.samplerate)
+            except Exception as e:
+                failed += 1
+                logger.warning(f"{self.LABEL}: the audio of scene {scene.index} could not be read: {e}")
+                continue
+            if length >= MIN_MODEL_AUDIO_S:
+                groups.append(_Group(scene.index, 0.0, length))
+            elif length >= self.MIN_GROUP_S:
+                too_short += 1
+        self._note_too_short(too_short, "scene(s)")
+        return groups, failed
+
+    def _note_too_short(self, count: int, what: str) -> None:
+        """One note per file for the pieces not sent because they are shorter than the model minimum (W461)."""
+        if count:
+            self.notes.append(f"{self.LABEL}: {count} {what} shorter than {MIN_MODEL_AUDIO_S:g} s were not "
+                              f"transcribed (the shortest audio a model is given)")
 
     # -----------------------------------------------------------------------------------------------
     # 5. One CrispASR call per VAD group
@@ -568,6 +738,27 @@ class CrispASRPipeline(BasePipeline):
     ALIGNER_NOT_LOADED = ("{label}'s aligner ({model}) could not be loaded ({reason}): each VAD group is one "
                           "subtitle at the group's edges, as before 1.10.0.")
     GROUPS_NOT_ALIGNED = "{label}: {n} of {m} VAD group(s) could not be aligned; they keep the VAD group's edges"
+    # The same for a pipeline whose own rule uses the model's word times, with --passN-word-timestamps aligner
+    # (Part B, 1.10.1; drafted under the owner's W416 approval, to be shown to him).
+    ALIGNER_NOT_LOADED_OWN_TIMES = ("{label}'s aligner ({model}) could not be loaded ({reason}): the model's own "
+                                    "word times are used.")
+    GROUPS_NOT_ALIGNED_OWN_TIMES = ("{label}: {n} of {m} VAD group(s) could not be aligned; they keep the model's "
+                                    "own word times")
+    # MOSS-CrispASR's model gives segment times, not word times (1.10.1; drafted under W428 I2, to be shown to him).
+    ALIGNER_NOT_LOADED_SEGMENT_TIMES = ("{label}'s aligner ({model}) could not be loaded ({reason}): the model's "
+                                        "own segment times are used.")
+    GROUPS_NOT_ALIGNED_SEGMENT_TIMES = ("{label}: {n} of {m} VAD group(s) could not be aligned; they keep the "
+                                        "model's own segment times")
+
+    def _aligner_texts(self) -> Tuple[str, str]:
+        """The two notes for an aligner that could not be loaded and for groups it could not align, by the row's
+        line rule: the VAD group's edges ("group"), the model's word times ("tokens"), its segment times
+        ("segments")."""
+        if self.engine.line_rule == "group":
+            return self.ALIGNER_NOT_LOADED, self.GROUPS_NOT_ALIGNED
+        if self.engine.line_rule == "segments":
+            return self.ALIGNER_NOT_LOADED_SEGMENT_TIMES, self.GROUPS_NOT_ALIGNED_SEGMENT_TIMES
+        return self.ALIGNER_NOT_LOADED_OWN_TIMES, self.GROUPS_NOT_ALIGNED_OWN_TIMES
 
     def _align(self, scenes: List[_Scene], results: List[Tuple[_Group, List[CrispSegment]]],
                md: Dict) -> set:
@@ -580,13 +771,13 @@ class CrispASRPipeline(BasePipeline):
         if self._aligner_error is None and (self.aligner is None or not self.aligner.is_loaded):
             try:
                 if self.aligner is None:
-                    self.aligner = CrispAligner(self.ENGINE.aligner, device=self.device, temp_dir=self.temp_dir,
+                    self.aligner = CrispAligner(self.engine.aligner, device=self.device, temp_dir=self.temp_dir,
                                                 label=self.LABEL)
                 self.aligner.load()
             except (CrispASRSetupError, OSError, RuntimeError) as e:
                 first_line = (str(e).strip().splitlines() or [""])[0][:200]
-                self._aligner_error = self.ALIGNER_NOT_LOADED.format(label=self.LABEL, model=self.ENGINE.aligner,
-                                                                     reason=first_line)
+                text = self._aligner_texts()[0]
+                self._aligner_error = text.format(label=self.LABEL, model=self.engine.aligner, reason=first_line)
                 logger.warning(self._aligner_error)
         if self._aligner_error is not None:
             self.notes.append(self._aligner_error)
@@ -598,7 +789,7 @@ class CrispASRPipeline(BasePipeline):
         with_text = 0
         loaded_scene, audio = None, None
         for i, (g, segments) in enumerate(results):
-            text = "".join(seg.text.strip() for seg in segments).strip()
+            text = self._group_text(segments)
             if not text:
                 continue
             with_text += 1
@@ -614,11 +805,19 @@ class CrispASRPipeline(BasePipeline):
             results[i] = (g, [CrispSegment(text, 0.0, len(piece) / SAMPLE_RATE, (), tokens)])
             aligned.add(i)
         not_aligned = with_text - len(aligned)
-        md["stages"]["alignment"] = {"aligner": self.ENGINE.aligner, "groups": with_text, "aligned": len(aligned),
+        md["stages"]["alignment"] = {"aligner": self.engine.aligner, "groups": with_text, "aligned": len(aligned),
                                      "not_aligned": not_aligned, "seconds": round(time.time() - began, 2)}
         if not_aligned:
-            self.notes.append(self.GROUPS_NOT_ALIGNED.format(label=self.LABEL, n=not_aligned, m=with_text))
+            text = self._aligner_texts()[1]
+            self.notes.append(text.format(label=self.LABEL, n=not_aligned, m=with_text))
         return aligned
+
+    def _group_text(self, segments: List[CrispSegment]) -> str:
+        """A group's text for the aligner: the segments' texts joined; for the "segments" rule (MOSS-CrispASR)
+        without the speaker labels and time marks, which are not speech (lines.segment_text)."""
+        if self.engine.line_rule == "segments":
+            return "".join(lines.segment_text(seg.text) for seg in segments).strip()
+        return "".join(seg.text.strip() for seg in segments).strip()
 
     def cleanup(self):
         """The aligner, then the model and the rest (BasePipeline.cleanup)."""
@@ -647,8 +846,9 @@ class CrispASRPipeline(BasePipeline):
                 subs = lines.build("tokens", scene.start + g.start, scene.start + g.end, segments, stats,
                                    self.cues, onsets=True)
             else:
-                subs = lines.build(self.ENGINE.line_rule, scene.start + g.start, scene.start + g.end, segments,
-                                   stats, self.cues)
+                subs = lines.build(self.engine.line_rule, scene.start + g.start, scene.start + g.end, segments,
+                                   stats, self.cues, onsets=self.engine.onsets,
+                                   cut_at_pauses=self.engine.cut_at_pauses, end_at_group=self.engine.onsets)
             by_scene.setdefault(g.scene, []).extend(subs)
 
         scene_srts_dir = self.temp_dir / "scene_srts"
@@ -679,31 +879,45 @@ class CrispASRPipeline(BasePipeline):
             stitched.write_text("", encoding="utf-8")
         return stitched, count
 
-    def _postprocess(self, stitched: Path, count: int) -> Tuple[Dict[str, int], int]:
-        """The three filters, in place: nonverbal, nonlinguistic, scene overlap (W129 6)."""
-        stats: Dict[str, int] = {}
-        if count == 0:
-            return stats, 0
-        from whisperjav.modules.subtitle_pipeline.cleaners.nonlinguistic_utterance_filter import (
-            NonlinguisticUtteranceFilter)
-        from whisperjav.modules.subtitle_pipeline.cleaners.nonverbal_line_filter import NonverbalLineFilter
-        from whisperjav.modules.subtitle_pipeline.cleaners.scene_overlap_resolver import SceneOverlapResolver
+    def _postprocess(self, stitched: Path, count: int, basename: str = "") -> Tuple[Dict[str, Any], int]:
+        """The row's post-processing, in place (whisperjav/crispasr/cleanup.py; owner W421 i1, W422): the raw copy
+        first, then the stages the row names, then the artifacts file. Before 1.10.1: the three filters nonverbal,
+        nonlinguistic, scene overlap (W129 6)."""
+        stem = crispasr_cleanup.file_stem(basename or stitched.stem.replace("_stitched", ""), self.PIPELINE_NAME,
+                                          self.pass_tag)
+        raw_dir = Path(self.raw_subs_dir) if self.raw_subs_dir else self.output_dir / crispasr_cleanup.RAW_SUBS
+        return self._srt_cleanup.run(stitched, raw_dir, stem, count, self._text_changes)
 
-        r = NonverbalLineFilter().filter_srt_file(stitched)
-        stats["nonverbal_dropped"] = r.get("dropped_nonverbal", 0)
-        stats["empty_removed"] = r.get("dropped_empty", 0)
-        count = r.get("final_count", count)
-        if count:
-            r = NonlinguisticUtteranceFilter().filter_srt_file(stitched)
-            stats["nonlinguistic_dropped"] = r.get("dropped_nonlinguistic", 0)
-            stats["empty_removed"] += r.get("dropped_empty", 0)
-            count = r.get("final_count", count)
-        if count:
-            r = SceneOverlapResolver().resolve_srt_file(stitched)
-            stats["overlap_nested_dropped"] = r.get("dropped_nested", 0)
-            stats["overlap_shifted"] = r.get("shifted_starts", 0)
-            count = r.get("final_count", count)
-        return stats, count
+    def _clean_texts(self, scenes: List[_Scene], results: List[Tuple[_Group, List[CrispSegment]]],
+                     md: Dict) -> None:
+        """The row's text stages on each VAD group's text before the aligner (Cohere-CrispASR: ChronosJAV's text
+        cleaner, as for Qwen3-ASR). A changed group keeps one segment with the cleaned text, which the aligner then
+        times (or which becomes the group's one subtitle when the aligner gives nothing); a group cleaned to nothing
+        has no text. Every change goes into the artifacts file."""
+        if self._text_cleaner is None:
+            self._text_cleaner = crispasr_cleanup.TextCleaner()
+        scene_of = {sc.index: sc for sc in scenes}
+        with_text = changed = chars_before = chars_after = 0
+        for i, (g, segments) in enumerate(results):
+            text = "".join(seg.text.strip() for seg in segments).strip()
+            if not text:
+                continue
+            with_text += 1
+            cleaned = self._text_cleaner.clean(text).strip()
+            chars_before += len(text)
+            chars_after += len(cleaned)
+            if cleaned == text:
+                continue
+            changed += 1
+            start = scene_of[g.scene].start
+            self._text_changes.append(crispasr_cleanup.TextChange(start + g.start, start + g.end, text, cleaned))
+            self._model_texts[i] = text
+            results[i] = (g, [CrispSegment(cleaned, 0.0, g.end - g.start)] if cleaned else [])
+        md["stages"]["text_cleaner"] = {"groups": with_text, "changed": changed,
+                                        "chars_before": chars_before, "chars_after": chars_after}
+        if changed:
+            logger.info(f"{self.LABEL}: text cleaner changed {changed} of {with_text} VAD groups "
+                        f"({chars_before} -> {chars_after} characters)")
 
     def _write_group_record(self, basename: str, scenes: List[_Scene],
                             results: List[Tuple[_Group, List[CrispSegment]]], aligned: Optional[set] = None) -> None:
@@ -721,9 +935,10 @@ class CrispASRPipeline(BasePipeline):
             with open(folder / f"{basename}.{self.PIPELINE_NAME}.groups.jsonl", "w", encoding="utf-8") as fh:
                 for i, (g, segments) in enumerate(results):
                     scene = scene_of[g.scene]
+                    extra = {"model_text": self._model_texts[i]} if i in self._model_texts else {}
                     fh.write(json.dumps({
                         "scene": g.scene, "start": round(scene.start + g.start, 3),
-                        "end": round(scene.start + g.end, 3), "aligned": i in aligned,
+                        "end": round(scene.start + g.end, 3), "aligned": i in aligned, **extra,
                         "segments": [{"text": s.text, "start": s.start, "end": s.end,
                                       "words": [[w.text, w.start, w.end, w.confidence] for w in s.words],
                                       "tokens": [[t.text, t.start, t.end, t.confidence] for t in s.tokens]}

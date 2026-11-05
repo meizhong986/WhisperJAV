@@ -1,17 +1,17 @@
-# Parakeet-CrispASR 与 Cohere-CrispASR（GGUF）
+# GGUF 处理管线（CrispASR）
 
-Parakeet-CrispASR 和 Cohere-CrispASR 是两个处理管线，使用 GGUF 格式的 ASR 模型生成日语字幕。它们通过 CrispASR 运行；CrispASR 随每个 WhisperJAV 安装一起安装，无需另外下载任何程序。
+GGUF 处理管线共七个：Parakeet-CrispASR、Cohere-CrispASR，以及 1.10.1 新增的 ReazonSpeech-CrispASR、Kotoba-CrispASR、Whisper-Turbo-CrispASR、Whisper-Large-CrispASR 和 MOSS-CrispASR。它们使用 GGUF 格式（Whisper 模型为 whisper.cpp 格式）的 ASR 模型生成日语字幕，通过 CrispASR 运行；CrispASR 随每个 WhisperJAV 安装一起安装，无需另外下载任何程序。
 
 - **仅限专家模式。** 只能在 **专家模式**（Ensemble Mode）选项卡中作为第一轮、第二轮或两者运行。没有对应的 `--mode` 值，也不出现在 Transcription Mode 选项卡中。
 - **仅支持日语。** 选择其他源语言时，运行会停止并给出提示。
-- **1.10.0 中为实验性功能（早期版本）。** 建议与你目前使用的处理管线的字幕对比，并告诉我们效果如何：https://github.com/meizhong986/WhisperJAV/issues
+- **实验性（早期版本）：** Parakeet-CrispASR 和 Cohere-CrispASR 从 1.10.0 起，其他五个为 1.10.1 新增。 建议与你目前使用的处理管线的字幕对比，并告诉我们效果如何：https://github.com/meizhong986/WhisperJAV/issues
 
 !!! warning "文件夹名称"
     程序中的提示原文：The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).
 
     意思是：GGUF（CrispASR）处理管线需要只由西文字母（ASCII）组成的文件夹名称。如果你的用户文件夹名称含有中文、日文或韩文字符，WhisperJAV 会把模型以链接或复制的方式放到一个名称只含 ASCII 字符的文件夹中（原文件保留在原处）。
 
-    这一限制针对存放模型文件的文件夹：CrispASR 只接收这一个路径（音频在内存中交给它）。在 Windows 上，WhisperJAV 先尝试使用该文件夹的短名称（8.3 格式）；只有在没有短名称时，才把链接或副本放在 `C:\Users\Public\WhisperJAV\crispasr`（或 `C:\ProgramData\WhisperJAV\crispasr`），并在日志中说明。副本最多占用 2.4 GB，并保留供以后使用。已检查过一次：安装在含日文字符文件夹中的 CrispASR CPU 版能从那里加载模型并转写。WhisperJAV 本身以及 CrispASR 的 CUDA 版和 Vulkan 版尚未在这种文件夹中检查过。
+    这一限制针对存放模型文件的文件夹：CrispASR 只接收这一个路径（音频在内存中交给它）。在 Windows 上，WhisperJAV 先尝试使用该文件夹的短名称（8.3 格式）；只有在没有短名称时，才把链接或副本放在 `C:\Users\Public\WhisperJAV\crispasr`（或 `C:\ProgramData\WhisperJAV\crispasr`），并在日志中说明。副本最多占用 4.1 GB，并保留供以后使用。已检查过一次：安装在含日文字符文件夹中的 CrispASR CPU 版能从那里加载模型并转写。WhisperJAV 本身以及 CrispASR 的 CUDA 版和 Vulkan 版尚未在这种文件夹中检查过。
 
 !!! note "从 1.9.x 升级？"
     1.9.x 中需要自行下载 `crispasr` 程序的 CrispASR 模式已被移除。详见[从 1.9.x 升级](#upgrading-from-19x)。
@@ -20,7 +20,7 @@ Parakeet-CrispASR 和 Cohere-CrispASR 是两个处理管线，使用 GGUF 格式
 
 ## 它们在哪里运行 {#where-they-run}
 
-每个 1.10.0 安装都包含 CrispASR，版本与安装所针对的加速器相符（见[是否加速](../getting-started/index.md#accelerated-or-not)）：
+从 1.10.0 起，每个安装都包含 CrispASR，版本与安装所针对的加速器相符（见[是否加速](../getting-started/index.md#accelerated-or-not)）：
 
 | 安装为哪种加速器制作 | CrispASR 版本 | GGUF 处理管线运行在 |
 |---|---|---|
@@ -36,29 +36,45 @@ Parakeet-CrispASR 和 Cohere-CrispASR 是两个处理管线，使用 GGUF 格式
 每一轮开始时，日志会说明请求 CrispASR 在哪里运行，例如：
 
 ```
-Parakeet-CrispASR asks CrispASR to use the NVIDIA GPU (CUDA) (CrispASR 0.8.44+cuda).
+Parakeet-CrispASR asks CrispASR to use the NVIDIA GPU (CUDA) (CrispASR 0.8.50+cuda).
 ```
 
-使用 Vulkan 版时为："Parakeet-CrispASR asks CrispASR's Vulkan build to use this PC's GPU (CrispASR 0.8.44+vulkan). GPUs through Vulkan are experimental in 1.10.0 and have not been tested on AMD or Intel graphics cards."（意思是：通过 Vulkan 使用 GPU 在 1.10.0 中为实验性，尚未在 AMD 或 Intel 显卡上测试。）WhisperJAV 目前无法读取 CrispASR 实际使用的设备，这一行只说明它请求了什么。
+使用 Vulkan 版时为："Parakeet-CrispASR asks CrispASR's Vulkan build to use this PC's GPU (CrispASR 0.8.50+vulkan). GPUs through Vulkan are experimental and have not been tested on AMD or Intel graphics cards."（意思是：通过 Vulkan 使用 GPU 为实验性，尚未在 AMD 或 Intel 显卡上测试。）WhisperJAV 目前无法读取 CrispASR 实际使用的设备，这一行只说明它请求了什么。
 
 ---
 
-## 两个处理管线
+## Parakeet-CrispASR 与 Cohere-CrispASR
 
 | | Parakeet-CrispASR | Cohere-CrispASR |
 |---|---|---|
 | **GUI 中的名称** | **parakeet**（在 **GGUF via crispasr** 分组下） | **cohere**（在 **GGUF via crispasr** 分组下） |
-| **模型** | `parakeet-tdt-0.6b-ja`（674 MB） | `cohere-asr-ja-v0.1`（默认）或 `cohere-asr-ja`（各 2,424 MB） |
+| **模型** | `parakeet-tdt-0.6b-ja`（默认，674 MB）或 `parakeet-tdt-0.6b-ja-f16`（1,247 MB） | `cohere-asr-ja-v0.1`（默认）或 `cohere-asr-ja`（各 2,424 MB）；以及它们的完整大小文件 `cohere-asr-ja-v0.1-f16`、`cohere-asr-ja-f16`（各 4,137 MB） |
 | **默认语音分割器** | TEN VAD | FireRedVAD |
 | **默认灵敏度** | Aggressive | Balanced |
 | **VAD 组最长** | 6 秒，任何灵敏度下都一样 | 3 秒 |
 | **字幕在哪里断开** | 只在语音的自然停顿处断开（见下文） | 只在句末断开（见下文） |
-| **字幕时间** | 来自模型对其输出文字给出的时间 | 来自对齐器 `wav2vec2-ja`，它为模型写出的文字标出时间 |
+| **字幕时间**（默认；计时选项卡可更改） | 来自模型对其输出文字给出的时间 | 来自对齐器 `wav2vec2-ja`，它为模型写出的文字标出时间 |
 | **音频分析报告** | 有 | 有 |
 
 **VAD 组**：语音分割器找到并一次性交给模型的一段语音，长度为几秒。
 
 Parakeet-CrispASR 使用 Fidelity 处理管线的语音分割器设置，另加 6 秒上限；Cohere-CrispASR 使用 Qwen3-ASR 处理管线的设置。
+
+## 1.10.1 新增的五个处理管线
+
+| GUI（在 **实验性，欢迎反馈** 分组下） | 命令行 | 模型（第一个为默认） | 说明 |
+|---|---|---|---|
+| **reazonspeech** | `reazonspeech-crispasr` | `reazonspeech-nemo-v2-f16`（1,240 MB）、`reazonspeech-nemo-v2-q8_0`（667 MB） | ReazonSpeech 的日语模型 reazonspeech-nemo-v2 |
+| **kotoba** | `kotoba-crispasr` | `kotoba-whisper-v2.0-f16`（1,520 MB）、`kotoba-whisper-v2.0-q5_0`（538 MB） | Kotoba-Whisper v2.0，为日语缩小（"蒸馏"）的 Whisper 模型 |
+| **whisper-turbo** | `whisper-turbo-crispasr` | `whisper-large-v3-turbo-f16`（1,625 MB）、`whisper-large-v3-turbo-q8_0`（874 MB） | OpenAI Whisper large-v3-turbo |
+| **whisper-large** | `whisper-large-crispasr` | `whisper-large-v2-f16`（3,095 MB）、`whisper-large-v2-q8_0`（1,656 MB）、`whisper-large-v3-f16`（3,095 MB）、`whisper-large-v3-q5_0`（1,081 MB） | OpenAI Whisper large-v2 或 large-v3 |
+| **MOSS** | `moss-crispasr` | `moss-transcribe-diarize-0.9b-f16`（1,823 MB）、`moss-transcribe-diarize-0.9b-q8_0`（1,410 MB） | OpenMOSS 的 MOSS-Transcribe-Diarize 0.9B；WhisperJAV 不使用其说话人标签 |
+
+与上面两个处理管线的不同之处：
+
+- **reazonspeech** 使用 Parakeet-CrispASR 的语音分割器设置（TEN VAD、高灵敏、VAD 组最长 6 秒）。字幕时间来自模型，模型只给每个词一个开始时间：只在句末之后开始新的一条字幕，每条在下一条开始处结束，最后一条在其 VAD 组结束处结束。
+- **kotoba**、**whisper-turbo** 和 **whisper-large** 使用 Cohere-CrispASR 的语音分割器设置（FireRedVAD、中灵敏、VAD 组最长 3 秒）。字幕时间来自模型；只在句末之后开始新的一条字幕。
+- **MOSS** 处理较长的片段：Semantic 场景 90 到 240 秒；FireRedVAD（中灵敏）的 VAD 组在超过 5 秒的静音处结束，最长 240 秒。MOSS 写出的每一段为一条字幕，使用 MOSS 自己的时间。它的 **自定义参数**（Customize Parameters）窗口另有 **MOSS** 选项卡，清理步骤也不同（见[字幕是怎样生成的](#how-the-subtitles-are-made)）。
 
 ---
 
@@ -66,16 +82,16 @@ Parakeet-CrispASR 使用 Fidelity 处理管线的语音分割器设置，另加 
 
 ### GUI
 
-1. 打开 **专家模式**（Ensemble Mode）选项卡。打开时 **第一轮**（Pass 1）为 **cohere**（Balanced，FireRedVAD），**第二轮**（Pass 2）为 **parakeet**（Aggressive，TEN VAD）；第二轮在勾选之前不运行。如果开启了 **Remember settings**，选项卡打开时显示的是你保存的设置。
-2. 要为某一轮换处理管线，打开它的 **Pipeline** 菜单：**parakeet** 和 **cohere** 在 **GGUF via crispasr** 分组下。选择其中之一时，会同时设好它自己的灵敏度和语音分割器（见上表）。
-3. 如果选的是 cohere，可在 **Model** 列选择模型（默认 `cohere-asr-ja-v0.1`）。
+1. 打开 **专家模式**（Ensemble Mode）选项卡。打开时 **第一轮**（Pass 1）为 **cohere**（Balanced，FireRedVAD），**第二轮**（Pass 2）为 **parakeet**（Aggressive，TEN VAD）；第二轮在勾选之前不运行。如果开启了 **记住设置**（Remember settings），选项卡打开时显示的是你保存的设置。
+2. 要为某一轮换处理管线，打开它的 **处理管线**（Pipeline）菜单：parakeet 和 cohere 在 **GGUF via crispasr** 分组下；分隔线下方，1.10.1 新增的五个在 **实验性，欢迎反馈** 分组下（reazonspeech、kotoba、whisper-turbo、whisper-large、MOSS）。选择其中之一时，会同时设好它自己的灵敏度、语音分割器和场景检测器（见上面的表）。
+3. 在 **模型**（Model）列选择模型。每一项都写明文件的数值格式和所需显存，例如 "Parakeet TDT 0.6B ja (q8_0), ~0.9 GB VRAM"；处理管线的默认模型排在第一个。
 4. 如需第二轮，勾选 **第二轮**（Pass 2），确认其处理管线，并在 **Merge** 中选择两者的合并方式。
 5. 点击 **Start**。
 
 当某一轮使用这两个处理管线之一时：
 
-- **Sensitivity**、**Speech Segmenter**、**Model**、**Scene Detector**、**Speech Enhancer** 和 **Enhance for VAD only** 都可以设置，与其他 Pass 相同。语音分割器不能选 **None**：这两个处理管线只转写语音分割器找到的语音。
-- **Customize Parameters** 打开三个选项卡：**Segmenter**、**Enhancer** 和 **Scene**，初始值就是这一轮实际使用的值。
+- **Sensitivity**、**Speech Segmenter**、**Model**、**Scene Detector**、**Speech Enhancer** 和 **Enhance for VAD only** 都可以设置，与其他 Pass 相同。语音分割器选 **无**（None）时不做语音检测：每个场景整段交给模型，因此静音和音乐也会交给模型。
+- **自定义参数**（Customize Parameters）打开四个选项卡：**分割器**（Segmenter）、**增强器**（Enhancer）、**场景**（Scene）和 **计时**（Timing；只有一个菜单 **词级时间戳来源**（Word timestamps）：**来自模型**（From the model）或 **来自对齐器（wav2vec2-ja）**，处理管线的默认项标有（默认））；MOSS 另有 **MOSS** 选项卡。初始值就是这一轮实际使用的值。
 - 这一轮一行下方会显示一个状态面板，说明模型和 CrispASR 将在哪里运行，例如：
 
   ```
@@ -83,7 +99,7 @@ Parakeet-CrispASR 使用 Fidelity 处理管线的语音分割器设置，另加 
   GPU: asks for the NVIDIA GPU (CUDA)
   ```
 
-  也可能显示 "CPU (not accelerated), several times slower: <原因>" 或 "CrispASR cannot run here: <原因>"。对 Cohere-CrispASR，面板还会列出它的对齐器，例如 "Aligner: wav2vec2 large XLSR-53 ja (q4_k) — not downloaded yet (232 MB); downloaded the first time it is used"。
+  也可能显示 "CPU (not accelerated), several times slower: <原因>" 或 "CrispASR cannot run here: <原因>"。字幕时间来自对齐器时（Cohere-CrispASR 的默认，或在计时选项卡中选了来自对齐器），面板还会列出对齐器，例如 "Aligner: wav2vec2 large XLSR-53 ja (q4_k) — not downloaded yet (232 MB); downloaded the first time it is used"。
 
 ### 命令行
 
@@ -109,14 +125,16 @@ whisperjav video.mp4 --ensemble --pass1-pipeline parakeet-crispasr --pass2-pipel
 
 | 设置 | GUI | 命令行 | 说明 |
 |---|---|---|---|
-| 模型 | Model | `--pass1-model`、`--pass2-model` | `parakeet-tdt-0.6b-ja`；`cohere-asr-ja-v0.1`、`cohere-asr-ja` |
-| 语音分割器 | Speech Segmenter | `--pass1-speech-segmenter` | 除 `none` 以外均可 |
-| 灵敏度 | Sensitivity | `--pass1-sensitivity` | `conservative`、`balanced`、`aggressive`；Parakeet-CrispASR 默认 `aggressive`，Cohere-CrispASR 默认 `balanced` |
-| 场景检测器 | Scene Detector | `--pass1-scene-detector` | `semantic`（默认，场景 12 到 48 秒）、`auditok`、`silero`（场景最长 48 秒）、`none`（每个文件一个场景） |
+| 模型 | Model | `--pass1-model`、`--pass2-model` | 各处理管线的模型，见上面两张表 |
+| 语音分割器 | Speech Segmenter | `--pass1-speech-segmenter` | 任一；`none` 不做语音检测，把每个场景整段交给模型 |
+| 灵敏度 | Sensitivity | `--pass1-sensitivity` | `conservative`、`balanced`、`aggressive`；Parakeet-CrispASR 和 ReazonSpeech-CrispASR 默认 `aggressive`，其他默认 `balanced` |
+| 场景检测器 | Scene Detector | `--pass1-scene-detector` | `semantic`（默认）、`auditok`、`silero`：场景最长 48 秒，semantic 的场景最短 12 秒（MOSS-CrispASR：最长 240 秒，semantic 最短 90 秒）；`none`（每个文件一个场景） |
 | 语音增强器 | Speech Enhancer | `--pass1-speech-enhancer` | `none`（默认），或其他 Pass 可用的语音增强器，例如 `ffmpeg-dsp`、`zipenhancer` 或 `htdemucs` |
 | 仅用于 VAD 的增强 | Enhance for VAD only | `--pass1-enhance-for-vad` | 增强后的音频只交给语音分割器；CrispASR 听到的是原始音频 |
 | 检测阈值 | Customize，Segmenter 选项卡 | `--pass1-vad-threshold` | 0 到 1；覆盖灵敏度设定的值 |
-| 前后填充 | Customize，Segmenter 选项卡 | `--pass1-speech-pad-ms` | 每段语音前后各加的毫秒数。Cohere-CrispASR：前后都加。Parakeet-CrispASR：仅对有此设置的语音分割器（例如 WhisperSeg）生效；使用 FireRedVAD 或 TEN VAD（它的默认分割器）时会被忽略并给出警告 |
+| 前后填充 | Customize，Segmenter 选项卡 | `--pass1-speech-pad-ms` | 每段语音前后各加的毫秒数。Cohere-、Kotoba-、Whisper-Turbo-、Whisper-Large-CrispASR：前后都加。Parakeet-、ReazonSpeech-CrispASR：仅对有此设置的语音分割器（例如 WhisperSeg）生效；使用 FireRedVAD 或 TEN VAD 时会被忽略并给出警告。MOSS-CrispASR：仅对有此设置的语音分割器生效 |
+| 字幕时间 | Customize，计时（Timing）选项卡：**词级时间戳来源**（Word timestamps） | `--pass1-word-timestamps model` 或 `aligner` | Cohere-CrispASR 默认 `aligner`，其他默认 `model`（MOSS-CrispASR：它自己的段落时间）。使用 `aligner` 时，对齐器标出时间的 VAD 组按 Cohere-CrispASR 的方式切分（见下文）；对齐器没有给出时间的组保留处理管线自己的规则 |
+| MOSS 设置 | Customize，**MOSS** 选项卡（仅 MOSS-CrispASR） | `--pass1-params` 中的键 | 指令语言、语言提示、热词、每段的 token 上限、采样、温度、Top-k、随机种子、束搜索宽度（1 到 4）；这些键见 `--help` 中 `--pass1-params` 的说明 |
 | 设备 | — | `--device auto`、`cuda` 或 `cpu` | 见下文 |
 | 语言 | Source audio language | `--language japanese`（默认） | 其他语言会使运行停止 |
 
@@ -133,7 +151,7 @@ whisperjav video.mp4 --ensemble --pass1-pipeline parakeet-crispasr --pass2-pipel
 | Cohere-CrispASR（FireRedVAD）：检测阈值 | 0.5 | 0.4 | 0.3 |
 | Cohere-CrispASR：语音前后填充 | 100 ms | 100 ms | 100 ms |
 
-检测阈值表示语音分割器要有多大把握才把一段声音当作语音，取值 0 到 1。无论灵敏度如何，VAD 组最长都保持 6 秒（Parakeet-CrispASR）或 3 秒（Cohere-CrispASR）。换用其他语音分割器时，Parakeet-CrispASR 使用 Fidelity 处理管线为它给出的值，Cohere-CrispASR 使用 Qwen3-ASR 处理管线为它给出的值；Parakeet-CrispASR 保留 6 秒上限。
+检测阈值表示语音分割器要有多大把握才把一段声音当作语音，取值 0 到 1。ReazonSpeech-CrispASR 使用 Parakeet-CrispASR 的值；Kotoba-、Whisper-Turbo-、Whisper-Large-CrispASR 使用 Cohere-CrispASR 的值。无论灵敏度如何，VAD 组最长都保持 6 秒（Parakeet-、ReazonSpeech-CrispASR）、3 秒（Cohere-、Kotoba-、Whisper-Turbo-、Whisper-Large-CrispASR）或 240 秒（MOSS-CrispASR）。换用其他语音分割器时，Parakeet- 和 ReazonSpeech-CrispASR 使用 Fidelity 处理管线为它给出的值，除 MOSS-CrispASR 外的其他处理管线使用 Qwen3-ASR 处理管线为它给出的值；6 秒上限保留。
 
 不实际运行、只查看某次运行会用到的值：
 
@@ -147,29 +165,29 @@ whisperjav --ensemble --pass1-pipeline parakeet-crispasr --dump-params settings.
 
 - `--device auto`（默认值，GUI 也使用它）：使用安装中 CrispASR 版本能用的 GPU（见[它们在哪里运行](#where-they-run)），否则使用 CPU。日志会说明用的是哪一个以及原因。
 - `--device cuda`：需要 CUDA 版和它能用的 NVIDIA GPU；否则运行会在读取任何音频之前停止。
-- `--device cpu`：ASR 模型始终使用 CPU。在 GUI 中，"Run on the CPU this time" 对一次运行起同样作用。Cohere-CrispASR 的对齐器不能被限制在 CPU 上：在 CrispASR 的版本会使用 GPU 的地方，它仍会请求使用 GPU，运行开始时的提示框会说明这一点。
+- `--device cpu`：ASR 模型始终使用 CPU。在 GUI 中，"Run on the CPU this time" 对一次运行起同样作用。对齐器（Cohere-CrispASR 的默认，或任一选了来自对齐器的这一轮）不能被限制在 CPU 上：在 CrispASR 的版本会使用 GPU 的地方，它仍会请求使用 GPU，运行开始时的提示框会说明这一点。
 
 `--device` 决定一次运行中所有处理管线的设备，包括语音增强器。
 
 ### 这两个处理管线不使用的设置
 
 - 如果指定了 `--pass1-hf-params` 或 `--pass1-qwen-params`，日志会用一行列出它们（"Parakeet-CrispASR does not use: …"），运行继续。
-- `--compute-type` 会被忽略并给出警告：CrispASR 的模型文件只有一种数值格式（8 位）。
+- `--compute-type` 会被忽略并给出警告：每个模型文件有自己的数值格式（f16、q8_0 等）；请用 `--pass1-model` 选择文件。
 - `--subs-language direct-to-english` 仍然生成日语字幕，并给出警告。之后可用 `--translate` 或 `whisperjav-translate` 翻译。
 
 ---
 
 ## 字幕是怎样生成的 {#how-the-subtitles-are-made}
 
-对每个视频，两个处理管线都会：
+对每个视频，每个 GGUF 处理管线都会：
 
 1. 提取音频（16 kHz，单声道；选择了语音增强器时为 48 kHz，增强后得到 16 kHz 音频）；
-2. 用场景检测器把音频分成场景（默认为 Semantic，12 到 48 秒）；
+2. 用场景检测器把音频分成场景（默认为 Semantic，12 到 48 秒；MOSS-CrispASR 为 90 到 240 秒）；
 3. 如果选择了语音增强器，清理每个场景的音频；增强器在模型打开之前关闭，两者不会同时占用 GPU 显存；
 4. 对每个场景运行语音分割器，把找到的语音组成 VAD 组；
 5. 把每个 VAD 组单独交给模型；没有语音增强器时，模型每一轮只加载一次，有语音增强器时，每个视频的 ASR 步骤打开模型，结束后关闭；
 6. 按下文各处理管线的规则，用每个 VAD 组的文字生成字幕；
-7. 合并各场景，并使用与 Qwen3-ASR 处理管线相同的三个清理过滤器：删除「あ。」「うん。」这类单独成行的字幕、只有呻吟或呼吸声的字幕，以及两个场景交界处的重复和重叠；
+7. 合并各场景并清理字幕。除 MOSS-CrispASR 外，先运行 Fidelity 处理管线的连续重复行合并、幻觉过滤器和重复清理器，再运行与 Qwen3-ASR 处理管线相同的三个过滤器：删除「あ。」「うん。」这类单独成行的字幕、只有呻吟或呼吸声的字幕，以及两个场景交界处的重复和重叠。MOSS-CrispASR 运行连续重复行合并和这三个过滤器，然后删除只由 ああ、あっ、うん 或 えっ 组成的字幕行，以及不含假名、只是一个感叹词（如 "Oh" 或 啊）的字幕行。清理前的字幕副本和清理删改内容的清单保存在这一轮字幕文件旁边的 `raw_subs` 文件夹中（`<名称>.pass<N>.<处理管线>_stitched.original.srt` 和 `.artifacts.srt`）；
 8. 写出这一轮的字幕文件；若有另一轮，专家模式会把两者合并。
 
 **Parakeet-CrispASR：字幕在哪里断开。** 在一个 VAD 组内，只有遇到以下自然停顿时才开始新的一条字幕：
@@ -184,7 +202,7 @@ whisperjav --ensemble --pass1-pipeline parakeet-crispasr --dump-params settings.
 
 如果对齐器对某个 VAD 组没有给出时间，这个组保持为一条字幕，时间从语音分割器找到的语音开始处到结束处，运行汇总会统计这样的组。如果对齐器完全无法加载（例如第一次运行时没有网络），所有组都这样生成，运行汇总会说明；两种情况下文字都会保留。1.10.0 新增；尚未与参考字幕对比测量。
 
-**音频分析报告。** 与 Qwen3-ASR 处理管线一样，两个处理管线都会为每个视频输出一份简短报告：哪些部分可能漏掉语音、哪些部分声学条件较差，并附上时间，方便你检查这些位置。报告需要 Semantic 场景检测器；使用其他场景检测器时，日志会用一行说明，不生成报告。
+**音频分析报告。** 与 Qwen3-ASR 处理管线一样，每个 GGUF 处理管线都会为每个视频输出一份简短报告：哪些部分可能漏掉语音、哪些部分声学条件较差，并附上时间，方便你检查这些位置。报告需要 Semantic 场景检测器；使用其他场景检测器时，日志会用一行说明，不生成报告。
 
 ---
 
@@ -198,9 +216,9 @@ whisperjav --ensemble --pass1-pipeline parakeet-crispasr --dump-params settings.
 | `parakeet-tdt-0.6b-ja` | `cstr/parakeet-tdt-0.6b-ja-GGUF` | `parakeet-tdt-0.6b-ja-q8_0.gguf` |
 | `cohere-asr-ja-v0.1` | `TransWithAI/cohere-transcribe-ja-v0.1-GGUF` | `cohere-asr-ja-v0.1-q8_0.gguf` |
 | `cohere-asr-ja` | `CKHO/cohere-asr-ja-GGUF` | `cohere-asr-ja-q8_0.gguf` |
-| 对齐器 `wav2vec2-ja`（Cohere-CrispASR；也是 ChronosJAV 的默认对齐器） | `cstr/wav2vec2-large-xlsr-53-japanese-GGUF` | `wav2vec2-large-xlsr-53-japanese-q4_k.gguf` |
+| 对齐器 `wav2vec2-ja`（Cohere-CrispASR 的默认、选了来自对齐器的任一 GGUF 处理管线，以及未指定其他对齐器时的 ChronosJAV 对齐器模式） | `cstr/wav2vec2-large-xlsr-53-japanese-GGUF` | `wav2vec2-large-xlsr-53-japanese-q4_k.gguf` |
 
-Cohere-CrispASR 的对齐器（232 MB）在这一轮第一次使用时下载，下载发生在这一轮内部，而不是运行开始之前。如果下载失败，这一轮会在没有对齐器的情况下继续：每个 VAD 组成为一条字幕，时间为该组的起止位置（见[字幕是怎样生成的](#how-the-subtitles-are-made)）。ChronosJAV 的其他对齐器和时间模型会在 `whisperjav --check` 中列出，也见 [ChronosJAV 页面](chronosjav.md#subtitle-timing-1100)。
+对齐器（232 MB；Cohere-CrispASR 的默认，以及选了来自对齐器的任一轮）在一轮第一次使用它时下载，下载发生在这一轮内部，而不是运行开始之前。如果下载失败，这一轮会在没有对齐器的情况下继续：每个 VAD 组成为一条字幕，时间为该组的起止位置（见[字幕是怎样生成的](#how-the-subtitles-are-made)）。ChronosJAV 的其他对齐器和计时模型会在 `whisperjav --check` 中列出，也见 [ChronosJAV 页面](chronosjav.md#subtitle-timing-1100)。
 
 - 文件保存在你的 Hugging Face 缓存文件夹中（Windows 默认 `C:\Users\<你的用户名>\.cache\huggingface\`，macOS 和 Linux 默认 `~/.cache/huggingface/`），之后的运行会直接使用。
 - 首次使用前，WhisperJAV 会核对文件是否为它所需的版本。下载损坏的文件会被删除并重新下载一次。
@@ -217,10 +235,25 @@ Cohere-CrispASR 的对齐器（232 MB）在这一轮第一次使用时下载，�
 `whisperjav --check` 会列出 CrispASR 及其模型。在一切就绪的 NVIDIA GPU（CUDA）安装上显示：
 
 ```
-✓ CrispASR: 0.8.44+cuda (CUDA build), GGUF pipelines: asks for the NVIDIA GPU (CUDA)
+✓ CrispASR: 0.8.50+cuda (CUDA build), GGUF pipelines: asks for the NVIDIA GPU (CUDA)
 ✓ CrispASR model parakeet-tdt-0.6b-ja: Parakeet TDT 0.6B ja (q8_0), for parakeet-crispasr: downloaded
+✓ CrispASR model parakeet-tdt-0.6b-ja-f16: Parakeet TDT 0.6B ja (f16), for parakeet-crispasr: downloaded
 ✓ CrispASR model cohere-asr-ja-v0.1: Cohere Transcribe ja v0.1 (q8_0), for cohere-crispasr: downloaded
+✓ CrispASR model cohere-asr-ja-v0.1-f16: Cohere Transcribe ja v0.1 (f16), for cohere-crispasr: downloaded
 ✓ CrispASR model cohere-asr-ja: Cohere ASR ja (q8_0), for cohere-crispasr: downloaded
+✓ CrispASR model cohere-asr-ja-f16: Cohere ASR ja (f16), for cohere-crispasr: downloaded
+✓ CrispASR model reazonspeech-nemo-v2-f16: ReazonSpeech NeMo v2 (f16), for reazonspeech-crispasr: downloaded
+✓ CrispASR model reazonspeech-nemo-v2-q8_0: ReazonSpeech NeMo v2 (q8_0), for reazonspeech-crispasr: downloaded
+✓ CrispASR model kotoba-whisper-v2.0-f16: Kotoba-Whisper v2.0 (f16), for kotoba-crispasr: downloaded
+✓ CrispASR model kotoba-whisper-v2.0-q5_0: Kotoba-Whisper v2.0 (q5_0), for kotoba-crispasr: downloaded
+✓ CrispASR model whisper-large-v3-turbo-f16: Whisper large-v3-turbo (f16), for whisper-turbo-crispasr: downloaded
+✓ CrispASR model whisper-large-v3-turbo-q8_0: Whisper large-v3-turbo (q8_0), for whisper-turbo-crispasr: downloaded
+✓ CrispASR model whisper-large-v2-f16: Whisper large-v2 (f16), for whisper-large-crispasr: downloaded
+✓ CrispASR model whisper-large-v2-q8_0: Whisper large-v2 (q8_0), for whisper-large-crispasr: downloaded
+✓ CrispASR model whisper-large-v3-f16: Whisper large-v3 (f16), for whisper-large-crispasr: downloaded
+✓ CrispASR model whisper-large-v3-q5_0: Whisper large-v3 (q5_0), for whisper-large-crispasr: downloaded
+✓ CrispASR model moss-transcribe-diarize-0.9b-f16: MOSS-Transcribe-Diarize 0.9B (f16), for moss-crispasr: downloaded
+✓ CrispASR model moss-transcribe-diarize-0.9b-q8_0: MOSS-Transcribe-Diarize 0.9B (q8_0), for moss-crispasr: downloaded
 ✓ CrispASR model wav2vec2-ja: wav2vec2 large XLSR-53 ja (q4_k), for ChronosJAV and Cohere-CrispASR (aligner): downloaded
 ✓ CrispASR model parakeet-ctc-ja: Parakeet CTC 1.1B ja (q8_0), for ChronosJAV (aligner): downloaded
 ✓ CrispASR model qwen3-fa-gguf: Qwen3-ForcedAligner 0.6B (q4_k), for ChronosJAV (aligner): downloaded
@@ -248,10 +281,10 @@ Cohere-CrispASR 的对齐器（232 MB）在这一轮第一次使用时下载，�
 
   ```
   --mode crispasr is no longer available: WhisperJAV 1.10 removed the "bring your own CrispASR" mode.
-  CrispASR now runs in Ensemble Mode as two pipelines, Parakeet-CrispASR and Cohere-CrispASR, and WhisperJAV installs it itself.
+  CrispASR now runs in Ensemble Mode as the seven GGUF pipelines (parakeet-crispasr, cohere-crispasr, reazonspeech-crispasr, kotoba-crispasr, whisper-turbo-crispasr, whisper-large-crispasr, moss-crispasr), and WhisperJAV installs it itself.
   Example:
       whisperjav --ensemble --pass1-pipeline parakeet-crispasr <your video>
-  In the GUI: open the Ensemble Mode tab and choose parakeet or cohere under GGUF via crispasr in the Pass 1 or Pass 2 menu.
+  In the GUI: open the Ensemble Mode tab and choose one under GGUF via crispasr or Experimental, open to feedback in the Pass 1 or Pass 2 menu.
   ```
 
 - GUI 中，Transcription Mode 选项卡 Mode 菜单里的 **crispasr** 项已删除，专家模式（Ensemble Mode）选项卡中带 Backend 选项的旧 **CrispASR** 处理管线也已删除。
@@ -264,4 +297,4 @@ Cohere-CrispASR 的对齐器（232 MB）在这一轮第一次使用时下载，�
 
 ## 致谢
 
-CrispASR 由 [CrispStrobe/CrispASR](https://github.com/CrispStrobe/CrispASR) 开发。模型：NVIDIA 的 parakeet-tdt_ctc-0.6b-ja（CC-BY-4.0），由 cstr 转为 GGUF 格式；Cohere Transcribe 的日语微调版由 efwkjn 制作，由 TransWithAI 和 CKHO 转为 GGUF 格式。
+CrispASR 由 [CrispStrobe/CrispASR](https://github.com/CrispStrobe/CrispASR) 开发。模型：NVIDIA 的 parakeet-tdt_ctc-0.6b-ja（CC-BY-4.0），由 cstr 转为 GGUF 格式；Cohere Transcribe 的日语微调版由 efwkjn 制作，由 TransWithAI 和 CKHO 转为 GGUF 格式；reazon-research 的 reazonspeech-nemo-v2（Apache-2.0），由 cstr 转为 GGUF 格式；kotoba-tech 的 kotoba-whisper-v2.0（Apache-2.0），使用其自己的 whisper.cpp 文件；OpenAI 的 Whisper large-v2、large-v3 和 large-v3-turbo（MIT），使用 ggerganov 的 whisper.cpp 文件；OpenMOSS-Team 的 MOSS-Transcribe-Diarize（Apache-2.0），由 cstr 转为 GGUF 格式。

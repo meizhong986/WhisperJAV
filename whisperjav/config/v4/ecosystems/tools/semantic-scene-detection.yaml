@@ -116,7 +116,8 @@ gui:
     label: "Min Segment Duration"
     description: "Minimum segment length in seconds. Shorter segments are merged."
     min: 5
-    max: 60
+    max: 600
+    # 1.10.1: 600, not 60 -- a slider clamps to its max on Apply, and MOSS-CrispASR's minimum is 90 s (owner W482)
     step: 1
     data_type: float
     unit: "s"
@@ -126,9 +127,9 @@ gui:
     widget: slider
     label: "Max Segment Duration"
     description: "Scene ceiling in seconds. The engine clusters at 0.5 s granularity and merges upward, never past this value; a scene can only exceed it if one raw cluster is longer than the ceiling (a warning is logged). Balanced and Fidelity resolve 240 s."
-    min: 60
+    min: 10
     max: 1200
-    step: 10
+    step: 1
     data_type: float
     unit: "s"
     group: core

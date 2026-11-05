@@ -392,13 +392,18 @@ def _compute_timing_metrics(scenes: List[Dict]) -> Dict:
 # Health Scorecard
 # ---------------------------------------------------------------------------
 
+ALIGNER_NOT_USED = "not used (VAD Only)"   # owner W501 2: no red mark when the run loads no aligner
+
+
 def _compute_health_scorecard(
     alignment: Dict,
     timing: Dict,
     subtitle: Dict,
     scene: Dict,
+    timestamp_mode: Optional[str] = None,
 ) -> List[Dict]:
-    """Compute traffic-light health indicators."""
+    """Compute traffic-light health indicators. Under the timestamp mode vad_only (ChronosJAV's default since
+    1.10.1, owner W498 D1) no aligner runs, so the aligner line says so instead of a red 0.0 % (owner W501 2)."""
     indicators = []
 
     # 1. Collapse rate
@@ -415,19 +420,22 @@ def _compute_health_scorecard(
         "level": level,
     })
 
-    # 2. Aligner native percentage
+    # 2. Aligner native percentage (no level when the run loads no aligner)
     an_pct = timing["aligner_native_pct"]
-    if an_pct > 90:
-        level = "GREEN"
-    elif an_pct > 70:
-        level = "YELLOW"
+    if timestamp_mode == "vad_only":
+        indicators.append({"name": "Aligner", "value": ALIGNER_NOT_USED, "level": "OFF"})
     else:
-        level = "RED"
-    indicators.append({
-        "name": "Aligner native",
-        "value": f"{an_pct:.1f}%",
-        "level": level,
-    })
+        if an_pct > 90:
+            level = "GREEN"
+        elif an_pct > 70:
+            level = "YELLOW"
+        else:
+            level = "RED"
+        indicators.append({
+            "name": "Aligner native",
+            "value": f"{an_pct:.1f}%",
+            "level": level,
+        })
 
     # 3. Speech ratio
     sr = scene["speech_ratio"] * 100
@@ -482,7 +490,7 @@ def _compute_health_scorecard(
 # Console summary
 # ---------------------------------------------------------------------------
 
-_LEVEL_SYMBOLS = {"GREEN": "+", "YELLOW": "~", "RED": "!"}
+_LEVEL_SYMBOLS = {"GREEN": "+", "YELLOW": "~", "RED": "!", "OFF": "-"}
 
 
 def print_summary(analytics: Dict, title: str = "") -> None:
@@ -604,6 +612,7 @@ def compute_analytics(
     raw_subs_dir: Path,
     srt_path: Path,
     title: Optional[str] = None,
+    timestamp_mode: Optional[str] = None,
 ) -> Dict:
     """
     Compute pipeline analytics from diagnostics and SRT.
@@ -612,6 +621,8 @@ def compute_analytics(
         raw_subs_dir: Directory containing scene_NNNN_diagnostics.json files.
         srt_path: Path to the final (or stitched) SRT file.
         title: Optional title for the analytics report (e.g., media filename).
+        timestamp_mode: The run's timestamp mode (its value, e.g. "vad_only"); under vad_only the aligner line
+            says "not used (VAD Only)" with no level (owner W501 2). None = not known (as before).
 
     Returns:
         Analytics dict with keys: scene, alignment, subtitle, timing, health.
@@ -631,7 +642,7 @@ def compute_analytics(
     )
     timing_metrics = _compute_timing_metrics(scenes)
     health = _compute_health_scorecard(
-        alignment_metrics, timing_metrics, subtitle_metrics, scene_metrics,
+        alignment_metrics, timing_metrics, subtitle_metrics, scene_metrics, timestamp_mode,
     )
 
     analytics = {

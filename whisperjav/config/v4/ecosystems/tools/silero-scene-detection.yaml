@@ -104,7 +104,8 @@ gui:
     label: "Max Scene Duration"
     description: "Maximum scene duration in seconds"
     min: 10
-    max: 120
+    max: 600
+    # 1.10.1: 600, not 120 -- a range slider clamps to its max, and the silero default is 420 s (MOSS-CrispASR, W426 4)
     step: 1
     data_type: float
     group: core

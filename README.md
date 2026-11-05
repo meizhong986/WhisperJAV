@@ -60,141 +60,6 @@ Any input FFmpeg can read works: MP4, MKV, AVI, WMV, MP3, WAV, FLAC, and so on. 
 
 ---
 
-## New in v1.9.5
-
-**A small fix release on top of 1.9.4.** On 1.9.3 or 1.9.4, upgrade with one command,
-`whisperjav-upgrade --wheel-only`, because 1.9.5 changes no library underneath WhisperJAV. Full
-detail: [**release notes**](docs/release_notes_v1.9.5_for_users.md).
-
-- **Saved output folder (GUI):** with *Remember settings* on, an empty saved output folder sent
-  subtitles into WhisperJAV's program folder. They now go next to the video (#454).
-- **Ollama translations:** repeated `<summary>` and `<scene>` blocks in a local model's reply are now
-  removed before the reply is read (#455, PR #443).
-- **DeepSeek:** the default model is now `deepseek-flash`. DeepSeek still accepts the old name,
-  `deepseek-v4-flash` (PR #457).
-- **Ensemble defaults:** pass 1 is Qwen3-ASR + FireRedVAD and pass 2 is Anime-Whisper + TEN VAD, both
-  Aggressive. Pass 2 stays off until you tick it. Saved settings are kept.
-- **Colab:** the notebook no longer replaces Colab's PyTorch. It adds the CUDA 12 libraries that
-  faster-whisper needs (#456, #447).
-
-**If you run WhisperJAV from scripts:** in a two-pass run, a pass 1 on Qwen3-ASR or a pass 2 on
-anime-whisper now defaults to Aggressive with FireRedVAD (pass 1) or TEN (pass 2). In 1.9.4 it was
-Balanced with WhisperSeg. A pass 1 on Qwen3-ASR stops before transcribing if FireRedVAD is not
-installed. See [Changes](docs/release_notes_v1.9.5_for_users.md#changes).
-
----
-
-## New in v1.9.4
-
-**Bug fixes, hardening, and better subtitle timing for ChronosJAV.** On 1.9.3, upgrade with one
-command — `whisperjav-upgrade --wheel-only` — because 1.9.4 changes no library underneath
-WhisperJAV. Full detail, including every change and who reported it:
-[**release notes**](docs/release_notes_v1.9.4_for_users.md).
-
-**Subtitles stay in time in films with holes in their audio.** Some downloaded films have hidden holes in their audio
-track. In those files every subtitle after the first hole came out early — by up to 10 seconds in
-the films we measured. WhisperJAV now fills the holes with silence while extracting the audio, so
-subtitle times stay in step with the video. Every file is checked as it is extracted. A damaged file
-is still transcribed, and the run summary lists it as `suspect`, with the reason. To stop such files
-instead, use `--fail-on suspect`, or tick **Treat 'suspect' files as failures** in the GUI.
-
-**An attempt to improve ChronosJAV timing** (#433, #421, #417, #437, #427). For Qwen3-ASR and
-anime-whisper, the longest piece of speech sent to the model is now 4 seconds at every sensitivity,
-with the WhisperSeg, TEN and FireRedVAD speech segmenters, and anime-whisper has new settings for
-where long pieces are cut. TEN now cuts long speech at the quietest point and never past the limit.
-On seven drama scenes with reference subtitles, measured with WhisperSeg, the typical gap between a
-line's end and the reference end shrank by 10 to 24 % (Qwen3-ASR measured at balanced only). The
-text error changed by between 1.5 % better and 0.5 % worse. These are drama scenes, not JAV, and lines
-still end somewhat late — please tell us how it does on your films. Qwen3-ASR with WhisperSeg no
-longer adds 100 ms of padding after each piece of speech. anime-whisper now also hears 200 ms of
-silence before each piece of audio, except with the Silero speech segmenters, where it is off:
-**Silence Before Each Window (ms)**, or `--qwen-leading-silence` (`0` turns it off).
-
-**If you run WhisperJAV from scripts:** `--fail-on suspect` now also stops files with damaged audio;
-a ForcedAligner that cannot be loaded now leaves the file `suspect` and exits 0 instead of failing the
-job; a custom translation server now keeps its own temperature unless you pass `--temperature`. See
-[What will break](docs/release_notes_v1.9.4_for_users.md#what-will-break).
-
-Also here: Gemini's default model is now `gemini-3.6-flash`; translation choices are remembered
-between launches; the command line finds the bundled FFmpeg on Windows; on Balanced and Faster, a
-speech piece of a few milliseconds at the edge of a scene, which could crash the run, is now joined to
-its neighbour; and the Windows installer downloads PyTorch again if it does not load after install.
-
----
-
-## New in v1.9.3
-
-**More bug fixes and overall improvements.** 1.9.3 builds on 1.9.2: where that release was about
-performance and the Balanced pipeline, this one is about fixing bugs and making small improvements
-across the features. Full detail, including every fix and who reported it:
-[**release notes**](docs/release_notes_v1.9.3_for_users.md).
-
-**The one to know about: a major bug in the speech enhancers.** "Enhance for VAD only" did not do
-what its name says — on Fidelity it enhanced *both* tracks, so the recogniser heard the cleaned-up
-audio too, which is the very thing the option exists to avoid. It now genuinely splits them. The
-control was also invisible in the GUI unless you re-picked the enhancer by hand, and FFmpeg DSP could
-not be chosen from the GUI at all.
-
-**The recommended recipe** — more accurate subtitles and more accurate timing, for a little more
-time. Choose a speech enhancer: **htdemucs** (new here; it comes with a fresh install — upgraders,
-see the release notes), or any of the
-stable enhancers that suits your machine. Then turn on **Enhance for VAD only**. The enhanced vocal
-stem drives the voice detection, so the speech is *segmented* on clean audio, while the recogniser
-transcribes the **original, untouched** audio. Preparing one track and recognising the other is what
-improves the accuracy. The maintainer's own favourite is **Qwen ASR + htdemucs + Enhance-for-VAD-only
-+ TEN VAD**:
-
-```
-whisperjav video.mkv --ensemble --pass1-pipeline qwen --pass1-model Qwen/Qwen3-ASR-1.7B \
-  --pass1-speech-enhancer htdemucs --pass1-enhance-for-vad --pass1-speech-segmenter ten
-```
-
-**If you run WhisperJAV from scripts:** `--mode balanced --enhance-for-vad` now exits 2 with an
-explanation instead of being accepted and ignored, and so does a Balanced pass in a two-pass run. See
-[What will break](docs/release_notes_v1.9.3_for_users.md#what-will-break).
-
-Also here: the installer shows what it is doing during the PyTorch download instead of looking
-frozen, and no longer writes settings into your global Git configuration; French translation works
-and Italian, Thai and Korean are added; a failed translation names the right server's log instead of
-telling everyone to check Ollama's.
-
----
-
-## New in v1.9.2
-
-Full detail, including every bug fixed and who reported it: [**release notes**](docs/release_notes_v1.9.2_for_users.md).
-
-**Every run now tells you whether it worked.** It ends with a table, one line per file:
-
-```
-STATE    MILEAGE        FILE
-done     ok 100%        movie1.mp4 -> movie1.ja.srt (1961 cue(s))
-suspect  low 6%         movie2.mp4 -> movie2.ja.srt (82 cue(s)); subtitles stop at 400s of 7000s (5.7% of the file); 82 cue(s) produced
-empty    not assessed   movie3.mp4 -> movie3.ja.srt; movie3.ja.srt contains no subtitles
-```
-
-(The framing rules and the totals line are omitted here.)
-
-`done` · `empty` · `suspect` · `failed` · `skipped` mean the same thing in every mode, and the exit status follows them: **1 if any file failed, or if the run did not finish** (interrupted, or stopped by an error), 0 otherwise. Zero subtitles is an observation, not a failure — silence and music both end there — so `empty` and `suspect` exit 0 unless you ask otherwise with `--fail-on empty` / `--fail-on suspect`, or the two matching checkboxes on the GUI's *Transcription Adv. Options* tab. A `whisperjav_run.json` next to your subtitles carries the same result for scripts.
-
-**MILEAGE** is how far into the file your subtitles reach — where the last one ends, as a share of the video's length. It is *not* how much of the video carries subtitles. `--min-coverage` sets how low that can go before a file is called `suspect` (a quarter, by default).
-
-**It warns you when your audio looks difficult.** After working out the scenes and before the long part, a run on Balanced, Fidelity or `--mode qwen` says how much of the file is speech, and flags the file as unusually quiet, or names the scenes where speech sits close in level to everything around it. If your audio looks normal you get one line and nothing else.
-
-**Other things you can now do:**
-
-| | |
-|---|---|
-| `--offline` | Use only Hugging Face models already downloaded; a missing one fails at once instead of retrying for minutes. Also a checkbox on *Transcription Adv. Options*. |
-| `--vad-version 3.1\|4.0\|6.2` | Which Silero build Balanced's voice detection runs. Default 4.0. |
-| `--fail-on empty` / `suspect` | Make those states fail the run. |
-| `--model-refresh-audio-minutes` | The recogniser is reloaded every 20 minutes of audio on Balanced and Fidelity, to bound a fault where it stops returning anything (#394). `0` turns it off. |
-| `--skip-existing` | Skip files that already have subtitles — now in the GUI too, and in two-pass runs. |
-
-**Changes you may notice:** Aggressive is much faster on Balanced and no longer decodes a passage twice, so run times are predictable and the same file gives the same subtitles every time. Scene detection changed default (above), so your scenes — and your subtitles — will differ from 1.9.0/1.9.1 output. `--no-vad` is removed; `--speech-segmenter none` does the same thing on the modes that still take one. On a machine with no usable GPU a script now needs `--accept-cpu-mode` or `--device cpu`, where it used to continue by itself after a countdown.
-
----
-
 ## How a video becomes subtitles
 
 Every pipeline follows the same overall shape; modes differ in which components they use and how aggressively they are tuned.
@@ -235,13 +100,13 @@ Each stage has several interchangeable providers — the full menu, with strengt
 | **qwen** (ChronosJAV) | Qwen3-ASR | Modern text-first recognizer |
 | **anime-whisper** (ChronosJAV) | anime-whisper | Anime/JAV-tuned dialogue |
 | **transformers** | HuggingFace | Kotoba and other HF Whisper models |
-| **parakeet-crispasr**, **cohere-crispasr** (Ensemble passes) | CrispASR (GGUF models) | Japanese; experimental in 1.10.0 |
+| **parakeet**, **cohere**, **reazonspeech**, **kotoba**, **whisper-turbo**, **whisper-large**, **MOSS** (`*-crispasr`, Ensemble passes) | CrispASR (GGUF models) | Japanese; experimental (parakeet and cohere since 1.10.0, the others new in 1.10.1) |
 
 **Sensitivity** applies to every mode: **conservative** (fewer false positives, good for noisy content) · **balanced** · **aggressive** (catches more quiet dialogue; good for whisper/ASMR content — and the tuning target of most of our benchmark work).
 
 ### ChronosJAV
 
-Some of the best recognizers for this domain (anime-whisper, Qwen3-ASR and its Japanese finetunes) don't produce reliable timestamps on their own. ChronosJAV runs text generation and timing as separate stages: the VAD provides the time skeleton, the model provides the words. Since v1.9, timestamps come from the VAD frames by default (no aligner model loaded, ~1 GB less VRAM); a Qwen forced-aligner mode remains available in the settings for word-level alignment.
+Some of the best ASR models for this material (anime-whisper, Qwen3-ASR and its Japanese fine-tunes) do not give reliable times on their own. ChronosJAV therefore takes the text from the ASR model and the times from a separate step. By default each subtitle takes the start and end of the piece of speech (VAD group) the speech segmenter found, and no aligner is loaded — as in 1.9.x, and again since 1.10.1 (1.10.0 timed the text with an aligner and a timing model by default). Both remain choices in the settings: an aligner mode (CrispASR's aligners such as `wav2vec2-ja`, or the PyTorch Qwen3 forced aligner) and the Whisper small timing model.
 
 The same decoupled design is why new models can be added without rebuilding the pipeline — anything that turns audio into text can be slotted in.
 
@@ -261,7 +126,7 @@ whisperjav video.mp4 --ensemble \
 
 - **Merge strategies:** `pass1_primary` / `pass2_primary` (one pass leads, the other fills gaps), `smart_merge`, `full_merge`, `pass1_overlap` / `pass2_overlap`, `longest`
 - **Presets:** save and reload named ensemble configurations from the GUI
-- **Serial mode** (`--ensemble-serial`): finish each file completely before starting the next, so results appear as they're done
+- **Serial mode** ("Finish each file", `--ensemble-serial`, on by default since 1.10.1; `--no-ensemble-serial` turns it off): finish each file completely before starting the next, so results appear as they're done
 - **Bring your own pass 1, pass 2 or both:** [PurfView's Faster-Whisper XXL](https://github.com/Purfview/whisper-standalone-win) (`--pass1-pipeline xxl` and/or `--pass2-pipeline xxl`, with `--xxl-exe ...`; the model with `--pass1-model` / `--pass2-model`, default `large-v2`)
 
 ---
@@ -283,7 +148,7 @@ The recipe that ties the other choices together.
 | **qwen** (ChronosJAV) | Modern text-first recognizer; robust on messy audio | Timestamps come from the VAD, so the segmenter choice matters doubly |
 | **anime-whisper** (ChronosJAV) | Best-in-class on anime-style/JAV dialogue; heavily benchmark-tuned here | Can miss very faint, isolated utterances |
 | **transformers** | Runs any HF Whisper model; best GPU path on Apple Silicon | Uses HF's own chunking — scene/segmenter choices don't apply |
-| **parakeet-crispasr** / **cohere-crispasr** | GGUF models through CrispASR, installed with WhisperJAV; scene detection, enhancement and VAD work as for the other passes | Experimental in 1.10.0; Japanese only |
+| **The seven GGUF pipelines** (`*-crispasr`) | GGUF models through CrispASR, installed with WhisperJAV; scene detection, enhancement and VAD work as for the other passes | Experimental; Japanese only |
 | **xxl** | Bring your own external engine as a pass | Self-contained: WhisperJAV's knobs don't reach inside |
 
 > **Naming note (CLI users).** *ChronosJAV* is one pipeline with interchangeable recognizers, so **qwen** and **anime-whisper** are two backends of it rather than two separate pipelines. The GUI lists them side by side in the pipeline dropdown; on the command line both live under `qwen`, and the backend is chosen inside the params:
@@ -427,9 +292,22 @@ These are starting points, not rules — see [Mix-and-match strategies](#mix-and
 
 ---
 
+## Which pipeline for which computer
+
+You choose your kind of computer once, when you install WhisperJAV.
+
+| Your computer | What uses the graphics card |
+|---|---|
+| NVIDIA graphics card | Every pipeline. |
+| AMD or Intel graphics card, or an older NVIDIA card (Windows) | The GGUF pipelines (Ensemble tab, Pipeline menu groups "GGUF via crispasr" and "Experimental, open to feedback"), through Vulkan. Experimental, not yet tested. The other pipelines run on the processor, several times slower. |
+| Mac with Apple silicon | transformers asks for the Apple GPU; the GGUF pipelines and fidelity ask for it too (not yet tested on a Mac). balanced, fast, faster and ChronosJAV run on the processor. |
+| No graphics card | None: every pipeline runs on the processor, several times slower than on a graphics card. |
+
+---
+
 ## Installation
 
-> **Already on 1.10?** Windows installer: upgrade with `whisperjav-upgrade`; it keeps the accelerator of your install. Source install: `git fetch --tags`, `git checkout` the new release tag, and run the installer again with the same Python environment active. Rollback is available: `whisperjav-upgrade --rollback`. **On 1.9.x?** Install 1.10.0 fresh: it needs Python 3.13, so `whisperjav-upgrade` cannot take 1.9.x to it.
+> **Already on 1.10?** Windows installer: close WhisperJAV and run `"%LOCALAPPDATA%\WhisperJAV\python.exe" -m whisperjav.upgrade` in Command Prompt (or your install folder's `python.exe`), not `whisperjav-upgrade`, which can leave an install on another drive than Windows' temporary folder (normally C:) unable to start. It keeps the accelerator of your install. The GUI only tells you that a new version is out. If WhisperJAV no longer starts after an upgrade, uninstall it and install the newest release with the Windows installer; your settings and downloaded models stay. Source install: `git fetch --tags`, `git checkout` the new release tag, and run the installer again with the same Python environment active. **On 1.9.x?** Install 1.10 fresh: it needs Python 3.13, so `whisperjav-upgrade` cannot take 1.9.x to it.
 >
 > **Each install is made for one accelerator**, chosen when you install: NVIDIA GPU (CUDA), GPU through Vulkan (AMD, Intel or older NVIDIA card, Windows), Apple GPU (Metal), your own PyTorch, or CPU only. See [Accelerated or not](https://meizhong986.github.io/WhisperJAV/getting-started/#accelerated-or-not).
 
@@ -444,7 +322,7 @@ No Python knowledge needed.
 
 ### Google Colab / Kaggle
 
-Not supported by 1.10.0, which is made and tested for installs on your own computer only. The Colab expert notebook (badge at the top) keeps installing 1.9.5.
+Not supported by 1.10, which is made and tested for installs on your own computer only. The Colab expert notebook (badge at the top) keeps installing 1.9.5.
 
 <details>
 <summary><b>Windows — install from source</b></summary>
@@ -452,7 +330,7 @@ Not supported by 1.10.0, which is made and tested for installs on your own compu
 Prerequisites: Python 3.13, Git, FFmpeg in PATH.
 
 ```batch
-git clone --branch v1.10.0 https://github.com/meizhong986/whisperjav.git
+git clone --branch v1.10.1 https://github.com/meizhong986/whisperjav.git
 cd whisperjav
 installer\install_windows.bat                    :: a supported NVIDIA GPU is used; otherwise it asks
 installer\install_windows.bat --accelerator cpu  :: or choose: nvidia, vulkan, own-pytorch, cpu
@@ -468,13 +346,13 @@ Full guide: [docs/en/guides/installation_windows_python.md](docs/en/guides/insta
 xcode-select --install
 brew install python@3.13 ffmpeg portaudio git
 
-git clone --branch v1.10.0 https://github.com/meizhong986/whisperjav.git
+git clone --branch v1.10.1 https://github.com/meizhong986/whisperjav.git
 cd whisperjav
 python3.13 -m venv ~/venvs/whisperjav && source ~/venvs/whisperjav/bin/activate
 chmod +x installer/install_mac.sh && ./installer/install_mac.sh
 ```
 
-Apple silicon, macOS 14 or newer; the install is made for the Apple GPU (Metal). The transformers pipeline uses the Apple GPU and is recommended on a Mac; fidelity and the GGUF pipelines ask for it (not yet tested on a Mac); balanced, fast, faster and ChronosJAV run on the CPU. Intel Macs are not supported by 1.10.0.
+Apple silicon, macOS 14 or newer; the install is made for the Apple GPU (Metal). The transformers pipeline uses the Apple GPU and is recommended on a Mac; fidelity and the GGUF pipelines ask for it (not yet tested on a Mac); balanced, fast, faster and ChronosJAV run on the CPU. Intel Macs are not supported by 1.10.
 
 Full guide: [docs/en/guides/installation_mac_apple_silicon.md](docs/en/guides/installation_mac_apple_silicon.md)
 </details>
@@ -492,7 +370,7 @@ sudo apt-get install -y python3 python3-pip python3-venv python3-dev \
 Then:
 
 ```bash
-git clone --branch v1.10.0 https://github.com/meizhong986/whisperjav.git
+git clone --branch v1.10.1 https://github.com/meizhong986/whisperjav.git
 cd whisperjav
 chmod +x installer/install_linux.sh && ./installer/install_linux.sh
 ```
@@ -507,13 +385,13 @@ Full guide: [docs/en/guides/installation_linux.md](docs/en/guides/installation_l
 <details>
 <summary><b>Expert: your own Python environment and PyTorch</b></summary>
 
-Every 1.10.0 install gets the package versions this release was tested with: `install.py` installs them from the lock file with `uv sync`. To keep a PyTorch build you already have in your environment (for example ROCm for an AMD GPU), install with:
+Every 1.10 install gets the package versions its release was tested with: `install.py` installs them from the lock file with `uv sync`. To keep a PyTorch build you already have in your environment (for example ROCm for an AMD GPU), install with:
 
 ```bash
 python install.py --accelerator own-pytorch
 ```
 
-WhisperJAV then installs everything except PyTorch and never replaces it (experimental in 1.10.0).
+WhisperJAV then installs everything except PyTorch and never replaces it (experimental).
 </details>
 
 ### System requirements
@@ -540,7 +418,7 @@ Choose what the install is made for when you install — GPU through Vulkan (Win
 - **"FFmpeg not found"** — install FFmpeg and add it to PATH.
 - **Very slow** — run `whisperjav --check`, or read the box at the start of a run: they say where each part runs. On a CPU-only install everything runs on the CPU, several times slower than on a GPU.
 - **`model.bin` error in faster mode** — enable Windows Developer Mode (or run once as admin), then delete the cached model folder under `%USERPROFILE%\.cache\huggingface\hub`.
-- **An empty or very short subtitle file, with the run reporting success.** v1.9.2 fixes one cause of this on Balanced and now reports the outcome per file rather than always claiming success — see [New in v1.9.2](#new-in-v192). If it still happens, that is worth a report.
+- **An empty or very short subtitle file, with the run reporting success.** v1.9.2 fixes one cause of this on Balanced and now reports the outcome per file rather than always claiming success. If it still happens, that is worth a report.
 - Anything else: open a [GitHub issue](https://github.com/meizhong986/WhisperJAV/issues) with your system info and the console log. `tools/whisperjav_env_report.py` in this repository prints your package versions, GPU, driver and CUDA in one go — run it with the same Python that runs WhisperJAV (Windows users can right-click `whisperjav_env_report.ps1`). Logs and reproduction details make fixes much faster.
 
 ---
@@ -574,7 +452,9 @@ MIT. See [LICENSE](LICENSE).
 
 ## Acknowledgments
 
-Built on the shoulders of: [OpenAI Whisper](https://github.com/openai/whisper) · [faster-whisper](https://github.com/guillaumekln/faster-whisper) · [stable-ts](https://github.com/jianfch/stable-ts) · [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) · [anime-whisper](https://huggingface.co/litagin/anime-whisper) · [Kotoba-Whisper](https://huggingface.co/kotoba-tech/kotoba-whisper-v2.2) · [HuggingFace Transformers](https://github.com/huggingface/transformers) · [PySubtrans](https://github.com/machinewrapped/llm-subtrans) — and the testing community, whose feedback and bug reports shape every release.
+Built on the shoulders of: [OpenAI Whisper](https://github.com/openai/whisper) · [faster-whisper](https://github.com/guillaumekln/faster-whisper) · [stable-ts](https://github.com/jianfch/stable-ts) · [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) · [anime-whisper](https://huggingface.co/litagin/anime-whisper) · [Kotoba-Whisper](https://huggingface.co/kotoba-tech/kotoba-whisper-v2.2) · [HuggingFace Transformers](https://github.com/huggingface/transformers) · [PySubtrans](https://github.com/machinewrapped/llm-subtrans) · [CrispASR](https://github.com/CrispStrobe/CrispASR) — and the testing community, whose feedback and bug reports shape every release.
+
+Special thanks to [CrispASR](https://github.com/CrispStrobe/CrispASR), which runs the GGUF pipelines and ChronosJAV's aligner and timing model, for its rapid response and support.
 
 ## Disclaimer
 

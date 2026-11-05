@@ -7,6 +7,13 @@ Design note docs/plans/design/2026-10-28-chronosjav-timing-c3-c1.md sections 7-8
   flips the timestamp mode to vad_only and step-down off for all three models;
 - the timing model runs without an aligner too (rule T5: it moves the start only).
 
+1.10.1 (owner W498 D1): for Qwen3-ASR and anime-whisper the default is VAD only, with no timing model — the
+command line (--qwen-timestamp-mode vad_only, --qwen-timing-model none), the Ensemble pass worker's defaults and the
+GUI's Customize defaults. An aligner mode and the timing model stay choices, and everything above still holds when
+they are chosen. The dormant Cohere-in-ChronosJAV branch keeps 1.10.0's values (the pass worker's shared defaults).
+QwenPipeline's own constructor defaults are read by no caller (main.py and the pass worker pass both values); the
+QwenPipeline tests here build it directly, with them.
+
 No model is loaded: QwenPipeline builds its parts without loading them, the pass worker's settings are pure,
 and the GUI's argument builder runs nothing.
 """
@@ -92,8 +99,134 @@ def test_pass_worker_defaults():
     from whisperjav.ensemble.pass_worker import prepare_qwen_params
 
     p = prepare_qwen_params({})
+    # The shared values stay 1.10.0's (owner W254), taken by the dormant Cohere branch; Qwen3-ASR and anime-whisper
+    # get vad_only and no timing model in _build_pipeline (W498 D1; test_pass_worker_builds_each_model below).
     assert (p["qwen_aligner"], p["qwen_timestamp_mode"], p["qwen_timing_model"]) == \
         ("wav2vec2-ja", "aligner_vad_fallback", "whisper-small")
+
+
+class _Built(Exception):
+    pass
+
+
+def _built_with(monkeypatch, tmp_path, qwen_params, pass_number=1):
+    """The keyword arguments the pass worker builds QwenPipeline with (the pipeline is not built)."""
+    import whisperjav.ensemble.pass_worker as pw
+
+    seen = {}
+
+    def recorder(**kwargs):
+        seen.update(kwargs)
+        raise _Built()
+
+    monkeypatch.setattr(pw, "QwenPipeline", recorder)
+    monkeypatch.setitem(pw.PIPELINE_CLASSES, "qwen", recorder)
+    config = {"pipeline": "qwen", "sensitivity": "balanced", "scene_detector": None, "speech_segmenter": None,
+              "speech_enhancer": None, "model": None, "params": None, "qwen_params": qwen_params, "language": "ja",
+              "device": None}
+    with pytest.raises(_Built):
+        pw._build_pipeline(config, pass_number, str(tmp_path / "out"), False, "native", {}, tmp_path / "pass")
+    return seen
+
+
+@pytest.mark.parametrize("qwen_params,mode,timing", [
+    (None, "vad_only", "none"),                                                    # Qwen3-ASR, nothing named
+    ({"generator_backend": "anime-whisper"}, "vad_only", "none"),                  # anime-whisper (W498 D1)
+    ({"generator_backend": "anime-whisper", "assembly_cleaner": "passthrough", "framer": "vad-grouped"},
+     "vad_only", "none"),                                                          # the GUI's shape, not customized
+    ({"timestamp_mode": "aligner_vad_fallback", "timing_model": "whisper-small"},
+     "aligner_vad_fallback", "whisper-small"),                                     # chosen: still a choice
+    ({"generator_backend": "anime-whisper", "timestamp_mode": "aligner_vad_fallback"},
+     "aligner_vad_fallback", "none"),
+    ({"timing_model": "whisper-small"}, "vad_only", "whisper-small"),
+    ({"generator_backend": "cohere"}, "aligner_vad_fallback", "whisper-small"),   # dormant Cohere: as in 1.10.0
+    # W501 1: a named aligner without a timestamp mode brings aligner_vad_fallback; the timing model stays off
+    ({"aligner_id": "qwen3-fa-gguf"}, "aligner_vad_fallback", "none"),
+    ({"qwen_aligner": "qwen3-fa-gguf"}, "aligner_vad_fallback", "none"),
+    ({"aligner_backend": "qwen3"}, "aligner_vad_fallback", "none"),
+    ({"aligner_backend": "crispasr"}, "aligner_vad_fallback", "none"),
+    ({"generator_backend": "anime-whisper", "aligner_id": "qwen3-fa-gguf"}, "aligner_vad_fallback", "none"),
+    ({"aligner_id": "qwen3-fa-gguf", "timing_model": "whisper-small"}, "aligner_vad_fallback", "whisper-small"),
+    # ... but a mode the pass names wins, and an aligner turned off brings nothing
+    ({"aligner_id": "qwen3-fa-gguf", "timestamp_mode": "vad_only"}, "vad_only", "none"),
+    ({"aligner_backend": "none", "aligner_id": "wav2vec2-ja"}, "vad_only", "none"),
+    ({"use_aligner": False, "aligner_backend": "crispasr"}, "vad_only", "none"),
+    ({"aligner_id": "none"}, "vad_only", "none"),
+    # the GUI's customized shape: every Alignment control, its mode included -> what the window says
+    ({"aligner_backend": "crispasr", "aligner_id": "wav2vec2-ja", "timestamp_mode": "vad_only",
+      "timing_model": "none"}, "vad_only", "none"),
+])
+def test_pass_worker_builds_each_model(monkeypatch, tmp_path, qwen_params, mode, timing):
+    seen = _built_with(monkeypatch, tmp_path, qwen_params)
+    assert (seen["timestamp_mode"], seen["timing_model"]) == (mode, timing)
+
+
+@pytest.mark.parametrize("aligner_id,backend,use,named", [
+    (None, None, None, False), ("", None, None, False), ("none", None, None, False), ("wav2vec2-ja", None, None, True),
+    ("Qwen/Qwen3-ForcedAligner-0.6B", None, None, True), (None, "crispasr", None, True), (None, "qwen3", None, True),
+    ("wav2vec2-ja", "none", None, False), (None, "crispasr", False, False), ("qwen3-fa-gguf", None, True, True),
+])
+def test_the_one_rule_aligner_named(aligner_id, backend, use, named):
+    from whisperjav.config.chronosjav_timing import aligner_named, timestamp_mode_for
+
+    assert aligner_named(aligner_id, backend, use) is named
+    assert timestamp_mode_for(None, named) == ("aligner_vad_fallback" if named else "vad_only")
+    assert timestamp_mode_for("aligner_only", named) == "aligner_only"
+
+
+def _single_pass_kwargs(monkeypatch, tmp_path, extra):
+    """The keyword arguments a real --mode qwen run (main.process_files_sync) builds QwenPipeline with."""
+    import sys
+    import types
+    from whisperjav import main as wj_main
+
+    seen = {}
+
+    class Pipeline:
+        def __init__(self, **kwargs):
+            seen.update(kwargs)
+            raise _Built()
+
+    fake = types.ModuleType("whisperjav.pipelines.qwen_pipeline")
+    fake.QwenPipeline = Pipeline
+    monkeypatch.setitem(sys.modules, "whisperjav.pipelines.qwen_pipeline", fake)
+    (tmp_path / "a.mp4").write_bytes(b"")
+    media = [{"path": str(tmp_path / "a.mp4"), "basename": "a", "duration": 60.0}]
+    monkeypatch.setattr("sys.argv", ["whisperjav", media[0]["path"], "--mode", "qwen", "--output-dir",
+                                     str(tmp_path / "out"), "--temp-dir", str(tmp_path / "temp"), "--no-progress",
+                                     *extra])
+    args = wj_main.parse_arguments()
+    try:
+        wj_main.process_files_sync(media, args, None, [])
+    except _Built:
+        pass
+    return seen
+
+
+@pytest.mark.parametrize("extra,mode,aligner,timing", [
+    ([], "vad_only", "wav2vec2-ja", "none"),                                              # W498 D1
+    (["--qwen-generator", "anime-whisper"], "vad_only", "wav2vec2-ja", "none"),
+    (["--qwen-aligner", "qwen3-fa-gguf"], "aligner_vad_fallback", "qwen3-fa-gguf", "none"),   # W501 1
+    (["--qwen-aligner=qwen3-fa-gguf", "--qwen-generator", "anime-whisper"], "aligner_vad_fallback", "qwen3-fa-gguf",
+     "none"),
+    (["--qwen-aligner", "qwen3-fa-gguf", "--qwen-timestamp-mode", "vad_only"], "vad_only", "qwen3-fa-gguf", "none"),
+    (["--qwen-timestamp-mode", "aligner_vad_fallback"], "aligner_vad_fallback", "wav2vec2-ja", "none"),
+    (["--qwen-timing-model", "whisper-small"], "vad_only", "wav2vec2-ja", "whisper-small"),
+])
+def test_single_pass_run_builds_the_pipeline_with(monkeypatch, tmp_path, extra, mode, aligner, timing):
+    seen = _single_pass_kwargs(monkeypatch, tmp_path, extra)
+    assert seen, "the run did not reach QwenPipeline"
+    assert (seen["timestamp_mode"], seen["aligner_id"], seen["timing_model"]) == (mode, aligner, timing)
+
+
+@pytest.mark.parametrize("qwen_params", [{"timestamp_mode": "aligner_vad_fallback", "timing_model": "whisper-small"},
+                                         {"qwen_timestamp_mode": "aligner_vad_fallback",
+                                          "qwen_timing_model": "whisper-small"}])
+def test_pass_worker_aligner_and_timing_model_still_a_choice(qwen_params):
+    from whisperjav.ensemble.pass_worker import prepare_qwen_params
+
+    p = prepare_qwen_params({"qwen_params": qwen_params})
+    assert (p["qwen_timestamp_mode"], p["qwen_timing_model"]) == ("aligner_vad_fallback", "whisper-small")
 
 
 @pytest.mark.parametrize("qwen_params,aligner,timestamps", [
@@ -136,13 +269,13 @@ def test_pass_worker_timing_model_key():
     assert prepare_qwen_params({"qwen_params": {"timing_model": "none"}})["qwen_timing_model"] == "none"
 
 
-def test_pass_worker_no_longer_forces_anime_whisper_to_vad_only():
+def test_pass_worker_no_longer_forces_step_down_off_for_anime_whisper():
+    """anime-whisper has no step-down rule of its own since 1.10.0; its timing defaults are Qwen3-ASR's (W498 D1)."""
     import whisperjav.ensemble.pass_worker as pw
 
     src = Path(pw.__file__).read_text(encoding="utf-8")
-    assert 'qwen_pipeline_params["timestamp_mode"] = "vad_only"' not in src
     assert 'qwen_pipeline_params["stepdown_enabled"] = False' not in src
-    assert '"timing_model": qwen_defaults.get("qwen_timing_model", "whisper-small")' in src
+    assert 'if _gen_backend in ("qwen3", "anime-whisper"):' in src
 
 
 # --- the GUI ------------------------------------------------------------------------------------------
@@ -186,9 +319,16 @@ def test_gui_alignment_schema(api):
     assert alignment["aligner_backend"]["default"] == "crispasr"
     assert alignment["aligner_id"]["default"] == "wav2vec2-ja"
     assert {o["backend"] for o in alignment["aligner_id"]["options"]} == {"crispasr", "qwen3"}
-    assert alignment["timing_model"]["default"] == "whisper-small"
+    assert alignment["timing_model"]["default"] == "none"                 # W498 D1
     assert [o["value"] for o in alignment["timing_model"]["options"]] == ["whisper-small", "none"]
-    assert alignment["timestamp_mode"]["default"] == "aligner_vad_fallback"
+    assert alignment["timestamp_mode"]["default"] == "vad_only"           # W498 D1
+    assert "aligner_vad_fallback" in [o["value"] for o in alignment["timestamp_mode"]["options"]]
+
+
+def test_gui_status_panel_names_no_crispasr_part_by_default(api):
+    """With the defaults (VAD only, no timing model) a ChronosJAV pass uses neither CrispASR part."""
+    assert api.get_chronosjav_crispasr_status()["lines"] == []
+    assert api.get_chronosjav_crispasr_status(timestamp_mode="vad_only", timing_model="none")["lines"] == []
 
 
 def test_gui_alignment_tab_values_reach_the_run():
@@ -200,7 +340,9 @@ def test_gui_alignment_tab_values_reach_the_run():
     # ... and a saved preset keeps them too
     assert "if (tab === 'enhancer' && !passState.isQwen) return;" in js
     assert "if (tab === 'enhancer') return;" not in js
-    assert "timing_model: 'whisper-small'," in js and "aligner_backend: 'crispasr'," in js
+    # QwenManager.defaults (W498 D1): VAD only, no timing model; the aligner an aligner mode would use
+    assert "timing_model: 'none'," in js and "timestamp_mode: 'vad_only'," in js
+    assert "aligner_backend: 'crispasr'," in js
 
 
 # --- the command line -----------------------------------------------------------------------------------
@@ -214,5 +356,10 @@ def test_cli_defaults_and_help():
     assert done.returncode == 0
     out = " ".join(done.stdout.split())
     assert "--qwen-timing-model {whisper-small,none}" in out
-    assert "wav2vec2-ja (default" in out and "parakeet-ctc-ja" in out and "qwen3-fa-gguf" in out
+    assert "wav2vec2-ja (used when none is named" in out and "parakeet-ctc-ja" in out and "qwen3-fa-gguf" in out
+    # W498 D1: the command line's defaults, as --help states them; W501 1: a named aligner brings the aligner mode
+    assert "Timestamp resolution mode (default: vad_only" in out
+    assert "with --qwen-aligner and no mode: aligner_vad_fallback" in out
+    assert "Given without --qwen-timestamp-mode, it turns on aligner_vad_fallback" in out
+    assert "none (default)" in out and "whisper-small (default" not in out and "wav2vec2-ja (default" not in out
     assert "inert under the vad_only default" not in out

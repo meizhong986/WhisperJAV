@@ -20,6 +20,7 @@ S2, W175). What is Cohere's own (route B design 6):
   - the audio analytics, as the qwen pipeline (W202 5b); no CPS start retimer (W202 5c).
 """
 
+from whisperjav.crispasr import cleanup as crispasr_cleanup
 from whisperjav.pipelines.crispasr_pipeline import CrispASRPipeline, EngineRow
 
 
@@ -28,4 +29,9 @@ class CohereCrispASRPipeline(CrispASRPipeline):
 
     PIPELINE_NAME = "cohere-crispasr"
     LABEL = "Cohere-CrispASR"
-    ENGINE = EngineRow(line_rule="group", audio_analytics=True, aligner="wav2vec2-ja")
+    # 1.10.1 (owner W421 i1, W422): ChronosJAV's text cleaner on each VAD group's text before the aligner times it.
+    ENGINE = EngineRow(line_rule="group", audio_analytics=True, aligner="wav2vec2-ja",
+                       text_cleanup=crispasr_cleanup.TEXT_STAGES)
+    # --passN-word-timestamps model (1.10.1; owner W413, W414): Cohere's own token times (estimated by CrispASR),
+    # cut at sentence-end marks only, as the Whisper pipelines.
+    ENGINE_WITHOUT_ALIGNER = EngineRow(line_rule="tokens", audio_analytics=True, cut_at_pauses=False)

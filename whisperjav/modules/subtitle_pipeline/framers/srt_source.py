@@ -117,6 +117,13 @@ class SrtSourceFramer:
                 self._min_duration,
             )
 
+        # The shortest audio a model is given (owner W461; whisperjav/modules/model_audio.py): an entry shorter than
+        # 0.2 s is widened to it into the audio beside it, without reaching into its neighbours. SRT entries can
+        # overlap or be out of order: such a neighbour leaves no room on that side, and nothing is cut.
+        from whisperjav.modules.model_audio import widen_frames
+
+        widen_frames(frames, duration)
+
         return FramingResult(
             frames=frames,
             metadata={

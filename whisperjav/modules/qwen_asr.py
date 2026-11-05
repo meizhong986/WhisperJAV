@@ -26,8 +26,9 @@ import numpy as np
 import torch
 import stable_whisper
 
-from whisperjav.utils.logger import logger
+from whisperjav.utils.logger import console_shows_debug, hide_weight_loading_bar, keep_root_logger, logger
 from whisperjav.modules.japanese_postprocessor import JapanesePostProcessor
+from whisperjav.modules.qwen_errors import PREFIX as UNUSABLE_PREFIX, QwenModelUnusable
 
 
 def _as_audiolike(entry):
@@ -43,6 +44,46 @@ def _as_audiolike(entry):
     if isinstance(entry, np.ndarray):
         return (entry, 16000)
     return str(entry)
+
+
+# The output layer and the input embeddings of a Qwen3-ASR model, as its model file names them (R-QFT, #494).
+OUTPUT_LAYER = "thinker.lm_head.weight"
+INPUT_EMBEDDINGS = "thinker.model.embed_tokens.weight"
+
+
+def _checkpoint_tensor_names(model_id: str) -> Optional[set]:
+    """The tensor names stored in the model's files, read from their safetensors headers only.
+
+    ``model_id`` is a local folder or a Hugging Face model ID already in this computer's cache (the model has just
+    been loaded from it). ``None`` when the names cannot be read here: no safetensors files, or not in the cache.
+    """
+    root = Path(model_id)
+    if not root.is_dir():
+        try:
+            from huggingface_hub import try_to_load_from_cache
+            config_file = try_to_load_from_cache(model_id, "config.json")
+        except Exception as e:  # noqa: BLE001 -- unknown here means "do as before"
+            logger.debug("Could not find the files of %s in the cache: %s", model_id, e)
+            return None
+        if not isinstance(config_file, str):
+            return None
+        root = Path(config_file).parent
+    try:
+        index = root / "model.safetensors.index.json"
+        if index.is_file():
+            return set(json.loads(index.read_text(encoding="utf-8")).get("weight_map", {}))
+        files = sorted(root.glob("*.safetensors"))
+        if not files:
+            return None
+        from safetensors import safe_open
+        names = set()
+        for f in files:
+            with safe_open(str(f), framework="pt") as handle:
+                names.update(handle.keys())
+        return names
+    except Exception as e:  # noqa: BLE001 -- unknown here means "do as before"
+        logger.debug("Could not read the tensor names of %s: %s", model_id, e)
+        return None
 
 
 
@@ -420,7 +461,7 @@ class QwenASR:
         try:
             gen_config = self.model.model.thinker.generation_config
             gen_config.repetition_penalty = self.repetition_penalty
-            logger.info(
+            logger.debug(
                 "  Generation safety: repetition_penalty=%.2f applied to thinker",
                 self.repetition_penalty,
             )
@@ -430,6 +471,63 @@ class QwenASR:
                 "may have changed: %s. Generation will proceed without penalty.",
                 e,
             )
+
+    def _ensure_output_layer(self) -> None:
+        """Give the model its output layer when its file stores none (R-QFT, #494); stop when that cannot be done.
+
+        Qwen3-ASR fine-tunes such as jaykwok/Qwen3-ASR-1.7B-JA-Anime-Galgame and neosophie/Qwen3-ASR-1.7B-JA store
+        the input embeddings only; their settings say the output layer is the same matrix (tie_word_embeddings).
+        transformers 4 made that copy when loading (WhisperJAV 1.9.5); transformers 5 with the qwen-asr fork does
+        not, and leaves the output layer filled with random numbers, so the model never stops by itself and writes
+        nonsense. The copy is made here, after loading, on both load paths. The standard Qwen3-ASR models store
+        their output layer (byte for byte equal to their input embeddings) and are left as they are. When the
+        model's files cannot be read here (a model in .bin files, or not in this computer's cache), the copy is made
+        as transformers 4 made it: when the settings say the two are one matrix and they differ. A model with no
+        output layer that cannot take the copy stops the run (owner W491 2): its text would be nonsense.
+        """
+        names = _checkpoint_tensor_names(self.model_id)
+        if names is not None and OUTPUT_LAYER in names:
+            return
+        try:
+            thinker = self.model.model.thinker
+            head = thinker.lm_head.weight
+            embeddings = thinker.get_input_embeddings().weight
+            text_config = getattr(thinker.config, "text_config", None)
+            tied = bool(getattr(text_config, "tie_word_embeddings", True))
+        except AttributeError as e:
+            self._stop(f"{UNUSABLE_PREFIX}{self.model_id} could not be checked: WhisperJAV could not reach its "
+                       f"output layer ({e}). This is a fault in WhisperJAV, not in the model; please report it.")
+        same_shape = tuple(head.shape) == tuple(embeddings.shape)
+        in_memory = not (head.is_meta or embeddings.is_meta)
+        if names is None:
+            if tied and same_shape and in_memory and not torch.equal(head, embeddings):
+                with torch.no_grad():
+                    head.copy_(embeddings)
+                logger.info("  Output layer: made from the model's input embeddings, as its settings say "
+                            "(its files could not be read here)")
+            return
+        if INPUT_EMBEDDINGS not in names:
+            self._stop(self._unusable_text("its file has no input embeddings to make one from"))
+        if not tied:
+            self._stop(self._unusable_text("its settings say the output layer is not the same as the input embeddings"))
+        if not same_shape:
+            self._stop(self._unusable_text(
+                f"its input embeddings ({tuple(embeddings.shape)}) do not fit the output layer ({tuple(head.shape)})"))
+        if not in_memory:
+            self._stop(self._unusable_text("its input embeddings are not in memory"))
+        with torch.no_grad():
+            head.copy_(embeddings)
+        logger.info("  Output layer: not in the model file; made from the model's input embeddings")
+
+    def _unusable_text(self, reason: str) -> str:
+        """The plain message of a model that stops the run (owner W491 2)."""
+        return (f"{UNUSABLE_PREFIX}{self.model_id} cannot be used. Its model file has no output layer and {reason}, "
+                f"so its text would be nonsense. Choose another Qwen3-ASR model, for example Qwen/Qwen3-ASR-1.7B.")
+
+    def _stop(self, text: str) -> None:
+        """Free the model just loaded, then stop the run with ``text`` (owner W491 2)."""
+        self.unload_model()
+        raise QwenModelUnusable(text)
 
     def _compute_dynamic_token_limit(self, audio_duration_sec: float) -> int:
         """
@@ -579,15 +677,15 @@ class QwenASR:
         # Detect attention implementation
         attn_impl = self._detect_attn_implementation()
 
-        logger.info("Loading Qwen3-ASR model...")
-        logger.info(f"  Model:    {self.model_id}")
-        logger.info(f"  Device:   {self._device}")
-        logger.info(f"  Dtype:    {self._dtype}")
-        logger.info(f"  Batch:    {self.batch_size}")
-        logger.info(f"  Attention: {attn_impl}")
-        logger.info(f"  Aligner:  {self.aligner_id if self.use_aligner else 'disabled'}")
+        logger.debug("Loading Qwen3-ASR model...")
+        logger.debug(f"  Model:    {self.model_id}")
+        logger.debug(f"  Device:   {self._device}")
+        logger.debug(f"  Dtype:    {self._dtype}")
+        logger.debug(f"  Batch:    {self.batch_size}")
+        logger.debug(f"  Attention: {attn_impl}")
+        logger.debug(f"  Aligner:  {self.aligner_id if self.use_aligner else 'disabled'}")
         if self.context:
-            logger.info(f"  Context:  '{self.context[:50]}{'...' if len(self.context) > 50 else ''}'")
+            logger.debug(f"  Context:  '{self.context[:50]}{'...' if len(self.context) > 50 else ''}'")
 
         # Diagnostic logging
         logger.debug(
@@ -598,7 +696,9 @@ class QwenASR:
         start_time = time.time()
 
         try:
-            from qwen_asr import Qwen3ASRModel
+            with keep_root_logger():   # nagisa's root handler undone (review F3)
+                from qwen_asr import Qwen3ASRModel
+            hide_weight_loading_bar()   # owner W509, console item 3
 
             # Build model kwargs
             model_kwargs = {
@@ -631,11 +731,14 @@ class QwenASR:
             )
 
             load_time = time.time() - start_time
-            logger.info(f"  Loaded in {load_time:.1f}s")
+            logger.info(f"Qwen3-ASR loaded: {self.model_id} on {self._device} ({load_time:.1f} s)")
             logger.debug(
                 "[QwenASR PID %s] Model loaded successfully: %s in %.1fs",
                 os.getpid(), self.model_id, load_time
             )
+
+            # A fine-tune whose file stores no output layer gets it from the input embeddings (R-QFT, #494).
+            self._ensure_output_layer()
 
             # Apply generation safety controls (v1.8.9+)
             self._apply_generation_config()
@@ -1126,17 +1229,19 @@ class QwenASR:
         self._dtype = self._detect_dtype(self._device)
         attn_impl = self._detect_attn_implementation()
 
-        logger.info("Loading Qwen3-ASR model (text-only, no aligner)...")
-        logger.info(f"  Model:    {self.model_id}")
-        logger.info(f"  Device:   {self._device}")
-        logger.info(f"  Dtype:    {self._dtype}")
-        logger.info(f"  Batch:    {self.batch_size}")
-        logger.info(f"  Attention: {attn_impl}")
+        logger.debug("Loading Qwen3-ASR model (text-only, no aligner)...")
+        logger.debug(f"  Model:    {self.model_id}")
+        logger.debug(f"  Device:   {self._device}")
+        logger.debug(f"  Dtype:    {self._dtype}")
+        logger.debug(f"  Batch:    {self.batch_size}")
+        logger.debug(f"  Attention: {attn_impl}")
 
         start_time = time.time()
 
         try:
-            from qwen_asr import Qwen3ASRModel
+            with keep_root_logger():   # nagisa's root handler undone (review F3)
+                from qwen_asr import Qwen3ASRModel
+            hide_weight_loading_bar()   # owner W509, console item 3
 
             model_kwargs = {
                 "dtype": self._dtype,
@@ -1154,7 +1259,10 @@ class QwenASR:
             )
 
             load_time = time.time() - start_time
-            logger.info(f"  Loaded (text-only) in {load_time:.1f}s")
+            logger.info(f"Qwen3-ASR loaded (text only): {self.model_id} on {self._device} ({load_time:.1f} s)")
+
+            # A fine-tune whose file stores no output layer gets it from the input embeddings (R-QFT, #494).
+            self._ensure_output_layer()
 
             # Apply generation safety controls (v1.8.9+)
             self._apply_generation_config()
@@ -1190,15 +1298,17 @@ class QwenASR:
         if self._dtype is None:
             self._dtype = self._detect_dtype(self._device)
 
-        logger.info("Loading standalone ForcedAligner...")
-        logger.info(f"  Aligner:  {self.aligner_id}")
-        logger.info(f"  Device:   {self._device}")
-        logger.info(f"  Dtype:    {self._dtype}")
+        logger.debug("Loading standalone ForcedAligner...")
+        logger.debug(f"  Aligner:  {self.aligner_id}")
+        logger.debug(f"  Device:   {self._device}")
+        logger.debug(f"  Dtype:    {self._dtype}")
 
         start_time = time.time()
 
         try:
-            from qwen_asr.inference.qwen3_forced_aligner import Qwen3ForcedAligner
+            with keep_root_logger():   # nagisa's root handler undone (review F3)
+                from qwen_asr.inference.qwen3_forced_aligner import Qwen3ForcedAligner
+            hide_weight_loading_bar()   # owner W509, console item 3
 
             self._standalone_aligner = Qwen3ForcedAligner.from_pretrained(
                 self.aligner_id,
@@ -1207,7 +1317,7 @@ class QwenASR:
             )
 
             load_time = time.time() - start_time
-            logger.info(f"  Aligner loaded in {load_time:.1f}s")
+            logger.info(f"Qwen3 ForcedAligner loaded: {self.aligner_id} on {self._device} ({load_time:.1f} s)")
 
         except ImportError as e:
             raise ImportError(
@@ -1273,7 +1383,7 @@ class QwenASR:
         # for in-memory frame audio (v1.9.0 pathless mode).
         audio_inputs = [_as_audiolike(p) for p in audio_paths]
 
-        logger.info(
+        logger.debug(
             "Assembly: Text generation — %d scenes, language=%s",
             n, qwen_language or "auto",
         )
@@ -1284,6 +1394,7 @@ class QwenASR:
         with tqdm(
             total=n,
             desc="ASR Text Gen",
+            disable=not console_shows_debug(),   # one line per redraw in the GUI (owner W509, item 3)
             unit="scene",
             bar_format="{desc} {bar} {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
         ) as pbar:
@@ -1315,7 +1426,7 @@ class QwenASR:
                 chars = len(text)
                 speed = chars / scene_elapsed if scene_elapsed > 0 else 0
                 budget_info = f", budget={scene_token_limit}" if scene_token_limit != self.max_new_tokens else ""
-                logger.info(
+                logger.debug(
                     "  Scene %d/%d: %d chars in %.1fs (%.1f chars/s) | audio=%s%s",
                     i + 1, n, chars, scene_elapsed, speed, dur_str, budget_info,
                 )
@@ -1331,7 +1442,7 @@ class QwenASR:
 
         elapsed = time.time() - batch_start
         avg = elapsed / n if n > 0 else 0
-        logger.info(
+        logger.debug(
             "Assembly: Text generation complete — %d scenes in %.1fs (avg %.1fs/scene)",
             n, elapsed, avg,
         )
@@ -1394,7 +1505,7 @@ class QwenASR:
                 to_align_text.append(text)
 
         n_with_text = len(to_align_indices)
-        logger.info(
+        logger.debug(
             "Assembly: Alignment — %d/%d scenes with text, language=%s",
             n_with_text, n, qwen_language,
         )
@@ -1403,7 +1514,7 @@ class QwenASR:
         results: List[Optional[Any]] = [None] * n
 
         if not to_align_indices:
-            logger.info("Assembly: No scenes with text to align")
+            logger.debug("Assembly: No scenes with text to align")
             return results
 
         batch_start = time.time()
@@ -1411,6 +1522,7 @@ class QwenASR:
         with tqdm(
             total=n_with_text,
             desc="Aligning",
+            disable=not console_shows_debug(),   # one line per redraw in the GUI (owner W509, item 3)
             unit="scene",
             bar_format="{desc} {bar} {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
         ) as pbar:
@@ -1434,7 +1546,7 @@ class QwenASR:
                 results[idx] = align_result[0]
 
                 # Per-scene log line
-                logger.info(
+                logger.debug(
                     "  Scene %d/%d: aligned in %.1fs | audio=%s, %d chars",
                     idx + 1, n, scene_elapsed, dur_str, chars,
                 )
@@ -1443,7 +1555,7 @@ class QwenASR:
 
         elapsed = time.time() - batch_start
         avg = elapsed / n_with_text if n_with_text > 0 else 0
-        logger.info(
+        logger.debug(
             "Assembly: Alignment complete — %d scenes in %.1fs (avg %.1fs/scene)",
             n_with_text, elapsed, avg,
         )

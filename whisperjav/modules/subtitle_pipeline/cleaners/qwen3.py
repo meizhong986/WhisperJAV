@@ -80,7 +80,7 @@ class Qwen3TextCleaner:
         clean_chars = sum(len(t) for t in cleaned_texts)
         n_modified = sum(1 for r, c in zip(texts, cleaned_texts) if r != c)
         if n_modified > 0:
-            logger.info(
+            logger.debug(
                 "[Qwen3TextCleaner] Cleaned %d/%d items — %d → %d chars (-%d)",
                 n_modified, n_items, raw_chars, clean_chars, raw_chars - clean_chars,
             )

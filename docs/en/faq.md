@@ -132,7 +132,7 @@ The standalone installer respects standard proxy environment variables. Set them
 ```cmd
 set HTTPS_PROXY=http://user:pass@proxy.example.com:8080
 set HTTP_PROXY=http://user:pass@proxy.example.com:8080
-WhisperJAV-1.10.0-Windows-x86_64.exe
+WhisperJAV-1.10.1-Windows-x86_64.exe
 ```
 
 **Windows (persistent, all sessions):**
@@ -182,15 +182,17 @@ This error came from running the original `qwen-asr` package on `transformers` 5
 
 ### How do I upgrade?
 
-Within 1.10:
+Within 1.10, an install made with the Windows installer: close WhisperJAV, open Command Prompt and run
 
-```bash
-whisperjav-upgrade
+```
+"%LOCALAPPDATA%\WhisperJAV\python.exe" -m whisperjav.upgrade
 ```
 
-Or for code-only (faster): `whisperjav-upgrade --wheel-only`. It keeps the accelerator of your install. This is for installs made with the Windows installer. A source install: `git fetch --tags`, `git checkout` the new release tag, and run the installer again with the same Python environment active.
+(or the `python.exe` in your install folder), then answer `y`. It keeps the accelerator of your install. Do not start it with `Scripts\whisperjav-upgrade.exe` ([why](UPGRADE.md#windows-installer-installs)). If WhisperJAV no longer starts after an upgrade, uninstall it and install the newest release with the installer; your settings and downloaded models stay ([Repair](MANUAL_ROLLBACK.md)).
 
-From 1.9.x, install 1.10.0 fresh: 1.10.0 needs Python 3.13, so `whisperjav-upgrade` cannot take a 1.9.x install to it.
+A source install: `git fetch --tags`, `git checkout` the new release tag, and run the installer again with the same Python environment active.
+
+From 1.9.x, install the newest 1.10 release fresh: 1.10 needs Python 3.13, so `whisperjav-upgrade` cannot take a 1.9.x install to it.
 
 See the [Upgrade Guide](UPGRADE.md) for details.
 
@@ -262,7 +264,7 @@ Tips:- Avoid running other GPU-heavy applications simultaneously (Chrome, games,
 
 ## Cohere-Transcribe (not available yet)
 
-> **Status:** Cohere-Transcribe is not available in WhisperJAV yet. No release date is set. The dropdown entry is greyed out. (Not to be confused with Cohere-CrispASR, the GGUF pipeline in Ensemble Mode: see [Parakeet-CrispASR and Cohere-CrispASR](pipelines/crispasr.md).)
+> **Status:** Cohere-Transcribe is not available in WhisperJAV yet. No release date is set. (Not to be confused with Cohere-CrispASR, the GGUF pipeline in Ensemble Mode: see [Parakeet-CrispASR and Cohere-CrispASR](pipelines/crispasr.md).)
 
 > **About transformers:** WhisperJAV 1.10.0 installs transformers 5.20 together with its own build of `qwen-asr` made for it ([meizhong986/Qwen3-ASR](https://github.com/meizhong986/Qwen3-ASR)). Do not downgrade transformers below 5.0. If Qwen3-ASR does not load, run the installer again; it puts back the tested versions.
 

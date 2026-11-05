@@ -7,7 +7,8 @@ What is pinned here:
     message naming what was typed (owner W118 3, plan 2.5), found in the raw command line;
   - the new Ensemble pass values parakeet-crispasr and cohere-crispasr are in --help, and a pass
     that cannot run (unknown model, no model where there is no default, a language other than
-    Japanese, the speech segmenter "none") is a usage error with exit status 2 (plan 2.4, Q14, Q19);
+    Japanese) is a usage error with exit status 2 (plan 2.4, Q19); the speech segmenter "none" is accepted
+    since owner W457, W458 (each scene goes to the model whole; it replaced Q14's refusal);
   - a CrispASR pass with no speech segmenter named runs its pipeline's default: WhisperSeg for
     Parakeet-CrispASR, FireRedVAD for Cohere-CrispASR (W202 2-3);
   - the pass worker builds the two pipelines from the pass settings they use (--device included,
@@ -41,6 +42,7 @@ from whisperjav.crispasr.pass_settings import (
     ignored_hardware_settings,
     models_help,
     segmenter_settings,
+    unused_by_other_pipelines,
     unused_pass_settings,
     unused_settings_message,
     validate_crispasr_passes,
@@ -115,7 +117,9 @@ class TestTheOldModeIsFound:
         assert message.startswith("--crispasr-exe is no longer available")
         assert "Ensemble Mode" in message
         assert "--ensemble --pass1-pipeline parakeet-crispasr" in message
-        assert "Parakeet-CrispASR" in message and "Cohere-CrispASR" in message
+        from whisperjav.crispasr.manifest import CRISPASR_PIPELINES      # all seven (1.10.1; owner W525 2B b)
+        assert all(p in message for p in CRISPASR_PIPELINES), message
+        assert "two pipelines" not in message
 
 
 # ===========================================================================
@@ -150,7 +154,7 @@ class TestAPassThatCannotRunIsRefused:
         problem = crispasr_pass_problem(1, "parakeet-crispasr", model=CTC, speech_segmenter=None,
                                         language="japanese")
         assert problem == (f"--pass1-model: '{CTC}' is not a model of parakeet-crispasr; "
-                           f"choose one of: parakeet-tdt-0.6b-ja")
+                           f"choose one of: parakeet-tdt-0.6b-ja, parakeet-tdt-0.6b-ja-f16")
 
     @pytest.mark.parametrize("pipeline", manifest.CRISPASR_PIPELINES)
     def test_no_model_named_runs_the_default(self, pipeline):
@@ -163,13 +167,12 @@ class TestAPassThatCannotRunIsRefused:
                                         language=language)
         assert "transcribes Japanese only" in problem and language in problem
 
+    @pytest.mark.parametrize("pipeline", manifest.CRISPASR_PIPELINES)
     @pytest.mark.parametrize("segmenter", ["none", "None", " NONE "])
-    def test_the_segmenter_none_is_refused(self, segmenter):
-        problem = crispasr_pass_problem(2, "parakeet-crispasr", model=None, speech_segmenter=segmenter,
-                                        language="japanese")
-        assert problem.startswith("--pass2-speech-segmenter none is not available")
-        assert CRISPASR_DEFAULT_SEGMENTERS["parakeet-crispasr"] in problem
-        assert "it transcribes the VAD groups the speech segmenter finds" in problem
+    def test_the_segmenter_none_is_accepted(self, segmenter, pipeline):
+        # owner W457, W458: each scene goes to the model whole
+        assert crispasr_pass_problem(2, pipeline, model=None, speech_segmenter=segmenter,
+                                     language="japanese") is None
 
     def test_another_segmenter_is_accepted(self):
         assert crispasr_pass_problem(1, "parakeet-crispasr", model=None, speech_segmenter="ten",
@@ -232,6 +235,28 @@ class TestTheSettingsAPassDoesNotUse:
     def test_sensitivity_is_used_so_never_named(self, sensitivity):
         assert unused_pass_settings({"pipeline": "cohere-crispasr", "sensitivity": sensitivity}, 1) == []
 
+    # 1.10.1 (Part B; owner W413): --passN-word-timestamps is the CrispASR pipelines' only
+    @pytest.mark.parametrize("pipeline", ["balanced", "fidelity", "qwen", "transformers", "xxl"])
+    def test_word_timestamps_on_another_pipeline_is_named(self, pipeline):
+        config = {"pipeline": pipeline, "word_timestamps": "aligner"}
+        assert unused_by_other_pipelines(config, 2) == ["--pass2-word-timestamps"]
+        assert unused_settings_message(f"The {pipeline} pipeline", unused_by_other_pipelines(config, 2)) == \
+            f"The {pipeline} pipeline does not use: --pass2-word-timestamps"
+
+    @pytest.mark.parametrize("pipeline", manifest.CRISPASR_PIPELINES)
+    def test_word_timestamps_on_a_crispasr_pipeline_is_used(self, pipeline):
+        config = {"pipeline": pipeline, "word_timestamps": "model"}
+        assert unused_by_other_pipelines(config, 1) == [] and unused_pass_settings(config, 1) == []
+
+    def test_word_timestamps_left_out_is_never_named(self):
+        assert unused_by_other_pipelines({"pipeline": "balanced", "word_timestamps": None}, 1) == []
+
+    def test_the_pass_worker_names_it_before_any_pipeline_is_built(self):
+        source = (REPO / "whisperjav" / "ensemble" / "pass_worker.py").read_text(encoding="utf-8")
+        at = source.index("_other_unused = unused_by_other_pipelines(pass_config, pass_number)")
+        assert at < source.index('if pass_config.get("pipeline") == "xxl":')   # XXL too
+        assert '"word_timestamps": pass_config.get("word_timestamps") or None,' in source
+
 
 class TestComputeType:
     """--compute-type is not used, with a logged warning; --device is used (W194 1). Left out or auto,
@@ -248,12 +273,13 @@ class TestComputeType:
 
     def test_the_warning(self):
         assert ignored_hardware_message("Cohere-CrispASR", ["--compute-type int8"]) == (
-            "Cohere-CrispASR ignores --compute-type int8: CrispASR's model files come in one number "
-            "format (8-bit).")
+            "Cohere-CrispASR ignores --compute-type int8: each model file has its own number format (f16, q8_0, "
+            "...); choose the file with --passN-model.")
 
-    def test_the_8_bit_in_the_warning_is_true_of_every_model_file(self):
-        names = {name for models in manifest.PIPELINE_MODELS.values() for name in models}
-        assert names and all(manifest.MODELS[name].filename.endswith("-q8_0.gguf") for name in names)
+    def test_the_menus_offer_more_than_one_number_format(self):
+        # 1.10.1 (W400, W401): the 1.10.0 warning said every file was 8-bit; f16 and q5_0 files are offered now
+        labels = {manifest.MODELS[name].label for models in manifest.PIPELINE_MODELS.values() for name in models}
+        assert any("(f16)" in label for label in labels) and any("(q8_0)" in label for label in labels)
 
 
 class TestTheModelHelp:
@@ -279,25 +305,51 @@ class TestTheCommandLine:
         result = _cli("--help")
         assert result.returncode == 0, result.stderr[-600:]
         text = " ".join(result.stdout.split())
-        assert "parakeet-crispasr" in text and "cohere-crispasr" in text
+        for pipeline in manifest.CRISPASR_PIPELINES:
+            assert pipeline in text
         for models in manifest.PIPELINE_MODELS.values():
             for model in models:
                 assert model in text
         assert CTC not in text   # not offered (W129 2)
         # T1, T2, T24 (route B design 12)
         assert "run through CrispASR, installed with WhisperJAV" in text
-        assert ("Experimental in 1.10.0 (early release). "   # owner W212 D4 1
+        assert ("Experimental (early release): parakeet-crispasr and cohere-crispasr since 1.10.0, the others "
+                "new in 1.10.1. "   # owner W212 D4 1; versions corrected W501 4
                 "The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user "
                 "folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a "
                 "plain-named folder (the original stays where it is).") in text
         # T2 (design 22.10, owner W237 1): --device for every pipeline; the GGUF pipelines' builds.
         assert "Where this run's ASR and other models run, for every pipeline." in text
         assert "the GPU through Vulkan on Windows (Vulkan build, experimental)" in text
-        assert "ten for parakeet-crispasr and firered-vad for cohere-crispasr" in text   # W344
+        assert ("for the GGUF pipelines: ten for parakeet-crispasr and "   # W344, W401
+                "reazonspeech-crispasr, firered-vad for the others; "  # W482: MOSS FireRedVAD
+                "none sends each scene to the model whole.") in text  # W457, W458
+        # W482: MOSS-CrispASR's default scenes (review finding 7 of 2026-11-03: the scene detector help was unpinned)
+        for n in (1, 2):
+            assert (f"Scene detection method for pass {n} (default: semantic since v1.9.2; for moss-crispasr "
+                    f"semantic with scenes of normally 90-240 s).") in text
+        # the MOSS settings as --passN-params keys (W428 I1 3, I1 4)
+        from whisperjav.crispasr.moss_prompt import help_text as moss_help
+        assert " ".join(moss_help().split()) in text
+        assert ('"do_sample" (true, the default; false = greedy), "temperature" (0.7), "top_k" (50; 0 = no limit), '
+                '"seed" (42; 0 = a new seed each run) and "beam_size" (1 = off;') in text   # W492 M1, W502
         assert "CrispASR's own program" not in text
         assert "--crispasr-exe" not in text and "--crispasr-backend" not in text
         assert "--crispasr-args" not in text
         assert "{fidelity,balanced,fast,faster,transformers,qwen}" in text   # --mode has no crispasr
+        # 1.10.1 (Part B): --passN-word-timestamps and its help text, approved by the owner (W413 1)
+        for n in (1, 2):
+            assert f"--pass{n}-word-timestamps {{model,aligner}}" in text
+            # W413 1's text; 1.10.1 (W426): MOSS uses its own segment times by default
+            assert (f"Where pass {n}'s subtitle times come from, for the CrispASR pipelines. model = the ASR model's "
+                    "own word times (default for parakeet, reazonspeech, kotoba, whisper-turbo and whisper-large; "
+                    "for moss its own segment times); aligner = the CrispASR aligner wav2vec2-ja (232 MB, "
+                    "downloaded on first use; default for cohere).") in text
+
+    def test_an_unknown_word_timestamps_value_is_a_usage_error(self):
+        result = _cli("x.mp4", "--ensemble", "--pass1-pipeline", "kotoba-crispasr", "--pass1-word-timestamps", "dtw",
+                      "--dump-params", os.devnull)
+        assert result.returncode == 2 and "invalid choice: 'dtw'" in result.stderr
 
     @pytest.mark.parametrize("argv,used", [
         (["--mode", "crispasr", "x.mp4"], "--mode crispasr"),
@@ -318,11 +370,10 @@ class TestTheCommandLine:
          + ", ".join(manifest.PIPELINE_MODELS["parakeet-crispasr"])),
         # not offered (W129 2): not on the command line
         (["--pass1-pipeline", "parakeet-crispasr", "--pass1-model", CTC],
-         f"error: --pass1-model: '{CTC}' is not a model of parakeet-crispasr; choose one of: parakeet-tdt-0.6b-ja"),
+         f"error: --pass1-model: '{CTC}' is not a model of parakeet-crispasr; choose one of: "
+         + ", ".join(manifest.PIPELINE_MODELS["parakeet-crispasr"])),
         (["--pass1-pipeline", "parakeet-crispasr", "--language", "english"],
          "error: --pass1-pipeline parakeet-crispasr transcribes Japanese only"),
-        (["--pass1-pipeline", "parakeet-crispasr", "--pass1-speech-segmenter", "none"],
-         "error: --pass1-speech-segmenter none is not available"),
     ])
     def test_a_pass_that_cannot_run_is_a_usage_error(self, extra, expected, tmp_path):
         # The input does not exist: had the check not stopped the run, media discovery would
@@ -372,6 +423,7 @@ class TestTheCommandLine:
             "scene_detector": "semantic",                                     # none named: semantic (W214 2)
             "speech_enhancer": "none",
             "enhance_for_vad": False,
+            "word_timestamps": "model",                                       # 1.10.1: Parakeet's own (W411)
             "not_used": not_used,
         }
         s1 = p1["speech_segmenter_settings"]
@@ -384,6 +436,22 @@ class TestTheCommandLine:
         assert (s2["max_group_duration_s"], s2["chunk_threshold_s"], s2["max_speech_duration_s"],
                 s2["start_pad_ms"], s2["end_pad_ms"]) == (3.0, 0.3, 4.0, 100, 100)  # the qwen pipeline's
         assert s2["threshold"] == 0.42                                        # TEN's conservative preset (W202 4)
+        assert p2["word_timestamps"] == "aligner"                             # 1.10.1: Cohere's own (W411, W412)
+
+    def test_the_dump_shows_the_segmenter_none(self, tmp_path):
+        # owner W457, W458: accepted for the GGUF pipelines; no segmenter settings, each scene whole
+        dump = tmp_path / "params.json"
+        result = _cli(tmp_path / "x.mp4", "--ensemble",
+                      "--pass1-pipeline", "parakeet-crispasr", "--pass1-speech-segmenter", "none",
+                      "--pass2-pipeline", "moss-crispasr", "--pass2-speech-segmenter", "none",
+                      "--device", "cpu", "--dump-params", dump)
+        assert result.returncode == 0, (result.stdout + result.stderr)[-800:]
+        ensemble = json.loads(dump.read_text(encoding="utf-8"))["ensemble_config"]
+        for p in ("pass1", "pass2"):
+            effective = ensemble[p]["crispasr_effective"]
+            assert effective["speech_segmenter"] == "none"
+            s = effective["speech_segmenter_settings"]
+            assert (s["speech_segmenter"], s["max_group_duration_s"], s["chunk_threshold_s"]) == ("none", None, None)
 
     def test_the_dump_shows_the_vad_threshold_and_speech_pad_flags_at_work(self, tmp_path):
         # W208 "make the flags work": Parakeet as fidelity, Cohere as the qwen pipeline.
@@ -519,6 +587,8 @@ class TestThePassWorkerBuildsThem:
             "speech_enhancer_model": None,
             "segmenter_overrides": {},           # beam_size is neither a segmenter nor a scene setting
             "scene_params": {},
+            "word_timestamps": None,             # 1.10.1 (Part B): none named, the pipeline's own default
+            "model_params": {"beam_size": 5},    # 1.10.1: the whole dict; MOSS-CrispASR's MOSS settings come from it
         }
         assert not [l for l in built["log"] if "ignores --" in l], built["log"]
         assert not [l for l in built["log"] if "speech pad of" in l], built["log"]

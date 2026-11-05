@@ -21,6 +21,7 @@ from whisperjav.crispasr import install, native_log
 from whisperjav.crispasr.engine import LANGUAGE
 from whisperjav.crispasr.errors import CrispASRSetupError
 from whisperjav.crispasr.manifest import ModelFile, timing_model_for
+from whisperjav.modules.model_audio import too_short
 from whisperjav.utils.logger import logger
 
 # whisper.cpp's alignment-head presets for DTW (8 = small).
@@ -104,7 +105,9 @@ class CrispTimer:
         if self._model is None:
             raise RuntimeError("the CrispASR timing model is not loaded")
         pcm = np.ascontiguousarray(audio, dtype=np.float32)
-        if pcm.size == 0:
+        if too_short(pcm.size, 16000):
+            # The shortest audio a model is given (owner W461; modules/model_audio.py): no timing for a piece under
+            # 0.2 s, which by rule T3 changes nothing. Shorter pieces can stop the process in CrispASR's DTW step.
             return []
         try:
             segments = self._model.transcribe_pcm(pcm, language=LANGUAGE, decode_options=dict(DECODE_OPTIONS))

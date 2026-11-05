@@ -106,6 +106,7 @@ _PARAM_SCHEMAS = {
         "end_pad_ms":              (int,   200,   False),  # v1.8.12: 150→200 (YAML balanced)
         "chunk_threshold_s":       (float, 1.0,   True),
         "max_group_duration_s":    (float, 6.0,   True),   # v1.8.12: 29.0→6.0 (YAML balanced)
+        "min_group_duration_s":    (float, None,  True),   # 1.10.1 (W426 3): shortest group; None/0 = off
     },
     "silero": {
         # All nullable: backend SileroSpeechSegmenter consumes None values via
@@ -133,6 +134,7 @@ _PARAM_SCHEMAS = {
         "use_max_poss_sil_at_max_speech":   (bool,  True, False),
         "chunk_threshold_s":                (float, 1.5,  True),   # v1.8.12: 1.0→1.5 (YAML balanced)
         "max_group_duration_s":             (float, 6.0,  True),   # v1.8.12: 29.0→6.0 (YAML balanced)
+        "min_group_duration_s":             (float, None, True),   # 1.10.1 (W426 3): shortest group; None/0 = off
     },
     "whisper-vad": {
         "no_speech_threshold":     (float, 0.6,   False),
@@ -173,6 +175,7 @@ _PARAM_SCHEMAS = {
         "max_speech_duration_s":   (float, 5.0,  True),   # v1.8.12: None→5.0 (YAML balanced, explicit)
         "chunk_threshold_s":       (float, 1.0,  True),
         "max_group_duration_s":    (float, 6.0,  True),   # v1.8.12: None→6.0 (YAML balanced)
+        "min_group_duration_s":    (float, None, True),   # 1.10.1 (W426 3): shortest group; None/0 = off
         "force_cpu":               (bool,  False, False),
         "num_threads":             (int,   1,    False),
     },
@@ -192,6 +195,7 @@ _PARAM_SCHEMAS = {
         "end_pad_ms":              (int,   150,   False),
         "chunk_threshold_s":       (float, 1.0,   True),
         "max_group_duration_s":    (float, 6.0,   True),
+        "min_group_duration_s":    (float, None,  True),   # 1.10.1 (W426 3): shortest group; None/0 = off
         "use_gpu":                 (bool,  False, False),
         # A model directory the user downloaded themselves. Nullable with no
         # default: absent or None means "use the cache, then download".

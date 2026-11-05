@@ -11,13 +11,77 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from whisperjav.utils.logger import logger
+from whisperjav.modules.qwen_errors import NOT_STARTED, PREFIX as UNUSABLE_PREFIX
+from whisperjav.utils.logger import logger, pass_log_file
 from whisperjav.utils.metadata_manager import MetadataManager
 from whisperjav.utils.parameter_tracer import NullTracer
 
 from .merge import MergeEngine
-from .pass_worker import WorkerPayload, run_pass_worker
+from .pass_worker import WorkerPayload, partial_result_file, run_pass_worker
 from .utils import resolve_language_code
+
+
+_KEPT_KEYS = ('savepoint_srt', 'savepoint_stage', 'savepoint_subtitles', 'kept_dir', 'save_points')
+
+
+def _model_unusable(result: Optional[Dict[str, Any]]) -> bool:
+    """A pass result that stopped because the pass's ASR model cannot be used (R-QFT, #494; modules/qwen_errors.py)."""
+    return bool(result) and str(result.get('error') or '').startswith(UNUSABLE_PREFIX)
+
+
+def _first_unusable(media_files: List[Dict[str, Any]], results: Dict[str, Dict[str, Any]]) -> Optional[int]:
+    """The position of the first file whose pass stopped because its ASR model cannot be used, or None. The pass
+    worker stops on that file and gives every later file of its list the same message without starting it."""
+    return next((k for k, info in enumerate(media_files) if _model_unusable(results.get(info['basename']))), None)
+
+
+def _not_started() -> Dict[str, Any]:
+    """The result of a file no pass started after the stop (owner W501: shown as "skipped")."""
+    return {'status': 'skipped', 'error': NOT_STARTED}
+
+
+def _kept_work(result: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """What a pass result that did not finish left behind (owner W462, W463 C1), as recorded by
+    EnsembleOrchestrator._keep_failed_pass_work."""
+    return {k: result[k] for k in _KEPT_KEYS if result and result.get(k) not in (None, "")}
+
+
+# How far a failed pass's unfinished subtitles got, by the stage its pipeline recorded with the save-point
+# (subtitle_pipeline/orchestrator.py, qwen_pipeline.py); owner W485: the plainer wording.
+_STAGE_WORDS = {
+    "after the ASR": "text only, timed by the VAD groups; the aligner did not run",
+    "after the ASR, before the timing model": "timed by the VAD groups; the timing model did not run",
+    "after the aligner, before the timing model": "timed by the aligner; the timing model did not run",
+}
+
+
+def _stage_words(stage: Optional[str]) -> str:
+    """The user's words for a save-point stage; "" for a stage this table does not know."""
+    stage = str(stage or "")
+    if stage.startswith("before the clean-up"):
+        return "timed, but not cleaned up"
+    return _STAGE_WORDS.get(stage, "")
+
+
+def _kept_work_sentences(pass_number: int, result: Optional[Dict[str, Any]]) -> List[str]:
+    """What a pass that did not finish left behind, in plain words (owner W462, W463 C1: the user is told clearly;
+    W485: the plainer wording). Only what is true: the unfinished subtitles with their count and how far they got,
+    or, for a pipeline that writes save-points, that none were ready; the kept working folder. A pipeline without
+    save-points gets no word about them."""
+    kept = _kept_work(result)
+    sentences = []
+    if kept.get('savepoint_srt'):
+        count = kept.get('savepoint_subtitles')
+        counted = f"{count} subtitle{'' if count == 1 else 's'}" if isinstance(count, int) else ""
+        details = ", ".join(part for part in (counted,
+                                              _stage_words(kept.get('savepoint_stage'))) if part)
+        sentences.append(f"pass {pass_number}'s unfinished subtitles are saved as {kept['savepoint_srt']}"
+                         + (f" ({details})" if details else ""))
+    elif kept.get('save_points'):
+        sentences.append(f"pass {pass_number} stopped before any of its subtitles were ready, so none could be saved")
+    if kept.get('kept_dir'):
+        sentences.append(f"pass {pass_number}'s working files are kept in {kept['kept_dir']}")
+    return sentences
 
 
 class EnsembleOrchestrator:
@@ -32,6 +96,7 @@ class EnsembleOrchestrator:
         progress_display=None,
         log_level: str = "INFO",
         serial_file_processing: bool = False,
+        log_file: Optional[str] = None,
         **kwargs
     ):
         """
@@ -66,11 +131,14 @@ class EnsembleOrchestrator:
         self.subs_language = subs_language
         self.progress_display = progress_display
         self.log_level = log_level
+        self.log_file = log_file
         self.serial_file_processing = serial_file_processing
         self.extra_kwargs = kwargs
         self.worker_kwargs = self._filter_picklable_kwargs(kwargs)
 
         self.temp_dir.mkdir(parents=True, exist_ok=True)
+        # Pass folders kept in place because they could not be moved to kept/ (owner W462, W463 C1).
+        self._kept_in_place: set = set()
 
         self.metadata_manager = MetadataManager(self.temp_dir, self.output_dir)
         self.merge_engine = MergeEngine()
@@ -186,8 +254,23 @@ class EnsembleOrchestrator:
             pass1_completed, len(pass1_results), pass1_subs
         )
 
+        # The Ensemble stop (owner W501): once pass 1 stops because its ASR model cannot be used, pass 2 is skipped
+        # for that file and no further file starts; the later files show as "skipped" (not started).
+        pass2_media = serialized_media
+        stop_at = _first_unusable(serialized_media, pass1_results)
+        if stop_at is not None:
+            stopped = serialized_media[stop_at]['basename']
+            for info in serialized_media[stop_at + 1:]:
+                pass1_results[info['basename']] = _not_started()
+            pass2_media = serialized_media[:stop_at]
+            later = len(serialized_media) - stop_at - 1
+            logger.warning(
+                "Pass 1 stopped on %s: its ASR model cannot be used.%s%s", stopped,
+                " Pass 2 is skipped for it." if pass2_config else "",
+                f" The {later} file(s) after it are not started." if later else "")
+
         pass2_results: Dict[str, Dict[str, Any]] = {}
-        if pass2_config:
+        if pass2_config and pass2_media:
             logger.info(
                 "Pass 2 is enabled (%s). Launching worker...",
                 pass2_config['pipeline'],
@@ -202,13 +285,13 @@ class EnsembleOrchestrator:
 
             logger.debug(
                 "Starting Pass 2 for %d files with pipeline=%s, sensitivity=%s",
-                len(serialized_media),
+                len(pass2_media),
                 pass2_config.get('pipeline'), pass2_config.get('sensitivity')
             )
 
             pass2_results = self._run_pass_in_subprocess(
                 pass_number=2,
-                media_files=serialized_media,
+                media_files=pass2_media,
                 pass_config=pass2_config,
                 language_code=pass_languages[2],
             )
@@ -266,6 +349,7 @@ class EnsembleOrchestrator:
             "completed": completed_count,
             "degraded": degraded_count,
             "failed": failed_count,
+            "skipped": sum(1 for m in all_metadata if m.get('status') == 'skipped'),
             "total_duration_seconds": round(batch_duration, 2),
             "summary_path": str(summary_path) if summary_path else None,
         })
@@ -306,13 +390,33 @@ class EnsembleOrchestrator:
             'final': f"{basename}: missing",
         }
 
+        if pass1 and pass1.get('status') == 'skipped':
+            # Not started (owner W501): an earlier file's pass stopped because its ASR model cannot be used.
+            ensemble_metadata['pass1'] = dict(pass1)
+            ensemble_metadata['pass2'] = {'status': 'skipped'}
+            ensemble_metadata['merge'] = {'status': 'skipped'}
+            ensemble_metadata['status'] = 'skipped'
+            ensemble_metadata['error'] = pass1.get('error') or NOT_STARTED
+            row_display['pass2'] = 'skipped' if pass2_config else 'n/a'
+            row_display['merge'] = 'n/a'
+            row_display['final'] = f"{basename}: not started"
+            return ensemble_metadata, row_display
+
         if not pass1 or pass1['status'] != 'completed':
             error_msg = pass1.get('error') if pass1 else 'Pass 1 worker returned no result'
-            ensemble_metadata['pass1'] = {'status': 'failed', 'error': error_msg}
+            ensemble_metadata['pass1'] = {'status': 'failed', 'error': error_msg,
+                                          **_kept_work(pass1)}
+            # What the passes that did not finish left behind (owner W462, W463 C1), for main.py's line.
+            ensemble_metadata['kept_work'] = (
+                _kept_work_sentences(1, pass1)
+                + (_kept_work_sentences(2, pass2) if pass2_config and pass2 and pass2.get('status') != 'completed'
+                   else []))
             if pass2_config:
                 ensemble_metadata['pass2'] = (
                     pass2 if pass2 else {'status': 'skipped', 'error': 'Pass 2 not executed'}
                 )
+                if not pass2:
+                    row_display['pass2'] = 'skipped'
             else:
                 ensemble_metadata['pass2'] = {'status': 'skipped'}
             ensemble_metadata['status'] = 'failed'
@@ -419,7 +523,7 @@ class EnsembleOrchestrator:
                                 row_display['final'] = f"fallback to pass1 ({pass1_srt.name})"
             else:
                 ensemble_metadata['pass2'] = (
-                    {'status': pass2['status'], 'error': pass2.get('error')}
+                    {'status': pass2['status'], 'error': pass2.get('error'), **_kept_work(pass2)}
                     if pass2
                     else {'status': 'failed', 'error': 'Pass 2 did not return a result'}
                 )
@@ -477,6 +581,9 @@ class EnsembleOrchestrator:
             'degradations': degradations,
             'notes': notes,
         }
+        # Owner W462, W463 C1: what a pass that did not finish left behind, in plain words for the run summary.
+        ensemble_metadata['kept_work'] = (_kept_work_sentences(2, pass2)
+                                          if pass2_config and pass2 and pass2.get('status') != 'completed' else [])
         ensemble_metadata['output_files'] = {
             'final_srt': str(final_output_path) if final_output_path else None,
             'pass1_srt': pass1.get('srt_path'),
@@ -529,10 +636,28 @@ class EnsembleOrchestrator:
 
         all_metadata: List[Dict[str, Any]] = []
         table_rows: List[Dict[str, str]] = []
+        # The Ensemble stop (owner W501): once pass 1 stops because its ASR model cannot be used, no further file
+        # starts; the later files show as "skipped" (not started).
+        run_stopped = False
+        # Once pass 2 stops because its ASR model cannot be used (owner W505 1): the later files get pass 1 alone,
+        # pass 2 is not tried again, and each is marked as with the box unticked -- pass 2 failed with this reason,
+        # output pass 1 alone (state "suspect"; the exit status is not changed by it).
+        pass2_stop: Optional[str] = None
 
         for file_idx, media_info in enumerate(serialized_media, 1):
             basename = media_info['basename']
             file_start = time.time()
+
+            if run_stopped:
+                metadata, row = self._process_single_file_merge(
+                    media_info, {basename: _not_started()}, {},
+                    pass1_config, pass2_config, merge_strategy, pass_languages,
+                )
+                all_metadata.append(metadata)
+                table_rows.append(row)
+                logger.warning("[%d/%d] NOT STARTED: %s — the run stopped because its ASR model cannot be used",
+                               file_idx, total_files, basename)
+                continue
 
             # --- Pass 1 ---
             logger.info(
@@ -545,10 +670,21 @@ class EnsembleOrchestrator:
                 pass_config=pass1_config,
                 language_code=pass_languages[1],
             )
+            pass1_stopped = _model_unusable(pass1_results.get(basename))
 
-            # --- Pass 2 (if enabled) ---
+            # --- Pass 2 (if enabled; skipped when pass 1's ASR model cannot be used, owner W501) ---
             pass2_results: Dict[str, Dict[str, Any]] = {}
-            if pass2_config:
+            pass2_ran = False
+            if pass2_config and pass1_stopped:
+                logger.warning("[%d/%d] %s — Pass 2 skipped: pass 1's ASR model cannot be used",
+                               file_idx, total_files, basename)
+            elif pass2_config and pass2_stop is not None:
+                # The same result the pass worker gives the files after its stop in the normal mode.
+                logger.warning("[%d/%d] %s — Pass 2 not run: its ASR model cannot be used; output is pass 1 alone",
+                               file_idx, total_files, basename)
+                pass2_results = {basename: {'status': 'failed', 'error': pass2_stop}}
+            elif pass2_config:
+                pass2_ran = True
                 logger.info(
                     "[%d/%d] %s — Pass 2 (%s)...",
                     file_idx, total_files, basename, pass2_config['pipeline'],
@@ -561,7 +697,7 @@ class EnsembleOrchestrator:
                 )
 
             # --- Merge + metadata (reuses shared method) ---
-            if pass2_config:
+            if pass2_ran:
                 logger.info(
                     "[%d/%d] %s — Merge (%s)...",
                     file_idx, total_files, basename, merge_strategy,
@@ -572,6 +708,16 @@ class EnsembleOrchestrator:
             )
             all_metadata.append(metadata)
             table_rows.append(row)
+            if pass1_stopped:
+                run_stopped = True
+                if file_idx < total_files:
+                    logger.warning("Pass 1 stopped on %s: its ASR model cannot be used. The %d file(s) after it "
+                                   "are not started.", basename, total_files - file_idx)
+            elif pass2_ran and _model_unusable(pass2_results.get(basename)):
+                pass2_stop = str(pass2_results[basename].get('error') or '')
+                if file_idx < total_files:
+                    logger.warning("Pass 2 stopped on %s: its ASR model cannot be used. The %d file(s) after it "
+                                   "get pass 1 alone.", basename, total_files - file_idx)
 
             # --- Per-file cleanup ---
             if not self.keep_temp_files:
@@ -618,6 +764,7 @@ class EnsembleOrchestrator:
             "completed": completed_count,
             "degraded": degraded_count,
             "failed": failed_count,
+            "skipped": sum(1 for m in all_metadata if m.get('status') == 'skipped'),
             "total_duration_seconds": round(batch_duration, 2),
             "summary_path": str(summary_path) if summary_path else None,
             "serial_mode": True,
@@ -659,10 +806,18 @@ class EnsembleOrchestrator:
             language_code=language_code,
             log_level=self.log_level,
             trace_file_path=trace_file_path,
+            log_file=pass_log_file(self.log_file, pass_number),
         )
 
         # Setup Drop-Box path (unique per pass)
         result_file = str(self.temp_dir / f"worker_result_pass{pass_number}.pkl")
+        partial_file = Path(partial_result_file(result_file))
+        partial_file.unlink(missing_ok=True)  # a stale one from an earlier run must not count
+        # No earlier save-point may pass for this run's (owner W462, W463 C1); the pipeline clears its own too.
+        for stale in (self.temp_dir / f"pass{pass_number}_worker").glob(f"*{self.SAVE_POINT_SUFFIX}"):
+            stale.unlink(missing_ok=True)
+        for stale in (self.temp_dir / f"pass{pass_number}_worker").glob("*.savepoint.json"):
+            stale.unlink(missing_ok=True)
 
         # Use 'spawn' start method for GPU compatibility across all platforms.
         # - Linux defaults to 'fork' which breaks CUDA/MPS in child processes
@@ -702,13 +857,29 @@ class EnsembleOrchestrator:
         # Handle missing or invalid Drop-Box
         if worker_output is None:
             logger.error("Pass %s: Worker produced no Drop-Box (crashed before writing?)", pass_number)
-            return {
-                info['basename']: {
+            # Step 3 (owner W462, W463): the files the worker finished before it stopped keep their results.
+            done: Dict[str, Dict[str, Any]] = {}
+            if partial_file.exists():
+                try:
+                    with open(partial_file, 'rb') as f:
+                        done = {r['basename']: r for r in (pickle.load(f).get('results') or [])}
+                except Exception as e:
+                    logger.error("Pass %s: Failed to read the per-file results: %s", pass_number, e)
+            formatted_crash = {
+                info['basename']: done.get(info['basename']) or {
                     'status': 'failed',
                     'error': f'Worker crash: exit code {p.exitcode}, no result file',
                 }
                 for info in media_files
             }
+            partial_file.unlink(missing_ok=True)
+            if done:
+                logger.warning("Pass %s: the worker stopped after %d of %d file(s); their results are kept",
+                               pass_number, len(done), len(media_files))
+            self._keep_failed_pass_work(pass_number, media_files, formatted_crash, language_code,
+                                        pass_config.get('pipeline'))
+            return formatted_crash
+        partial_file.unlink(missing_ok=True)
 
         worker_error = worker_output.get('worker_error')
         if worker_error:
@@ -746,7 +917,104 @@ class EnsembleOrchestrator:
                     'error': 'Worker returned no result for this file',
                 }
 
+        self._keep_failed_pass_work(pass_number, media_files, formatted, language_code, pass_config.get('pipeline'))
         return formatted
+
+    # Owner W462, W463 (step 1 and C1): a pass that did not finish a file keeps what it made.
+    SAVE_POINT_SUFFIX = ".savepoint.srt"   # what the pipeline writes in its temp folder (qwen_pipeline.py)
+    UNFINISHED_SUFFIX = ".unfinished.srt"  # the copy beside the video: <basename>.<lang>.pass<N>.unfinished.srt (W485)
+    KEPT_DIR = "kept"
+    # A kept folder keeps the subtitles, records and logs, not the audio (owner W485): the extracted audio and the scene
+    # files are about 0.5 GB for a 2-hour film and can be made again. WhisperJAV's own working files only.
+    KEPT_AUDIO_SUFFIXES = (".wav", ".flac", ".mp3", ".m4a", ".aac", ".ogg", ".opus")
+
+    # The pipelines that write save-points (qwen_pipeline.py; ChronosJAV's three models all run as "qwen").
+    SAVE_POINT_PIPELINES = ("qwen",)
+
+    def _keep_failed_pass_work(self, pass_number: int, media_files: List[Dict[str, Any]],
+                               results: Dict[str, Dict[str, Any]], language_code: str,
+                               pipeline: Optional[str] = None) -> None:
+        """For each file this pass did not finish: the pass's working folder is kept under
+        ``<temp>/kept/<time>_pass<N>`` (the next pass or file would reuse its name), without its audio (W485), then the
+        file's last save-point, if the pipeline wrote one, is copied beside the video as
+        ``<basename>.<lang>.pass<N>.unfinished.srt``. Both are named in the file's result (``savepoint_srt``,
+        ``savepoint_stage``, ``kept_dir``, ``save_points``) for the run summary, and in a warning now."""
+        failed = [info for info in media_files
+                  if (results.get(info['basename']) or {}).get('status') != 'completed']
+        # After a stop because the pass's ASR model cannot be used, the worker started no later file of its list
+        # (owner W501): those have no work to keep and get no "stopped before any subtitles" warning.
+        stop_at = _first_unusable(media_files, results)
+        if stop_at is not None:
+            never_started = {info['basename'] for info in media_files[stop_at + 1:]}
+            failed = [info for info in failed if info['basename'] not in never_started]
+        if not failed:
+            return
+        work_dir = self.temp_dir / f"pass{pass_number}_worker"
+        kept = work_dir
+        if work_dir.is_dir():
+            target_dir = self.temp_dir / self.KEPT_DIR / f"{time.strftime('%Y%m%d_%H%M%S')}_pass{pass_number}"
+            try:
+                target_dir.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(work_dir), str(target_dir))
+                kept = target_dir
+            except OSError as e:
+                logger.error("Pass %s: its working files could not be moved (%s); they stay in %s",
+                             pass_number, e, work_dir)
+                self.__dict__.setdefault("_kept_in_place", set()).add(work_dir.name)  # cleanup leaves it
+            self._drop_kept_audio(pass_number, kept)
+            logger.warning("Pass %s: its working files are kept in %s", pass_number, kept)
+        writes_save_points = str(pipeline or "") in self.SAVE_POINT_PIPELINES
+        for info in failed:
+            basename = info['basename']
+            entry = results.setdefault(basename, {'status': 'failed'})
+            entry['save_points'] = writes_save_points
+            if kept.is_dir():
+                entry['kept_dir'] = str(kept)
+            saved = kept / f"{basename}{self.SAVE_POINT_SUFFIX}"
+            if not saved.is_file():
+                if writes_save_points:
+                    logger.warning("Pass %s stopped on %s before any of its subtitles were ready, so none could be "
+                                   "saved.", pass_number, basename)
+                continue
+            stage, count = "", None
+            try:
+                meta = json.loads((kept / f"{basename}.savepoint.json").read_text(encoding="utf-8"))
+                stage, count = str(meta.get("stage") or ""), meta.get("subtitles")
+            except (OSError, ValueError):
+                pass
+            entry['savepoint_stage'] = stage
+            entry['savepoint_subtitles'] = count
+            target = (self._resolve_file_output_dir(info)
+                      / f"{basename}.{language_code}.pass{pass_number}{self.UNFINISHED_SUFFIX}")
+            try:
+                shutil.copy2(saved, target)
+                entry['savepoint_srt'] = str(target)
+            except OSError as e:
+                logger.error("Pass %s: the unfinished subtitles of %s could not be copied beside the video (%s)",
+                             pass_number, basename, e)
+                entry['savepoint_srt'] = str(saved)   # inside the kept folder, which stays
+            words = _stage_words(stage)
+            logger.warning("Pass %s did not finish %s. Its unfinished subtitles are saved as %s%s",
+                           pass_number, basename, entry['savepoint_srt'], f" ({words})" if words else "")
+
+    def _drop_kept_audio(self, pass_number: int, folder: Path) -> None:
+        """Owner W485: a kept folder keeps the subtitles, records and logs and drops the audio files (WhisperJAV's own
+        extracted audio and scene files in the pass's working folder; never a user's media). A file that cannot be
+        removed stays; nothing here stops the run."""
+        if not folder.is_dir():
+            return
+        removed, freed = 0, 0
+        for path in folder.rglob("*"):
+            if path.is_file() and path.suffix.lower() in self.KEPT_AUDIO_SUFFIXES:
+                try:
+                    size = path.stat().st_size
+                    path.unlink()
+                    removed, freed = removed + 1, freed + size
+                except OSError as e:
+                    logger.debug("Pass %s: kept audio file %s not removed: %s", pass_number, path, e)
+        if removed:
+            logger.info("Pass %s: %d audio file(s) left out of the kept working files (%.0f MB)",
+                        pass_number, removed, freed / 2**20)
 
     def _serialize_media_files(self, media_files: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Convert media descriptors to picklable dicts before multiprocessing."""
@@ -913,6 +1181,8 @@ class EnsembleOrchestrator:
             # Clean pass-specific temp directories created by orchestrator and workers
             for suffix in ["pass1", "pass2", "pass1_worker", "pass2_worker"]:
                 pass_temp = self.temp_dir / suffix
+                if suffix in getattr(self, "_kept_in_place", ()):
+                    continue  # a failed pass's work that could not be moved to kept/
                 if pass_temp.exists():
                     shutil.rmtree(pass_temp)
                     logger.debug(f"Cleaned up temp directory: {pass_temp.name}")

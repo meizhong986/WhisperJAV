@@ -54,6 +54,14 @@ class Stage:
 
     def __init__(self, monkeypatch, tmp_path):
         self.tmp = tmp_path
+        # The hallucination filter's lists (post-processing, 1.10.1) never come from the network or the user's cache
+        # here: its own built-in fallback list ("www", "笑", ..., a closing-phrase pattern) is used.
+        from whisperjav.modules.hallucination_remover import HallucinationRemover
+
+        def no_lists(remover):
+            raise RuntimeError("no lists in tests")
+
+        monkeypatch.setattr(HallucinationRemover, "_load_patterns", no_lists)
         self.calls = {"prepare": 0, "ensure": 0, "stage": 0, "extract": 0, "scenes": 0, "analytics": 0}
         self.runtime = install.RuntimeChoice(True, "cuda", None, False, "0.8.44+cuda", "cuda")
         self.setup_error = None
@@ -137,8 +145,12 @@ class Stage:
         monkeypatch.setitem(sys.modules, FRAMER_MODULE, types.SimpleNamespace(VadGroupedFramer=Framer))
 
         class Engine:
-            def __init__(self, model_path, backend, use_gpu, n_threads=None, label=""):
+            def __init__(self, model_path, backend, use_gpu, n_threads=None, label="", tokens_per_second=None,
+                         max_new_tokens=None, ask=None, decoding=None, token_floor=32):
                 self.model_path, self.backend, self.use_gpu = model_path, backend, use_gpu
+                self.tokens_per_second, self.token_floor = tokens_per_second, token_floor
+                self.max_new_tokens, self.ask = max_new_tokens, ask
+                self.decoding = decoding
                 self.n_threads = 8
                 self.opened = 0
                 self.closed = 0
@@ -240,13 +252,14 @@ class TestTheTwoPipelines:
             ("cohere-crispasr", "Cohere-CrispASR")
         assert ParakeetCrispASRPipeline.ENGINE == chain.EngineRow("tokens", audio_analytics=True)
         # Cohere-CrispASR's text is aligned by the CrispASR aligner (W248 3, W249); "group" for a group it cannot.
-        assert CohereCrispASRPipeline.ENGINE == chain.EngineRow("group", audio_analytics=True, aligner="wav2vec2-ja")
+        assert CohereCrispASRPipeline.ENGINE == chain.EngineRow("group", audio_analytics=True, aligner="wav2vec2-ja",
+                                                                text_cleanup=("text_cleaner",))   # W422
         assert ParakeetCrispASRPipeline.ENGINE.aligner is None
 
     def test_both_share_one_chain(self):
         for cls in (ParakeetCrispASRPipeline, CohereCrispASRPipeline):
             assert cls.__mro__[1] is CrispASRPipeline
-            assert set(vars(cls)) <= {"PIPELINE_NAME", "LABEL", "ENGINE", "__module__", "__doc__", "__qualname__",
+            assert set(vars(cls)) <= {"PIPELINE_NAME", "LABEL", "ENGINE", "ENGINE_WITHOUT_ALIGNER", "__module__", "__doc__", "__qualname__",
                                       "__firstlineno__", "__static_attributes__",
                                       "_abc_impl", "__abstractmethods__"}
 
@@ -381,9 +394,20 @@ class TestTheTwoPipelines:
         with pytest.raises(ValueError, match="Japanese only"):
             make(ParakeetCrispASRPipeline, tmp_path, language="en")
 
-    def test_the_segmenter_none_is_refused(self, tmp_path):
-        with pytest.raises(ValueError, match="needs a speech segmenter"):
-            make(CohereCrispASRPipeline, tmp_path, speech_segmenter="none")
+    def test_the_segmenter_none_sends_each_scene_whole(self, tmp_path):
+        # owner W457, W458: no segmenter is loaded; each scene is one VAD group, start to end; a scene shorter than
+        # 0.1 s is not sent (as a shorter VAD group is not); a scene that cannot be read counts as failed
+        pipe = make(CohereCrispASRPipeline, tmp_path, speech_segmenter="none")
+        assert pipe.speech_segmenter == "none" and pipe.segmenter.max_group_duration_s is None
+        tmp_path.mkdir(exist_ok=True)
+        long_wav, tiny_wav = tmp_path / "s0.wav", tmp_path / "s1.wav"
+        sf.write(str(long_wav), np.zeros(int(2.5 * 16000), dtype=np.float32), 16000)
+        sf.write(str(tiny_wav), np.zeros(800, dtype=np.float32), 16000)
+        scenes = [chain._Scene(0, long_wav, 10.0, 12.5), chain._Scene(1, tiny_wav, 12.5, 12.55),
+                  chain._Scene(2, tmp_path / "missing.wav", 12.55, 20.0)]
+        groups, failed = pipe._speech_groups(scenes)
+        assert [(g.scene, g.start, g.end) for g in groups] == [(0, 0.0, 2.5)]
+        assert failed == 1
 
     def test_a_model_of_another_pipeline_is_refused(self, tmp_path):
         with pytest.raises(ValueError, match="is not a model of parakeet-crispasr"):
@@ -401,6 +425,107 @@ class TestTheTwoPipelines:
 # ---------------------------------------------------------------------------------------------------
 # The whole chain
 # ---------------------------------------------------------------------------------------------------
+
+class TestThe1101Pipelines:
+    """The five pipelines of 1.10.1 (owner W397, W401; step 2 choices pre-approved): the shared chain, each with
+    Parakeet's (ReazonSpeech) or Cohere's (the others) speech segmenter settings, all aligned by wav2vec2-ja."""
+
+    NEW = {"reazonspeech-crispasr": ("ReazonSpeech-CrispASR", "fidelity", "aggressive", "ten"),
+           "kotoba-crispasr": ("Kotoba-CrispASR", "qwen", "balanced", "firered-vad"),
+           "whisper-turbo-crispasr": ("Whisper-Turbo-CrispASR", "qwen", "balanced", "firered-vad"),
+           "whisper-large-crispasr": ("Whisper-Large-CrispASR", "qwen", "balanced", "firered-vad"),
+           "moss-crispasr": ("MOSS-CrispASR", "moss", "balanced", "firered-vad")}   # W482
+
+    @staticmethod
+    def classes():
+        # the pass worker's own table, read from its source so the worker (and its ASR imports) is not loaded
+        import importlib
+        tree = ast.parse((REPO / "whisperjav" / "ensemble" / "pass_worker.py").read_text(encoding="utf-8"))
+        imports = {a.asname or a.name: node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)
+                   and node.module and node.module.startswith("whisperjav.pipelines.") for a in node.names}
+        table = next(node.value for node in tree.body if isinstance(node, ast.Assign)
+                     and getattr(node.targets[0], "id", "") == "PIPELINE_CLASSES")
+        return {k.value: getattr(importlib.import_module(imports[v.id]), v.id)
+                for k, v in zip(table.keys, table.values) if k.value.endswith("-crispasr")}
+
+    def test_the_pass_worker_runs_every_crispasr_pipeline(self):
+        from whisperjav.crispasr.manifest import CRISPASR_PIPELINES
+        classes = self.classes()
+        assert tuple(classes) == CRISPASR_PIPELINES
+        for name, cls in classes.items():
+            assert cls.PIPELINE_NAME == name
+            assert cls.__mro__[1] is CrispASRPipeline
+            assert set(vars(cls)) <= {"PIPELINE_NAME", "LABEL", "ENGINE", "ENGINE_WITHOUT_ALIGNER", "MODEL_SETTINGS",
+                                      "__module__", "__doc__", "__qualname__",
+                                      "__firstlineno__", "__static_attributes__", "_abc_impl", "__abstractmethods__"}
+
+    def test_the_aligned_pipelines_are_the_manifests(self):
+        from whisperjav.crispasr.manifest import ALIGNED_PIPELINES
+        classes = self.classes()
+        assert {name for name, cls in classes.items() if cls.ENGINE.aligner} == ALIGNED_PIPELINES == {"cohere-crispasr"}
+        # 1.10.1 post-processing (W421 i3, W422): Cohere cleans its text before the aligner
+        assert classes["cohere-crispasr"].ENGINE == chain.EngineRow("group", audio_analytics=True,
+                                                                    aligner="wav2vec2-ja",
+                                                                    text_cleanup=("text_cleaner",))
+
+    def test_moss_row(self):
+        # 1.10.1 (owner W411, W426): the model's own segment times, one subtitle per segment; its token limit per
+        # second of audio (W406 i1; W505 2 a: 20 a second, at least 128); its clean-up (W505 2 b-d: the duplicate
+        # merge, the three filters, the interjection rules); its MOSS settings (W428 I1 4).
+        from whisperjav.crispasr.moss_prompt import MossSettings
+        cls = self.classes()["moss-crispasr"]
+        assert cls.ENGINE == chain.EngineRow("segments", audio_analytics=True, tokens_per_second=20.0,
+                                             token_floor=128,
+                                             cleanup=("duplicates", "nonverbal", "nonlinguistic", "scene_overlap",
+                                                      "interjections"))
+        assert cls.MODEL_SETTINGS is MossSettings
+
+    def test_the_native_timing_pipelines(self):
+        # Owner W411, W412: the new pipelines whose models give word times use them, no aligner; ReazonSpeech's
+        # tokens carry starts only, so its ends are the VAD group's (onsets).
+        classes = self.classes()
+        for name in ("kotoba-crispasr", "whisper-turbo-crispasr", "whisper-large-crispasr"):
+            # their cutting stays at sentence-end marks only, as before (W401 step 2)
+            assert classes[name].ENGINE == chain.EngineRow("tokens", audio_analytics=True, cut_at_pauses=False)
+        assert classes["reazonspeech-crispasr"].ENGINE == chain.EngineRow("tokens", audio_analytics=True, onsets=True)
+        assert classes["parakeet-crispasr"].ENGINE == chain.EngineRow("tokens", audio_analytics=True)
+
+    def test_reazonspeech_starts_are_its_own_and_its_ends_the_vad_groups(self):
+        # Tokens with start = end, as ReazonSpeech gives them (2026-10-31): two sentences in a 3 s VAD group.
+        from whisperjav.crispasr import lines
+        tok = lambda t, s: CrispToken(t, s, s, 0.99)  # noqa: E731
+        seg = CrispSegment("はい。行きます。", 0.4, 2.0, (), (tok("はい", 0.40), tok("。", 0.72), tok("行き", 1.20),
+                                                         tok("ます", 1.50), tok("。", 1.80)))
+        subs = lines.build("tokens", 10.0, 13.0, [seg], onsets=True, end_at_group=True)
+        assert [(t, round(s, 2), round(e, 2)) for t, s, e in subs] == [("はい。", 10.4, 11.2), ("行きます。", 11.2, 13.0)]
+        # without end_at_group (the aligned path, whose aligner gives the last character the group's end itself)
+        # the last subtitle keeps its own last time
+        assert lines.build("tokens", 10.0, 13.0, [seg], onsets=True)[-1][2] == pytest.approx(11.5)
+
+    def test_sentence_end_cutting_keeps_the_models_own_ends(self):
+        # Kotoba, Whisper-Turbo, Whisper-Large: no cut at a pause, each subtitle ends at its own last token.
+        from whisperjav.crispasr import lines
+        tok = lambda t, s, e: CrispToken(t, s, e, 0.99)  # noqa: E731
+        seg = CrispSegment("そうだね行こう。", 0.2, 2.6, (), (tok("そう", 0.2, 0.5), tok("だね", 0.5, 0.8),
+                                                         tok("行こう", 1.8, 2.3), tok("。", 2.3, 2.3)))
+        assert lines.build("tokens", 5.0, 8.0, [seg]) == [("そうだね", 5.2, 5.8), ("行こう。", 6.8, 7.3)]  # pause cut
+        subs = lines.build("tokens", 5.0, 8.0, [seg], cut_at_pauses=False)
+        assert [(t, round(s, 2), round(e, 2)) for t, s, e in subs] == [("そうだね行こう。", 5.2, 7.3)]
+
+    @pytest.mark.parametrize("pipeline", sorted(NEW))
+    def test_labels_settings_and_defaults(self, tmp_path, pipeline):
+        from whisperjav.crispasr.manifest import PIPELINE_DEFAULT_MODEL
+        from whisperjav.crispasr.pass_settings import SEGMENTER_STYLE
+        label, style, sensitivity, segmenter = self.NEW[pipeline]
+        cls = self.classes()[pipeline]
+        assert cls.LABEL == label
+        assert SEGMENTER_STYLE[pipeline] == style
+        pipe = make(cls, tmp_path)
+        assert pipe.model.name == PIPELINE_DEFAULT_MODEL[pipeline]
+        assert (pipe.sensitivity, pipe.speech_segmenter) == (sensitivity, segmenter)
+        like = {"fidelity": "parakeet-crispasr", "qwen": "cohere-crispasr", "moss": "moss-crispasr"}[style]
+        assert pipe.segmenter == segmenter_settings(like, segmenter, sensitivity)
+
 
 class TestParakeetEndToEnd:
     def test_tokens_become_subtitles_in_media_file_time(self, stage, tmp_path):
@@ -538,6 +663,276 @@ class TestCohereAligned:
         stage.answers = [[parakeet_segment(("はい", 0.1, 0.4))]]
         make(ParakeetCrispASRPipeline, tmp_path).process(stage.media())
         assert stage.aligners == []
+
+
+class TestWordTimestampsSwitch:
+    """--passN-word-timestamps {model,aligner} (1.10.1, Part B; owner W411-W414): the pass's row."""
+
+    @staticmethod
+    def classes():
+        return TestThe1101Pipelines.classes()
+
+    def test_each_pipelines_row_for_each_choice(self):
+        for name, cls in self.classes().items():
+            assert cls.engine_row(None) == cls.ENGINE
+            if cls.ENGINE.aligner:
+                # its own default is the aligner
+                assert cls.engine_row("aligner") == cls.ENGINE
+                assert cls.engine_row("model").aligner is None
+            else:
+                # its own default is the model's word times; the aligner is added on request, nothing else changes
+                assert cls.engine_row("model") == cls.ENGINE
+                assert cls.engine_row("aligner") == chain.dataclasses.replace(cls.ENGINE, aligner="wav2vec2-ja")
+        rows = {name: cls.engine_row("model") for name, cls in self.classes().items()}
+        # Cohere + model: its own token times cut at sentence-end marks only, as the Whisper pipelines (W414)
+        assert rows["cohere-crispasr"] == chain.EngineRow("tokens", audio_analytics=True, cut_at_pauses=False)
+        # MOSS + model (its own default since 1.10.1, W426): its own segment times, one subtitle per segment
+        assert rows["moss-crispasr"].line_rule == "segments" and rows["moss-crispasr"].aligner is None
+
+    def test_an_unknown_choice_is_refused(self, tmp_path):
+        with pytest.raises(ValueError, match="word-timestamps"):
+            make(CohereCrispASRPipeline, tmp_path, word_timestamps="dtw")
+
+    def test_cohere_with_model_times_loads_no_aligner_and_cuts_at_sentence_ends(self, stage, tmp_path):
+        stage.answers = [[CrispSegment("本番。いいよ", 0.0, 1.0, (), toks(("本番", 0.1, 0.4), ("。", 0.4, 0.45),
+                                                                     ("いいよ", 0.6, 0.9)))], [], []]
+        md = make(CohereCrispASRPipeline, tmp_path, word_timestamps="model").process(stage.media())
+        assert stage.aligners == []
+        entries = srt_entries(md["output_files"]["final_srt"])
+        assert [text for text, _s, _e in entries] == ["本番。", "いいよ"]
+        assert entries[0][1] == 1.1 and entries[1][1] == 1.6     # the model's own starts, not the group's edge
+        config = md["config"]["crispasr"]
+        assert (config["word_timestamps"], config["aligner"], config["line_rule"]) == ("model", None, "tokens")
+
+    def test_moss_with_model_times_makes_one_subtitle_per_model_segment(self, stage, tmp_path):
+        from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
+
+        stage.answers = [[CrispSegment("本番。いいよ", 0.0, 1.0)], [], []]
+        md = make(MossCrispASRPipeline, tmp_path, word_timestamps="model").process(stage.media())
+        assert stage.aligners == []
+        assert srt_entries(md["output_files"]["final_srt"]) == [("本番。いいよ", 1.0, 2.0)]
+
+
+class TestMoss:
+    """MOSS-CrispASR built after the owner's reference (1.10.1; W425, W426, W428)."""
+
+    def test_by_default_each_model_segment_is_a_subtitle_at_its_own_times(self, stage, tmp_path):
+        from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
+
+        # one VAD group, 1.0-4.0 s of scene 0; MOSS's own times inside it; a label-only and an empty segment give
+        # nothing; a time past the group's end is clamped to it
+        stage.frames = {0: [(1.0, 4.0)], 1: []}
+        stage.answers = [[CrispSegment("[S01]本番。", 0.2, 0.9), CrispSegment("[S02]", 0.9, 1.0),
+                          CrispSegment("", 1.0, 1.1), CrispSegment("[S01]いいよ[12.5]", 1.2, 99.0)]]
+        md = make(MossCrispASRPipeline, tmp_path).process(stage.media())
+        assert stage.aligners == []
+        assert srt_entries(md["output_files"]["final_srt"]) == [("本番。", 1.2, 1.9), ("いいよ", 2.2, 4.0)]
+        assert md["config"]["crispasr"]["word_timestamps"] == "model"
+        assert md["config"]["crispasr"]["line_rule"] == "segments"
+
+    def test_the_reference_instruction_and_the_token_limit_reach_the_engine(self, stage, tmp_path):
+        from whisperjav.crispasr.moss_prompt import PROMPT_EN, TOKENS_PER_SECOND
+        from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
+
+        stage.answers = [[], [], []]
+        make(MossCrispASRPipeline, tmp_path).process(stage.media())
+        engine = stage.engines[0]
+        assert engine.ask == PROMPT_EN + " Language hint: Japanese."
+        assert (engine.tokens_per_second, engine.max_new_tokens) == (TOKENS_PER_SECOND, None)
+        assert engine.token_floor == 128
+
+    def test_its_moss_settings_come_from_the_pass_params(self, stage, tmp_path):
+        from whisperjav.crispasr.moss_prompt import PROMPT_ZH
+        from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
+
+        stage.answers = [[], [], []]
+        params = {"prompt_language": "zh", "hotwords": "監督, 村西", "max_new_tokens": 4000, "threshold": 0.5}
+        md = make(MossCrispASRPipeline, tmp_path, model_params=params).process(stage.media())
+        engine = stage.engines[0]
+        assert engine.ask == PROMPT_ZH + " 语言提示：Japanese 热词提示：監督, 村西"
+        assert engine.max_new_tokens == 4000
+        assert md["config"]["crispasr"]["model_settings"] == {
+            "prompt_language": "zh", "language_hint": "Japanese", "hotwords": "監督, 村西", "max_new_tokens": 4000,
+            # the decoding preset (owner W492 M1, W502), handed to the engine
+            "do_sample": True, "temperature": 0.7, "top_k": 50, "seed": 42, "beam_size": 1}
+        assert engine.decoding == {"do_sample": True, "temperature": 0.7, "top_k": 50, "seed": 42, "beam_size": 1}
+
+    def test_a_setting_it_cannot_use_is_refused(self, tmp_path):
+        from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
+
+        with pytest.raises(ValueError, match="prompt_language"):
+            make(MossCrispASRPipeline, tmp_path, model_params={"prompt_language": "fr"})
+        with pytest.raises(ValueError, match="max_new_tokens"):
+            make(MossCrispASRPipeline, tmp_path, model_params={"max_new_tokens": -1})
+
+    def test_its_groups_and_scenes(self, tmp_path):
+        # W482: FireRedVAD with its own threshold; a group ends at a silence over 5 s, at most 240 s, no shortest
+        # group, at every sensitivity (W428 I1 2); semantic scenes of 90-240 s
+        from whisperjav.config.segmenter_presets import resolve_segmenter_sensitivity
+        from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
+
+        for sensitivity in ("conservative", "balanced", "aggressive"):
+            pipe = make(MossCrispASRPipeline, tmp_path, sensitivity=sensitivity)
+            s = pipe.segmenter
+            assert (s.backend, s.max_group_duration_s, s.chunk_threshold_s) == ("firered-vad", 240.0, 5.0)
+            assert s.config["min_group_duration_s"] == 0.0
+            assert s.config["threshold"] == resolve_segmenter_sensitivity("firered-vad", sensitivity)["threshold"]
+            assert pipe.scene_detector_kwargs() == {"method": "semantic", "min_duration": 90, "max_duration": 240}
+        # a user who chooses silero (W482: their choice): its own minimum, MOSS's longest scene; Silero's 0.7 (W426 2)
+        pipe = make(MossCrispASRPipeline, tmp_path, scene_detector="silero", speech_segmenter="silero-v6.2")
+        assert pipe.scene_detector_kwargs() == {"method": "silero", "max_duration": 240}
+        assert pipe.segmenter.config["threshold"] == 0.7
+        # the Customize Scene values on top
+        pipe = make(MossCrispASRPipeline, tmp_path, scene_params={"min_duration": 120, "max_duration": 300})
+        assert pipe.scene_detector_kwargs() == {"method": "semantic", "min_duration": 120, "max_duration": 300}
+        pipe = make(MossCrispASRPipeline, tmp_path, vad_threshold=0.5,
+                    segmenter_overrides={"min_group_duration_s": 90, "max_group_duration_s": 110})
+        assert (pipe.segmenter.config["threshold"], pipe.segmenter.config["min_group_duration_s"],
+                pipe.segmenter.max_group_duration_s) == (0.5, 90, 110)
+
+    def test_the_other_pipelines_keep_their_scenes_and_no_shortest_group(self, tmp_path):
+        pipe = make(CohereCrispASRPipeline, tmp_path)
+        assert pipe.scene_detector_kwargs() == {"method": "semantic", "min_duration": 12, "max_duration": 48}
+        assert not pipe.segmenter.config.get("min_group_duration_s")
+        assert pipe.model_settings is None
+
+    def test_with_the_aligner_the_labels_are_not_aligned(self, stage, tmp_path):
+        from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
+
+        stage.answers = [[CrispSegment("[S01]本番。", 0.2, 0.9)], [], []]
+        stage.alignments = [[]]
+        make(MossCrispASRPipeline, tmp_path, word_timestamps="aligner").process(stage.media())
+        assert [text for _n, text in stage.aligners[0].texts] == ["本番。"]
+
+    def test_kotoba_with_the_aligner_aligns_and_cuts_as_cohere(self, stage, tmp_path):
+        from whisperjav.pipelines.kotoba_crispasr_pipeline import KotobaCrispASRPipeline
+
+        stage.frames = {0: [(1.0, 4.79)], 1: []}
+        stage.answers = [[CrispSegment(TestCohereAligned.TEXT, 0.0, 3.79)]]
+        stage.alignments = [TestCohereAligned.UNITS]
+        md = make(KotobaCrispASRPipeline, tmp_path, word_timestamps="aligner").process(stage.media())
+        assert srt_entries(md["output_files"]["final_srt"]) == [
+            ("近くのカラオケでそのまま酔っぱらっちゃった。", 1.26, 4.1), ("それで？", 4.1, 4.79)]
+        assert (stage.aligners[0].model_name, stage.aligners[0].label) == ("wav2vec2-ja", "Kotoba-CrispASR")
+        assert md["config"]["crispasr"]["word_timestamps"] == "aligner"
+
+    def test_kotoba_by_default_loads_no_aligner(self, stage, tmp_path):
+        from whisperjav.pipelines.kotoba_crispasr_pipeline import KotobaCrispASRPipeline
+
+        stage.answers = [[parakeet_segment(("はい", 0.1, 0.4))]]
+        md = make(KotobaCrispASRPipeline, tmp_path).process(stage.media())
+        assert stage.aligners == [] and md["config"]["crispasr"]["word_timestamps"] == "model"
+
+    def test_with_the_aligner_a_group_it_gives_nothing_for_keeps_the_models_own_times(self, stage, tmp_path):
+        stage.answers = [[parakeet_segment(("本番", 0.1, 0.4))], [parakeet_segment(("いいよ", 0.2, 0.9))], []]
+        stage.alignments = [[TimedUnit("本", 0.1, 0.2), TimedUnit("番", 0.3, 1.0)], []]
+        md = make(ParakeetCrispASRPipeline, tmp_path, word_timestamps="aligner").process(stage.media())
+        entries = srt_entries(md["output_files"]["final_srt"])
+        assert entries[1][0] == "いいよ" and entries[1][1] == 3.2   # the model's own start, not the group's edge
+        assert md["summary"]["notes"][-1] == (
+            "Parakeet-CrispASR: 1 of 2 VAD group(s) could not be aligned; they keep the model's own word times")
+
+    def test_with_the_aligner_unloadable_the_models_own_times_are_used_and_said(self, stage, tmp_path):
+        stage.aligner_load_error = CrispASRSetupError("Downloading the model wav2vec2 failed: offline")
+        stage.answers = [[parakeet_segment(("監督", 0.1, 0.4))], [], []]
+        md = make(ParakeetCrispASRPipeline, tmp_path, word_timestamps="aligner").process(stage.media())
+        assert srt_entries(md["output_files"]["final_srt"])[0][:2] == ("監督", 1.1)
+        assert md["summary"]["notes"][-1] == (
+            "Parakeet-CrispASR's aligner (wav2vec2-ja) could not be loaded (Downloading the model wav2vec2 failed: "
+            "offline): the model's own word times are used.")
+
+
+class TestPostProcessing:
+    """Option B (owner W421 i1, W422): each pipeline's clean-up; MOSS its own set (W505 2 b-d; before it the three
+    earlier filters, W421 i3)."""
+
+    CLOSING = "ご視聴ありがとうございました"   # removed by the hallucination filter's built-in closing-phrase pattern
+
+    def test_which_pipeline_gets_which_stages(self):
+        from whisperjav.crispasr import cleanup
+        for name, cls in TestThe1101Pipelines.classes().items():
+            expected = cleanup.MOSS_STAGES if name == "moss-crispasr" else cleanup.SRT_STAGES
+            assert cls.ENGINE.cleanup == expected, name
+            for choice in ("model", "aligner"):
+                assert cls.engine_row(choice).cleanup == expected, (name, choice)
+            # the text cleaner: Cohere's text, before the aligner, only
+            assert cls.ENGINE.text_cleanup == (("text_cleaner",) if name == "cohere-crispasr" else ()), name
+        assert CohereCrispASRPipeline.engine_row("model").text_cleanup == ()   # its own times: no text change
+
+    def test_a_hallucination_is_removed_kept_in_the_raw_copy_and_listed(self, stage, tmp_path):
+        stage.answers = [[parakeet_segment((self.CLOSING, 0.1, 0.9))], [parakeet_segment(("本番", 0.2, 0.9))],
+                         [parakeet_segment(("監督", 0.1, 0.5))]]
+        md = make(ParakeetCrispASRPipeline, tmp_path).process(stage.media())
+        assert [t for t, _s, _e in srt_entries(md["output_files"]["final_srt"])] == ["本番", "監督"]
+        raw = tmp_path / "out" / "raw_subs"
+        original = raw / "film.parakeet-crispasr_stitched.original.srt"
+        assert [t for t, _s, _e in srt_entries(original)] == [self.CLOSING, "本番", "監督"]   # R-RAW
+        artifacts = (raw / "film.parakeet-crispasr_stitched.artifacts.srt").read_text(encoding="utf-8")
+        assert "[SANITIZATION SUMMARY]" in artifacts and f"[REMOVED - Hallucination]\nOriginal: {self.CLOSING}" \
+            in artifacts
+        assert md["summary"]["quality_metrics"]["hallucinations_removed"] == 1
+        assert md["config"]["crispasr"]["cleanup"] == ["duplicates", "hallucination", "repetition", "nonverbal",
+                                                      "nonlinguistic", "scene_overlap"]
+
+    def test_moss_clean_up(self, stage, tmp_path):
+        """W505 2 b-d: the duplicate merge, the three filters, the interjection rules; no hallucination filter (a
+        closing phrase stays); the trace of R-RAW is kept as for the other pipelines."""
+        from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
+
+        stage.frames = {0: [(0.0, 10.0)], 1: []}   # one VAD group of 10 s holds every line
+        stage.answers = [[CrispSegment(self.CLOSING, 0.0, 1.0), CrispSegment("痛い。", 1.1, 1.5),
+                          CrispSegment("痛い。", 1.6, 2.0), CrispSegment("痛い。", 2.1, 2.5),
+                          CrispSegment("Ah.", 3.0, 3.5), CrispSegment("嗯。", 4.0, 4.5),
+                          CrispSegment("ああああ", 5.0, 5.5), CrispSegment("うん。", 6.0, 6.5),
+                          CrispSegment("Honey.", 7.0, 7.5), CrispSegment("あっ、監督", 8.0, 8.5)]]
+        md = make(MossCrispASRPipeline, tmp_path, word_timestamps="model").process(stage.media())
+        assert [t for t, _s, _e in srt_entries(md["output_files"]["final_srt"])] == [
+            self.CLOSING, "痛い。", "Honey.", "あっ、監督"]
+        names = sorted(q.name for q in (tmp_path / "out" / "raw_subs").iterdir())
+        assert names == ["film.moss-crispasr_stitched.artifacts.srt", "film.moss-crispasr_stitched.original.srt"]
+        artifacts = (tmp_path / "out" / "raw_subs" / names[0]).read_text(encoding="utf-8")
+        # "うん。" goes by the non-verbal filter first; "Ah.", "嗯。", "ああああ" by the interjection rules
+        assert artifacts.count("Category: interjection_line") == 3 and "[MODIFIED - Sequential Duplicates Merged]" in artifacts
+
+    def test_in_an_ensemble_pass_the_trace_goes_beside_the_pass_file_named_with_the_pass(self, stage, tmp_path):
+        # what the pass worker sets per file (pass_worker._configure_trace): in --output-dir source mode the
+        # pipeline's own output folder is the temp folder, which is removed
+        stage.answers = [[parakeet_segment((self.CLOSING, 0.1, 0.9))], [parakeet_segment(("本番", 0.2, 0.9))], []]
+        pipe = make(ParakeetCrispASRPipeline, tmp_path)
+        pipe.raw_subs_dir, pipe.pass_tag = str(tmp_path / "beside_video" / "raw_subs"), "pass2"
+        pipe.process(stage.media())
+        names = sorted(p.name for p in (tmp_path / "beside_video" / "raw_subs").iterdir())
+        assert names == ["film.pass2.parakeet-crispasr_stitched.artifacts.srt",
+                         "film.pass2.parakeet-crispasr_stitched.original.srt"]
+        source = (REPO / "whisperjav" / "ensemble" / "pass_worker.py").read_text(encoding="utf-8")
+        assert "_configure_trace(pipeline, pass_number, Path(media_info.get('output_dir', payload.output_dir)))" \
+            in source
+        assert 'pipeline.raw_subs_dir = str(Path(file_output_dir) / "raw_subs")' in source
+
+    def test_cohere_text_is_cleaned_before_the_aligner(self, stage, tmp_path):
+        stage.frames = {0: [(1.0, 4.0)], 1: []}
+        stage.answers = [[CrispSegment("行け行け行け行け行け。", 0.0, 3.0)]]
+        stage.alignments = [[TimedUnit("行", 0.2, 0.3), TimedUnit("け", 0.4, 0.5), TimedUnit("行", 0.6, 0.7),
+                             TimedUnit("け。", 0.8, 3.0)]]
+        md = make(CohereCrispASRPipeline, tmp_path, save_metadata_json=True).process(stage.media())
+        assert stage.aligners[0].texts == [(3 * RATE, "行け行け。")]       # the aligner times the cleaned text
+        assert [t for t, _s, _e in srt_entries(md["output_files"]["final_srt"])] == ["行け行け。"]
+        assert md["stages"]["text_cleaner"]["changed"] == 1
+        raw = tmp_path / "out" / "raw_subs"
+        artifacts = (raw / "film.cohere-crispasr_stitched.artifacts.srt").read_text(encoding="utf-8")
+        assert "[MODIFIED - Text Cleaner]\nOriginal: 行け行け行け行け行け。\nModified: 行け行け。" in artifacts
+        record = [json.loads(line) for line in
+                  (raw / "film.cohere-crispasr.groups.jsonl").read_text(encoding="utf-8").splitlines()]
+        assert record[0]["model_text"] == "行け行け行け行け行け。"            # the model's own text stays on record
+
+    def test_cohere_with_its_own_times_has_no_text_cleaner(self, stage, tmp_path):
+        stage.answers = [[CrispSegment("行け行け行け行け行け。", 0.0, 1.0, (), toks(("行け行け行け行け行け", 0.1, 0.8),
+                                                                              ("。", 0.8, 0.9)))], [], []]
+        md = make(CohereCrispASRPipeline, tmp_path, word_timestamps="model").process(stage.media())
+        assert "text_cleaner" not in md["stages"] and stage.aligners == []
+        # Fidelity's repetition cleaner (SRT level) has kana patterns; a kanji+kana phrase repeated stays -- only
+        # ChronosJAV's text cleaner, which works on full Unicode, shortens it (found 2026-11-01).
+        assert srt_entries(md["output_files"]["final_srt"])[0][0] == "行け行け行け行け行け。"
 
 
 class TestOncePerPass:

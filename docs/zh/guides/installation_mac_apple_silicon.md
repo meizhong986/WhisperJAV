@@ -1,10 +1,10 @@
 # WhisperJAV Apple silicon Mac 安装指南
 
-**版本：** 1.10.0
+**版本：** 1.10.1
 
-在 Apple silicon Mac 上，WhisperJAV 1.10.0 会自动为 **Apple GPU（Metal）** 制作安装：即 Apple 芯片内置的 GPU。部分处理管线使用它，其他的在 CPU 上运行（见[各处理管线在哪里运行](#4-where-each-pipeline-runs)）。Mac 没有类似 `.exe` 的安装程序；你需要用一个脚本从源码安装。
+在 Apple silicon Mac 上，WhisperJAV 1.10.1 会自动为 **Apple GPU（Metal）** 制作安装：即 Apple 芯片内置的 GPU。部分处理管线使用它，其他的在 CPU 上运行（见[各处理管线在哪里运行](#4-where-each-pipeline-runs)）。Mac 没有类似 `.exe` 的安装程序；你需要用一个脚本从源码安装。
 
-项目中还没有人在 Mac 上运行过 WhisperJAV 1.10.0。标为"尚未在 Mac 上测试"的部分已经具备，应当可以工作，但我们无法检查。请告诉我们它在你的 Mac 上表现如何：https://github.com/meizhong986/WhisperJAV/issues
+项目中还没有人在 Mac 上运行过 WhisperJAV 1.10。标为"尚未在 Mac 上测试"的部分已经具备，应当可以工作，但我们无法检查。请告诉我们它在你的 Mac 上表现如何：https://github.com/meizhong986/WhisperJAV/issues
 
 ---
 
@@ -22,7 +22,7 @@
 
 ## 1. 你的 Mac {#1-your-mac}
 
-| | WhisperJAV 1.10.0 需要 |
+| | WhisperJAV 1.10.1 需要 |
 |---|---|
 | 芯片 | Apple silicon（M1 或更新） |
 | macOS | 14（Sonoma）或更新 |
@@ -30,7 +30,7 @@
 | 磁盘 | 约 10 GB，用于安装和首次使用时下载的模型 |
 | Python | 3.13，Apple silicon（arm64）版 |
 
-**不支持**（安装程序会说明原因，不安装任何内容）：Intel Mac，因为 WhisperJAV 1.10.0 需要的 PyTorch 2.11 没有为它们制作；macOS 13 及更早，因为 ONNX Runtime 1.29 需要 macOS 14 或更新。在 Apple silicon Mac 上通过 Rosetta（作为 Intel 程序）运行的 Python 也会被拒绝：请使用 arm64 的 Python，例如 Homebrew 提供的。
+**不支持**（安装程序会说明原因，不安装任何内容）：Intel Mac，因为 WhisperJAV 1.10.1 需要的 PyTorch 2.11 没有为它们制作；macOS 13 及更早，因为 ONNX Runtime 1.29 需要 macOS 14 或更新。在 Apple silicon Mac 上通过 Rosetta（作为 Intel 程序）运行的 Python 也会被拒绝：请使用 arm64 的 Python，例如 Homebrew 提供的。
 
 ---
 
@@ -63,7 +63,7 @@ source ~/venvs/whisperjav/bin/activate
 python3 --version          # 应显示 Python 3.13.x
 
 # 该版本的源码
-git clone --branch v1.10.0 https://github.com/meizhong986/WhisperJAV.git
+git clone --branch v1.10.1 https://github.com/meizhong986/WhisperJAV.git
 cd WhisperJAV
 
 # 安装脚本
@@ -102,9 +102,9 @@ chmod +x installer/install_mac.sh
 |---|---|
 | **transformers** | Apple GPU（Metal）——**在 Mac 上推荐** |
 | **fidelity** | 向 PyTorch 请求使用 Apple GPU（Metal）；尚未在 Mac 上测试。如果失败，请使用 transformers 处理管线。 |
-| **Parakeet-CrispASR、Cohere-CrispASR**（GGUF） | 请求使用 Apple GPU（Metal）；尚未在 Mac 上测试 |
+| **GGUF 处理管线**（parakeet、cohere、reazonspeech、kotoba、whisper-turbo、whisper-large、MOSS） | 请求使用 Apple GPU（Metal）；尚未在 Mac 上测试 |
 | **balanced、fast、faster** | CPU（不加速），慢好几倍：它们的引擎（CTranslate2）无法使用 Apple GPU |
-| **ChronosJAV**（Qwen3-ASR、anime-whisper） | 在 1.10.0 中为 CPU（不加速）：其 ASR 模型尚不使用 Apple GPU |
+| **ChronosJAV**（Qwen3-ASR、anime-whisper） | 在 1.10 中为 CPU（不加速）：其 ASR 模型尚不使用 Apple GPU |
 | WhisperSeg 语音分割器 | CPU，所有安装中都是 |
 
 Apple GPU 可用时，运行开始时不显示任何内容；每个处理管线启动时会在控制台中说明自己在哪里运行（例如 balanced、fast 和 faster 会说明它们在 CPU 上运行）。如果 Apple GPU 不可用，运行开始时会有一个框说明各部分在哪里运行。安装脚本结束时会显示：
@@ -143,13 +143,13 @@ git checkout v1.10.x      # 你想要的版本
 ./installer/install_mac.sh
 ```
 
-1.9.x 环境无法更新到 1.10.0：1.10.0 需要 Python 3.13。请新建一个 Python 3.13 环境并安装到那里。
+1.9.x 环境无法更新到 1.10：1.10 需要 Python 3.13。请新建一个 Python 3.13 环境并安装到那里。
 
 ---
 
 ## 7. 故障排除 {#7-troubleshooting}
 
-**"WhisperJAV 1.10.0 does not support Intel Macs" / "does not support macOS …"。** 这台 Mac 不在受支持列表中；没有安装任何内容。
+**"WhisperJAV 1.10 does not support Intel Macs" / "does not support macOS …"。** 这台 Mac 不在受支持列表中；没有安装任何内容。
 
 **"Python 3.x is not supported"。** 激活 Python 3.13 环境（第 3 节）后再次运行脚本。
 

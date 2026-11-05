@@ -26,13 +26,20 @@ from whisperjav.pipelines.transformers_pipeline import TransformersPipeline
 from whisperjav.pipelines.qwen_pipeline import QwenPipeline
 from whisperjav.pipelines.parakeet_crispasr_pipeline import ParakeetCrispASRPipeline
 from whisperjav.pipelines.cohere_crispasr_pipeline import CohereCrispASRPipeline
+from whisperjav.pipelines.reazonspeech_crispasr_pipeline import ReazonSpeechCrispASRPipeline
+from whisperjav.pipelines.kotoba_crispasr_pipeline import KotobaCrispASRPipeline
+from whisperjav.pipelines.whisper_turbo_crispasr_pipeline import WhisperTurboCrispASRPipeline
+from whisperjav.pipelines.whisper_large_crispasr_pipeline import WhisperLargeCrispASRPipeline
+from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
 from whisperjav.crispasr.errors import FAILURE_PREFIX as CRISPASR_FAILURE_PREFIX, CrispASRRunError, CrispASRSetupError
+from whisperjav.modules.qwen_errors import QwenModelUnusable
 from whisperjav.crispasr.manifest import CRISPASR_PIPELINES
 from whisperjav.crispasr.pass_settings import (ignored_hardware_message, ignored_hardware_settings,
                                                speech_pad_ignored as crispasr_speech_pad_ignored,
-                                               unused_pass_settings, unused_settings_message)
+                                               unused_by_other_pipelines, unused_pass_settings,
+                                               unused_settings_message)
 from whisperjav.utils.device_detector import pass_device
-from whisperjav.utils.logger import logger, setup_logger
+from whisperjav.utils.logger import logger, quiet_library_loggers, setup_logger
 from whisperjav.utils.parameter_tracer import create_tracer, NullTracer
 
 from .utils import resolve_language_code
@@ -48,6 +55,12 @@ PIPELINE_CLASSES = {
     # replace the 1.9.x "crispasr" pipeline, whose name main.py now stops (exit status 2).
     "parakeet-crispasr": ParakeetCrispASRPipeline,
     "cohere-crispasr": CohereCrispASRPipeline,
+    # 1.10.1 (owner W397, W401).
+    "reazonspeech-crispasr": ReazonSpeechCrispASRPipeline,
+    "kotoba-crispasr": KotobaCrispASRPipeline,
+    "whisper-turbo-crispasr": WhisperTurboCrispASRPipeline,
+    "whisper-large-crispasr": WhisperLargeCrispASRPipeline,
+    "moss-crispasr": MossCrispASRPipeline,
 }
 
 # Pipelines whose constructors never read enhance_for_vad. Verified against their
@@ -295,6 +308,7 @@ class WorkerPayload:
     language_code: str
     log_level: str = "INFO"  # Propagate log level to subprocess workers
     trace_file_path: Optional[str] = None  # Path for parameter tracer output
+    log_file: Optional[str] = None  # this pass's log file beside the run's --log-file (owner W509, way B)
 
 
 @dataclass
@@ -386,7 +400,10 @@ DEFAULT_QWEN_PARAMS = {
     "qwen_language": "Japanese",  # WhisperJAV is purpose-built for Japanese
     "qwen_timestamps": "word",
     "qwen_aligner": "wav2vec2-ja",  # 1.10.0: the CrispASR aligner (design note 2026-10-28)
-    "qwen_timing_model": "whisper-small",  # 1.10.0: the CrispASR timing model, step 8
+    # The timing model and timestamp mode below are the shared 1.10.0 values (owner W254), still taken by the dormant
+    # Cohere-in-ChronosJAV branch, which this change leaves as it was. Qwen3-ASR and anime-whisper default to no
+    # timing model and vad_only since 1.10.1 (owner W498 D1): set in their branches of _build_pipeline.
+    "qwen_timing_model": "whisper-small",  # the CrispASR timing model, step 8
     "qwen_scene": "semantic",
     "qwen_context": "",
     "qwen_context_file": None,
@@ -400,7 +417,7 @@ DEFAULT_QWEN_PARAMS = {
     "qwen_input_mode": "assembly",
     "qwen_framer": "vad-grouped",  # Preserve previous VAD_SLICING behavior for ensemble
     "qwen_safe_chunking": True,
-    "qwen_timestamp_mode": "aligner_vad_fallback",  # 1.10.0: the aligner times the text (owner W254)
+    "qwen_timestamp_mode": "aligner_vad_fallback",  # see the note above qwen_timing_model
     "qwen_assembly_cleaner": True,
     "qwen_repetition_penalty": 1.1,
     "qwen_max_tokens_per_second": 20.0,
@@ -514,6 +531,27 @@ def prepare_qwen_params(pass_config: Dict[str, Any]) -> Dict[str, Any]:
     return params
 
 
+def partial_result_file(result_file: str) -> str:
+    """Where the worker writes the results of the files finished so far (owner W462, W463 step 3)."""
+    return result_file + ".partial"
+
+
+def _write_partial_results(result_file: str, results: List["FileResult"]) -> None:
+    """Each file's result as soon as it is known, so that a crash later in the pass (a native abort, which no
+    Python handler sees) does not lose the files already done. Written whole, then renamed; a failure to write it
+    is logged and changes nothing else."""
+    import pickle
+
+    target = partial_result_file(result_file)
+    try:
+        tmp = target + ".tmp"
+        with open(tmp, "wb") as f:
+            pickle.dump({"results": [r.__dict__ for r in results], "worker_error": None}, f)
+        os.replace(tmp, target)
+    except Exception as e:  # noqa: BLE001 -- a safety copy only
+        logger.debug("[Worker %s] Could not write the per-file results: %s", os.getpid(), e)
+
+
 def _write_dropbox_and_exit(result_file: str, result: Dict[str, Any], tracer, exit_code: int) -> None:
     """
     Write result to Drop-Box file and perform Nuclear Exit.
@@ -598,7 +636,8 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
 
     # Reconfigure logger with the log level from main process
     # (subprocess starts fresh with default INFO level due to 'spawn' context)
-    setup_logger("whisperjav", payload.log_level)
+    setup_logger("whisperjav", payload.log_level, payload.log_file)
+    quiet_library_loggers(debug=payload.log_level.upper() == "DEBUG")   # owner W509, console item 4
 
     # Create parameter tracer if trace file path is provided
     # Use append=True since the main process already created the file
@@ -622,8 +661,7 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
     language_code = payload.language_code or resolve_language_code(pass_config, payload.subs_language)
 
     logger.info(
-        "[Worker %s] Starting pass %s for %s file(s)",
-        os.getpid(),
+        "Starting pass %s for %s file(s)",
         pass_number,
         len(media_files),
         extra={'color': 'blue'},
@@ -634,6 +672,13 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
         _write_dropbox_and_exit(result_file, {"results": [], "worker_error": None}, tracer, 0)
 
     pass_temp_dir = Path(payload.temp_dir) / f"pass{pass_number}_worker"
+
+    # --passN-word-timestamps is used by the CrispASR pipelines only (1.10.1, Part B; owner W413): for any
+    # other pipeline, XXL included, the same "does not use" line the CrispASR passes log names it.
+    _other_unused = unused_by_other_pipelines(pass_config, pass_number)
+    if _other_unused:
+        # e.g. "The balanced pipeline does not use: --pass1-word-timestamps"
+        logger.info(unused_settings_message(f"The {pass_config.get('pipeline')} pipeline", _other_unused))
 
     # =========================================================================
     # BYOP XXL: External subprocess — bypasses _build_pipeline() entirely.
@@ -706,8 +751,7 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
         for media_info in media_files:
             basename = media_info["basename"]
             logger.info(
-                "[Worker %s] Pass %s processing %s",
-                os.getpid(),
+                "Pass %s processing %s",
                 pass_number,
                 basename,
                 extra={'color': 'blue'},
@@ -719,6 +763,12 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
             # #394 per-scene telemetry goes beside this file's pass output,
             # tagged with the pass number so two Balanced passes do not
             # overwrite each other. Pipelines that do not record it ignore it.
+            # The CrispASR pipelines' raw copy and artifacts file, and ChronosJAV's raw copy (1.10.1, R-RAW), go to
+            # the same folder.
+            _configure_trace(pipeline, pass_number, Path(media_info.get('output_dir', payload.output_dir)))
+            # An Ensemble pass keeps its save-points (owner W462, W463 C1); pipelines without them ignore this.
+            if hasattr(pipeline, "save_points"):
+                pipeline.save_points = True
             _configure_telemetry(
                 pipeline, pass_config, pass_number,
                 Path(media_info.get('output_dir', payload.output_dir)),
@@ -821,6 +871,15 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                 # --fail-on suspect: a requested stop, not a crash.
                 logger.error("[Worker %s] Pass %s: %s: %s", os.getpid(), pass_number, basename, stop)
                 results.append(FileResult(basename=basename, status="failed", error=str(stop)))
+            except QwenModelUnusable as stop:
+                # The pass's Qwen3-ASR model cannot give real text for any file (R-QFT, #494; owner W491 2): the pass
+                # stops here, and every file not yet done fails with the same plain reason, without a new load.
+                logger.error("[Worker %s] Pass %s: %s: %s", os.getpid(), pass_number, basename, stop)
+                position = next(k for k, m in enumerate(media_files) if m is media_info)
+                results.extend(FileResult(basename=m["basename"], status="failed", error=str(stop))
+                               for m in media_files[position:])
+                _write_partial_results(result_file, results)
+                break
             except (CrispASRRunError, CrispASRSetupError) as failure:
                 # CrispASR or its model failed, with the reason in plain words: the run summary
                 # shows it, prefixed, instead of a traceback.
@@ -838,6 +897,8 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                         error=traceback.format_exc(),
                     )
                 )
+            # Step 3 (owner W462, W463): this file's result is on disk before the next file starts.
+            _write_partial_results(result_file, results)
     finally:
         # Defensive cleanup: Use BaseException to catch more error types.
         # On Windows, CUDA driver crashes during cleanup can terminate the process
@@ -857,8 +918,10 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                 os.getpid(), e
             )
 
-        # Temp directory cleanup - also make defensive
-        if not payload.keep_temp_files and pass_temp_dir.exists():
+        # Temp directory cleanup - also make defensive. Not when a file failed (owner W462, W463 step 1): the
+        # Ensemble keeps that file's save-point and the pass's working files (ensemble/orchestrator.py).
+        if (not payload.keep_temp_files and pass_temp_dir.exists()
+                and not any(r.status == "failed" for r in results)):
             try:
                 shutil.rmtree(pass_temp_dir, ignore_errors=True)
             except BaseException:
@@ -871,7 +934,7 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
     total_time = sum(r.processing_time for r in results if r.status == 'completed')
 
     if completed_count > 0:
-        logger.info(
+        logger.debug(
             "[Worker %s] Pass %s completed: %d file(s), %d subtitles, %.1fs",
             os.getpid(), pass_number, completed_count, total_subs, total_time
         )
@@ -881,7 +944,7 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
             os.getpid(), pass_number, failed_count
         )
 
-    logger.info("[Worker %s] Worker exiting via Nuclear Exit", os.getpid())
+    logger.debug("[Worker %s] Worker exiting via Nuclear Exit", os.getpid())
 
     # Write result to Drop-Box and Nuclear Exit
     final_result = {"results": [r.__dict__ for r in results], "worker_error": None}
@@ -941,8 +1004,8 @@ def _run_xxl_pass(
     asr_task = "translate" if payload.subs_language == "direct-to-english" else "transcribe"
 
     logger.info(
-        "[Worker %s] Pass %s: BYOP XXL (exe=%s, model=%s)",
-        os.getpid(), pass_number, xxl_exe, xxl_model,
+        "Pass %s: BYOP XXL (exe=%s, model=%s)",
+        pass_number, xxl_exe, xxl_model,
     )
 
     # A model named in the extra arguments is not used (#272); say so once per pass worker --
@@ -954,8 +1017,8 @@ def _run_xxl_pass(
     for media_info in media_files:
         basename = media_info["basename"]
         logger.info(
-            "[Worker %s] Pass %s [XXL] processing %s",
-            os.getpid(), pass_number, basename,
+            "Pass %s [XXL] processing %s",
+            pass_number, basename,
             extra={'color': 'blue'},
         )
         file_start = _time.monotonic()
@@ -1002,8 +1065,8 @@ def _run_xxl_pass(
                 )
             )
             logger.info(
-                "[Worker %s] Pass %s [XXL] %s -> %d subtitles in %.1fs",
-                os.getpid(), pass_number, basename, subtitle_count, elapsed,
+                "Pass %s [XXL] %s -> %d subtitles in %.1fs",
+                pass_number, basename, subtitle_count, elapsed,
             )
         except Exception as xxl_error:
             elapsed = _time.monotonic() - file_start
@@ -1035,13 +1098,22 @@ def _run_xxl_pass(
     failed_count = sum(1 for r in results if r.status == 'failed')
     total_subs = sum(r.subtitles for r in results if r.status == 'completed')
     logger.info(
-        "[Worker %s] Pass %s [XXL] done: %d completed, %d failed, %d subtitles",
-        os.getpid(), pass_number, completed_count, failed_count, total_subs,
+        "Pass %s [XXL] done: %d completed, %d failed, %d subtitles",
+        pass_number, completed_count, failed_count, total_subs,
     )
 
     # Write Drop-Box and Nuclear Exit (same pattern as normal passes)
     final_result = {"results": [r.__dict__ for r in results], "worker_error": None}
     _write_dropbox_and_exit(result_file, final_result, tracer, 0)
+
+
+def _configure_trace(pipeline: Any, pass_number: int, file_output_dir: Path) -> None:
+    """Point a CrispASR pipeline's raw copy and artifacts file, and ChronosJAV's raw copy (1.10.1, requirement R-RAW;
+    crispasr/cleanup.py, qwen_pipeline.py: _keep_raw_copy) at this file's pass output folder, named with the pass. As for the telemetry below: in ``--output-dir source`` mode
+    the pipeline's own ``output_dir`` is the temp directory, which is removed. Other pipelines are left alone."""
+    if hasattr(pipeline, "raw_subs_dir") and hasattr(pipeline, "pass_tag"):
+        pipeline.raw_subs_dir = str(Path(file_output_dir) / "raw_subs")
+        pipeline.pass_tag = f"pass{pass_number}"
 
 
 def _configure_telemetry(pipeline: Any, pass_config: Dict[str, Any],
@@ -1348,6 +1420,18 @@ def _build_pipeline(
         # When anime-whisper generator is selected, override model defaults
         # unless ensemble config explicitly set them
         _gen_backend = qwen_pipeline_params.get("generator_backend", "qwen3")
+        if _gen_backend in ("qwen3", "anime-whisper"):
+            # 1.10.1 (owner W498 D1): Qwen3-ASR and anime-whisper default to VAD Only with no timing model -- no
+            # aligner, no timing model -- unless the pass names a timestamp mode or a timing model itself. A pass
+            # that names an aligner but no timestamp mode gets aligner_vad_fallback (owner W501 1). One rule with
+            # main.py: config/chronosjav_timing.py.
+            from whisperjav.config.chronosjav_timing import DEFAULT_TIMING_MODEL, timestamp_mode_for_pass
+            _named = pass_config.get("qwen_params") or {}
+            _mode = timestamp_mode_for_pass(_named)
+            if _mode is not None:
+                qwen_pipeline_params["timestamp_mode"] = _mode
+            if "timing_model" not in _named and "qwen_timing_model" not in _named:
+                qwen_pipeline_params["timing_model"] = DEFAULT_TIMING_MODEL
         if _gen_backend == "anime-whisper":
             _user_qwen = pass_config.get("qwen_params") or {}
             # v1.9.0: per-sensitivity WhisperSeg VAD defaults (owner table, single
@@ -1357,8 +1441,8 @@ def _build_pipeline(
             _aw_vad = anime_whisperseg_defaults(qwen_sensitivity)
             if "model_id" not in _user_qwen and not pass_config.get("model"):
                 qwen_pipeline_params["model_id"] = "litagin/anime-whisper"
-            # 1.10.0: no longer vad_only with step-down off; the aligner and timing model
-            # apply as for Qwen3-ASR (design note 2026-10-28 section 7, owner W254 Q6).
+            # The timestamp mode and timing model follow the same defaults as Qwen3-ASR (since 1.10.1
+            # vad_only and none, owner W498 D1; in 1.10.0 the aligner and timing model, W254 Q6).
             if "assembly_cleaner" not in _user_qwen:
                 qwen_pipeline_params["assembly_cleaner"] = False
             if "chunk_threshold" not in _user_qwen:
@@ -1466,8 +1550,9 @@ def _build_pipeline(
     # through its Python binding. Built from the pass settings they use -- model, speech
     # segmenter, sensitivity, source language, device -- and returned here, before resolve_legacy_pipeline(),
     # which raises for any name outside LEGACY_PIPELINES (config/legacy.py). main.py has
-    # already refused a model they do not know, a language other than Japanese and the
-    # segmenter "none" (whisperjav/crispasr/pass_settings.py). The pass settings they do
+    # already refused a model they do not know and a language other than Japanese
+    # (whisperjav/crispasr/pass_settings.py); the segmenter "none" is accepted (owner W457, W458:
+    # each scene goes to the model whole). The pass settings they do
     # not use are named in one line and otherwise left alone: the GUI and saved Ensemble
     # presets carry them for every pipeline.
     if is_crispasr:
@@ -1511,6 +1596,9 @@ def _build_pipeline(
             # values of the Segmenter and Scene tabs.
             "scene_detector": pass_config.get("scene_detector") or None,
             "enhance_for_vad": bool(pass_config.get("enhance_for_vad", False)),
+            # --passN-word-timestamps (1.10.1; owner W411-W414): "model", "aligner", or None for the pipeline's
+            # own default (manifest.word_timestamps_for).
+            "word_timestamps": pass_config.get("word_timestamps") or None,
         }
         if pass_config.get("speech_enhancer"):
             enhancer_backend, enhancer_model = _parse_speech_enhancer(pass_config["speech_enhancer"])
@@ -1518,7 +1606,13 @@ def _build_pipeline(
             crispasr_kwargs["speech_enhancer_model"] = enhancer_model
         custom = pass_config.get("params") or {}
         crispasr_kwargs["segmenter_overrides"] = {k: v for k, v in custom.items() if k in SEGMENTER_PARAMS}
-        crispasr_kwargs["scene_params"] = {k: v for k, v in custom.items() if k in SCENE_DETECTION_PARAMS}
+        # R-SCN's settings travel as rscn_<name> keys (owner W450 1; rscn/settings.py); the other scene detectors
+        # do not take them.
+        crispasr_kwargs["scene_params"] = {k: v for k, v in custom.items()
+                                           if k in SCENE_DETECTION_PARAMS or str(k).startswith("rscn_")}
+        # The model's own Customize values (1.10.1; MOSS-CrispASR's MOSS tab, owner W428 I1 4): the pipeline's
+        # MODEL_SETTINGS takes its keys from the whole dict; a pipeline without it ignores them.
+        crispasr_kwargs["model_params"] = dict(custom)
         if crispasr_speech_pad_ignored(pipeline_name, crispasr_kwargs["speech_segmenter"],
                                        crispasr_kwargs["speech_pad_ms"]):
             # Fidelity's own warning, below, for the same case.

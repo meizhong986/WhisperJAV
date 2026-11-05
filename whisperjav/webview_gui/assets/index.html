@@ -442,15 +442,23 @@
                                             <optgroup label="ChronosJAV">
                                                 <option value="qwen">Qwen3-ASR</option>
                                                 <option value="anime-whisper">Anime-Whisper</option>
-                                                <option value="cohere" disabled>Cohere-Transcribe (not available yet)</option>
                                             </optgroup>
                                             <!-- 1.10.0 (item 5, REQ5): XXL as pass 1, as in the pass 2 menu -->
                                             <optgroup label="External (BYOP)">
                                                 <option value="xxl">XXL Faster Whisper</option>
                                             </optgroup>
                                             <optgroup label="GGUF via crispasr">
-                                                <option value="parakeet-crispasr" title="Experimental in 1.10.0 (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">parakeet</option>
-                                                <option value="cohere-crispasr" selected title="Experimental in 1.10.0 (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">cohere</option>
+                                                <option value="parakeet-crispasr" title="Experimental (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">parakeet</option>
+                                                <option value="cohere-crispasr" selected title="Experimental (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">cohere</option>
+                                            </optgroup>
+                                            <!-- 1.10.1 (owner W520 CLA2, W521): a divider line, then the five GGUF pipelines new in 1.10.1 under their own heading -->
+                                            <hr>
+                                            <optgroup label="Experimental, open to feedback">
+                                                <option value="reazonspeech-crispasr" title="New in 1.10.1, experimental (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">reazonspeech</option>
+                                                <option value="kotoba-crispasr" title="New in 1.10.1, experimental (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">kotoba</option>
+                                                <option value="whisper-turbo-crispasr" title="New in 1.10.1, experimental (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">whisper-turbo</option>
+                                                <option value="whisper-large-crispasr" title="New in 1.10.1, experimental (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">whisper-large</option>
+                                                <option value="moss-crispasr" title="New in 1.10.1, experimental (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">MOSS</option>
                                             </optgroup>
                                         </select>
                                     </div>
@@ -612,14 +620,22 @@
                                             <optgroup label="ChronosJAV">
                                                 <option value="qwen">Qwen3-ASR</option>
                                                 <option value="anime-whisper">Anime-Whisper</option>
-                                                <option value="cohere" disabled>Cohere-Transcribe (not available yet)</option>
                                             </optgroup>
                                             <optgroup label="External (BYOP)">
                                                 <option value="xxl">XXL Faster Whisper</option>
                                             </optgroup>
                                             <optgroup label="GGUF via crispasr">
-                                                <option value="parakeet-crispasr" selected title="Experimental in 1.10.0 (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">parakeet</option>
-                                                <option value="cohere-crispasr" title="Experimental in 1.10.0 (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">cohere</option>
+                                                <option value="parakeet-crispasr" selected title="Experimental (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">parakeet</option>
+                                                <option value="cohere-crispasr" title="Experimental (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">cohere</option>
+                                            </optgroup>
+                                            <!-- 1.10.1 (owner W520 CLA2, W521): a divider line, then the five GGUF pipelines new in 1.10.1 under their own heading -->
+                                            <hr>
+                                            <optgroup label="Experimental, open to feedback">
+                                                <option value="reazonspeech-crispasr" title="New in 1.10.1, experimental (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">reazonspeech</option>
+                                                <option value="kotoba-crispasr" title="New in 1.10.1, experimental (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">kotoba</option>
+                                                <option value="whisper-turbo-crispasr" title="New in 1.10.1, experimental (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">whisper-turbo</option>
+                                                <option value="whisper-large-crispasr" title="New in 1.10.1, experimental (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">whisper-large</option>
+                                                <option value="moss-crispasr" title="New in 1.10.1, experimental (early release). The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).">MOSS</option>
                                             </optgroup>
                                         </select>
                                     </div>
@@ -797,7 +813,8 @@
                                             <option value="pass2_overlap">Pass 2 + Fill (30% Overlap)</option>
                                         </select>
                                         <label class="checkbox-label" style="margin-left: 16px; white-space: nowrap;" title="Complete each file fully before starting the next. Slower (reloads models per file) but delivers results incrementally.">
-                                            <input type="checkbox" id="ensemble-serial">
+                                            <!-- 1.10.1: ticked by default (owner W493 1) -->
+                                            <input type="checkbox" id="ensemble-serial" checked>
                                             <span>Finish each file</span>
                                         </label>
                                     </div>
@@ -1347,6 +1364,8 @@
                     <button class="modal-tab" data-tab="enhancer">Enhancer</button>
                     <button class="modal-tab" data-tab="scene">Scene</button>
                     <button class="modal-tab" data-tab="context" style="display: none;">Context</button>
+                    <!-- 1.10.1 (owner W413 2): shown only for a CrispASR pass (openCrispasrCustomize) -->
+                    <button class="modal-tab" data-tab="timing" style="display: none;">Timing</button>
                 </div>
                 <!-- Tab Panels -->
                 <div class="modal-tab-content">
@@ -1367,6 +1386,9 @@
                     </div>
                     <div id="tab-context" class="modal-tab-panel">
                         <!-- Context hints and generation safety (Qwen only) -->
+                    </div>
+                    <div id="tab-timing" class="modal-tab-panel">
+                        <!-- Word timestamps of a CrispASR pass: from the model or from the aligner (1.10.1) -->
                     </div>
                 </div>
             </div>

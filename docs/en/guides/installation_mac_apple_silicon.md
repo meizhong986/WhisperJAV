@@ -1,10 +1,10 @@
 # WhisperJAV Installation Guide for Apple Silicon Macs
 
-**Version:** 1.10.0
+**Version:** 1.10.1
 
-On an Apple silicon Mac, WhisperJAV 1.10.0 is installed for the **Apple GPU (Metal)** by itself: the GPU inside the Apple chip. Some pipelines use it, others run on the CPU (see [Where each pipeline runs](#4-where-each-pipeline-runs)). There is no `.exe`-style installer for the Mac; you install from the source code with one script.
+On an Apple silicon Mac, WhisperJAV 1.10.1 is installed for the **Apple GPU (Metal)** by itself: the GPU inside the Apple chip. Some pipelines use it, others run on the CPU (see [Where each pipeline runs](#4-where-each-pipeline-runs)). There is no `.exe`-style installer for the Mac; you install from the source code with one script.
 
-Nobody in the project has run WhisperJAV 1.10.0 on a Mac yet. The parts marked "not yet tested on a Mac" are there and should work, but we could not check them. Please tell us how it works for you: https://github.com/meizhong986/WhisperJAV/issues
+Nobody in the project has run WhisperJAV 1.10 on a Mac yet. The parts marked "not yet tested on a Mac" are there and should work, but we could not check them. Please tell us how it works for you: https://github.com/meizhong986/WhisperJAV/issues
 
 ---
 
@@ -22,7 +22,7 @@ Nobody in the project has run WhisperJAV 1.10.0 on a Mac yet. The parts marked "
 
 ## 1. Your Mac
 
-| | WhisperJAV 1.10.0 needs |
+| | WhisperJAV 1.10.1 needs |
 |---|---|
 | Chip | Apple silicon (M1 or newer) |
 | macOS | 14 (Sonoma) or newer |
@@ -30,7 +30,7 @@ Nobody in the project has run WhisperJAV 1.10.0 on a Mac yet. The parts marked "
 | Disk | about 10 GB for the install and the models it downloads on first use |
 | Python | 3.13, for Apple silicon (arm64) |
 
-**Not supported** (the installer says so and installs nothing): Intel Macs, because PyTorch 2.11, which WhisperJAV 1.10.0 needs, is not made for them; macOS 13 and older, because ONNX Runtime 1.29 needs macOS 14 or newer. A Python running under Rosetta (as an Intel program) on an Apple silicon Mac is refused too: use an arm64 Python, for example from Homebrew.
+**Not supported** (the installer says so and installs nothing): Intel Macs, because PyTorch 2.11, which WhisperJAV 1.10.1 needs, is not made for them; macOS 13 and older, because ONNX Runtime 1.29 needs macOS 14 or newer. A Python running under Rosetta (as an Intel program) on an Apple silicon Mac is refused too: use an arm64 Python, for example from Homebrew.
 
 ---
 
@@ -63,7 +63,7 @@ source ~/venvs/whisperjav/bin/activate
 python3 --version          # should print Python 3.13.x
 
 # The source code of the release
-git clone --branch v1.10.0 https://github.com/meizhong986/WhisperJAV.git
+git clone --branch v1.10.1 https://github.com/meizhong986/WhisperJAV.git
 cd WhisperJAV
 
 # The installer
@@ -100,9 +100,9 @@ The install's accelerator is recorded in `whisperjav_stack.txt` in the environme
 |---|---|
 | **transformers** | the Apple GPU (Metal) — **recommended on a Mac** |
 | **fidelity** | asks PyTorch for the Apple GPU (Metal); not yet tested on a Mac. If it fails, use the transformers pipeline. |
-| **Parakeet-CrispASR, Cohere-CrispASR** (GGUF) | ask for the Apple GPU (Metal); not yet tested on a Mac |
+| **The GGUF pipelines** (parakeet, cohere, reazonspeech, kotoba, whisper-turbo, whisper-large, MOSS) | ask for the Apple GPU (Metal); not yet tested on a Mac |
 | **balanced, fast, faster** | the CPU (not accelerated), several times slower: their engine (CTranslate2) cannot use the Apple GPU |
-| **ChronosJAV** (Qwen3-ASR, anime-whisper) | the CPU (not accelerated) in 1.10.0: its ASR model does not use the Apple GPU yet |
+| **ChronosJAV** (Qwen3-ASR, anime-whisper) | the CPU (not accelerated) in 1.10: its ASR model does not use the Apple GPU yet |
 | WhisperSeg speech segmenter | the CPU, in every install |
 
 When the Apple GPU can be used, nothing is shown at the start of a run; each pipeline says in the console where it runs as it starts (for example, balanced, fast and faster say they run on the CPU). If the Apple GPU cannot be used, a box at the start says where each part runs. The installer ends with:
@@ -139,13 +139,13 @@ git checkout v1.10.x      # the release you want
 ./installer/install_mac.sh
 ```
 
-A 1.9.x environment cannot be updated to 1.10.0: 1.10.0 needs Python 3.13. Make a new Python 3.13 environment and install there.
+A 1.9.x environment cannot be updated to 1.10: 1.10 needs Python 3.13. Make a new Python 3.13 environment and install there.
 
 ---
 
 ## 7. Troubleshooting
 
-**"WhisperJAV 1.10.0 does not support Intel Macs" / "does not support macOS …".** The Mac is outside the supported list; nothing was installed.
+**"WhisperJAV 1.10 does not support Intel Macs" / "does not support macOS …".** The Mac is outside the supported list; nothing was installed.
 
 **"Python 3.x is not supported".** Activate the Python 3.13 environment (section 3) and run the script again.
 

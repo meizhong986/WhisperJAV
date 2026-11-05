@@ -90,7 +90,7 @@ contourpy==1.3.3
     # via matplotlib
 crcmod==1.7
     # via oss2
-crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.44/crispasr-0.8.44%2Bvulkan-py3-none-win_amd64.whl ; platform_machine == 'AMD64' and sys_platform == 'win32'
+crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.50/crispasr-0.8.50%2Bvulkan-py3-none-win_amd64.whl ; platform_machine == 'AMD64' and sys_platform == 'win32'
     # via whisperjav
 cryptography==50.0.0
     # via

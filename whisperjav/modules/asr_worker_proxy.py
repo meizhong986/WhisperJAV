@@ -180,8 +180,10 @@ class RemoteFasterWhisperASR:
         self._task = cfg.get("task", "transcribe")
         self._trace_file_path = trace_file_path
         if log_level is None:
-            lvl = logging.getLogger("whisperjav").level
-            log_level = logging.getLevelName(lvl) if lvl else "INFO"
+            # The console's level, not the logger's: with a log file the logger is at DEBUG for the file
+            # (owner W509, way B), and the worker would print every DEBUG line on the console (review F2).
+            from whisperjav.utils.logger import console_level_name
+            log_level = console_level_name()
         self._log_level = log_level
         self._asr_class = asr_class
         self._max_deaths = max(1, int(max_consecutive_deaths))

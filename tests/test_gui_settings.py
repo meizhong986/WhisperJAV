@@ -148,20 +148,20 @@ class TestS01FirstLaunch:
             # 1.10.0 (design 22.5.1): the "Accept CPU-only mode" box is gone, so is its key.
             "offline_mode": False,
             "async_processing": False,
-            # v1.9.5 (owner, 2026-10-12): new Ensemble defaults
-            "pass1_pipeline": "qwen",
-            "pass1_sensitivity": "aggressive",
+            # 1.10.0 Ensemble defaults (owner W343, W344; stored defaults aligned W526)
+            "pass1_pipeline": "cohere-crispasr",
+            "pass1_sensitivity": "balanced",
             "pass1_scene_detector": "semantic",
             "pass1_speech_enhancer": "none",
             "pass1_speech_segmenter": "firered-vad",
-            "pass1_model": "Qwen/Qwen3-ASR-1.7B",
+            "pass1_model": "cohere-asr-ja-v0.1",
             "pass2_enabled": False,
-            "pass2_pipeline": "anime-whisper",
+            "pass2_pipeline": "parakeet-crispasr",
             "pass2_sensitivity": "aggressive",
             "pass2_scene_detector": "semantic",
             "pass2_speech_enhancer": "none",
             "pass2_speech_segmenter": "ten",
-            "pass2_model": "litagin/anime-whisper",
+            "pass2_model": "parakeet-tdt-0.6b-ja",
             "merge_strategy": "pass1_primary",
             "pass1_preset": "",
             "pass2_preset": "",
@@ -902,12 +902,13 @@ class TestCompleteness:
         data_keys = {
             k for k in DEFAULT_GUI_SETTINGS if k not in ("version", "_comment")
         }
-        # 19 Tab 1 keys + 14 Tab 3 keys + 2 preset keys + 1 language key = 36
+        # 19 Tab 1 keys + 15 Tab 3 keys + 2 preset keys + 1 language key = 37
         # (v1.9.0: +skip_existing, +remember_settings;
         #  v1.9.2: +fail_on_empty, +fail_on_suspect, +asr_telemetry,
         #          +model_refresh_audio_minutes, +offline_mode (#415);
-        #  1.10.0: -accept_cpu_mode, design 22.5.1; +ui_language, item 6)
-        assert len(data_keys) == 36, (
-            f"Expected 36 settings keys, got {len(data_keys)}: {data_keys}"
+        #  1.10.0: -accept_cpu_mode, design 22.5.1; +ui_language, item 6;
+        #  1.10.1: +ensemble_serial, "Finish each file" remembered, owner W501)
+        assert len(data_keys) == 37, (
+            f"Expected 37 settings keys, got {len(data_keys)}: {data_keys}"
         )
         assert "accept_cpu_mode" not in data_keys

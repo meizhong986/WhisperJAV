@@ -238,6 +238,8 @@ class WhisperSegSpeechSegmenter:
         self.max_group_duration_s = (
             float(max_group_duration_s) if max_group_duration_s is not None else 29.0
         )
+        # The shortest group (1.10.1; owner W426 3; ten.group_segments): 0 = off.
+        self.min_group_duration_s = float(kwargs.get("min_group_duration_s") or 0.0)
 
         if max_speech_duration_s is not None:
             self.max_speech_duration_s = float(max_speech_duration_s)
@@ -973,6 +975,7 @@ class WhisperSegSpeechSegmenter:
             segments,
             max_group_duration_s=self.max_group_duration_s,
             chunk_threshold_s=self.chunk_threshold_s,
+            min_group_duration_s=self.min_group_duration_s,
         )
 
         return SegmentationResult(
@@ -1057,6 +1060,7 @@ class WhisperSegSpeechSegmenter:
             "max_speech_duration_s": self.max_speech_duration_s,
             "chunk_threshold_s": self.chunk_threshold_s,
             "max_group_duration_s": self.max_group_duration_s,
+            "min_group_duration_s": self.min_group_duration_s,
             "force_cpu": self.force_cpu,
             "num_threads": self.num_threads,
             "device": self._actual_device,

@@ -23,9 +23,21 @@ by default, for every backend B:
                                  <name>__scene0001__begin__00_12_03.450.jpg
     <name>.compare.md / .json    when more than one backend is given: counts, coverage,
                                  duration percentiles and pairwise boundary agreement
+    <name>.B.calls.csv           with --pipeline: one row per call to the ASR model (one VAD group,
+                                 or one whole scene without a speech segmenter) and what ended it
+    <name>.pbf, <name>.ass       with --markers, beside the media file (or in --markers-dir):
+                                 PotPlayer bookmarks at each scene start and each call start, and an
+                                 on-screen label of the scene and the call at every moment
+
+With --pipeline (a CrispASR pipeline, e.g. moss-crispasr) the scenes and the calls are made the way
+an Ensemble pass of that pipeline makes them (owner W482, W483): the pass's scene detector and its
+settings (pass_settings.scene_detector_for / scene_min_s_for / scene_max_s_for), its speech
+segmenter and VAD groups (pass_settings.segmenter_settings, the VAD-grouped framer), the 0.2 s model
+minimum (modules/model_audio.py); --param and --segmenter-param are the pass's Customize Scene and
+Segmenter values. The speech enhancer is not run.
 
 Only the media file is read; nothing is transcribed. No WhisperJAV configuration
-files are touched.
+files are touched. Existing .pbf and .ass files are never overwritten.
 
 USAGE
 -----
@@ -39,10 +51,19 @@ USAGE
         [--output-dir DIR]                           default: <media folder>/scenes_info
         [--no-screenshots] [--image-format jpg|png] [--keep-scene-audio]
         [--list-params BACKEND]
+        [--pipeline CRISPASR_PIPELINE]               scenes and calls as an Ensemble pass makes them
+        [--speech-segmenter NAME|none]               with --pipeline; default the pipeline's own
+        [--segmenter-param KEY=VALUE ...]            with --pipeline; the pass's Customize Segmenter values
+        [--label TEXT]                               names this run in the output files
+        [--markers] [--markers-dir DIR] [--marker-level both|scenes|calls]
 
     python tools/scene_inspector.py movie.mp4
     python tools/scene_inspector.py movie.mp4 --backend semantic --scene-threshold 10
     python tools/scene_inspector.py movie.mp4 --backend auditok,semantic --speech-ratio --srt movie.ja.whisperjav.srt
+    python tools/scene_inspector.py movie.mp4 --pipeline moss-crispasr --no-screenshots --markers
+    python tools/scene_inspector.py movie.mp4 --pipeline moss-crispasr --backend semantic --param min_duration=90
+        --param max_duration=240 --speech-segmenter firered-vad --segmenter-param max_group_duration_s=240
+        --segmenter-param chunk_threshold_s=5 --segmenter-param min_group_duration_s=0 --label w482 --markers
 """
 from __future__ import annotations
 
@@ -78,6 +99,37 @@ ALIGNER_LIMIT_S = 180.0              # ChronosJAV ForcedAligner ceiling
 BOUNDARY_TOLERANCE_S = 1.0           # two backends "agree" on a cut within this distance
 SHEET_COLS, SHEET_TILE_W, SHEET_PAGE = 5, 320, 60   # contact sheet layout
 SILENCE_DBFS = -120.0
+
+# --pipeline (owner W482, W483): a value a CrispASR pass uses that lives on the pipeline class. Copied, because
+# importing pipelines/crispasr_pipeline.py loads CrispASR; tests/test_scene_inspector_markers.py reads it from that file
+# and keeps it equal. The scene bounds come from crispasr/pass_settings.py (light).
+CRISPASR_MIN_GROUP_S = 0.1        # CrispASRPipeline.MIN_GROUP_S: shorter VAD groups are dropped, not counted
+CALL_BUCKETS_S = (10, 30, 70, 120, 240)   # call-length histogram edges (70 s: W425 4)
+# What ended a call (classify_call_ends); the words used in the summary and the on-screen label.
+ENDED_BY_TEXT = {
+    "silence": "a silence longer than the group gap",
+    "length": "the longest group length",
+    "scene cut": "the scene cut (the next speech came within the group gap)",
+    "end of file": "the end of the file",
+}
+MARKER_LEVELS = ("both", "scenes", "calls")
+ASS_HEADER = (
+    "[Script Info]",
+    "; Written by tools/scene_inspector.py --markers: an on-screen label, not subtitles.",
+    "ScriptType: v4.00+",
+    "PlayResX: 1920",
+    "PlayResY: 1080",
+    "WrapStyle: 2",
+    "",
+    "[V4+ Styles]",
+    "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, "
+    "Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, "
+    "MarginV, Encoding",
+    "Style: Marker,Arial,34,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,3,2,0,7,30,30,30,1",
+    "",
+    "[Events]",
+    "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+)
 
 # Parameters each backend's constructor reads (from the backends' _build_config_from_kwargs).
 BACKEND_PARAMS: Dict[str, List[str]] = {
@@ -357,6 +409,51 @@ def read_srt_cues(path: Path) -> List[Tuple[float, float]]:
     return [(s.start.ordinal / 1000.0, s.end.ordinal / 1000.0) for s in subs]
 
 
+def read_srt_entries(path: Path) -> List[Tuple[float, float, str]]:
+    """Start, end and text (lines joined with " / ") of every entry of a subtitle file."""
+    import pysrt
+    subs = pysrt.open(str(path), encoding="utf-8")
+    return [(s.start.ordinal / 1000.0, s.end.ordinal / 1000.0, " / ".join(s.text.splitlines())) for s in subs]
+
+
+# Where a reference line falls against the calls to the ASR model (owner W487 CA5), by the share of its time inside
+# calls: sent (half or more), partly sent (less than half), not sent (no part in a call, its middle in a scene), in no
+# scene (no part in a call, its middle outside every scene).
+LINE_PLACES = ("sent", "partly sent", "not sent", "in no scene")
+
+
+def place_reference_lines(entries: List[Tuple[float, float, str]], calls: List[Dict[str, Any]],
+                          scenes: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """For each reference line (a subtitle of a reference file such as the Netflix one): the share of its time that
+    lies inside the calls, its place (LINE_PLACES) and the call holding most of it; each call gets "ref_lines", the
+    lines whose largest part it holds. This shows where the speech the reference transcribes reaches the model; it
+    says nothing about how well the model then transcribes it."""
+    spans = [(c["start_s"], c["end_s"], c) for c in calls]
+    for c in calls:
+        c["ref_lines"] = 0
+    rows: List[Dict[str, Any]] = []
+    for n, (a, b, text) in enumerate(entries, start=1):
+        overlaps = [(max(0.0, min(b, e) - max(a, s)), c) for s, e, c in spans]
+        covered = sum(o for o, _ in overlaps)
+        share = min(1.0, covered / (b - a)) if b > a else (1.0 if covered > 0 else 0.0)
+        best = max(overlaps, key=lambda oc: oc[0], default=(0.0, None))
+        holder = best[1] if best[0] > 0 else None
+        if holder is not None:
+            holder["ref_lines"] += 1
+        if share >= 0.5:
+            place = "sent"
+        elif share > 0:
+            place = "partly sent"
+        elif any(sc["start_s"] <= (a + b) / 2.0 < sc["end_s"] for sc in scenes):
+            place = "not sent"
+        else:
+            place = "in no scene"
+        rows.append({"line": n, "start_s": round(a, 3), "end_s": round(b, 3), "start_hms": hms(a),
+                     "share_in_calls": round(share, 3), "place": place,
+                     "call_id": holder["call_id"] if holder is not None else None, "text": text})
+    return {"lines": len(rows), **{p: sum(1 for r in rows if r["place"] == p) for p in LINE_PLACES}, "rows": rows}
+
+
 def boundaries_of(scenes: List[Dict[str, Any]]) -> List[float]:
     pts = set()
     for s in scenes:
@@ -377,6 +474,226 @@ def agreement(a: List[float], b: List[float], tol: float = BOUNDARY_TOLERANCE_S)
         if near and min(abs(t - x) for x in near) <= tol:
             hits += 1
     return round(hits / len(a), 3)
+
+
+# ----------------------------------------------------------------------------- calls to the ASR model (--pipeline)
+def crispasr_pipeline_names() -> Tuple[str, ...]:
+    """The CrispASR pipelines (manifest: standard library only, no CrispASR import)."""
+    from whisperjav.crispasr.manifest import CRISPASR_PIPELINES
+    return tuple(CRISPASR_PIPELINES)
+
+
+def pipeline_scene_kwargs(pipeline: str, backend: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    """The scene detector's settings as a CrispASR pass sets them (crispasr_pipeline.scene_detector_kwargs): semantic
+    with the pipeline's minimum (pass_settings.scene_min_s_for), auditok and silero with their own minimum, the
+    pipeline's longest scene for all three (pass_settings.scene_max_s_for); the --param values on top, as the pass's
+    Customize Scene values. No sensitivity preset: the pass applies none to its scenes."""
+    from whisperjav.crispasr.pass_settings import scene_max_s_for, scene_min_s_for
+    kwargs: Dict[str, Any] = {"method": backend}
+    if backend == "semantic":
+        kwargs.update(min_duration=scene_min_s_for(pipeline), max_duration=scene_max_s_for(pipeline))
+    elif backend in ("auditok", "silero"):
+        kwargs.update(max_duration=scene_max_s_for(pipeline))
+    kwargs.update(params)
+    return kwargs
+
+
+def pipeline_segmenter(pipeline: str, backend: Optional[str], sensitivity: Optional[str],
+                       overrides: Dict[str, Any]):
+    """The speech segmenter settings of a CrispASR pass (pass_settings.segmenter_settings), with the
+    --segmenter-param values on top as the pass applies its Customize Segmenter values (CrispASRPipeline.__init__)."""
+    import dataclasses
+    from whisperjav.crispasr.pass_settings import NO_SEGMENTER, segmenter_settings
+    settings = segmenter_settings(pipeline, backend or None, sensitivity or None)
+    if overrides and settings.backend != NO_SEGMENTER:
+        extra = dict(overrides)
+        settings = dataclasses.replace(
+            settings,
+            max_group_duration_s=extra.pop("max_group_duration_s", settings.max_group_duration_s),
+            chunk_threshold_s=extra.pop("chunk_threshold_s", settings.chunk_threshold_s),
+            config={**settings.config, **extra})
+    return settings
+
+
+def scene_calls(framer, scene_wav: Path, sample_rate: int = 16000) -> Tuple[List[Tuple[float, float]], int]:
+    """The calls a CrispASR pass makes for one scene, in scene time, as crispasr_pipeline._speech_groups and
+    _whole_scenes keep them: each VAD group of the framer, or (framer None: no speech segmenter) the whole scene.
+    A piece of MIN_MODEL_AUDIO_S (0.2 s) or longer is sent; a shorter one of CRISPASR_MIN_GROUP_S or longer is not
+    sent and is counted (the framer itself also cuts groups under 0.2 s: FramingResult "groups_cut_short", added).
+    Returns (calls, pieces not sent)."""
+    import numpy as np
+    import soundfile as sf
+    from whisperjav.modules.model_audio import MIN_MODEL_AUDIO_S
+    cut_by_framer = 0
+    if framer is None:
+        info = sf.info(str(scene_wav))
+        length = info.frames / float(info.samplerate)
+        pieces = [(0.0, length)]
+    else:
+        audio, rate = sf.read(str(scene_wav), dtype="float32", always_2d=False)
+        if getattr(audio, "ndim", 1) > 1:
+            audio = audio.mean(axis=1).astype(np.float32)
+        if rate != sample_rate:
+            raise RuntimeError(f"the scene audio {scene_wav.name} is at {rate} Hz, not {sample_rate} Hz")
+        result = framer.frame(np.ascontiguousarray(audio, dtype=np.float32), sample_rate)
+        if result.metadata.get("segmenter_error"):
+            raise RuntimeError(f"the speech segmenter failed: {result.metadata['segmenter_error']}")
+        cut_by_framer = int(result.metadata.get("groups_cut_short") or 0)
+        clip_end = len(audio) / float(sample_rate)
+        pieces = [(max(0.0, f.start), min(clip_end, f.end)) for f in result.frames]
+    calls: List[Tuple[float, float]] = []
+    not_sent = cut_by_framer
+    for start, end in pieces:
+        if end - start >= MIN_MODEL_AUDIO_S:
+            calls.append((start, end))
+        elif end - start >= CRISPASR_MIN_GROUP_S:
+            not_sent += 1
+    return calls, not_sent
+
+
+def classify_call_ends(calls: List[Dict[str, Any]], gap_s: Optional[float]) -> None:
+    """Set each call's "ended_by" (calls in time order, media time, each with its scene_index):
+      "silence"     the next call starts more than gap_s after this one ends (the speech segmenter's gap rule);
+      "length"      the next call is in the same scene and starts within gap_s: the group reached its longest length;
+      "scene cut"   the next call is in a later scene and starts within gap_s: the scene cut ended this call where
+                    the speech segmenter alone would have gone on;
+      "end of file" no call follows.
+    Without a speech segmenter (gap_s None) each call is a whole scene; the gap is then 0 s.
+    The gap is measured between the calls' edges, which include the segmenter's speech padding, as its grouping does."""
+    gap = float(gap_s or 0.0)
+    for i, call in enumerate(calls):
+        nxt = calls[i + 1] if i + 1 < len(calls) else None
+        if nxt is None:
+            call["ended_by"] = "end of file"
+        elif nxt["start_s"] - call["end_s"] > gap:
+            call["ended_by"] = "silence"
+        elif nxt["scene_index"] == call["scene_index"]:
+            call["ended_by"] = "length"
+        else:
+            call["ended_by"] = "scene cut"
+
+
+def call_bucket_label(i: int) -> str:
+    edges = CALL_BUCKETS_S
+    if i == 0:
+        return f"0.2-{edges[0]}s"
+    if i == len(edges):
+        return f">{edges[-1]}s"
+    return f"{edges[i-1]}-{edges[i]}s"
+
+
+def call_stats(calls: List[Dict[str, Any]], media_duration: float, scene_count: int, not_sent: int,
+               failed_scenes: List[int]) -> Dict[str, Any]:
+    durations = sorted(c["duration_s"] for c in calls)
+    n, total = len(durations), sum(durations)
+    hist = [0] * (len(CALL_BUCKETS_S) + 1)
+    for d in durations:
+        i = 0
+        while i < len(CALL_BUCKETS_S) and d >= CALL_BUCKETS_S[i]:
+            i += 1
+        hist[i] += 1
+    with_calls = {c["scene_index"] for c in calls}
+    return {
+        "call_count": n,
+        "calls_total_s": round(total, 3),
+        "share_of_media": round(total / media_duration, 4) if media_duration else None,
+        "duration": {
+            "min_s": round(durations[0], 3) if n else 0.0,
+            "p10_s": round(percentile(durations, 0.10), 3),
+            "median_s": round(percentile(durations, 0.50), 3),
+            "mean_s": round(total / n, 3) if n else 0.0,
+            "p90_s": round(percentile(durations, 0.90), 3),
+            "max_s": round(durations[-1], 3) if n else 0.0,
+        },
+        "histogram": {call_bucket_label(i): c for i, c in enumerate(hist)},
+        "calls_70s_or_longer": sum(1 for d in durations if d >= 70.0),
+        "ended_by": {k: sum(1 for c in calls if c.get("ended_by") == k) for k in ENDED_BY_TEXT},
+        "pieces_not_sent_under_0_2s": not_sent,
+        "scenes_without_calls": [i for i in range(1, scene_count + 1) if i not in with_calls and i not in failed_scenes],
+        "scenes_failed": list(failed_scenes),
+    }
+
+
+# ----------------------------------------------------------------------------- markers (--markers)
+def _mark_name(text: str) -> str:
+    """A bookmark name: one line, no '*' (the .pbf field separator)."""
+    return " ".join(str(text).replace("*", "x").split())
+
+
+def marker_marks(scenes: List[Dict[str, Any]], calls: Optional[List[Dict[str, Any]]], level: str) -> List[Tuple[float, str]]:
+    """(time in s, name) of each bookmark: every scene start and, with calls, every call start."""
+    marks: List[Tuple[float, str]] = []
+    if level in ("both", "scenes"):
+        marks += [(s["start_s"], f"Scene {s['scene_index']} ({s['duration_s']:.1f} s)") for s in scenes]
+    if calls and level in ("both", "calls"):
+        marks += [(c["start_s"], f"Call {c['call_id']} ({c['duration_s']:.1f} s, ends: {c['ended_by']})") for c in calls]
+    return marks
+
+
+def pbf_text(marks: List[Tuple[float, str]]) -> str:
+    """PotPlayer's bookmark file: the line [Bookmark], then one line <n>=<ms>*<name>* per bookmark, numbered from 0,
+    as fireattack's chapter_converter writes and reads it (github.com/fireattack/chapter_converter; written there as
+    UTF-8 with a byte-order mark, which write_markers does too). Marks at the same millisecond become one bookmark,
+    their names joined with " | "."""
+    merged: Dict[int, List[str]] = {}
+    for t, name in marks:
+        merged.setdefault(int(round(max(0.0, float(t)) * 1000)), []).append(_mark_name(name))
+    lines = ["[Bookmark]"] + [f"{i}={ms}*{' | '.join(names)}*" for i, (ms, names) in enumerate(sorted(merged.items()))]
+    return "\r\n".join(lines) + "\r\n"
+
+
+def ass_time(seconds: float) -> str:
+    """H:MM:SS.cc, the time format of an .ass event."""
+    cs = int(round(max(0.0, float(seconds)) * 100))
+    return f"{cs // 360000}:{(cs // 6000) % 60:02d}:{(cs // 100) % 60:02d}.{cs % 100:02d}"
+
+
+def ass_text(media_duration: float, scenes: List[Dict[str, Any]], calls: Optional[List[Dict[str, Any]]],
+             model: Optional[str]) -> str:
+    """An .ass file that labels every moment of the media: the scene (number, times, length) and, with calls, the call
+    to the ASR model (number, length, what ended it) or that this stretch is not sent to the model. Where scenes
+    overlap (semantic's padding) the earlier scene is named."""
+    points = {0.0, float(media_duration)}
+    for item in list(scenes) + list(calls or []):
+        points.add(min(max(0.0, item["start_s"]), media_duration))
+        points.add(min(max(0.0, item["end_s"]), media_duration))
+    pts = sorted(points)
+    events: List[Tuple[float, float, str]] = []
+    for a, b in zip(pts, pts[1:]):
+        if b - a < 0.01:
+            continue
+        mid = (a + b) / 2.0
+        sc = next((s for s in scenes if s["start_s"] <= mid < s["end_s"]), None)
+        text = (f"Scene {sc['scene_index']} of {len(scenes)}: {hms(sc['start_s'])} - {hms(sc['end_s'])}, "
+                f"{sc['duration_s']:.1f} s") if sc else "No scene"
+        if calls is not None:
+            call = next((c for c in calls if c["start_s"] <= mid < c["end_s"]), None)
+            if call:
+                text += (f"\\NCall {call['call_id']} to {model}: {call['duration_s']:.1f} s, "
+                         f"ends at {ENDED_BY_TEXT[call['ended_by']]}")
+            else:
+                text += f"\\NNot sent to {model} (no VAD group here)"
+        if events and events[-1][2] == text and abs(events[-1][1] - a) < 0.011:
+            events[-1] = (events[-1][0], b, text)
+        else:
+            events.append((a, b, text))
+    lines = list(ASS_HEADER) + [f"Dialogue: 0,{ass_time(a)},{ass_time(b)},Marker,,0,0,0,,{t}" for a, b, t in events]
+    return "\r\n".join(lines) + "\r\n"
+
+
+def write_markers(media: Path, folder: Optional[Path], pbf: str, ass: str) -> Tuple[Path, Path]:
+    """Write <media name>.pbf and <media name>.ass into ``folder`` (default: beside the media, where PotPlayer finds
+    them). Never overwrites: if either file exists, nothing is written and FileExistsError names it."""
+    folder = folder or media.parent
+    pbf_path, ass_path = folder / f"{media.stem}.pbf", folder / f"{media.stem}.ass"
+    existing = [p for p in (pbf_path, ass_path) if p.exists()]
+    if existing:
+        raise FileExistsError("markers not written; these files already exist and are never overwritten: "
+                              + ", ".join(str(p) for p in existing) + " (move them, or use --markers-dir DIR)")
+    folder.mkdir(parents=True, exist_ok=True)
+    pbf_path.write_bytes(pbf.encode("utf-8-sig"))
+    ass_path.write_bytes(ass.encode("utf-8-sig"))
+    return pbf_path, ass_path
 
 
 # ----------------------------------------------------------------------------- outputs
@@ -429,9 +746,67 @@ def write_contact_sheets(out_dir: Path, base: str, scenes: List[Dict[str, Any]])
     return written
 
 
+def calls_summary_lines(rec: Dict[str, Any], base: str) -> List[str]:
+    """The summary's section on the calls to the ASR model (--pipeline)."""
+    P, C = rec["pipeline"], rec["stats"]["calls"]
+    seg = P["speech_segmenter"]
+    d = C["duration"]
+    if seg["speech_segmenter"] == "none":
+        how = "none: each scene goes to the model whole"
+    else:
+        shortest = seg.get("min_group_duration_s") or 0
+        how = (f"{seg['speech_segmenter']} at {seg['sensitivity']}; a group ends at a gap over {seg['chunk_threshold_s']} s "
+               f"or at {seg['max_group_duration_s']} s; shortest group "
+               f"{str(shortest) + ' s (a shorter group joins the next while both fit)' if shortest else 'off'}")
+    lines = [
+        "", f"## Calls to the ASR model ({P['name']})",
+        "A call is a VAD group passed to the ASR model (WhisperJAV's term: VAD group; with no speech segmenter, the "
+        "whole scene).",
+        f"- Scene settings: {json.dumps(P['scene_settings'])}",
+        f"- Speech segmenter: {how}; {P['segmenter_time_s']} s",
+        f"- Calls: {C['call_count']}, {C['calls_total_s']} s = {round((C['share_of_media'] or 0) * 100, 1)} % of the media; "
+        f"{C['calls_70s_or_longer']} of 70 s or longer",
+        f"- Length: min {d['min_s']} / p10 {d['p10_s']} / median {d['median_s']} / mean {d['mean_s']} / p90 {d['p90_s']} / "
+        f"max {d['max_s']} s",
+        f"- Not sent: {C['pieces_not_sent_under_0_2s']} piece(s) under 0.2 s (the model minimum); scenes without a call: "
+        f"{len(C['scenes_without_calls'])} {C['scenes_without_calls'][:20]}; scenes the segmenter failed on: "
+        f"{len(C['scenes_failed'])} {C['scenes_failed'][:20]}",
+        "", "| call length | calls |", "|---|---|", *[f"| {k} | {v} |" for k, v in C["histogram"].items()],
+        "", "| what ended the call | calls |", "|---|---|",
+        *[f"| {ENDED_BY_TEXT[k]} | {v} |" for k, v in C["ended_by"].items()],
+        "", "A call ended by the scene cut is one where the next speech came within the group gap: the speech segmenter "
+        "alone would have gone on.", f"Every call: `{base}.calls.csv`.",
+    ]
+    R = rec["stats"].get("reference_lines")
+    if R:
+        lines += [
+            "", f"## Reference lines ({rec['srt']['name']}) against the calls",
+            f"- {R['lines']} lines: sent {R['sent']}, partly sent {R['partly sent']}, not sent {R['not sent']}, "
+            f"in no scene {R['in no scene']}",
+            "- Sent: half of the line's time or more lies inside calls; partly sent: less than half; not sent: no part "
+            "inside a call, its middle inside a scene; in no scene: no part inside a call, its middle outside every "
+            "scene. A line can count twice where padded scenes overlap (under a second). This shows where the speech "
+            "the reference transcribes reaches the model, not how well the model transcribes it.",
+        ]
+        missing = [r for r in R["rows"] if r["place"] != "sent"]
+        if missing:
+            lines += ["", "| line | start | end s | share in calls | place | call | text |", "|---|---|---|---|---|---|---|"]
+            lines += [f"| {r['line']} | {r['start_hms']} | {r['end_s']} | {r['share_in_calls']} | {r['place']} | "
+                      f"{r['call_id'] or ''} | {r['text'].replace('|', '/')} |" for r in missing]
+    return lines
+
+
 def write_outputs(out_dir: Path, base: str, rec: Dict[str, Any]) -> None:
     (out_dir / f"{base}.scenes.json").write_text(
         json.dumps(rec, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    if rec.get("calls") is not None:
+        with open(out_dir / f"{base}.calls.csv", "w", newline="", encoding="utf-8") as fh:
+            w = csv.writer(fh)
+            w.writerow(["call_id", "scene_index", "start_hms", "end_hms", "start_s", "end_s", "duration_s", "ended_by",
+                        "ref_lines"])
+            for c in rec["calls"]:
+                w.writerow([c["call_id"], c["scene_index"], c["start_hms"], c["end_hms"], c["start_s"], c["end_s"],
+                            c["duration_s"], c["ended_by"], c.get("ref_lines", "")])
 
     with open(out_dir / f"{base}.scenes.csv", "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
@@ -497,6 +872,11 @@ def write_outputs(out_dir: Path, base: str, rec: Dict[str, Any]) -> None:
             lines.append("- Contact sheet(s): " + ", ".join(f"`{n}`" for n in rec["contact_sheets"]))
     else:
         lines.append(f"- Screenshots: none ({sc['skipped_reason'] or 'disabled with --no-screenshots'})")
+    if rec.get("markers"):
+        M = rec["markers"]
+        lines.append(f"- Markers: {M['error']}" if M.get("error") else f"- Markers: `{M['pbf']}`, `{M['ass']}`")
+    if rec.get("pipeline"):
+        lines += calls_summary_lines(rec, base)
     head = "| # | start | end | duration s | gap s | pass | RMS dBFS | speech s | cues |"
     lines += ["", "## Scene table", head, "|---|---|---|---|---|---|---|---|---|"]
     for s in rec["scenes"]:
@@ -539,7 +919,12 @@ def write_comparison(out_dir: Path, stem: str, records: List[Dict[str, Any]]) ->
 # ----------------------------------------------------------------------------- core
 def inspect_media(media: Path, backends: List[str], sensitivity: Optional[str], params: Dict[str, Any],
                   out_dir: Path, *, screenshots: bool, image_format: str, keep_scene_audio: bool,
-                  speech_segmenter: Optional[str], srt_path: Optional[Path]) -> List[Dict[str, Any]]:
+                  speech_segmenter: Optional[str], srt_path: Optional[Path],
+                  pipeline: Optional[str] = None, pass_segmenter=None, label: Optional[str] = None,
+                  markers: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    """``pipeline`` and ``pass_segmenter`` (pipeline_segmenter()): make the scenes and the calls as an Ensemble pass of
+    that CrispASR pipeline does. ``markers``: {"folder": Path or None, "level": one of MARKER_LEVELS}; one backend only.
+    ``label`` replaces the backend in the output file names."""
     import numpy as np
     import soundfile as sf
     from whisperjav.modules.audio_extraction import AudioExtractor
@@ -578,11 +963,26 @@ def inspect_media(media: Path, backends: List[str], sensitivity: Optional[str], 
             segmenter = SpeechSegmenterFactory.create(speech_segmenter)
             logger.info("Speech ratio: segmenter %s", segmenter.name)
 
+        # --pipeline: the pass's speech segmenter, through the framer the CrispASR chain uses (none: whole scenes).
+        framer = None
+        if pipeline and pass_segmenter is not None and pass_segmenter.backend != "none":
+            from whisperjav.modules.subtitle_pipeline.framers.vad_grouped import VadGroupedFramer
+            framer = VadGroupedFramer(segmenter_backend=pass_segmenter.backend,
+                                      max_group_duration_s=pass_segmenter.max_group_duration_s,
+                                      chunk_threshold_s=pass_segmenter.chunk_threshold_s,
+                                      min_frame_duration_s=CRISPASR_MIN_GROUP_S,
+                                      segmenter_config=dict(pass_segmenter.config))
+
         for backend in backends:
-            base = f"{stem}.{backend}"
-            # 2. Detector: backend defaults (P7) < YAML sensitivity preset (6) < --param / --scene-threshold.
-            effective = {**sensitivity_params(backend, sensitivity), **params}
-            detector = SceneDetectorFactory.create(backend, **effective)
+            base = f"{stem}.{label or backend}"
+            if pipeline:
+                # 2. Detector as the pass builds it (crispasr_pipeline._detect_scenes): its settings, --param on top.
+                effective = pipeline_scene_kwargs(pipeline, backend, params)
+                detector = SceneDetectorFactory.safe_create_from_legacy_kwargs(**effective)
+            else:
+                # 2. Detector: backend defaults (P7) < YAML sensitivity preset (6) < --param / --scene-threshold.
+                effective = {**sensitivity_params(backend, sensitivity), **params}
+                detector = SceneDetectorFactory.create(backend, **effective)
             scene_dir = (out_dir / f"{base}_scene_audio") if keep_scene_audio else (work / f"scenes_{backend}")
             scene_dir.mkdir(parents=True, exist_ok=True)
             t0 = time.time()
@@ -594,6 +994,8 @@ def inspect_media(media: Path, backends: List[str], sensitivity: Optional[str], 
                 pass
 
             scenes: List[Dict[str, Any]] = []
+            calls: Optional[List[Dict[str, Any]]] = [] if pipeline else None
+            not_sent, failed_scenes, segmenter_s = 0, [], 0.0
             for idx, sc in enumerate(sorted(result.scenes, key=lambda s: s.start_sec), start=1):
                 rms, peak = scene_loudness(audio, sr, sc.start_sec, sc.end_sec)
                 row: Dict[str, Any] = {
@@ -621,8 +1023,33 @@ def inspect_media(media: Path, backends: List[str], sensitivity: Optional[str], 
                     n_cues = sum(1 for a, b_ in cues if sc.start_sec <= (a + b_) / 2.0 < sc.end_sec)
                     row["cues"] = n_cues
                     row["cues_per_min"] = round(n_cues / (sc.duration_sec / 60.0), 2) if sc.duration_sec else 0.0
+                # 4b. --pipeline: the calls to the ASR model in this scene, as the pass makes them.
+                if calls is not None:
+                    t1 = time.time()
+                    try:
+                        if not (sc.scene_path and Path(sc.scene_path).exists()):
+                            raise RuntimeError("the detector wrote no audio file for it")
+                        pieces, short = scene_calls(framer, Path(sc.scene_path))
+                    except Exception as exc:  # noqa: BLE001 - one scene must not stop the report
+                        logger.warning("Calls: scene %d: %s", idx, exc)
+                        failed_scenes.append(idx)
+                        pieces, short = [], 0
+                    segmenter_s += time.time() - t1
+                    not_sent += short
+                    for j, (a, b_) in enumerate(pieces, start=1):
+                        start, end = sc.start_sec + a, sc.start_sec + b_
+                        calls.append({"call_id": f"{idx}.{j}", "scene_index": idx,
+                                      "start_s": round(start, 3), "end_s": round(end, 3),
+                                      "duration_s": round(b_ - a, 3), "start_hms": hms(start), "end_hms": hms(end)})
+                    row["calls"] = len(pieces)
                 scenes.append(row)
             stats = compute_stats(scenes, media_duration)
+            if calls is not None:
+                classify_call_ends(calls, pass_segmenter.chunk_threshold_s if framer is not None else None)
+                stats["calls"] = call_stats(calls, media_duration, len(scenes), not_sent, failed_scenes)
+                if srt_path:
+                    # W487 CA5: where the reference file's lines fall against the calls.
+                    stats["reference_lines"] = place_reference_lines(read_srt_entries(srt_path), calls, scenes)
 
             # 5. Screenshots (P5/P6) and contact sheets (suggestion 4).
             shot_rel = f"{SCREENSHOT_SUBFOLDER}/{backend}"
@@ -669,12 +1096,34 @@ def inspect_media(media: Path, backends: List[str], sensitivity: Optional[str], 
                 "coarse_boundaries": result.coarse_boundaries,
                 "scenes": scenes,
             }
+            if pipeline:
+                rec["backend"]["sensitivity"] = None   # the pass applies no scene preset
+                rec["pipeline"] = {"name": pipeline, "scene_settings": effective,
+                                   "speech_segmenter": pass_segmenter.as_dict(),
+                                   "segmenter_time_s": round(segmenter_s, 3)}
+                rec["calls"] = calls
+            # 7. Markers for PotPlayer (owner W477, W478, W483), beside the media unless a folder is given.
+            if markers is not None:
+                pbf = pbf_text(marker_marks(scenes, calls, markers.get("level", "both")))
+                ass = ass_text(media_duration, scenes, calls, pipeline)
+                try:
+                    pbf_path, ass_path = write_markers(media, markers.get("folder"), pbf, ass)
+                    rec["markers"] = {"pbf": str(pbf_path), "ass": str(ass_path), "level": markers.get("level", "both")}
+                    logger.info("Markers: %s, %s", pbf_path, ass_path)
+                except FileExistsError as exc:
+                    rec["markers"] = {"error": str(exc)}
+                    logger.error("%s", exc)
             write_outputs(out_dir, base, rec)
             records.append(rec)
 
         if segmenter is not None:
             try:
                 segmenter.cleanup()
+            except Exception:  # noqa: BLE001
+                pass
+        if framer is not None:
+            try:
+                framer.cleanup()
             except Exception:  # noqa: BLE001
                 pass
         if len(records) > 1:
@@ -694,9 +1143,33 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=__doc__.split("USAGE")[0],
     )
     p.add_argument("media", nargs="*", type=Path, help="Media file(s) - video or audio.")
-    p.add_argument("--backend", type=parse_backends, default=[DEFAULT_BACKEND], metavar="NAME[,NAME...]",
+    p.add_argument("--backend", type=parse_backends, default=None, metavar="NAME[,NAME...]",
                    help=f"Scene detector backend(s): {', '.join(BACKENDS)}. Default {DEFAULT_BACKEND} "
-                        "(the legacy pipelines' default). Several names = run each and write a comparison.")
+                        "(the legacy pipelines' default), or with --pipeline the pipeline's own. Several names = run "
+                        "each and write a comparison.")
+    p.add_argument("--pipeline", choices=crispasr_pipeline_names(), default=None,
+                   help="Make the scenes and the calls to the ASR model as an Ensemble pass of this CrispASR pipeline "
+                        "makes them (its scene settings, speech segmenter, VAD groups and the 0.2 s model minimum); "
+                        "nothing is transcribed. --sensitivity is then the pass's sensitivity (it picks the speech "
+                        "segmenter's preset; no scene preset is applied, as in the pass) and --param the pass's "
+                        "Customize Scene values.")
+    p.add_argument("--speech-segmenter", default=None, metavar="NAME",
+                   help="With --pipeline: the pass's speech segmenter (default: the pipeline's own); none = each scene "
+                        "goes to the model whole.")
+    p.add_argument("--segmenter-param", action="append", type=parse_param, default=[], metavar="KEY=VALUE",
+                   help="With --pipeline: one Customize Segmenter value of the pass, e.g. max_group_duration_s=240, "
+                        "chunk_threshold_s=5, min_group_duration_s=0; repeatable.")
+    p.add_argument("--label", default=None,
+                   help="Name of this run in the output file names (<name>.<label>.*) instead of the backend; keeps "
+                        "runs with different settings apart. One backend only.")
+    p.add_argument("--markers", action="store_true",
+                   help="Also write PotPlayer markers beside the media file: <name>.pbf (a bookmark at each scene start "
+                        "and, with --pipeline, each call start) and <name>.ass (an on-screen label of the scene and the "
+                        "call at every moment). Existing files are never overwritten. One backend only.")
+    p.add_argument("--markers-dir", type=Path, default=None,
+                   help="Write the markers into this folder instead of beside the media file (implies --markers).")
+    p.add_argument("--marker-level", choices=MARKER_LEVELS, default="both",
+                   help="Bookmarks for scenes and calls (both, the default), scenes only, or calls only.")
     p.add_argument("--sensitivity", choices=SENSITIVITIES, default=None,
                    help="Apply the backend's YAML sensitivity preset (as the pipelines do). Default: the backend's own defaults.")
     p.add_argument("--scene-threshold", type=float, default=None, metavar="FLOAT",
@@ -732,6 +1205,36 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.srt is not None and not args.srt.exists():
         print(f"error: --srt file not found: {args.srt}", file=sys.stderr)
         return 2
+    if (args.speech_segmenter or args.segmenter_param) and not args.pipeline:
+        print("error: --speech-segmenter and --segmenter-param need --pipeline", file=sys.stderr)
+        return 2
+    pass_segmenter = None
+    if args.pipeline:
+        from whisperjav.crispasr.pass_settings import scene_detector_for
+        if args.backend is None:
+            default = scene_detector_for(args.pipeline)
+            if default not in BACKENDS:
+                print(f"error: {args.pipeline}'s scene detector {default} is not one this tool runs; give --backend",
+                      file=sys.stderr)
+                return 2
+            args.backend = [default]
+        try:
+            pass_segmenter = pipeline_segmenter(args.pipeline, args.speech_segmenter, args.sensitivity,
+                                                dict(args.segmenter_param))
+        except (ValueError, KeyError) as exc:
+            print(f"error: speech segmenter for {args.pipeline}: {exc}", file=sys.stderr)
+            return 2
+    args.backend = args.backend or [DEFAULT_BACKEND]
+    markers = None
+    if args.markers or args.markers_dir:
+        if len(args.backend) != 1:
+            print("error: --markers takes one backend (the markers of one layout)", file=sys.stderr)
+            return 2
+        markers = {"folder": args.markers_dir.resolve() if args.markers_dir else None, "level": args.marker_level}
+    if args.label and len(args.backend) != 1:
+        print("error: --label takes one backend", file=sys.stderr)
+        return 2
+
     from whisperjav.utils.logger import setup_logger
     setup_logger("whisperjav", "WARNING" if args.quiet else "INFO")
 
@@ -742,7 +1245,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             print("warning: --scene-threshold only affects the semantic backend, which is not selected", file=sys.stderr)
     for backend in args.backend:
         unknown = [k for k in params if k not in BACKEND_PARAMS.get(backend, [])]
-        if unknown and len(args.backend) == 1:
+        if unknown and len(args.backend) == 1 and not args.pipeline:
             print(f"warning: --param key(s) not read by the {backend} backend and will be ignored: {unknown}", file=sys.stderr)
 
     status = 0
@@ -756,7 +1259,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             records = inspect_media(media.resolve(), args.backend, args.sensitivity, params, out_dir,
                                     screenshots=not args.no_screenshots, image_format=args.image_format,
                                     keep_scene_audio=args.keep_scene_audio, speech_segmenter=args.speech_ratio,
-                                    srt_path=args.srt.resolve() if args.srt else None)
+                                    srt_path=args.srt.resolve() if args.srt else None,
+                                    pipeline=args.pipeline, pass_segmenter=pass_segmenter, label=args.label,
+                                    markers=markers)
         except Exception as exc:  # noqa: BLE001 - report and continue with the next file
             print(f"error: {media.name}: {type(exc).__name__}: {exc}", file=sys.stderr)
             status = 1
@@ -771,6 +1276,22 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"{media.name} [{rec['backend']['used']}]: {st['scene_count']} scenes, coverage "
                   f"{round((st['coverage_ratio'] or 0) * 100, 1)} %, median {st['duration']['median_s']} s, "
                   f"max {st['duration']['max_s']} s{extra}; screenshots {rec['screenshots']['written']} -> {out_dir}")
+            if "calls" in st:
+                C = st["calls"]
+                ended = ", ".join(f"{k} {v}" for k, v in C["ended_by"].items())
+                print(f"{media.name} [{rec['pipeline']['name']} calls]: {C['call_count']} calls, median "
+                      f"{C['duration']['median_s']} s, max {C['duration']['max_s']} s, {C['calls_70s_or_longer']} of 70 s "
+                      f"or longer; ended by: {ended}; not sent (under 0.2 s): {C['pieces_not_sent_under_0_2s']}")
+            if "reference_lines" in st:
+                R = st["reference_lines"]
+                print(f"{media.name} [reference lines]: {R['lines']} lines: sent {R['sent']}, partly sent "
+                      f"{R['partly sent']}, not sent {R['not sent']}, in no scene {R['in no scene']}")
+            if rec.get("markers"):
+                if rec["markers"].get("error"):
+                    print(f"{media.name}: {rec['markers']['error']}", file=sys.stderr)
+                    status = 1
+                else:
+                    print(f"{media.name}: markers -> {rec['markers']['pbf']}, {rec['markers']['ass']}")
         if len(records) > 1:
             print(f"{media.name}: comparison -> {out_dir / (media.stem + '.compare.md')}")
     return status
