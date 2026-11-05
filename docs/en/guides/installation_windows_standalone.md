@@ -1,7 +1,7 @@
 # WhisperJAV Windows Installer Guide
 
-**Version:** 1.10.0
-**Installer:** `WhisperJAV-1.10.0-Windows-x86_64.exe` (no administrator rights needed)
+**Version:** 1.10.1
+**Installer:** `WhisperJAV-1.10.1-Windows-x86_64.exe` (no administrator rights needed)
 
 ---
 
@@ -54,7 +54,7 @@ The installer downloads from GitHub, PyPI, download.pytorch.org and Hugging Face
 
 ## Installation steps
 
-1. Download `WhisperJAV-1.10.0-Windows-x86_64.exe` from the [releases page](https://github.com/meizhong986/WhisperJAV/releases).
+1. Download `WhisperJAV-1.10.1-Windows-x86_64.exe` from the [releases page](https://github.com/meizhong986/WhisperJAV/releases).
 2. Double-click it. You do not need to run it as administrator. If Windows SmartScreen warns, click **More info**, then **Run anyway**.
 3. Accept the licence.
 4. Choose **Just Me** (recommended; no administrator rights) or **All Users**.
@@ -74,7 +74,7 @@ After the files are unpacked, a console window runs the rest of the installation
 | 5.5–5.8 | Creates the `WhisperJAV-GUI.exe` launcher, downloads the FireRedVAD speech detection model, checks the icons |
 | 6 | Checks that the installed program starts |
 
-At the end, a summary shows what was installed and what the install is made for, and a desktop shortcut "WhisperJAV v1.10.0" is created. The installation takes about 10 to 30 minutes, depending on your connection.
+At the end, a summary shows what was installed and what the install is made for, and a desktop shortcut "WhisperJAV v1.10.1" is created. The installation takes about 10 to 30 minutes, depending on your connection.
 
 ---
 
@@ -130,13 +130,13 @@ The installer writes the accelerator into `whisperjav_stack.txt` in the install 
 
 ### When the installer stops on purpose
 
-If you choose Stop, a closing dialog says: "WhisperJAV was not installed. The installer stopped for the reason shown in its console window." The reason is also saved in `INSTALLATION_STOPPED_v1.10.0.txt` in the install folder.
+If you choose Stop, a closing dialog says: "WhisperJAV was not installed. The installer stopped for the reason shown in its console window." The reason is also saved in `INSTALLATION_STOPPED_v1.10.1.txt` in the install folder.
 
 ---
 
 ## First run
 
-Double-click the **WhisperJAV v1.10.0** shortcut, or `WhisperJAV-GUI.exe` in the install folder.
+Double-click the **WhisperJAV v1.10.1** shortcut, or `WhisperJAV-GUI.exe` in the install folder.
 
 The first time a pipeline needs a model, WhisperJAV downloads it (for example about 3 GB for Whisper large-v3, 674 MB for Parakeet-CrispASR). Later runs reuse it.
 
@@ -170,26 +170,28 @@ It lists Python, PyTorch, the accelerator of the install, where each part runs, 
 ℹ CTranslate2: CTranslate2 (balanced, fast, faster): NVIDIA GPU (CUDA)
 ```
 
-`Scripts\whisperjav.exe --version` prints the version: `WhisperJAV 1.10.0`.
+`Scripts\whisperjav.exe --version` prints the version: `WhisperJAV 1.10.1`.
 
-The installation log is `install_log_v1.10.0.txt` in the install folder.
+The installation log is `install_log_v1.10.1.txt` in the install folder.
 
 ---
 
 ## Coming from 1.9.x
 
-Install 1.10.0 fresh: 1.10.0 needs Python 3.13, so `whisperjav-upgrade` cannot take a 1.9.x install to 1.10.0. If you install into the folder of your old version, the installer finds it and offers to replace it: everything in that folder is removed first. Your settings in `%APPDATA%\WhisperJAV` and your downloaded models stay.
+Install the newest 1.10 release fresh: 1.10 needs Python 3.13, so `whisperjav-upgrade` cannot take a 1.9.x install to 1.10. If you install into the folder of your old version, the installer finds it and offers to replace it: everything in that folder is removed first. Your settings in `%APPDATA%\WhisperJAV` and your downloaded models stay.
 
 ---
 
 ## Updating within 1.10
 
-Later 1.10 releases can be installed with `whisperjav-upgrade`, which keeps the accelerator of your install and its PyTorch:
+Later 1.10 releases are installed with WhisperJAV's upgrade tool, which keeps the accelerator of your install and its PyTorch. The GUI tells you when a new version is out, but it does not upgrade by itself.
 
-1. Open a Command Prompt.
-2. `cd /d "%LOCALAPPDATA%\WhisperJAV"` (or your install folder).
-3. `Scripts\whisperjav-upgrade.exe`
-4. Check the version: `Scripts\whisperjav.exe --version`
+1. Close WhisperJAV.
+2. Open a Command Prompt.
+3. Run `"%LOCALAPPDATA%\WhisperJAV\python.exe" -m whisperjav.upgrade` (or the `python.exe` in your install folder) and answer `y`.
+4. Check the version: `"%LOCALAPPDATA%\WhisperJAV\Scripts\whisperjav.exe" --version` (or `Scripts\whisperjav.exe` in your install folder)
+
+Start the upgrade with the install's `python.exe`, not with `Scripts\whisperjav-upgrade.exe`: when WhisperJAV is installed on another drive than Windows' temporary folder (normally drive C:), `whisperjav-upgrade.exe` of 1.10.0 and 1.10.1 stops halfway and WhisperJAV no longer starts. If that happens, or WhisperJAV does not start after an upgrade for another reason, [uninstall](#uninstalling) it and install the newest release with the installer; your settings and downloaded models stay.
 
 Do not update with a plain `pip install -U whisperjav…`: on Windows, PyPI serves the CPU-only build of PyTorch, so it can replace your GPU build without a word.
 
@@ -197,7 +199,7 @@ Do not update with a plain `pip install -U whisperjav…`: on Windows, PyPI serv
 
 ## Running the installer again
 
-Run the installer again into the same folder to repair the install or to change what it is made for. A window titled **"WhisperJAV — this install's accelerator"** says "This install is made for: …. Keep it, or choose another." The current accelerator is pre-selected; without an answer, the install is kept as it is after 20 seconds. If the NVIDIA GPU cannot be used at that moment, the reason is shown above the choice. The installer removes the old install folder first (your settings and downloaded models stay) and keeps only its record of the accelerator; on an Own PyTorch install, add your PyTorch again with the command shown at the end.
+Run the installer again into the same folder to repair the install or to change what it is made for. A window titled **"WhisperJAV — this install's accelerator"** says "This install is made for: …. Keep it, or choose another." The current accelerator is pre-selected; without an answer, the install is kept as it is after 20 seconds. If the NVIDIA GPU cannot be used at that moment, the reason is shown above the choice. The installer removes the old install folder first (your settings and downloaded models stay) and keeps only its record of the accelerator; on an Own PyTorch install, add your PyTorch again with the command shown at the end. If WhisperJAV no longer starts, for example after a failed upgrade, [uninstall](#uninstalling) it first and then install it again.
 
 ---
 
@@ -221,7 +223,7 @@ Open Windows **Settings > Apps**, find **WhisperJAV** and choose **Uninstall**. 
 
 **The GUI does not open, or the window is blank.** Install WebView2 from [Microsoft](https://go.microsoft.com/fwlink/p/?LinkId=2124703). To see error messages, run `"%LOCALAPPDATA%\WhisperJAV\python.exe" -m whisperjav.webview_gui.main` in a Command Prompt.
 
-**The installation failed.** Open `install_log_v1.10.0.txt` in the install folder: it names the phase that failed. `INSTALLATION_FAILED_v1.10.0.txt` holds the reason. Run the installer again; it offers to replace the partial install. If it keeps failing, open an issue at [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) with the log attached.
+**The installation failed.** Open `install_log_v1.10.1.txt` in the install folder: it names the phase that failed. `INSTALLATION_FAILED_v1.10.1.txt` holds the reason. Run the installer again; it offers to replace the partial install. If it keeps failing, open an issue at [GitHub Issues](https://github.com/meizhong986/WhisperJAV/issues) with the log attached.
 
 ---
 
@@ -230,20 +232,20 @@ Open Windows **Settings > Apps**, find **WhisperJAV** and choose **Uninstall**. 
 ### Silent installation
 
 ```cmd
-cmd /C START /WAIT WhisperJAV-1.10.0-Windows-x86_64.exe /S /D=C:\WhisperJAV
+cmd /C START /WAIT WhisperJAV-1.10.1-Windows-x86_64.exe /S /D=C:\WhisperJAV
 ```
 
-`/S` installs without the installer's screens; `/D=` sets the folder and must come last. `WhisperJAV-1.10.0-Windows-x86_64.exe /?` lists every option. The window of [What this install is made for](#what-this-install-is-made-for) still opens when the installer has to ask: on a PC without a supported NVIDIA GPU it installs the CPU-only version after 20 seconds without an answer; with an NVIDIA GPU that 1.10 cannot use, it waits for an answer.
+`/S` installs without the installer's screens; `/D=` sets the folder and must come last. `WhisperJAV-1.10.1-Windows-x86_64.exe /?` lists every option. The window of [What this install is made for](#what-this-install-is-made-for) still opens when the installer has to ask: on a PC without a supported NVIDIA GPU it installs the CPU-only version after 20 seconds without an answer; with an NVIDIA GPU that 1.10 cannot use, it waits for an answer.
 
 ### Files in the install folder
 
 | File | What it is |
 |---|---|
-| `install_log_v1.10.0.txt` | the installation log |
+| `install_log_v1.10.1.txt` | the installation log |
 | `whisperjav_stack.txt` | what the install is made for |
 | `OWN_PYTORCH_NEXT_STEP.txt` | Own PyTorch install only: the command that adds your PyTorch |
-| `INSTALLATION_STOPPED_v1.10.0.txt` | only when the installer stopped on purpose: the reason |
-| `INSTALLATION_FAILED_v1.10.0.txt` | only when the installation failed: the reason |
+| `INSTALLATION_STOPPED_v1.10.1.txt` | only when the installer stopped on purpose: the reason |
+| `INSTALLATION_FAILED_v1.10.1.txt` | only when the installation failed: the reason |
 | `WhisperJAV-GUI.exe` | the GUI launcher |
 
 ### Addresses the installer downloads from
