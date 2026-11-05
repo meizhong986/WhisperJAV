@@ -11,7 +11,7 @@ WhisperJAV 1.10.0 runs on Windows, Linux and Apple silicon Macs. Choose the way 
 | Have an Apple silicon Mac (M1 or newer) | [macOS Guide](../guides/installation_mac_apple_silicon.md) |
 | Run Linux | [Linux Guide](../guides/installation_linux.md) |
 
-**Coming from 1.9.x?** Install 1.10.0 fresh. 1.10.0 needs Python 3.13, so `whisperjav-upgrade` cannot take a 1.9.x install to 1.10.0. Your settings in the user settings folder are kept.
+**Coming from 1.9.x?** Install the newest 1.10 release fresh. 1.10 needs Python 3.13, so `whisperjav-upgrade` cannot take a 1.9.x install to 1.10. Your settings in the user settings folder are kept.
 
 **Google Colab and Kaggle** are not supported by 1.10.0: it is made and tested for installs on your own computer only. The Colab expert notebook keeps installing 1.9.5.
 
