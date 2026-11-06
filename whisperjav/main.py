@@ -1959,6 +1959,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                         "total_processing_time_seconds"
                     ),
                 )
+                # Routine notes (1.10.2, #501: ChronosJAV's aligner events), as in Ensemble runs; no state change.
+                outcome.notes = list(metadata.get("summary", {}).get("notes") or [])
                 outcomes.append(outcome)
                 log_outcome(outcome)
                 
@@ -2275,6 +2277,8 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
                     degraded_reason="; ".join(_shortfalls),
                     processing_time_s=_summary.get("total_processing_time_seconds"),
                 )
+                # Routine notes (1.10.2, #501), as on the other paths; no state change.
+                outcome.notes = list(_summary.get("notes") or [])
             elif task.status == ProcessingStatus.CANCELLED:
                 outcome = failed_outcome(_path, "cancelled")
             else:
