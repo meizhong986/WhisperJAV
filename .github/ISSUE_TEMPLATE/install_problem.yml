@@ -1,0 +1,45 @@
+name: "Installation problem / 安装问题"
+description: "The installer stops, fails or WhisperJAV does not start after installing / 安装程序停止或失败，或安装后无法启动"
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Logs may show your user name; you can remove it.
+        日志中可能有用户名，可以删掉。
+
+  - type: textarea
+    id: what
+    attributes:
+      label: "What happened / 发生了什么"
+      description: "Which installer (file name), at which step it stopped, the message you saw. / 哪个安装程序（文件名）、在哪一步停止、看到的提示。"
+    validations:
+      required: true
+
+  - type: textarea
+    id: files
+    attributes:
+      label: "Installer log files / 安装日志文件"
+      description: |
+        Attach these files from the install folder (by default `%LOCALAPPDATA%\WhisperJAV`): `install_log_v<version>.txt` and, if they exist, `INSTALLATION_FAILED_v<version>.txt` or `INSTALLATION_STOPPED_v<version>.txt` (for example `install_log_v1.10.1.txt`).
+        请附上安装文件夹（默认 `%LOCALAPPDATA%\WhisperJAV`）中的这些文件：`install_log_v<版本>.txt`，以及（如果有）`INSTALLATION_FAILED_v<版本>.txt` 或 `INSTALLATION_STOPPED_v<版本>.txt`（例如 `install_log_v1.10.1.txt`）。
+    validations:
+      required: true
+
+  - type: dropdown
+    id: network
+    attributes:
+      label: "Network / 网络"
+      description: "How this computer reaches the internet. / 这台电脑如何上网。"
+      options:
+        - "Direct / 直接上网"
+        - "VPN"
+        - "Proxy / 代理"
+        - "Company or school network / 公司或学校网络"
+        - "Not sure / 不确定"
+
+  - type: input
+    id: gpu
+    attributes:
+      label: "Graphics card / 显卡"
+      description: "For example NVIDIA RTX 3060, AMD RX 7800, Intel Arc, or none. / 例如 NVIDIA RTX 3060、AMD RX 7800、Intel Arc，或没有独立显卡。"
