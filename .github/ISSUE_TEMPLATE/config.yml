@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: "Questions and settings advice / 使用问题与设置建议"
+    url: https://github.com/meizhong986/WhisperJAV/discussions
+    about: "How to use WhisperJAV, which settings to choose. / 如何使用、选择哪些设置。"
+  - name: "Roadmap / 路线图"
+    url: https://github.com/users/meizhong986/projects/2
+    about: "What is planned and what is being looked at. / 已计划和正在研究的内容。"
