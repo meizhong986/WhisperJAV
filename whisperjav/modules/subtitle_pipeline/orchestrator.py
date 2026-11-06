@@ -268,6 +268,8 @@ class DecoupledSubtitlePipeline:
 
         self.alignment_unavailable = None
         self.alignment_partial = None
+        # 1.10.2 (#501): True when the aligner gave times for no VAD group with text (it ran, but timed nothing).
+        self.alignment_none = False
         self.timing_unavailable = None
 
         logger.info(
@@ -290,6 +292,7 @@ class DecoupledSubtitlePipeline:
         if unaligned:
             self.alignment_partial = GROUPS_NOT_ALIGNED_TEXT.format(
                 name=getattr(self.aligner, "display_name", "aligner"), n=unaligned, m=with_text)
+            self.alignment_none = unaligned >= with_text
 
         # --- Identify collapsed scenes ---
         collapsed_indices = [
