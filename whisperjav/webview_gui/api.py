@@ -4381,17 +4381,11 @@ class WhisperJAVAPI:
                     "error": f"No API key. Set {config.get('env_var')} or provide key."
                 }
 
-            # Test with a minimal request
-            api_base = config.get('api_base', 'https://api.openai.com/v1')
-            test_url = f"{api_base.rstrip('/')}/models"
-
-            req = urllib.request.Request(
-                test_url,
-                headers={
-                    "Authorization": f"Bearer {key}",
-                    "Content-Type": "application/json"
-                }
-            )
+            # Test with a minimal request at the provider's own models list (#465: Gemini, Claude, GLM and Groq
+            # keys used to be checked at OpenAI's address).
+            from whisperjav.translate.providers import key_check_request, is_invalid_key_response
+            test_url, headers = key_check_request(provider, key)
+            req = urllib.request.Request(test_url, headers={**headers, "Content-Type": "application/json"})
 
             try:
                 with urllib.request.urlopen(req, timeout=10) as response:
@@ -4401,7 +4395,11 @@ class WhisperJAVAPI:
                         "status_code": response.status
                     }
             except urllib.error.HTTPError as e:
-                if e.code == 401:
+                try:
+                    body = e.read().decode("utf-8", "replace")
+                except Exception:
+                    body = ""
+                if is_invalid_key_response(provider, e.code, body):
                     return {"success": False, "error": "Invalid API key"}
                 elif e.code == 403:
                     return {"success": False, "error": "API key lacks permissions"}
