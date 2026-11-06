@@ -582,7 +582,8 @@ def write_results_md(out, run, summaries):
              f"Tool `tools/vibevoice_crispasr_ref.py` version {TOOL_VERSION}; run {run['when']}.", "",
              "| Fact | Value |", "|---|---|"]
     for k in ("model_file", "model_size_bytes", "model_sha256", "sha256_vs_hugging_face", "crispasr", "backend",
-              "input", "audio_window", "reference", "crispasr_cutting", "gpu", "gpu_free_before_mib",
+              "input", "audio_window", "reference", "crispasr_cutting", "raw_transcript", "encoder_window",
+              "gpu_layers", "gpu", "gpu_free_before_mib",
               "model_open_s", "gpu_after_open_mib", "gpu_peak_mib", "gpu_over_before_mib", "gpu_was_full"):
         lines.append(f"| {k} | {run.get(k, '–')} |")
     lines += ["", "## Calls", "",
@@ -634,6 +635,12 @@ def cmd_run(args):
     cutting = {"default": "CrispASR's own (audio over 30 s cut into pieces of at most 30 s at quiet points)",
                "off": "off (CRISPASR_SESSION_AUTOCHUNK=0): each call's audio goes to the model whole"}.get(
         args.crisp_cutting, f"CrispASR cuts audio over {args.crisp_cutting} s (CRISPASR_SESSION_CHUNK_SECONDS)")
+    if args.raw_transcript:
+        os.environ["CRISPASR_VIBEVOICE_RAW_TRANSCRIPT"] = "1"
+    if args.encoder_window:
+        os.environ["CRISPASR_VIBEVOICE_ENCODER_CHUNK_SECONDS"] = str(int(args.encoder_window))
+    if args.gpu_layers is not None:
+        os.environ["CRISPASR_N_GPU_LAYERS"] = str(int(args.gpu_layers))
 
     path, rf = resolve_model(args.model)
     size = path.stat().st_size
@@ -647,7 +654,13 @@ def cmd_run(args):
         raise SystemExit(f"Reference not found: {args.reference}")
     run = {"when": time.strftime("%Y-%m-%d %H:%M:%S"), "model_label": args.model, "model_file": str(path),
            "model_size_bytes": size, "input": str(media), "reference": args.reference or "–",
-           "crispasr_cutting": cutting}
+           "crispasr_cutting": cutting,
+           "raw_transcript": "yes: the model's whole answer as one text (CRISPASR_VIBEVOICE_RAW_TRANSCRIPT=1)"
+           if args.raw_transcript else "no: CrispASR splits the answer into utterances",
+           "encoder_window": f"{int(args.encoder_window)} s (CRISPASR_VIBEVOICE_ENCODER_CHUNK_SECONDS)"
+           if args.encoder_window else "CrispASR's default (300 s)",
+           "gpu_layers": f"{int(args.gpu_layers)} language-model layers on the GPU (CRISPASR_N_GPU_LAYERS)"
+           if args.gpu_layers is not None else "all on the GPU (CrispASR's default)"}
 
     # GPU room, before anything is loaded
     info = None if args.cpu else gpu_info(args.gpu_index)
@@ -789,6 +802,17 @@ def build_parser():
     e.add_argument("--crisp-cutting", default="default",
                    help="CrispASR's own cutting of long audio: 'default' (over 30 s: pieces of at most 30 s), 'off', "
                         "or a number of seconds. Set once per run.")
+    e.add_argument("--raw-transcript", action="store_true",
+                   help="Ask CrispASR to return VibeVoice's whole answer as one text, not split into utterances "
+                        "(CRISPASR_VIBEVOICE_RAW_TRANSCRIPT=1): shows exactly what the model wrote. The subtitles then "
+                        "hold the model's JSON. Set once per run.")
+    e.add_argument("--encoder-window", type=float,
+                   help="Seconds of audio VibeVoice's audio encoder takes at once (CrispASR's "
+                        "CRISPASR_VIBEVOICE_ENCODER_CHUNK_SECONDS; CrispASR's default 300). A smaller window bounds the "
+                        "encoder's GPU memory; the model still writes the whole call's text. Set once per run.")
+    e.add_argument("--gpu-layers", type=int,
+                   help="How many of the language model's layers go on the GPU, the rest on the CPU (CrispASR's "
+                        "CRISPASR_N_GPU_LAYERS; VibeVoice 7B has 28). Less GPU memory, slower. Set once per run.")
     e.add_argument("--threads", type=int, default=max(1, min(8, os.cpu_count() or 4)), help="CPU threads (default up to 8).")
     e.add_argument("--cpu", action="store_true", help="Run on the CPU (no GPU).")
     e.add_argument("--no-flash-attn", action="store_true", help="Open the model without flash attention.")
