@@ -96,7 +96,13 @@ def test_groups_the_aligner_gave_no_times_are_counted(tmp_path):
         "ChronosJAV's aligner (wav2vec2-ja) gave no times for 1 of 2 VAD group(s)")
     src = (Path(__file__).resolve().parents[1] / "whisperjav" / "pipelines" / "qwen_pipeline.py").read_text(
         encoding="utf-8")
+    # 1.10.2 (#501): a note when the aligner timed at least one VAD group; "suspect" when it timed none.
+    assert "self.notes.append(self._subtitle_pipeline.alignment_partial)" in src
     assert "self.degradations.append(self._subtitle_pipeline.alignment_partial)" in src
+    assert 'master_metadata["summary"]["notes"]' in src
+    orch_src = (Path(__file__).resolve().parents[1] / "whisperjav" / "modules" / "subtitle_pipeline"
+                / "orchestrator.py").read_text(encoding="utf-8")
+    assert "self.alignment_none = unaligned >= with_text" in orch_src
 
 
 def test_both_pipelines_report_it():
@@ -104,7 +110,7 @@ def test_both_pipelines_report_it():
     for name in ("qwen_pipeline.py", "decoupled_pipeline.py"):
         src = (root / name).read_text(encoding="utf-8")
         assert "self.degradations.append(self._subtitle_pipeline.alignment_unavailable)" in src, name
-    # The timing model (1.10.0, item 12) is ChronosJAV's only: its note reaches the summary the same way.
+    # The timing model (1.10.0, item 12) is ChronosJAV's only: it is a degradation, as an aligner that cannot load.
     src = (root / "qwen_pipeline.py").read_text(encoding="utf-8")
     assert "self.degradations.append(self._subtitle_pipeline.timing_unavailable)" in src
 
