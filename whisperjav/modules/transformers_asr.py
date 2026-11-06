@@ -22,6 +22,7 @@ import time
 
 import torch
 
+from whisperjav.modules.transformers_language import generation_language
 from whisperjav.utils.logger import hide_weight_loading_bar, logger
 
 # Suppress specific transformers warnings that are informational only
@@ -264,8 +265,13 @@ class TransformersASR:
         # All other params (num_beams, temperature, thresholds, etc.) defer to
         # the model's generation_config.json which contains tested defaults.
         # Users can override via constructor args if needed.
+        # Kotoba bilingual reads `language` as the language of its output (#469; transformers_language.py).
+        language = generation_language(self.model_id, self.language, self.task)
+        if language != self.language:
+            logger.debug(f"  {self.model_id}: language='{language}' for task='{self.task}' "
+                         f"(this model takes the language of the text it writes)")
         generate_kwargs = {
-            "language": self.language,
+            "language": language,
             "task": self.task,
         }
         if self.beam_size is not None:
