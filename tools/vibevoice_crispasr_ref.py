@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 """VibeVoice-ASR through CrispASR: a reference way to run, measure and compare VibeVoice models and settings.
 
-Standalone research utility. It imports nothing from WhisperJAV. It needs the crispasr package (CrispASR's Python
-binding), numpy, ffmpeg, and for the GPU figures nvidia-smi; huggingface_hub for listing and downloading models.
-A run can be scored with subeval (the repository's subtitle scoring tool) against a reference SRT.
+Research utility. It imports nothing from WhisperJAV, except WhisperJAV's own speech segmenter when --vad is given
+(run as the CrispASR pipelines run it). It needs the crispasr package (CrispASR's Python binding), numpy, ffmpeg, and
+for the GPU figures nvidia-smi; huggingface_hub for listing and downloading models. A run can be scored with subeval
+(the repository's subtitle scoring tool) against a reference SRT.
 
   python tools/vibevoice_crispasr_ref.py gpu
   python tools/vibevoice_crispasr_ref.py models
@@ -52,6 +53,11 @@ MODELS = {
 SETTING_KEYS = ("context", "max_new_tokens", "language", "temperature", "seed", "do_sample", "top_k", "top_p",
                 "beam_size", "best_of", "frequency_penalty", "repetition_penalty", "ask")
 PIECE_KEYS = ("piece_seconds", "segments", "whole")
+# VAD (owner W554, W555): WhisperJAV's own speech segmenter, run as the CrispASR pipelines run it; default settings
+# those of cohere-crispasr (W555).
+VAD_KEYS = ("vad", "vad_like", "vad_sensitivity", "vad_threshold", "max_group_seconds", "group_gap_seconds",
+            "vad_unit")
+VAD_LIKE = ("cohere-crispasr", "moss-crispasr", "parakeet-crispasr")
 LEFTOVER_NAMES = ("python.exe", "pythonw.exe", "python", "python3")
 
 
@@ -376,6 +382,81 @@ def read_segments(path, offset):
     return out
 
 
+def scenes_for(v, audio, offset):
+    """The stretches a variant works on, in seconds of the loaded audio, and how they were made."""
+    total_s = len(audio) / SR
+    if v.get("segments"):
+        return read_segments(v["segments"], offset), f"segments from {v['segments']}"
+    if v.get("piece_seconds"):
+        return quiet_pieces(audio, float(v["piece_seconds"])), f"pieces of at most {v['piece_seconds']} s"
+    return [(0.0, total_s)], "the whole audio"
+
+
+def vad_calls(audio, scenes, v):
+    """VAD groups (or speech segments) found by WhisperJAV's speech segmenter in each scene, as the CrispASR pipelines
+    find them: settings from crispasr/pass_settings.py segmenter_settings() for the pipeline named in vad_like, groups
+    from framers/vad_grouped.py VadGroupedFramer; a group under 0.2 s (the shortest audio a model is given,
+    modules/model_audio.py) is not sent. Returns (calls in seconds of the loaded audio, a description, facts)."""
+    import numpy as np
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))  # this repository's WhisperJAV code, beside the tool
+    from whisperjav.crispasr.pass_settings import segmenter_settings
+    from whisperjav.modules.subtitle_pipeline.framers.vad_grouped import VadGroupedFramer
+
+    like = v.get("vad_like") or VAD_LIKE[0]
+    if like not in VAD_LIKE:
+        raise SystemExit(f"vad_like must be one of {', '.join(VAD_LIKE)}.")
+    s = segmenter_settings(like, v["vad"], v.get("vad_sensitivity"), vad_threshold=v.get("vad_threshold"))
+    max_group = float(v["max_group_seconds"]) if v.get("max_group_seconds") is not None else s.max_group_duration_s
+    gap = float(v["group_gap_seconds"]) if v.get("group_gap_seconds") is not None else s.chunk_threshold_s
+    unit = v.get("vad_unit") or "groups"
+    if unit not in ("groups", "segments"):
+        raise SystemExit("vad_unit must be 'groups' or 'segments'.")
+    if unit == "segments":
+        gap = 0.0  # every gap starts a new group: each speech segment is its own call
+    framer = VadGroupedFramer(segmenter_backend=s.backend, max_group_duration_s=max_group, chunk_threshold_s=gap,
+                              min_frame_duration_s=0.1, segmenter_config=dict(s.config))
+    calls, failed, too_short = [], [], 0
+    t = time.time()
+    try:
+        for i, (a, b) in enumerate(scenes):
+            piece = np.ascontiguousarray(audio[int(round(a * SR)):int(round(b * SR))])
+            try:
+                res = framer.frame(piece, SR)
+            except Exception as e:
+                failed.append(f"scene {i}: {type(e).__name__}: {e}")
+                continue
+            if res.metadata.get("segmenter_error"):
+                failed.append(f"scene {i}: {res.metadata['segmenter_error']}")
+                continue
+            dur = len(piece) / SR
+            for fr in res.frames:
+                s0, e0 = max(0.0, fr.start), min(dur, fr.end)
+                if e0 - s0 >= 0.2:
+                    calls.append((a + s0, a + e0))
+                else:
+                    too_short += 1
+    finally:
+        try:
+            framer.cleanup()
+        except Exception:
+            pass
+        del framer
+        gc.collect()
+    lengths = [e - s for s, e in calls]
+    facts = {"backend": s.backend, "settings_like": like, "sensitivity": s.sensitivity, "unit": unit,
+             "max_group_seconds": max_group, "group_gap_seconds": gap, "segmenter_config": dict(s.config),
+             "scenes": len(scenes), "scenes_failed": failed, "calls": len(calls), "too_short_not_sent": too_short,
+             "speech_s": round(sum(lengths), 1), "longest_call_s": round(max(lengths), 2) if lengths else 0.0,
+             "vad_seconds": round(time.time() - t, 1)}
+    how = (f"{s.backend} VAD {unit} ({like} settings: sensitivity {s.sensitivity}, longest group {max_group} s, "
+           f"new group at a silence over {gap} s)")
+    say(f"VAD: {len(calls)} {unit} from {len(scenes)} scene(s), {facts['speech_s']} s of speech, longest "
+        f"{facts['longest_call_s']} s, in {facts['vad_seconds']} s" + (f"; FAILED on {len(failed)} scene(s)" if failed
+                                                                        else ""))
+    return calls, how, facts
+
+
 # ----------------------------------------------------------------------------------------------------------------
 # One variant
 # ----------------------------------------------------------------------------------------------------------------
@@ -427,13 +508,15 @@ def apply_settings(session, v, previous_extra):
 def run_variant(session, audio, offset, v, out_dir, watch, args):
     import numpy as np
     out_dir.mkdir(parents=True, exist_ok=True)
-    total_s = len(audio) / SR
-    if v.get("segments"):
-        pieces, how = read_segments(v["segments"], offset), f"segments from {v['segments']}"
-    elif v.get("piece_seconds"):
-        pieces, how = quiet_pieces(audio, float(v["piece_seconds"])), f"pieces of at most {v['piece_seconds']} s"
+    if "_vad_calls" in v:
+        pieces, how = v["_vad_calls"], v["_vad_how"] + f", over {v['_scenes_how']}"
+        with open(out_dir / "vad_groups.jsonl", "w", encoding="utf-8", newline="\n") as fh:
+            for s, e in pieces:
+                fh.write(json.dumps({"start": round(offset + s, 3), "end": round(offset + e, 3)}) + "\n")
     else:
-        pieces, how = [(0.0, total_s)], "the whole audio in one call"
+        pieces, how = scenes_for(v, audio, offset)
+        if how == "the whole audio":
+            how = "the whole audio in one call"
     language = v.get("language", "ja")
     language = None if language in (None, "", "none") else language
     applied, args._extra = apply_settings(session, v, getattr(args, "_extra", set()))
@@ -491,7 +574,8 @@ def run_variant(session, audio, offset, v, out_dir, watch, args):
 
     audio_s = sum(r["end"] - r["start"] for r in records if "error" not in r)
     summary = {
-        "variant": v, "pieces_how": how, "calls": len(records), "calls_failed": errors,
+        "variant": {k: val for k, val in v.items() if not k.startswith("_")}, "pieces_how": how,
+        "vad": v.get("_vad_facts"), "calls": len(records), "calls_failed": errors,
         "first_errors": [r["error"] for r in records if "error" in r][:3],
         "settings_applied": applied, "language_passed": language,
         "audio_s": round(audio_s, 1), "asr_s": round(sum(calls), 1),
@@ -554,13 +638,17 @@ def variants_from(args):
             raise SystemExit("--variants: a JSON list of objects, each with a 'name'.")
         for i, r in enumerate(rows):
             r.setdefault("name", f"v{i + 1}")
-            unknown = set(r) - set(SETTING_KEYS) - set(PIECE_KEYS) - {"name"}
+            unknown = set(r) - set(SETTING_KEYS) - set(PIECE_KEYS) - set(VAD_KEYS) - {"name"}
             if unknown:
                 raise SystemExit(f"--variants: unknown key(s) {sorted(unknown)} in '{r['name']}'. "
-                                 f"Known: {', '.join(SETTING_KEYS + PIECE_KEYS)}")
+                                 f"Known: {', '.join(SETTING_KEYS + PIECE_KEYS + VAD_KEYS)}")
+            # The VAD options on the command line apply to every variant that does not set its own.
+            for key in VAD_KEYS:
+                if getattr(args, key, None) is not None:
+                    r.setdefault(key, getattr(args, key))
         return rows
     v = {"name": args.name}
-    for key in SETTING_KEYS:
+    for key in SETTING_KEYS + VAD_KEYS:
         val = getattr(args, key, None)
         if val is not None:
             v[key] = val
@@ -707,6 +795,19 @@ def cmd_run(args):
     run["audio_window"] = f"from {args.start} s, {len(audio) / SR:.1f} s of audio"
     say(f"Audio: {len(audio) / SR:.1f} s from {media.name}")
 
+    # VAD before the ASR model loads (the segmenter is released again), as the CrispASR pipelines do.
+    vad_cache = {}
+    for v in variants:
+        if v.get("vad") and str(v["vad"]).lower() != "none":
+            scenes, scenes_how = scenes_for(v, audio, args.start)
+            key = json.dumps({k: v.get(k) for k in VAD_KEYS + PIECE_KEYS}, sort_keys=True)
+            if key not in vad_cache:
+                vad_cache[key] = vad_calls(audio, scenes, v)
+            v["_vad_calls"], v["_vad_how"], v["_vad_facts"] = vad_cache[key]
+            v["_scenes_how"] = scenes_how
+            if not v["_vad_calls"]:
+                say(f"Variant '{v['name']}': the VAD found no speech to send.")
+
     import crispasr
     run["crispasr"] = getattr(crispasr, "__version__", "?")
     watch = GpuWatch(args.gpu_index, info["total_mib"]) if info else None
@@ -783,6 +884,25 @@ def build_parser():
     r.add_argument("--variants", help="A JSON list of variants, each an object with a 'name' and any of: "
                                       + ", ".join(SETTING_KEYS + PIECE_KEYS) + ". The model is loaded once.")
     r.add_argument("--name", default="run", help="Name of the single variant when --variants is not given.")
+    vg = r.add_argument_group(
+        "VAD (WhisperJAV's own speech segmenter, run as the CrispASR pipelines run it; with --variants these apply to "
+        "every variant that does not set its own)")
+    vg.add_argument("--vad", help="Speech segmenter, for example firered-vad (also ten, silero-v6.2, whisperseg). With "
+                                  "it, the VAD groups (or speech segments) it finds in each scene are the calls; the "
+                                  "scenes are the pieces of --piece-seconds, the --segments, or the whole audio. "
+                                  "Default: no VAD.")
+    vg.add_argument("--vad-like", dest="vad_like", choices=VAD_LIKE,
+                    help="Whose settings the VAD takes: cohere-crispasr (default: FireRedVAD groups of at most 3.0 s, "
+                         "a new group at a silence over 0.3 s), moss-crispasr (240 s, 5.0 s) or parakeet-crispasr "
+                         "(6.0 s, 1.0 s).")
+    vg.add_argument("--vad-sensitivity", dest="vad_sensitivity", choices=("conservative", "balanced", "aggressive"),
+                    help="Sensitivity of the VAD (default: that pipeline's).")
+    vg.add_argument("--vad-threshold", dest="vad_threshold", type=float, help="VAD threshold, 0-1 (default: the preset's).")
+    vg.add_argument("--max-group-seconds", dest="max_group_seconds", type=float, help="Longest VAD group, in seconds.")
+    vg.add_argument("--group-gap-seconds", dest="group_gap_seconds", type=float,
+                    help="A silence longer than this starts a new VAD group, in seconds.")
+    vg.add_argument("--vad-unit", dest="vad_unit", choices=("groups", "segments"),
+                    help="groups (default): one call per VAD group; segments: one call per speech segment.")
     g = r.add_argument_group("settings (for a single variant; see the .md for which ones CrispASR applies to "
                              "VibeVoice)")
     g.add_argument("--context", help="Context / hotword text, put into VibeVoice's prompt (binding set_hotwords).")
