@@ -88,6 +88,54 @@ for _provider_key, _provider_config in PROVIDER_CONFIGS.items():
     _provider_config.setdefault('whisperjav_provider', _provider_key)
 
 
+# The GUI's Test Connection checks a key at the provider's own models list (#465). Until 1.10.1 every provider
+# without 'api_base' was checked at OpenAI's address, so a working Gemini, Claude, GLM or Groq key showed
+# "Invalid API key". Each address below answered a made-up key with its invalid-key status on 2026-11-06:
+# Gemini 400 API_KEY_INVALID; Anthropic, Zhipu (GLM), Groq, DeepSeek and OpenAI 401. OpenRouter's models list is
+# public (200 for any key), so its key is checked at /key (401 for a made-up key). Groq's firewall answers Python's
+# default User-Agent with 403 "error code: 1010", so every check names WhisperJAV as its User-Agent.
+OPENAI_MODELS_URL = 'https://api.openai.com/v1/models'
+GEMINI_MODELS_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
+ANTHROPIC_MODELS_URL = 'https://api.anthropic.com/v1/models'
+OPENROUTER_KEY_URL = 'https://openrouter.ai/api/v1/key'
+ANTHROPIC_VERSION = '2023-06-01'
+
+
+def _user_agent() -> str:
+    try:
+        from whisperjav.__version__ import __version__
+        return f'WhisperJAV/{__version__}'
+    except Exception:
+        return 'WhisperJAV'
+
+
+def key_check_request(provider: str, key: str):
+    """(url, headers) that check `key` at `provider`'s own service."""
+    agent = {'User-Agent': _user_agent()}
+    if provider == 'gemini':
+        return GEMINI_MODELS_URL, {'x-goog-api-key': key, **agent}
+    if provider == 'claude':
+        return ANTHROPIC_MODELS_URL, {'x-api-key': key, 'anthropic-version': ANTHROPIC_VERSION, **agent}
+    if provider == 'openrouter':
+        return OPENROUTER_KEY_URL, {'Authorization': f'Bearer {key}', **agent}
+    config = PROVIDER_CONFIGS.get(provider) or {}
+    base = config.get('api_base')
+    if not base and config.get('server_address'):
+        # OpenAI-compatible servers (glm, groq): the chat endpoint's folder holds the models list.
+        endpoint = config.get('endpoint', '')
+        base = config['server_address'].rstrip('/') + endpoint.rsplit('/chat/completions', 1)[0]
+    if not base:
+        return OPENAI_MODELS_URL, {'Authorization': f'Bearer {key}', **agent}
+    return f"{base.rstrip('/')}/models", {'Authorization': f'Bearer {key}', **agent}
+
+
+def is_invalid_key_response(provider: str, status: int, body: str = '') -> bool:
+    """True when the provider's answer means the key itself is wrong (Gemini answers 400, not 401)."""
+    if status == 401:
+        return True
+    return provider == 'gemini' and status == 400 and ('API_KEY_INVALID' in body or 'API key not valid' in body)
+
+
 # v1.10.0 (REQ2, owner W22 (1), W42 (2)): the 'local' provider -- the llama-cpp-python
 # server WhisperJAV started itself -- is removed; Ollama is the only local translator.
 # A saved 'local' choice is read as 'ollama' with one console line (settings.py);
