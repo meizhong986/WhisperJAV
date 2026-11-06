@@ -1,0 +1,51 @@
+{
+  "about": "Models for tools/crispasr_model_test.py (owner W568, W569). One entry per GGUF file. 'backend' is what CrispASR must report when it opens the file. 'row' is the WhisperJAV pipeline row (pipelines/crispasr_pipeline.py EngineRow) that the measure stage builds subtitles with, read-only: line_rule tokens | group | segments; onsets; cut_at_pauses; cleanup srt (crispasr/cleanup.py SRT_STAGES) | moss (MOSS_STAGES) | none. 'baseline' is the model a candidate is compared with. 'revision' pins the Hugging Face commit; without it, fetch takes the repository's current commit and records it.",
+  "not_speech_to_text": {
+    "note": "Registry and backend names that are not speech-to-text models (speech synthesis, music, separation, pitch, translation, aligners, speaker embeddings), sorted out by hand from their names on 2026-11-06 for the catalog. A name not listed here is shown as a candidate.",
+    "names": ["audioseal", "wespeaker", "hubert", "data2vec", "sidon", "htdemucs", "mel-band-roformer", "scnet",
+              "mini-bs-roformer", "piano-transcription", "basic-pitch", "onsets-and-frames", "hft-transformer", "mt3",
+              "rvc-svc", "meanvc2", "marian", "madlad", "moss-diarize", "vibevoice-tts", "voxtral-tts", "kugelaudio",
+              "zonos", "qwen3-tts", "miotts", "arktts", "confucius4-tts", "bt2-tts", "moss-tts", "moss-tts-local",
+              "omnivoice", "orpheus", "kokoro", "kartoffelbox-turbo", "lahgtna-chatterbox", "bananamind-tts",
+              "outetts", "csm", "dia", "dots-tts", "fireredtts3", "fastpitch", "speecht5", "bark", "parler-tts",
+              "voxcpm2-tts", "voxcpm2-vae", "indextts", "f5-tts", "irodori-tts", "supertonic", "piper", "melotts",
+              "tiron", "quds", "quds-fa"],
+    "prefixes": ["chatterbox", "tada", "pocket-tts", "cosyvoice3", "crepe", "beat-this", "btc-chords", "tabcnn",
+                 "m2m100", "wav2vec2-aligner", "fastconformer-aligner"]
+  },
+  "models": {
+    "parakeet-tdt-0.6b-ja": {
+      "label": "Parakeet TDT 0.6B ja (q8_0)",
+      "repo": "cstr/parakeet-tdt-0.6b-ja-GGUF",
+      "file": "parakeet-tdt-0.6b-ja-q8_0.gguf",
+      "revision": "d9e3ba65a6579796389ea89e5939509ed257f972",
+      "backend": "parakeet",
+      "licence": "CC-BY-4.0 (nvidia/parakeet-tdt_ctc-0.6b-ja)",
+      "shipped_as": "parakeet-crispasr (whisperjav/crispasr/manifest.py, default model)",
+      "row": {"line_rule": "tokens", "onsets": false, "cut_at_pauses": true, "cleanup": "srt"}
+    },
+    "haas-ja-v1.0-q8_0": {
+      "label": "Haas ja v1.0 (q8_0)",
+      "repo": "cstr/Haas-ja-v1.0-GGUF",
+      "file": "haas-ja-v1.0-q8_0.gguf",
+      "revision": "607fa1450398d589643fbb0e8bb1d0424af68d11",
+      "backend": "parakeet",
+      "base_model": "third-intelligence/Haas-ja-v1.0",
+      "licence": "Apache-2.0 (third-intelligence/Haas-ja-v1.0)",
+      "note": "CrispASR 0.8.50 runs it in its parakeet runtime with the KDA predictor (CrispASR #561). Registry name haas-ja. Asked for in WhisperJAV #504.",
+      "row": {"line_rule": "tokens", "onsets": false, "cut_at_pauses": true, "cleanup": "srt"},
+      "baseline": "parakeet-tdt-0.6b-ja"
+    },
+    "haas-ja-v1.0-f16": {
+      "label": "Haas ja v1.0 (f16)",
+      "repo": "cstr/Haas-ja-v1.0-GGUF",
+      "file": "haas-ja-v1.0-f16.gguf",
+      "revision": "607fa1450398d589643fbb0e8bb1d0424af68d11",
+      "backend": "parakeet",
+      "base_model": "third-intelligence/Haas-ja-v1.0",
+      "licence": "Apache-2.0 (third-intelligence/Haas-ja-v1.0)",
+      "row": {"line_rule": "tokens", "onsets": false, "cut_at_pauses": true, "cleanup": "srt"},
+      "baseline": "parakeet-tdt-0.6b-ja"
+    }
+  }
+}
