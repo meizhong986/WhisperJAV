@@ -80,10 +80,13 @@ A single variant takes its settings from the options; `--variants FILE` takes a 
 | Key / option | Binding call | Applied to VibeVoice by CrispASR 0.8.50? |
 |---|---|---|
 | `context` / `--context` | `set_hotwords` | Yes: put into VibeVoice's prompt ("with extra info:"). Cleared by a variant without it. |
-| `max_new_tokens` / `--max-new-tokens` | `set_max_new_tokens` | Yes (`vibevoice_set_max_new_tokens`). 0 or absent = the model's default. |
+| `max_new_tokens` / `--max-new-tokens` | `set_max_new_tokens` | Yes (`vibevoice_set_max_new_tokens`). 0 or absent = CrispASR's default: the larger of 512 and 8 per second of the call's audio (`vibevoice_resolve_max_new_tokens`). |
 | `language` / `--language` | the call's `language` | Passed (default `ja`); the vibevoice branch does not read it. |
 | `temperature`, `seed`, `do_sample`, `top_k`, `top_p`, `beam_size`, `best_of`, `frequency_penalty`, `repetition_penalty`, `ask` | the binding's setters | Not found applied to VibeVoice's transcription in the 0.8.50 source; VibeVoice decodes greedily. The tool calls them and records "applied (no error)", which means only that the call did not fail. The binding cannot clear them, so a later variant may still carry them (the summary says so). |
 | `--no-flash-attn`, `--threads`, `--cpu` | how the model is opened | Yes. |
+| `--raw-transcript` | switch `CRISPASR_VIBEVOICE_RAW_TRANSCRIPT=1` | Yes: the model's whole answer (its JSON) comes back as one text, not split into utterances. For seeing exactly what the model wrote. |
+| `--encoder-window S` | switch `CRISPASR_VIBEVOICE_ENCODER_CHUNK_SECONDS` | Yes: the audio encoder takes S seconds at once (default 300); bounds its GPU memory; the model still writes the whole call's text. |
+| `--gpu-layers N` | switch `CRISPASR_N_GPU_LAYERS` | Yes: N of the 28 language-model layers on the GPU, the rest on the CPU. The binding's own `n_gpu_layers=` argument does not reach VibeVoice (measured: same memory as all layers). |
 
 Which settings reach VibeVoice was read from CrispASR 0.8.50's C source on 2026-11-06; a newer CrispASR may differ.
 Compare a variant's output with and without a setting to see whether it acts.
@@ -103,8 +106,8 @@ programs is the user's choice. `--force` loads the model anyway.
 During the run the card's used memory is sampled every half second. When it comes within 200 MiB of the card's total,
 a warning is printed: the Windows NVIDIA driver may then move memory into ordinary RAM instead of failing, and the run
 becomes slow. The tool runs one model at a time and closes it at the end; the figures before, after opening, at the
-peak and after closing are in `results.md`. CrispASR 0.8.50 does not pass a layer count to VibeVoice, so the model
-cannot be split between GPU and CPU.
+peak and after closing are in `results.md`. Two CrispASR switches lower the GPU memory: `--encoder-window` (long
+calls) and `--gpu-layers` (the model itself; slower).
 
 ## Output
 
@@ -133,12 +136,23 @@ One clip (The Naked Director S01E04 scene 4, 294.5 s, the Netflix reference); re
 `D:\WJ110_measure\vibevoice_2026-11-06\` (`step4_report.md`, `tags_removed_report.md`).
 - GPU memory over the card's use before loading: q8_0 about 9.0 GB once open, 9.5 GB at its peak with pieces of up to
   30 s; with pieces of 60 s the card was full (12,088 of 12,288 MiB). q4_k: 5.5 GB open, 6.8 GB with 30 s pieces.
-- Long pieces fail: CrispASR's VibeVoice code reserves GPU working memory for the audio encoder for the whole piece
-  at once, and the call fails when the reservation cannot be made (log: "failed to allocate CUDA0 buffer of size
-  2962368128 ... vibevoice: at_enc graph alloc failed" for a 104 s piece with q8_0; 8.37 GB asked for 294.5 s).
-  q4_k ran 104 s pieces and failed on 294.5 s.
-- Sound tags such as `[Environmental Sounds]`, `[Human Sounds]`, `[Music]`, `[Sigh]` came back as text, and in one
-  60 s piece the model's raw JSON came back as the text. CrispASR printed twice "transcript is not in time order".
+- Long pieces fail with CrispASR's default encoder window (300 s): the audio encoder's GPU working memory for the
+  whole piece cannot be reserved (log: "failed to allocate CUDA0 buffer of size 2962368128 ... vibevoice: at_enc graph
+  alloc failed" for a 104 s piece with q8_0; 8.37 GB asked for 294.5 s). With `--encoder-window 30` both q8_0
+  (peak 11,982 MiB) and q4_k ran 104 s pieces and the whole 294.5 s clip in one call. On the whole clip both models
+  stopped writing at 81 s (9 utterances).
+- `--gpu-layers 24` with q8_0: 7,986 MiB after opening instead of about 8,930; the same text; 0.5 times real time
+  instead of 2.8 on 60 s pieces.
+- Sound tags such as `[Environmental Sounds]`, `[Human Sounds]`, `[Music]`, `[Sigh]` came back as utterances
+  without a speaker label. CrispASR drops only "silence", "blank_audio", "blank audio", "no speech" and "inaudible"
+  (`core/vibevoice_transcript.h`, `is_non_speech_marker`).
+- Repetition loops: VibeVoice decodes greedily and sometimes repeats a word or phrase until the token limit
+  ("let's go let's go …", "うわ、うわ、…"). The utterance that loops is then never closed in the model's JSON, and
+  CrispASR's reader drops an unclosed utterance whole, with any right text before the loop (seen with
+  `--raw-transcript`); when it is the first utterance of the call, the raw JSON comes back as the text. CrispASR's
+  loop clean-up (`fix_loops`) runs only where CrispASR itself cut audio over 30 s; the frequency and repetition
+  penalties are not used by VibeVoice's decoder.
+- CrispASR printed twice "transcript is not in time order".
 
 ## Exit status
 
