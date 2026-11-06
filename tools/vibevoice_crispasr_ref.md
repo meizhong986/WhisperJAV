@@ -135,14 +135,15 @@ calls. Entries CrispASR judges to be non-speech markers are dropped by CrispASR.
 One clip (The Naked Director S01E04 scene 4, 294.5 s, the Netflix reference); results in
 `D:\WJ110_measure\vibevoice_2026-11-06\` (`step4_report.md`, `tags_removed_report.md`).
 - GPU memory over the card's use before loading: q8_0 about 9.0 GB once open, 9.5 GB at its peak with pieces of up to
-  30 s; with pieces of 60 s the card was full (12,088 of 12,288 MiB). q4_k: 5.5 GB open, 6.8 GB with 30 s pieces.
+  30 s; with pieces of 60 s the card was full (12,088 of 12,288 MiB). q4_k: 4.7 GB open, 6.0 GB at its peak with
+  30 s pieces.
 - Long pieces fail with CrispASR's default encoder window (300 s): the audio encoder's GPU working memory for the
   whole piece cannot be reserved (log: "failed to allocate CUDA0 buffer of size 2962368128 ... vibevoice: at_enc graph
   alloc failed" for a 104 s piece with q8_0; 8.37 GB asked for 294.5 s). With `--encoder-window 30` both q8_0
   (peak 11,982 MiB) and q4_k ran 104 s pieces and the whole 294.5 s clip in one call. On the whole clip both models
   stopped writing at 81 s (9 utterances).
-- `--gpu-layers 24` with q8_0: 7,986 MiB after opening instead of about 8,930; the same text; 0.5 times real time
-  instead of 2.8 on 60 s pieces.
+- `--gpu-layers 24` with q8_0: 8,158 MiB for the model once open instead of 9,100 (the binding's `n_gpu_layers=24`
+  argument: 9,100, no change); the same text; 0.5 times real time instead of 2.8 on 60 s pieces.
 - Sound tags such as `[Environmental Sounds]`, `[Human Sounds]`, `[Music]`, `[Sigh]` came back as utterances
   without a speaker label. CrispASR drops only "silence", "blank_audio", "blank audio", "no speech" and "inaudible"
   (`core/vibevoice_transcript.h`, `is_non_speech_marker`).
