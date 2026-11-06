@@ -725,6 +725,9 @@ class QwenPipeline(BasePipeline):
         # than only in the log. Reset per file -- the pipeline object is reused
         # across the whole run.
         self.degradations = []
+        # Routine notes, printed under the file's row in the run summary; they never change its state (main.py,
+        # "Routine notes from the passes"). 1.10.2 (#501): the aligner events go here, as in the GGUF pipelines.
+        self.notes = []
         input_file = Path(media_info["path"])
         media_basename = media_info["basename"]
         pipeline_start = time.time()
@@ -1075,13 +1078,20 @@ class QwenPipeline(BasePipeline):
             vad_audio_paths=orch_vad_paths,
         )
 
-        # A failed aligner load no longer ends the job (#436); say so in the summary.
+        # A failed aligner load no longer ends the job (#436); say so in the summary: the file is "suspect".
         if getattr(self._subtitle_pipeline, "alignment_unavailable", None):
             self.degradations.append(self._subtitle_pipeline.alignment_unavailable)
-        # The aligner loaded but gave no times for some VAD groups (1.10.0, item 12).
+        # The aligner loaded but gave no times for some VAD groups (1.10.0, item 12). 1.10.2 (#501, owner W563): when
+        # it timed at least one VAD group, this is a note and the file stays "done" (before, 6 of 1,624 groups made a
+        # full film "suspect"); the groups concerned keep their text, timed from their VAD group. When it timed none,
+        # the aligner did not work at all, as when it cannot be loaded: still "suspect". Where between "some" and
+        # "all" a file should become "suspect" is the owner's open decision (review action 9).
         if getattr(self._subtitle_pipeline, "alignment_partial", None):
-            self.degradations.append(self._subtitle_pipeline.alignment_partial)
-        # The same for the timing model (1.10.0, item 12): the subtitles are kept, unsplit.
+            if getattr(self._subtitle_pipeline, "alignment_none", False):
+                self.degradations.append(self._subtitle_pipeline.alignment_partial)
+            else:
+                self.notes.append(self._subtitle_pipeline.alignment_partial)
+        # The timing model (1.10.0, item 12): the subtitles are kept, unsplit; a degradation, as before.
         if getattr(self._subtitle_pipeline, "timing_unavailable", None):
             self.degradations.append(self._subtitle_pipeline.timing_unavailable)
 
@@ -1432,6 +1442,7 @@ class QwenPipeline(BasePipeline):
         # the same way: the plain path, the async path, and a pass running in
         # its own process (agreed error-handling table, 2026-09-17).
         master_metadata["summary"]["degradations"] = list(getattr(self, "degradations", None) or [])
+        master_metadata["summary"]["notes"] = list(getattr(self, "notes", None) or [])
 
         logger.info(
             "Complete: %s (%d subtitles in %s)",
