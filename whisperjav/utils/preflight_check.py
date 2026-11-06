@@ -98,6 +98,78 @@ CRISPASR_MODEL_NOT_DOWNLOADED = "not downloaded ({size})"
 CRISPASR_CHECK_FAILED = "could not be checked: {error}"
 
 
+# 1.10.2 (owner W563, item 3): --check also prints what support asks for first, so one command's output answers
+# it: WhisperJAV's version and this Python; where PyTorch is loaded from (#502: a PyTorch outside the install loaded
+# before the installed one); PYTHONPATH and the user's own package folder, which Python reads before the install's
+# own packages; and whether the addresses installs and downloads need answer from this computer (#495).
+# DRAFT texts, not yet approved by the owner.
+INSTALL_PYTHON_TEXT = "WhisperJAV {version}; Python {python} at {executable}"
+TORCH_INSIDE_TEXT = "PyTorch {version} is loaded from this Python's own packages: {folder}"
+# #502's case: a PyTorch elsewhere is found before the one in the install's own package folder.
+TORCH_SHADOWED_TEXT = ("PyTorch {version} is loaded from {folder}, ahead of the PyTorch in this install's own "
+                       "packages ({own}); that other PyTorch is used instead of the install's.")
+TORCH_ELSEWHERE_TEXT = "PyTorch {version} is loaded from {folder} (this Python's own packages: {own})"
+PYTHONPATH_TEXT = "PYTHONPATH is set; this Python reads these folders before its own packages: {value}"
+USER_SITE_TEXT = "Your own Python package folder is read before this Python's own packages: {folder}"
+# The install's own release file: a HEAD request follows GitHub's redirect to its release-download host, the
+# path the install takes for GitHub-hosted packages (a network can let github.com through and block that host).
+GITHUB_DOWNLOAD_PROBE = ("https://github.com/meizhong986/WhisperJAV/releases/download/v1.10.1/"
+                         "whisperjav-1.10.1-py3-none-any.whl")
+NETWORK_OK_TEXT = "These addresses answer from this computer: {hosts}"
+NETWORK_FAIL_TEXT = ("No answer from {failed} ({reasons}). Installs and upgrades need pypi.org, "
+                     "download.pytorch.org and GitHub's release downloads; model downloads need {hf}. "
+                     "Proxy in use: {proxy}")
+NETWORK_TIMEOUT_S = 8
+
+
+def _network_targets() -> List[Tuple[str, str]]:
+    """(name, url) of each address to test; the model address follows HF_ENDPOINT when it is set."""
+    hf = (os.environ.get("HF_ENDPOINT") or "").strip().rstrip("/")
+    return [("pypi.org", "https://pypi.org/simple/"),
+            ("download.pytorch.org", "https://download.pytorch.org/whl/"),
+            ("GitHub release downloads", GITHUB_DOWNLOAD_PROBE),
+            (hf.split("://")[-1] if hf else "huggingface.co", (hf or "https://huggingface.co") + "/")]
+
+
+def _address_answers(url: str) -> Optional[str]:
+    """None when the address answers at all (any HTTP status), else why it did not."""
+    import urllib.error
+    import urllib.request
+    try:
+        from whisperjav.__version__ import __version__ as version
+    except Exception:
+        version = ""
+    request = urllib.request.Request(url, method="HEAD", headers={"User-Agent": f"WhisperJAV/{version}".rstrip("/")})
+    try:
+        urllib.request.urlopen(request, timeout=NETWORK_TIMEOUT_S).close()
+        return None
+    except urllib.error.HTTPError:
+        return None  # the server answered; the status does not matter here
+    except Exception as exc:  # noqa: BLE001 - every network failure is reported the same way
+        reason = getattr(exc, "reason", exc)
+        return str(reason) or type(exc).__name__
+
+
+def _probe_all(targets: List[Tuple[str, str]]) -> List[Tuple[str, Optional[str]]]:
+    """Test every address at once, waiting at most NETWORK_TIMEOUT_S + 4 s in all (a name lookup is not bound
+    by the socket timeout, so each test runs in a daemon thread that is left behind if it does not finish)."""
+    import threading
+    import time
+    answers: Dict[str, Optional[str]] = {}
+
+    def run(name, url):
+        answers[name] = _address_answers(url)
+
+    threads = [threading.Thread(target=run, args=t, daemon=True) for t in targets]
+    for t in threads:
+        t.start()
+    deadline = time.monotonic() + NETWORK_TIMEOUT_S + 4
+    for t in threads:
+        t.join(max(0.0, deadline - time.monotonic()))
+    late = f"no answer within {NETWORK_TIMEOUT_S + 4} s"
+    return [(name, answers[name] if name in answers else late) for name, _url in targets]
+
+
 def cublas12_files_missing() -> List[str]:
     """Placed cuBLAS 12 files missing on a CUDA 13.0 install ([] otherwise; spec C)."""
     try:
@@ -153,6 +225,7 @@ class PreflightChecker:
         
         # Run checks in order of importance
         self._check_python_version()
+        self._check_install_python()
         self._check_cuda_availability()
         self._check_pytorch_cuda()
         self._check_cublas12_for_faster_whisper()
@@ -162,6 +235,7 @@ class PreflightChecker:
         self._check_dependencies()
         self._check_downloaded_segmenter_models()
         self._check_crispasr()
+        self._check_network()
 
         # Display results
         self._display_results()
@@ -169,6 +243,82 @@ class PreflightChecker:
         # Return False if any fatal check failed
         return not any(r.fatal and r.status == CheckStatus.FAIL for r in self.results)
     
+    def _check_install_python(self):
+        """1.10.2 (W563): WhisperJAV's version, this Python, and what it reads before its own packages (#502)."""
+        import site
+        try:
+            from whisperjav.__version__ import __version__ as version
+        except Exception:
+            version = "unknown"
+        v = sys.version_info
+        self.results.append(CheckResult(
+            name="WhisperJAV", status=CheckStatus.INFO,
+            message=INSTALL_PYTHON_TEXT.format(version=version, python=f"{v.major}.{v.minor}.{v.micro}",
+                                               executable=sys.executable)))
+
+        pythonpath = os.environ.get("PYTHONPATH", "").strip()
+        if pythonpath:
+            self.results.append(CheckResult(name="PYTHONPATH", status=CheckStatus.WARN,
+                                            message=PYTHONPATH_TEXT.format(value=pythonpath)))
+
+        import sysconfig
+        paths = sysconfig.get_paths()
+        own_folders = []
+        for key in ("purelib", "platlib"):
+            try:
+                own_folders.append(Path(paths[key]).resolve())
+            except Exception:
+                pass
+
+        # The user's own folder: listed only when this Python reads it before its own packages.
+        user_site = site.getusersitepackages() if site.ENABLE_USER_SITE else ""
+        if user_site and user_site in sys.path:
+            own_index = min((i for i, p in enumerate(sys.path)
+                             if p and any(Path(p).resolve() == o for o in own_folders if Path(p).exists())),
+                            default=len(sys.path))
+            if sys.path.index(user_site) < own_index:
+                self.results.append(CheckResult(name="User package folder", status=CheckStatus.INFO,
+                                                message=USER_SITE_TEXT.format(folder=user_site)))
+
+        try:
+            import torch
+            folder = Path(torch.__file__).resolve().parent
+        except Exception:
+            return  # PyTorch missing or broken: the PyTorch check below reports it
+        version = getattr(torch, "__version__", "?")
+        own = own_folders[0] if own_folders else Path(sys.prefix)
+        if folder.parent in own_folders:
+            status, message = CheckStatus.PASS, TORCH_INSIDE_TEXT.format(version=version, folder=folder)
+        elif any((o / "torch").is_dir() for o in own_folders):
+            # #502: another PyTorch is found before the one in this install's own packages.
+            status, message = CheckStatus.WARN, TORCH_SHADOWED_TEXT.format(version=version, folder=folder,
+                                                                           own=own / "torch")
+        else:
+            # Elsewhere, and none in the own packages: a venv with system packages, a per-user install, Own PyTorch.
+            status, message = CheckStatus.INFO, TORCH_ELSEWHERE_TEXT.format(version=version, folder=folder, own=own)
+        self.results.append(CheckResult(name="PyTorch location", status=status, message=message))
+
+    def _check_network(self):
+        """1.10.2 (W563): whether the addresses installs and downloads need answer from this computer (#495)."""
+        import urllib.request
+        targets = _network_targets()
+        answers = _probe_all(targets)
+        failed = [(name, why) for name, why in answers if why]
+        if not failed:
+            self.results.append(CheckResult(
+                name="Network", status=CheckStatus.PASS,
+                message=NETWORK_OK_TEXT.format(hosts=", ".join(name for name, _ in answers))))
+            return
+        try:  # what urllib and pip use: the environment, else (Windows) the system proxy setting
+            proxy = urllib.request.getproxies().get("https") or "none"
+        except Exception:
+            proxy = "unknown"
+        self.results.append(CheckResult(
+            name="Network", status=CheckStatus.WARN,
+            message=NETWORK_FAIL_TEXT.format(failed=", ".join(n for n, _ in failed),
+                                             reasons="; ".join(f"{n}: {w}" for n, w in failed),
+                                             hf=targets[-1][0], proxy=proxy)))
+
     def _check_cublas12_for_faster_whisper(self):
         """v1.10.0: the stack this PC was installed with, and its cuBLAS 12 files."""
         try:
