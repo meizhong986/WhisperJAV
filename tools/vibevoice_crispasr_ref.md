@@ -8,7 +8,8 @@ the speed and the GPU memory. Each run can be scored with subeval against a refe
 settings run one after another with the model loaded once.
 
 It is a reference way of calling VibeVoice, written to try its models and settings before a WhisperJAV pipeline for it
-is designed (owner W549, W550, 2026-11-06). It imports nothing from WhisperJAV and changes nothing in WhisperJAV.
+is designed (owner W549, W550, 2026-11-06). It changes nothing in WhisperJAV and imports nothing from it, except
+WhisperJAV's own speech segmenter when `--vad` is given (owner W554, W555).
 
 ## Script
 
@@ -55,6 +56,26 @@ One call to the binding (`Session.transcribe`) per piece:
 - `--piece-seconds N`: pieces of at most N seconds, each cut at the quietest 100 ms of its last quarter;
 - `--segments FILE`: one call per `{start, end}` entry (seconds of the media file), `.jsonl` or `.json`, for example
   the VAD groups of a WhisperJAV `--debug` run.
+
+**With a VAD (`--vad firered-vad`; owner W554, W555).** WhisperJAV's own speech segmenter finds the speech, and each
+VAD group (or, with `--vad-unit segments`, each speech segment) is one call. It runs as the CrispASR pipelines run it:
+settings from `whisperjav/crispasr/pass_settings.py` `segmenter_settings()` for the pipeline named by `--vad-like`,
+groups from `whisperjav/modules/subtitle_pipeline/framers/vad_grouped.py` `VadGroupedFramer`; a group under 0.2 s is
+not sent (`modules/model_audio.py`). It runs over each scene: the pieces of `--piece-seconds`, the `--segments`, or
+the whole audio window. The VAD runs before VibeVoice loads and is released; FireRedVAD runs on the CPU with all three
+settings. The groups are saved as `vad_groups.jsonl` in the variant's folder (usable again with `--segments`).
+
+| `--vad-like` | Longest VAD group | New group at a silence over | Sensitivity | Pads (start / end) |
+|---|---|---|---|---|
+| `cohere-crispasr` (default, W555) | 3.0 s | 0.3 s | balanced | 100 / 100 ms |
+| `moss-crispasr` | 240 s | 5.0 s | balanced | 50 / 150 ms |
+| `parakeet-crispasr` | 6.0 s | 1.0 s | aggressive | 50 / 100 ms |
+
+(FireRedVAD values as `segmenter_settings()` gave them on 2026-11-06.) `--max-group-seconds`, `--group-gap-seconds`,
+`--vad-sensitivity` and `--vad-threshold` change single values. With `--variants`, these options apply to every variant
+that does not set its own keys (`vad`, `vad_like`, `vad_sensitivity`, `vad_threshold`, `max_group_seconds`,
+`group_gap_seconds`, `vad_unit`). A single speech segment longer than the longest group stays one call (its longest is
+the preset's `max_speech_duration_s` plus the pads: 4.18 s with the cohere-crispasr settings).
 
 **CrispASR also cuts, on its own.** CrispASR 0.8.50 cuts a call's audio longer than 30 s into pieces of at most 30 s at
 quiet points and decodes each piece on its own (for every backend but parakeet, reazonspeech and index-echo). So a
@@ -154,6 +175,9 @@ One clip (The Naked Director S01E04 scene 4, 294.5 s, the Netflix reference); re
   loop clean-up (`fix_loops`) runs only where CrispASR itself cut audio over 30 s; the frequency and repetition
   penalties are not used by VibeVoice's decoder.
 - CrispASR printed twice "transcript is not in time order".
+- FireRedVAD with the cohere-crispasr settings on S01E04 Scene 4 (whole clip as one scene): 81 VAD groups, 196.2 s
+  of speech, longest 4.18 s, in 2.0 s; the first groups equal those of Cohere-CrispASR's own run of 2026-10-29. q4_k
+  on them: CER 5.22, 50 of 68 lines missed (tags kept); on the near-identical October groups 3.42.
 
 ## Exit status
 
