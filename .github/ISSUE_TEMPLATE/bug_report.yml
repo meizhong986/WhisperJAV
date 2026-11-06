@@ -1,0 +1,44 @@
+name: "Problem with WhisperJAV / 使用中的问题"
+description: "Subtitles wrong or missing, a run that stops, the GUI, translation / 字幕错误或缺失、运行中断、界面、翻译"
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not upload video or audio. Logs may show file names and your user name; you can remove them.
+        请不要上传视频或音频。日志中可能有文件名和用户名，可以删掉。
+
+  - type: textarea
+    id: what
+    attributes:
+      label: "What happened / 发生了什么"
+      description: "What you did, what you expected, what you got. / 您做了什么、期望什么、实际得到什么。"
+    validations:
+      required: true
+
+  - type: textarea
+    id: check
+    attributes:
+      label: "Output of whisperjav --check / whisperjav --check 的输出"
+      description: |
+        Open Command Prompt (Start, type cmd, Enter), run the line below and paste everything it prints. If you installed to another folder, replace %LOCALAPPDATA%\WhisperJAV. On Linux or a Mac, run `whisperjav --check` in the environment where WhisperJAV is installed.
+        打开命令提示符（按"开始"，输入 cmd，按回车），运行下面一行，把显示的全部文字贴到这里。如果安装在其他文件夹，请替换 %LOCALAPPDATA%\WhisperJAV。Linux 或 Mac 上，请在安装了 WhisperJAV 的环境中运行 `whisperjav --check`。
+
+        "%LOCALAPPDATA%\WhisperJAV\Scripts\whisperjav.exe" --check
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: settings
+    attributes:
+      label: "Settings / 设置"
+      description: "Mode or Ensemble passes, pipeline, sensitivity, anything you changed in Customize. / 模式或 Ensemble 各轮、流水线、灵敏度，以及在自定义参数中改过的设置。"
+
+  - type: textarea
+    id: log
+    attributes:
+      label: "Log / 日志"
+      description: |
+        Attach the log file, or paste the console text. A GUI run writes `raw_subs\whisperjav_run.log` in the output folder; an Ensemble run also writes `whisperjav_run.pass1.log` and `whisperjav_run.pass2.log` beside it.
+        请附上日志文件，或贴上控制台的文字。界面运行会在输出文件夹的 `raw_subs\whisperjav_run.log` 中写入日志；Ensemble 运行还会在旁边写入 `whisperjav_run.pass1.log` 和 `whisperjav_run.pass2.log`。
