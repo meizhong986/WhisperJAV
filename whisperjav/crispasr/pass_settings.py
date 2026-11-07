@@ -1,7 +1,8 @@
 """What an Ensemble pass running a CrispASR pipeline accepts, refuses and uses (1.10.0; 1.10.1).
 
 The CrispASR pipelines (manifest.CRISPASR_PIPELINES: parakeet-crispasr, cohere-crispasr and, since 1.10.1,
-reazonspeech-crispasr, kotoba-crispasr, whisper-turbo-crispasr, whisper-large-crispasr, moss-crispasr) are
+reazonspeech-crispasr, kotoba-crispasr, whisper-turbo-crispasr, whisper-large-crispasr, moss-crispasr, and since
+1.10.2 haas-crispasr, qwen3-asr-crispasr) are
 Ensemble passes only, with no --mode value (owner W118 2). Of a pass's settings they use: the model (--passN-model, a short name from the
 manifest), the speech segmenter (--passN-speech-segmenter), the sensitivity (--passN-sensitivity),
 --passN-vad-threshold and --passN-speech-pad-ms (owner W208), the source language (--language),
@@ -17,7 +18,9 @@ whisper pipeline"; W202): ``segmenter_settings()`` resolves them through those p
 The 1.10.1 pipelines (W401, pre-approved choices of step 2) take Cohere's settings, except ReazonSpeech-CrispASR,
 whose model is a transducer like Parakeet's and takes Parakeet's, and MOSS-CrispASR, which has its own: FireRedVAD
 VAD groups that end at a silence over 5 s and are at most 240 s, in semantic scenes of 90-240 s (owner W482; before it
-Silero VAD v6.2 with 90-120 s stretches in silero scenes of up to 420 s, W425, W426).
+Silero VAD v6.2 with 90-120 s stretches in silero scenes of up to 420 s, W425, W426). The 1.10.2 pipelines (owner
+W574), Haas-CrispASR and Qwen3-ASR-CrispASR, take Parakeet's: the GGUF model test tool measured both on
+Parakeet-CrispASR's VAD groups.
 
 Used by three callers, so the rules have one home:
   - whisperjav/main.py refuses a pass that cannot run (validate_crispasr_passes), as a usage error
@@ -91,7 +94,10 @@ MODELS_HELP_DEFAULT = " (default)"
 # Which pipeline's presets each CrispASR pipeline takes.
 SEGMENTER_STYLE = {"parakeet-crispasr": "fidelity", "cohere-crispasr": "qwen",
                    "reazonspeech-crispasr": "fidelity", "kotoba-crispasr": "qwen", "whisper-turbo-crispasr": "qwen",
-                   "whisper-large-crispasr": "qwen", "moss-crispasr": "moss"}
+                   "whisper-large-crispasr": "qwen", "moss-crispasr": "moss",
+                   # 1.10.2 (owner W574): both measured on Parakeet-CrispASR's VAD groups by the GGUF model test tool
+                   # (2026-11-06), so both take Parakeet's settings; no other settings were measured.
+                   "haas-crispasr": "fidelity", "qwen3-asr-crispasr": "fidelity"}
 # MOSS-CrispASR's VAD groups, what MOSS hears in one call (owner W482): speech segments less than 5 s apart are one
 # group; a silence longer than 5 s marks a change of sequence and ends the group; a group is at most 240 s; a short
 # group followed by a long silence stays alone (no shortest group). The same at every sensitivity (W428 I1 2); the
