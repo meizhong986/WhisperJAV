@@ -21,7 +21,7 @@ GPU——显卡，或 Apple 芯片内置的 GPU——承担把语音转成文字
 
 每种电脑得到的安装：
 
-| 你的电脑 | 安装为哪种加速器制作 | GGUF 处理管线（由 CrispASR 运行的七个） | 其他所有处理管线 |
+| 你的电脑 | 安装为哪种加速器制作 | GGUF 处理管线（由 CrispASR 运行的九个） | 其他所有处理管线 |
 |---|---|---|---|
 | Windows 电脑，带 1.10 支持的 NVIDIA GPU（GTX 16 / RTX 20 或更新），驱动 580 或更新 | NVIDIA GPU（CUDA），自动选择 | NVIDIA GPU（CUDA） | NVIDIA GPU（CUDA） |
 | Windows 电脑，带 AMD 或 Intel 显卡，或比 1.10 支持范围更旧的 NVIDIA 显卡 | 通过 Vulkan 使用 GPU、你自己的 PyTorch 或仅 CPU——安装程序会询问 | 通过 Vulkan：使用你的显卡（实验性，未经测试） | CPU（不加速），慢好几倍 |
@@ -54,7 +54,7 @@ WhisperSeg 语音分割器在所有安装中都在 CPU 上运行。
 | Python（源码安装） | 3.13 | 其他版本 |
 | 托管 notebook | — | Google Colab、Kaggle |
 
-GGUF 处理管线（全部七个）需要支持 AVX2 的处理器（Intel 2013 年以后、AMD 2015 年以后）；其他所有处理管线不需要。
+GGUF 处理管线（全部九个）需要支持 AVX2 的处理器（Intel 2013 年以后、AMD 2015 年以后）；其他所有处理管线不需要。
 
 其他要求：8 GB 内存（推荐 16 GB）；约 10 GB 可用磁盘空间，用于安装和首次使用时下载的模型；FFmpeg（Windows 安装程序已附带）；安装时以及每个模型首次运行时需要联网。
 
