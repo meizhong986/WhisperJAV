@@ -90,7 +90,8 @@ CRISPASR_MODEL_NAME = "CrispASR model {model}"
 CRISPASR_MODEL_TEXT = "{label}, for {pipeline}: {state}"
 # What uses an aligner or timing-model file (item 12). Texts approved by the owner as drafted (W268);
 # design note 2026-10-28 section 9, Q11.
-CRISPASR_DEFAULT_ALIGNER_FOR = "ChronosJAV and Cohere-CrispASR (aligner)"
+# 1.10.2 (owner W574): Qwen3-ASR-CrispASR also uses it by default.
+CRISPASR_DEFAULT_ALIGNER_FOR = "ChronosJAV, Cohere-CrispASR and Qwen3-ASR-CrispASR (aligner)"
 CRISPASR_ALIGNER_FOR = "ChronosJAV (aligner)"
 CRISPASR_TIMING_FOR = "ChronosJAV (timing model)"
 CRISPASR_DOWNLOADED = "downloaded"
