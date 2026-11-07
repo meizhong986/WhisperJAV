@@ -31,6 +31,8 @@ from whisperjav.pipelines.kotoba_crispasr_pipeline import KotobaCrispASRPipeline
 from whisperjav.pipelines.whisper_turbo_crispasr_pipeline import WhisperTurboCrispASRPipeline
 from whisperjav.pipelines.whisper_large_crispasr_pipeline import WhisperLargeCrispASRPipeline
 from whisperjav.pipelines.moss_crispasr_pipeline import MossCrispASRPipeline
+from whisperjav.pipelines.haas_crispasr_pipeline import HaasCrispASRPipeline
+from whisperjav.pipelines.qwen3_asr_crispasr_pipeline import Qwen3AsrCrispASRPipeline
 from whisperjav.crispasr.errors import FAILURE_PREFIX as CRISPASR_FAILURE_PREFIX, CrispASRRunError, CrispASRSetupError
 from whisperjav.modules.qwen_errors import QwenModelUnusable
 from whisperjav.crispasr.manifest import CRISPASR_PIPELINES
@@ -61,6 +63,9 @@ PIPELINE_CLASSES = {
     "whisper-turbo-crispasr": WhisperTurboCrispASRPipeline,
     "whisper-large-crispasr": WhisperLargeCrispASRPipeline,
     "moss-crispasr": MossCrispASRPipeline,
+    # 1.10.2 (owner W574).
+    "haas-crispasr": HaasCrispASRPipeline,
+    "qwen3-asr-crispasr": Qwen3AsrCrispASRPipeline,
 }
 
 # Pipelines whose constructors never read enhance_for_vad. Verified against their
