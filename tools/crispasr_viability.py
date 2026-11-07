@@ -301,6 +301,15 @@ class CrispSegmenter:
 # The child process: Parakeet-CrispASR with one stage swapped
 # ----------------------------------------------------------------------------------------------------------------
 
+# The steps of the CrispASR chain whose windows are recorded (crispasr_pipeline.py: process()), in order: model check,
+# audio extraction, scene detection, speech enhancer, speech segmenter, ASR, subtitle building, clean-up (W586).
+CHAIN_STEPS = ("ready", "extract_audio", "detect_scenes", "enhance", "speech_groups", "transcribe", "build_subtitles",
+               "postprocess")
+STEP_LABELS = {"ready": "model check", "extract_audio": "audio extraction", "detect_scenes": "scene detection",
+               "enhance": "speech enhancer", "speech_groups": "speech segmenter", "transcribe": "ASR (CrispASR)",
+               "build_subtitles": "subtitle building", "postprocess": "clean-up"}
+
+
 def chain_settings(name, spec, track):
     """(speech enhancer name, speech segmenter name the pipeline resolves its settings for, enhance for VAD)."""
     kind = spec["kind"]
@@ -391,17 +400,17 @@ def worker(job_path):
           "segmenter": pipeline.speech_segmenter, "segmenter_settings": pipeline.segmenter.as_dict(),
           "model": pipeline.model.label})
 
-    # Stage windows (wall clock) for the parent's GPU samples.
-    for stage in ("_enhance", "_speech_groups", "_transcribe"):
-        orig = getattr(pipeline, stage)
+    # Each step's window (wall clock), for its duration and for the parent's GPU and RAM samples (W586).
+    for stage in CHAIN_STEPS:
+        orig = getattr(pipeline, "_" + stage)
 
         def wrapped(*a, _orig=orig, _stage=stage, **k):
             t0 = time.time()
             try:
                 return _orig(*a, **k)
             finally:
-                emit({"kind": "stage", "stage": _stage.strip("_"), "t0": round(t0, 3), "t1": round(time.time(), 3)})
-        setattr(pipeline, stage, wrapped)
+                emit({"kind": "stage", "stage": _stage, "t0": round(t0, 3), "t1": round(time.time(), 3)})
+        setattr(pipeline, "_" + stage, wrapped)
 
     code = 0
     try:
@@ -436,23 +445,55 @@ def worker(job_path):
 # The parent: run, score, record
 # ----------------------------------------------------------------------------------------------------------------
 
-class GpuSampler(threading.Thread):
-    """The card's memory in use, every half second, with the time (nvidia-smi)."""
+def tree_rss_mib(pid):
+    """Resident memory (RAM) of a process and all its descendants, MiB; None when it is gone."""
+    try:
+        import psutil
+        p = psutil.Process(pid)
+        procs = [p] + p.children(recursive=True)
+    except Exception:
+        return None
+    total = 0
+    for q in procs:
+        try:
+            total += q.memory_info().rss
+        except Exception:
+            pass
+    return round(total / 2 ** 20, 1)
+
+
+class Sampler(threading.Thread):
+    """Every half second, with the time: the card's memory in use (nvidia-smi, MiB) and the RAM of the watched child
+    process and its descendants (psutil RSS, MiB). samples: [(time, gpu_mib or None, ram_mib or None)]."""
 
     def __init__(self, index=0):
         super().__init__(daemon=True)
-        self.index, self.samples, self._stop = index, [], threading.Event()
+        self.index, self.samples, self.pid, self._stop = index, [], None, threading.Event()
+
+    def watch(self, pid):
+        self.pid = pid
 
     def run(self):
         while not self._stop.is_set():
-            v = cmt.gpu_used_mib(self.index)
-            if v is not None and v >= 0:
-                self.samples.append((time.time(), v))
+            g = cmt.gpu_used_mib(self.index)
+            r = tree_rss_mib(self.pid) if self.pid else None
+            self.samples.append((time.time(), g if g is not None and g >= 0 else None, r))
             self._stop.wait(0.5)
 
     def stop(self):
         self._stop.set()
         self.join(5)
+
+    def gpu_peak(self):
+        vals = [g for _, g, _ in self.samples if g is not None]
+        return max(vals) if vals else None
+
+    def ram_peak(self):
+        vals = [r for _, _, r in self.samples if r is not None]
+        return max(vals) if vals else None
+
+
+GpuSampler = Sampler  # the name used before W586
 
 
 def clips_of(args):
@@ -468,15 +509,20 @@ def run_name(name, track, given=None):
     return given or (name + ("_vadtrack" if track == "vad" else ""))
 
 
-def spawn(job, folder, log_name="run.log"):
-    """The child process; returns its exit code."""
+def spawn(job, folder, log_name="run.log", sampler=None):
+    """The child process; returns its exit code. A sampler, when given, watches its RAM."""
     dump(folder / "job.json", job)
     env = dict(os.environ, PYTHONIOENCODING="utf-8")
     with open(folder / log_name, "a", encoding="utf-8") as log:
-        r = subprocess.run([sys.executable, "-X", "utf8", str(Path(__file__).resolve()), job["worker"],
-                            str(folder / "job.json")], cwd=str(REPO_ROOT), env=env, stdout=log,
-                           stderr=subprocess.STDOUT)
-    return r.returncode
+        proc = subprocess.Popen([sys.executable, "-X", "utf8", str(Path(__file__).resolve()), job["worker"],
+                                 str(folder / "job.json")], cwd=str(REPO_ROOT), env=env, stdout=log,
+                                stderr=subprocess.STDOUT)
+        if sampler is not None:
+            sampler.watch(proc.pid)
+        code = proc.wait()
+        if sampler is not None:
+            sampler.watch(None)
+    return code
 
 
 def run_candidate(name, out_root, clips, track=None, given_name=None, gpu_index=0):
@@ -491,7 +537,7 @@ def run_candidate(name, out_root, clips, track=None, given_name=None, gpu_index=
     folder.mkdir(parents=True)
     say(f"\n== {folder.name}: {len(clips)} clip(s); {spec.get('note') or spec['kind']}")
     groups = [[m for m, _ in clips]] if not spec.get("one_file_per_process") else [[m] for m, _ in clips]
-    sampler = GpuSampler(gpu_index)
+    sampler = Sampler(gpu_index)
     gpu_before = cmt.gpu_used_mib(gpu_index)
     sampler.start()
     began = time.time()
@@ -499,9 +545,10 @@ def run_candidate(name, out_root, clips, track=None, given_name=None, gpu_index=
     for media_list in groups:
         job = {"worker": "_worker", "candidate": name, "spec": spec, "model_path": path, "track": track,
                "run_dir": str(folder), "events": str(folder / "events.jsonl"), "media": [str(m) for m in media_list]}
-        codes.append(spawn(job, folder))
+        codes.append(spawn(job, folder, sampler=sampler))
     wall = time.time() - began
     sampler.stop()
+    dump(folder / "samples.json", sampler.samples)
     events = read_jsonl(folder / "events.jsonl")
     res = summarise(name, spec, track, folder, clips, events, codes, wall, gpu_before, sampler.samples, path)
     dump(folder / "result.json", res)
@@ -512,10 +559,41 @@ def run_candidate(name, out_root, clips, track=None, given_name=None, gpu_index=
     return res
 
 
+def step_figures(samples, events, step, gpu_before, audio_s=None):
+    """One chain step over the whole run (W586): its calls, total seconds, x real time, and from the half-second
+    samples inside its windows (0.6 s either side): the GPU memory's peak over the use before the run, the largest
+    rise of GPU memory and of RAM within one call (over the last sample before it began), the RAM peak of the run's
+    process tree. Only samples inside a call's own window count (0.3 s after its end, for nvidia-smi's lag), so a step
+    shorter than the half-second sampling step shows no memory figure rather than a neighbour's."""
+    wins = [(e["t0"], e["t1"]) for e in events if e.get("kind") == "stage" and e.get("stage") == step]
+    if not wins:
+        return None
+    gpu_in, ram_in, g_rise, r_rise = [], [], [], []
+    for a, b in wins:
+        inside = [(g, r) for t, g, r in samples if a <= t <= b + 0.3]
+        before = [(g, r) for t, g, r in samples if t < a]
+        g0 = next((g for g, _ in reversed(before) if g is not None), None)
+        r0 = next((r for _, r in reversed(before) if r is not None), None)
+        gs = [g for g, _ in inside if g is not None]
+        rs = [r for _, r in inside if r is not None]
+        gpu_in += gs
+        ram_in += rs
+        if gs and g0 is not None:
+            g_rise.append(max(gs) - g0)
+        if rs and r0 is not None:
+            r_rise.append(max(rs) - r0)
+    secs = sum(b - a for a, b in wins)
+    return {"calls": len(wins), "seconds": round(secs, 2),
+            "x_realtime": round(audio_s / secs, 1) if audio_s and secs > 0 else None,
+            "gpu_peak_over_run_start_mib": (max(gpu_in) - gpu_before) if gpu_in and gpu_before is not None else None,
+            "gpu_rise_mib": max(g_rise) if g_rise else None,
+            "ram_peak_mib": max(ram_in) if ram_in else None,
+            "ram_rise_mib": round(max(r_rise), 1) if r_rise else None}
+
+
 def stage_gpu_peak(samples, events, stage, before):
-    wins = [(e["t0"], e["t1"]) for e in events if e.get("kind") == "stage" and e.get("stage") == stage]
-    vals = [v for t, v in samples if any(a - 0.6 <= t <= b + 0.6 for a, b in wins)]
-    return (max(vals) - before) if vals and before is not None else None
+    f = step_figures(samples, events, stage, before)
+    return f["gpu_peak_over_run_start_mib"] if f else None
 
 
 def vad_metrics(groups_file, ref, duration):
@@ -608,8 +686,11 @@ def summarise(name, spec, track, folder, clips, events, codes, wall, gpu_before,
         "pipeline": pipe, "files_done": len(done), "files": len(clips), "per_clip": per_clip, "pooled": pooled,
         "vad_pooled": vad_pooled, "wall_s": round(wall, 1), "audio_s": round(audio_s, 1),
         "enhance_s": total("enhance_s"), "vad_s": total("vad_s"), "asr_s": total("asr_s"),
-        "gpu_before_mib": gpu_before, "gpu_peak_over_before_mib": (max(v for _, v in samples) - gpu_before)
-        if samples and gpu_before is not None else None,
+        "gpu_before_mib": gpu_before, "gpu_peak_over_before_mib": (max(g for _, g, _ in samples if g is not None)
+                                                                   - gpu_before)
+        if any(g is not None for _, g, _ in samples) and gpu_before is not None else None,
+        "ram_peak_mib": max((r for _, _, r in samples if r is not None), default=None),
+        "components": {s: step_figures(samples, events, s, gpu_before, audio_s) for s in CHAIN_STEPS},
         "gpu_enhance_peak_mib": stage_gpu_peak(samples, events, "enhance", gpu_before),
         "gpu_vad_peak_mib": stage_gpu_peak(samples, events, "speech_groups", gpu_before),
         "gpu_asr_peak_mib": stage_gpu_peak(samples, events, "transcribe", gpu_before),
@@ -647,8 +728,20 @@ def write_result_md(path, r):
     L += [f"Time: {r['wall_s']} s for {r['audio_s']} s of audio; enhancer {r['enhance_s']} s, speech segmenter "
           f"{r['vad_s']} s, ASR {r['asr_s']} s. GPU over the {r['gpu_before_mib']} MiB in use before: peak "
           f"{r['gpu_peak_over_before_mib']} MiB; enhancer {r['gpu_enhance_peak_mib']}, segmenter {r['gpu_vad_peak_mib']}, "
-          f"ASR {r['gpu_asr_peak_mib']}.", "",
-          "## Each clip", "",
+          f"ASR {r['gpu_asr_peak_mib']}. RAM peak of the run's process tree: {r.get('ram_peak_mib')} MiB.", "",
+          "## Each step of the chain (W586)", "",
+          "Seconds and x real time over all files; GPU memory over the use before the run, and its largest rise within "
+          "one call; RAM of the run's process tree (RSS): its peak, and its largest rise within one call. Sampled every "
+          "half second, so a step shorter than that may show no figure. A step's first call includes its model's load.",
+          "", "| Step | Calls | Seconds | x real time | GPU peak over start (MiB) | GPU rise in a call (MiB) | "
+          "RAM peak (MiB) | RAM rise in a call (MiB) |", "|---|---|---|---|---|---|---|---|"]
+    for s in CHAIN_STEPS:
+        c = (r.get("components") or {}).get(s)
+        if c:
+            L.append(f"| {STEP_LABELS[s]} | {c['calls']} | {c['seconds']} | {fmt(c['x_realtime'], '{:.1f}')} | "
+                     f"{fmt(c['gpu_peak_over_run_start_mib'], '{:.0f}')} | {fmt(c['gpu_rise_mib'], '{:.0f}')} | "
+                     f"{fmt(c['ram_peak_mib'], '{:.0f}')} | {fmt(c['ram_rise_mib'], '{:.0f}')} |")
+    L += ["", "## Each clip", "",
           "| Clip | Done | Scenes | VAD groups | Group s | Subtitles | CER | Missing | Missed lines | Halluc. lines | "
           "VAD F1 | Enhancer s | VAD s | ASR s | Notes |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for c in r["per_clip"]:
@@ -734,6 +827,9 @@ def bench_worker(job_path):
     import numpy as np
     name, spec, device = job["candidate"], job["spec"], job["device"]
     rec = {"candidate": name, "device": device}
+    import whisperjav.modules.speech_enhancement  # noqa: F401  (WhisperJAV's imports done before the start RAM)
+    import whisperjav.modules.speech_segmentation  # noqa: F401
+    rec["ram_start_mib"] = tree_rss_mib(os.getpid())
     piece_s = float(job["piece_seconds"])
     if spec["area"] == "A1":
         from whisperjav.modules.speech_enhancement.pipeline_helper import resample_audio
@@ -812,20 +908,26 @@ def cmd_bench(args):
     results = []
     for dev in devices:
         job = {"worker": "_bench", "candidate": name, "spec": spec, "model_path": path, "device": dev,
-               "media": str(media), "seconds": args.seconds, "piece_seconds": args.piece_seconds,
+               "media": str(media), "seconds": args.cpu_seconds if dev == "cpu" else args.seconds,
+               "piece_seconds": args.piece_seconds,
                "ffmpeg": cmt.find_ffmpeg(None), "out": str(folder / f"{dev.replace(' ', '_')}.json")}
         before = cmt.gpu_used_mib(args.gpu_index)
-        sampler = GpuSampler(args.gpu_index)
+        sampler = Sampler(args.gpu_index)
         sampler.start()
-        code = spawn(job, folder, log_name=f"{dev.replace(' ', '_')}.log")
+        code = spawn(job, folder, log_name=f"{dev.replace(' ', '_')}.log", sampler=sampler)
         sampler.stop()
         rec = load_json(job["out"]) if Path(job["out"]).exists() else {"error": f"exit code {code}"}
-        rec.update({"exit_code": code, "gpu_peak_over_before_mib": (max(v for _, v in sampler.samples) - before)
-                    if sampler.samples and before is not None else None, "media": str(media)})
+        g = sampler.gpu_peak()
+        # RAM: the child's peak, and its rise over the child before the model (worker records it, ram_start_mib).
+        rec.update({"exit_code": code, "gpu_peak_over_before_mib": (g - before) if g is not None and before is not None
+                    else None, "ram_peak_mib": sampler.ram_peak(), "media": str(media)})
+        if rec.get("ram_peak_mib") is not None and rec.get("ram_start_mib") is not None:
+            rec["ram_rise_mib"] = round(rec["ram_peak_mib"] - rec["ram_start_mib"], 1)
         dump(Path(job["out"]), rec)
         results.append(rec)
         say(f"{name} on {dev}: {rec.get('stage_s')} s for {rec.get('audio_s')} s ({rec.get('x_realtime')} x real time), "
-            f"pieces ok {rec.get('pieces_ok')}/{rec.get('pieces')}, GPU +{rec['gpu_peak_over_before_mib']} MiB"
+            f"pieces ok {rec.get('pieces_ok')}/{rec.get('pieces')}, GPU +{rec['gpu_peak_over_before_mib']} MiB, "
+            f"RAM peak {rec.get('ram_peak_mib')} MiB (+{rec.get('ram_rise_mib')} over the process before the model)"
             + (f", exit {code}" if code else ""))
     dump(folder / "bench.json", results)
     return 0
@@ -874,7 +976,10 @@ def cmd_table(args):
                      "enhance_s": r["enhance_s"], "vad_s": r["vad_s"], "asr_s": r["asr_s"], "wall_s": r["wall_s"],
                      "gpu_enhance": r["gpu_enhance_peak_mib"], "gpu_vad": r["gpu_vad_peak_mib"],
                      "degraded_files": sum(1 for c in r["per_clip"] if c.get("degradations")),
-                     "simplicity": spec.get("simplicity")})
+                     "simplicity": spec.get("simplicity"),
+                     "stage_fig": (r.get("components") or {}).get("enhance" if r["area"] == "A1" else "speech_groups"),
+                     "asr_fig": (r.get("components") or {}).get("transcribe"),
+                     "components": r.get("components"), "ram_peak": r.get("ram_peak_mib")})
     order = {"A": 0, "A1": 1, "A2": 2, "check": 3}
     rows.sort(key=lambda x: (order.get(x["area"], 9), x["pooled"]["cer"] if x["pooled"] else 9))
     benches = {}
@@ -899,13 +1004,38 @@ def cmd_table(args):
                  f"{(x['vs_twin'] + ' (' + x['twin_run'] + ')') if x['vs_twin'] else '–'} | {fmt(x['enhance_s'], '{:.0f}')} | "
                  f"{fmt(x['vad_s'], '{:.1f}')} | {fmt(x['asr_s'], '{:.0f}')} | {x['gpu_enhance']} / {x['gpu_vad']} | "
                  f"{x['degraded_files']} |")
+    L += ["", "## The swapped stage and the ASR step in each run (W586)", "",
+          "Over the seven clips. Stage: the speech enhancer (A1) or the speech segmenter (A2; the baseline's TEN), its "
+          "model load included. GPU: rise within one call over the last sample before it. RAM: the run's process tree "
+          "(RSS); rise within one call. Sampled every half second.", "",
+          "| Run | Stage s | Stage x real time | Stage GPU rise (MiB) | Stage RAM rise (MiB) | Stage RAM peak (MiB) | "
+          "ASR s | ASR GPU rise (MiB) | ASR RAM rise (MiB) | Run RAM peak (MiB) | Run s |", "|---" * 11 + "|"]
+    for x in rows:
+        s, a = x.get("stage_fig") or {}, x.get("asr_fig") or {}
+        L.append(f"| {x['run']} | {fmt(s.get('seconds'), '{:.1f}')} | {fmt(s.get('x_realtime'), '{:.0f}')} | "
+                 f"{fmt(s.get('gpu_rise_mib'), '{:.0f}')} | {fmt(s.get('ram_rise_mib'), '{:.0f}')} | "
+                 f"{fmt(s.get('ram_peak_mib'), '{:.0f}')} | {fmt(a.get('seconds'), '{:.1f}')} | "
+                 f"{fmt(a.get('gpu_rise_mib'), '{:.0f}')} | {fmt(a.get('ram_rise_mib'), '{:.0f}')} | "
+                 f"{fmt(x.get('ram_peak'), '{:.0f}')} | {fmt(x.get('wall_s'), '{:.0f}')} |")
+    bc = next((x for x in rows if x["run"] == "baseline"), None)
+    if bc and bc.get("components"):
+        L += ["", "## Every step of the baseline (Parakeet-CrispASR as shipped)", "",
+              "| Step | Calls | Seconds | x real time | GPU rise in a call (MiB) | RAM rise in a call (MiB) | RAM peak (MiB) |",
+              "|---|---|---|---|---|---|---|"]
+        for st in CHAIN_STEPS:
+            c = bc["components"].get(st)
+            if c:
+                L.append(f"| {STEP_LABELS[st]} | {c['calls']} | {c['seconds']} | {fmt(c['x_realtime'], '{:.1f}')} | "
+                         f"{fmt(c['gpu_rise_mib'], '{:.0f}')} | {fmt(c['ram_rise_mib'], '{:.0f}')} | "
+                         f"{fmt(c['ram_peak_mib'], '{:.0f}')} |")
     if benches:
         L += ["", "## The swapped stage alone (bench)", "", "| Candidate | Device | Audio s | Stage s | x real time | "
-              "Pieces ok | GPU (MiB) |", "|---|---|---|---|---|---|---|"]
+              "Pieces ok | GPU (MiB) | RAM peak (MiB) | RAM rise (MiB) |", "|---|---|---|---|---|---|---|---|---|"]
         for n, recs in benches.items():
             for b in recs:
                 L.append(f"| {n} | {b.get('device')} | {b.get('audio_s')} | {b.get('stage_s')} | {b.get('x_realtime')} | "
-                         f"{b.get('pieces_ok')}/{b.get('pieces')} | {b.get('gpu_peak_over_before_mib')} |")
+                         f"{b.get('pieces_ok')}/{b.get('pieces')} | {b.get('gpu_peak_over_before_mib')} | "
+                         f"{fmt(b.get('ram_peak_mib'), '{:.0f}')} | {fmt(b.get('ram_rise_mib'), '{:.0f}')} |")
     L += ["", "## Simplicity facts (data file)", "", "| Candidate | Replaces | Packages no longer needed | Why |",
           "|---|---|---|---|"]
     for n, spec in cands.items():
@@ -1002,7 +1132,8 @@ def build_parser():
     b.add_argument("name_", metavar="CANDIDATE")
     b.add_argument("--out", required=True)
     b.add_argument("--clips", default=None)
-    b.add_argument("--seconds", type=float, default=120.0)
+    b.add_argument("--seconds", type=float, default=120.0, help="audio on the GPU (default 120)")
+    b.add_argument("--cpu-seconds", type=float, default=30.0, help="audio on the CPU (default 30)")
     b.add_argument("--piece-seconds", type=float, default=30.0)
     b.add_argument("--gpu-index", type=int, default=0)
     n = sub.add_parser("rnnoise", help="call CrispASR's RNNoise once and record its answer")
