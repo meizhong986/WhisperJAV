@@ -80,12 +80,20 @@ python tools/crispasr_viability.py selfcheck --out ROOT [--clip S01E04.Scene.1] 
   candidate's name, `_vadtrack` added for `--track vad`; `--run-name` gives another (the baseline's repeat:
   `--run-name baseline-repeat`). Recorded: pooled CER with wrong / missing / extra, missed lines, suspected hallucination
   lines, lines, CER plain; per clip; for every run the VAD groups against the reference lines (frame precision, recall, F1 at
-  10 ms; reference subtitle times are reading times, not speech times); the times of the enhancer, segmenter and ASR steps;
-  the GPU memory over the use before the run, overall and during each step; the swapped stage's own record (scenes, failures,
+  10 ms; reference subtitle times are reading times, not speech times); the swapped stage's own record (scenes, failures,
   settings).
-- **bench:** the candidate's stage alone on the first `--seconds` of the longest clip, in pieces of `--piece-seconds`
-  (scene-sized): A1 on the GPU and the CPU (CrispASR: `use_gpu`; WhisperJAV: `device`); A2 CrispASR as built
-  (`vad_slices` takes no GPU switch), WhisperJAV's VAD on the CPU. Writes `ROOT/_bench/<name>/`.
+- **Each component (owner W586):** every step of the chain (model check, audio extraction, scene detection, speech
+  enhancer, speech segmenter, ASR, subtitle building, clean-up) is timed per call. Every half second the parent samples the
+  card's memory in use (nvidia-smi) and the RAM of the run's process tree (psutil, resident memory of the child and its
+  descendants), kept in `samples.json`. Per step: calls, seconds, x real time, GPU memory's peak over the use before the
+  run and its largest rise within one call, RAM peak and its largest rise within one call (a negative rise: memory was
+  freed). Only samples inside a call's window count, so a step shorter than half a second shows no memory figure. A step's
+  first call includes its model's load.
+- **bench:** the candidate's stage alone on the first `--seconds` (default 120) of the longest clip on the GPU, and the
+  first `--cpu-seconds` (default 30) on the CPU, in pieces of `--piece-seconds` (scene-sized): A1 on the GPU and the CPU
+  (CrispASR: `use_gpu`; WhisperJAV: `device`); A2 CrispASR as built (`vad_slices` takes no GPU switch), WhisperJAV's VAD on
+  the CPU. Records the stage's seconds and x real time, the GPU memory's peak over the use before, and the child's RAM
+  peak and its rise over the process before the model. Writes `ROOT/_bench/<name>/`.
 - **rnnoise:** calls `enhance_audio_rnnoise` on one second of silence and records the answer (`ROOT/_rnnoise.json`).
 - **table:** `ROOT/table.md` and `table.json`: every run, the margin (the larger of 0.5 percentage points and twice the
   difference between `baseline` and `baseline-repeat`), the verdict against the baseline and against the twin (better, keeps
