@@ -26,8 +26,9 @@ VALUE_FLAGS = ("--mode", "--pass1-pipeline", "--pass2-pipeline")
 # Route B design 12, T14 (W193 5, W203 I2). {flag} is what the user typed: a flag, or a flag and its value.
 LEGACY_CRISPASR_MESSAGE = (
     "{flag} is no longer available: WhisperJAV 1.10 removed the \"bring your own CrispASR\" mode.\n"
-    "CrispASR now runs in Ensemble Mode as the seven GGUF pipelines (parakeet-crispasr, cohere-crispasr, "
-    "reazonspeech-crispasr, kotoba-crispasr, whisper-turbo-crispasr, whisper-large-crispasr, moss-crispasr), "
+    "CrispASR now runs in Ensemble Mode as the nine GGUF pipelines (parakeet-crispasr, cohere-crispasr, "
+    "reazonspeech-crispasr, kotoba-crispasr, whisper-turbo-crispasr, whisper-large-crispasr, moss-crispasr, "
+    "haas-crispasr, qwen3-asr-crispasr), "
     "and WhisperJAV installs it itself.\n"
     "Example:\n"
     "    whisperjav --ensemble --pass1-pipeline parakeet-crispasr <your video>\n"
