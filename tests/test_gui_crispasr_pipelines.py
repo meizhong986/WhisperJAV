@@ -41,10 +41,12 @@ JS = (ASSETS / "app.js").read_text(encoding="utf-8")
 LABELS = {"parakeet-crispasr": "parakeet", "cohere-crispasr": "cohere",   # W343
           "reazonspeech-crispasr": "reazonspeech", "kotoba-crispasr": "kotoba",  # W401
           "whisper-turbo-crispasr": "whisper-turbo", "whisper-large-crispasr": "whisper-large",
-          "moss-crispasr": "MOSS"}                                             # W520 S2
+          "moss-crispasr": "MOSS",                                             # W520 S2
+          "haas-crispasr": "haas", "qwen3-asr-crispasr": "qwen3-asr"}          # 1.10.2, owner W574
 GROUP = "GGUF via crispasr"                                                # W343
 NEW_GROUP = "Experimental, open to feedback"                               # W520 CLA2 S1, W521
 FIRST_TWO = ("parakeet-crispasr", "cohere-crispasr")                        # 1.10.0's; the other five new in 1.10.1
+NEW_IN_1102 = ("haas-crispasr", "qwen3-asr-crispasr")                      # owner W574; in the same group
 
 
 @pytest.fixture
@@ -136,7 +138,7 @@ def test_the_ensemble_tab_opens_on_cohere_and_parakeet(pass_key, pipeline, sensi
 def _crispasr_menus():
     block = re.search(r"\n    crispasrModels: \{(.*?)\n    \},", JS, re.S).group(1)
     return {p: re.findall(r"\{ value: '([^']+)', label: '([^']+)' \}", body)
-            for p, body in re.findall(r"'([a-z-]+)': \[(.*?)\]", block, re.S)}
+            for p, body in re.findall(r"'([a-z0-9-]+)': \[(.*?)\]", block, re.S)}
 
 
 def test_every_crispasr_pipeline_has_a_model_menu():
@@ -331,7 +333,7 @@ def test_the_default_segmenters_in_app_js_are_the_command_lines():
     from whisperjav.crispasr.pass_settings import scene_detector_for
 
     in_js = {p: (seg, sens, wt, scene or "semantic") for p, seg, sens, wt, scene in
-             re.findall(r"'([a-z-]+)': \{ segmenter: '([^']+)', sensitivity: '([^']+)', "
+             re.findall(r"'([a-z0-9-]+)': \{ segmenter: '([^']+)', sensitivity: '([^']+)', "
                         r"wordTimestamps: '([^']+)'(?:, scene: '([^']+)')? \}", block)}
     # 1.10.1 (owner W411-W414): each pipeline's default word timestamps, as the command line's; and its scene
     # detector (semantic for every one; W482 for MOSS-CrispASR)
@@ -345,11 +347,13 @@ def test_the_default_segmenters_in_app_js_are_the_command_lines():
     assert CRISPASR_DEFAULT_SEGMENTERS == {"parakeet-crispasr": "ten", "cohere-crispasr": "firered-vad",
                                            "reazonspeech-crispasr": "ten", "kotoba-crispasr": "firered-vad",
                                            "whisper-turbo-crispasr": "firered-vad",
-                                           "whisper-large-crispasr": "firered-vad", "moss-crispasr": "firered-vad"}
+                                           "whisper-large-crispasr": "firered-vad", "moss-crispasr": "firered-vad",
+                                           "haas-crispasr": "ten", "qwen3-asr-crispasr": "ten"}   # 1.10.2, W574
     assert CRISPASR_DEFAULT_SENSITIVITY == {"parakeet-crispasr": "aggressive", "cohere-crispasr": "balanced",
                                             "reazonspeech-crispasr": "aggressive", "kotoba-crispasr": "balanced",
                                             "whisper-turbo-crispasr": "balanced",
-                                            "whisper-large-crispasr": "balanced", "moss-crispasr": "balanced"}
+                                            "whisper-large-crispasr": "balanced", "moss-crispasr": "balanced",
+                                            "haas-crispasr": "aggressive", "qwen3-asr-crispasr": "aggressive"}
 
 
 @pytest.mark.parametrize("select_id", ["pass1-pipeline", "pass2-pipeline"])
@@ -359,12 +363,14 @@ def test_the_gguf_pipelines_carry_the_cjk_note(select_id):
             "plain-named folder (the original stays where it is).")
     note = "Experimental (early release). " + tail                    # owner W212 D4 1; versions W501 4
     new_note = "New in 1.10.1, experimental (early release). " + tail  # the five pipelines new in 1.10.1
+    note_1102 = "New in 1.10.2, experimental (early release). " + tail  # the two new in 1.10.2 (owner W574)
     menu = _select(HTML, select_id)
     for pipeline in CRISPASR_PIPELINES:
         group = GROUP if pipeline in FIRST_TWO else NEW_GROUP
         options = re.search(r'<optgroup label="%s">(.*?)</optgroup>' % group, menu, re.S).group(1)
         option = re.search(r'<option value="%s"[^>]*>' % pipeline, options).group(0)
-        assert f'title="{note if pipeline in FIRST_TWO else new_note}"' in option, option
+        expected = note if pipeline in FIRST_TWO else note_1102 if pipeline in NEW_IN_1102 else new_note
+        assert f'title="{expected}"' in option, option
     assert "Experimental in 1.10.0" not in HTML
     # and on the Pipeline dropdown itself while a GGUF pipeline is selected
     assert f"CRISPASR_CJK_NOTE: '{note}'" in JS
