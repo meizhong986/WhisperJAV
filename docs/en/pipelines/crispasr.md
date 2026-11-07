@@ -1,10 +1,10 @@
 # GGUF pipelines (CrispASR)
 
-There are seven GGUF pipelines: Parakeet-CrispASR and Cohere-CrispASR, and, new in 1.10.1, ReazonSpeech-CrispASR, Kotoba-CrispASR, Whisper-Turbo-CrispASR, Whisper-Large-CrispASR and MOSS-CrispASR. They make Japanese subtitles with ASR models in the GGUF file format (the Whisper models in whisper.cpp's format). They run through CrispASR, which is installed with WhisperJAV in every install; there is no separate program to download.
+There are nine GGUF pipelines: Parakeet-CrispASR and Cohere-CrispASR; new in 1.10.1, ReazonSpeech-CrispASR, Kotoba-CrispASR, Whisper-Turbo-CrispASR, Whisper-Large-CrispASR and MOSS-CrispASR; new in 1.10.2, Haas-CrispASR and Qwen3-ASR-CrispASR. They make Japanese subtitles with ASR models in the GGUF file format (the Whisper models in whisper.cpp's format). They run through CrispASR, which is installed with WhisperJAV in every install; there is no separate program to download.
 
 - **Ensemble Mode only.** They run as Pass 1, Pass 2 or both in the **Ensemble Mode** tab. They have no `--mode` value and are not in the Transcription Mode tab.
 - **Japanese only.** Any other source language stops the run with a message.
-- **Experimental (early release):** Parakeet-CrispASR and Cohere-CrispASR since 1.10.0, the other five new in 1.10.1. Compare their subtitles with those of the pipelines you use now, and tell us how they work for you: https://github.com/meizhong986/WhisperJAV/issues
+- **Experimental (early release):** Parakeet-CrispASR and Cohere-CrispASR since 1.10.0, five new in 1.10.1, two new in 1.10.2. Compare their subtitles with those of the pipelines you use now, and tell us how they work for you: https://github.com/meizhong986/WhisperJAV/issues
 
 !!! warning "Folder names"
     The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).
@@ -74,6 +74,18 @@ How they differ from the two above:
 - **kotoba**, **whisper-turbo** and **whisper-large** take Cohere-CrispASR's speech segmenter settings (FireRedVAD, Balanced, VAD groups up to 3 s). Their times come from the model; a new subtitle starts only after a sentence end.
 - **MOSS** works on longer stretches: Semantic scenes of 90 to 240 s, and FireRedVAD (Balanced) VAD groups that end at a silence longer than 5 s and are at most 240 s. Each segment MOSS writes is one subtitle, at MOSS's own times. Its **Customize Parameters** window has a **MOSS** tab, and its clean-up differs (see [How the subtitles are made](#how-the-subtitles-are-made)).
 
+## The two pipelines new in 1.10.2
+
+| GUI (under **Experimental, open to feedback**) | Command line | Models (default first) | What it is |
+|---|---|---|---|
+| **haas** | `haas-crispasr` | `haas-ja-v1.0-f16` (1,233 MB, ~1.6 GB of GPU memory), `haas-ja-v1.0-q8_0` (656 MB, ~0.9 GB) | third-intelligence's Haas-ja-v1.0, a Japanese model of the Parakeet kind |
+| **qwen3-asr** | `qwen3-asr-crispasr` | `qwen3-asr-1.7b-f16` (4,705 MB, ~6.3 GB of GPU memory) | Qwen3-ASR-1.7B, the model of ChronosJAV's Qwen3-ASR, here as a GGUF file run by CrispASR instead of PyTorch |
+
+Both take Parakeet-CrispASR's speech segmenter settings (TEN VAD, Aggressive, VAD groups up to 6 s), the settings they were tested with before they were added.
+
+- **haas** is made like Parakeet-CrispASR: its times come from the model, which times every word, and a subtitle ends only at a natural break in the speech.
+- **qwen3-asr** is made like Cohere-CrispASR: its model gives no times, so ChronosJAV's text cleaner for Qwen3-ASR first cleans each VAD group's text (for example, it shortens a word repeated over and over), then the aligner `wav2vec2-ja` times it, and a subtitle ends only at a sentence end. With **From the model** in the Timing tab (`--pass1-word-timestamps model`) there is no aligner: each VAD group is one subtitle, from its start to its end. It is not part of ChronosJAV: no timing model and no ChronosJAV clean-up; it is cleaned as the other GGUF pipelines are.
+
 ---
 
 ## How to use
@@ -81,7 +93,7 @@ How they differ from the two above:
 ### GUI
 
 1. Open the **Ensemble Mode** tab. It opens with **Pass 1** on **cohere** (Balanced, FireRedVAD) and **Pass 2** on **parakeet** (Aggressive, TEN VAD); Pass 2 is off until you tick it. With **Remember settings** on, the tab opens on the passes you saved instead.
-2. To choose another pipeline for a pass, open its **Pipeline** menu: parakeet and cohere are under **GGUF via crispasr**; below a divider line, the five new in 1.10.1 are under **Experimental, open to feedback** (reazonspeech, kotoba, whisper-turbo, whisper-large, MOSS). Choosing one sets its own sensitivity, speech segmenter and scene detector, as in the tables above.
+2. To choose another pipeline for a pass, open its **Pipeline** menu: parakeet and cohere are under **GGUF via crispasr**; below a divider line, the seven new in 1.10.1 and 1.10.2 are under **Experimental, open to feedback** (reazonspeech, kotoba, whisper-turbo, whisper-large, MOSS, haas, qwen3-asr). Choosing one sets its own sensitivity, speech segmenter and scene detector, as in the tables above.
 3. Choose the model in the **Model** column. Each entry names the file's number format and the GPU memory it needs, for example "Parakeet TDT 0.6B ja (q8_0), ~0.9 GB VRAM"; the pipeline's default is first.
 4. If you want a second pass, tick **Pass 2**, check its pipeline, and choose how the two are combined under **Merge**.
 5. Click **Start**.
@@ -125,13 +137,13 @@ Without `--merge-strategy`, two passes are combined with `pass1_primary` (in the
 |---|---|---|---|
 | Model | Model | `--pass1-model`, `--pass2-model` | each pipeline's models, in the two tables above |
 | Speech segmenter | Speech Segmenter | `--pass1-speech-segmenter` | any; `none` sends each scene to the model whole |
-| Sensitivity | Sensitivity | `--pass1-sensitivity` | `conservative`, `balanced`, `aggressive`; default `aggressive` for Parakeet-CrispASR and ReazonSpeech-CrispASR, `balanced` for the others |
+| Sensitivity | Sensitivity | `--pass1-sensitivity` | `conservative`, `balanced`, `aggressive`; default `aggressive` for Parakeet-, ReazonSpeech-, Haas- and Qwen3-ASR-CrispASR, `balanced` for the others |
 | Scene detector | Scene Detector | `--pass1-scene-detector` | `semantic` (default), `auditok`, `silero`: scenes of at most 48 s, semantic ones of at least 12 s (MOSS-CrispASR: at most 240 s, semantic ones at least 90 s); `none` (one scene per file) |
 | Speech enhancer | Speech Enhancer | `--pass1-speech-enhancer` | `none` (default) or the speech enhancers of the other passes, for example `ffmpeg-dsp`, `zipenhancer` or `htdemucs` |
 | Enhance for VAD only | Enhance for VAD only | `--pass1-enhance-for-vad` | the cleaned audio goes to the speech segmenter only; CrispASR hears the original |
 | Detection threshold | Customize, Segmenter tab | `--pass1-vad-threshold` | 0 to 1; replaces the value the sensitivity sets |
-| Padding | Customize, Segmenter tab | `--pass1-speech-pad-ms` | milliseconds added before and after each piece of speech. Cohere-, Kotoba-, Whisper-Turbo- and Whisper-Large-CrispASR: both sides. Parakeet- and ReazonSpeech-CrispASR: only with a speech segmenter that has padding, such as WhisperSeg; with FireRedVAD or TEN VAD it is ignored, with a warning. MOSS-CrispASR: only with a speech segmenter that has padding |
-| Subtitle times | Customize, Timing tab: **Word timestamps** | `--pass1-word-timestamps model` or `aligner` | default `aligner` for Cohere-CrispASR, `model` for the others (MOSS-CrispASR: its own segment times). With `aligner`, a VAD group the aligner times is cut as Cohere-CrispASR's are (see below); a group it gives no times keeps the pipeline's own rule |
+| Padding | Customize, Segmenter tab | `--pass1-speech-pad-ms` | milliseconds added before and after each piece of speech. Cohere-, Kotoba-, Whisper-Turbo- and Whisper-Large-CrispASR: both sides. Parakeet-, ReazonSpeech-, Haas- and Qwen3-ASR-CrispASR: only with a speech segmenter that has padding, such as WhisperSeg; with FireRedVAD or TEN VAD it is ignored, with a warning. MOSS-CrispASR: only with a speech segmenter that has padding |
+| Subtitle times | Customize, Timing tab: **Word timestamps** | `--pass1-word-timestamps model` or `aligner` | default `aligner` for Cohere-CrispASR and Qwen3-ASR-CrispASR, `model` for the others (MOSS-CrispASR: its own segment times). With `aligner`, a VAD group the aligner times is cut as Cohere-CrispASR's are (see below); a group it gives no times keeps the pipeline's own rule |
 | MOSS settings | Customize, **MOSS** tab (MOSS-CrispASR only) | keys in `--pass1-params` | Instruction language, Language hint, Hotwords, Token limit per piece, Sampling, Temperature, Top-k, Seed, Beam size (1 to 4); the keys are listed in `--help` under `--pass1-params` |
 | Device | — | `--device auto`, `cuda` or `cpu` | see below |
 | Language | Source audio language | `--language japanese` (default) | any other language stops the run |
@@ -149,7 +161,7 @@ Sensitivity picks the speech segmenter's preset. Aggressive accepts sound the sp
 | Cohere-CrispASR (FireRedVAD): detection threshold | 0.5 | 0.4 | 0.3 |
 | Cohere-CrispASR: padding before and after speech | 100 ms | 100 ms | 100 ms |
 
-The detection threshold is how sure the speech segmenter must be that a sound is speech, from 0 to 1. ReazonSpeech-CrispASR takes Parakeet-CrispASR's values; Kotoba-, Whisper-Turbo- and Whisper-Large-CrispASR take Cohere-CrispASR's. The longest VAD group stays 6 s (Parakeet-, ReazonSpeech-CrispASR), 3 s (Cohere-, Kotoba-, Whisper-Turbo-, Whisper-Large-CrispASR) or 240 s (MOSS-CrispASR) at every sensitivity. With another speech segmenter, each pipeline uses the values the Fidelity pipeline (for Parakeet- and ReazonSpeech-CrispASR) or the Qwen3-ASR pipeline (for the others but MOSS-CrispASR) gives it; the 6-second limit stays.
+The detection threshold is how sure the speech segmenter must be that a sound is speech, from 0 to 1. ReazonSpeech-, Haas- and Qwen3-ASR-CrispASR take Parakeet-CrispASR's values; Kotoba-, Whisper-Turbo- and Whisper-Large-CrispASR take Cohere-CrispASR's. The longest VAD group stays 6 s (Parakeet-, ReazonSpeech-, Haas-, Qwen3-ASR-CrispASR), 3 s (Cohere-, Kotoba-, Whisper-Turbo-, Whisper-Large-CrispASR) or 240 s (MOSS-CrispASR) at every sensitivity. With another speech segmenter, each pipeline uses the values the Fidelity pipeline (for Parakeet-, ReazonSpeech-, Haas- and Qwen3-ASR-CrispASR) or the Qwen3-ASR pipeline (for the others but MOSS-CrispASR) gives it; the 6-second limit stays.
 
 To see the values a run will use, without running it:
 
@@ -279,7 +291,7 @@ If CrispASR's Vulkan build cannot load on Windows, the message adds: "With the G
 
   ```
   --mode crispasr is no longer available: WhisperJAV 1.10 removed the "bring your own CrispASR" mode.
-  CrispASR now runs in Ensemble Mode as the seven GGUF pipelines (parakeet-crispasr, cohere-crispasr, reazonspeech-crispasr, kotoba-crispasr, whisper-turbo-crispasr, whisper-large-crispasr, moss-crispasr), and WhisperJAV installs it itself.
+  CrispASR now runs in Ensemble Mode as the nine GGUF pipelines (parakeet-crispasr, cohere-crispasr, reazonspeech-crispasr, kotoba-crispasr, whisper-turbo-crispasr, whisper-large-crispasr, moss-crispasr, haas-crispasr, qwen3-asr-crispasr), and WhisperJAV installs it itself.
   Example:
       whisperjav --ensemble --pass1-pipeline parakeet-crispasr <your video>
   In the GUI: open the Ensemble Mode tab and choose one under GGUF via crispasr or Experimental, open to feedback in the Pass 1 or Pass 2 menu.
@@ -295,4 +307,4 @@ What to type instead: `--ensemble --pass1-pipeline parakeet-crispasr` in place o
 
 ## Credits
 
-CrispASR is developed at [CrispStrobe/CrispASR](https://github.com/CrispStrobe/CrispASR). Models: NVIDIA's parakeet-tdt_ctc-0.6b-ja (CC-BY-4.0) in GGUF form by cstr; Japanese fine-tunes of Cohere Transcribe by efwkjn, in GGUF form by TransWithAI and CKHO; reazon-research's reazonspeech-nemo-v2 (Apache-2.0) in GGUF form by cstr; kotoba-tech's kotoba-whisper-v2.0 (Apache-2.0), in their own whisper.cpp files; OpenAI's Whisper large-v2, large-v3 and large-v3-turbo (MIT) in ggerganov's whisper.cpp files; OpenMOSS-Team's MOSS-Transcribe-Diarize (Apache-2.0) in GGUF form by cstr.
+CrispASR is developed at [CrispStrobe/CrispASR](https://github.com/CrispStrobe/CrispASR). Models: NVIDIA's parakeet-tdt_ctc-0.6b-ja (CC-BY-4.0) in GGUF form by cstr; Japanese fine-tunes of Cohere Transcribe by efwkjn, in GGUF form by TransWithAI and CKHO; reazon-research's reazonspeech-nemo-v2 (Apache-2.0) in GGUF form by cstr; kotoba-tech's kotoba-whisper-v2.0 (Apache-2.0), in their own whisper.cpp files; OpenAI's Whisper large-v2, large-v3 and large-v3-turbo (MIT) in ggerganov's whisper.cpp files; OpenMOSS-Team's MOSS-Transcribe-Diarize (Apache-2.0) in GGUF form by cstr; third-intelligence's Haas-ja-v1.0 (Apache-2.0) in GGUF form by cstr; Qwen's Qwen3-ASR-1.7B (Apache-2.0) in GGUF form by cstr.
