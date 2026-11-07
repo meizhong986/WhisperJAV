@@ -100,7 +100,7 @@ Each stage has several interchangeable providers — the full menu, with strengt
 | **qwen** (ChronosJAV) | Qwen3-ASR | Modern text-first recognizer |
 | **anime-whisper** (ChronosJAV) | anime-whisper | Anime/JAV-tuned dialogue |
 | **transformers** | HuggingFace | Kotoba and other HF Whisper models |
-| **parakeet**, **cohere**, **reazonspeech**, **kotoba**, **whisper-turbo**, **whisper-large**, **MOSS** (`*-crispasr`, Ensemble passes) | CrispASR (GGUF models) | Japanese; experimental (parakeet and cohere since 1.10.0, the others new in 1.10.1) |
+| **parakeet**, **cohere**, **reazonspeech**, **kotoba**, **whisper-turbo**, **whisper-large**, **MOSS**, **haas**, **qwen3-asr** (`*-crispasr`, Ensemble passes) | CrispASR (GGUF models) | Japanese; experimental (parakeet and cohere since 1.10.0, haas and qwen3-asr new in 1.10.2, the others new in 1.10.1) |
 
 **Sensitivity** applies to every mode: **conservative** (fewer false positives, good for noisy content) · **balanced** · **aggressive** (catches more quiet dialogue; good for whisper/ASMR content — and the tuning target of most of our benchmark work).
 
@@ -148,7 +148,7 @@ The recipe that ties the other choices together.
 | **qwen** (ChronosJAV) | Modern text-first recognizer; robust on messy audio | Timestamps come from the VAD, so the segmenter choice matters doubly |
 | **anime-whisper** (ChronosJAV) | Best-in-class on anime-style/JAV dialogue; heavily benchmark-tuned here | Can miss very faint, isolated utterances |
 | **transformers** | Runs any HF Whisper model; best GPU path on Apple Silicon | Uses HF's own chunking — scene/segmenter choices don't apply |
-| **The seven GGUF pipelines** (`*-crispasr`) | GGUF models through CrispASR, installed with WhisperJAV; scene detection, enhancement and VAD work as for the other passes | Experimental; Japanese only |
+| **The nine GGUF pipelines** (`*-crispasr`) | GGUF models through CrispASR, installed with WhisperJAV; scene detection, enhancement and VAD work as for the other passes | Experimental; Japanese only |
 | **xxl** | Bring your own external engine as a pass | Self-contained: WhisperJAV's knobs don't reach inside |
 
 > **Naming note (CLI users).** *ChronosJAV* is one pipeline with interchangeable recognizers, so **qwen** and **anime-whisper** are two backends of it rather than two separate pipelines. The GUI lists them side by side in the pipeline dropdown; on the command line both live under `qwen`, and the backend is chosen inside the params:
