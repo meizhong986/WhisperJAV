@@ -220,11 +220,12 @@ FFMPEG_DSP_EFFECTS = ["loudnorm", "normalize", "compress", "denoise",
 
 def _word_timestamps_help(whose: str) -> str:
     """--passN-word-timestamps' help; text approved by the owner (W413 1), changed for MOSS's own segment times in
-    1.10.1 (W426; drafted under W428 I2, to be shown to him). ``whose`` is "pass 1's" or "pass 2's"."""
+    1.10.1 (W426; drafted under W428 I2, to be shown to him), and for haas and qwen3-asr in 1.10.2 (W574). ``whose`` is
+    "pass 1's" or "pass 2's"."""
     return (f"Where {whose} subtitle times come from, for the CrispASR pipelines. model = the ASR model's own "
-            "word times (default for parakeet, reazonspeech, kotoba, whisper-turbo and whisper-large; for moss its "
-            "own segment times); aligner = the CrispASR aligner wav2vec2-ja (232 MB, downloaded on first use; "
-            "default for cohere).")
+            "word times (default for parakeet, reazonspeech, kotoba, whisper-turbo, whisper-large and haas; for moss its "
+            "own segment times; qwen3-asr gives none, so each VAD group is one subtitle at its edges); aligner = the "
+            "CrispASR aligner wav2vec2-ja (232 MB, downloaded on first use; default for cohere and qwen3-asr).")
 
 
 def speech_enhancer_spec(value: str) -> str:
@@ -421,7 +422,7 @@ def parse_arguments():
                                     "installed with WhisperJAV; their model is downloaded the first time "
                                     "it is needed; Japanese only. --pass1-model picks their model. "
                                     "Experimental (early release): parakeet-crispasr and cohere-crispasr "
-                                    "since 1.10.0, the others new in 1.10.1. "
+                                    "since 1.10.0, haas-crispasr and qwen3-asr-crispasr new in 1.10.2, the others new in 1.10.1. "
                                     "The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).")
     twopass_group.add_argument("--pass1-sensitivity", default=None,
                                choices=["conservative", "balanced", "aggressive"],
@@ -441,7 +442,7 @@ def parse_arguments():
                                help="Scene detection method for pass 1 (default: semantic since v1.9.2; for "
                                     "moss-crispasr semantic with scenes of normally 90-240 s).")
     twopass_group.add_argument("--pass1-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none). Default: firered-vad when pass 1 is Qwen3-ASR; for the GGUF pipelines: ten for parakeet-crispasr and reazonspeech-crispasr, firered-vad for the others; none sends each scene to the model whole. Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
+                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none). Default: firered-vad when pass 1 is Qwen3-ASR; for the GGUF pipelines: ten for parakeet-crispasr, reazonspeech-crispasr, haas-crispasr and qwen3-asr-crispasr, firered-vad for the others; none sends each scene to the model whole. Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
     twopass_group.add_argument("--pass1-vad-version", default=None,
                                choices=list(VAD_VERSIONS),
                                help="Silero VAD build for pass 1 when --pass1-pipeline is balanced "
@@ -488,7 +489,7 @@ def parse_arguments():
                                     "installed with WhisperJAV; their model is downloaded the first time "
                                     "it is needed; Japanese only. --pass2-model picks their model. "
                                     "Experimental (early release): parakeet-crispasr and cohere-crispasr "
-                                    "since 1.10.0, the others new in 1.10.1. "
+                                    "since 1.10.0, haas-crispasr and qwen3-asr-crispasr new in 1.10.2, the others new in 1.10.1. "
                                     "The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a plain-named folder (the original stays where it is).")
     twopass_group.add_argument("--pass2-sensitivity", default=None,
                                choices=["conservative", "balanced", "aggressive"],
@@ -508,7 +509,7 @@ def parse_arguments():
                                help="Scene detection method for pass 2 (default: semantic since v1.9.2; for "
                                     "moss-crispasr semantic with scenes of normally 90-240 s).")
     twopass_group.add_argument("--pass2-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Default: ten when pass 2 is Qwen3-ASR or anime-whisper; for the GGUF pipelines: ten for parakeet-crispasr and reazonspeech-crispasr, firered-vad for the others; none sends each scene to the model whole. Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
+                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Default: ten when pass 2 is Qwen3-ASR or anime-whisper; for the GGUF pipelines: ten for parakeet-crispasr, reazonspeech-crispasr, haas-crispasr and qwen3-asr-crispasr, firered-vad for the others; none sends each scene to the model whole. Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
     twopass_group.add_argument("--pass2-vad-version", default=None,
                                choices=list(VAD_VERSIONS),
                                help="Silero VAD build for pass 2 when --pass2-pipeline is balanced "
