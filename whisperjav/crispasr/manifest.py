@@ -9,6 +9,9 @@ repository, file name and commit, with its size and SHA-256 as Hugging Face list
 memory, about 2 GB of it taken, so each pipeline offers its largest files that fit 6-14 GB, and the menus name
 each file's quantization and the GPU memory it needs (W400).
 
+1.10.2 (owner W574): two more pipelines, Haas-CrispASR and Qwen3-ASR-CrispASR, each with only the files that went
+through the GGUF model test tool (tools/crispasr_model_test.py) first.
+
 Standard library only.
 """
 
@@ -154,6 +157,30 @@ MODELS = {m.name: m for m in (
               "80cb31198a07e0c456460658e3264b9a829095c07ad8454bdc9f1f999c277154",
               "Apache-2.0 (OpenMOSS-Team/MOSS-Transcribe-Diarize)",
               vram_mib=1673),
+    # 1.10.2 (owner W574): the models of two new pipelines, each file first run through the GGUF model test tool
+    # (tools/crispasr_model_test.py, owner W568-W573; its runs D:\WJ110_measure\haas_2026-11-06\). Their GPU memory
+    # is the tool's measuring stage figure: the card's peak over its use before the model was opened, on the VAD
+    # groups of the seven Netflix reference clips, through CrispASR 0.8.50 (CUDA build, RTX 3060), 2026-11-06.
+    # Haas-ja-v1.0 is a Parakeet-TDT model, which CrispASR 0.8.50 opens as the parakeet family (#561).
+    ModelFile("haas-ja-v1.0-f16", "Haas ja v1.0 (f16)", "parakeet",
+              "cstr/Haas-ja-v1.0-GGUF", "haas-ja-v1.0-f16.gguf",
+              "607fa1450398d589643fbb0e8bb1d0424af68d11", 1_232_807_488,
+              "69dce16668e9bfeaa611562443e52a3bf7000590c6d5870363ac16afedf92923",
+              "Apache-2.0 (third-intelligence/Haas-ja-v1.0)",
+              vram_mib=1550),
+    ModelFile("haas-ja-v1.0-q8_0", "Haas ja v1.0 (q8_0)", "parakeet",
+              "cstr/Haas-ja-v1.0-GGUF", "haas-ja-v1.0-q8_0.gguf",
+              "607fa1450398d589643fbb0e8bb1d0424af68d11", 656_182_656,
+              "630fb47ac99d5111b0f99a7488857405611f05d7acae0fb2ceba4847ae1f9a2c",
+              "Apache-2.0 (third-intelligence/Haas-ja-v1.0)",
+              vram_mib=919),
+    # Qwen3-ASR-1.7B, the model ChronosJAV's Qwen3-ASR runs through PyTorch, here as GGUF through CrispASR.
+    ModelFile("qwen3-asr-1.7b-f16", "Qwen3-ASR 1.7B (f16)", "qwen3",
+              "cstr/qwen3-asr-1.7b-GGUF", "qwen3-asr-1.7b-f16.gguf",
+              "674df5d44b50a63e7102a18895ed20e3f91de301", 4_704_800_576,
+              "ac6c58f9cb0f2bb22290319cde01b0e25a2c1f1ee69aa2f1a9265f29a8bfc9d7",
+              "Apache-2.0 (Qwen/Qwen3-ASR-1.7B)",
+              vram_mib=6367),
 )}
 
 # The models each pipeline offers its users, and its default. 1.10.0: Cohere-CrispASR's default is v0.1 (W129 1);
@@ -170,6 +197,9 @@ PIPELINE_MODELS = {
     "whisper-large-crispasr": ("whisper-large-v2-f16", "whisper-large-v2-q8_0",
                                "whisper-large-v3-f16", "whisper-large-v3-q5_0"),
     "moss-crispasr": ("moss-transcribe-diarize-0.9b-f16", "moss-transcribe-diarize-0.9b-q8_0"),
+    # 1.10.2 (owner W574): only the files the GGUF model test tool ran; the largest is the default (as W400).
+    "haas-crispasr": ("haas-ja-v1.0-f16", "haas-ja-v1.0-q8_0"),
+    "qwen3-asr-crispasr": ("qwen3-asr-1.7b-f16",),
 }
 PIPELINE_DEFAULT_MODEL = {
     "parakeet-crispasr": "parakeet-tdt-0.6b-ja",
@@ -181,15 +211,19 @@ PIPELINE_DEFAULT_MODEL = {
     # Netflix reference clip (2026-10-31, step 1: 4 and 0.520 against 14 and 0.574, both q5_0).
     "whisper-large-crispasr": "whisper-large-v2-f16",
     "moss-crispasr": "moss-transcribe-diarize-0.9b-f16",
+    # Haas f16 scored as q8_0 on the Netflix clips (CER 43.4 % each, 2026-11-06); the largest file is the default.
+    "haas-crispasr": "haas-ja-v1.0-f16",
+    "qwen3-asr-crispasr": "qwen3-asr-1.7b-f16",
 }
 CRISPASR_PIPELINES = tuple(PIPELINE_MODELS)
 # The pipelines whose text the CrispASR aligner times (wav2vec2-ja, DEFAULT_ALIGNER) by default: Cohere-CrispASR
-# (item 12; W248 3, Q7). The others use their models' own times (owner W411, W412): Parakeet, Kotoba,
-# Whisper-Turbo, Whisper-Large token starts and ends; ReazonSpeech starts only, its ends at the VAD group's end;
-# MOSS its own segment starts and ends (1.10.1, W426). --passN-word-timestamps changes it per pass
+# (item 12; W248 3, Q7) and, since 1.10.2, Qwen3-ASR-CrispASR (owner W574: its model gives no word or token times,
+# GGUF model test tool, 2026-11-06). The others use their models' own times (owner W411, W412): Parakeet, Kotoba,
+# Whisper-Turbo, Whisper-Large and Haas (1.10.2) token starts and ends; ReazonSpeech starts only, its ends at the VAD
+# group's end; MOSS its own segment starts and ends (1.10.1, W426). --passN-word-timestamps changes it per pass
 # (word_timestamps_for, below). Each pipeline class's ENGINE.aligner says the same
 # (tests/test_crispasr_pipelines.py); the GUI's status panel reads it here.
-ALIGNED_PIPELINES = frozenset({"cohere-crispasr"})
+ALIGNED_PIPELINES = frozenset({"cohere-crispasr", "qwen3-asr-crispasr"})
 
 # Where a pass's subtitle times come from (--passN-word-timestamps; owner W411-W413): "model" = the ASR model's
 # own word times, "aligner" = the CrispASR aligner DEFAULT_ALIGNER. The default is the pipeline's own
