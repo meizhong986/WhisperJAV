@@ -184,7 +184,7 @@ Always active. Each pass has identical controls:
 
 | Control | Options | Default |
 |---------|---------|---------|
-| **Pipeline** | Whisper-Based: Balanced, Fast, Faster, Fidelity; HuggingFace: Transformers (HF); ChronosJAV: Qwen3-ASR, Anime-Whisper; External (BYOP): XXL Faster Whisper; GGUF via crispasr: parakeet, cohere; Experimental, open to feedback: reazonspeech, kotoba, whisper-turbo, whisper-large, MOSS | Pass 1: cohere; Pass 2: parakeet (off until ticked) |
+| **Pipeline** | Whisper-Based: Balanced, Fast, Faster, Fidelity; HuggingFace: Transformers (HF); ChronosJAV: Qwen3-ASR, Anime-Whisper; External (BYOP): XXL Faster Whisper; GGUF via crispasr: parakeet, cohere; Experimental, open to feedback: reazonspeech, kotoba, whisper-turbo, whisper-large, MOSS, haas, qwen3-asr | Pass 1: cohere; Pass 2: parakeet (off until ticked) |
 | **Sensitivity** | Aggressive, Balanced, Conservative | set when you choose the pipeline: Pass 1 (cohere) Balanced, Pass 2 (parakeet) Aggressive |
 | **Scene Detector** | Auditok, Silero, Semantic, None | Semantic |
 | **Speech Enhancer** | None, FFmpeg DSP, ZipEnhancer, htdemucs (BS-RoFormer and ZipEnhancer ONNX: coming soon) | None |
@@ -200,7 +200,7 @@ The pipeline dropdown groups options by backend:
 - **Whisper-Based**: Balanced, Fast, Faster, Fidelity
 - **HuggingFace**: Transformers
 - **ChronosJAV**: Qwen3-ASR, Anime-Whisper
-- **GGUF via crispasr**: parakeet (Parakeet-CrispASR), cohere (Cohere-CrispASR); below a divider line, **Experimental, open to feedback**: reazonspeech (ReazonSpeech-CrispASR), kotoba (Kotoba-CrispASR), whisper-turbo (Whisper-Turbo-CrispASR), whisper-large (Whisper-Large-CrispASR), MOSS (MOSS-CrispASR) — Japanese only, all experimental; parakeet and cohere since 1.10.0, the other five new in 1.10.1 (see [GGUF pipelines (CrispASR)](../pipelines/crispasr.md))
+- **GGUF via crispasr**: parakeet (Parakeet-CrispASR), cohere (Cohere-CrispASR); below a divider line, **Experimental, open to feedback**: reazonspeech (ReazonSpeech-CrispASR), kotoba (Kotoba-CrispASR), whisper-turbo (Whisper-Turbo-CrispASR), whisper-large (Whisper-Large-CrispASR), MOSS (MOSS-CrispASR), haas (Haas-CrispASR), qwen3-asr (Qwen3-ASR-CrispASR) — Japanese only, all experimental; parakeet and cohere since 1.10.0, haas and qwen3-asr new in 1.10.2, the other five new in 1.10.1 (see [GGUF pipelines (CrispASR)](../pipelines/crispasr.md))
 - **External (BYOP)**: XXL Faster Whisper (Pass 1, Pass 2 or both)
 
 ### Customize Parameters
