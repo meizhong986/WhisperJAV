@@ -1822,6 +1822,14 @@ const EnsembleManager = {
         'moss-crispasr': [
             { value: 'moss-transcribe-diarize-0.9b-f16', label: 'MOSS-Transcribe-Diarize 0.9B (f16), ~2.1 GB VRAM' },
             { value: 'moss-transcribe-diarize-0.9b-q8_0', label: 'MOSS-Transcribe-Diarize 0.9B (q8_0), ~1.7 GB VRAM' }
+        ],
+        // 1.10.2 (owner W574): only the files the GGUF model test tool ran.
+        'haas-crispasr': [
+            { value: 'haas-ja-v1.0-f16', label: 'Haas ja v1.0 (f16), ~1.6 GB VRAM' },
+            { value: 'haas-ja-v1.0-q8_0', label: 'Haas ja v1.0 (q8_0), ~0.9 GB VRAM' }
+        ],
+        'qwen3-asr-crispasr': [
+            { value: 'qwen3-asr-1.7b-f16', label: 'Qwen3-ASR 1.7B (f16), ~6.3 GB VRAM' }
         ]
     },
     // Each CrispASR pipeline's speech segmenter and sensitivity when a pass names none
@@ -1838,7 +1846,11 @@ const EnsembleManager = {
         'whisper-turbo-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'model' },
         'whisper-large-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'model' },
         // MOSS-CrispASR (owner W482): semantic scenes of 90-240 s and FireRedVAD (crispasr/pass_settings.py).
-        'moss-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'model', scene: 'semantic' }
+        'moss-crispasr': { segmenter: 'firered-vad', sensitivity: 'balanced', wordTimestamps: 'model', scene: 'semantic' },
+        // 1.10.2 (owner W574): Parakeet-CrispASR's segmenter settings, on whose VAD groups both were measured;
+        // Qwen3-ASR's text is timed by the aligner (its model gives no times).
+        'haas-crispasr': { segmenter: 'ten', sensitivity: 'aggressive', wordTimestamps: 'model' },
+        'qwen3-asr-crispasr': { segmenter: 'ten', sensitivity: 'aggressive', wordTimestamps: 'aligner' }
     },
     crispasrDefaultScene(pipeline) {
         const defaults = this.crispasrDefaults[pipeline];
@@ -3390,6 +3402,11 @@ const EnsembleManager = {
         model: { text: 'From the model', defaultText: 'From the model (default)' },
         aligner: { text: 'From the aligner (wav2vec2-ja)', defaultText: 'From the aligner (wav2vec2-ja) (default)' }
     },
+    // A pipeline whose model gives no times of its own (1.10.2, owner W574: Qwen3-ASR-CrispASR): without the aligner
+    // each VAD group is one subtitle at its edges, so "From the model" would promise times the model does not give.
+    CRISPASR_NO_MODEL_TIMES: {
+        'qwen3-asr-crispasr': 'From the VAD groups (this model gives no times)'
+    },
 
     crispasrDefaultWordTimestamps(pipeline) {
         const defaults = this.crispasrDefaults[pipeline];
@@ -3425,7 +3442,8 @@ const EnsembleManager = {
         for (const [value, texts] of Object.entries(this.CRISPASR_WORD_TIMESTAMP_OPTIONS)) {
             const option = document.createElement('option');
             option.value = value;
-            option.textContent = value === pipelineDefault ? texts.defaultText : texts.text;
+            const noTimes = value === 'model' ? this.CRISPASR_NO_MODEL_TIMES[passState.pipeline] : null;
+            option.textContent = noTimes || (value === pipelineDefault ? texts.defaultText : texts.text);
             option.selected = value === current;
             select.appendChild(option);
         }
