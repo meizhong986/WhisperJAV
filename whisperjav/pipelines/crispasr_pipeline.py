@@ -737,6 +737,11 @@ class CrispASRPipeline(BasePipeline):
     # Texts approved by the owner as drafted (W268); design note 2026-10-28, section 9.
     ALIGNER_NOT_LOADED = ("{label}'s aligner ({model}) could not be loaded ({reason}): each VAD group is one "
                           "subtitle at the group's edges, as before 1.10.0.")
+    # The same for a "group" pipeline newer than 1.10.0 (Qwen3-ASR-CrispASR, 1.10.2, owner W574), for which "as before
+    # 1.10.0" would not be true.
+    ALIGNER_NOT_LOADED_NEW = ("{label}'s aligner ({model}) could not be loaded ({reason}): each VAD group is one "
+                              "subtitle at the group's edges.")
+    GROUP_RULE_BEFORE_1100 = ("cohere-crispasr",)
     GROUPS_NOT_ALIGNED = "{label}: {n} of {m} VAD group(s) could not be aligned; they keep the VAD group's edges"
     # The same for a pipeline whose own rule uses the model's word times, with --passN-word-timestamps aligner
     # (Part B, 1.10.1; drafted under the owner's W416 approval, to be shown to him).
@@ -755,7 +760,9 @@ class CrispASRPipeline(BasePipeline):
         line rule: the VAD group's edges ("group"), the model's word times ("tokens"), its segment times
         ("segments")."""
         if self.engine.line_rule == "group":
-            return self.ALIGNER_NOT_LOADED, self.GROUPS_NOT_ALIGNED
+            first = (self.ALIGNER_NOT_LOADED if self.PIPELINE_NAME in self.GROUP_RULE_BEFORE_1100
+                     else self.ALIGNER_NOT_LOADED_NEW)
+            return first, self.GROUPS_NOT_ALIGNED
         if self.engine.line_rule == "segments":
             return self.ALIGNER_NOT_LOADED_SEGMENT_TIMES, self.GROUPS_NOT_ALIGNED_SEGMENT_TIMES
         return self.ALIGNER_NOT_LOADED_OWN_TIMES, self.GROUPS_NOT_ALIGNED_OWN_TIMES
