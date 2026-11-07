@@ -30,6 +30,8 @@ from whisperjav.pipelines import crispasr_pipeline as chain
 from whisperjav.pipelines.cohere_crispasr_pipeline import CohereCrispASRPipeline
 from whisperjav.pipelines.crispasr_pipeline import CrispASRPipeline
 from whisperjav.pipelines.parakeet_crispasr_pipeline import ParakeetCrispASRPipeline
+from whisperjav.pipelines.haas_crispasr_pipeline import HaasCrispASRPipeline
+from whisperjav.pipelines.qwen3_asr_crispasr_pipeline import Qwen3AsrCrispASRPipeline
 
 REPO = Path(__file__).resolve().parents[1]
 RATE = 16000
@@ -462,7 +464,8 @@ class TestThe1101Pipelines:
     def test_the_aligned_pipelines_are_the_manifests(self):
         from whisperjav.crispasr.manifest import ALIGNED_PIPELINES
         classes = self.classes()
-        assert {name for name, cls in classes.items() if cls.ENGINE.aligner} == ALIGNED_PIPELINES == {"cohere-crispasr"}
+        assert {name for name, cls in classes.items() if cls.ENGINE.aligner} == ALIGNED_PIPELINES == {
+            "cohere-crispasr", "qwen3-asr-crispasr"}   # Qwen3-ASR-CrispASR since 1.10.2 (owner W574)
         # 1.10.1 post-processing (W421 i3, W422): Cohere cleans its text before the aligner
         assert classes["cohere-crispasr"].ENGINE == chain.EngineRow("group", audio_analytics=True,
                                                                     aligner="wav2vec2-ja",
@@ -525,6 +528,79 @@ class TestThe1101Pipelines:
         assert (pipe.sensitivity, pipe.speech_segmenter) == (sensitivity, segmenter)
         like = {"fidelity": "parakeet-crispasr", "qwen": "cohere-crispasr", "moss": "moss-crispasr"}[style]
         assert pipe.segmenter == segmenter_settings(like, segmenter, sensitivity)
+
+
+class TestThe1102Pipelines:
+    """The two pipelines of 1.10.2 (owner W574), built on the GGUF model test tool's findings (2026-11-06): Haas as
+    Parakeet-CrispASR (a Parakeet-TDT model, every token timed), Qwen3-ASR as Cohere-CrispASR (no times of its own:
+    the text cleaner, then the aligner); both with Parakeet-CrispASR's speech segmenter settings, on whose VAD groups
+    the tool measured them."""
+
+    NEW = {"haas-crispasr": ("Haas-CrispASR", "haas-ja-v1.0-f16"),
+           "qwen3-asr-crispasr": ("Qwen3-ASR-CrispASR", "qwen3-asr-1.7b-f16")}
+
+    def test_the_rows(self):
+        assert HaasCrispASRPipeline.ENGINE == ParakeetCrispASRPipeline.ENGINE == chain.EngineRow("tokens", True)
+        assert Qwen3AsrCrispASRPipeline.ENGINE == CohereCrispASRPipeline.ENGINE
+        assert Qwen3AsrCrispASRPipeline.engine_row("model") == chain.EngineRow("group", audio_analytics=True)
+        assert HaasCrispASRPipeline.engine_row("aligner").aligner == "wav2vec2-ja"
+
+    @pytest.mark.parametrize("pipeline", sorted(NEW))
+    def test_labels_settings_and_defaults(self, tmp_path, pipeline):
+        from whisperjav.crispasr.manifest import PIPELINE_DEFAULT_MODEL
+        from whisperjav.crispasr.pass_settings import SEGMENTER_STYLE
+        label, model = self.NEW[pipeline]
+        cls = TestThe1101Pipelines.classes()[pipeline]
+        assert cls.LABEL == label and SEGMENTER_STYLE[pipeline] == "fidelity"
+        pipe = make(cls, tmp_path)
+        assert pipe.model.name == PIPELINE_DEFAULT_MODEL[pipeline] == model
+        assert (pipe.sensitivity, pipe.speech_segmenter) == ("aggressive", "ten")
+        assert pipe.segmenter == segmenter_settings("parakeet-crispasr", "ten", "aggressive")
+        assert pipe.segmenter.max_group_duration_s == 6.0
+
+    def test_haas_tokens_become_subtitles_as_parakeets_with_no_aligner(self, stage, tmp_path):
+        stage.answers = [
+            [parakeet_segment((" ", 0.0, 0.1), ("本番", 0.1, 0.4), ("。", 0.4, 0.48), ("行こう", 0.48, 0.9))],
+            [parakeet_segment(("待って", 0.0, 0.5))],
+            [parakeet_segment(("監", 0.1, 0.3), ("督", 0.3, 0.5), ("。", 0.5, 0.7))],
+        ]
+        md = make(HaasCrispASRPipeline, tmp_path).process(stage.media())
+        assert srt_entries(md["output_files"]["final_srt"]) == [("本番。", 1.1, 1.4), ("行こう", 1.48, 1.9),
+                                                                ("待って", 3.0, 3.5), ("監督。", 10.6, 11.0)]
+        assert stage.aligners == [] and md["config"]["crispasr"]["aligner"] is None
+        assert md["pipeline"] == "haas-crispasr" and md["config"]["crispasr"]["backend"] == "parakeet"
+        made = stage.framer_made[0]
+        assert (made["backend"], made["max_group"]) == ("ten", 6.0)
+
+    def test_qwen3_text_is_cleaned_then_aligned_and_cut_at_the_sentence_end(self, stage, tmp_path):
+        stage.frames = {0: [(1.0, 4.79)], 1: []}
+        stage.answers = [[CrispSegment(TestCohereAligned.TEXT, 0.0, 3.79)]]
+        stage.alignments = [TestCohereAligned.UNITS]
+        md = make(Qwen3AsrCrispASRPipeline, tmp_path).process(stage.media())
+        assert srt_entries(md["output_files"]["final_srt"]) == [
+            ("近くのカラオケでそのまま酔っぱらっちゃった。", 1.26, 4.1), ("それで？", 4.1, 4.79)]
+        aligner = stage.aligners[0]
+        assert (aligner.model_name, aligner.label) == ("wav2vec2-ja", "Qwen3-ASR-CrispASR")
+        assert md["stages"]["alignment"]["aligned"] == 1 and "text_cleaner" in md["stages"]
+        assert md["config"]["crispasr"]["backend"] == "qwen3"
+
+    def test_qwen3_with_model_times_is_one_subtitle_per_group_at_its_edges(self, stage, tmp_path):
+        stage.answers = [[CrispSegment("本番。", 0.0, 1.0)], [CrispSegment("いいよ", 0.0, 1.5)],
+                         [CrispSegment("監督", 0.0, 1.0)]]
+        md = make(Qwen3AsrCrispASRPipeline, tmp_path, word_timestamps="model").process(stage.media())
+        assert srt_entries(md["output_files"]["final_srt"]) == [("本番。", 1.0, 2.0), ("いいよ", 3.0, 4.5),
+                                                                ("監督", 10.5, 11.5)]
+        assert stage.aligners == [] and "text_cleaner" not in md["stages"]
+
+    def test_qwen3_aligner_that_cannot_load_keeps_the_edges_without_naming_1_10_0(self, stage, tmp_path):
+        stage.aligner_load_error = CrispASRSetupError("Downloading the model wav2vec2 failed: offline")
+        stage.answers = [[CrispSegment("本番。", 0.0, 1.0)], [CrispSegment("いいよ", 0.0, 1.5)],
+                         [CrispSegment("監督", 0.0, 1.0)]]
+        md = make(Qwen3AsrCrispASRPipeline, tmp_path).process(stage.media())
+        assert srt_entries(md["output_files"]["final_srt"])[0] == ("本番。", 1.0, 2.0)
+        assert md["summary"]["notes"] == [
+            "Qwen3-ASR-CrispASR's aligner (wav2vec2-ja) could not be loaded (Downloading the model wav2vec2 "
+            "failed: offline): each VAD group is one subtitle at the group's edges."]
 
 
 class TestParakeetEndToEnd:
@@ -855,9 +931,11 @@ class TestPostProcessing:
             assert cls.ENGINE.cleanup == expected, name
             for choice in ("model", "aligner"):
                 assert cls.engine_row(choice).cleanup == expected, (name, choice)
-            # the text cleaner: Cohere's text, before the aligner, only
-            assert cls.ENGINE.text_cleanup == (("text_cleaner",) if name == "cohere-crispasr" else ()), name
+            # the text cleaner: Cohere's text and Qwen3-ASR's (1.10.2, owner W574), before the aligner, only
+            assert cls.ENGINE.text_cleanup == (("text_cleaner",) if name in ("cohere-crispasr", "qwen3-asr-crispasr")
+                                               else ()), name
         assert CohereCrispASRPipeline.engine_row("model").text_cleanup == ()   # its own times: no text change
+        assert Qwen3AsrCrispASRPipeline.engine_row("model").text_cleanup == ()
 
     def test_a_hallucination_is_removed_kept_in_the_raw_copy_and_listed(self, stage, tmp_path):
         stage.answers = [[parakeet_segment((self.CLOSING, 0.1, 0.9))], [parakeet_segment(("本番", 0.2, 0.9))],
