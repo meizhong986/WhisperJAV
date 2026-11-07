@@ -313,7 +313,8 @@ class TestTheCommandLine:
         assert CTC not in text   # not offered (W129 2)
         # T1, T2, T24 (route B design 12)
         assert "run through CrispASR, installed with WhisperJAV" in text
-        assert ("Experimental (early release): parakeet-crispasr and cohere-crispasr since 1.10.0, the others "
+        assert ("Experimental (early release): parakeet-crispasr and cohere-crispasr since 1.10.0, haas-crispasr "
+                "and qwen3-asr-crispasr new in 1.10.2, the others "   # 1.10.2: owner W574
                 "new in 1.10.1. "   # owner W212 D4 1; versions corrected W501 4
                 "The GGUF (CrispASR) pipelines need folder names in plain Western letters (ASCII). When your user "
                 "folder has Chinese, Japanese or Korean characters, WhisperJAV links or copies the model to a "
@@ -321,8 +322,9 @@ class TestTheCommandLine:
         # T2 (design 22.10, owner W237 1): --device for every pipeline; the GGUF pipelines' builds.
         assert "Where this run's ASR and other models run, for every pipeline." in text
         assert "the GPU through Vulkan on Windows (Vulkan build, experimental)" in text
-        assert ("for the GGUF pipelines: ten for parakeet-crispasr and "   # W344, W401
-                "reazonspeech-crispasr, firered-vad for the others; "  # W482: MOSS FireRedVAD
+        assert ("for the GGUF pipelines: ten for parakeet-crispasr, "   # W344, W401
+                "reazonspeech-crispasr, haas-crispasr and qwen3-asr-crispasr, "   # 1.10.2, W574
+                "firered-vad for the others; "  # W482: MOSS FireRedVAD
                 "none sends each scene to the model whole.") in text  # W457, W458
         # W482: MOSS-CrispASR's default scenes (review finding 7 of 2026-11-03: the scene detector help was unpinned)
         for n in (1, 2):
@@ -342,9 +344,10 @@ class TestTheCommandLine:
             assert f"--pass{n}-word-timestamps {{model,aligner}}" in text
             # W413 1's text; 1.10.1 (W426): MOSS uses its own segment times by default
             assert (f"Where pass {n}'s subtitle times come from, for the CrispASR pipelines. model = the ASR model's "
-                    "own word times (default for parakeet, reazonspeech, kotoba, whisper-turbo and whisper-large; "
-                    "for moss its own segment times); aligner = the CrispASR aligner wav2vec2-ja (232 MB, "
-                    "downloaded on first use; default for cohere).") in text
+                    "own word times (default for parakeet, reazonspeech, kotoba, whisper-turbo, whisper-large and "
+                    "haas; for moss its own segment times; qwen3-asr gives none, so each VAD group is one subtitle at "
+                    "its edges); aligner = the CrispASR aligner wav2vec2-ja (232 MB, "
+                    "downloaded on first use; default for cohere and qwen3-asr).") in text   # 1.10.2, W574
 
     def test_an_unknown_word_timestamps_value_is_a_usage_error(self):
         result = _cli("x.mp4", "--ensemble", "--pass1-pipeline", "kotoba-crispasr", "--pass1-word-timestamps", "dtw",
