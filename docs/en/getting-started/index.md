@@ -21,7 +21,7 @@ A GPU — a graphics card, or the GPU inside an Apple chip — does the heavy wo
 
 What each computer gets:
 
-| Your computer | The install is made for | GGUF pipelines (the seven run by CrispASR) | All other pipelines |
+| Your computer | The install is made for | GGUF pipelines (the nine run by CrispASR) | All other pipelines |
 |---|---|---|---|
 | Windows PC with an NVIDIA GPU that 1.10 supports (GTX 16 / RTX 20 or newer), driver 580 or newer | NVIDIA GPU (CUDA), chosen by itself | NVIDIA GPU (CUDA) | NVIDIA GPU (CUDA) |
 | Windows PC with an AMD or Intel graphics card, or an NVIDIA card older than 1.10 supports | GPU through Vulkan, your own PyTorch, or CPU only — the installer asks | GPU through Vulkan: your graphics card (experimental, not tested) | CPU (not accelerated), several times slower |
@@ -54,7 +54,7 @@ Every installer checks the computer before anything is installed. On a computer 
 | Python (source install) | 3.13 | other versions |
 | Hosted notebooks | — | Google Colab, Kaggle |
 
-The GGUF pipelines (all seven) need a processor with AVX2 (Intel since 2013, AMD since 2015); every other pipeline runs without it.
+The GGUF pipelines (all nine) need a processor with AVX2 (Intel since 2013, AMD since 2015); every other pipeline runs without it.
 
 Other needs: 8 GB of RAM (16 GB recommended); about 10 GB of free disk space for the install and the models it downloads on first use; FFmpeg (the Windows installer brings it); an internet connection while installing and on the first run of each model.
 
