@@ -116,6 +116,9 @@ CRISPASR_DEFAULT_SEGMENTERS = {
     "whisper-turbo-crispasr": "firered-vad",
     "whisper-large-crispasr": "firered-vad",
     "moss-crispasr": "firered-vad",
+    # 1.10.2 (owner W574): Parakeet-CrispASR's, on which the GGUF model test tool measured both models.
+    "haas-crispasr": "ten",
+    "qwen3-asr-crispasr": "ten",
 }
 # Their sensitivity when a pass names none (owner W343, W344): Parakeet-CrispASR aggressive, Cohere-CrispASR
 # balanced. Applied by main.py apply_ensemble_pass_defaults; the GUI Ensemble tab applies the same values
@@ -128,6 +131,8 @@ CRISPASR_DEFAULT_SENSITIVITY = {
     "whisper-turbo-crispasr": "balanced",
     "whisper-large-crispasr": "balanced",
     "moss-crispasr": "balanced",
+    "haas-crispasr": "aggressive",
+    "qwen3-asr-crispasr": "aggressive",
 }
 
 # Owner, 2026-10-12 (v1.9.5): the Ensemble defaults are pass 1 Qwen3-ASR with
