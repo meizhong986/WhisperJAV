@@ -196,7 +196,7 @@ WhisperJAV 接受扩展名为 .mp4、.mkv、.avi、.mov、.wmv、.flv、.webm、
 
 | 控制项 | 选项 | 默认值 |
 |--------|------|--------|
-| **处理管线** | 基于 Whisper：Balanced、Fast、Faster、Fidelity；HuggingFace：Transformers (HF)；ChronosJAV：Qwen3-ASR、Anime-Whisper；外部 (BYOP)：XXL Faster Whisper；GGUF via crispasr：parakeet、cohere；实验性，欢迎反馈：reazonspeech、kotoba、whisper-turbo、whisper-large、MOSS | 第一轮：cohere；第二轮：parakeet（勾选前不运行） |
+| **处理管线** | 基于 Whisper：Balanced、Fast、Faster、Fidelity；HuggingFace：Transformers (HF)；ChronosJAV：Qwen3-ASR、Anime-Whisper；外部 (BYOP)：XXL Faster Whisper；GGUF via crispasr：parakeet、cohere；实验性，欢迎反馈：reazonspeech、kotoba、whisper-turbo、whisper-large、MOSS、haas、qwen3-asr | 第一轮：cohere；第二轮：parakeet（勾选前不运行） |
 | **灵敏度** | 高灵敏、中灵敏、低灵敏 | 选择处理管线时随之设定：第一轮（cohere）中灵敏，第二轮（parakeet）高灵敏 |
 | **场景检测器** | Auditok、Silero、Semantic、None | Semantic |
 | **语音增强器** | None、FFmpeg DSP、ZipEnhancer、htdemucs（BS-RoFormer 和 ZipEnhancer ONNX：即将推出） | None |
@@ -212,7 +212,7 @@ WhisperJAV 接受扩展名为 .mp4、.mkv、.avi、.mov、.wmv、.flv、.webm、
 - **基于 Whisper**：Balanced、Fast、Faster、Fidelity
 - **HuggingFace**：Transformers
 - **ChronosJAV**：Qwen3-ASR、Anime-Whisper
-- **GGUF via crispasr**：parakeet（Parakeet-CrispASR）、cohere（Cohere-CrispASR）；分隔线下方的 **实验性，欢迎反馈**（Experimental, open to feedback）：reazonspeech（ReazonSpeech-CrispASR）、kotoba（Kotoba-CrispASR）、whisper-turbo（Whisper-Turbo-CrispASR）、whisper-large（Whisper-Large-CrispASR）、MOSS（MOSS-CrispASR）——只处理日语，全部为实验性；parakeet 和 cohere 从 1.10.0 起提供，其他五个为 1.10.1 新增（见 [GGUF 处理管线（CrispASR）](../pipelines/crispasr.md)）
+- **GGUF via crispasr**：parakeet（Parakeet-CrispASR）、cohere（Cohere-CrispASR）；分隔线下方的 **实验性，欢迎反馈**（Experimental, open to feedback）：reazonspeech（ReazonSpeech-CrispASR）、kotoba（Kotoba-CrispASR）、whisper-turbo（Whisper-Turbo-CrispASR）、whisper-large（Whisper-Large-CrispASR）、MOSS（MOSS-CrispASR）、haas（Haas-CrispASR）、qwen3-asr（Qwen3-ASR-CrispASR）——只处理日语，全部为实验性；parakeet 和 cohere 从 1.10.0 起提供，haas 和 qwen3-asr 为 1.10.2 新增，其他五个为 1.10.1 新增（见 [GGUF 处理管线（CrispASR）](../pipelines/crispasr.md)）
 - **外部 (BYOP)**：XXL Faster Whisper（第一轮、第二轮或两者）
 
 ### 自定义参数
