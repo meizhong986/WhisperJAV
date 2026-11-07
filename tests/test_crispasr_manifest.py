@@ -46,7 +46,9 @@ class TestModels:
         # the model family CrispASR 0.8.44 reported opening each file (2026-10-31); ReazonSpeech opens as parakeet
         backends = {"parakeet-crispasr": "parakeet", "cohere-crispasr": "cohere", "reazonspeech-crispasr": "parakeet",
                     "kotoba-crispasr": "whisper", "whisper-turbo-crispasr": "whisper",
-                    "whisper-large-crispasr": "whisper", "moss-crispasr": "moss-diarize"}
+                    "whisper-large-crispasr": "whisper", "moss-crispasr": "moss-diarize",
+                    # 1.10.2 (owner W574): as CrispASR 0.8.50 opened them in the GGUF model test tool (2026-11-06)
+                    "haas-crispasr": "parakeet", "qwen3-asr-crispasr": "qwen3"}
         assert set(PIPELINE_MODELS) == set(backends)
         for pipeline, names in PIPELINE_MODELS.items():
             assert names, pipeline
@@ -67,7 +69,10 @@ class TestModels:
                                           "kotoba-crispasr": "kotoba-whisper-v2.0-f16",
                                           "whisper-turbo-crispasr": "whisper-large-v3-turbo-f16",
                                           "whisper-large-crispasr": "whisper-large-v2-f16",
-                                          "moss-crispasr": "moss-transcribe-diarize-0.9b-f16"}
+                                          "moss-crispasr": "moss-transcribe-diarize-0.9b-f16",
+                                          # 1.10.2 (owner W574): the largest tested file, as W400
+                                          "haas-crispasr": "haas-ja-v1.0-f16",
+                                          "qwen3-asr-crispasr": "qwen3-asr-1.7b-f16"}
 
     def test_each_new_default_is_a_full_size_file(self):
         # W400: the largest files; Whisper-Large offers two full-size files, large-v2 (the default) and large-v3
@@ -93,7 +98,10 @@ class TestModels:
             "whisper-turbo-crispasr": ("whisper-large-v3-turbo-f16", "whisper-large-v3-turbo-q8_0"),
             "whisper-large-crispasr": ("whisper-large-v2-f16", "whisper-large-v2-q8_0",
                                        "whisper-large-v3-f16", "whisper-large-v3-q5_0"),
-            "moss-crispasr": ("moss-transcribe-diarize-0.9b-f16", "moss-transcribe-diarize-0.9b-q8_0")}
+            "moss-crispasr": ("moss-transcribe-diarize-0.9b-f16", "moss-transcribe-diarize-0.9b-q8_0"),
+            # 1.10.2 (owner W574): only the files the GGUF model test tool ran
+            "haas-crispasr": ("haas-ja-v1.0-f16", "haas-ja-v1.0-q8_0"),
+            "qwen3-asr-crispasr": ("qwen3-asr-1.7b-f16",)}
         assert set(MODELS) == {name for names in PIPELINE_MODELS.values() for name in names}
 
     def test_the_menu_label_names_quantization_and_gpu_memory(self):
@@ -106,8 +114,9 @@ class TestModels:
 
     def test_the_aligned_pipelines(self):
         # Cohere-CrispASR times its text with the CrispASR aligner; the others use their models' own times (owner
-        # W411, W412; MOSS-CrispASR its own segment times since 1.10.1, W426)
-        assert manifest.ALIGNED_PIPELINES == {"cohere-crispasr"}
+        # W411, W412; MOSS-CrispASR its own segment times since 1.10.1, W426). Qwen3-ASR-CrispASR (1.10.2, owner W574):
+        # its model gives no times, so the aligner times it.
+        assert manifest.ALIGNED_PIPELINES == {"cohere-crispasr", "qwen3-asr-crispasr"}
 
     def test_the_word_timestamps_rule(self):
         # 1.10.1 (Part B; owner W411-W414): the pipeline's default, or the user's choice
