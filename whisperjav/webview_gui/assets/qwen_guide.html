@@ -375,8 +375,12 @@
       Zero GPU cost. Good for normalizing volume levels.<br>
       <strong>ZipEnhancer (Torch)</strong> &mdash; Neural speech enhancement at 16kHz. Effective but
       adds ~1GB VRAM. Good for noisy recordings.<br>
-      <strong>BS-RoFormer</strong> &mdash; Vocal isolation (separates speech from music/background).
-      Not yet available.<br>
+      <strong>Mel-Band-RoFormer</strong> &mdash; Isolates the voice from music and effects; run by CrispASR.
+      Its 457 MB model is downloaded from Hugging Face the first time. Fast on an NVIDIA GPU, very slow on
+      the CPU. If it cannot run, the run stops and says so.<br>
+      <strong>Mini-BS-RoFormer</strong> &mdash; Isolates the voice from music and effects; run by CrispASR.
+      Its 92 MB model is downloaded from Hugging Face the first time. If it cannot run, the run stops and
+      says so.<br>
       <strong>htdemucs (Vocals)</strong> &mdash; Isolates the voice from music and effects. Installed
       with WhisperJAV; its 84 MB model is fetched once on first use, from Meta's site rather than
       Hugging Face. If it cannot run, the run stops and says so.
