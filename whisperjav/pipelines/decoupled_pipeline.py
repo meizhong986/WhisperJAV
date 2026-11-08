@@ -201,7 +201,9 @@ class DecoupledPipeline(BasePipeline):
         # Speech enhancement (Phase 3)
         speech_enhancer: str = "none",
         speech_enhancer_model: Optional[str] = None,
-        enhance_for_vad: bool = False,  # Dual-track: enhanced audio for VAD, original for ASR
+        # Dual-track: enhanced audio for VAD, original for ASR. None (1.10.2, owner W596 3: the default for every
+        # speech enhancer) = on when a speech enhancer is set, silently; True / False = as given.
+        enhance_for_vad: Optional[bool] = None,
 
         # Speech segmentation / VAD (Phase 4)
         # v1.8.13: was "ten" — flipped to whisperseg as part of system-wide
@@ -267,7 +269,9 @@ class DecoupledPipeline(BasePipeline):
         # Speech enhancement config
         self.enhancer_backend = speech_enhancer
         self.enhancer_model = speech_enhancer_model
-        self._enhance_for_vad = enhance_for_vad
+        self._enhance_for_vad_given = enhance_for_vad is not None
+        self._enhance_for_vad = (not is_passthrough_backend(speech_enhancer) if enhance_for_vad is None
+                                 else bool(enhance_for_vad))
 
         # Speech segmentation config
         self.segmenter_backend = speech_segmenter
@@ -551,7 +555,7 @@ class DecoupledPipeline(BasePipeline):
             scene_paths = original_16k_paths
         else:
             # Single-track (current behavior): enhanced audio → both VAD and ASR
-            if self._enhance_for_vad and is_passthrough_backend(self.enhancer_backend):
+            if self._enhance_for_vad and self._enhance_for_vad_given and is_passthrough_backend(self.enhancer_backend):
                 logger.warning(
                     "[DecoupledPipeline PID %s] Phase 3: --enhance-for-vad ignored — "
                     "no speech enhancer configured (backend=%s)",
