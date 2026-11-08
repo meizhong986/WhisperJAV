@@ -1,0 +1,164 @@
+# =============================================================================
+# pyannote Speech Segmentation Tool Configuration (CrispASR, experimental)
+# =============================================================================
+# 1.10.2 (owner W594, W596). CrispASR's pyannote segmentation-3.0 (6 MB GGUF
+# file, downloaded on first use) finds the speech: asked to label a grid of
+# 10 ms ranges, a range it leaves unlabelled is silence (its frames' silence
+# probability above 0.5). CrispASR marks this method experimental
+# ("segmentation only, NOT full diarization") and runs it on the CPU only.
+# WhisperJAV's own TEN post-processing then makes the speech segments and VAD
+# groups (backends/ten.py), with the values below.
+#
+# Owner W596 4: the same values at every sensitivity: the values the viability
+# test measured in Parakeet-CrispASR (TEN VAD's aggressive values;
+# docs/plans/design/2026-11-08-a2-diarization-viability-results.md). No
+# threshold setting reaches this backend (CrispASR's own 0.5).
+# =============================================================================
+
+schemaVersion: v1
+kind: Tool
+
+metadata:
+  name: pyannote-speech-segmentation
+  displayName: "pyannote 3.0"
+  description: |
+    Speech segmentation with CrispASR's pyannote segmentation-3.0 model
+    (experimental in CrispASR; CPU): the speech is where it finds no silence.
+    TEN VAD's post-processing makes the speech segments and groups.
+  version: "1.0.0"
+  tags:
+    - speech-segmentation
+    - pyannote
+    - crispasr
+    - diarization
+  dependencies:
+    - "crispasr"
+
+tool_type: speech_segmentation
+
+# =============================================================================
+# Input/Output Contract
+# =============================================================================
+contract:
+  input:
+    audio: "np.ndarray | Path | str"
+    sample_rate: int
+  output:
+    segments: "List[SpeechSegment]"
+    groups: "List[List[SpeechSegment]]"
+
+# =============================================================================
+# Tool Parameters (one set for every sensitivity, owner W596 4)
+# =============================================================================
+spec:
+  hop_size: 256                # the frame grid of TEN's post-processing (16 ms)
+  min_speech_duration_ms: 100
+  min_silence_duration_ms: 100
+  max_speech_duration_s: 4
+  start_pad_ms: 0
+  end_pad_ms: 100
+  chunk_threshold_s: 1.0
+  max_group_duration_s: 5
+  min_group_duration_s: 0      # 0 = off
+
+# =============================================================================
+# Sensitivity Presets: all the same (owner W596 4)
+# =============================================================================
+presets:
+  conservative: {}
+  balanced: {}
+  aggressive: {}
+
+# =============================================================================
+# GUI Hints
+# =============================================================================
+gui:
+  min_speech_duration_ms:
+    widget: spinner
+    label: "Min Speech Duration (ms)"
+    description: "Minimum speech segment duration to keep"
+    min: 10
+    max: 500
+    step: 10
+    data_type: int
+    group: filters
+
+  min_silence_duration_ms:
+    widget: spinner
+    label: "Min Silence Duration (ms)"
+    description: "Minimum silence gap to keep segments separate (shorter gaps are merged)"
+    min: 10
+    max: 500
+    step: 10
+    data_type: int
+    group: filters
+
+  max_speech_duration_s:
+    widget: slider
+    label: "Max Speech Duration (s)"
+    description: "Split long speech segments (prevents oversized chunks)"
+    min: 1.0
+    max: 30.0
+    step: 0.5
+    data_type: float
+    unit: "s"
+    group: filters
+
+  chunk_threshold_s:
+    widget: slider
+    label: "Group Gap Threshold (s)"
+    description: "Maximum gap to group consecutive segments"
+    min: 0.1
+    max: 30.0
+    step: 0.1
+    data_type: float
+    group: grouping
+
+  start_pad_ms:
+    widget: spinner
+    label: "Start Padding (ms)"
+    description: "Milliseconds to extend segment start (captures speech onset)"
+    min: 0
+    max: 500
+    step: 10
+    data_type: int
+    group: padding
+
+  end_pad_ms:
+    widget: spinner
+    label: "End Padding (ms)"
+    description: "Milliseconds to extend segment end (captures speech offset)"
+    min: 0
+    max: 500
+    step: 10
+    data_type: int
+    group: padding
+
+  max_group_duration_s:
+    widget: slider
+    label: "Max Group Duration"
+    description: "The longest a group of speech segments may be; each group goes to the ASR model in one call."
+    min: 1
+    max: 420
+    step: 1
+    data_type: float
+    unit: "s"
+    group: grouping
+
+  min_group_duration_s:
+    widget: slider
+    label: "Shortest Group (s)"
+    description: "A group shorter than this joins the next group while both together fit within the Max Group Duration. 0 = off."
+    min: 0
+    max: 300
+    step: 5
+    data_type: float
+    unit: "s"
+    group: grouping
+
+# =============================================================================
+# Provider Configuration
+# =============================================================================
+provider:
+  module: whisperjav.modules.speech_segmentation.backends.crispasr_diarize
+  class: PyannoteSpeechSegmenter
