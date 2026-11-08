@@ -119,6 +119,22 @@ def _with_device_cpu(args: List[str]) -> List[str]:
     return out + ["--device", "cpu"]
 
 
+
+# The pass pipelines (GUI values) that keep one track: balanced finds the speech inside faster-whisper on the audio it
+# transcribes (the flag is refused there), the others run no separate speech segmenter.
+ONE_TRACK_PIPELINES = frozenset({"balanced", "transformers", "xxl", "fast", "faster"})
+
+
+def _enhance_for_vad_args(n, pass_config) -> List[str]:
+    """The "For VAD only" tick box of the pass's Speech Enhancer menu as a flag (1.10.2, owner W596 3: ticked by
+    default). Sent for a pass with a speech enhancer whose pipeline has a separate speech segmenter: ticked
+    --passN-enhance-for-vad, unticked --no-passN-enhance-for-vad. Nothing for the one-track pipelines. The caller
+    has checked that the pass has a speech enhancer."""
+    if pass_config.get('pipeline') in ONE_TRACK_PIPELINES:
+        return []
+    on = pass_config.get('enhanceForVad', True)
+    return [f"--pass{n}-enhance-for-vad" if on else f"--no-pass{n}-enhance-for-vad"]
+
 class WhisperJAVAPI:
     """
     API class exposed to JavaScript via PyWebView.
@@ -1386,6 +1402,9 @@ class WhisperJAVAPI:
             "silero-v6.2": "silero-v6-speech-segmentation.yaml",
             "whisperseg": "whisperseg-speech-segmentation.yaml",
             "firered-vad": "firered-vad-speech-segmentation.yaml",  # v1.9.0; installed by default since v1.9.2
+            # 1.10.2 (owner W594, W596): CrispASR's diarization methods
+            "sortformer": "sortformer-speech-segmentation.yaml",
+            "pyannote": "pyannote-speech-segmentation.yaml",
         }
 
         # v1.9.2: "faster-whisper" is not an external segmenter and has no tool YAML
@@ -1450,7 +1469,7 @@ class WhisperJAVAPI:
         Get parameter schema for a speech enhancer backend.
 
         Args:
-            backend: Enhancer name (ffmpeg-dsp, zipenhancer, bs-roformer, etc.)
+            backend: Enhancer name (ffmpeg-dsp, zipenhancer, htdemucs, mel-band-roformer, mini-bs-roformer)
 
         Returns:
             Schema dict with parameters and options
@@ -1523,36 +1542,32 @@ class WhisperJAVAPI:
                 "defaults": {"model": "torch", "device": "auto"},
             }
 
-        # BS-RoFormer schema
-        if backend == "bs-roformer":
+        # 1.10.2 (owner W602 5): the speech enhancers without settings show their name, their menu description and
+        # one line, instead of "Failed to load enhancer schema" (htdemucs had the same fault before).
+        no_settings = {
+            "mel-band-roformer": ("Mel-Band-RoFormer",
+                                  "Isolates the voice from music and effects; run by CrispASR. Its 457 MB model is "
+                                  "downloaded from Hugging Face the first time. Fast on an NVIDIA GPU, very slow on "
+                                  "the CPU. If it cannot run, the run stops and says so."),
+            "mini-bs-roformer": ("Mini-BS-RoFormer",
+                                 "Isolates the voice from music and effects; run by CrispASR. Its 92 MB model is "
+                                 "downloaded from Hugging Face the first time. If it cannot run, the run stops and "
+                                 "says so."),
+            "htdemucs": ("htdemucs (Demucs v4)",
+                         "Isolates the voice from music and effects. Installed with WhisperJAV; its 84 MB model is "
+                         "fetched once on first use, from Meta's site rather than Hugging Face. If it cannot run, the "
+                         "run stops and says so."),
+        }
+        if backend in no_settings:
+            display_name, description = no_settings[backend]
             return {
                 "success": True,
-                "backend": "bs-roformer",
-                "display_name": "BS-RoFormer Vocal Isolation",
-                "description": "Separate vocals from background music (44.1kHz stereo)",
-                "parameters": {
-                    "model": {
-                        "type": "dropdown",
-                        "label": "Target",
-                        "description": "What to extract",
-                        "options": [
-                            {"value": "vocals", "label": "Vocals (speech/singing)"},
-                            {"value": "other", "label": "Other (background)"},
-                        ],
-                        "default": "vocals",
-                    },
-                    "device": {
-                        "type": "dropdown",
-                        "label": "Device",
-                        "options": [
-                            {"value": "auto", "label": "Auto (the GPU when one can be used, else the CPU)"},
-                            {"value": "cuda", "label": "NVIDIA GPU (CUDA)"},
-                            {"value": "cpu", "label": "CPU (not accelerated)"},
-                        ],
-                        "default": "auto",
-                    },
-                },
-                "defaults": {"model": "vocals", "device": "auto"},
+                "backend": backend,
+                "display_name": display_name,
+                "description": description,
+                "parameters": {},
+                "defaults": {},
+                "info_message": "This speech enhancer has no settings.",
             }
 
         # None (passthrough)
@@ -2276,9 +2291,15 @@ class WhisperJAVAPI:
                 audio.pop(key, None)
             return result
 
+        # 1.10.2 (owner W602 4): Sortformer and pyannote take no VAD threshold (CrispASR uses its own, 0.5), so the
+        # control is not offered for them.
+        from whisperjav.config.segmenter_presets import NO_THRESHOLD_SEGMENTERS
+        if segmenter in NO_THRESHOLD_SEGMENTERS:
+            audio.pop("vad_threshold", None)
+
         from whisperjav.config.chronosjav_vad import resolve_chronosjav_segmenter_config
         cfg = resolve_chronosjav_segmenter_config(generator_backend, segmenter, sensitivity)
-        if cfg.get("threshold") is not None:
+        if cfg.get("threshold") is not None and "vad_threshold" in audio:
             audio["vad_threshold"]["default"] = float(cfg["threshold"])
         if segmenter == "whisperseg":
             if cfg.get("segmentation_decoder"):
@@ -3232,8 +3253,7 @@ class WhisperJAVAPI:
                 effects = pass_config.get('dspEffects', ['loudnorm']) or ['loudnorm']
                 enhancer = f"ffmpeg-dsp:{','.join(effects)}"
             args += [f"--pass{n}-speech-enhancer", enhancer]
-            if pass_config.get('enhanceForVad'):
-                args += [f"--pass{n}-enhance-for-vad"]
+            args += _enhance_for_vad_args(n, pass_config)
         if pass_config.get('customized') and pass_config.get('params'):
             args += [f"--pass{n}-params", json.dumps(pass_config['params'])]
         # The Customize Timing tab (1.10.1; owner W413 2): sent only when it differs from the pipeline's default.
@@ -3413,9 +3433,8 @@ class WhisperJAVAPI:
             #     which the owner accepted on 2026-09-17; documented in --help.
             #   parakeet-crispasr, cohere-crispasr -- dual-track since design 22.9.1 (sent by
             #     _crispasr_pass_args).
-            if (pass1.get('enhanceForVad') and enhancer1 and enhancer1 not in ('none', '')
-                    and pass1.get('pipeline') != 'balanced'):
-                args += ["--pass1-enhance-for-vad"]
+            if enhancer1 and enhancer1 not in ('none', ''):
+                args += _enhance_for_vad_args(1, pass1)
 
             # Pass 1: Model
             # Note: All pipelines use --pass1-model. For Qwen, pass_worker.py
@@ -3536,9 +3555,8 @@ class WhisperJAVAPI:
                 # The program refuses this flag on a balanced pass (v1.9.3), so a
                 # stale value from another pipeline must not be sent: the run would
                 # stop with a usage error the user could not act on.
-                if (pass2.get('enhanceForVad') and enhancer2 and enhancer2 not in ('none', '')
-                        and pass2.get('pipeline') != 'balanced'):
-                    args += ["--pass2-enhance-for-vad"]
+                if enhancer2 and enhancer2 not in ('none', ''):
+                    args += _enhance_for_vad_args(2, pass2)
 
                 # Pass 2: Model
                 # Note: All pipelines use --pass2-model. For Qwen, pass_worker.py
@@ -4140,6 +4158,7 @@ class WhisperJAVAPI:
         "pass1_sensitivity":         "pass1Sensitivity",
         "pass1_scene_detector":      "pass1SceneDetector",
         "pass1_speech_enhancer":     "pass1SpeechEnhancer",
+        "pass1_enhance_for_vad":     "pass1EnhanceForVad",   # 1.10.2: "For VAD only" (owner W596 3)
         "pass1_speech_segmenter":    "pass1SpeechSegmenter",
         "pass1_model":               "pass1Model",
         "pass2_enabled":             "pass2Enabled",
@@ -4147,6 +4166,7 @@ class WhisperJAVAPI:
         "pass2_sensitivity":         "pass2Sensitivity",
         "pass2_scene_detector":      "pass2SceneDetector",
         "pass2_speech_enhancer":     "pass2SpeechEnhancer",
+        "pass2_enhance_for_vad":     "pass2EnhanceForVad",
         "pass2_speech_segmenter":    "pass2SpeechSegmenter",
         "pass2_model":               "pass2Model",
         "merge_strategy":            "mergeStrategy",
