@@ -6,6 +6,32 @@
     <title>WhisperJAV - Simple Runner</title>
     <!-- Theme stylesheet (swappable at runtime) -->
     <link id="themeStylesheet" rel="stylesheet" href="style.css">
+    <!-- 1.10.2 (owner W596 3): the Speech Enhancer menu with its "For VAD only" tick box (app.js EnhancerMenu).
+         Here, not in the theme files, so every theme gets it; it reads the theme's colours. -->
+    <style>
+        .enh-dd { position: relative; display: inline-block; }
+        .enh-dd > select.enh-dd-native { display: none; }
+        .enh-dd-button { text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; }
+        .enh-dd-button:disabled { cursor: default; }
+        /* the down-arrow the native drop-downs show */
+        .enh-dd > button.enh-dd-button { padding-right: 18px; background-repeat: no-repeat;
+            background-position: right 5px center; background-size: 9px 6px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 6'%3E%3Cpath d='M0.5 0.5l4 4 4-4' fill='none' stroke='%236C757D' stroke-width='1.4'/%3E%3C/svg%3E"); }
+        .enh-dd-menu { position: absolute; z-index: 1000; top: 100%; left: 0; min-width: 190px; margin-top: 2px;
+            padding: 4px 0; background: var(--input-bg, #fff); color: var(--text-primary, #212529);
+            border: 1px solid var(--border-color, #D1D5DB); border-radius: var(--border-radius, 6px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); font-size: 11px; max-height: 360px; overflow-y: auto; }
+        .enh-dd-group { padding: 4px 10px 2px; font-weight: 600; color: var(--text-secondary, #6C757D); }
+        .enh-dd-item { padding: 3px 10px 3px 20px; cursor: pointer; white-space: nowrap; }
+        .enh-dd-item.top { padding-left: 10px; }
+        .enh-dd-item:hover { background: var(--hover-tab-bg, #F2F4FA); }
+        .enh-dd-item.selected { font-weight: 600; color: var(--primary-color, #024873); }
+        .enh-dd-item.disabled { color: var(--text-muted, #ADB5BD); font-style: italic; cursor: default; }
+        .enh-dd-item.disabled:hover { background: transparent; }
+        .enh-dd-divider { border: 0; border-top: 1px solid var(--border-color, #D1D5DB); margin: 4px 0; }
+        .enh-dd-vad { display: flex; align-items: center; gap: 6px; padding: 3px 10px; cursor: pointer; white-space: nowrap; }
+        .enh-dd-vad.inactive { color: var(--text-muted, #ADB5BD); }
+    </style>
 </head>
 <body>
     <!-- Main Application Container -->
@@ -483,25 +509,31 @@
                                         </select>
                                     </div>
                                     <div class="col-enhancer">
+                                        <!-- 1.10.2 (owner W598 2a, W599, W600 1): None; the sections Vocal Separation, Noise
+                                             Suppression and DSP. Mel-Band-RoFormer and Mini-BS-RoFormer are run by CrispASR
+                                             (W594, W596). -->
                                         <select id="pass1-enhancer" class="form-select compact">
                                             <option value="none" selected>None</option>
-                                            <optgroup label="FFmpeg DSP (Lightweight)">
-                                                <option value="ffmpeg-dsp">Audio Filters...</option>
+                                            <hr>
+                                            <optgroup label="Vocal Separation">
+                                                <option value="mel-band-roformer" title="Isolates the voice from music and effects; run by CrispASR. Its 457 MB model is downloaded from Hugging Face the first time. Fast on an NVIDIA GPU, very slow on the CPU. If it cannot run, the run stops and says so.">Mel-Band-RoFormer</option>
+                                                <option value="mini-bs-roformer" title="Isolates the voice from music and effects; run by CrispASR. Its 92 MB model is downloaded from Hugging Face the first time. If it cannot run, the run stops and says so.">Mini-BS-RoFormer</option>
+                                                <option value="htdemucs" title="Isolates the voice from music and effects. Installed with WhisperJAV; its 84 MB model is fetched once on first use, from Meta's site rather than Hugging Face. If it cannot run, the run stops and says so.">htdemucs (Demucs v4)</option>
                                             </optgroup>
-                                            <optgroup label="ZipEnhancer (Recommended)">
-                                                <option value="zipenhancer">PyTorch (GPU when available)</option>
-                                                <option value="zipenhancer:onnx" disabled class="coming-soon">ONNX (Coming Soon)</option>
+                                            <hr>
+                                            <optgroup label="Noise Suppression">
+                                                <option value="zipenhancer">ZipEnhancer</option>
                                             </optgroup>
-                                            <optgroup label="BS-RoFormer">
-                                                <option value="bs-roformer:vocals" disabled class="coming-soon">Vocals (Coming Soon)</option>
-                                            </optgroup>
-                                            <optgroup label="htdemucs (Demucs v4)">
-                                                <option value="htdemucs" title="Isolates the voice from music and effects. Installed with WhisperJAV; its 84 MB model is fetched once on first use, from Meta's site rather than Hugging Face. If it cannot run, the run stops and says so.">Vocals</option>
+                                            <hr>
+                                            <optgroup label="DSP">
+                                                <option value="ffmpeg-dsp">FFmpeg Audio Filters...</option>
                                             </optgroup>
                                         </select>
+                                        <!-- 1.10.2 (owner W596 3): never shown; its tick box carries the setting, which the
+                                             Speech Enhancer menu shows under a divider (app.js EnhancerMenu). Ticked by default. -->
                                         <div class="enhance-for-vad-row" id="pass1-enhance-vad-row" style="display: none;">
                                             <label class="checkbox-label compact" title="Enhanced audio drives VAD boundaries; original audio is fed to the ASR model">
-                                                <input type="checkbox" id="pass1-enhance-for-vad">
+                                                <input type="checkbox" id="pass1-enhance-for-vad" checked>
                                                 <span>Enhance for VAD only</span>
                                             </label>
                                         </div>
@@ -511,9 +543,15 @@
                                              Pipeline is Balanced, app.js (populateSegmenterOptions)
                                              swaps this list for the built-in VAD's Silero versions:
                                              balanced offers no external segmenter (S2/S9). -->
+                                        <!-- 1.10.2 (owner W598 2b, W599): FireRedVAD, TEN VAD, WhisperSeg, the Silero builds;
+                                             a divider and "Experimental, open to feedback" with CrispASR's diarization
+                                             methods as speech finders (W594, W596); then None. -->
                                         <select id="pass1-segmenter" class="form-select compact">
-                                            <option value="silero">Silero v4.0</option>
+                                            <option value="firered-vad" selected title="FireRedTeam DFSMN VAD (~0.6M params, 100+ languages). Installed with WhisperJAV since v1.9.2.">FireRedVAD</option>
+                                            <option value="ten">TEN VAD</option>
+                                            <option value="whisperseg" title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). F1=0.787 on Netflix-GT JAV. For non-Japanese audio, switch to Silero v3.1.">WhisperSeg (JA-ASMR)</option>
                                             <option value="silero-v3.1">Silero v3.1</option>
+                                            <option value="silero">Silero v4.0</option>
                                             <option value="silero-v6.2">Silero v6.2</option>
                                             <!-- Hidden from GUI in v1.8.12 — still selectable via --speech-segmenter CLI.
                                                  NeMo Lite: requires heavy nemo_toolkit (2GB+), usually unavailable.
@@ -522,9 +560,11 @@
                                             <!-- <option value="whisper-vad">Whisper VAD (small)</option> -->
                                             <!-- <option value="whisper-vad-tiny">Whisper VAD (tiny)</option> -->
                                             <!-- <option value="whisper-vad-medium">Whisper VAD (medium)</option> -->
-                                            <option value="ten">TEN VAD</option>
-                                            <option value="whisperseg" title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). F1=0.787 on Netflix-GT JAV. For non-Japanese audio, switch to Silero v3.1.">WhisperSeg (JA-ASMR)</option>
-                                            <option value="firered-vad" selected title="FireRedTeam DFSMN VAD (~0.6M params, 100+ languages). Installed with WhisperJAV since v1.9.2.">FireRedVAD</option>
+                                            <hr>
+                                            <optgroup label="Experimental, open to feedback">
+                                                <option value="sortformer" title="NVIDIA Nemotron-3-Diarization, run by CrispASR: the speech is where it finds a speaker. Runs on the GPU; its 107 MB model is downloaded the first time. The same settings at every sensitivity.">Sortformer (NVIDIA Nemotron)</option>
+                                                <option value="pyannote" title="pyannote segmentation-3.0, run by CrispASR on the CPU; experimental in CrispASR. Its 6 MB model is downloaded the first time. The same settings at every sensitivity.">pyannote 3.0</option>
+                                            </optgroup>
                                             <option value="none">None</option>
                                         </select>
                                     </div>
@@ -663,25 +703,28 @@
                                         </select>
                                     </div>
                                     <div class="col-enhancer">
+                                        <!-- 1.10.2 (owner W598 2a, W599, W600 1): as pass 1. -->
                                         <select id="pass2-enhancer" class="form-select compact" disabled>
                                             <option value="none" selected>None</option>
-                                            <optgroup label="FFmpeg DSP (Lightweight)">
-                                                <option value="ffmpeg-dsp">Audio Filters...</option>
+                                            <hr>
+                                            <optgroup label="Vocal Separation">
+                                                <option value="mel-band-roformer" title="Isolates the voice from music and effects; run by CrispASR. Its 457 MB model is downloaded from Hugging Face the first time. Fast on an NVIDIA GPU, very slow on the CPU. If it cannot run, the run stops and says so.">Mel-Band-RoFormer</option>
+                                                <option value="mini-bs-roformer" title="Isolates the voice from music and effects; run by CrispASR. Its 92 MB model is downloaded from Hugging Face the first time. If it cannot run, the run stops and says so.">Mini-BS-RoFormer</option>
+                                                <option value="htdemucs" title="Isolates the voice from music and effects. Installed with WhisperJAV; its 84 MB model is fetched once on first use, from Meta's site rather than Hugging Face. If it cannot run, the run stops and says so.">htdemucs (Demucs v4)</option>
                                             </optgroup>
-                                            <optgroup label="ZipEnhancer (Recommended)">
-                                                <option value="zipenhancer">PyTorch (GPU when available)</option>
-                                                <option value="zipenhancer:onnx" disabled class="coming-soon">ONNX (Coming Soon)</option>
+                                            <hr>
+                                            <optgroup label="Noise Suppression">
+                                                <option value="zipenhancer">ZipEnhancer</option>
                                             </optgroup>
-                                            <optgroup label="BS-RoFormer">
-                                                <option value="bs-roformer:vocals" disabled class="coming-soon">Vocals (Coming Soon)</option>
-                                            </optgroup>
-                                            <optgroup label="htdemucs (Demucs v4)">
-                                                <option value="htdemucs" title="Isolates the voice from music and effects. Installed with WhisperJAV; its 84 MB model is fetched once on first use, from Meta's site rather than Hugging Face. If it cannot run, the run stops and says so.">Vocals</option>
+                                            <hr>
+                                            <optgroup label="DSP">
+                                                <option value="ffmpeg-dsp">FFmpeg Audio Filters...</option>
                                             </optgroup>
                                         </select>
+                                        <!-- 1.10.2 (owner W596 3): never shown; see pass 1. -->
                                         <div class="enhance-for-vad-row" id="pass2-enhance-vad-row" style="display: none;">
                                             <label class="checkbox-label compact" title="Enhanced audio drives VAD boundaries; original audio is fed to the ASR model">
-                                                <input type="checkbox" id="pass2-enhance-for-vad">
+                                                <input type="checkbox" id="pass2-enhance-for-vad" checked>
                                                 <span>Enhance for VAD only</span>
                                             </label>
                                         </div>
@@ -691,9 +734,13 @@
                                              Pipeline is Balanced, app.js (populateSegmenterOptions)
                                              swaps this list for the built-in VAD's Silero versions:
                                              balanced offers no external segmenter (S2/S9). -->
+                                        <!-- 1.10.2 (owner W598 2b, W599): as pass 1. -->
                                         <select id="pass2-segmenter" class="form-select compact" disabled>
-                                            <option value="silero">Silero v4.0</option>
+                                            <option value="firered-vad" title="FireRedTeam DFSMN VAD (~0.6M params, 100+ languages). Installed with WhisperJAV since v1.9.2.">FireRedVAD</option>
+                                            <option value="ten" selected title="TEN VAD — pass 2 default for segmentation diversity vs pass 1's FireRedVAD.">TEN VAD (default)</option>
+                                            <option value="whisperseg" title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). F1=0.787 on Netflix-GT JAV. For non-Japanese audio, switch to Silero v3.1.">WhisperSeg (JA-ASMR)</option>
                                             <option value="silero-v3.1">Silero v3.1</option>
+                                            <option value="silero">Silero v4.0</option>
                                             <option value="silero-v6.2">Silero v6.2</option>
                                             <!-- Hidden from GUI in v1.8.12 — still selectable via --pass2-speech-segmenter CLI.
                                                  NeMo Lite: requires heavy nemo_toolkit (2GB+), usually unavailable.
@@ -702,9 +749,11 @@
                                             <!-- <option value="whisper-vad">Whisper VAD (small)</option> -->
                                             <!-- <option value="whisper-vad-tiny">Whisper VAD (tiny)</option> -->
                                             <!-- <option value="whisper-vad-medium">Whisper VAD (medium)</option> -->
-                                            <option value="ten" selected title="TEN VAD — pass 2 default for segmentation diversity vs pass 1's FireRedVAD.">TEN VAD (default)</option>
-                                            <option value="whisperseg" title="Whisper-encoder VAD trained on Japanese ASMR (ONNX). F1=0.787 on Netflix-GT JAV. For non-Japanese audio, switch to Silero v3.1.">WhisperSeg (JA-ASMR)</option>
-                                            <option value="firered-vad" title="FireRedTeam DFSMN VAD (~0.6M params, 100+ languages). Installed with WhisperJAV since v1.9.2.">FireRedVAD</option>
+                                            <hr>
+                                            <optgroup label="Experimental, open to feedback">
+                                                <option value="sortformer" title="NVIDIA Nemotron-3-Diarization, run by CrispASR: the speech is where it finds a speaker. Runs on the GPU; its 107 MB model is downloaded the first time. The same settings at every sensitivity.">Sortformer (NVIDIA Nemotron)</option>
+                                                <option value="pyannote" title="pyannote segmentation-3.0, run by CrispASR on the CPU; experimental in CrispASR. Its 6 MB model is downloaded the first time. The same settings at every sensitivity.">pyannote 3.0</option>
+                                            </optgroup>
                                             <option value="none">None</option>
                                         </select>
                                     </div>
