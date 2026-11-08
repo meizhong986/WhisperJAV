@@ -6,7 +6,7 @@ defined in base.py.
 
 Available backends:
 - none: Passthrough (no enhancement)
-- bs_roformer: BS-RoFormer vocal isolation
+- crispasr_separator: Mel-Band-RoFormer and Mini-BS-RoFormer vocal isolation, run by CrispASR (1.10.2)
 """
 
 # Backends are lazy-loaded by the factory to avoid import overhead
