@@ -29,7 +29,9 @@ logger = logging.getLogger(__name__)
 _MAX_NAME_LENGTH = 80
 
 # Preset schema version — bump when the preset fields change
-PRESET_SCHEMA_VERSION = "1.0.0"
+# 1.1.0 (1.10.2, owner W596 3, W602 2): "For VAD only" (enhance_for_vad) is on by default since 1.10.2. A preset of
+# 1.0.0 holds the old default, false, which cannot be told from a deliberate untick; the GUI reads it as not set.
+PRESET_SCHEMA_VERSION = "1.1.0"
 
 # Required keys in a valid preset (everything else is optional)
 _REQUIRED_KEYS = {"name", "pipeline"}
