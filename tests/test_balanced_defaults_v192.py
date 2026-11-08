@@ -253,8 +253,10 @@ class TestBalancedDefault:
         from whisperjav.config.segmenter_presets import SINGLE_PASS_EXTERNAL_OK
         # 1.9.4 (WP-004, owner 2026-10-04): fidelity also keeps ten, whisperseg and
         # whisper-vad; nemo is still not listed. Still fidelity only.
+        # 1.10.2 (owner W596 2, "All pipelines"): and CrispASR's sortformer and pyannote.
         assert SINGLE_PASS_EXTERNAL_OK == {
-            "fidelity": frozenset({"firered-vad", "ten", "whisperseg", "whisper-vad"})}
+            "fidelity": frozenset({"firered-vad", "ten", "whisperseg", "whisper-vad",
+                                   "sortformer", "pyannote"})}
 
     def test_check_reports_without_downloading(self, monkeypatch):
         """A diagnostic must not change the machine it is diagnosing."""
