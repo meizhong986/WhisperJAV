@@ -110,8 +110,11 @@ class CrispEnhancer:
         self.use_gpu = (str(device or "auto") != "cpu") if use_gpu is None else bool(use_gpu)
         self.threads = threads
         self.session = None
+        # One record for the whole run: the pipeline makes a new enhancer for every file, so the counts add up across
+        # files (review finding 2: a reset per file hid a failed scene of an earlier file).
         self.record = record if record is not None else {}
-        self.record.update({"scenes": 0, "failed": 0, "audio_s": 0.0, "enhance_s": 0.0, "open_s": None, "errors": []})
+        for k, v in (("scenes", 0), ("failed", 0), ("audio_s", 0.0), ("enhance_s", 0.0), ("open_s", None), ("errors", [])):
+            self.record.setdefault(k, v)
 
     @property
     def name(self):
@@ -239,8 +242,9 @@ class CrispSegmenter:
         self._name, self.spec, self.path, self.threads = name, spec, path, threads
         self.settings = crisp_vad_settings(spec, config)
         self.record = record if record is not None else {}
-        self.record.update({"scenes": 0, "failed": 0, "vad_s": 0.0, "audio_s": 0.0, "spans": 0, "errors": [],
-                            "settings": self.settings})
+        for k, v in (("scenes", 0), ("failed", 0), ("vad_s", 0.0), ("audio_s", 0.0), ("spans", 0), ("errors", [])):
+            self.record.setdefault(k, v)   # added up across the run's files, as CrispEnhancer's
+        self.record["settings"] = self.settings
 
     @property
     def name(self):
