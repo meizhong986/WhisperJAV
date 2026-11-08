@@ -202,13 +202,7 @@ LANGUAGE_CODE_MAP = {
 # hardcoded rather than imported so `--help` does not pay the factory import cost.
 # Without `choices=`, a typo such as `zipenhance` was accepted and silently
 # downgraded to no enhancement part-way through a multi-hour run (#306).
-SPEECH_ENHANCER_CHOICES = ["none", "ffmpeg-dsp", "zipenhancer", "bs-roformer", "htdemucs"]
-
-# Speech enhancers WhisperJAV no longer includes (ClearVoice, v1.10.0). They pass
-# argument parsing so that _stop_on_removed_enhancer can name the flag in its
-# message (owner, W75/W79); argparse's own error could not. Kept in step with the
-# factory's REMOVED_BACKENDS by tests/test_clearvoice_removed_v110.py.
-REMOVED_SPEECH_ENHANCERS = ["clearvoice"]
+SPEECH_ENHANCER_CHOICES = ["none", "ffmpeg-dsp", "zipenhancer", "htdemucs", "mel-band-roformer", "mini-bs-roformer"]
 
 # The effects FFmpegDSPBackend knows. Hardcoded for the same reason
 # SPEECH_ENHANCER_CHOICES is: --help and argument validation must not pay the cost
@@ -234,7 +228,7 @@ def speech_enhancer_spec(value: str) -> str:
 
     The detail is the backend's own second argument: a list of effects for
     ffmpeg-dsp ("ffmpeg-dsp:loudnorm,denoise"), a model name for the others
-    ("bs-roformer:vocals"). Everything downstream already understood
+    ("mini-bs-roformer:vocals"). Everything downstream already understood
     that form -- pass_worker._parse_speech_enhancer splits it, and
     FFmpegDSPBackend splits a comma-separated detail into effects -- but the
     #306 fix in v1.9.2 put a plain choices= list on these flags, which rejected
@@ -252,10 +246,6 @@ def speech_enhancer_spec(value: str) -> str:
     """
     backend, separator, detail = value.partition(":")
     backend = backend.strip()
-
-    if backend.lower() in REMOVED_SPEECH_ENHANCERS:
-        # Stopped after parsing, by _stop_on_removed_enhancer, which can name the flag.
-        return value.strip()
 
     if backend not in SPEECH_ENHANCER_CHOICES:
         raise argparse.ArgumentTypeError(
@@ -287,22 +277,22 @@ def speech_enhancer_spec(value: str) -> str:
                     ", ".join(repr(e) for e in FFMPEG_DSP_EFFECTS)))
         return "{}:{}".format(backend, ",".join(effects))
 
-    # zipenhancer / bs-roformer / htdemucs: the detail is a model name. Which
+    # zipenhancer / htdemucs / mel-band-roformer / mini-bs-roformer: the detail is a model name. Which
     # models exist is the backend's business and costs an import to find out, so
     # it is left to the backend, which already falls back with a warning.
     return "{}:{}".format(backend, detail)
 
 
-def _stop_on_removed_enhancer(args) -> None:
+def _stop_on_unknown_enhancer(args) -> None:
     """
-    Stop the run, before any audio is read, when a speech enhancer WhisperJAV no
-    longer includes (ClearVoice, v1.10.0) is named on the command line.
+    Stop the run, before any audio is read, when a speech enhancer WhisperJAV does not
+    offer is named on the command line (1.10.2, owner W603, rule (i)).
 
-    Owner, W75: a saved ClearVoice choice stops the run with a message. The GUI,
-    an Ensemble preset or a script can carry it in the three enhancer flags or in
-    the pass parameters (qwen_enhancer, hf_speech_enhancer), which are passed
-    through to the pipeline unchecked. Exit code 2, the usage-error code these
-    flags already use (owner, W78 C5). Text M1 (owner, W79).
+    The three speech enhancer flags reject such a name while the arguments are parsed
+    (speech_enhancer_spec); the pass parameters (qwen_enhancer in --passN-qwen-params,
+    hf_speech_enhancer in --passN-hf-params) are passed through to the pipeline
+    unchecked, so this is where they are stopped. Exit code 2, the usage-error code
+    these flags already use (owner, W78 C5). Text approved, owner W603.
     """
     found = []
     for flag in ("pass1_speech_enhancer", "pass2_speech_enhancer", "qwen_enhancer"):
@@ -320,11 +310,10 @@ def _stop_on_removed_enhancer(args) -> None:
             if isinstance(params, dict):
                 found.append((params.get(key), f"{key} in --{flag.replace('_', '-')}"))
     for value, where in found:
-        if not isinstance(value, str):
-            continue
-        if value.split(":", 1)[0].strip().lower() in REMOVED_SPEECH_ENHANCERS:
-            from whisperjav.modules.speech_enhancement.factory import removed_backend_message
-            print(removed_backend_message(value, where), file=sys.stderr)
+        from whisperjav.modules.speech_enhancement.factory import unknown_backend_message
+        message = unknown_backend_message(value, where)
+        if message:
+            print(message, file=sys.stderr)
             sys.exit(2)
 
 
@@ -442,7 +431,7 @@ def parse_arguments():
                                help="Scene detection method for pass 1 (default: semantic since v1.9.2; for "
                                     "moss-crispasr semantic with scenes of normally 90-240 s).")
     twopass_group.add_argument("--pass1-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, none). Default: firered-vad when pass 1 is Qwen3-ASR; for the GGUF pipelines: ten for parakeet-crispasr, reazonspeech-crispasr, haas-crispasr and qwen3-asr-crispasr, firered-vad for the others; none sends each scene to the model whole. Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
+                               help="Speech segmenter backend for pass 1 (e.g., silero, ten, nemo, whisper-vad, sortformer, pyannote, none). Default: firered-vad when pass 1 is Qwen3-ASR; for the GGUF pipelines: ten for parakeet-crispasr, reazonspeech-crispasr, haas-crispasr and qwen3-asr-crispasr, firered-vad for the others; none sends each scene to the model whole. Not accepted when --pass1-pipeline is balanced: that pass runs the built-in VAD, so use --pass1-vad-version instead.")
     twopass_group.add_argument("--pass1-vad-version", default=None,
                                choices=list(VAD_VERSIONS),
                                help="Silero VAD build for pass 1 when --pass1-pipeline is balanced "
@@ -456,16 +445,19 @@ def parse_arguments():
                                     + ". A detail may follow a colon: for ffmpeg-dsp a comma-separated "
                                       "list of effects (" + ", ".join(FFMPEG_DSP_EFFECTS) + "), e.g. "
                                       "ffmpeg-dsp:loudnorm,denoise; for the others a model name, e.g. "
-                                      "bs-roformer:vocals. An unrecognised name or effect is "
+                                      "mini-bs-roformer:vocals. An unrecognised name or effect is "
                                       "rejected here rather than silently falling back mid-run (#306).")
-    twopass_group.add_argument("--pass1-enhance-for-vad", action="store_true", default=False,
-                               help="Dual-track mode for pass 1: the cleaned-up audio drives speech "
-                                    "detection, the original audio goes to the recogniser. Available "
-                                    "with qwen, fidelity and the GGUF pipelines. NOT "
-                                    "accepted when --pass1-pipeline is balanced: balanced finds the "
-                                    "speech inside faster-whisper itself, on the same audio it "
-                                    "transcribes, so there is nothing to split. fast, faster and "
-                                    "transformers ignore it: they run no separate speech segmenter to feed.")
+    # 1.10.2 (owner W596 3): on by default whenever the pass has a speech enhancer and runs a separate
+    # speech segmenter; --no-pass1-enhance-for-vad turns it off (apply_enhance_for_vad_default).
+    twopass_group.add_argument("--pass1-enhance-for-vad", action=argparse.BooleanOptionalAction, default=None,
+                               help="Enhance for VAD only, pass 1: the cleaned-up audio is used to find the "
+                                    "speech and the original audio goes to the ASR model. On by default "
+                                    "since 1.10.2 whenever pass 1 has a speech enhancer and its pipeline is "
+                                    "qwen, fidelity or a GGUF pipeline; --no-pass1-enhance-for-vad gives the "
+                                    "cleaned-up audio to both. balanced, fast, faster and transformers keep one "
+                                    "track: balanced finds the speech inside faster-whisper itself, on the "
+                                    "same audio it transcribes (--pass1-enhance-for-vad is refused there), "
+                                    "and the others run no separate speech segmenter.")
     # 1.10.0 (item 5): the XXL sentence is text H2, approved by the owner as drafted (W275).
     twopass_group.add_argument("--pass1-model", default=None,
                                help="Model name for pass 1 (e.g., large-v2, kotoba-whisper-v2.0). "
@@ -509,7 +501,7 @@ def parse_arguments():
                                help="Scene detection method for pass 2 (default: semantic since v1.9.2; for "
                                     "moss-crispasr semantic with scenes of normally 90-240 s).")
     twopass_group.add_argument("--pass2-speech-segmenter", default=None,
-                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, none). Default: ten when pass 2 is Qwen3-ASR or anime-whisper; for the GGUF pipelines: ten for parakeet-crispasr, reazonspeech-crispasr, haas-crispasr and qwen3-asr-crispasr, firered-vad for the others; none sends each scene to the model whole. Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
+                               help="Speech segmenter backend for pass 2 (e.g., silero, ten, nemo, whisper-vad, sortformer, pyannote, none). Default: ten when pass 2 is Qwen3-ASR or anime-whisper; for the GGUF pipelines: ten for parakeet-crispasr, reazonspeech-crispasr, haas-crispasr and qwen3-asr-crispasr, firered-vad for the others; none sends each scene to the model whole. Not accepted when --pass2-pipeline is balanced: that pass runs the built-in VAD, so use --pass2-vad-version instead.")
     twopass_group.add_argument("--pass2-vad-version", default=None,
                                choices=list(VAD_VERSIONS),
                                help="Silero VAD build for pass 2 when --pass2-pipeline is balanced "
@@ -523,16 +515,19 @@ def parse_arguments():
                                     + ". A detail may follow a colon: for ffmpeg-dsp a comma-separated "
                                       "list of effects (" + ", ".join(FFMPEG_DSP_EFFECTS) + "), e.g. "
                                       "ffmpeg-dsp:loudnorm,denoise; for the others a model name, e.g. "
-                                      "bs-roformer:vocals. An unrecognised name or effect is "
+                                      "mini-bs-roformer:vocals. An unrecognised name or effect is "
                                       "rejected here rather than silently falling back mid-run (#306).")
-    twopass_group.add_argument("--pass2-enhance-for-vad", action="store_true", default=False,
-                               help="Dual-track mode for pass 2: the cleaned-up audio drives speech "
-                                    "detection, the original audio goes to the recogniser. Available "
-                                    "with qwen, fidelity and the GGUF pipelines. NOT "
-                                    "accepted when --pass2-pipeline is balanced: balanced finds the "
-                                    "speech inside faster-whisper itself, on the same audio it "
-                                    "transcribes, so there is nothing to split. fast, faster and "
-                                    "transformers ignore it: they run no separate speech segmenter to feed.")
+    # 1.10.2 (owner W596 3): on by default whenever the pass has a speech enhancer and runs a separate
+    # speech segmenter; --no-pass2-enhance-for-vad turns it off (apply_enhance_for_vad_default).
+    twopass_group.add_argument("--pass2-enhance-for-vad", action=argparse.BooleanOptionalAction, default=None,
+                               help="Enhance for VAD only, pass 2: the cleaned-up audio is used to find the "
+                                    "speech and the original audio goes to the ASR model. On by default "
+                                    "since 1.10.2 whenever pass 2 has a speech enhancer and its pipeline is "
+                                    "qwen, fidelity or a GGUF pipeline; --no-pass2-enhance-for-vad gives the "
+                                    "cleaned-up audio to both. balanced, fast, faster and transformers keep one "
+                                    "track: balanced finds the speech inside faster-whisper itself, on the "
+                                    "same audio it transcribes (--pass2-enhance-for-vad is refused there), "
+                                    "and the others run no separate speech segmenter.")
     # 1.10.0 (item 5): the XXL sentence is text H2, approved by the owner as drafted (W275).
     twopass_group.add_argument("--pass2-model", default=None,
                                help="Model name for pass 2 (e.g., large-v2, kotoba-whisper-v2.0). "
@@ -694,7 +689,10 @@ def parse_arguments():
                                  "silero", "silero-v4.0", "silero-v3.1", "silero-v6.2",
                                  "nemo", "nemo-lite",
                                  "whisper-vad", "whisper-vad-tiny", "whisper-vad-base", "whisper-vad-medium",
-                                 "ten", "whisperseg", "firered-vad", "none"
+                                 "ten", "whisperseg", "firered-vad",
+                                 # 1.10.2 (owner W594, W596): CrispASR's diarization methods as speech finders
+                                 "sortformer", "pyannote",
+                                 "none"
                              ],
                              default=None,  # None = per-mode default (see help text)
                              metavar="BACKEND",
@@ -985,29 +983,36 @@ def parse_arguments():
                                 + ". A detail may follow a colon: for ffmpeg-dsp a "
                                   "comma-separated list of effects ("
                                 + ", ".join(FFMPEG_DSP_EFFECTS)
-                                + "), for the others a model name. htdemucs and "
-                                "bs-roformer isolate the voice from music and effects; "
+                                + "), for the others a model name. htdemucs, "
+                                "mel-band-roformer and mini-bs-roformer (run by CrispASR) "
+                                "isolate the voice from music and effects; "
                                 "zipenhancer reduces noise; ffmpeg-dsp applies "
                                 "level and filter work.")
     qwen_audio_group.add_argument("--qwen-enhancer-model", type=str, default=None,
                            help="Speech enhancer model variant (e.g., 'torch' for zipenhancer)")
-    qwen_audio_group.add_argument("--enhance-for-vad", action="store_true", default=False,
-                           help="Dual-track mode: the cleaned-up audio is used to find the speech "
-                                "and the original audio goes to the recogniser. Applies to the "
-                                "qwen, fidelity and decoupled pipelines and the GGUF (*-crispasr) "
-                                "pipelines. NOT accepted with balanced, which finds the speech "
-                                "inside faster-whisper itself, on the same audio it transcribes. "
-                                "Accepted but ignored by fast, faster and transformers.")
+    # 1.10.2 (owner W596 3): on by default whenever a speech enhancer runs; see apply_enhance_for_vad_default.
+    qwen_audio_group.add_argument("--enhance-for-vad", action=argparse.BooleanOptionalAction, default=None,
+                           help="Enhance for VAD only: the cleaned-up audio is used to find the speech "
+                                "and the original audio goes to the ASR model. On by default since "
+                                "1.10.2 whenever a speech enhancer runs in the qwen, fidelity or "
+                                "decoupled pipeline or a GGUF (*-crispasr) pipeline; --no-enhance-for-vad "
+                                "gives the cleaned-up audio to both. In an Ensemble run it applies to "
+                                "both passes unless --passN-enhance-for-vad or --no-passN-enhance-for-vad "
+                                "is given. Refused with balanced, which finds the speech inside "
+                                "faster-whisper itself, on the same audio it transcribes. fast, faster "
+                                "and transformers keep one track.")
     qwen_audio_group.add_argument("--qwen-segmenter", type=str, default="whisperseg",
                            choices=["none", "silero", "silero-v4.0", "silero-v3.1", "silero-v6.2",
                                     "nemo", "nemo-lite", "whisper-vad", "ten", "whisperseg",
-                                    "firered-vad"],
+                                    "firered-vad", "sortformer", "pyannote"],
                            help="Speech segmentation backend for VAD-based chunking: "
                                 "whisperseg (default since v1.8.13, JA-ASMR ONNX), "
                                 "silero-v6.2 (force-splits long chunks), "
                                 "ten, silero/silero-v4.0/v3.1, "
                                 "nemo/nemo-lite, whisper-vad, "
-                                "firered-vad, none")
+                                "firered-vad, "
+                                "sortformer (CrispASR, GPU), pyannote (CrispASR, CPU, experimental), "
+                                "none")
     qwen_audio_group.add_argument("--qwen-max-group-duration", type=float, default=None,
                            help="Max duration (seconds) for VAD segment grouping (default: 3.0 for Qwen3-ASR; "
                                 "anime-whisper 3.0 / 2.5 / 2.0 by sensitivity)")
@@ -1216,8 +1221,8 @@ def parse_arguments():
         from whisperjav.translate.providers import removed_local_provider_error
         print(removed_local_provider_error("--translate-provider"), file=sys.stderr)
         sys.exit(1)
-    # v1.10.0 (item 3, owner W75): a removed speech enhancer (ClearVoice).
-    _stop_on_removed_enhancer(args)
+    # 1.10.2 (owner W603): a speech enhancer WhisperJAV does not offer, inside the pass parameters.
+    _stop_on_unknown_enhancer(args)
     apply_run_device(args)
     return args
 
@@ -1625,9 +1630,10 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         elif _sd_attempts is not None and _sd_attempts > 0:
             _pipeline_kwargs["stepdown_enabled"] = True
 
-        # Dual-track enhancement
-        if getattr(args, 'enhance_for_vad', False):
-            _pipeline_kwargs.setdefault("enhance_for_vad", True)
+        # Dual-track enhancement. Not given (None): the pipeline's own default, on when its speech enhancer is set
+        # (1.10.2, owner W596 3); --enhance-for-vad / --no-enhance-for-vad: as given, unless the YAML names it.
+        if getattr(args, 'enhance_for_vad', None) is not None:
+            _pipeline_kwargs.setdefault("enhance_for_vad", bool(args.enhance_for_vad))
 
         # 3. Construct pipeline — DecoupledPipeline defaults fill anything not specified
         pipeline = DecoupledPipeline(
@@ -1702,6 +1708,11 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         _vad_thr = getattr(args, 'qwen_vad_threshold', None)
         if _vad_thr is not None:
             _user_vad_overrides["threshold"] = _vad_thr
+            # 1.10.2 (owner W602 4): Sortformer and pyannote take no threshold.
+            from whisperjav.config.segmenter_presets import vad_threshold_unused_line
+            _unused = vad_threshold_unused_line(_qwen_segmenter, "--qwen-vad-threshold")
+            if _unused:
+                logger.warning(_unused)
         # --qwen-max-speech-duration: explicit CLI cap on single-segment length.
         # A SEGMENTER_PARAM, so it routes via segmenter_config to BOTH the Phase-4
         # segmenter and the vad-grouped framer (the binding VAD for anime). Wins
@@ -2493,6 +2504,52 @@ def apply_ensemble_pass_defaults(args) -> None:
             setattr(args, f"pass{n}_speech_segmenter", defaults["speech_segmenter"])
 
 
+# The pipelines that run a separate speech segmenter on the cleaned-up audio while the original goes to the ASR
+# model (enhance for VAD only): fidelity_pipeline.py, qwen_pipeline.py, crispasr_pipeline.py (every GGUF pipeline).
+# The decoupled pipeline too, which resolves its own default (its speech enhancer comes from its YAML file).
+ENHANCE_FOR_VAD_PIPELINES = frozenset({"fidelity", "qwen", *CRISPASR_PIPELINES})
+
+
+def _runs_speech_enhancer(spec) -> bool:
+    """True when a --passN-speech-enhancer / --qwen-enhancer value names a real speech enhancer (not none)."""
+    return str(spec or "none").split(":", 1)[0].strip().lower() not in ("", "none")
+
+
+def apply_enhance_for_vad_default(args) -> None:
+    """Owner W596 3 (1.10.2): "enhance for VAD only" is the default for every speech enhancer.
+
+    The three flags are tri-state (None = not given). Run after validate_balanced_vad_options, which refuses an
+    explicit --enhance-for-vad / --passN-enhance-for-vad on balanced and must see only what the user typed.
+    Ensemble: each pass takes its own flag, else the global --enhance-for-vad, else on when the pass runs a speech
+    enhancer and its pipeline has a separate speech segmenter (ENHANCE_FOR_VAD_PIPELINES); the global flag is then
+    folded in (False), so the "pass OR global" reads below give the pass's value. A single run: --mode qwen with a
+    speech enhancer, on; the decoupled pipeline keeps None (its own default, decoupled_pipeline.py); every other
+    single run has no speech enhancer flag, so off. Silent: a default never warns.
+    """
+    if getattr(args, "ensemble", False):
+        global_efv = getattr(args, "enhance_for_vad", None)
+        for n in ("1", "2"):
+            value = getattr(args, f"pass{n}_enhance_for_vad", None)
+            if value is None:
+                value = global_efv
+            if value is None:
+                value = (getattr(args, f"pass{n}_pipeline", None) in ENHANCE_FOR_VAD_PIPELINES
+                         and _runs_speech_enhancer(getattr(args, f"pass{n}_speech_enhancer", None)))
+            setattr(args, f"pass{n}_enhance_for_vad", bool(value))
+        args.enhance_for_vad = False
+        return
+    for n in ("1", "2"):
+        if getattr(args, f"pass{n}_enhance_for_vad", None) is None:
+            setattr(args, f"pass{n}_enhance_for_vad", False)
+    if getattr(args, "enhance_for_vad", None) is not None:
+        args.enhance_for_vad = bool(args.enhance_for_vad)
+        return
+    if getattr(args, "pipeline", None) is not None or getattr(args, "pipeline_config", None):
+        return   # decoupled: its pipeline decides (None = on when its speech enhancer is set)
+    args.enhance_for_vad = (getattr(args, "mode", None) == "qwen"
+                            and _runs_speech_enhancer(getattr(args, "qwen_enhancer", None)))
+
+
 def validate_balanced_vad_options(args) -> None:
     """
     Enforce requirements S2/S9: the balanced pipeline offers no external speech segmenter.
@@ -2637,6 +2694,8 @@ def main():
         # 1.10.0: a CrispASR pass needs a model it knows, Japanese audio and a speech
         # segmenter (CrispASR master plan 2.4; owner Q14, Q19).
         validate_crispasr_passes(args)
+        # 1.10.2 (owner W596 3): enhance for VAD only, the default for every speech enhancer.
+        apply_enhance_for_vad_default(args)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         sys.exit(2)
@@ -3065,7 +3124,14 @@ def main():
             if "speech_segmenter" not in resolved_config["params"]:
                 resolved_config["params"]["speech_segmenter"] = {}
             resolved_config["params"]["speech_segmenter"]["threshold"] = vad_threshold
-            logger.info(f"VAD threshold set via CLI: {vad_threshold}")
+            # 1.10.2 (owner W602 4): Sortformer and pyannote take no threshold.
+            from whisperjav.config.segmenter_presets import vad_threshold_unused_line
+            _unused = vad_threshold_unused_line(
+                resolved_config["params"]["speech_segmenter"].get("backend"), "--vad-threshold")
+            if _unused:
+                logger.warning(_unused)
+            else:
+                logger.info(f"VAD threshold set via CLI: {vad_threshold}")
 
         speech_pad_ms = getattr(args, 'speech_pad_ms', None)
         if speech_pad_ms is not None:
@@ -3389,6 +3455,12 @@ def main():
             # wrong way (owner, 2026-09-17).
             ensure_segmenter_backend_available(_seg)
             ensure_segmenter_model_available(_seg)
+            # 1.10.2 (owner W602 4): Sortformer and pyannote take no threshold; one line per pass that gives one.
+            if getattr(args, f"pass{_n}_vad_threshold", None) is not None:
+                from whisperjav.config.segmenter_presets import vad_threshold_unused_line
+                _unused = vad_threshold_unused_line(_seg, f"--pass{_n}-vad-threshold")
+                if _unused:
+                    logger.warning("Pass %s: %s", _n, _unused)
         # CrispASR passes (route B design 4.2): CrispASR, the device and the models are made ready
         # here, models downloaded if missing, before any audio is read and before either pass starts. A
         # missing package, a processor without AVX2, --device cuda without an NVIDIA GPU, a missing file
@@ -3414,17 +3486,17 @@ def main():
     # user asked to have cleaned up, from a run that exits 0.
     if args.ensemble:
         for _n in (1, 2):
-            # A CrispASR pass runs no audio clean-up (CrispASR master plan 2.2), so a clean-up
-            # named for it must not stop the run; the pass worker names it among the settings
-            # that pass does not use.
-            if getattr(args, f"pass{_n}_pipeline", None) in CRISPASR_PIPELINES:
-                continue
+            # Every pass, the GGUF (CrispASR) passes included: they run the pass's speech enhancer since
+            # 1.10.0 (crispasr_pipeline.py _enhance). Before 1.10.2 they were skipped here, from the time they
+            # ran none (owner W596 7).
             ensure_speech_enhancer_available(
                 getattr(args, f"pass{_n}_speech_enhancer", None))
     else:
         ensure_speech_enhancer_available(getattr(args, "qwen_enhancer", None))
         if getattr(args, "mode", None) == "qwen":
             ensure_segmenter_backend_available(getattr(args, "qwen_segmenter", None))
+            # 1.10.2: a model downloaded on first use (FireRedVAD; CrispASR's sortformer, pyannote) is fetched here.
+            ensure_segmenter_model_available(getattr(args, "qwen_segmenter", None))
 
     # Setup temp directory
     if args.temp_dir:
