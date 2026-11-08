@@ -71,6 +71,9 @@ DEFAULT_GUI_SETTINGS = {
     "pass1_sensitivity": "balanced",
     "pass1_scene_detector": "semantic",
     "pass1_speech_enhancer": "none",
+    # 1.10.2 (owner W596 3): "For VAD only" in the Speech Enhancer menu, ticked in index.html. A settings file from
+    # before 1.10.2 has no such key and so takes this default.
+    "pass1_enhance_for_vad": True,
     "pass1_speech_segmenter": "firered-vad",
     "pass1_model": "cohere-asr-ja-v0.1",
     "pass2_enabled": False,
@@ -78,6 +81,7 @@ DEFAULT_GUI_SETTINGS = {
     "pass2_sensitivity": "aggressive",
     "pass2_scene_detector": "semantic",
     "pass2_speech_enhancer": "none",
+    "pass2_enhance_for_vad": True,
     "pass2_speech_segmenter": "ten",
     "pass2_model": "parakeet-tdt-0.6b-ja",
     "merge_strategy": "pass1_primary",
