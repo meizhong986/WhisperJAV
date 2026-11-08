@@ -145,6 +145,8 @@ The language spoken in the video. Affects Whisper's language hint and post-proce
 - **Native** (default) — subtitles in the original spoken language
 - **Direct-to-English** — Whisper translates to English during transcription (lower quality than dedicated translation)
 
+Known issue: with Kotoba Bilingual v1.0, the default model of the transformers pipeline, the model gives the English text no times, so the subtitles are unusable.
+
 ---
 
 ## 6. Advanced Options
@@ -187,8 +189,8 @@ Always active. Each pass has identical controls:
 | **Pipeline** | Whisper-Based: Balanced, Fast, Faster, Fidelity; HuggingFace: Transformers (HF); ChronosJAV: Qwen3-ASR, Anime-Whisper; External (BYOP): XXL Faster Whisper; GGUF via crispasr: parakeet, cohere; Experimental, open to feedback: reazonspeech, kotoba, whisper-turbo, whisper-large, MOSS, haas, qwen3-asr | Pass 1: cohere; Pass 2: parakeet (off until ticked) |
 | **Sensitivity** | Aggressive, Balanced, Conservative | set when you choose the pipeline: Pass 1 (cohere) Balanced, Pass 2 (parakeet) Aggressive |
 | **Scene Detector** | Auditok, Silero, Semantic, None | Semantic |
-| **Speech Enhancer** | None, FFmpeg DSP, ZipEnhancer, htdemucs (BS-RoFormer and ZipEnhancer ONNX: coming soon) | None |
-| **Speech Segmenter** | Silero v4.0, Silero v3.1, Silero v6.2, TEN VAD, WhisperSeg (JA-ASMR), FireRedVAD, None; for Balanced, the Silero version of its built-in VAD: 3.1, 4.0 (default), 6.2; for a GGUF pass, None sends each scene to the model whole | set when you choose the pipeline: Pass 1 (cohere) FireRedVAD, Pass 2 (parakeet) TEN VAD |
+| **Speech Enhancer** | None; Vocal Separation: Mel-Band-RoFormer, Mini-BS-RoFormer, htdemucs (Demucs v4); Noise Suppression: ZipEnhancer; DSP: FFmpeg Audio Filters... | None |
+| **Speech Segmenter** | FireRedVAD, TEN VAD, WhisperSeg (JA-ASMR), Silero v3.1, Silero v4.0, Silero v6.2; under "Experimental, open to feedback": Sortformer (NVIDIA Nemotron), pyannote 3.0; None. For Balanced, the Silero version of its built-in VAD: 3.1, 4.0 (default), 6.2; for a GGUF pass, None sends each scene to the model whole. | set when you choose the pipeline: Pass 1 (cohere) FireRedVAD, Pass 2 (parakeet) TEN VAD |
 | **Model** | the models of the chosen pipeline | the pipeline's default |
 
 ### Available Pipelines
@@ -270,13 +272,9 @@ When **FFmpeg DSP** is selected as the speech enhancer, an additional panel appe
 | De-esser | Reduce harsh sibilance (s/t sounds) |
 | Amplify | Boost overall volume |
 
-### Enhance for VAD Only (v1.8.10+)
+### For VAD only (v1.8.10+)
 
-When a speech enhancer is selected (anything other than "None"), a checkbox appears below the enhancer dropdown:
-
-**Enhance for VAD only** — When ticked, the enhanced audio is used only to find the speech (VAD). The original audio is sent to the ASR model for transcription.
-
-The box is not shown for Balanced and XXL Faster Whisper, nor when the enhancer is "None". It takes effect with Fidelity, Qwen3-ASR, Anime-Whisper and the GGUF pipelines; Fast, Faster and Transformers ignore it, as they run no separate speech segmenter.
+The **Speech Enhancer** menu ends, under a divider line, with the tick box **For VAD only**, ticked by default since 1.10.2. When ticked, the cleaned-up audio is used only to find the speech (VAD), and the original audio goes to the ASR model. Untick it to give the cleaned-up audio to the ASR model too. It takes effect with Fidelity, Qwen3-ASR, Anime-Whisper and the GGUF pipelines when a speech enhancer is chosen; it is not offered for Balanced, Fast, Faster, Transformers and XXL Faster Whisper, which keep one track.
 
 ### Merge Strategy
 
