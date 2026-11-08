@@ -73,6 +73,9 @@ SEGMENTER_TOOL_NAMES = {
     "whisper-vad-medium": "whisper-vad-speech-segmentation",
     "whisperseg": "whisperseg-speech-segmentation",
     "firered-vad": "firered-vad-speech-segmentation",  # v1.9.0; installed by default since v1.9.2
+    # 1.10.2 (owner W594, W596): CrispASR's diarization methods; the same values at every sensitivity (W596 4)
+    "sortformer": "sortformer-speech-segmentation",
+    "pyannote": "pyannote-speech-segmentation",
 }
 
 # The Balanced pipeline's default speech segmenter is faster-whisper's built-in VAD
@@ -178,7 +181,11 @@ ENSEMBLE_DEFAULT_SENSITIVITY = "balanced"
 # same values two-pass Fidelity already uses. That knowingly departs from the rule
 # above, by his decision. nemo is not listed: it still goes to silero-v3.1 with
 # the warning, unchanged.
-SINGLE_PASS_EXTERNAL_OK = {"fidelity": frozenset({"firered-vad", "ten", "whisperseg", "whisper-vad"})}
+#
+# 1.10.2 (owner W596 2, "All pipelines"): sortformer and pyannote too; their tool YAMLs carry chunk_threshold_s 1.0
+# and max_group_duration_s 5 in the spec that all three (identical) sensitivity presets take.
+SINGLE_PASS_EXTERNAL_OK = {"fidelity": frozenset({"firered-vad", "ten", "whisperseg", "whisper-vad",
+                                                  "sortformer", "pyannote"})}
 
 # The default SCENE detector for every scene-detecting legacy pipeline (v1.9.2).
 #
@@ -226,6 +233,19 @@ def effective_segmenter_for_pass(
     if pipeline in CRISPASR_PIPELINES and not speech_segmenter:
         return CRISPASR_DEFAULT_SEGMENTERS[pipeline]
     return speech_segmenter
+
+
+# 1.10.2 (owner W602 4): CrispASR's diarization methods take no VAD threshold (CrispASR uses its own, 0.5). A threshold
+# given for them is not used: the Customize window does not offer it, and a threshold flag gets one console line.
+NO_THRESHOLD_SEGMENTERS = {"sortformer": "Sortformer", "pyannote": "pyannote"}
+
+
+def vad_threshold_unused_line(segmenter_backend: Optional[str], flag: str) -> Optional[str]:
+    """The console line for a VAD threshold given with ``flag`` to a speech segmenter that takes none, else None."""
+    name = NO_THRESHOLD_SEGMENTERS.get((segmenter_backend or "").strip().lower())
+    if name is None:
+        return None
+    return f"{flag} is not used by {name}; CrispASR uses its own threshold (0.5)."
 
 
 def segmenter_accepts(segmenter_backend: Optional[str], param_name: str) -> bool:
