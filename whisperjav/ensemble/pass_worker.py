@@ -705,18 +705,17 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
         # This line should never be reached, but guard against it
         return  # pragma: no cover
 
-    # v1.10.0 (item 3, owner W75): a speech enhancer WhisperJAV no longer includes
-    # (ClearVoice) stops the pass here, before any audio is read. main.py checks the
-    # command line; this covers whatever else builds a pass configuration.
-    removed = _removed_enhancer_in_pass(pass_config, pass_number)
-    if removed:
-        logger.error("[Worker %s] Pass %s: %s", os.getpid(), pass_number, removed)
+    # A speech enhancer WhisperJAV does not offer stops the pass here, before any audio is read (owner W603, rule
+    # (i)). main.py checks the command line; this covers whatever else builds a pass configuration.
+    unknown = _unknown_enhancer_in_pass(pass_config, pass_number)
+    if unknown:
+        logger.error("[Worker %s] Pass %s: %s", os.getpid(), pass_number, unknown)
         _write_dropbox_and_exit(result_file, {
             "results": [
-                FileResult(basename=info["basename"], status="failed", error=removed).__dict__
+                FileResult(basename=info["basename"], status="failed", error=unknown).__dict__
                 for info in media_files
             ],
-            "worker_error": removed,
+            "worker_error": unknown,
         }, tracer, 1)
 
     try:
@@ -1160,19 +1159,19 @@ def _build_pipeline(
 
     # Pass enhance_for_vad flag to all pipelines via extra_kwargs.
     #
-    # What each pipeline then does with it, read from the code on 2026-09-17:
-    #   qwen (and the decoupled pipeline behind it) -- the real dual track: the
-    #     enhanced audio drives the segmenter, the original goes to the recogniser.
-    #   balanced, fidelity -- the flag is read and reported in an INFO line, but
-    #     the enhanced audio goes to BOTH; separating them needs recogniser-side
-    #     changes (balanced_pipeline.py, fidelity_pipeline.py).
-    #   fast, faster, transformers -- never read.
-    #     The owner accepted that on 2026-09-17; it is stated here and in --help
-    #     so it is not mistaken for an oversight.
-    #   parakeet-crispasr, cohere-crispasr (1.10.0) -- never read either: they run
-    #     no audio clean-up at all (CrispASR master plan 2.2). A user who set it on
-    #     such a pass is told below, in one line naming every pass setting the pass
-    #     does not use; the reason the line here gives would be wrong for them.
+    # What each pipeline then does with it, read from the code on 2026-11-08:
+    #   qwen (and the decoupled pipeline behind it), fidelity, and the GGUF
+    #     (*-crispasr) pipelines (since 1.10.0, design 22.9.1, owner W232 8) -- the
+    #     dual track: the enhanced audio goes to the speech segmenter, the original
+    #     to the ASR model (fidelity_pipeline.py process(), crispasr_pipeline.py
+    #     _enhance()). Since 1.10.2 it is on by default whenever a speech enhancer
+    #     runs in these pipelines (owner W596 3; main.py apply_enhance_for_vad_default).
+    #   balanced -- refused before the run (main.py validate_balanced_vad_options):
+    #     faster-whisper finds the speech inside its own transcribe call, on the
+    #     audio it transcribes; balanced_pipeline.py only warns if it still arrives.
+    #   fast, faster, transformers (ENHANCE_FOR_VAD_IGNORED_BY) -- never read; the
+    #     owner accepted that on 2026-09-17. It is stated here and in --help so it
+    #     is not mistaken for an oversight; the default leaves it off for them.
     #
     # A user who asked for it and is getting nothing is told so once, rather than
     # being left to infer it from the absence of any mention.
@@ -1861,23 +1860,22 @@ def apply_custom_params(
 
 # Map GUI speech enhancer values to factory-compatible backend names
 # Supports two formats:
-#   1. Legacy: "bs-roformer" -> uses default model
-#   2. New:    "bs-roformer:vocals" -> backend + specific model
+#   1. Legacy: "mini-bs-roformer" -> uses default model
+#   2. New:    "mini-bs-roformer:vocals" -> backend + specific model
 #   3. FFmpeg DSP: "ffmpeg-dsp:loudnorm,denoise" -> backend + comma-separated effects
 SPEECH_ENHANCER_MAP = {
     "": "none",                 # Empty string -> disabled
     "ffmpeg-dsp": "ffmpeg-dsp", # FFmpeg DSP audio filters
     "none": "none",             # Explicit disable
     "zipenhancer": "zipenhancer",       # ZipEnhancer 16kHz (recommended, lightweight)
-    "bs-roformer": "bs-roformer",       # BS-RoFormer vocal isolation
 }
 
 
-def _removed_enhancer_in_pass(pass_config: Dict[str, Any], pass_number: int) -> Optional[str]:
-    """The stop message when this pass names a removed speech enhancer (ClearVoice), else None."""
-    from whisperjav.modules.speech_enhancement.factory import removed_backend_in_pass
+def _unknown_enhancer_in_pass(pass_config: Dict[str, Any], pass_number: int) -> Optional[str]:
+    """The stop message when this pass names a speech enhancer WhisperJAV does not offer, else None (owner W603)."""
+    from whisperjav.modules.speech_enhancement.factory import unknown_backend_in_pass
 
-    return removed_backend_in_pass(pass_config, pass_number)
+    return unknown_backend_in_pass(pass_config, pass_number)
 
 
 def _parse_speech_enhancer(enhancer_value: str) -> tuple:
@@ -1886,8 +1884,8 @@ def _parse_speech_enhancer(enhancer_value: str) -> tuple:
 
     Supports formats:
         - "none" -> ("none", None)
-        - "bs-roformer" -> ("bs-roformer", None)  # Uses factory default
-        - "bs-roformer:vocals" -> ("bs-roformer", "vocals")
+        - "mini-bs-roformer" -> ("mini-bs-roformer", None)  # Uses factory default
+        - "mini-bs-roformer:vocals" -> ("mini-bs-roformer", "vocals")
         - "ffmpeg-dsp:loudnorm,denoise" -> ("ffmpeg-dsp", "loudnorm,denoise")
 
     Returns:
