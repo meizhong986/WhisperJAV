@@ -74,6 +74,20 @@ def test_same_srt(tmp_path):
     assert not cv.same_srt(a, b)[0]
 
 
+def test_stage_record_adds_up_across_files():
+    rec = {}
+    a = cv.CrispEnhancer("crisp-x", {"kind": "crisp-separator"}, "x.gguf", record=rec)
+    a.record["scenes"] += 3
+    a.record["failed"] += 1
+    cv.CrispEnhancer("crisp-x", {"kind": "crisp-separator"}, "x.gguf", record=rec)   # the next file's enhancer
+    assert rec["scenes"] == 3 and rec["failed"] == 1
+    seg = {}
+    s = cv.CrispSegmenter("crisp-v", {"settings": "own"}, "v.gguf", record=seg, max_group_duration_s=6.0)
+    s.record["scenes"] += 2
+    cv.CrispSegmenter("crisp-v", {"settings": "own"}, "v.gguf", record=seg, max_group_duration_s=6.0)
+    assert seg["scenes"] == 2 and seg["settings"]["max_group_duration_s"] == 6.0
+
+
 def test_chain_settings():
     assert cv.chain_settings("crisp-x", {"kind": "crisp-separator"}, None) == ("crisp-x", "ten", False)
     assert cv.chain_settings("crisp-x", {"kind": "crisp-separator"}, "vad") == ("crisp-x", "ten", True)
