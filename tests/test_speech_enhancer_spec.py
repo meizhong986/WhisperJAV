@@ -38,7 +38,7 @@ class TestAccepted:
         ("ffmpeg-dsp:loudnorm", "ffmpeg-dsp:loudnorm"),
         ("ffmpeg-dsp:loudnorm,denoise,highpass", "ffmpeg-dsp:loudnorm,denoise,highpass"),
         ("htdemucs:htdemucs", "htdemucs:htdemucs"),
-        ("bs-roformer:vocals", "bs-roformer:vocals"),
+        ("mini-bs-roformer:vocals", "mini-bs-roformer:vocals"),
         # Whitespace is tidied so downstream sees a clean value.
         ("  ffmpeg-dsp : loudnorm , denoise ", "ffmpeg-dsp:loudnorm,denoise"),
     ])
@@ -65,6 +65,9 @@ class TestRejected:
         ("ffmpeg-dsp:", "colon"),                # nothing after the colon
         ("ffmpeg-dsp:loudnorm,", "unknown"),     # a trailing comma is an empty effect
         ("", "choose from"),
+        # 1.10.2 (owner W603): names WhisperJAV no longer includes are unknown names like any other.
+        ("clearvoice", "invalid choice"),
+        ("bs-roformer:vocals", "invalid choice"),
     ])
     def test_value_is_refused(self, value, must_mention):
         with pytest.raises(argparse.ArgumentTypeError) as excinfo:
@@ -172,6 +175,9 @@ class TestEnhanceForVadIsIgnoredWhereWeSayItIs:
                                 env={**os.environ, "COLUMNS": "1000"})
         assert result.returncode == 0
         help_text = " ".join(result.stdout.split())
-        assert "fast, faster and transformers ignore it" in help_text
-        assert "Accepted but ignored by fast, faster and transformers." in help_text
-        assert "Available with qwen, fidelity and the GGUF pipelines." in help_text   # 1.10.1: seven of them
+        # 1.10.2 (owner W596 3): on by default where a speech enhancer runs in a pipeline with a separate speech
+        # segmenter; the help says where it is on and which pipelines keep one track.
+        assert "fast, faster and transformers keep one track." in help_text   # --enhance-for-vad
+        assert "balanced, fast, faster and transformers keep one track" in help_text   # --passN-enhance-for-vad
+        assert ("On by default since 1.10.2 whenever pass 1 has a speech enhancer and its pipeline is qwen, "
+                "fidelity or a GGUF pipeline") in help_text
