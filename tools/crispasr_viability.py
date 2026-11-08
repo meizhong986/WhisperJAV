@@ -905,6 +905,8 @@ def cmd_bench(args):
         devices = ["cpu"]   # WhisperJAV's VAD engines in Parakeet-CrispASR run on the CPU (whisperseg: CPU on NVIDIA installs)
     if spec["area"] == "A2" and spec["kind"].startswith("crisp"):
         devices = ["as built"]  # crispasr.vad_slices takes no GPU switch
+    if args.devices:
+        devices = [d for d in devices if d in args.devices.split(",")] or devices
     results = []
     for dev in devices:
         job = {"worker": "_bench", "candidate": name, "spec": spec, "model_path": path, "device": dev,
@@ -1135,6 +1137,7 @@ def build_parser():
     b.add_argument("--seconds", type=float, default=120.0, help="audio on the GPU (default 120)")
     b.add_argument("--cpu-seconds", type=float, default=30.0, help="audio on the CPU (default 30)")
     b.add_argument("--piece-seconds", type=float, default=30.0)
+    b.add_argument("--devices", default=None, help="only these of cuda,cpu (default: both for A1)")
     b.add_argument("--gpu-index", type=int, default=0)
     n = sub.add_parser("rnnoise", help="call CrispASR's RNNoise once and record its answer")
     n.add_argument("--out", required=True)
