@@ -205,14 +205,25 @@ class TestBalancedDoesNotOfferIt:
         assert result.returncode == 0, (result.stdout + result.stderr)[-500:]
 
     def test_the_gui_hides_the_box_for_a_balanced_pass(self):
+        # 1.10.2 (owner W596 3): the box lives in the Speech Enhancer menu under a divider (app.js EnhancerMenu),
+        # drawn only where the row is marked applicable; balanced (and transformers, XXL) never is.
         from pathlib import Path
         source = (Path(__file__).resolve().parents[1] / "whisperjav" / "webview_gui"
                   / "assets" / "app.js").read_text(encoding="utf-8")
         assert "const isBalanced = this.state[passId]?.pipeline === 'balanced';" in source
-        assert "&& !isXxl && !isBalanced) ? 'block' : 'none';" in source
+        assert ("row.dataset.applicable = (isEnabled && !isXxl && !isBalanced && !isTransformers && !isFastOrFaster)"
+                in source)
+        assert "return !!m.box && !!m.row && m.row.dataset.applicable === '1';" in source
+        assert "if (this._applies(m)) {" in source
 
     def test_the_gui_does_not_send_the_flag_for_a_balanced_pass(self):
+        # 1.10.2: one helper builds the flag for every pass (api.py _enhance_for_vad_args).
         from pathlib import Path
+        from whisperjav.webview_gui.api import ONE_TRACK_PIPELINES, _enhance_for_vad_args
+        assert "balanced" in ONE_TRACK_PIPELINES
+        for ticked in (True, False):
+            assert _enhance_for_vad_args(1, {"pipeline": "balanced", "enhanceForVad": ticked}) == []
+            assert _enhance_for_vad_args(2, {"pipeline": "balanced", "enhanceForVad": ticked}) == []
         source = (Path(__file__).resolve().parents[1] / "whisperjav" / "webview_gui"
                   / "api.py").read_text(encoding="utf-8")
-        assert source.count("get('pipeline') != 'balanced'") == 2
+        assert source.count("_enhance_for_vad_args(") == 4  # the definition and its three callers
