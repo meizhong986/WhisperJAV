@@ -4,7 +4,7 @@ htdemucs vocal isolation (Demucs v4).
 
 Separates the voice from music and effects, and hands the recogniser the voice
 alone. Useful where a scene has background music or heavy effects over the
-dialogue -- the case BS-RoFormer also serves, with a different model.
+dialogue -- the case Mel-Band-RoFormer and Mini-BS-RoFormer (crispasr_separator.py) also serve.
 
 The demucs package is an ordinary WhisperJAV dependency (owner's decision,
 2026-09-17, replacing an earlier one): it is installed with everything else, not
