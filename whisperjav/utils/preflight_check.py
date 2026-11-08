@@ -865,6 +865,26 @@ _RUNTIME_DOWNLOADED_SEGMENTERS = {
 }
 
 
+# The speech segmenters run by CrispASR whose model file is downloaded on first use (1.10.2, owner W594, W596):
+# fetched here before any audio is read, for the reason above. Not listed by --check (_check_downloaded_
+# segmenter_models): no pipeline runs them unless the user picks one. Pinned in crispasr/manifest.py.
+_CRISPASR_DOWNLOADED_SEGMENTERS = {
+    "sortformer": "Sortformer",
+    "pyannote": "pyannote",
+}
+
+
+def _ensure_crispasr_segmenter_model(backend: str, download: bool) -> None:
+    """The pinned model file of a CrispASR speech segmenter on this machine; fetched when ``download``."""
+    from whisperjav.crispasr import install, manifest
+    model = manifest.SEGMENTER_MODELS[backend]
+    if not download:
+        if not install.model_status(model).downloaded:
+            raise FileNotFoundError(f"{model.filename} is not downloaded yet")
+        return
+    install.ensure_model(model)
+
+
 def ensure_segmenter_model_available(backend, *, model_dir=None,
                                      download: bool = True,
                                      exit_on_fail: bool = True) -> bool:
@@ -890,6 +910,8 @@ def ensure_segmenter_model_available(backend, *, model_dir=None,
     segmenter is actually built and so cannot be walked around by a path this check
     does not predict.
     """
+    if (backend or "") in _CRISPASR_DOWNLOADED_SEGMENTERS:
+        return _crispasr_segmenter_model_available(backend, download, exit_on_fail)
     entry = _RUNTIME_DOWNLOADED_SEGMENTERS.get(backend or "")
     if entry is None:
         return True
@@ -992,6 +1014,106 @@ def ensure_crispasr_ready(passes, *, device=None, temp_dir=None, exit_on_fail: b
         sys.exit(1)
 
 
+def _crispasr_segmenter_model_available(backend: str, download: bool, exit_on_fail: bool) -> bool:
+    """ensure_segmenter_model_available for the CrispASR speech segmenters (sortformer, pyannote).
+
+    Text drafted in the 58th session (owner W596 INSTRUCT1: steps 1-4 preapproved); for his approval.
+    """
+    display = _CRISPASR_DOWNLOADED_SEGMENTERS[backend]
+    try:
+        _ensure_crispasr_segmenter_model(backend, download)
+        return True
+    except Exception as exc:
+        if not exit_on_fail:
+            return False
+        from whisperjav.crispasr import install, manifest
+        model = manifest.SEGMENTER_MODELS[backend]
+        offline = bool(os.environ.get("HF_HUB_OFFLINE"))
+        lines = [
+            f"{display}'s speech-detection model is not on this machine",
+            "",
+            f"This run needs {display} (run by CrispASR) to find the speech in",
+            f"your audio, and its model ({install.mb(model.size)}) is downloaded once",
+            "from Hugging Face. That did not work:",
+            "",
+            f"  {((str(exc).splitlines() or ['unknown error'])[0])[:BOX_WIDTH - 8]}",
+            "",
+            "Nothing has been transcribed. Without the model every scene would",
+            "fail and you would be handed an empty subtitle file.",
+            "",
+            "What you can do:",
+            "  - Connect to the internet and run this once. The download is",
+            "    kept for every run after it.",
+            "  - Or pick another speech segmenter for this pass. In the",
+            "    Ensemble tab, set that pass's Speech Segmenter to another one.",
+        ]
+        if offline:
+            lines += [
+                "",
+                "Downloads are switched off for this run (HF_HUB_OFFLINE is set,",
+                "which is what --offline does), so nothing can be fetched now.",
+                "The model has to have been downloaded once beforehand.",
+            ]
+        _print_box(lines, Fore.RED)
+        sys.exit(1)
+
+
+# The speech enhancers run by CrispASR whose model file is downloaded on first use (1.10.2, owner W594, W596). Since
+# W602 3 the file is fetched at start-up, before any audio is read, with a box when that fails: otherwise a run
+# without the network would stop only after audio extraction and scene detection (in an Ensemble with the enhancer on
+# pass 2, after all of pass 1). Pinned in crispasr/manifest.py ENHANCER_MODELS.
+_CRISPASR_DOWNLOADED_ENHANCERS = {
+    "mel-band-roformer": "Mel-Band-RoFormer",
+    "mini-bs-roformer": "Mini-BS-RoFormer",
+}
+
+
+def _crispasr_enhancer_model_available(backend: str, *, download: bool, exit_on_fail: bool) -> bool:
+    """The model file of a speech enhancer run by CrispASR on this machine; fetched when ``download``.
+
+    Text approved by the owner (W600 3 for the speech segmenters' box, W602 3 for this one: "clear user communication").
+    """
+    display = _CRISPASR_DOWNLOADED_ENHANCERS[backend]
+    from whisperjav.crispasr import install, manifest
+    model = manifest.ENHANCER_MODELS[backend]
+    try:
+        if download:
+            install.ensure_model(model)
+        elif not install.model_status(model).downloaded:
+            raise FileNotFoundError(f"{model.filename} is not downloaded yet")
+        return True
+    except Exception as exc:
+        if not exit_on_fail:
+            return False
+        offline = bool(os.environ.get("HF_HUB_OFFLINE"))
+        lines = [
+            f"{display}'s model is not on this machine",
+            "",
+            f"This run needs {display} (run by CrispASR) to clean up",
+            f"your audio, and its model ({install.mb(model.size)}) is downloaded once",
+            "from Hugging Face. That did not work:",
+            "",
+            f"  {((str(exc).splitlines() or ['unknown error'])[0])[:BOX_WIDTH - 8]}",
+            "",
+            "Nothing has been transcribed.",
+            "",
+            "What you can do:",
+            "  - Connect to the internet and run this once. The download is",
+            "    kept for every run after it.",
+            "  - Or pick another speech enhancer for this pass. In the",
+            "    Ensemble tab, set that pass's Speech Enhancer to another one.",
+        ]
+        if offline:
+            lines += [
+                "",
+                "Downloads are switched off for this run (HF_HUB_OFFLINE is set,",
+                "which is what --offline does), so nothing can be fetched now.",
+                "The model has to have been downloaded once beforehand.",
+            ]
+        _print_box(lines, Fore.RED)
+        sys.exit(1)
+
+
 def ensure_speech_enhancer_available(backend, *, exit_on_fail: bool = True) -> bool:
     """
     Make sure a chosen audio clean-up can actually run, before any audio is read.
@@ -1033,6 +1155,9 @@ def ensure_speech_enhancer_available(backend, *, exit_on_fail: bool = True) -> b
 
     available, hint = SpeechEnhancerFactory.is_backend_available(backend)
     if available:
+        if backend in _CRISPASR_DOWNLOADED_ENHANCERS:
+            # 1.10.2 (owner W602 3): its model file is fetched here, before any audio is read.
+            return _crispasr_enhancer_model_available(backend, download=exit_on_fail, exit_on_fail=exit_on_fail)
         return True
     if not exit_on_fail:
         return False
