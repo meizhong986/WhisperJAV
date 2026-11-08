@@ -44,7 +44,7 @@ CONTRACTS (v1.8.5+):
         - Skip enhance_scenes() entirely — no enhanced_scenes/ folder created
         - No disk I/O or CPU resampling overhead
 
-    When a real enhancer is configured (zipenhancer, bs-roformer, etc.):
+    When a real enhancer is configured (zipenhancer, htdemucs, mini-bs-roformer, etc.):
         - Extract at 48kHz (SCENE_EXTRACTION_SR) — enhancers need high-SR input
         - enhance_scenes() runs the full pipeline (enhance → resample → save)
         - Output: Enhanced files at 16kHz mono (TARGET_SAMPLE_RATE)
@@ -78,7 +78,7 @@ import logging
 import time
 import soundfile as sf
 
-from .factory import FATAL_WHEN_UNAVAILABLE, SpeechEnhancerFactory, removed_backend_message
+from .factory import FATAL_WHEN_UNAVAILABLE, SpeechEnhancerFactory, unknown_backend_message
 from .base import SpeechEnhancer, SpeechEnhancerUnavailable, resample_audio
 
 logger = logging.getLogger("whisperjav")
@@ -130,11 +130,11 @@ def create_enhancer_from_config(
     if not backend:
         backend = "none"
 
-    # A removed backend (ClearVoice, v1.10.0) is otherwise an unknown name, which
-    # the availability check below would quietly turn into "none".
-    removed = removed_backend_message(backend, "this run")
-    if removed:
-        raise SpeechEnhancerUnavailable(removed)
+    # A speech enhancer name WhisperJAV does not offer stops here (owner W603, rule (i)); the availability check
+    # below would otherwise quietly turn it into "none".
+    unknown = unknown_backend_message(backend, "this run")
+    if unknown:
+        raise SpeechEnhancerUnavailable(unknown)
 
     # Check availability (except for "none" which is always available)
     if backend != "none":
@@ -183,7 +183,7 @@ def create_enhancer_direct(
     The "none" backend performs 48kHz→16kHz resampling without processing.
 
     Args:
-        backend: Enhancer backend name ("none", "zipenhancer", "bs-roformer", "ffmpeg-dsp")
+        backend: Enhancer backend name ("none", "zipenhancer", "mini-bs-roformer", "ffmpeg-dsp", ...)
         model: Optional model variant
         **kwargs: Additional parameters
 
@@ -194,11 +194,11 @@ def create_enhancer_direct(
     if not backend:
         backend = "none"
 
-    # A removed backend (ClearVoice, v1.10.0) is otherwise an unknown name, which
-    # the availability check below would quietly turn into "none".
-    removed = removed_backend_message(backend, "this run")
-    if removed:
-        raise SpeechEnhancerUnavailable(removed)
+    # A speech enhancer name WhisperJAV does not offer stops here (owner W603, rule (i)); the availability check
+    # below would otherwise quietly turn it into "none".
+    unknown = unknown_backend_message(backend, "this run")
+    if unknown:
+        raise SpeechEnhancerUnavailable(unknown)
 
     # Check availability (except for "none" which is always available)
     if backend != "none":
