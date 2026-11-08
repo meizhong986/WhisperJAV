@@ -5,7 +5,7 @@ This module defines the core data structures and interface that all
 speech enhancement backends must implement.
 
 Design Decisions (v1.7.3):
-- Single backend entry with model parameter (e.g., bs-roformer with stem selection)
+- Single backend entry with model parameter (e.g., htdemucs with its model name)
 - Graceful degradation: failures log warning and return original audio
 - In-memory processing for scene-level chunks (memory-efficient)
 - Sample rate negotiation via get_preferred_sample_rate() / get_output_sample_rate()
@@ -51,7 +51,7 @@ class EnhancementResult:
     Attributes:
         audio: Enhanced audio data (float32, mono)
         sample_rate: Sample rate of output audio
-        method: Backend name with model info (e.g., "bs-roformer-vocals")
+        method: Backend name with model info (e.g., "htdemucs-htdemucs")
         parameters: Parameters used for enhancement
         processing_time_sec: Time taken to process (seconds)
         metadata: Backend-specific metadata (SNR improvement, etc.)
@@ -122,7 +122,7 @@ class SpeechEnhancer(Protocol):
         """
         Unique backend identifier.
 
-        Examples: "zipenhancer", "bs-roformer", "none"
+        Examples: "zipenhancer", "mini-bs-roformer", "none"
         """
         ...
 
@@ -131,7 +131,7 @@ class SpeechEnhancer(Protocol):
         """
         Human-readable name for GUI display.
 
-        Examples: "ZipEnhancer 16kHz", "BS-RoFormer Vocal Isolation"
+        Examples: "ZipEnhancer 16kHz", "Mini-BS-RoFormer (CrispASR)"
         """
         ...
 
@@ -198,7 +198,7 @@ class SpeechEnhancer(Protocol):
         """
         Return list of supported model variants.
 
-        Examples for BS-RoFormer: ["vocals", "other"]
+        Examples for htdemucs: ["htdemucs", "htdemucs_ft", "htdemucs_6s"]
 
         Returns:
             List of model identifiers
@@ -218,7 +218,7 @@ class SpeechEnhancer(Protocol):
 
         Examples:
             - ZipEnhancer (2.04M params, ~500MB): True
-            - BS-RoFormer: False
+            - htdemucs, Mel-Band-RoFormer, Mini-BS-RoFormer: False
 
         Returns:
             True if VRAM usage is low enough to stream to VAD
