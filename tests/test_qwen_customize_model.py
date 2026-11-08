@@ -102,14 +102,18 @@ class TestTheRowShowsWhatWasApplied:
             "Apply stores the value but never asks the row to redraw")
 
     def test_the_repaint_sets_the_box_from_the_stored_value(self, source):
-        start = source.index("updateEnhanceForVadCheckbox(passId)")
-        body = source[start:start + 2000]
+        start = source.index("updateEnhanceForVadCheckbox(passId) {")
+        body = source[start:start + 2500]
         assert "box.checked = !!this.state[passId]?.enhanceForVad" in body, (
             "the row must show the value that will actually be used")
 
-    def test_balanced_still_clears_it(self, source):
+    def test_balanced_never_sends_it(self, source):
         # The refusal must survive: balanced offers no VAD-only split, and a
         # value left from another pipeline must not travel into a run.
-        start = source.index("updateEnhanceForVadCheckbox(passId)")
-        body = source[start:start + 2000]
-        assert "this.state[passId].enhanceForVad = false" in body
+        # 1.10.2 (owner W596 3): the value is kept (a pass switched back keeps the user's choice), the box is not
+        # offered for balanced, and the run command carries no flag for it (api.py ONE_TRACK_PIPELINES).
+        from whisperjav.webview_gui.api import _enhance_for_vad_args
+        start = source.index("updateEnhanceForVadCheckbox(passId) {")
+        body = source[start:start + 2500]
+        assert "!isBalanced" in body and "row.dataset.applicable" in body
+        assert _enhance_for_vad_args(1, {"pipeline": "balanced", "enhanceForVad": True}) == []
