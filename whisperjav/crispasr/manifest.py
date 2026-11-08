@@ -10,7 +10,9 @@ memory, about 2 GB of it taken, so each pipeline offers its largest files that f
 each file's quantization and the GPU memory it needs (W400).
 
 1.10.2 (owner W574): two more pipelines, Haas-CrispASR and Qwen3-ASR-CrispASR, each with only the files that went
-through the GGUF model test tool (tools/crispasr_model_test.py) first.
+through the GGUF model test tool (tools/crispasr_model_test.py) first; and the model files of four backends CrispASR
+runs for every pipeline (owner W594, W596): the speech segmenters Sortformer and pyannote, the speech enhancers
+Mel-Band-RoFormer and Mini-BS-RoFormer (SEGMENTER_MODELS, ENHANCER_MODELS).
 
 Standard library only.
 """
@@ -309,6 +311,38 @@ def timing_model_for(name: Optional[str]) -> ModelFile:
     if name not in TIMING_MODELS:
         raise ValueError(f"'{name}' is not a timing model; choose one of: {', '.join(TIMING_MODELS)}")
     return TIMING_MODELS[name]
+
+
+# The speech segmenter backends `sortformer` and `pyannote`, and the speech enhancer backends `mel-band-roformer`
+# and `mini-bs-roformer`, run by CrispASR (1.10.2, owner W594, W596). Keyed by the backend's name. Repository,
+# file, commit, size and SHA-256 as the viability tests fetched and checked them against Hugging Face's listing
+# (D:\WJ110_measure\phase_a2b_diar_2026-11-08\_fetch, D:\WJ110_measure\phase_a_2026-11-07\_fetch). The
+# `backend` field: the separators' CrispASR backend name (passed to Session); for the diarization files, which
+# CrispASR opens through its diarization functions and not as a Session, the method's name.
+SEGMENTER_MODELS = {
+    "sortformer": ModelFile("sortformer", "Sortformer (NVIDIA Nemotron-3-Diarization, q8_0)", "sortformer",
+                            "nvidia/Nemotron-3-Diarization", "Nemotron-3-Diarization.q8_0.gguf",
+                            "f667ed73aee57d40cc39428eb768b4fd87a0a29e", 107_012_128,
+                            "08456d9e22cd9a323c0364d98375f3746d6e68507ebb705cd46438c534c7a3a1",
+                            "OpenMDW-1.1"),
+    "pyannote": ModelFile("pyannote", "pyannote segmentation-3.0", "pyannote",
+                          "cstr/pyannote-v3-segmentation-GGUF", "pyannote-seg-3.0.gguf",
+                          "2b2492e0c04f0df609b9faa1ecf363766ad970fa", 5_976_512,
+                          "1242d50f6642ae86faae72535a8804279c22e7dc410d412b575c893a49bd77f2",
+                          "MIT"),
+}
+ENHANCER_MODELS = {
+    "mel-band-roformer": ModelFile("mel-band-roformer", "Mel-Band-RoFormer vocals (f16)", "mel-band-roformer",
+                                   "cstr/mel-band-roformer-vocals-GGUF", "mel-band-roformer-vocals-f16.gguf",
+                                   "d6909215e1d7a3bc4ea1a569b930e38470d43000", 457_014_016,
+                                   "fe94b114bce12653dae4e94968d28cbab36dcdd0c783fc052c3b656218233f24",
+                                   "MIT"),
+    "mini-bs-roformer": ModelFile("mini-bs-roformer", "Mini-BS-RoFormer (f16)", "mini-bs-roformer",
+                                  "cstr/mini-bs-roformer-GGUF", "mini-bs-roformer-f16.gguf",
+                                  "919fed2376680efd1bcdd917cc44e19c3bcfd3a0", 92_488_448,
+                                  "c9c1c4d99fbab49f8c6e29b2553d7ee50c9aa73226ac5f4891e557165a600474",
+                                  "MIT"),
+}
 
 
 # The source-language values that mean Japanese, lower-cased: the command line's --language value
