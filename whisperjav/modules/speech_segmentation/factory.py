@@ -31,6 +31,9 @@ _BACKEND_REGISTRY: Dict[str, str] = {
     "whisperseg": "whisperjav.modules.speech_segmentation.backends.whisperseg.WhisperSegSpeechSegmenter",
     "firered-vad": "whisperjav.modules.speech_segmentation.backends.firered_vad.FireRedVadSpeechSegmenter",
     "none": "whisperjav.modules.speech_segmentation.backends.none.NullSpeechSegmenter",
+    # 1.10.2 (owner W594, W596): CrispASR's diarization methods as speech finders, then TEN's post-processing
+    "sortformer": "whisperjav.modules.speech_segmentation.backends.crispasr_diarize.SortformerSpeechSegmenter",
+    "pyannote": "whisperjav.modules.speech_segmentation.backends.crispasr_diarize.PyannoteSpeechSegmenter",
 }
 
 # Cache for loaded backend classes (avoid repeated imports)
@@ -82,6 +85,18 @@ _BACKEND_DEPENDENCIES: Dict[str, Dict[str, Any]] = {
         "packages": [],
         "install_hint": "",
         "always_available": True,
+    },
+    # 1.10.2 (owner W594, W596): run by CrispASR, installed with WhisperJAV for the GGUF pipelines; the model files
+    # download on first use (crispasr/manifest.py SEGMENTER_MODELS).
+    "sortformer": {
+        "packages": ["crispasr"],
+        "install_hint": "CrispASR is installed with WhisperJAV; reinstall WhisperJAV to restore it",
+        "always_available": False,
+    },
+    "pyannote": {
+        "packages": ["crispasr"],
+        "install_hint": "CrispASR is installed with WhisperJAV; reinstall WhisperJAV to restore it",
+        "always_available": False,
     },
 }
 
@@ -201,7 +216,21 @@ _PARAM_SCHEMAS = {
         # default: absent or None means "use the cache, then download".
         "model_dir":               (str,   None,  True),
     },
+    # 1.10.2 (owner W594, W596): TEN's post-processing settings; no threshold (the methods use CrispASR's own 0.5).
+    # Defaults: the values the viability test measured (TEN's aggressive row), the same at every sensitivity (W596 4).
+    "sortformer": {
+        "hop_size":                (int,   256,   False),
+        "min_speech_duration_ms":  (int,   100,   False),
+        "min_silence_duration_ms": (int,   100,   False),
+        "max_speech_duration_s":   (float, 4.0,   True),
+        "start_pad_ms":            (int,   0,     False),
+        "end_pad_ms":              (int,   100,   False),
+        "chunk_threshold_s":       (float, 1.0,   True),
+        "max_group_duration_s":    (float, 5.0,   True),
+        "min_group_duration_s":    (float, None,  True),
+    },
 }
+_PARAM_SCHEMAS["pyannote"] = dict(_PARAM_SCHEMAS["sortformer"])
 
 
 class SpeechSegmenterFactory:
@@ -235,7 +264,7 @@ class SpeechSegmenterFactory:
     @staticmethod
     def list_unique_backends() -> List[str]:
         """Return list of unique backend names (without version aliases)."""
-        return ["silero", "nemo", "whisper", "ten", "whisperseg", "firered-vad", "none"]
+        return ["silero", "nemo", "whisper", "ten", "whisperseg", "firered-vad", "sortformer", "pyannote", "none"]
 
     @staticmethod
     def is_backend_available(name: str) -> Tuple[bool, str]:
@@ -294,10 +323,12 @@ class SpeechSegmenterFactory:
             "ten": "TEN VAD",
             "whisperseg": "WhisperSeg (JA-ASMR)",
             "firered-vad": "FireRedVAD",
+            "sortformer": "Sortformer (NVIDIA Nemotron)",
+            "pyannote": "pyannote 3.0",
             "none": "None (Skip)",
         }
 
-        for name in ["silero", "silero-v3.1", "silero-v6.2", "nemo-lite", "nemo-diarization", "whisper-vad", "whisper-vad-tiny", "whisper-vad-medium", "ten", "whisperseg", "firered-vad", "none"]:
+        for name in ["silero", "silero-v3.1", "silero-v6.2", "nemo-lite", "nemo-diarization", "whisper-vad", "whisper-vad-tiny", "whisper-vad-medium", "ten", "whisperseg", "firered-vad", "sortformer", "pyannote", "none"]:
             available, hint = SpeechSegmenterFactory.is_backend_available(name)
             backends.append({
                 "name": name,
