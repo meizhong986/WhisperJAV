@@ -10,7 +10,7 @@ Usage:
     python tests/test_speech_enhancement_cli.py video.mp4
 
     # Test with specific backend and model
-    python tests/test_speech_enhancement_cli.py video.mp4 --backend bs-roformer --model vocals
+    python tests/test_speech_enhancement_cli.py video.mp4 --backend mini-bs-roformer --model vocals
 
     # List available backends and models
     python tests/test_speech_enhancement_cli.py --list-backends
@@ -426,8 +426,8 @@ Examples:
   # Test with specific model
   python tests/test_speech_enhancement_cli.py video.mp4 --model FRCRN_SE_16K
 
-  # Test BS-RoFormer backend
-  python tests/test_speech_enhancement_cli.py video.mp4 --backend bs-roformer
+  # Test Mini-BS-RoFormer backend
+  python tests/test_speech_enhancement_cli.py video.mp4 --backend mini-bs-roformer
 
   # Extract and test specific segment
   python tests/test_speech_enhancement_cli.py video.mp4 --start 60 --duration 30
