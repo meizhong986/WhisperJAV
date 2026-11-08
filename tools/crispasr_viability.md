@@ -105,6 +105,13 @@ python tools/crispasr_viability.py selfcheck --out ROOT [--clip S01E04.Scene.1] 
 
 ## Limits
 
+- **CrispASR's `vad_slices` merges before the suite sees the spans:** spans less than 1 s apart are joined, and so is any span
+  shorter than 3 s, then the result is cut again at the longest speech segment (`src/crispasr_vad.cpp: finish_vad_slices`,
+  `src/crispasr_vad.h`, CrispASR main; the 2026-11-07 runs show it in 0.8.50). No argument turns it off. An A2 CrispASR
+  candidate is therefore the engine plus this merge; the minimum silence passed in is overridden by it. To tell an engine from
+  the merge, run WhisperJAV's own segmenter with its shortest-group join (`min_group_duration_s`) at about 3 s.
+- The 0.5-point margin of `table` covers repeating a run only; differences on seven clips need the bootstrap range
+  (`docs/plans/design/2026-11-07-phase-a-results.md`, section 0).
 - The installed CrispASR build only (here the CUDA build of 0.8.50); Vulkan and Apple are not measured; the CPU figures come
   from the CUDA build with the GPU off.
 - One fixed chain, Parakeet-CrispASR.
