@@ -226,11 +226,13 @@ class TestUnknownEnhancerIsRejectedAtTheBoundary:
             SpeechEnhancerFactory,
         )
 
-        ok, hint = SpeechEnhancerFactory.is_backend_available("bs-roformer")
-        # Whatever the answer on this machine, it must be a usable pair and must
-        # not be reported as an unknown backend.
-        assert isinstance(ok, bool)
-        assert "Unknown backend" not in hint
+        # 1.10.2 (owner W594, W596): bs-roformer is no longer a backend; the installable ones are checked instead.
+        for backend in ("zipenhancer", "htdemucs", "mel-band-roformer", "mini-bs-roformer"):
+            ok, hint = SpeechEnhancerFactory.is_backend_available(backend)
+            # Whatever the answer on this machine, it must be a usable pair and must
+            # not be reported as an unknown backend.
+            assert isinstance(ok, bool), backend
+            assert "Unknown backend" not in hint, backend
 
 
 # ---------------------------------------------------------------------------
