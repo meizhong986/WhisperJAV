@@ -13,7 +13,7 @@ def test_data_file_entries_are_complete():
     cands = json.loads((ROOT / "tools" / "crispasr_viability.json").read_text(encoding="utf-8"))["candidates"]
     assert "baseline" in cands
     for name, c in cands.items():
-        assert c["kind"] in ("wj", "crisp-separator", "crisp-s2s", "crisp-vad", "wj-enhancer-swap",
+        assert c["kind"] in ("wj", "crisp-separator", "crisp-s2s", "crisp-vad", "crisp-diar", "wj-enhancer-swap",
                              "wj-segmenter-swap"), name
         if c.get("same_file_as"):
             assert cands[c["same_file_as"]].get("repo"), name
@@ -23,6 +23,47 @@ def test_data_file_entries_are_complete():
             assert c["twin"] in cands, name
         if c["kind"] == "crisp-vad":
             assert c.get("twin_segmenter"), name
+        if c["kind"] == "crisp-diar":
+            assert c.get("method") in ("sortformer", "pyannote", "ten-frames") and c.get("twin_segmenter") == "ten", name
+
+
+def test_union_spans_joins_overlapping_speaker_turns():
+    # two speakers' turns overlap (1.0-2.0 with 1.5-3.0); a touching span joins; a separate one stays
+    assert cv.union_spans([(4.0, 5.0), (1.5, 3.0), (1.0, 2.0), (3.0, 3.5), (6.0, 6.0)]) == [(1.0, 3.5), (4.0, 5.0)]
+    assert cv.union_spans([]) == []
+
+
+def test_frame_runs_and_spans_to_flags_round_trip():
+    flags = [0, 1, 1, 0, 0, 1, 0, 1]
+    spans = cv.frame_runs(flags, 0.016)
+    assert [(round(a, 3), round(b, 3)) for a, b in spans] == [(0.016, 0.048), (0.08, 0.096), (0.112, 0.128)]
+    assert cv.spans_to_flags(spans, len(flags), 0.016) == flags
+
+
+def test_spans_to_flags_marks_frames_whose_middle_is_inside():
+    # 16 ms frames: middles at 8, 24, 40, 56 ms; the span 20-45 ms holds the middles of frames 1 and 2
+    assert cv.spans_to_flags([(0.020, 0.045)], 4, 0.016) == [0, 1, 1, 0]
+    assert cv.spans_to_flags([(0.0, 1.0)], 3, 0.016) == [1, 1, 1]       # clamped to the grid
+    assert cv.spans_to_flags([], 2, 0.016) == [0, 0]
+
+
+def test_diar_segmenter_uses_ten_post_processing():
+    """The method's spans go through TEN's own merge, pads, cut and grouping, with TEN's settings."""
+    import numpy as np
+    from whisperjav.modules.speech_segmentation.backends.ten import TenSpeechSegmenter
+    ten = TenSpeechSegmenter(min_speech_duration_ms=100, min_silence_duration_ms=100, max_speech_duration_s=6.0,
+                             chunk_threshold_s=1.0, max_group_duration_s=6.0, start_pad_ms=0, end_pad_ms=100)
+    seg = cv.CrispDiarSegmenter("x", {"method": "sortformer"}, "unused", ten)
+    # 1.00-2.00 and 2.05-3.00: the 50 ms gap is under 100 ms, so they merge; 3.50-3.55 is under 100 ms, dropped;
+    # 5.0-14.0 is longer than 6 s and is cut
+    seg.speech_spans = lambda pcm, duration: ([(1.0, 2.0), (2.05, 3.0), (3.5, 3.55), (5.0, 14.0)], 4)
+    r = seg.segment(np.zeros(16 * 16000, dtype=np.float32), sample_rate=16000)
+    assert r.error is None
+    spans = [(round(s.start_sec, 2), round(s.end_sec, 2)) for s in r.segments]
+    assert abs(spans[0][0] - 1.0) < 0.02 and abs(spans[0][1] - 3.1) < 0.02         # merged, end pad 100 ms
+    assert all(not (3.4 < a < 3.6) for a, _ in spans)                              # the short one is gone
+    assert all(b - a <= 6.0 + 1e-6 for a, b in spans)                              # every piece at most 6 s
+    assert len(r.groups) >= 3 and seg.record["turns"] == 4 and seg.record["scenes"] == 1
 
 
 def test_pad_spans_pads_clamps_and_meets_in_the_gap():

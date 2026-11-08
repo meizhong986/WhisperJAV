@@ -94,8 +94,25 @@
     "crisp-marblenet-own": {"area": "A2", "kind": "crisp-vad", "twin_segmenter": "ten", "settings": "own", "same_file_as": "crisp-marblenet", "twin": null},
     "crisp-webrtc-own": {"area": "A2", "kind": "crisp-vad", "twin_segmenter": "ten", "settings": "own", "path": "webrtc", "twin": null},
 
+    "crisp-sortformer": {"area": "A2", "kind": "crisp-diar", "method": "sortformer", "twin_segmenter": "ten",
+      "repo": "nvidia/Nemotron-3-Diarization", "file": "Nemotron-3-Diarization.q8_0.gguf",
+      "revision": "f667ed73aee57d40cc39428eb768b4fd87a0a29e", "licence": "OpenMDW-1.1", "twin": null,
+      "note": "W591: CrispASR's Sortformer diarization (NVIDIA Nemotron-3-Diarization, up to 8 speakers, English-trained per CrispASR's docs/cli.md) as the speech finder: the union of its speaker turns, then TEN's post-processing with TEN's settings. GPU (nemotron3_diar.cpp: use_gpu true).",
+      "simplicity": {"replaces": null, "packages_removed": [],
+        "why": "a new kind of speech segmenter (speaker turns as speech); no WhisperJAV backend runs this model; nemo-diarization runs NeMo's own diarizer, not this one",
+        "backend_file_lines": null}},
+    "crisp-pyannote": {"area": "A2", "kind": "crisp-diar", "method": "pyannote", "twin_segmenter": "ten",
+      "repo": "cstr/pyannote-v3-segmentation-GGUF", "file": "pyannote-seg-3.0.gguf",
+      "revision": "2b2492e0c04f0df609b9faa1ecf363766ad970fa", "licence": "MIT", "twin": null,
+      "note": "W591: CrispASR's pyannote segmentation-3.0 (the segmentation model of its pyannote diarization method) as the speech finder: its non-silence frames read through a grid of 10 ms ranges, then TEN's post-processing with TEN's settings. CPU (pyannote_seg.cpp).",
+      "simplicity": {"replaces": null, "packages_removed": [],
+        "why": "a new kind of speech segmenter; no WhisperJAV backend runs pyannote (pyannote.audio is not a dependency)",
+        "backend_file_lines": null}},
+
     "check-ten-swap": {"area": "check", "kind": "wj-segmenter-swap", "twin_segmenter": "ten",
       "note": "Self-check: WhisperJAV's own TEN segmenter handed in through the A2 swap point; must equal the baseline."},
+    "check-ten-diar": {"area": "check", "kind": "crisp-diar", "method": "ten-frames", "twin_segmenter": "ten", "path": "ten",
+      "note": "Self-check of the crisp-diar path (W591): TEN's own frame decisions through it; differs from the baseline only where a segment longer than 6 s is cut (0/1 frames instead of TEN's probabilities)."},
     "check-ffmpeg-dsp-swap": {"area": "check", "kind": "wj-enhancer-swap", "swap_enhancer": "ffmpeg-dsp",
       "note": "Self-check: WhisperJAV's own ffmpeg-dsp handed in through the A1 swap point; must equal wj-ffmpeg-dsp."}
   }

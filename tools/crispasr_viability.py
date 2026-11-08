@@ -3,7 +3,8 @@
 
 Phase A swaps one stage of Parakeet-CrispASR, run as WhisperJAV ships it:
   A1  the speech enhancer   (CrispASR separators and audio-to-audio speech models, against WhisperJAV's own enhancers)
-  A2  the speech segmenter  (CrispASR VAD engines, against WhisperJAV's own segmenters)
+  A2  the speech segmenter  (CrispASR VAD engines, against WhisperJAV's own segmenters; since W591 also CrispASR's
+      diarization methods that find speech themselves, Sortformer and pyannote segmentation-3.0, kind crisp-diar)
 Every other step (audio extraction, semantic scenes, the enhancer's scene loop, the VAD grouping, parakeet-tdt-0.6b-ja,
 line building, clean-up) is WhisperJAV's unchanged code, imported read-only in a child process.
 
@@ -33,7 +34,7 @@ import threading
 import time
 from pathlib import Path
 
-TOOL_VERSION = "1 (2026-11-07)"
+TOOL_VERSION = "2 (2026-11-08)"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DATA_FILE = Path(__file__).resolve().with_name("crispasr_viability.json")
 NETFLIX = REPO_ROOT / "test_media" / "Ground_Truths" / "Netflix"
@@ -301,6 +302,167 @@ class CrispSegmenter:
         return [SR]
 
 
+PYANNOTE_GRID_S = 0.01   # the ranges pyannote is asked to label: one CrispASR centisecond each
+
+
+def union_spans(spans):
+    """Overlapping or touching spans (seconds) joined; sorted. Speaker turns of different speakers overlap."""
+    out = []
+    for s, e in sorted((float(a), float(b)) for a, b in spans if b > a):
+        if out and s <= out[-1][1]:
+            out[-1][1] = max(out[-1][1], e)
+        else:
+            out.append([s, e])
+    return [(a, b) for a, b in out]
+
+
+def frame_runs(flags, frame_s):
+    """The runs of 1 in a frame grid as spans (seconds): frame i = [i * frame_s, (i + 1) * frame_s)."""
+    out, start = [], None
+    for i, x in enumerate(list(flags) + [0]):
+        if x and start is None:
+            start = i
+        elif not x and start is not None:
+            out.append((start * frame_s, i * frame_s))
+            start = None
+    return out
+
+
+def spans_to_flags(spans, n_frames, frame_s):
+    """1 for each frame of the grid (frame i = [i * frame_s, (i + 1) * frame_s)) whose middle lies inside a span."""
+    flags = [0] * n_frames
+    for s, e in spans:
+        i0 = max(0, int(-(-(s / frame_s - 0.5) // 1)))          # first i with (i + 0.5) * frame_s >= s
+        i1 = min(n_frames, int(-(-(e / frame_s - 0.5) // 1)))   # first i with (i + 0.5) * frame_s >= e
+        for i in range(i0, i1):
+            flags[i] = 1
+    return flags
+
+
+class CrispDiarSegmenter:
+    """A CrispASR diarization method as WhisperJAV's speech segmenter backend (owner W591). The method decides, frame by
+    frame, where there is speech; WhisperJAV's own TEN post-processing does the rest with the settings WhisperJAV
+    resolved for TEN in Parakeet-CrispASR (shortest speech, the silence merge, the pads, the cut of a long segment at
+    the lowest point, the VAD groups; backends/ten.py), so only the engine differs from the baseline. CrispASR's VAD
+    merge (vad_slices) is not on this path.
+
+    sortformer: the speaker turns Nemotron-3-Diarization returns from the audio (crispasr.diarize_segments_with_turns;
+      runs of a speaker's probability above 0.5 every 10 ms, crispasr_diarize.cpp: apply_sortformer), their union.
+    pyannote: segmentation-3.0's frames, read through crispasr.diarize_segments over a grid of 10 ms ranges: a range
+      whose frames are all silence (p[silence] > 0.5) comes back unlabelled (crispasr_diarize.cpp:
+      score_speaker_for_range). The binding gives no probability curve, so the frames are 0 or 1 and TEN's cut of a
+      segment longer than the longest speech falls in a bridged pause or, on a tie, at the latest allowed point."""
+
+    def __init__(self, name, spec, path, ten, record=None, threads=8):
+        self._name, self.spec, self.path, self.ten, self.threads = name, spec, path, ten, threads
+        self.record = record if record is not None else {}
+        for k, v in (("scenes", 0), ("failed", 0), ("vad_s", 0.0), ("audio_s", 0.0), ("spans", 0), ("speech_s", 0.0),
+                     ("turns", 0), ("errors", [])):
+            self.record.setdefault(k, v)   # added up across the run's files, as CrispEnhancer's
+        self.record["method"] = spec["method"]
+        self.record["settings"] = self.settings()
+
+    def settings(self):
+        t = self.ten
+        return {"method": self.spec["method"], "min_speech_duration_ms": t.min_speech_duration_ms,
+                "min_silence_duration_ms": t.min_silence_duration_ms, "start_pad_ms": t.start_pad_ms,
+                "end_pad_ms": t.end_pad_ms, "max_speech_duration_s": t.max_speech_duration_s,
+                "max_group_duration_s": t.max_group_duration_s, "chunk_threshold_s": t.chunk_threshold_s,
+                "min_group_duration_s": t.min_group_duration_s, "hop_size": t.hop_size}
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def display_name(self):
+        return f"CrispASR diarization {self.spec['method']}"
+
+    def speech_spans(self, pcm, duration):
+        """(speech spans in seconds, number of speaker turns) for one scene."""
+        import numpy as np
+        from crispasr import _binding as b
+        method = self.spec["method"]
+        if method == "sortformer":
+            ok, turns = b.diarize_segments_with_turns([b.DiarizeSegment(0.0, duration)], pcm,
+                                                      method=b.DiarizeMethod.SORTFORMER,
+                                                      pyannote_model_path=self.path, n_threads=self.threads)
+            if not ok:
+                raise RuntimeError("diarize_segments_with_turns (sortformer) reported a failure")
+            return union_spans([(t.t0, t.t1) for t in turns]), len(turns)
+        if method == "pyannote":
+            n = int(round(duration / PYANNOTE_GRID_S))
+            grid = [b.DiarizeSegment(round(i * PYANNOTE_GRID_S, 2), round((i + 1) * PYANNOTE_GRID_S, 2))
+                    for i in range(n)]
+            ok = b.diarize_segments(grid, pcm, method=b.DiarizeMethod.PYANNOTE, pyannote_model_path=self.path,
+                                    n_threads=self.threads)
+            if not ok:
+                raise RuntimeError("diarize_segments (pyannote) reported a failure")
+            return union_spans([(g.t0, g.t1) for g in grid if g.speaker >= 0]), 0
+        if method == "ten-frames":
+            # Self-check of this path (check-ten-diar): TEN's own frame decisions, from the same TEN instance scene after
+            # scene as in the baseline (TEN's model keeps state across calls); only the 0/1 cut of long segments differs.
+            ten = self.ten
+            ten._ensure_model()
+            a = ten._convert_to_int16(pcm)
+            flags = []
+            for i in range(0, len(a), ten.hop_size):
+                fr = a[i:i + ten.hop_size]
+                if len(fr) < ten.hop_size:
+                    fr = np.pad(fr, (0, ten.hop_size - len(fr)), mode="constant")
+                ten._model.process(fr)
+                flags.append(ten._model.out_flags.value)
+            return frame_runs(flags, ten.hop_size / SR), 0
+        raise ValueError(f"unknown diarization method {method!r}")
+
+    def segment(self, audio, sample_rate=16000, **kwargs):
+        import numpy as np
+        from whisperjav.modules.speech_segmentation.base import SegmentationResult
+        t = time.time()
+        pcm = np.ascontiguousarray(np.asarray(audio, dtype=np.float32))
+        if pcm.ndim > 1:
+            pcm = np.ascontiguousarray(pcm.mean(axis=1), dtype=np.float32)
+        if sample_rate != SR:
+            from whisperjav.modules.speech_enhancement.pipeline_helper import resample_audio
+            pcm = np.ascontiguousarray(resample_audio(pcm, sample_rate, SR), dtype=np.float32)
+        duration = len(pcm) / SR
+        self.record["scenes"] += 1
+        self.record["audio_s"] += duration
+        params = self.settings()
+        try:
+            spans, n_turns = self.speech_spans(pcm, duration)
+            ten = self.ten
+            frame_s = ten.hop_size / SR
+            n_frames = (len(pcm) + ten.hop_size - 1) // ten.hop_size   # TEN's own frame count (ten.py: segment)
+            flags = spans_to_flags(spans, n_frames, frame_s)
+            probs = [float(f) for f in flags]
+            raw = ten._flags_to_segments(flags, probs, SR, duration)
+            merged = ten._merge_by_silence(raw)
+            padded = ten._apply_padding(merged, duration)
+            segs = ten._split_long_segments(padded, probs, frame_s)
+            groups = ten._group_segments(segs)
+            self.record["spans"] += len(spans)
+            self.record["speech_s"] += sum(e - s for s, e in spans)
+            self.record["turns"] += n_turns
+            self.record["vad_s"] += time.time() - t
+            return SegmentationResult(segments=segs, groups=groups, method=self._name, audio_duration_sec=duration,
+                                      parameters=params, processing_time_sec=time.time() - t)
+        except Exception as e:
+            self.record["failed"] += 1
+            self.record["vad_s"] += time.time() - t
+            if len(self.record["errors"]) < 5:
+                self.record["errors"].append(f"{type(e).__name__}: {e}")
+            return SegmentationResult(segments=[], groups=[], method=self._name, audio_duration_sec=duration,
+                                      parameters=params, processing_time_sec=time.time() - t,
+                                      error=f"{type(e).__name__}: {e}")
+
+    def cleanup(self):
+        pass
+
+    def get_supported_sample_rates(self):
+        return [SR]
+
+
 # ----------------------------------------------------------------------------------------------------------------
 # The child process: Parakeet-CrispASR with one stage swapped
 # ----------------------------------------------------------------------------------------------------------------
@@ -369,7 +531,7 @@ def worker(job_path):
             return orig_ced(backend, model, **kw)
         se.create_enhancer_direct = create_enhancer_direct
     # A2 swap point: the one segmenter name is answered here, with the settings WhisperJAV resolved for the twin.
-    if kind in ("crisp-vad", "wj-segmenter-swap"):
+    if kind in ("crisp-vad", "wj-segmenter-swap", "crisp-diar"):
         from whisperjav.modules.speech_segmentation.factory import SpeechSegmenterFactory
         orig_create = SpeechSegmenterFactory.create
 
@@ -378,6 +540,11 @@ def worker(job_path):
                 params = {**(config or {}), **kw}
                 if kind == "wj-segmenter-swap":
                     return orig_create(spec["twin_segmenter"], None, **params)
+                if kind == "crisp-diar":
+                    # WhisperJAV's TEN built exactly as the self-check's TEN swap (2a): its post-processing is used,
+                    # its model is never loaded.
+                    ten = orig_create(spec["twin_segmenter"], None, **params)
+                    return CrispDiarSegmenter(name, spec, job["model_path"], ten, record=stage_record)
                 return CrispSegmenter(name, spec, job["model_path"], record=stage_record, **params)
             return orig_create(backend, config, **kw)
         SpeechSegmenterFactory.create = staticmethod(create)
@@ -395,7 +562,7 @@ def worker(job_path):
         enhance_for_vad=enhance_for_vad, word_timestamps=None,
         speech_enhancer=None if enhancer in ("", "none") else enhancer, speech_enhancer_model=None,
         segmenter_overrides={}, scene_params={}, model_params={})
-    if kind in ("crisp-vad", "wj-segmenter-swap"):
+    if kind in ("crisp-vad", "wj-segmenter-swap", "crisp-diar"):
         pipeline.segmenter = dataclasses.replace(pipeline.segmenter, backend=name)
         pipeline.speech_segmenter = name
     pipeline.raw_subs_dir = str(run_dir / "raw_subs")
@@ -513,10 +680,10 @@ def run_name(name, track, given=None):
     return given or (name + ("_vadtrack" if track == "vad" else ""))
 
 
-def spawn(job, folder, log_name="run.log", sampler=None):
+def spawn(job, folder, log_name="run.log", sampler=None, extra_env=None):
     """The child process; returns its exit code. A sampler, when given, watches its RAM."""
     dump(folder / "job.json", job)
-    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8", **(extra_env or {}))
     with open(folder / log_name, "a", encoding="utf-8") as log:
         proc = subprocess.Popen([sys.executable, "-X", "utf8", str(Path(__file__).resolve()), job["worker"],
                                  str(folder / "job.json")], cwd=str(REPO_ROOT), env=env, stdout=log,
@@ -872,6 +1039,9 @@ def bench_worker(job_path):
         params = {**s.config, "max_group_duration_s": s.max_group_duration_s, "chunk_threshold_s": s.chunk_threshold_s}
         if spec["kind"] == "crisp-vad":
             seg = CrispSegmenter(name, spec, job["model_path"], **params)
+        elif spec["kind"] == "crisp-diar":
+            from whisperjav.modules.speech_segmentation.factory import SpeechSegmenterFactory
+            seg = CrispDiarSegmenter(name, spec, job["model_path"], SpeechSegmenterFactory.create(twin, None, **params))
         else:
             from whisperjav.modules.speech_segmentation.factory import SpeechSegmenterFactory
             seg = SpeechSegmenterFactory.create(twin, None, **params)
@@ -909,6 +1079,10 @@ def cmd_bench(args):
         devices = ["cpu"]   # WhisperJAV's VAD engines in Parakeet-CrispASR run on the CPU (whisperseg: CPU on NVIDIA installs)
     if spec["area"] == "A2" and spec["kind"].startswith("crisp"):
         devices = ["as built"]  # crispasr.vad_slices takes no GPU switch
+    if spec["kind"] == "crisp-diar":
+        # The diarization calls take no GPU switch either; 'cpu' hides the NVIDIA GPU from the child process
+        # (CUDA_VISIBLE_DEVICES=-1), so CrispASR's CUDA build finds no device and runs on the CPU (its log says which).
+        devices = ["as built", "cpu"]
     if args.devices:
         devices = [d for d in devices if d in args.devices.split(",")] or devices
     results = []
@@ -920,7 +1094,8 @@ def cmd_bench(args):
         before = cmt.gpu_used_mib(args.gpu_index)
         sampler = Sampler(args.gpu_index)
         sampler.start()
-        code = spawn(job, folder, log_name=f"{dev.replace(' ', '_')}.log", sampler=sampler)
+        hide_gpu = {"CUDA_VISIBLE_DEVICES": "-1"} if dev == "cpu" and spec["kind"] == "crisp-diar" else None
+        code = spawn(job, folder, log_name=f"{dev.replace(' ', '_')}.log", sampler=sampler, extra_env=hide_gpu)
         sampler.stop()
         rec = load_json(job["out"]) if Path(job["out"]).exists() else {"error": f"exit code {code}"}
         g = sampler.gpu_peak()
