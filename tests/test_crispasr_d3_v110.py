@@ -129,7 +129,7 @@ def test_device_cpu_reaches_the_enhancer(tmp_path, monkeypatch):
 def test_enhance_for_vad_the_enhanced_to_the_segmenter_and_the_original_to_crispasr(tmp_path, monkeypatch):
     log = []
     _stub_enhancement(monkeypatch, log)
-    pipe = make(CohereCrispASRPipeline, tmp_path, speech_enhancer="bs-roformer", enhance_for_vad=True)
+    pipe = make(CohereCrispASRPipeline, tmp_path, speech_enhancer="mini-bs-roformer", enhance_for_vad=True)
     md = {"stages": {}}
     asr, vad = pipe._enhance(_scenes(tmp_path), md)
     assert [s.path.name for s in vad] == ["s0.wav.enh", "s1.wav.enh"]
