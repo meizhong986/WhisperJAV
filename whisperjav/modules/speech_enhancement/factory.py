@@ -5,11 +5,12 @@ Supports lazy loading to avoid import overhead for unused backends.
 
 Design Decisions (v1.7.3, extended v1.8.x):
 - Single backend entry with model parameter (not separate entries per sample rate)
-- Default model varies by backend (e.g., "torch" for ZipEnhancer, "vocals" for BS-RoFormer)
+- Default model varies by backend (e.g., "torch" for ZipEnhancer, "vocals" for the separators)
 - Graceful degradation handled at backend level
 - Consistent with SpeechSegmenterFactory pattern
-- Five backends: none, ffmpeg-dsp, zipenhancer, bs-roformer, htdemucs
-  (ClearVoice was removed in v1.10.0; see REMOVED_BACKENDS)
+- Six backends: none, ffmpeg-dsp, zipenhancer, htdemucs, and (1.10.2, owner W594, W596) mel-band-roformer and
+  mini-bs-roformer, run by CrispASR (backends/crispasr_separator.py). A name not among them stops the
+  run before any audio is read (unknown_backend_message, owner W603)
 """
 
 from typing import Dict, Type, Optional, Any, List, Tuple
@@ -26,8 +27,10 @@ _BACKEND_REGISTRY: Dict[str, str] = {
     "none": "whisperjav.modules.speech_enhancement.backends.none.NullSpeechEnhancer",
     "ffmpeg-dsp": "whisperjav.modules.speech_enhancement.backends.ffmpeg_dsp.FFmpegDSPBackend",
     "zipenhancer": "whisperjav.modules.speech_enhancement.backends.zipenhancer.ZipEnhancerBackend",
-    "bs-roformer": "whisperjav.modules.speech_enhancement.backends.bs_roformer.BSRoformerSpeechEnhancer",
     "htdemucs": "whisperjav.modules.speech_enhancement.backends.htdemucs.HtDemucsSpeechEnhancer",
+    # 1.10.2 (owner W594, W596): run by CrispASR
+    "mel-band-roformer": "whisperjav.modules.speech_enhancement.backends.crispasr_separator.MelBandRoformerSpeechEnhancer",
+    "mini-bs-roformer": "whisperjav.modules.speech_enhancement.backends.crispasr_separator.MiniBsRoformerSpeechEnhancer",
 }
 
 # Cache for loaded backend classes (avoid repeated imports)
@@ -54,18 +57,27 @@ _BACKEND_DEPENDENCIES: Dict[str, Dict[str, Any]] = {
         "description": "ZipEnhancer 16kHz (lightweight, SOTA quality)",
         "fatal_when_unavailable": True,
     },
-    "bs-roformer": {
-        "packages": ["bs_roformer"],
-        "install_hint": "pip install bs-roformer-infer",
-        "always_available": False,
-        "description": "BS-RoFormer vocal isolation",
-        "fatal_when_unavailable": True,
-    },
     "htdemucs": {
         "packages": ["demucs"],
         "install_hint": "pip install demucs",
         "always_available": False,
         "description": "htdemucs vocal isolation (Demucs v4)",
+        "fatal_when_unavailable": True,
+    },
+    # 1.10.2 (owner W594, W596): CrispASR is installed with WhisperJAV (for the GGUF pipelines); the model files
+    # download on first use (crispasr/manifest.py ENHANCER_MODELS).
+    "mel-band-roformer": {
+        "packages": ["crispasr"],
+        "install_hint": "CrispASR is installed with WhisperJAV; reinstall WhisperJAV to restore it",
+        "always_available": False,
+        "description": "Mel-Band-RoFormer vocal isolation (CrispASR)",
+        "fatal_when_unavailable": True,
+    },
+    "mini-bs-roformer": {
+        "packages": ["crispasr"],
+        "install_hint": "CrispASR is installed with WhisperJAV; reinstall WhisperJAV to restore it",
+        "always_available": False,
+        "description": "Mini-BS-RoFormer vocal isolation (CrispASR)",
         "fatal_when_unavailable": True,
     },
 }
@@ -92,43 +104,42 @@ FATAL_WHEN_UNAVAILABLE = frozenset(
 _DEFAULT_MODELS: Dict[str, str] = {
     "ffmpeg-dsp": "loudnorm",  # Default effect (can be comma-separated for combos)
     "zipenhancer": "torch",  # torch (GPU) or onnx (CPU/GPU)
-    "bs-roformer": "vocals",
     "htdemucs": "htdemucs",
+    "mel-band-roformer": "vocals",
+    "mini-bs-roformer": "vocals",
 }
 
-# Backends WhisperJAV no longer includes, with the name users knew them by.
-#
-# ClearVoice left in v1.10.0 (owner, W73). A value that still names it -- a saved
-# GUI setting, an Ensemble preset, a script's command line or pass parameters --
-# stops the run with removed_backend_message (owner, W75; text approved W79).
-# Without this, an unknown name reaching the enhancer helpers would fall back to
-# no clean-up with only a warning in the log.
-REMOVED_BACKENDS: Dict[str, str] = {
-    "clearvoice": "ClearVoice",
-}
+# A speech enhancer name WhisperJAV does not offer stops the run before any audio is read (1.10.2, owner W603, rule
+# (i); it replaces the named stops of the speech enhancers WhisperJAV no longer includes). Without it, an unknown name
+# reaching the enhancer helpers would fall back to no clean-up with only a warning in the log. The command line's
+# speech enhancer flags reject such a name already (main.speech_enhancer_spec); this covers what they do not see:
+# the speech enhancer inside an Ensemble pass's parameters, a preset, a pipeline config.
+def _offered_backends() -> str:
+    """The speech enhancers WhisperJAV offers, as the message lists them: "none, ffmpeg-dsp, ... or mini-bs-roformer"."""
+    names = list(_BACKEND_REGISTRY)
+    return ", ".join(names[:-1]) + " or " + names[-1]
 
 
-def removed_backend_message(value: Any, where: str) -> Optional[str]:
+def unknown_backend_message(value: Any, where: str) -> Optional[str]:
     """
-    The message for a speech-enhancer value that names a removed backend, else None.
+    The stop message for a speech-enhancer value WhisperJAV does not offer, else None (text approved, owner W603).
 
-    value may be "backend" or "backend:model". where names what carried it -- a
-    flag such as "--pass1-speech-enhancer" or a pass parameter -- and is put into
-    the message as the place to choose another enhancer.
+    value may be "backend" or "backend:model"; empty or not a string is not a choice and gives None. where names what
+    carried it -- a flag such as "--pass1-speech-enhancer" or a pass parameter -- and is put into the message as the
+    place to choose another speech enhancer.
     """
     if not isinstance(value, str):
         return None
-    label = REMOVED_BACKENDS.get(value.split(":", 1)[0].strip().lower())
-    if label is None:
+    name = value.split(":", 1)[0].strip()
+    if not name or name in _BACKEND_REGISTRY:
         return None
-    return (f"{label} is no longer included in WhisperJAV 1.10. Choose another speech "
-            f"enhancer for {where} (none, zipenhancer, bs-roformer, ffmpeg-dsp or "
-            f"htdemucs) and run again.")
+    return (f"'{name}' is not a speech enhancer in WhisperJAV. Choose one of {_offered_backends()} "
+            f"for {where} and run again.")
 
 
-def removed_backend_in_pass(pass_config: Dict[str, Any], pass_number: int) -> Optional[str]:
+def unknown_backend_in_pass(pass_config: Dict[str, Any], pass_number: int) -> Optional[str]:
     """
-    removed_backend_message for an ensemble pass configuration, else None.
+    unknown_backend_message for an ensemble pass configuration, else None.
 
     Looks where a pass can carry a speech enhancer: its speech_enhancer, and the
     qwen_enhancer / hf_speech_enhancer keys of its Qwen3-ASR and Transformers
@@ -142,7 +153,7 @@ def removed_backend_in_pass(pass_config: Dict[str, Any], pass_number: int) -> Op
         if isinstance(params, dict):
             candidates.append((params.get(key), f"{key} in --pass{pass_number}-{flag}"))
     for value, where in candidates:
-        message = removed_backend_message(value, where)
+        message = unknown_backend_message(value, where)
         if message:
             return message
     return None
@@ -185,7 +196,7 @@ class SpeechEnhancerFactory:
         Check if a backend's dependencies are installed.
 
         Args:
-            name: Backend name (e.g., "zipenhancer", "bs-roformer")
+            name: Backend name (e.g., "zipenhancer", "mini-bs-roformer")
 
         Returns:
             Tuple of (is_available, install_hint)
@@ -223,7 +234,9 @@ class SpeechEnhancerFactory:
             "none": "None (Skip Enhancement)",
             "ffmpeg-dsp": "FFmpeg DSP (Audio Filters)",
             "zipenhancer": "ZipEnhancer 16kHz (Recommended)",
-            "bs-roformer": "BS-RoFormer Vocal Isolation",
+            "htdemucs": "htdemucs (Demucs v4)",
+            "mel-band-roformer": "Mel-Band-RoFormer (CrispASR)",
+            "mini-bs-roformer": "Mini-BS-RoFormer (CrispASR)",
         }
 
         for name in _BACKEND_REGISTRY.keys():
@@ -266,8 +279,8 @@ class SpeechEnhancerFactory:
                 return ["loudnorm", "normalize", "compress", "denoise", "highpass", "lowpass", "deess", "amplify"]
             elif name == "zipenhancer":
                 return ["zipenhancer"]  # No model variants
-            elif name == "bs-roformer":
-                return ["vocals", "other"]
+            elif name in ("mel-band-roformer", "mini-bs-roformer"):
+                return ["vocals"]
             return []
 
     @staticmethod
@@ -329,7 +342,7 @@ class SpeechEnhancerFactory:
         Create a speech enhancer instance.
 
         Args:
-            name: Backend name ('none', 'zipenhancer', 'bs-roformer')
+            name: Backend name ('none', 'zipenhancer', 'mini-bs-roformer', ...)
             config: Configuration dict (from resolved config or GUI)
             **kwargs: Additional backend-specific parameters (override config)
                 - model: Model variant to use (e.g., "vocals")
@@ -348,16 +361,16 @@ class SpeechEnhancerFactory:
 
             # With specific model
             enhancer = SpeechEnhancerFactory.create(
-                "bs-roformer",
+                "mini-bs-roformer",
                 model="vocals"
             )
 
             # Passthrough (no enhancement)
             enhancer = SpeechEnhancerFactory.create("none")
         """
-        removed = removed_backend_message(name, "this run")
-        if removed:
-            raise SpeechEnhancerUnavailable(removed)
+        unknown = unknown_backend_message(name, "this run")
+        if unknown:
+            raise SpeechEnhancerUnavailable(unknown)
 
         # Merge config with kwargs (kwargs take precedence)
         params = dict(config or {})
