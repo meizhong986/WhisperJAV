@@ -35,7 +35,7 @@ Available Backends:
     - none: Passthrough (no enhancement)
     - ffmpeg-dsp: FFmpeg audio filters (loudnorm, compress, denoise)
     - zipenhancer: ZipEnhancer 16kHz via ModelScope (lightweight, SOTA quality)
-    - bs-roformer: BS-RoFormer vocal isolation (44.1kHz)
+    - mel-band-roformer, mini-bs-roformer: vocal isolation run by CrispASR (44.1kHz; 1.10.2)
 
 Design Principles:
     - Lazy loading: Backends loaded only when needed
