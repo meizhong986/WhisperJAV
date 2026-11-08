@@ -102,7 +102,8 @@ class TestItDoesNotFailQuietly:
         a failure and the process shall stop with helpful communication." That
         is every clean-up the user has to install.
         """
-        for backend in ("zipenhancer", "bs-roformer", "htdemucs"):
+        # 1.10.2 (owner W594, W596): bs-roformer is gone; the two speech enhancers run by CrispASR take its place.
+        for backend in ("zipenhancer", "htdemucs", "mel-band-roformer", "mini-bs-roformer"):
             assert backend in FATAL_WHEN_UNAVAILABLE, backend
 
     def test_the_two_that_cannot_be_missing_are_not(self):
@@ -130,7 +131,7 @@ class TestItDoesNotFailQuietly:
             pipeline_helper.create_enhancer_from_config(
                 {"params": {"speech_enhancer": {"backend": "htdemucs"}}})
 
-    @pytest.mark.parametrize("backend", ["zipenhancer", "bs-roformer"])
+    @pytest.mark.parametrize("backend", ["zipenhancer", "mel-band-roformer", "mini-bs-roformer"])
     def test_an_installable_enhancer_that_is_missing_now_stops_the_run(
             self, backend, monkeypatch):
         """
