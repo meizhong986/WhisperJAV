@@ -495,7 +495,9 @@ def test_construct_ships_the_three_files_and_pins_the_conda_part():
     text = (ROOT / "installer" / "templates" / "construct.yaml.template").read_text(encoding="utf-8")
     for variant in VARIANTS:
         assert f"  - requirements_v{{{{VERSION}}}}_{variant}.txt" in text
-    for spec in ("python=3.13.16", "openssl=3.6.2", "pip=26.2.1", "git=2.56.0", "ffmpeg=7.1.1", "menuinst=2.5.2"):
+    # 1.10.2 (owner W610): FFmpeg 8.1.2 with its conda-forge build pinned (before: ffmpeg=7.1.1).
+    for spec in ("python=3.13.16", "openssl=3.6.2", "pip=26.2.1", "git=2.56.0", "ffmpeg=8.1.2=gpl_ha77653d_912",
+                 "menuinst=2.5.2"):
         assert f"  - {spec}" in text, spec
 
 
