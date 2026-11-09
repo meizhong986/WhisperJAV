@@ -27,7 +27,7 @@ specs:
   # dependencies; every WhisperJAV dependency comes from the locked files below.
   - pip=26.2.1      # Package installer
   - git=2.56.0      # Required for GitHub installs
-  - ffmpeg=7.1.1    # Audio/video processing (v6 or v7 required, v8+ incompatible)
+  - ffmpeg=8.1.2=gpl_ha77653d_912  # Audio/video processing. v1.10.2 (owner W610): FFmpeg 8.1.2, with the build a conda solve of these six entries gave on 2026-11-08 (before: 7.1.1)
   - menuinst=2.5.2  # Desktop/Start Menu shortcut creation
 
 
