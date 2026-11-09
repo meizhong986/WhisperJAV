@@ -24,7 +24,7 @@ This guide installs WhisperJAV from its source code into a Python environment yo
 | Windows | 10 or 11, 64-bit (x86-64); Windows on ARM is not supported | — |
 | Python | **3.13** (other versions are refused) | [python.org](https://www.python.org/downloads/) or conda/Miniconda |
 | Git | any recent version | [git-scm.com](https://git-scm.com/download/win) |
-| FFmpeg | 6.x or 7.x, on your PATH | [gyan.dev](https://www.gyan.dev/ffmpeg/builds/), or `winget install --id=Gyan.FFmpeg -e` |
+| FFmpeg | 8.x, on your PATH | [gyan.dev](https://www.gyan.dev/ffmpeg/builds/), or `winget install --id=Gyan.FFmpeg -e` |
 | Visual C++ Redistributable | 2015–2022 (x64) | [microsoft.com](https://aka.ms/vs/17/release/vc_redist.x64.exe) |
 | WebView2 Runtime | any, for the GUI | [microsoft.com](https://go.microsoft.com/fwlink/p/?LinkId=2124703) |
 | NVIDIA driver | 580 or newer, for the NVIDIA GPU (CUDA) install | [nvidia.com/drivers](https://www.nvidia.com/drivers) |
