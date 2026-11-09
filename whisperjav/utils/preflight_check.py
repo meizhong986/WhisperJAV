@@ -103,7 +103,7 @@ CRISPASR_CHECK_FAILED = "could not be checked: {error}"
 # it: WhisperJAV's version and this Python; where PyTorch is loaded from (#502: a PyTorch outside the install loaded
 # before the installed one); PYTHONPATH and the user's own package folder, which Python reads before the install's
 # own packages; and whether the addresses installs and downloads need answer from this computer (#495).
-# DRAFT texts, not yet approved by the owner.
+# Texts approved by the owner (W613).
 INSTALL_PYTHON_TEXT = "WhisperJAV {version}; Python {python} at {executable}"
 TORCH_INSIDE_TEXT = "PyTorch {version} is loaded from this Python's own packages: {folder}"
 # #502's case: a PyTorch elsewhere is found before the one in the install's own package folder.
@@ -1017,7 +1017,7 @@ def ensure_crispasr_ready(passes, *, device=None, temp_dir=None, exit_on_fail: b
 def _crispasr_segmenter_model_available(backend: str, download: bool, exit_on_fail: bool) -> bool:
     """ensure_segmenter_model_available for the CrispASR speech segmenters (sortformer, pyannote).
 
-    Text drafted in the 58th session (owner W596 INSTRUCT1: steps 1-4 preapproved); for his approval.
+    Text drafted in the 58th session (owner W596 INSTRUCT1: steps 1-4 preapproved); approved by the owner (W600 3).
     """
     display = _CRISPASR_DOWNLOADED_SEGMENTERS[backend]
     try:
