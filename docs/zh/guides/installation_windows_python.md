@@ -24,7 +24,7 @@
 | Windows | 10 或 11，64 位（x86-64）；不支持 Windows on ARM | — |
 | Python | **3.13**（其他版本会被拒绝） | [python.org](https://www.python.org/downloads/) 或 conda/Miniconda |
 | Git | 任意较新版本 | [git-scm.com](https://git-scm.com/download/win) |
-| FFmpeg | 6.x 或 7.x，需在 PATH 中 | [gyan.dev](https://www.gyan.dev/ffmpeg/builds/)，或 `winget install --id=Gyan.FFmpeg -e` |
+| FFmpeg | 8.x，需在 PATH 中 | [gyan.dev](https://www.gyan.dev/ffmpeg/builds/)，或 `winget install --id=Gyan.FFmpeg -e` |
 | Visual C++ Redistributable | 2015–2022（x64） | [microsoft.com](https://aka.ms/vs/17/release/vc_redist.x64.exe) |
 | WebView2 Runtime | 任意版本，供 GUI 使用 | [microsoft.com](https://go.microsoft.com/fwlink/p/?LinkId=2124703) |
 | NVIDIA 驱动 | 580 或更新，用于 NVIDIA GPU（CUDA）安装 | [nvidia.com/drivers](https://www.nvidia.com/drivers) |
