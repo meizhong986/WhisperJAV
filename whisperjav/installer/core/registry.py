@@ -571,7 +571,7 @@ PACKAGES: List[Package] = [
     # =========================================================================
     Package(
         name="pysubtrans",
-        version=">=1.5.0",
+        version=">=1.6.0",
         extra=Extra.TRANSLATE,
         order=60,
         import_name="PySubtrans",  # pip name != import name (case-sensitive)
@@ -590,6 +590,13 @@ PACKAGES: List[Package] = [
         extra=Extra.TRANSLATE,
         order=62,
         reason="Gemini provider for pysubtrans",
+    ),
+    Package(
+        name="anthropic",
+        version=">=2.0.0",
+        extra=Extra.TRANSLATE,
+        order=62,
+        reason="Claude provider for pysubtrans",
     ),
     Package(
         name="google-api-core",

@@ -219,9 +219,10 @@ gui = [
 # Translation module
 # Install with: pip install whisperjav[translate]
 translate = [
-    "pysubtrans>=1.5.0",  # AI subtitle translation (requires Python 3.10+)
+    "pysubtrans>=1.6.0",  # AI subtitle translation (requires Python 3.10+). The Claude patch in core.py needs 1.6
     "openai>=1.35.0",     # GPT provider
     "google-genai>=1.39.0",  # Gemini provider
+    "anthropic>=2.0.0",   # Claude provider (2.x sends API version 2026-10-21)
     "google-api-core>=2.14.0",  # Required by pysubtrans Gemini provider (undeclared transitive dep)
 ]
 
