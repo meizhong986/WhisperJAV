@@ -857,7 +857,7 @@ class TestGeneratedRequirements:
 
         content = req_files[0].read_text(encoding="utf-8").lower()
 
-        translate_packages = ["pysubtrans", "openai", "google-genai"]
+        translate_packages = ["pysubtrans", "openai", "google-genai", "anthropic"]
         missing = [pkg for pkg in translate_packages if pkg not in content]
 
         assert not missing, f"Translate packages missing from requirements.txt: {missing}"

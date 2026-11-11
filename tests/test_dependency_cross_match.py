@@ -264,9 +264,10 @@ class TestInstallationConstraints:
                 )
 
     @pytest.mark.parametrize("pkg_info", [
-        ("pysubtrans", ">=1.5.0", "PySubtrans"),
+        ("pysubtrans", ">=1.6.0", "PySubtrans"),
         ("openai", ">=1.35.0", "openai"),
         ("google-genai", ">=1.39.0", "google.genai"),
+        ("anthropic", ">=2.0.0", "anthropic"),
     ], ids=lambda x: x[0] if isinstance(x, tuple) else str(x))
     def test_translate_package_installed(self, pkg_info):
         """Translation packages are importable where applicable."""

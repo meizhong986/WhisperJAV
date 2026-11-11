@@ -28,7 +28,7 @@ gui
 
 translate
     AI-powered subtitle translation using PySubtrans.
-    Includes: pysubtrans, openai, google-genai
+    Includes: pysubtrans, openai, google-genai, anthropic
 
 enhance
     Speech enhancement (denoising, vocal isolation).
