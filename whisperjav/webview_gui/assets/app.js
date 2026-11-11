@@ -8071,6 +8071,8 @@ const ProviderUIManager = {
             return;
         }
 
+        TranslatorManager.setOverridePlaceholder(modelOverrideEl, provider);
+
         if (provider === 'ollama') {
             if (apiKeyRow) apiKeyRow.style.display = 'none';
             if (ollamaPanel) ollamaPanel.style.display = 'block';
@@ -8122,16 +8124,12 @@ const ProviderUIManager = {
         }
 
         // Non-Ollama providers — flat list
-        const providerModels = TranslatorManager.providerModels;
-        const models = providerModels[provider] || [];
+        modelSelect.innerHTML = TranslatorManager.modelOptionsHtml(provider);
 
-        modelSelect.innerHTML = '<option value="">Default</option>' +
-            models.map(m => {
-                let label = m;
-                return `<option value="${m}">${label}</option>`;
-            }).join('');
-
-        if (currentValue) modelSelect.value = currentValue;
+        // A value the list no longer offers (such as the default itself) falls back to "Default"
+        if (currentValue && Array.from(modelSelect.options).some(o => o.value === currentValue)) {
+            modelSelect.value = currentValue;
+        }
 
     },
 
@@ -8223,7 +8221,8 @@ const TranslatorManager = {
         currentFile: null
     },
 
-    // Provider model options (Ollama models are now driven by OllamaStateManager)
+    // Provider model options (Ollama models are now driven by OllamaStateManager).
+    // The first entry is the default in providers.py. The "Default" option names it and replaces it.
     providerModels: {
         // #325: deepseek-chat/-reasoner deprecate 2026-07-24; v4 names per
         // https://api-docs.deepseek.com/ (pro = thinking; flash is sent with thinking off).
@@ -8231,7 +8230,7 @@ const TranslatorManager = {
         deepseek: ['deepseek-flash', 'deepseek-v4-pro'],
         // WP-002: 2.0 / 1.5 are retired. 3.1 Pro (preview) added for harder material.
         gemini: ['gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview'],
-        // The Claude 3 models are retired. The first entry is the default in providers.py.
+        // The Claude 3 models are retired.
         claude: ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'],
         gpt: ['gpt-6-luna', 'gpt-6.1-terra', 'gpt-6.1-sol'],
         // #325: the routed DeepSeek model was deprecated 2026-07-24 alongside the
@@ -8244,6 +8243,34 @@ const TranslatorManager = {
         // Groq shut down the Llama 3 and Mixtral models.
         groq: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'],
         custom: []
+    },
+
+    /**
+     * Build the model drop-down options of a cloud provider.
+     * The blank option names the default model, so the default is not listed twice.
+     * @param {string} provider - Provider key, such as 'claude'.
+     * @returns {string} The option elements as HTML.
+     */
+    modelOptionsHtml(provider) {
+        const [defaultModel, ...others] = this.providerModels[provider] || [];
+        const label = defaultModel ? `Default (${defaultModel})` : 'No default - type a model';
+        return `<option value="">${label}</option>` +
+            others.map(m => `<option value="${m}">${m}</option>`).join('');
+    },
+
+    /**
+     * Make the model override box say which default it replaces.
+     * Ollama keeps the box's original placeholder.
+     * @param {HTMLInputElement|null} input - The override box.
+     * @param {string} provider - Provider key, such as 'claude'.
+     * @returns {void}
+     */
+    setOverridePlaceholder(input, provider) {
+        if (!input) return;
+        if (!('placeholder' in input.dataset)) input.dataset.placeholder = input.placeholder;
+        const defaultModel = (this.providerModels[provider] || [])[0];
+        if (provider === 'ollama') input.placeholder = input.dataset.placeholder;
+        else input.placeholder = defaultModel ? `Optional - replaces ${defaultModel}` : 'Model name (required)';
     },
 
     init() {
@@ -8290,13 +8317,7 @@ const TranslatorManager = {
         const modelSelect = document.getElementById('translatorModel');
         if (!modelSelect) return;
 
-
-        const models = this.providerModels[provider] || [];
-        modelSelect.innerHTML = '<option value="">Default</option>' +
-            models.map(m => {
-                let label = m;
-                return `<option value="${m}">${label}</option>`;
-            }).join('');
+        modelSelect.innerHTML = this.modelOptionsHtml(provider);
     },
 
     async updateApiKeyStatus(provider) {
@@ -8982,14 +9003,7 @@ const TranslationSettingsModal = {
         const modelSelect = document.getElementById('ensembleTranslateModel');
         if (!modelSelect) return;
 
-
-        const models = this.providerModels[provider] || [];
-        modelSelect.innerHTML = '<option value="">Default</option>' +
-            models.map(m => {
-                let label = m;
-                return `<option value="${m}">${label}</option>`;
-            }).join('');
-
+        modelSelect.innerHTML = TranslatorManager.modelOptionsHtml(provider);
     },
 
     async testConnection() {
