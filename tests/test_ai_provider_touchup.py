@@ -128,3 +128,83 @@ class TestClaudeRequestPatch:
 
     def test_missing_hook_is_reported(self):
         assert not apply_claude_request_patch(SimpleNamespace(client=None), "claude-haiku-5-5")
+
+
+class TestConnectionCheck:
+    """The GUI's Test Connection button must ask each provider, not OpenAI."""
+
+    @pytest.fixture
+    def api(self):
+        from whisperjav.webview_gui.api import WhisperJAVAPI
+        return WhisperJAVAPI()
+
+    @pytest.fixture
+    def sent(self, monkeypatch):
+        """Record the request urlopen gets, and answer it with the status in `sent["status"]`."""
+        import io
+        import urllib.error
+        import urllib.request
+
+        sent = {"status": 200}
+
+        class _Response:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        def urlopen(req, timeout=None):
+            sent["url"] = req.full_url
+            sent["headers"] = {k.lower(): v for k, v in req.header_items()}
+            if sent["status"] != 200:
+                raise urllib.error.HTTPError(req.full_url, sent["status"], "err", None, io.BytesIO())
+            return _Response()
+
+        monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+        return sent
+
+    @pytest.mark.parametrize("provider, url, auth", [
+        ("gemini", "https://generativelanguage.googleapis.com/v1beta/models", ("x-goog-api-key", "k")),
+        ("groq", "https://api.groq.com/openai/v1/models", ("authorization", "Bearer k")),
+        ("glm", "https://open.bigmodel.cn/api/paas/v4/models", ("authorization", "Bearer k")),
+        ("gpt", "https://api.openai.com/v1/models", ("authorization", "Bearer k")),
+        ("deepseek", "https://api.deepseek.com/models", ("authorization", "Bearer k")),
+    ])
+    def test_each_provider_asks_its_own_server(self, api, sent, provider, url, auth):
+        assert api.test_provider_connection(provider, "k")["success"]
+        assert sent["url"] == url
+        assert sent["headers"][auth[0]] == auth[1]
+
+    def test_gemini_bad_key_is_invalid(self, api, sent):
+        sent["status"] = 400
+        assert api.test_provider_connection("gemini", "k")["error"] == "Invalid API key"
+
+    def test_claude_looks_up_the_default_model(self, api, monkeypatch):
+        import anthropic
+
+        calls = []
+
+        class _Client:
+            def __init__(self, **kwargs):
+                calls.append(kwargs["api_key"])
+                self.models = SimpleNamespace(retrieve=calls.append)
+
+        monkeypatch.setattr(anthropic, "Anthropic", _Client)
+        assert api.test_provider_connection("claude", "k")["success"]
+        assert calls == ["k", PROVIDER_CONFIGS["claude"]["model"]]
+
+    def test_claude_bad_key_is_invalid(self, api, monkeypatch):
+        import anthropic
+        import httpx
+
+        request = httpx.Request("GET", "https://api.anthropic.com/v1/models/x")
+        error = anthropic.AuthenticationError("bad key", response=httpx.Response(401, request=request), body=None)
+
+        def retrieve(model):
+            raise error
+
+        monkeypatch.setattr(anthropic, "Anthropic", lambda **kw: SimpleNamespace(models=SimpleNamespace(retrieve=retrieve)))
+        assert api.test_provider_connection("claude", "k")["error"] == "Invalid API key"
