@@ -2,12 +2,16 @@
 
 Model IDs were read from each provider's model page on 2026-11-10.
 """
+import re
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from whisperjav.translate.core import apply_claude_request_patch
 from whisperjav.translate.providers import PROVIDER_CONFIGS
+
+APP_JS = Path(__file__).resolve().parents[1] / "whisperjav" / "webview_gui" / "assets" / "app.js"
 
 # Retired or shut down by the provider. None may be a default or a dropdown choice.
 RETIRED = {
@@ -17,6 +21,21 @@ RETIRED = {
     "llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "mixtral-8x7b-32768",
 }
 
+
+def _gui_model_lists() -> dict:
+    """Parse the `providerModels` table out of app.js.
+
+    Returns:
+        A dict of provider key to its list of model IDs.
+    """
+    text = APP_JS.read_text(encoding="utf-8")
+    block = re.search(r"providerModels: \{(.*?)\n    \}", text, re.S).group(1)
+    lists = {}
+    for key, body in re.findall(r"^\s*(\w+): \[(.*?)\]", block, re.M | re.S):
+        lists[key] = re.findall(r"'([^']+)'", body)
+    return lists
+
+
 class TestDefaults:
     def test_no_retired_default(self):
         for key, config in PROVIDER_CONFIGS.items():
@@ -25,6 +44,21 @@ class TestDefaults:
     def test_claude_output_room_for_thinking(self):
         # Current Claude models think before answering, and the thinking counts against max_tokens.
         assert PROVIDER_CONFIGS["claude"]["max_tokens"] >= 16000
+
+
+class TestGuiModelLists:
+    def test_one_table(self):
+        # The settings dialog reuses the main table, so the two cannot drift apart.
+        assert APP_JS.read_text(encoding="utf-8").count("providerModels: {") == 1
+
+    def test_no_retired_choice(self):
+        for key, models in _gui_model_lists().items():
+            assert not RETIRED & set(models), key
+
+    def test_first_choice_is_the_default(self):
+        for key, models in _gui_model_lists().items():
+            if models:
+                assert models[0] == PROVIDER_CONFIGS[key]["model"], key
 
 
 class _FakeSdk:
