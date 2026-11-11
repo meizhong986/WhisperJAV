@@ -335,6 +335,82 @@ def apply_server_temperature_patch(translator, debug: bool = False) -> bool:
     return True
 
 
+# Claude models that take `output_config.effort`: the 5.x family. Claude Haiku 4.5 rejects it.
+_CLAUDE_EFFORT_MODEL = re.compile(r'claude-[a-z]+-5')
+
+
+class _ClaudeMessages:
+    """`messages` of the Anthropic SDK client, minus the fields current Claude requests reject."""
+
+    def __init__(self, messages, effort: bool):
+        self._messages = messages
+        self._effort = effort
+
+    def _clean(self, kwargs: dict) -> dict:
+        for field in ('temperature', 'top_p', 'top_k'):
+            kwargs.pop(field, None)
+        if self._effort:
+            kwargs.setdefault('output_config', {'effort': 'low'})
+        return kwargs
+
+    def create(self, **kwargs):
+        return self._messages.create(**self._clean(kwargs))
+
+    def stream(self, **kwargs):
+        return self._messages.stream(**self._clean(kwargs))
+
+
+class _ClaudeSdk:
+    """The Anthropic SDK client with `messages` swapped for `_ClaudeMessages`."""
+
+    def __init__(self, sdk, effort: bool):
+        self._sdk = sdk
+        self.messages = _ClaudeMessages(sdk.messages, effort)
+
+    def __getattr__(self, name):
+        return getattr(self._sdk, name)
+
+
+def apply_claude_request_patch(translator, model: str, debug: bool = False) -> bool:
+    """Send Claude requests the current Anthropic API accepts.
+
+    PySubtrans' Claude client passes `temperature` on every request. The Anthropic SDK 2.x
+    has no such argument, and API version 2026-10-21 answers it with a 400 on every model.
+    This patch removes `temperature`, `top_p` and `top_k`. On the 5.x models it also asks
+    for low effort, because subtitle lines need little thinking and thinking is billed as
+    output. PySubtrans creates the SDK client on the first request, so `_get_client_response`
+    wraps it there, once, and leaves it wrapped.
+
+    Args:
+        translator: The PySubtrans translator whose `client` is an `AnthropicClient`.
+        model: The Claude model ID the run uses.
+        debug: Print a line when the SDK client gets wrapped.
+
+    Returns:
+        True if the patch was applied.
+    """
+    client = getattr(translator, 'client', None)
+    if client is None or not hasattr(client, '_get_client_response'):
+        print("[TRANSLATE]   WARNING: could not adapt Claude requests - "
+              "translator.client._get_client_response not found", file=sys.stderr)
+        return False
+
+    original = client._get_client_response
+    effort = bool(_CLAUDE_EFFORT_MODEL.search(model or ''))
+
+    def _patched(request, temperature):
+        if not isinstance(client.client, _ClaudeSdk):
+            client.client = _ClaudeSdk(client.client, effort)
+            if debug:
+                print("[TRANSLATE]   [claude-patch] SDK client wrapped", file=sys.stderr)
+        return original(request, temperature)
+
+    client._get_client_response = _patched
+    print(f"[TRANSLATE]   Claude requests: no temperature, effort {'low' if effort else 'model default'}",
+          file=sys.stderr)
+    return True
+
+
 def target_language_name(target_lang: str) -> str:
     """'chinese' -> 'Chinese'; the name the instructions and the prompt use."""
     name = (target_lang or "").strip()
@@ -885,6 +961,10 @@ def translate_subtitle(
         # rate-limit hungry, and can leak reasoning text into the subtitles.
         if provider_config.get('pysubtrans_name') == 'DeepSeek':
             apply_deepseek_thinking_patch(translator, model, debug=debug)
+
+        # Claude: the current API rejects a temperature on every model
+        if provider_config.get('pysubtrans_name') == 'Claude':
+            apply_claude_request_patch(translator, model, debug=debug)
 
         # Custom server keeps its own temperature (#444)
         if _server_temperature:
