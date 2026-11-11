@@ -8576,15 +8576,20 @@ const TranslatorManager = {
         // https://api-docs.deepseek.com/ (pro = thinking; flash is sent with thinking off).
         // v1.9.5 (PR #457): flash is now 'deepseek-flash'; 'deepseek-v4-flash' still accepted.
         deepseek: ['deepseek-flash', 'deepseek-v4-pro'],
-        gemini: ['gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite'],  // WP-002: 2.0 / 1.5 are retired
+        // WP-002: 2.0 / 1.5 are retired. 3.1 Pro (preview) added for harder material.
+        gemini: ['gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview'],
         // 1.10.2 (owner W624 A): the current three, Haiku 5.5 (the default) first; the 3.x names had left Anthropic's list.
         claude: ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'],
-        gpt: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'],
+        gpt: ['gpt-6-luna', 'gpt-6.1-terra', 'gpt-6.1-sol'],
         // #325: the routed DeepSeek model was deprecated 2026-07-24 alongside the
         // direct one; v4-flash is now published on OpenRouter, so both agree again.
-        openrouter: ['deepseek/deepseek-v4-flash', 'deepseek/deepseek-v4-pro', 'anthropic/claude-3.5-sonnet', 'openai/gpt-4o'],
-        glm: ['glm-4-flash', 'glm-4', 'glm-4-plus'],
-        groq: ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile', 'mixtral-8x7b-32768'],
+        // Claude and GPT slugs checked against openrouter.ai/api/v1/models.
+        openrouter: ['deepseek/deepseek-v4-flash', 'deepseek/deepseek-v4-pro', 'anthropic/claude-haiku-5.5',
+                     'anthropic/claude-sonnet-5.5', 'openai/gpt-6-luna'],
+        // The bare glm-4 names are gone from Zhipu's list. glm-4.7-flash is free.
+        glm: ['glm-4.7-flash', 'glm-5.3-flash', 'glm-5.3'],
+        // Groq shut down the Llama 3 and Mixtral models.
+        groq: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'],
         custom: []
     },
 
@@ -9121,23 +9126,8 @@ const TranslateIntegrationManager = {
 // Translation Settings Modal Manager
 // ============================================================
 const TranslationSettingsModal = {
-    // Provider model options (Ollama models are now driven by OllamaStateManager)
-    providerModels: {
-        // #325: deepseek-chat/-reasoner deprecate 2026-07-24; v4 names per
-        // https://api-docs.deepseek.com/ (pro = thinking; flash is sent with thinking off).
-        // v1.9.5 (PR #457): flash is now 'deepseek-flash'; 'deepseek-v4-flash' still accepted.
-        deepseek: ['deepseek-flash', 'deepseek-v4-pro'],
-        gemini: ['gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite'],  // WP-002: 2.0 / 1.5 are retired
-        // 1.10.2 (owner W624 A): as the Translate tab's menu above, Haiku 5.5 (the default) first.
-        claude: ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'],
-        gpt: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'],
-        // #325: the routed DeepSeek model was deprecated 2026-07-24 alongside the
-        // direct one; v4-flash is now published on OpenRouter, so both agree again.
-        openrouter: ['deepseek/deepseek-v4-flash', 'deepseek/deepseek-v4-pro', 'anthropic/claude-3.5-sonnet', 'openai/gpt-4o'],
-        glm: ['glm-4-flash', 'glm-4', 'glm-4-plus'],
-        groq: ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile', 'mixtral-8x7b-32768'],
-        custom: []
-    },
+    // Shares TranslatorManager's table so the two cannot drift apart.
+    providerModels: TranslatorManager.providerModels,
 
     // Settings state
     settings: {
