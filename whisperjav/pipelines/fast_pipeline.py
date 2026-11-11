@@ -388,7 +388,7 @@ class FastPipeline(BasePipeline):
                 self.progress_reporter.report_step("Post-processing final SRT", 5, 5)
             logger.info("Step 5: Post-processing final SRT")
 
-            final_srt_path = self.output_dir / f"{media_basename}.{self.lang_code}.whisperjav.srt"
+            final_srt_path = self.build_output_srt_path(media_basename)
 
             # Capture the returned path
             processed_srt_path, stats = self.standard_postprocessor.process(stitched_srt_path, final_srt_path)

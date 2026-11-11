@@ -537,7 +537,7 @@ class TestParakeetEndToEnd:
         pipe = make(ParakeetCrispASRPipeline, tmp_path, save_metadata_json=True)
         md = pipe.process(stage.media())
         final = Path(md["output_files"]["final_srt"])
-        assert final.name == "film.ja.whisperjav.srt"
+        assert final.name == "film.whisperjav.ja.srt"
         # scene 0 starts at 0 s: groups at 1.0 and 3.0; scene 1 starts at 10 s: group at 10.5
         assert srt_entries(final) == [("本番。", 1.1, 1.4), ("行こう", 1.48, 1.9), ("待って", 3.0, 3.5),
                                       ("監督。", 10.6, 11.0)]

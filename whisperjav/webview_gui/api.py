@@ -18,6 +18,7 @@ import subprocess
 import webbrowser
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
+from whisperjav.utils.output_naming import ensemble_srt_name
 import webview
 from webview import FileDialog
 
@@ -472,10 +473,10 @@ class WhisperJAVAPI:
             input_name = Path(input_path).stem
 
             # Determine output filename based on mode
-            # Ensemble mode: {basename}.{lang}.merged.whisperjav.srt
+            # Ensemble mode: {basename}.merged.whisperjav.{lang}.srt
             # Other modes: {basename}.srt (standard naming)
             if use_ensemble_naming:
-                output_name = f"{input_name}.{lang_code}.merged.whisperjav.srt"
+                output_name = ensemble_srt_name(input_name, lang_code)
             else:
                 output_name = f"{input_name}.srt"
 

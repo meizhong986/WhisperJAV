@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict
 from whisperjav.utils.metadata_manager import MetadataManager
+from whisperjav.utils.output_naming import transcription_srt_name
 from whisperjav.utils.logger import logger
 import os
 import shutil
@@ -54,7 +55,15 @@ class BasePipeline(ABC):
             Dictionary containing processing metadata and results
         """
         pass
-        
+
+    def build_output_srt_path(self, media_basename: str) -> Path:
+        """Final SRT path for this media file using the shared naming scheme.
+
+        Produces `{output_dir}/{basename}.whisperjav.{lang}.srt` where the
+        language is this pipeline's `self.lang_code` (set by each subclass).
+        """
+        return self.output_dir / transcription_srt_name(media_basename, self.lang_code)
+
     def cleanup_temp_files(self, media_basename: str):
         """Clean up temporary files for a specific media file.
 

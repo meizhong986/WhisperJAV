@@ -121,6 +121,7 @@ from whisperjav.utils.run_outcome import (
     skipped_outcome,
     write_manifest,
 )
+from whisperjav.utils.output_naming import ensemble_srt_name, transcription_srt_name
 from whisperjav.modules.media_discovery import MediaDiscovery
 from whisperjav.modules.audio_integrity import AudioIntegrityStop
 from whisperjav.modules.qwen_errors import (
@@ -1907,8 +1908,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                     expected_dir = Path(file_path_str).parent
                 else:
                     expected_dir = Path(args.output_dir)
-                expected_srt = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.srt"
-                expected_vtt = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.vtt"
+                expected_srt = expected_dir / transcription_srt_name(media_basename, output_lang_code)
+                expected_vtt = expected_srt.with_suffix(".vtt")
                 if expected_srt.exists() or expected_vtt.exists():
                     logger.info(f"Skipping (output exists): {file_name}")
                     skipped_count += 1
@@ -2200,8 +2201,8 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
                 expected_dir = Path(file_path_str).parent
             else:
                 expected_dir = Path(args.output_dir)
-            expected_srt = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.srt"
-            expected_vtt = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.vtt"
+            expected_srt = expected_dir / transcription_srt_name(media_basename, output_lang_code)
+            expected_vtt = expected_srt.with_suffix(".vtt")
             if expected_srt.exists() or expected_vtt.exists():
                 logger.info(f"Skipping (output exists): {Path(file_path_str).name}")
                 skipped_files.append(file_path_str)
@@ -3658,7 +3659,7 @@ def main():
 
             # --skip-existing (#328): filter out files whose merged output
             # already exists. Mirrors the sync/async single-pass behavior;
-            # ensemble's final artifact is <basename>.<lang>.merged.whisperjav.srt.
+            # ensemble's final artifact is <basename>.merged.whisperjav.<lang>.srt.
             _all_media_files = media_files
             if getattr(args, 'skip_existing', False):
                 _out_lang = 'en' if args.subs_language == 'direct-to-english' else language_code
@@ -3668,7 +3669,7 @@ def main():
                     _src = Path(media_info.get('path', ''))
                     _base = media_info.get('basename', _src.stem)
                     _dir = _src.parent if _to_source else Path(args.output_dir)
-                    if (_dir / f"{_base}.{_out_lang}.merged.whisperjav.srt").exists():
+                    if (_dir / ensemble_srt_name(_base, _out_lang)).exists():
                         logger.info(f"Skipping (merged output exists): {_src.name}")
                         outcomes.append(skipped_outcome(str(_src), "merged output already exists"))
                     else:

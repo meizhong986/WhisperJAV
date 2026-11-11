@@ -71,7 +71,7 @@ This preserves:
 python -m scripts.visualization.viz_cli \
     --audio ./temp/video_extracted.wav \
     --metadata ./temp/video_master.json \
-    --srt ./output/video.ja.whisperjav.srt \
+    --srt ./output/video.whisperjav.ja.srt \
     --output ./output/video_viz.html
 ```
 
@@ -83,7 +83,7 @@ Let the tool find audio and metadata automatically:
 python -m scripts.visualization.viz_cli \
     --temp-dir ./temp \
     --basename video \
-    --srt ./output/video.ja.whisperjav.srt \
+    --srt ./output/video.whisperjav.ja.srt \
     --output ./output/video_viz.html
 ```
 
@@ -94,7 +94,7 @@ For faster generation without audio processing:
 ```bash
 python -m scripts.visualization.viz_cli \
     --metadata ./temp/video_master.json \
-    --srt ./output/video.ja.whisperjav.srt \
+    --srt ./output/video.whisperjav.ja.srt \
     --output ./output/video_viz.html
 ```
 

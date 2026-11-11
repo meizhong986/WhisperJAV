@@ -797,7 +797,7 @@ class DecoupledPipeline(BasePipeline):
         logger.info("[DecoupledPipeline PID %s] Phase 8: Skipped (sanitizer not yet implemented for generic pipeline)", os.getpid())
         phase8_start = time.time()
 
-        final_srt_path = self.output_dir / f"{media_basename}.{self.lang_code}.whisperjav.srt"
+        final_srt_path = self.build_output_srt_path(media_basename)
 
         if num_subtitles > 0:
             shutil.copy2(stitched_srt_path, final_srt_path)

@@ -458,10 +458,10 @@ def test_one_program_run_writes_the_pipeline_srt_and_every_variant(bench, pipeli
     folder = bench.folder(model, slice_form)
     names = EXPECTED_VARIANTS[pipeline]
     assert {p.name for p in folder.iterdir() if p.is_dir()} == set(names) | {"temp"}
-    assert {p.name for p in folder.iterdir() if p.is_file()} == {"film.ja.whisperjav.srt", "film.run.json",
+    assert {p.name for p in folder.iterdir() if p.is_file()} == {"film.whisperjav.ja.srt", "film.run.json",
                                                                  "film.run.log", "film.cuts.json"}
     # subeval pairs a reference with the one test SRT whose name starts with the film's: one per folder
-    assert [p.name for p in folder.glob("*.srt")] == ["film.ja.whisperjav.srt"]
+    assert [p.name for p in folder.glob("*.srt")] == ["film.whisperjav.ja.srt"]
     for name in names:
         assert [p.name for p in (folder / name).glob("*.srt")] == [f"film.{name}.srt"]
         assert srt_lines(folder / name / f"film.{name}.srt"), name
@@ -476,7 +476,7 @@ def test_one_program_run_writes_the_pipeline_srt_and_every_variant(bench, pipeli
     assert record["error"] is None
     assert [v["name"] for v in record["variants"]] == names
     own = record["pipeline_srt"]
-    assert own["file"] == str(folder / "film.ja.whisperjav.srt")
+    assert own["file"] == str(folder / "film.whisperjav.ja.srt")
     assert own["settings_variant"] is not None and own["settings_variant"] in own["same_lines_as"]
 
 
@@ -549,7 +549,7 @@ def test_parakeet_variants_differ_where_their_settings_differ(script, monkeypatc
 
     # the pipeline's own SRT is the variant with its own settings (Parakeet's own segments since W129 4),
     # from the same single program run
-    own = srt_lines(folder / "film.ja.whisperjav.srt")
+    own = srt_lines(folder / "film.whisperjav.ja.srt")
     assert own == v["lines-segments_post-text+overlap"] and own != v["lines-regroup_post-text+overlap"]
     assert len(b.program.calls) == 1
 
@@ -574,7 +574,7 @@ def test_cohere_variants_differ_where_their_settings_differ(script, monkeypatch,
     assert "あ。" in texts["lines-regroup_post-none"]
     assert "あ。" not in texts["lines-regroup_post-text"] and "あ。" not in texts["lines-regroup_post-text+overlap"]
     assert {"テストです。", "もう一度。"} <= set(texts["lines-regroup_post-none"])
-    assert srt_lines(folder / "film.ja.whisperjav.srt") == v["lines-regroup_post-text+overlap"]
+    assert srt_lines(folder / "film.whisperjav.ja.srt") == v["lines-regroup_post-text+overlap"]
     assert not (folder / "lines-segments_post-none").exists()  # Cohere has no segments line mode
     assert len(b.program.calls) == 1
 
@@ -648,7 +648,7 @@ def test_a_failed_program_run_is_recorded_with_its_log_and_writes_no_variant(scr
     assert (error["stage"], error["type"]) == ("the pipeline run", "CrispASRRunError")
     assert "required VAD model failed" in error["message"] and "Traceback" in error["traceback"]
     assert record["variants"] == [] and record["pipeline_srt"] is None
-    assert not (folder / "film.ja.whisperjav.srt").exists()
+    assert not (folder / "film.whisperjav.ja.srt").exists()
     assert not any((folder / name).exists() for name in EXPECTED_VARIANTS["cohere-crispasr"])
     assert (folder / "film.run.log").read_text(encoding="utf-8").startswith("command: stand-in")
     assert (folder / "film.cuts.json").is_file()
@@ -675,7 +675,7 @@ def test_an_earlier_measurement_is_kept_unless_overwrite_is_given(bench, capsys)
     bench.program.outcome, bench.program.exit_code, bench.program.write_json = CrispOutcome.FAILED, 30, False
     assert bench.script.main(argv + ["--overwrite"]) == 1
     assert len(bench.program.calls) == 2
-    assert not (folder / "film.ja.whisperjav.srt").exists()
+    assert not (folder / "film.whisperjav.ja.srt").exists()
     assert not any((folder / name / f"film.{name}.srt").exists() for name in EXPECTED_VARIANTS["parakeet-crispasr"])
     assert bench.record("parakeet-tdt-0.6b-ja", "windows")["error"]["type"] == "CrispASRRunError"
 
@@ -697,7 +697,7 @@ def test_dry_run_starts_and_writes_nothing(bench, monkeypatch, capsys):
     pin = manifest.MODELS["parakeet-tdt-0.6b-ja"]
     assert "Dry run: nothing is started, downloaded or written." in out
     for words in ("parakeet-tdt-0.6b-ja_speech", "ParakeetCrispASRPipeline", pin.repo_id, pin.revision,
-                  "keep_temp_files=True", "process() once", "film.ja.whisperjav.srt", "film.run.json"):
+                  "keep_temp_files=True", "process() once", "film.whisperjav.ja.srt", "film.run.json"):
         assert words in out, words
     for name in EXPECTED_VARIANTS["parakeet-crispasr"]:
         assert f"film.{name}.srt" in out
