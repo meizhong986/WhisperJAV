@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict
 from whisperjav.utils.metadata_manager import MetadataManager
 from whisperjav.utils.logger import logger
+import glob
 import os
 import shutil
 
@@ -81,24 +82,41 @@ class BasePipeline(ABC):
                         file_path.unlink()
                         logger.debug(f"Deleted temporary file: {file_path}")
 
+                # The media file's name as a glob pattern matches itself only: a name such as
+                # "[ABC-123] Film" would otherwise be read as a character class and match nothing
+                # (1.10.2, still-open item 1).
+                name_pattern = glob.escape(media_basename)
+
                 # Clean up scene-specific WAV files
                 scenes_dir = self.temp_dir / "scenes"
                 if scenes_dir.exists():
-                    for scene_file in scenes_dir.glob(f"{media_basename}_scene_*.wav"):
+                    for scene_file in scenes_dir.glob(f"{name_pattern}_scene_*.wav"):
                         scene_file.unlink()
                         logger.debug(f"Deleted temporary scene: {scene_file}")
-                
+
                 # Clean up scene-specific SRT files
                 scene_srts_dir = self.temp_dir / "scene_srts"
                 if scene_srts_dir.exists():
-                    for srt_file in scene_srts_dir.glob(f"{media_basename}_scene_*.srt"):
+                    for srt_file in scene_srts_dir.glob(f"{name_pattern}_scene_*.srt"):
                         srt_file.unlink()
                         logger.debug(f"Deleted temporary scene SRT: {srt_file}")
 
-                # Clean up raw_subs in temp directory (only for current media)
+                # Clean up raw_subs in temp directory (only for current media): its files are named
+                # "<name>." or "<name>_" (so "Film" leaves "Film 2"'s alone), and ChronosJAV keeps a
+                # folder named "<name>" (qwen_pipeline.py, Phase 5). The folder is removed whole; before
+                # 1.10.2 it was passed to unlink(), which fails on a folder, and every ChronosJAV file
+                # ended with "Error during temporary file cleanup" (still-open item 1).
                 temp_raw_subs_dir = self.temp_dir / "raw_subs"
                 if temp_raw_subs_dir.exists():
-                    for raw_file in temp_raw_subs_dir.glob(f"{media_basename}*"):
+                    for raw_file in temp_raw_subs_dir.glob(f"{name_pattern}*"):
+                        rest = raw_file.name[len(media_basename):]
+                        if raw_file.is_dir():
+                            if rest == "":
+                                shutil.rmtree(raw_file)
+                                logger.debug(f"Deleted temporary raw_subs folder: {raw_file}")
+                            continue
+                        if rest[:1] not in (".", "_"):
+                            continue
                         raw_file.unlink()
                         logger.debug(f"Deleted temporary raw_subs file: {raw_file}")
 
