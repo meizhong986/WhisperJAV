@@ -2240,6 +2240,10 @@ const EnsembleManager = {
                 e.target.value = this.state.pass1.sceneDetector;
                 return;
             }
+            if (!this.confirmComponentChangeReset('pass1', 'scene')) {
+                e.target.value = this.state.pass1.sceneDetector;
+                return;
+            }
             this.state.pass1.sceneDetector = e.target.value;
         });
         document.getElementById('pass1-enhancer').addEventListener('change', (e) => {
@@ -2263,6 +2267,10 @@ const EnsembleManager = {
             if (e.target.dataset.mode === 'vad-version') {
                 this.state.pass1.vadVersion = e.target.value;
             } else {
+                if (!this.confirmComponentChangeReset('pass1', 'segmenter')) {
+                    e.target.value = this.state.pass1.speechSegmenter;
+                    return;
+                }
                 this.state.pass1.speechSegmenter = e.target.value;
             }
         });
@@ -2276,6 +2284,10 @@ const EnsembleManager = {
             // A disabled option (rscn for a pipeline without it, 1.10.1) is not a choice: keep what the pass had.
             const chosen = e.target.options[e.target.selectedIndex];
             if (chosen && chosen.disabled) {
+                e.target.value = this.state.pass2.sceneDetector;
+                return;
+            }
+            if (!this.confirmComponentChangeReset('pass2', 'scene')) {
                 e.target.value = this.state.pass2.sceneDetector;
                 return;
             }
@@ -2302,6 +2314,10 @@ const EnsembleManager = {
             if (e.target.dataset.mode === 'vad-version') {
                 this.state.pass2.vadVersion = e.target.value;
             } else {
+                if (!this.confirmComponentChangeReset('pass2', 'segmenter')) {
+                    e.target.value = this.state.pass2.speechSegmenter;
+                    return;
+                }
                 this.state.pass2.speechSegmenter = e.target.value;
             }
         });
@@ -2974,6 +2990,25 @@ const EnsembleManager = {
         // start-up, on a pipeline change and after a preset is loaded.
         this.updateDspPanel(passKey);
         this.updateCrispasrStatus(passKey);
+    },
+
+    // 1.10.2 (known fault K2 of 1.10.1): Customize values are set for one speech segmenter and one scene detector.
+    // When either changes after Apply, the saved values are reset -- after asking -- as a pipeline or sensitivity
+    // change already does; before, the new one ran with the earlier one's values (e.g. TEN with FireRedVAD's
+    // threshold). Returns false when the user keeps the custom values (the caller then puts the dropdown back).
+    confirmComponentChangeReset(passKey, component) {
+        const passState = this.state[passKey];
+        if (!passState.customized) return true;
+        const passLabel = passKey === 'pass1' ? 'Pass 1' : 'Pass 2';
+        const text = component === 'scene'
+            ? `You have custom parameters for ${passLabel}. Changing the scene detector will reset them. Continue?`
+            : `You have custom parameters for ${passLabel}. Changing the speech segmenter will reset them. Continue?`;
+        if (!confirm(I18n.t(text))) return false;
+        passState.customized = false;
+        passState.params = null;
+        passState.presetName = null;
+        this.updateBadges();
+        return true;
     },
 
     handleSensitivityChange(passKey, newValue, selectElement) {
