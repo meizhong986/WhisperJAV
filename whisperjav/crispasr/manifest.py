@@ -245,6 +245,14 @@ def word_timestamps_for(pipeline: str, choice: Optional[str] = None) -> str:
         return choice
     return "aligner" if pipeline in ALIGNED_PIPELINES else "model"
 
+
+def aligner_for(pipeline: str, choice: Optional[str] = None) -> Optional[str]:
+    """The CrispASR aligner a pass of this pipeline runs with --passN-word-timestamps ``choice`` (DEFAULT_ALIGNER),
+    or None when it runs none. Each pipeline class's engine_row(choice).aligner says the same
+    (tests/test_start_check_aligner_v1102.py); main.py's start-of-run check downloads it (1.10.2, owner W622 item 5).
+    """
+    return DEFAULT_ALIGNER if word_timestamps_for(pipeline, choice) == "aligner" else None
+
 # The aligners: models that time text already written, run by CrispASR's align_words (item 12, C1; design
 # note docs/plans/design/2026-10-28-chronosjav-timing-c3-c1.md section 4). Kept apart from MODELS, which are
 # the CrispASR pipelines' ASR models. CrispASR picks the aligner family from the file's name ("forced-aligner"
