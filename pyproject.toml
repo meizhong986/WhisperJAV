@@ -135,33 +135,35 @@ torch = [
 # v1.10.0 (item 3, owner W78 C2): torchvision left with ClearVoice, its only user.
 # CrispASR's Python package (route B, owner W176-W178), one line per platform in each extra: the
 # CUDA build (+cuda, its own CUDA 12.8 libraries inside) and the Vulkan build (+vulkan) from the
-# v0.8.50 GitHub release, each pinned by URL and SHA-256 (decision record D10; the hashes equal the
+# v0.8.53 GitHub release, each pinned by URL and SHA-256 (decision record D10; the hashes equal the
 # release's own digests); everywhere else PyPI's build (CPU on Windows and Linux, Metal inside on
 # Apple silicon; owner W217 13, W217 15, W225). 1.10.1: 0.8.44 -> 0.8.50 for MOSS-CrispASR's sampling
 # and beam size (CrispASR #564; owner W492 M1, W501), the same builds for the same platforms.
+# 1.10.2: 0.8.50 -> 0.8.53, the newest release, which holds the fix of our CrispASR #574 for MOSS
+# (owner W618 3); the same builds for the same platforms.
 cu130 = [
     "torch==2.11.0",
     "torchaudio==2.11.0",
-    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.50/crispasr-0.8.50%2Bcuda-py3-none-win_amd64.whl#sha256=df5ff626816ff03416aba44066285c55705dda604b9949607c153bc50be1a19a ; sys_platform == 'win32' and platform_machine == 'AMD64'",
-    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.50/crispasr-0.8.50%2Bcuda-py3-none-manylinux_2_35_x86_64.whl#sha256=bbe85311927d196b84cd5abecb023b8e6a295b4786bf7cc1f3af0dd203a7892a ; sys_platform == 'linux' and platform_machine == 'x86_64'",
-    "crispasr==0.8.50 ; sys_platform == 'linux' and platform_machine == 'aarch64'",
+    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bcuda-py3-none-win_amd64.whl#sha256=8460e67defeb7301240fc919552f147b923a615cb6fbb4831e1953ee310eb697 ; sys_platform == 'win32' and platform_machine == 'AMD64'",
+    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bcuda-py3-none-manylinux_2_35_x86_64.whl#sha256=f942de093b2996990315f91c101ee0b8416c37d34c3b0836671949ba2d559e88 ; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "crispasr==0.8.53 ; sys_platform == 'linux' and platform_machine == 'aarch64'",
 ]
 cu128 = [
     "torch==2.11.0",
     "torchaudio==2.11.0",
-    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.50/crispasr-0.8.50%2Bcuda-py3-none-win_amd64.whl#sha256=df5ff626816ff03416aba44066285c55705dda604b9949607c153bc50be1a19a ; sys_platform == 'win32' and platform_machine == 'AMD64'",
-    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.50/crispasr-0.8.50%2Bcuda-py3-none-manylinux_2_35_x86_64.whl#sha256=bbe85311927d196b84cd5abecb023b8e6a295b4786bf7cc1f3af0dd203a7892a ; sys_platform == 'linux' and platform_machine == 'x86_64'",
-    "crispasr==0.8.50 ; sys_platform == 'linux' and platform_machine == 'aarch64'",
+    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bcuda-py3-none-win_amd64.whl#sha256=8460e67defeb7301240fc919552f147b923a615cb6fbb4831e1953ee310eb697 ; sys_platform == 'win32' and platform_machine == 'AMD64'",
+    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bcuda-py3-none-manylinux_2_35_x86_64.whl#sha256=f942de093b2996990315f91c101ee0b8416c37d34c3b0836671949ba2d559e88 ; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "crispasr==0.8.53 ; sys_platform == 'linux' and platform_machine == 'aarch64'",
 ]
 vulkan = [
     "torch==2.11.0",
     "torchaudio==2.11.0",
-    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.50/crispasr-0.8.50%2Bvulkan-py3-none-win_amd64.whl#sha256=d830a06c9283a0d048096cb468ce08b93602741875d6d9dd71d24e0897e19354 ; sys_platform == 'win32' and platform_machine == 'AMD64'",
+    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bvulkan-py3-none-win_amd64.whl#sha256=f7d668d4746d8ecabe1567bdbdfdb6c918437a19210289bfd7e8cef732c070e3 ; sys_platform == 'win32' and platform_machine == 'AMD64'",
 ]
 cpu = [
     "torch==2.11.0",
     "torchaudio==2.11.0",
-    "crispasr==0.8.50 ; (sys_platform == 'win32' and platform_machine == 'AMD64') or (sys_platform == 'linux' and platform_machine == 'x86_64') or (sys_platform == 'linux' and platform_machine == 'aarch64') or (sys_platform == 'darwin' and platform_machine == 'arm64')",
+    "crispasr==0.8.53 ; (sys_platform == 'win32' and platform_machine == 'AMD64') or (sys_platform == 'linux' and platform_machine == 'x86_64') or (sys_platform == 'linux' and platform_machine == 'aarch64') or (sys_platform == 'darwin' and platform_machine == 'arm64')",
 ]
 
 # CLI audio processing features
@@ -219,7 +221,11 @@ gui = [
 # Translation module
 # Install with: pip install whisperjav[translate]
 translate = [
-    "pysubtrans>=1.5.0",  # AI subtitle translation (requires Python 3.10+)
+    # 1.10.2 (owner W618 1, 4): PySubtrans 1.8.0 flags a response label left in a subtitle (our report
+    # llm-subtrans #541, #460), and supports the Anthropic 2.x SDK. Without anthropic installed, PySubtrans
+    # turns its Claude provider off; it was never in the lock before 1.10.2 (PySubtrans's "claude" extra).
+    "pysubtrans>=1.8.0",  # AI subtitle translation (requires Python 3.10+)
+    "anthropic>=2.0",     # Claude provider
     "openai>=1.35.0",     # GPT provider
     "google-genai>=1.39.0",  # Gemini provider
     "google-api-core>=2.14.0",  # Required by pysubtrans Gemini provider (undeclared transitive dep)
@@ -260,13 +266,11 @@ enhance = [
 
     # v1.10.0 (item 3, owner W73): ClearVoice is no longer included, and with it
     # gdown, opencv-python, python-speech-features, scenedetect, torchinfo and
-    # yamlargparse. joblib (scikit-learn) and rotary-embedding-torch (BS-RoFormer)
-    # are still needed by others.
+    # yamlargparse. joblib (scikit-learn) is still needed by others.
     "joblib",
 
-    # BS-RoFormer vocal isolation
-    "bs-roformer-infer",
-    "rotary-embedding-torch>=0.8",
+    # 1.10.2 (owner W594, W596 6): BS-RoFormer is replaced by CrispASR's Mini-BS-RoFormer, so
+    # bs-roformer-infer and rotary-embedding-torch (and their beartype, ml-collections) are out.
 
     # htdemucs vocal isolation (Demucs v4). Owner's decision, 2026-09-17 (second
     # decision, replacing the first): an ordinary dependency like any other, not
