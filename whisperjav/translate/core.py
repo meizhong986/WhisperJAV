@@ -121,7 +121,11 @@ def apply_format_marker_check(translator) -> bool:
     if client is None or not hasattr(client, "GetParser"):
         return False
 
-    from PySubtrans.SubtitleError import TranslationValidationError
+    try:
+        # PySubtrans 1.8.0 moved the class to PySubtrans.ValidationError (1.10.2's lock).
+        from PySubtrans.ValidationError import TranslationValidationError
+    except ImportError:
+        from PySubtrans.SubtitleError import TranslationValidationError
 
     original = client.GetParser
 
