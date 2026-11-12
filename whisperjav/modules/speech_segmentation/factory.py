@@ -64,8 +64,12 @@ _BACKEND_DEPENDENCIES: Dict[str, Dict[str, Any]] = {
         "always_available": False,
     },
     "whisperseg": {
-        # onnxruntime is the real gate; transformers/huggingface_hub are usually present
-        "packages": ["onnxruntime"],
+        # All three are imported when WhisperSeg runs (backends/whisperseg.py: onnxruntime for the model,
+        # transformers' WhisperFeatureExtractor, huggingface_hub for the download). A minimal install
+        # (install.py --minimal) has no transformers: with onnxruntime alone listed here, the start-of-run
+        # check let the run through and every scene then failed, exit 0, no subtitles (1.10.2, owner
+        # W622 item 9: a stop at start instead).
+        "packages": ["onnxruntime", "transformers", "huggingface_hub"],
         "install_hint": "pip install whisperjav[whisperseg] (or whisperjav[whisperseg-gpu] for CUDA)",
         "always_available": False,
     },
