@@ -216,8 +216,10 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
 
-    # Required arguments
-    parser.add_argument('-i', '--input', nargs='+', required=True,
+    # Required for a translation; checked after the utility commands below (--configure, --show-settings,
+    # --create-default-settings, --list-ollama-models), which need no input: with required=True argparse stopped
+    # them with exit status 2 before they ran (1.10.2, still-open item 6).
+    parser.add_argument('-i', '--input', nargs='+', required=False,
                         help='Input subtitle file(s), directory, or glob pattern (.srt). '
                              'Supports: -i file.srt, -i dir/, -i "*.srt", -i a.srt b.srt')
     parser.add_argument('--recursive', '-r', action='store_true',
@@ -443,6 +445,10 @@ def main():
                 size = m.get('details', {}).get('parameter_size', '?')
                 print(f"  {m['name']:<30s}  {size:>8s}")
         return
+
+    # The same message and exit status 2 argparse gives a missing required argument.
+    if not args.input:
+        parser.error("the following arguments are required: -i/--input")
 
     # Validate and collect input files (supports files, directories, and glob patterns)
     import glob as glob_module
