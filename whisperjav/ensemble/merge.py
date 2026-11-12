@@ -558,7 +558,7 @@ def get_available_strategies() -> List[Dict[str, str]]:
     return [
         {
             'name': 'smart_merge',
-            'label': 'Smart Merge (Best Quality)',
+            'label': 'Smart Merge',
             'description': 'Automatically picks the better subtitle line from each pass'
         },
         {
