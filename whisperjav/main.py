@@ -3492,14 +3492,13 @@ def main():
             for _n in (1, 2)
             if getattr(args, f"pass{_n}_pipeline", None) in CRISPASR_PIPELINES
         ]
-        # The aligner too (1.10.2, owner W622 item 5): a pass that asks for it (--passN-word-timestamps aligner)
-        # has it downloaded here, so a failed download stops the run before any audio is read, instead of the pass
-        # going on without it after its first file's ASR. A pass whose pipeline runs the aligner by default
-        # (Cohere-CrispASR, Qwen3-ASR-CrispASR) is not covered: the owner's verdict on it is pending (W623 B).
+        # The aligner too (1.10.2, owner W622 item 5, W624 B): every pass that runs it -- one that asks for it
+        # (--passN-word-timestamps aligner) and one whose pipeline runs it by default (Cohere-CrispASR,
+        # Qwen3-ASR-CrispASR) -- has it downloaded here, so a failed download stops the run before any audio is read,
+        # instead of the pass going on without it after its first file's ASR.
         _crispasr_aligners = {}
         for _n, _pipe, _model in _crispasr_passes:
-            _choice = getattr(args, f"pass{_n}_word_timestamps", None)
-            _aligner = crispasr_aligner_for(_pipe, _choice) if _choice else None
+            _aligner = crispasr_aligner_for(_pipe, getattr(args, f"pass{_n}_word_timestamps", None))
             if _aligner:
                 _crispasr_aligners[_n] = _aligner
         if _crispasr_passes:
