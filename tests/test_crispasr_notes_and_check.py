@@ -70,7 +70,9 @@ def _write_srt(path, spans):
 
 
 def _probe(code, *args, timeout=300):
-    result = subprocess.run([sys.executable, "-c", code, *map(str, args)], capture_output=True,
+    # -X utf8: a probe that sets sys.argv[0] to "whisperjav" would otherwise make whisperjav.main relaunch itself in
+    # UTF-8 mode (1.10.2, install-test finding 4) in a new process, without the probe's stand-ins.
+    result = subprocess.run([sys.executable, "-X", "utf8", "-c", code, *map(str, args)], capture_output=True,
                             text=True, encoding="utf-8", errors="replace", timeout=timeout,
                             cwd=str(REPO))
     assert result.returncode == 0, (result.stdout + result.stderr)[-2000:]
