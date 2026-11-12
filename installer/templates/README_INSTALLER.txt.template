@@ -11,8 +11,9 @@ https://meizhong986.github.io/WhisperJAV/guides/installation_windows_standalone/
 -------------------------------------------------------------------------------
 QUICK START
 -------------------------------------------------------------------------------
-1. Double-click the "WhisperJAV v{{VERSION}}" desktop shortcut, or
-   WhisperJAV-GUI.exe in the install folder.
+1. Double-click the "WhisperJAV v{{VERSION}}" desktop shortcut, choose
+   WhisperJAV in the Start menu, or double-click WhisperJAV-GUI.exe in the
+   install folder.
 2. Click "Add File(s)" or "Add Folder" and choose your videos.
 3. In the "Transcription Mode" tab, choose a mode (balanced is a good
    start). The "Ensemble Mode" tab runs pass 1, and also pass 2 when you
@@ -169,9 +170,9 @@ Open Windows Settings > Apps, find WhisperJAV and choose Uninstall, or
 double-click Uninstall-WhisperJAV.exe in the install folder. After an
 upgrade, the Apps entry still names the version you first installed.
 
-The uninstall leaves the desktop shortcut; delete it yourself. Your settings
-(%APPDATA%\WhisperJAV) and downloaded models (%USERPROFILE%\.cache) also
-stay. To free the space, delete %APPDATA%\WhisperJAV, and in
+The uninstall removes this install's desktop shortcut and its Start-menu
+entry. Your settings (%APPDATA%\WhisperJAV) and downloaded models
+(%USERPROFILE%\.cache) stay. To free the space, delete %APPDATA%\WhisperJAV, and in
 %USERPROFILE%\.cache the model folders you no longer need; other programs
 may keep files there too.
 
