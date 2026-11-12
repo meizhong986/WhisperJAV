@@ -85,6 +85,10 @@ def run_cli(args: list, timeout: int = 300) -> subprocess.CompletedProcess:
         cmd,
         capture_output=True,
         text=True,
+        # The CLI writes UTF-8 (it relaunches in UTF-8 mode on Windows; its help holds Japanese text). Decoding with
+        # the locale's cp1252 failed in subprocess's reader, which left stdout None.
+        encoding="utf-8",
+        errors="replace",
         timeout=timeout,
         cwd=str(REPO_ROOT)
     )
