@@ -257,12 +257,17 @@ class TestEnvironmentConfiguration:
         custom_repo = "git+https://github.com/test/stub.git@v1.7.5"
         monkeypatch.setenv('WHISPERJAV_UPGRADE_REPO', custom_repo)
 
-        # Re-import to pick up new env var
-        if 'whisperjav.upgrade' in sys.modules:
-            del sys.modules['whisperjav.upgrade']
-
-        import whisperjav.upgrade as u
+        # Load a separate copy of the module to pick up the new env var. 1.10.2: never through sys.modules -- the
+        # earlier "del sys.modules[...]; import" left a second whisperjav.upgrade in place, so later tests patched the
+        # new copy while upgrade.main() ran the old one with the REAL update_desktop_shortcut(): it deleted the real
+        # desktop's "WhisperJAV v*.lnk" and wrote "WhisperJAV v1.8.0.lnk" (1.10.1 install test finding 6; again on
+        # 2026-11-09).
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("_whisperjav_upgrade_env_probe", upgrade.__file__)
+        u = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(u)
         assert u.GITHUB_REPO == custom_repo
+        assert sys.modules["whisperjav.upgrade"] is upgrade
 
     def test_default_upgrade_repo(self):
         """Test default GITHUB_REPO value."""
