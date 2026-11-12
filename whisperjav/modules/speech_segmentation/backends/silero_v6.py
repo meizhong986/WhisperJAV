@@ -236,6 +236,8 @@ class SileroV6SpeechSegmenter:
                 audio_duration_sec=duration,
                 parameters=self._get_parameters(),
                 processing_time_sec=time.time() - start_time,
+                # A failure, not silence: the GGUF pipelines count the scene as failed (1.10.2, still-open item 4).
+                error=str(e) or type(e).__name__,
             )
 
         # Group segments using shared grouping logic
