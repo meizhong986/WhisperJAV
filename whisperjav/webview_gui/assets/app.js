@@ -8515,7 +8515,8 @@ const TranslatorManager = {
         // v1.9.5 (PR #457): flash is now 'deepseek-flash'; 'deepseek-v4-flash' still accepted.
         deepseek: ['deepseek-flash', 'deepseek-v4-pro'],
         gemini: ['gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite'],  // WP-002: 2.0 / 1.5 are retired
-        claude: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022', 'claude-3-opus-20240229'],
+        // 1.10.2 (owner W624 A): the current three, Haiku 5.5 (the default) first; the 3.x names had left Anthropic's list.
+        claude: ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'],
         gpt: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'],
         // #325: the routed DeepSeek model was deprecated 2026-07-24 alongside the
         // direct one; v4-flash is now published on OpenRouter, so both agree again.
@@ -9062,7 +9063,8 @@ const TranslationSettingsModal = {
         // v1.9.5 (PR #457): flash is now 'deepseek-flash'; 'deepseek-v4-flash' still accepted.
         deepseek: ['deepseek-flash', 'deepseek-v4-pro'],
         gemini: ['gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite'],  // WP-002: 2.0 / 1.5 are retired
-        claude: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022', 'claude-3-opus-20240229'],
+        // 1.10.2 (owner W624 A): as the Translate tab's menu above, Haiku 5.5 (the default) first.
+        claude: ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'],
         gpt: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'],
         // #325: the routed DeepSeek model was deprecated 2026-07-24 alongside the
         // direct one; v4-flash is now published on OpenRouter, so both agree again.
