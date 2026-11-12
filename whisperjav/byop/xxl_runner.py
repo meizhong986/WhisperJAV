@@ -57,7 +57,16 @@ def strip_model_args(tokens: List[str]) -> Tuple[List[str], List[str]]:
 
 
 def _split(args: str) -> List[str]:
-    return shlex.split(args.strip()) if args and args.strip() else []
+    """XXL's extra arguments as tokens: split at spaces, quotes group (and are removed), a backslash is an ordinary
+    character, so Windows paths such as C:\\Models\\x arrive whole (1.10.2, still-open item 8: shlex.split read the
+    backslash as an escape and dropped it). An unclosed quote still raises ValueError; '#' starts no comment."""
+    if not args or not args.strip():
+        return []
+    lexer = shlex.shlex(args.strip(), posix=True)
+    lexer.whitespace_split = True
+    lexer.escape = ""
+    lexer.commenters = ""
+    return list(lexer)
 
 
 def _side_file_tokens(exe: Path) -> List[str]:
