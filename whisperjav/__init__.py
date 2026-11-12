@@ -28,11 +28,11 @@ gui
 
 translate
     AI-powered subtitle translation using PySubtrans.
-    Includes: pysubtrans, openai, google-genai
+    Includes: pysubtrans, openai, google-genai, anthropic
 
 enhance
     Speech enhancement (denoising, vocal isolation).
-    Includes: modelscope, bs-roformer-infer, demucs
+    Includes: modelscope, demucs
 
 huggingface
     HuggingFace Transformers integration.
