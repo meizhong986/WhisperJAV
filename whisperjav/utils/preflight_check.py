@@ -963,12 +963,17 @@ def ensure_segmenter_model_available(backend, *, model_dir=None,
 
 
 
-def ensure_crispasr_ready(passes, *, device=None, temp_dir=None, exit_on_fail: bool = True) -> bool:
+def ensure_crispasr_ready(passes, *, device=None, temp_dir=None, exit_on_fail: bool = True,
+                          aligners=None) -> bool:
     """
     Make CrispASR, the device and each CrispASR pass's model ready before a run starts.
 
     ``passes`` lists (pass number, pipeline, --passN-model value or None) for every Ensemble pass
-    that names a CrispASR pipeline; ``device`` is --device. A missing model is downloaded here, unless
+    that names a CrispASR pipeline; ``device`` is --device. ``aligners`` maps a pass number to the
+    CrispASR aligner (manifest.ALIGNER_MODELS short name) that pass is set to use: its file is
+    downloaded here too, and a failure stops the run in the same way (1.10.2, owner W622 item 5;
+    before, the pass downloaded it after its first file's ASR and went on without it on failure).
+    The pass still loads it itself. A missing model is downloaded here, unless
     --offline, and staged under a plain-ASCII name when its path has other characters (route B design
     4.2): a missing package, a processor without AVX2, --device cuda without an NVIDIA GPU, a missing
     file under --offline or a failed download then stops the run before any audio is read. Checked
@@ -989,6 +994,9 @@ def ensure_crispasr_ready(passes, *, device=None, temp_dir=None, exit_on_fail: b
             install.prepare_runtime(device, model)
             path = install.ensure_model(model)
             install.stage_model(path, stage_root, model.sha256)
+            aligner = (aligners or {}).get(_n)
+            if aligner:
+                install.ensure_model(manifest.aligner_model_for(aligner))
         return True
     except install.CrispASRSetupError as exc:
         if not exit_on_fail:
