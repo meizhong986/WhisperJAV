@@ -209,7 +209,9 @@ def main():
     settings = load_settings()
 
     # Parse arguments
+    # 1.10.2 (1.10.1 install test, finding 5): the usage line said "cli.py"; it names the command users type.
     parser = argparse.ArgumentParser(
+        prog="whisperjav-translate",
         description="Translate subtitles using AI (PySubtrans wrapper)",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
