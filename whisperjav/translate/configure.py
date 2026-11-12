@@ -97,18 +97,26 @@ def interactive_configure():
 
     # API Key
     print(f"\n2. API Key for {provider_config['pysubtrans_name']}")
-    print(f"   Environment variable: {provider_config['env_var']}")
-
-    current_key = os.getenv(provider_config['env_var'], '')
-    if current_key:
-        print(f"   Current key from environment: {current_key[:8]}...")
-        use_current = input("   Use current environment key? [Y/n]: ").strip().lower()
-        if use_current != 'n':
-            api_key = current_key
+    api_key = ''
+    if not provider_config['env_var']:
+        # ollama and custom have no key variable: os.getenv(None) stopped the wizard with a TypeError
+        # (1.10.2, still-open item 6). Ollama needs no key; a custom server's key is given with --api-key.
+        if provider == 'ollama':
+            print("   Ollama runs on this computer and needs no API key.")
+        else:
+            print("   If your server needs a key, give it with --api-key when you translate.")
+    else:
+        print(f"   Environment variable: {provider_config['env_var']}")
+        current_key = os.getenv(provider_config['env_var'], '')
+        if current_key:
+            print(f"   Current key from environment: {current_key[:8]}...")
+            use_current = input("   Use current environment key? [Y/n]: ").strip().lower()
+            if use_current != 'n':
+                api_key = current_key
+            else:
+                api_key = input("   Enter API key: ").strip()
         else:
             api_key = input("   Enter API key: ").strip()
-    else:
-        api_key = input("   Enter API key: ").strip()
 
     if api_key:
         save_to_dotenv = input("   Save to .env file? [y/N]: ").strip().lower()
