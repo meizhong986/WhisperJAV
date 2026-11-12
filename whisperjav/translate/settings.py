@@ -208,6 +208,10 @@ def resolve_config(cli_args, settings: Optional[dict] = None) -> dict:
             # Map CLI arg names to config keys
             if key == 'target':
                 config['target_language'] = value
+            elif key == 'source':
+                # 1.10.2: --source (and the GUI's source language, which sends it) was never mapped, so every run
+                # was translated "from Japanese" (found by the contributor of PR #508).
+                config['source'] = value
             elif key == 'scene_threshold':
                 config['scene_threshold'] = value
             elif key == 'max_batch_size':
