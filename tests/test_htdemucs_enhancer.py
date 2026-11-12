@@ -83,13 +83,21 @@ class TestItIsOffered:
         enhance = project["optional-dependencies"]["enhance"]
         assert "demucs" in enhance
 
-        # The peers it must travel with.
-        assert "bs-roformer-infer" in enhance
+        # The peers it must travel with. 1.10.2: BS-RoFormer's package left with BS-RoFormer
+        # (CrispASR's Mini-BS-RoFormer replaces it, owner W594, W596 6).
+        assert "bs-roformer-infer" not in enhance
         assert any(spec.startswith("modelscope") for spec in enhance)
 
     def test_the_windows_installer_includes_that_extra(self):
-        build = (REPO / "installer" / "build_release.py").read_text(encoding="utf-8")
-        assert '"enhance"' in build, "the installer must build requirements from the enhance extra"
+        # Since 1.10.0 the installer's requirement files are exported from uv.lock with the "all" extra
+        # (build_release.py export_locked_requirements), and "all" holds "enhance".
+        import tomllib
+
+        build =(REPO / "installer" / "build_release.py").read_text(encoding="utf-8")
+        assert '"--extra", "all"' in build, "the installer must export the lock with the all extra"
+        with open(REPO / "pyproject.toml", "rb") as handle:
+            extras = tomllib.load(handle)["project"]["optional-dependencies"]
+        assert any("enhance" in spec for spec in extras["all"]), "the all extra must hold enhance"
 
 
 class TestItDoesNotFailQuietly:
