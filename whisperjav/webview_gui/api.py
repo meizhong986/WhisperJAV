@@ -2278,6 +2278,16 @@ class WhisperJAVAPI:
             audio["max_group_duration"]["default"] = aw["max_group_duration_s"]
             audio["vad_start_pad"]["default"] = int(aw["start_pad_ms"])
             audio["vad_end_pad"]["default"] = int(aw["end_pad_ms"])
+            # 1.10.2 (guide point d): anime-whisper always runs its own text cleaner (qwen_pipeline.py: the cleaner
+            # follows the model; the Qwen3 cleaner is off), so the menu showed "Passthrough (no cleaning)" wrongly and
+            # its choice had no effect. One entry, named for what runs; the value sent stays "passthrough" (unchanged).
+            result["schema"]["alignment"]["assembly_cleaner"] = {
+                "type": "dropdown",
+                "label": "Text Cleaner",
+                "description": "anime-whisper always uses its own text cleaner",
+                "options": [{"value": "passthrough", "label": "anime-whisper's own text cleaner"}],
+                "default": "passthrough",
+            }
 
         # Qwen3-ASR + WhisperSeg: end pad 0 ms (owner, 2026-10-09), as a run uses it.
         from whisperjav.config.chronosjav_vad import chronosjav_end_pad_default
