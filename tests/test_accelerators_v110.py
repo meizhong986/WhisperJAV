@@ -84,7 +84,11 @@ def test_every_locked_file_holds_one_crispasr_line_per_platform():
                  if l.startswith("crispasr")]
         assert len(lines) == len(expected[extra]), (extra, lines)
     vulkan = (locked / "requirements_vulkan.txt").read_text(encoding="utf-8")
-    assert "crispasr-0.8.50%2Bvulkan-py3-none-win_amd64.whl" in vulkan and "+cpu" not in vulkan.split("torch==")[0]
+    # The version comes from pyproject.toml, so the next CrispASR refresh does not break this check (1.10.2: 0.8.53).
+    import re
+    pyproject = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8")
+    version = re.search(r"crispasr-([0-9.]+)%2Bvulkan-py3-none-win_amd64\.whl", pyproject).group(1)
+    assert f"crispasr-{version}%2Bvulkan-py3-none-win_amd64.whl" in vulkan and "+cpu" not in vulkan.split("torch==")[0]
 
 
 # --- the supported-computers check -------------------------------------------------
