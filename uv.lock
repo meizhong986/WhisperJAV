@@ -39,15 +39,6 @@ conflicts = [[
 ]]
 
 [[package]]
-name = "absl-py"
-version = "2.5.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d0/4f/d79676ab82f2e42fc3611618139f13a9c4c31d0cff4b486982047679a802/absl_py-2.5.0.tar.gz", hash = "sha256:0c996f25c0490700fadabe6351630f6111534fa0ae252cc6d2014ea3b141135f", size = 118119, upload-time = "2026-07-03T10:57:48.157Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/58/0a/a10b45aab35b175aded078a462dc8d0c698f5b13946e7cb0869097b78bb6/absl_py-2.5.0-py3-none-any.whl", hash = "sha256:0f17b89f2a4eaaedc4f28c622998aa690564b3012a396a4ffad0821007fe03ba", size = 137410, upload-time = "2026-07-03T10:57:46.735Z" },
-]
-
-[[package]]
 name = "accelerate"
 version = "1.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -191,6 +182,25 @@ wheels = [
 ]
 
 [[package]]
+name = "anthropic"
+version = "2.8.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "docstring-parser" },
+    { name = "httpx2" },
+    { name = "jiter" },
+    { name = "opentelemetry-api" },
+    { name = "pydantic" },
+    { name = "sniffio" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/75/e6/aabc3c266a0aaf38fa542648585741fce9616ba4cd034ddde74548f790a0/anthropic-2.8.0.tar.gz", hash = "sha256:d34e389ba0544cd64e033eb7475f46cc1ac6f2a388cdcd472b33ad4ac29ef40c", size = 1976933, upload-time = "2026-11-10T16:33:19.38Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/96/8e/f8ef271dcbe3b187879b660c129ee36ef655c7b878f6878460891d9b2a26/anthropic-2.8.0-py3-none-any.whl", hash = "sha256:76ad332e2d500fc54d0112cf100544ad1a7605e71e092b98d9eb664d2b66e283", size = 2456925, upload-time = "2026-11-10T16:33:21.388Z" },
+]
+
+[[package]]
 name = "anyio"
 version = "4.14.2"
 source = { registry = "https://pypi.org/simple" }
@@ -299,15 +309,6 @@ wheels = [
 ]
 
 [[package]]
-name = "beartype"
-version = "0.22.9"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/c7/94/1009e248bbfbab11397abca7193bea6626806be9a327d399810d523a07cb/beartype-0.22.9.tar.gz", hash = "sha256:8f82b54aa723a2848a56008d18875f91c1db02c32ef6a62319a002e3e25a975f", size = 1608866, upload-time = "2025-12-13T06:50:30.72Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/71/cc/18245721fa7747065ab478316c7fea7c74777d07f37ae60db2e84f8172e8/beartype-0.22.9-py3-none-any.whl", hash = "sha256:d16c9bbc61ea14637596c5f6fbff2ee99cbe3573e46a716401734ef50c3060c2", size = 1333658, upload-time = "2025-12-13T06:50:28.266Z" },
-]
-
-[[package]]
 name = "blinker"
 version = "1.9.0"
 source = { registry = "https://pypi.org/simple" }
@@ -326,32 +327,6 @@ wheels = [
 ]
 
 [[package]]
-name = "bs-roformer-infer"
-version = "0.1.5"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "beartype" },
-    { name = "einops" },
-    { name = "ml-collections" },
-    { name = "numpy" },
-    { name = "packaging" },
-    { name = "pyyaml" },
-    { name = "requests" },
-    { name = "rotary-embedding-torch" },
-    { name = "soundfile" },
-    { name = "torch", version = "2.11.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'x86_64' and sys_platform == 'darwin' and extra == 'extra-10-whisperjav-cpu') or (platform_machine != 'x86_64' and sys_platform == 'darwin' and extra != 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine == 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (platform_machine == 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (platform_machine == 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine == 'x86_64' and extra != 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan')" },
-    { name = "torch", version = "2.11.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (extra != 'extra-10-whisperjav-cpu' and extra != 'extra-10-whisperjav-cu128' and extra != 'extra-10-whisperjav-cu130' and extra != 'extra-10-whisperjav-vulkan')" },
-    { name = "torch", version = "2.11.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'x86_64' and extra == 'extra-10-whisperjav-cpu') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine == 'x86_64' and extra != 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan')" },
-    { name = "torch", version = "2.11.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'extra-10-whisperjav-cu128' or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
-    { name = "torch", version = "2.11.0+cu130", source = { registry = "https://download.pytorch.org/whl/cu130" }, marker = "extra == 'extra-10-whisperjav-cu130' or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cpu' and extra != 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
-    { name = "tqdm" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/cd/34/020ffe73323ed1ca452327df5863c5585cf43962b7230eac98dc541e75d3/bs_roformer_infer-0.1.5.tar.gz", hash = "sha256:8d17452d32a09dce2b8422f24b524b32481386e640c511462c0989515e4a6bc1", size = 25498, upload-time = "2026-07-12T05:55:50.777Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/26/54/d4875883ce1a2b488aea4785e7182d2ba695bde7511ad85bfd05eab21337/bs_roformer_infer-0.1.5-py3-none-any.whl", hash = "sha256:46f3d5eb4b666a54adcb67524258c3cb6f96e185db97a3e1e1ef7efaea4e1848", size = 31448, upload-time = "2026-07-12T05:55:49.432Z" },
-]
-
-[[package]]
 name = "build"
 version = "1.6.1"
 source = { registry = "https://pypi.org/simple" }
@@ -367,11 +342,11 @@ wheels = [
 
 [[package]]
 name = "certifi"
-version = "2026.7.22"
+version = "2026.10.23"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a3/c2/24167ea9858356b47a87a50d39908bfdb72ceeefe0041586e704e5376b3a/certifi-2026.7.22.tar.gz", hash = "sha256:741e2c3b351ddf169a738da9f2c048608ff7f2c5cc02f1ebc6b118bb090d5d55", size = 138112, upload-time = "2026-07-22T03:35:12.644Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fd/11/b524cbd9bbdaca58608e4cf4053fd463417549e1959fa8d3aa18319f9555/certifi-2026.10.23.tar.gz", hash = "sha256:a9895e6e2758b371e0545e321a3a8fd1fcfd9829ada8824a936dfb16aaaf36cd", size = 136225, upload-time = "2026-10-23T11:36:16.478Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0b/a7/71ac2cff56fec219ed242bb11b8efb69fcc4bec75db06fb7bfe35de520e6/certifi-2026.7.22-py3-none-any.whl", hash = "sha256:62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775", size = 136983, upload-time = "2026-07-22T03:35:11.276Z" },
+    { url = "https://files.pythonhosted.org/packages/32/d1/a3652fe2c19134d0d15922177821d863cbd7e842d53a21bbe7e8e3a1b5ac/certifi-2026.10.23-py3-none-any.whl", hash = "sha256:e9b54de76e530bb6cf0ccd036787103acb58fd42ba930ea8bf948ddbaa2f61d1", size = 135082, upload-time = "2026-10-23T11:36:14.763Z" },
 ]
 
 [[package]]
@@ -576,7 +551,7 @@ sdist = { url = "https://files.pythonhosted.org/packages/6b/b0/e595ce2a2527e169c
 
 [[package]]
 name = "crispasr"
-version = "0.8.50"
+version = "0.8.53"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'extra-10-whisperjav-cpu' and extra != 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130' and extra != 'extra-10-whisperjav-vulkan'",
@@ -588,18 +563,18 @@ resolution-markers = [
 dependencies = [
     { name = "numpy", marker = "(platform_machine != 'x86_64' and sys_platform == 'darwin' and extra == 'extra-10-whisperjav-cpu') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-whisperjav-cu128') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and extra == 'extra-10-whisperjav-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform == 'linux' and extra == 'extra-10-whisperjav-cpu') or (sys_platform == 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (sys_platform == 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (sys_platform == 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform == 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform == 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform == 'darwin' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform == 'emscripten' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (sys_platform == 'emscripten' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (sys_platform == 'emscripten' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform == 'emscripten' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform == 'emscripten' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform == 'emscripten' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform == 'linux' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform == 'linux' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform == 'linux' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8a/e4/85685e405e7cdc28bfd9472a28d67a49d03e2fded9a3d9831647422ef3e5/crispasr-0.8.50.tar.gz", hash = "sha256:249c69f3f7c4d9d36289879fdc797451ff27b110a5fc1213c8915936eb06dcc2", size = 72198, upload-time = "2026-11-03T20:04:56.675Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1f/b2/7e162556adfe8be53e26e0cbd7d7b7c457e7e9d60131aa3779311c6c8e47/crispasr-0.8.53.tar.gz", hash = "sha256:037921cb73bae65dcea341da5bf4b30398543bb62efafa8b8909800e4ba5ecef", size = 73053, upload-time = "2026-11-09T11:20:20.843Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c0/96/227f08d559ed97312f362087bd9b5fb686216fe36fb29446e155ece07250/crispasr-0.8.50-py3-none-macosx_11_0_arm64.whl", hash = "sha256:6ef0a904ad65cd8bd612364d1e64451981a83fcaf2a9a3f50429f7e3cc871abf", size = 37003777, upload-time = "2026-11-03T20:04:42.426Z" },
-    { url = "https://files.pythonhosted.org/packages/96/4a/aef6f7d1aa72ae091d83009b937da1976fd7b643282db9231577e4a84645/crispasr-0.8.50-py3-none-manylinux_2_35_aarch64.whl", hash = "sha256:b9b2ba4afcbe6e22b8a4b793c858e8ff15f6a2833d466b8816c58dda884badf8", size = 47707747, upload-time = "2026-11-03T20:04:46.581Z" },
-    { url = "https://files.pythonhosted.org/packages/be/d1/bcb25695b04bdbbfbe5779809f469426066b68ff8140500c628e37a67fa7/crispasr-0.8.50-py3-none-manylinux_2_35_x86_64.whl", hash = "sha256:d86c6b0becabfcd14384d52d2e62469b2624e957bf81ec9e54470be793dcbc73", size = 55766096, upload-time = "2026-11-03T20:04:50.669Z" },
-    { url = "https://files.pythonhosted.org/packages/d2/d4/a2086bb8ce93106b3c8bf6fd65a0d3344d60c03259bb737200cbdcf07485/crispasr-0.8.50-py3-none-win_amd64.whl", hash = "sha256:2147df187e879067ecb8f6beb7f50f1995c18b3b9cc4deb8d9f15777a7cfa42f", size = 15297946, upload-time = "2026-11-03T20:04:54.369Z" },
+    { url = "https://files.pythonhosted.org/packages/94/fb/ae7cc4ad033d68d43376969eec5ce97a8fd1df0463a057f701ac757497ce/crispasr-0.8.53-py3-none-macosx_11_0_arm64.whl", hash = "sha256:d07cbd11e587e29de4ca8e60b7be32903a855162f10fecc90d2b3fa5e298a0f7", size = 37197446, upload-time = "2026-11-09T11:20:07.51Z" },
+    { url = "https://files.pythonhosted.org/packages/88/2d/c497a37eb8e200ab921133888be9a8cc93d3e0648e829eb73d4f19258558/crispasr-0.8.53-py3-none-manylinux_2_35_aarch64.whl", hash = "sha256:d01c79dee19d635a9a2dd398beca53d923089b3ec6603f44ea413eb5bacfc48d", size = 47964812, upload-time = "2026-11-09T11:20:11.137Z" },
+    { url = "https://files.pythonhosted.org/packages/a4/36/75f25d394295d86cab8afa297fd4577e57c0bdb46977d10a5424a422df58/crispasr-0.8.53-py3-none-manylinux_2_35_x86_64.whl", hash = "sha256:53a22be3a50c7fbc57a9d5a45d0ddb92251d0049bda23b9e10e9fb84388af917", size = 56031533, upload-time = "2026-11-09T11:20:15.262Z" },
+    { url = "https://files.pythonhosted.org/packages/b0/d0/a4af0a3b775e7c41148a3d37fbbd71e782fc87177f96c6138ebd3949b744/crispasr-0.8.53-py3-none-win_amd64.whl", hash = "sha256:365478e545ab4f6cede2d4f5bdeab12921a77b210842c2b7877d1ebf1cc594f1", size = 15400683, upload-time = "2026-11-09T11:20:18.723Z" },
 ]
 
 [[package]]
 name = "crispasr"
-version = "0.8.50+cuda"
-source = { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.50/crispasr-0.8.50%2Bcuda-py3-none-manylinux_2_35_x86_64.whl" }
+version = "0.8.53+cuda"
+source = { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bcuda-py3-none-manylinux_2_35_x86_64.whl" }
 resolution-markers = [
     "platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
@@ -607,7 +582,7 @@ dependencies = [
     { name = "numpy", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
 ]
 wheels = [
-    { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.50/crispasr-0.8.50%2Bcuda-py3-none-manylinux_2_35_x86_64.whl", hash = "sha256:bbe85311927d196b84cd5abecb023b8e6a295b4786bf7cc1f3af0dd203a7892a" },
+    { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bcuda-py3-none-manylinux_2_35_x86_64.whl", hash = "sha256:f942de093b2996990315f91c101ee0b8416c37d34c3b0836671949ba2d559e88" },
 ]
 
 [package.metadata]
@@ -619,8 +594,8 @@ provides-extras = ["test"]
 
 [[package]]
 name = "crispasr"
-version = "0.8.50+cuda"
-source = { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.50/crispasr-0.8.50%2Bcuda-py3-none-win_amd64.whl" }
+version = "0.8.53+cuda"
+source = { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bcuda-py3-none-win_amd64.whl" }
 resolution-markers = [
     "platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
@@ -628,7 +603,7 @@ dependencies = [
     { name = "numpy", marker = "platform_machine == 'AMD64' and sys_platform == 'win32'" },
 ]
 wheels = [
-    { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.50/crispasr-0.8.50%2Bcuda-py3-none-win_amd64.whl", hash = "sha256:df5ff626816ff03416aba44066285c55705dda604b9949607c153bc50be1a19a" },
+    { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bcuda-py3-none-win_amd64.whl", hash = "sha256:8460e67defeb7301240fc919552f147b923a615cb6fbb4831e1953ee310eb697" },
 ]
 
 [package.metadata]
@@ -640,8 +615,8 @@ provides-extras = ["test"]
 
 [[package]]
 name = "crispasr"
-version = "0.8.50+vulkan"
-source = { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.50/crispasr-0.8.50%2Bvulkan-py3-none-win_amd64.whl" }
+version = "0.8.53+vulkan"
+source = { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bvulkan-py3-none-win_amd64.whl" }
 resolution-markers = [
     "sys_platform == 'win32'",
 ]
@@ -649,7 +624,7 @@ dependencies = [
     { name = "numpy", marker = "sys_platform == 'win32'" },
 ]
 wheels = [
-    { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.50/crispasr-0.8.50%2Bvulkan-py3-none-win_amd64.whl", hash = "sha256:d830a06c9283a0d048096cb468ce08b93602741875d6d9dd71d24e0897e19354" },
+    { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bvulkan-py3-none-win_amd64.whl", hash = "sha256:f7d668d4746d8ecabe1567bdbdfdb6c918437a19210289bfd7e8cef732c070e3" },
 ]
 
 [package.metadata]
@@ -1018,6 +993,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/fc/f8/98eea607f65de6527f8a2e8885fc8015d3e6f5775df186e443e0964a11c3/distro-1.9.0.tar.gz", hash = "sha256:2fa77c6fd8940f116ee1d6b94a2f90b13b5ea8d019b98bc8bafdcabcdd9bdbed", size = 60722, upload-time = "2023-12-24T09:54:32.31Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/12/b3/231ffd4ab1fc9d679809f356cebee130ac7daa00d6d6f3206dd4fd137e9e/distro-1.9.0-py3-none-any.whl", hash = "sha256:7bffd925d65168f85027d8da9af6bddab658135b840670a223589bc0c8ef02b2", size = 20277, upload-time = "2023-12-24T09:54:30.421Z" },
+]
+
+[[package]]
+name = "docstring-parser"
+version = "0.18.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e0/4d/f332313098c1de1b2d2ff91cf2674415cc7cddab2ca1b01ae29774bd5fdf/docstring_parser-0.18.0.tar.gz", hash = "sha256:292510982205c12b1248696f44959db3cdd1740237a968ea1e2e7a900eeb2015", size = 29341, upload-time = "2026-04-14T04:09:19.867Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a7/5f/ed01f9a3cdffbd5a008556fc7b2a08ddb1cc6ace7effa7340604b1d16699/docstring_parser-0.18.0-py3-none-any.whl", hash = "sha256:b3fcbed555c47d8479be0796ef7e19c2670d428d72e96da63f3a40122860374b", size = 22484, upload-time = "2026-04-14T04:09:18.638Z" },
 ]
 
 [[package]]
@@ -1746,19 +1730,6 @@ wheels = [
 ]
 
 [[package]]
-name = "ml-collections"
-version = "1.1.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "absl-py" },
-    { name = "pyyaml" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/b8/f8/1a9ae6696dbb6bc9c44ddf5c5e84710d77fe9a35a57e8a06722e1836a4a6/ml_collections-1.1.0.tar.gz", hash = "sha256:0ac1ac6511b9f1566863e0bb0afad0c64e906ea278ad3f4d2144a55322671f6f", size = 61356, upload-time = "2025-04-17T08:25:02.247Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ab/8a/18d4ff2c7bd83f30d6924bd4ad97abf418488c3f908dea228d6f0961ad68/ml_collections-1.1.0-py3-none-any.whl", hash = "sha256:23b6fa4772aac1ae745a96044b925a5746145a70734f087eaca6626e92c05cbc", size = 76707, upload-time = "2025-04-17T08:24:59.038Z" },
-]
-
-[[package]]
 name = "modelscope"
 version = "1.40.2"
 source = { registry = "https://pypi.org/simple" }
@@ -2382,6 +2353,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "opentelemetry-api"
+version = "1.45.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/19/14/cf3a6b6448849656e1e5f4e2101f3988dc6789724050096aba1bc5ccf592/opentelemetry_api-1.45.2.tar.gz", hash = "sha256:d7b0008e21e5fd61cbe7a7f34ca3b6905a78ab677d9bc395e299359c75cda6b4", size = 73277, upload-time = "2026-10-29T17:29:37.888Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a9/2d/610db864d7513158cebb8f36cc88e67e73bd6c7aa1905ef18d89e1281c81/opentelemetry_api-1.45.2-py3-none-any.whl", hash = "sha256:2cbd737377e710ee740d261c94e93fa0f08e6d037c18f17513cc0a2d94479a34", size = 60335, upload-time = "2026-10-29T17:29:06.955Z" },
+]
+
+[[package]]
 name = "openunmix"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2875,12 +2858,13 @@ wheels = [
 
 [[package]]
 name = "pysubtrans"
-version = "1.6.0"
+version = "1.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "appdirs" },
     { name = "babel" },
     { name = "blinker" },
+    { name = "certifi" },
     { name = "httpx", extra = ["socks"] },
     { name = "pysubs2" },
     { name = "python-dotenv" },
@@ -2889,9 +2873,9 @@ dependencies = [
     { name = "setuptools" },
     { name = "srt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/78/be/35081c8e47bbe252c48bc9d39d0b867d4dbd29f69c7725e964a1da025e3f/pysubtrans-1.6.0.tar.gz", hash = "sha256:5bf917445032e6a72a92b837169b3168f0abc498754b408e26a1db2bf2a7a18c", size = 140191, upload-time = "2026-04-26T11:28:01.404Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/69/3c/5162819816507d874074ac3b77816064ebc6fad8d042445326a602590dd8/pysubtrans-1.8.0.tar.gz", hash = "sha256:3955c068d55e6c92e323d013ddb14dea52063a6fa072e642d02b2ae66fd36e95", size = 276460, upload-time = "2026-11-09T23:04:52.16Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/94/09/0ffca6213c60f7b4ba2bacae70d49378665f0b4618840c787ba9f674321b/pysubtrans-1.6.0-py3-none-any.whl", hash = "sha256:f00b2fe32a2c64a247b5df4c52a20549c1d8b5096129e4c315775e2f150d6e36", size = 160406, upload-time = "2026-04-26T11:28:00.26Z" },
+    { url = "https://files.pythonhosted.org/packages/ed/e0/e26f52c8d7a8886feaffd349cf820ff8feb83778d9a173431618814b675c/pysubtrans-1.8.0-py3-none-any.whl", hash = "sha256:717fe214386dc531e8a71451e1b3d952e3cb1532669df69f64084601175ca410", size = 331933, upload-time = "2026-11-09T23:04:50.937Z" },
 ]
 
 [[package]]
@@ -3133,23 +3117,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c0/8f/0722ca900cc807c13a6a0c696dacf35430f72e0ec571c4275d2371fca3e9/rich-15.0.0.tar.gz", hash = "sha256:edd07a4824c6b40189fb7ac9bc4c52536e9780fbbfbddf6f1e2502c31b068c36", size = 230680, upload-time = "2026-04-12T08:24:00.75Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/82/3b/64d4899d73f91ba49a8c18a8ff3f0ea8f1c1d75481760df8c68ef5235bf5/rich-15.0.0-py3-none-any.whl", hash = "sha256:33bd4ef74232fb73fe9279a257718407f169c09b78a87ad3d296f548e27de0bb", size = 310654, upload-time = "2026-04-12T08:24:02.83Z" },
-]
-
-[[package]]
-name = "rotary-embedding-torch"
-version = "0.8.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "einops" },
-    { name = "torch", version = "2.11.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'x86_64' and sys_platform == 'darwin' and extra == 'extra-10-whisperjav-cpu') or (platform_machine != 'x86_64' and sys_platform == 'darwin' and extra != 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine == 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (platform_machine == 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (platform_machine == 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine == 'x86_64' and extra != 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan')" },
-    { name = "torch", version = "2.11.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (extra != 'extra-10-whisperjav-cpu' and extra != 'extra-10-whisperjav-cu128' and extra != 'extra-10-whisperjav-cu130' and extra != 'extra-10-whisperjav-vulkan')" },
-    { name = "torch", version = "2.11.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'x86_64' and extra == 'extra-10-whisperjav-cpu') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine == 'x86_64' and extra != 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan')" },
-    { name = "torch", version = "2.11.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'extra-10-whisperjav-cu128' or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
-    { name = "torch", version = "2.11.0+cu130", source = { registry = "https://download.pytorch.org/whl/cu130" }, marker = "extra == 'extra-10-whisperjav-cu130' or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cpu' and extra != 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/f7/1b/a48e340986fc7bc208b89ebe532036db68c0b22c8d944584b80301a63a81/rotary_embedding_torch-0.8.3.tar.gz", hash = "sha256:6ecad1e830616a99380deb466383fc5a8c225ab53ead1b1d3fecd71978e1f63a", size = 7158, upload-time = "2024-09-07T12:19:31.389Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b7/64/c0062faf35184b8d3cbe7863589cd69dbca4bde0115ac5eea1aa480d1194/rotary_embedding_torch-0.8.3-py3-none-any.whl", hash = "sha256:971c963e9d37a1d82577014a7feda62d1b785562cfba22ffa4ab2ea0eebd910f", size = 5502, upload-time = "2024-09-07T12:19:30.506Z" },
 ]
 
 [[package]]
@@ -3988,11 +3955,11 @@ dependencies = [
 all = [
     { name = "accelerate" },
     { name = "addict" },
+    { name = "anthropic" },
     { name = "attrs" },
     { name = "audioop-lts" },
     { name = "auditok" },
     { name = "av" },
-    { name = "bs-roformer-infer" },
     { name = "datasets" },
     { name = "demucs", version = "4.0.1", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'darwin') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
     { name = "demucs", version = "4.1.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'x86_64' or sys_platform != 'darwin' or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
@@ -4024,7 +3991,6 @@ all = [
     { name = "pywebview" },
     { name = "pywin32", marker = "sys_platform == 'win32' or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
     { name = "qwen-asr" },
-    { name = "rotary-embedding-torch" },
     { name = "scikit-learn" },
     { name = "scipy" },
     { name = "setuptools" },
@@ -4078,6 +4044,7 @@ cli = [
 ]
 colab = [
     { name = "accelerate" },
+    { name = "anthropic" },
     { name = "audioop-lts" },
     { name = "auditok" },
     { name = "fireredvad" },
@@ -4119,23 +4086,23 @@ compatibility = [
     { name = "websockets" },
 ]
 cpu = [
-    { name = "crispasr", version = "0.8.50", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine == 'AMD64' and sys_platform == 'win32')" },
+    { name = "crispasr", version = "0.8.53", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine == 'AMD64' and sys_platform == 'win32')" },
     { name = "torch", version = "2.11.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'x86_64' and sys_platform == 'darwin' and extra == 'extra-10-whisperjav-cpu') or (platform_machine == 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (platform_machine == 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (platform_machine == 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
     { name = "torch", version = "2.11.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'x86_64' and extra == 'extra-10-whisperjav-cpu') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
     { name = "torchaudio", version = "2.11.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'x86_64' and sys_platform == 'darwin' and extra == 'extra-10-whisperjav-cpu') or (platform_machine == 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (platform_machine == 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (platform_machine == 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
     { name = "torchaudio", version = "2.11.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'x86_64' and extra == 'extra-10-whisperjav-cpu') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (extra != 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
 ]
 cu128 = [
-    { name = "crispasr", version = "0.8.50", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-whisperjav-cu128') or (platform_machine != 'aarch64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'aarch64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'aarch64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'linux' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'linux' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'linux' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra != 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
-    { name = "crispasr", version = "0.8.50+cuda", source = { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.50/crispasr-0.8.50%2Bcuda-py3-none-manylinux_2_35_x86_64.whl" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-10-whisperjav-cu128') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'linux' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'linux' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'linux' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra != 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
-    { name = "crispasr", version = "0.8.50+cuda", source = { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.50/crispasr-0.8.50%2Bcuda-py3-none-win_amd64.whl" }, marker = "(platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'extra-10-whisperjav-cu128') or (platform_machine != 'AMD64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'AMD64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'AMD64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'win32' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'win32' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'win32' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra != 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
+    { name = "crispasr", version = "0.8.53", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-whisperjav-cu128') or (platform_machine != 'aarch64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'aarch64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'aarch64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'linux' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'linux' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'linux' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra != 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
+    { name = "crispasr", version = "0.8.53+cuda", source = { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bcuda-py3-none-manylinux_2_35_x86_64.whl" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-10-whisperjav-cu128') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'linux' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'linux' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'linux' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra != 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
+    { name = "crispasr", version = "0.8.53+cuda", source = { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bcuda-py3-none-win_amd64.whl" }, marker = "(platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'extra-10-whisperjav-cu128') or (platform_machine != 'AMD64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'AMD64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'AMD64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'win32' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'win32' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'win32' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra != 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
     { name = "torch", version = "2.11.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" } },
     { name = "torchaudio", version = "2.11.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" } },
 ]
 cu130 = [
-    { name = "crispasr", version = "0.8.50", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'aarch64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'linux' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan')" },
-    { name = "crispasr", version = "0.8.50+cuda", source = { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.50/crispasr-0.8.50%2Bcuda-py3-none-manylinux_2_35_x86_64.whl" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'linux' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan')" },
-    { name = "crispasr", version = "0.8.50+cuda", source = { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.50/crispasr-0.8.50%2Bcuda-py3-none-win_amd64.whl" }, marker = "(platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'AMD64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'win32' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan')" },
+    { name = "crispasr", version = "0.8.53", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'aarch64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'linux' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan')" },
+    { name = "crispasr", version = "0.8.53+cuda", source = { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bcuda-py3-none-manylinux_2_35_x86_64.whl" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'linux' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan')" },
+    { name = "crispasr", version = "0.8.53+cuda", source = { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bcuda-py3-none-win_amd64.whl" }, marker = "(platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'AMD64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'win32' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan')" },
     { name = "torch", version = "2.11.0+cu130", source = { registry = "https://download.pytorch.org/whl/cu130" } },
     { name = "torchaudio", version = "2.11.0+cu130", source = { registry = "https://download.pytorch.org/whl/cu130" } },
 ]
@@ -4150,7 +4117,6 @@ enhance = [
     { name = "accelerate" },
     { name = "addict" },
     { name = "attrs" },
-    { name = "bs-roformer-infer" },
     { name = "datasets" },
     { name = "demucs", version = "4.0.1", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'darwin') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
     { name = "demucs", version = "4.1.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'x86_64' or sys_platform != 'darwin' or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
@@ -4163,7 +4129,6 @@ enhance = [
     { name = "oss2" },
     { name = "packaging" },
     { name = "pillow" },
-    { name = "rotary-embedding-torch" },
     { name = "setuptools" },
     { name = "simplejson" },
     { name = "sortedcontainers" },
@@ -4182,6 +4147,7 @@ huggingface = [
 ]
 kaggle = [
     { name = "accelerate" },
+    { name = "anthropic" },
     { name = "audioop-lts" },
     { name = "auditok" },
     { name = "fireredvad" },
@@ -4234,6 +4200,7 @@ torch = [
     { name = "torchaudio", version = "2.11.0+cu130", source = { registry = "https://download.pytorch.org/whl/cu130" }, marker = "extra == 'extra-10-whisperjav-cu130' or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cpu' and extra != 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
 ]
 translate = [
+    { name = "anthropic" },
     { name = "google-api-core" },
     { name = "google-genai" },
     { name = "openai" },
@@ -4242,11 +4209,11 @@ translate = [
 unix = [
     { name = "accelerate" },
     { name = "addict" },
+    { name = "anthropic" },
     { name = "attrs" },
     { name = "audioop-lts" },
     { name = "auditok" },
     { name = "av" },
-    { name = "bs-roformer-infer" },
     { name = "datasets" },
     { name = "demucs", version = "4.0.1", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'darwin') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
     { name = "demucs", version = "4.1.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'x86_64' or sys_platform != 'darwin' or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
@@ -4274,7 +4241,6 @@ unix = [
     { name = "pydub" },
     { name = "pyloudnorm" },
     { name = "pysubtrans" },
-    { name = "rotary-embedding-torch" },
     { name = "scikit-learn" },
     { name = "scipy" },
     { name = "setuptools" },
@@ -4298,7 +4264,7 @@ unix = [
     { name = "websockets" },
 ]
 vulkan = [
-    { name = "crispasr", version = "0.8.50+vulkan", source = { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.50/crispasr-0.8.50%2Bvulkan-py3-none-win_amd64.whl" }, marker = "platform_machine == 'AMD64' and sys_platform == 'win32'" },
+    { name = "crispasr", version = "0.8.53+vulkan", source = { url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bvulkan-py3-none-win_amd64.whl" }, marker = "platform_machine == 'AMD64' and sys_platform == 'win32'" },
     { name = "torch", version = "2.11.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'x86_64' and sys_platform == 'darwin' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine == 'x86_64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan')" },
     { name = "torch", version = "2.11.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'x86_64' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra != 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra != 'extra-10-whisperjav-cpu' and extra != 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan')" },
     { name = "torchaudio", version = "2.11.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'x86_64' and sys_platform == 'darwin' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine == 'x86_64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan')" },
@@ -4322,11 +4288,11 @@ whisperseg-gpu = [
 windows = [
     { name = "accelerate" },
     { name = "addict" },
+    { name = "anthropic" },
     { name = "attrs" },
     { name = "audioop-lts" },
     { name = "auditok" },
     { name = "av" },
-    { name = "bs-roformer-infer" },
     { name = "datasets" },
     { name = "demucs", version = "4.0.1", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'darwin') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (platform_machine != 'x86_64' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (sys_platform != 'darwin' and extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
     { name = "demucs", version = "4.1.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'x86_64' or sys_platform != 'darwin' or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
@@ -4358,7 +4324,6 @@ windows = [
     { name = "pywebview" },
     { name = "pywin32", marker = "sys_platform == 'win32' or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu128') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cpu' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-cu130') or (extra == 'extra-10-whisperjav-cu128' and extra == 'extra-10-whisperjav-vulkan') or (extra == 'extra-10-whisperjav-cu130' and extra == 'extra-10-whisperjav-vulkan')" },
     { name = "qwen-asr" },
-    { name = "rotary-embedding-torch" },
     { name = "scikit-learn" },
     { name = "scipy" },
     { name = "setuptools" },
@@ -4387,21 +4352,21 @@ requires-dist = [
     { name = "accelerate", marker = "extra == 'huggingface'", specifier = ">=1.15" },
     { name = "addict", marker = "extra == 'enhance'" },
     { name = "aiofiles" },
+    { name = "anthropic", marker = "extra == 'translate'", specifier = ">=2.0" },
     { name = "attrs", marker = "extra == 'enhance'" },
     { name = "audioop-lts", marker = "extra == 'cli'" },
     { name = "auditok", marker = "extra == 'cli'" },
     { name = "av", marker = "extra == 'compatibility'", specifier = ">=13.0.0" },
-    { name = "bs-roformer-infer", marker = "extra == 'enhance'" },
     { name = "build", marker = "extra == 'dev'" },
     { name = "colorama" },
-    { name = "crispasr", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'cpu') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'cpu') or (platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'cpu')", specifier = "==0.8.50" },
-    { name = "crispasr", marker = "platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'cu128'", specifier = "==0.8.50" },
-    { name = "crispasr", marker = "platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'cu130'", specifier = "==0.8.50" },
-    { name = "crispasr", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'cu128'", url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.50/crispasr-0.8.50%2Bcuda-py3-none-manylinux_2_35_x86_64.whl" },
-    { name = "crispasr", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'cu130'", url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.50/crispasr-0.8.50%2Bcuda-py3-none-manylinux_2_35_x86_64.whl" },
-    { name = "crispasr", marker = "platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'cu128'", url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.50/crispasr-0.8.50%2Bcuda-py3-none-win_amd64.whl" },
-    { name = "crispasr", marker = "platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'cu130'", url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.50/crispasr-0.8.50%2Bcuda-py3-none-win_amd64.whl" },
-    { name = "crispasr", marker = "platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'vulkan'", url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.50/crispasr-0.8.50%2Bvulkan-py3-none-win_amd64.whl" },
+    { name = "crispasr", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'cpu') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'cpu') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'cpu') or (platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'cpu')", specifier = "==0.8.53" },
+    { name = "crispasr", marker = "platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'cu128'", specifier = "==0.8.53" },
+    { name = "crispasr", marker = "platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'cu130'", specifier = "==0.8.53" },
+    { name = "crispasr", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'cu128'", url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bcuda-py3-none-manylinux_2_35_x86_64.whl" },
+    { name = "crispasr", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'cu130'", url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bcuda-py3-none-manylinux_2_35_x86_64.whl" },
+    { name = "crispasr", marker = "platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'cu128'", url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bcuda-py3-none-win_amd64.whl" },
+    { name = "crispasr", marker = "platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'cu130'", url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bcuda-py3-none-win_amd64.whl" },
+    { name = "crispasr", marker = "platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'vulkan'", url = "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bvulkan-py3-none-win_amd64.whl" },
     { name = "ctranslate2", specifier = "==4.8.3" },
     { name = "datasets", marker = "extra == 'enhance'", specifier = ">=4.0.0,<=4.8.4" },
     { name = "demucs", marker = "extra == 'enhance'" },
@@ -4438,7 +4403,7 @@ requires-dist = [
     { name = "pydub", marker = "extra == 'cli'" },
     { name = "pyloudnorm", marker = "extra == 'cli'" },
     { name = "pysrt" },
-    { name = "pysubtrans", marker = "extra == 'translate'", specifier = ">=1.5.0" },
+    { name = "pysubtrans", marker = "extra == 'translate'", specifier = ">=1.8.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "pytest-cov", marker = "extra == 'dev'" },
     { name = "pythonnet", marker = "sys_platform == 'win32' and extra == 'gui'", specifier = ">=3.0" },
@@ -4448,7 +4413,6 @@ requires-dist = [
     { name = "qwen-asr", marker = "extra == 'qwen'", git = "https://github.com/meizhong986/Qwen3-ASR.git?rev=10cfb322e42c74cd75a6be622054c9becfeb3082" },
     { name = "regex" },
     { name = "requests" },
-    { name = "rotary-embedding-torch", marker = "extra == 'enhance'", specifier = ">=0.8" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
     { name = "scikit-learn", marker = "extra == 'cli'", specifier = ">=1.4.0" },
     { name = "scipy", marker = "extra == 'cli'", specifier = ">=1.13.0" },
