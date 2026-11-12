@@ -4,8 +4,7 @@ Before, the pass downloaded it after its first file's ASR, and a failed download
 (subtitles at the VAD groups' edges or the model's own times, with a note). Now a pass with
 --passN-word-timestamps aligner has the aligner downloaded with its ASR model, before any audio is read, and a
 failure stops the run with the start check's box, exit status 1. A pass whose pipeline runs the aligner by default
-(Cohere-CrispASR, Qwen3-ASR-CrispASR) without the switch is not covered yet: the owner's verdict on it is pending
-(W623 B).
+(Cohere-CrispASR, Qwen3-ASR-CrispASR) has it downloaded there too, without the switch (owner W624 B).
 
 No download and no CrispASR call: install's steps are replaced, as in tests/test_crispasr_notes_and_check.py. The
 main() probe runs in a child process with -X utf8 (no UTF-8 relaunch), and its start check is a stand-in.
@@ -160,8 +159,8 @@ def _probe(tmp_path, extra):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("extra, aligners", [
-    ([], {}),                                                       # neither pass asks (Cohere's default: W623 B)
-    (["--pass1-word-timestamps", "aligner"], {"1": "wav2vec2-ja"}),
+    ([], {"2": "wav2vec2-ja"}),                                     # Cohere-CrispASR's default aligner (W624 B)
+    (["--pass1-word-timestamps", "aligner"], {"1": "wav2vec2-ja", "2": "wav2vec2-ja"}),
     (["--pass2-word-timestamps", "aligner"], {"2": "wav2vec2-ja"}),
     (["--pass1-word-timestamps", "model", "--pass2-word-timestamps", "model"], {}),
 ], ids=["no switch", "pass 1 aligner", "pass 2 aligner", "both model"])
