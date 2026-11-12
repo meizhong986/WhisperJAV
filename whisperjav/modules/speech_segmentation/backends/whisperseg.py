@@ -34,9 +34,17 @@ import time
 import numpy as np
 
 from ..base import SpeechSegment, SegmentationResult
+from ..factory import WHISPERSEG_PIP_NAMES
 from .ten import group_segments  # shared gap/max-duration grouping
 
 logger = logging.getLogger("whisperjav")
+
+
+def _install_line(package: str) -> str:
+    """What to type to install one package WhisperSeg imports: that package alone, with WhisperJAV's own limits
+    (factory.WHISPERSEG_PIP_NAMES; owner W624 D3, W625 2). Not "pip install whisperjav[whisperseg]", which could
+    fetch WhisperJAV itself again from PyPI, with a PyTorch that runs on the CPU only on Windows."""
+    return f"pip install {WHISPERSEG_PIP_NAMES[package]}"
 
 # --- Pinned upstream revision (prevents silent upstream changes) ---
 _HF_REPO_ID = "TransWithAI/Whisper-Vad-EncDec-ASMR-onnx"
@@ -306,7 +314,7 @@ class WhisperSegSpeechSegmenter:
         except ImportError as e:
             raise ImportError(
                 "WhisperSeg requires the huggingface_hub package. "
-                "Install with: pip install whisperjav[whisperseg]"
+                f"Install with: {_install_line('huggingface_hub')}"
             ) from e
 
         try:
@@ -368,8 +376,7 @@ class WhisperSegSpeechSegmenter:
             except ImportError as e:
                 raise ImportError(
                     "WhisperSeg requires onnxruntime. "
-                    "Install with: pip install whisperjav[whisperseg] "
-                    "(or whisperjav[whisperseg-gpu] for CUDA)"
+                    f"Install with: {_install_line('onnxruntime')}"
                 ) from e
 
             try:
@@ -377,7 +384,7 @@ class WhisperSegSpeechSegmenter:
             except ImportError as e:
                 raise ImportError(
                     "WhisperSeg requires transformers. "
-                    "Install with: pip install whisperjav[whisperseg]"
+                    f"Install with: {_install_line('transformers')}"
                 ) from e
 
             model_path, metadata_path = self._download_model()
