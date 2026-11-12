@@ -1274,15 +1274,25 @@ def ensure_segmenter_backend_available(backend, *, exit_on_fail: bool = True) ->
     lines = [
         f"The {backend} speech detector cannot run on this machine",
         "",
-        f"This run needs {backend} to find the speech in your audio, and it is",
-        "not installed.",
+        # Wrapped, so a long backend name keeps the box's frame (the words as before; "whisperseg" overran it).
+        *textwrap.wrap(f"This run needs {backend} to find the speech in your audio, and it is not installed.",
+                       BOX_WIDTH - 4),
         "",
         "Nothing has been transcribed. Without a working speech detector",
         "every scene would fail and you would get an empty subtitle file.",
         "",
         "What you can do:",
-        f"  - Install it, once:  {hint}",
     ]
+    install_line = f"  - Install it, once:  {hint}"
+    if len(install_line) <= BOX_WIDTH - 4:
+        lines.append(install_line)
+    else:
+        # A hint too long for the line goes on its own line(s), so the box keeps its frame (owner W625 2). "them"
+        # when it installs more than one package (WhisperSeg's hint names each missing package).
+        packages = len(hint.split()) - 2 if hint.startswith("pip install ") else 1
+        lines.append(f"  - Install {'them' if packages > 1 else 'it'}, once:")
+        lines += [f"      {chunk}" for chunk in textwrap.wrap(hint, BOX_WIDTH - 10, break_long_words=False,
+                                                              break_on_hyphens=False)]
     if alternatives:
         lines += ["  - Or pick a speech detector that is already installed:"]
         lines += [f"      {name}" for name in alternatives[:8]]
