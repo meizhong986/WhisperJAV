@@ -39,6 +39,14 @@ _BACKEND_REGISTRY: Dict[str, str] = {
 # Cache for loaded backend classes (avoid repeated imports)
 _BACKEND_CACHE: Dict[str, Type] = {}
 
+# What to type to install each package WhisperSeg imports, with WhisperJAV's own limits (pyproject.toml,
+# [huggingface]); used by its start-check hint below and by backends/whisperseg.py's errors (owner W624 D3, W625 2).
+WHISPERSEG_PIP_NAMES = {
+    "onnxruntime": "onnxruntime",
+    "transformers": '"transformers>=5.20,<6"',
+    "huggingface_hub": '"huggingface-hub>=1.0,<2"',
+}
+
 # Dependency information for each backend
 _BACKEND_DEPENDENCIES: Dict[str, Dict[str, Any]] = {
     "silero": {
@@ -70,7 +78,12 @@ _BACKEND_DEPENDENCIES: Dict[str, Dict[str, Any]] = {
         # check let the run through and every scene then failed, exit 0, no subtitles (1.10.2, owner
         # W622 item 9: a stop at start instead).
         "packages": ["onnxruntime", "transformers", "huggingface_hub"],
-        "install_hint": "pip install whisperjav[whisperseg] (or whisperjav[whisperseg-gpu] for CUDA)",
+        # The hint names only the missing packages, with WhisperJAV's own limits (pyproject.toml, [huggingface];
+        # owner W624 D3, W625 2): "pip install whisperjav[whisperseg]", the hint until 1.10.1, could fetch
+        # WhisperJAV itself again from PyPI, with a PyTorch that runs on the CPU only on Windows, and would put
+        # onnxruntime over a user's onnxruntime-gpu. None of the three needs PyTorch.
+        "pip_names": WHISPERSEG_PIP_NAMES,
+        "install_hint": "",
         "always_available": False,
     },
     # v1.9.0 (installed by default since v1.9.2). Exact key required: the base-name fallback below
@@ -298,12 +311,14 @@ class SpeechSegmenterFactory:
 
         # Check if required packages are importable WITHOUT actually importing them
         # This avoids triggering heavy initialization (like NeMo's Megatron init) at startup
-        for package in dep_info["packages"]:
-            spec = importlib.util.find_spec(package)
-            if spec is None:
-                return False, dep_info["install_hint"]
-
-        return True, ""
+        missing = [package for package in dep_info["packages"] if importlib.util.find_spec(package) is None]
+        if not missing:
+            return True, ""
+        pip_names = dep_info.get("pip_names")
+        if pip_names:
+            # A backend that lists its packages' pip names: the hint installs only the missing ones.
+            return False, "pip install " + " ".join(pip_names[package] for package in missing)
+        return False, dep_info["install_hint"]
 
     @staticmethod
     def get_available_backends() -> List[Dict[str, Any]]:
