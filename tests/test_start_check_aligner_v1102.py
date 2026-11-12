@@ -108,6 +108,11 @@ class TestEnsureCrispASRReadyWithAligner:
         out = re.sub(r"\x1b\[[0-9;]*m", "", capsys.readouterr().out)
         text = " ".join(" ".join(line.strip("║ ") for line in out.splitlines()).split())
         assert "CrispASR is not ready for this run" in text
+        # The box names the aligner of the pass that has one (owner W624 D1); the no-aligner sentence is T4 of
+        # tests/test_crispasr_notes_and_check.py.
+        assert ("This run uses parakeet-crispasr (pass 1) with the aligner wav2vec2-ja, cohere-crispasr (pass 2). "
+                "WhisperJAV checks CrispASR and downloads its models the first time they are needed. "
+                "That did not work:") in text
         assert self.REASON in text
         assert "Nothing has been transcribed." in text
 
