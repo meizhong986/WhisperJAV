@@ -1890,13 +1890,12 @@ Section "Install"
     System::Call 'kernel32::SetEnvironmentVariable(t,t)i("CONDA_REGISTER_ENVS", "{{ env.register_envs }}")'
 
     # Run conda install
-    ${If} $Ana_CreateShortcuts_State = ${BST_CHECKED}
-        ${Print} "Installing packages for {{ env.name }}, creating shortcuts if necessary..."
-        push '"$INSTDIR\_conda.exe" install --offline -yp "{{ env.prefix }}" --file "{{ env.lockfile_txt }}" {{ env.shortcuts }} {{ env.no_rcs_arg }} {{ CONDA_LOG_ARG }}'
-    ${Else}
-        ${Print} "Installing packages for {{ env.name }}..."
-        push '"$INSTDIR\_conda.exe" install --offline -yp "{{ env.prefix }}" --file "{{ env.lockfile_txt }}" --no-shortcuts {{ env.no_rcs_arg }} {{ CONDA_LOG_ARG }}'
-    ${EndIf}
+    # v1.10.2 (1.10.1 install test, finding 2): never the conda packages' own menu entries. The bundled git
+    # package's "Git Bash" was the only item in the Start-menu folder "WhisperJAV". WhisperJAV's own shortcuts
+    # (desktop and Start menu) are made further down when "Create shortcuts" is ticked. (Setting menu_packages
+    # to [] in construct.yaml would also remove that tick box, and with it the desktop shortcut.)
+    ${Print} "Installing packages for {{ env.name }}..."
+    push '"$INSTDIR\_conda.exe" install --offline -yp "{{ env.prefix }}" --file "{{ env.lockfile_txt }}" --no-shortcuts {{ env.no_rcs_arg }} {{ CONDA_LOG_ARG }}'
     push 'Failed to link extracted packages to {{ env.prefix }}!'
     push 'WithLog'
     SetDetailsPrint listonly
@@ -2018,6 +2017,19 @@ https://github.com/meizhong986/WhisperJAV/issues" /SD IDOK
             "WhisperJAV v{{VERSION}} - Japanese AV Subtitle Generator"
 
         ${Print} "Desktop shortcut created successfully"
+
+        ; v1.10.2 (1.10.1 install test, finding 2): a Start-menu entry for WhisperJAV itself, in the folder
+        ; "WhisperJAV". No version in its name: the upgrade tool does not rename it.
+        CreateDirectory "$SMPROGRAMS\WhisperJAV"
+        CreateShortCut "$SMPROGRAMS\WhisperJAV\WhisperJAV.lnk" \
+            "$INSTDIR\WhisperJAV-GUI.exe" \
+            "" \
+            "$INSTDIR\whisperjav_icon.ico" \
+            0 \
+            SW_SHOWNORMAL \
+            "" \
+            "WhisperJAV - Japanese AV Subtitle Generator"
+        ${Print} "Start-menu entry created"
     ${EndIf}
 
     ${If} $Ana_ClearPkgCache_State = ${BST_CHECKED}
@@ -2239,6 +2251,15 @@ Section "Uninstall"
     ${If} ${FileExists} "$INSTDIR\.nonadmin"
         !insertmacro AddRemovePath "remove" "un."
     ${EndIf}
+
+    # v1.10.2 (1.10.1 install test, finding 1): remove this install's shortcuts. Only links that point into
+    # $INSTDIR go: the desktop's "WhisperJAV v*.lnk" (the upgrade tool renames it to the new version, so the
+    # installed version's name alone would miss it) and the Start-menu folder's links. Another install's links
+    # stay. A failure here does not stop the uninstall. ($$ is a literal $ for PowerShell.)
+    ${Print} "Removing this install's desktop and Start-menu shortcuts..."
+    nsExec::ExecToLog `"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$$w = New-Object -ComObject WScript.Shell; $$root = '$INSTDIR\'; foreach ($$p in @(@('$DESKTOP', 'WhisperJAV v*.lnk'), @('$SMPROGRAMS\WhisperJAV', '*.lnk'))) { if (Test-Path -LiteralPath $$p[0]) { Get-ChildItem -LiteralPath $$p[0] -Filter $$p[1] | Where-Object { $$t = $$w.CreateShortcut($$_.FullName).TargetPath; $$t -and $$t.StartsWith($$root, [StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { Remove-Item -LiteralPath $$_.FullName -Force; Write-Output ('Removed ' + $$_.FullName) } } }"`
+    Pop $0
+    RMDir "$SMPROGRAMS\WhisperJAV"
 
 {%- if uninstall_with_conda_exe %}
 
