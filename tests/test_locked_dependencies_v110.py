@@ -13,6 +13,8 @@ from pathlib import Path
 
 import pytest
 
+from whisperjav.__version__ import __version__ as WJ_VERSION
+
 ROOT = Path(__file__).parent.parent
 TEMPLATE = ROOT / "installer" / "templates" / "post_install.py.template"
 LOCKED = ROOT / "whisperjav" / "installer" / "locked"
@@ -225,11 +227,11 @@ def test_install_py_knows_which_builds_the_lock_holds(monkeypatch, system, machi
 
 @pytest.mark.parametrize("system, machine, build, text", [
     ("linux", "x86_64", "cu130",
-     "CUDA 13.0 is not offered on Linux in WhisperJAV 1.10.0. Use --accelerator nvidia (CUDA 12.8 on Linux) or --accelerator cpu."),
+     f"CUDA 13.0 is not offered on Linux in WhisperJAV {WJ_VERSION}. Use --accelerator nvidia (CUDA 12.8 on Linux) or --accelerator cpu."),
     ("darwin", "arm64", "cu128",
      "macOS has no CUDA builds. Run without --accelerator; WhisperJAV installs for the Apple GPU."),
     ("darwin", "x86_64", "cpu",
-     "PyTorch has no CPU build for this computer (darwin, x86_64) in WhisperJAV 1.10.0, so it cannot be "
+     f"PyTorch has no CPU build for this computer (darwin, x86_64) in WhisperJAV {WJ_VERSION}, so it cannot be "
      "installed here. Nothing was installed."),
     ("win32", "AMD64", "cu130", ""),
     ("linux", "x86_64", "cu128", ""),
@@ -282,10 +284,10 @@ def test_source_upgrade_syncs_frozen_with_the_recorded_build(upgrade, monkeypatc
 
 @pytest.mark.parametrize("system, machine, build, text", [
     ("linux", "x86_64", "cu130",
-     "This installation uses CUDA 13.0, which WhisperJAV 1.10.0 does not offer on Linux. Nothing was changed. "
+     f"This installation uses CUDA 13.0, which WhisperJAV {WJ_VERSION} does not offer on Linux. Nothing was changed. "
      "Run install.py again with --accelerator nvidia (CUDA 12.8 on Linux)."),
     ("darwin", "x86_64", "cpu",
-     "PyTorch has no CPU build for this computer (darwin, x86_64) in WhisperJAV 1.10.0, so it cannot be "
+     f"PyTorch has no CPU build for this computer (darwin, x86_64) in WhisperJAV {WJ_VERSION}, so it cannot be "
      "upgraded here. Nothing was changed."),
     ("darwin", "arm64", "metal", ""),
     ("win32", "AMD64", "cu130", ""),
