@@ -163,6 +163,7 @@ from whisperjav.config.segmenter_presets import (
 # The CrispASR Ensemble passes (1.10.0): their names, model list and usage checks. Light modules.
 from whisperjav.crispasr.manifest import CRISPASR_PIPELINES, model_for as crispasr_model_for
 from whisperjav.crispasr.manifest import (WORD_TIMESTAMPS as CRISPASR_WORD_TIMESTAMPS,
+                                          aligner_for as crispasr_aligner_for,
                                           word_timestamps_for as crispasr_word_timestamps_for)
 from whisperjav.crispasr.pass_settings import (models_help as crispasr_models_help, segmenter_settings as
                                                crispasr_segmenter_settings, validate_crispasr_passes,
@@ -3485,8 +3486,19 @@ def main():
             for _n in (1, 2)
             if getattr(args, f"pass{_n}_pipeline", None) in CRISPASR_PIPELINES
         ]
+        # The aligner too (1.10.2, owner W622 item 5): a pass that asks for it (--passN-word-timestamps aligner)
+        # has it downloaded here, so a failed download stops the run before any audio is read, instead of the pass
+        # going on without it after its first file's ASR. A pass whose pipeline runs the aligner by default
+        # (Cohere-CrispASR, Qwen3-ASR-CrispASR) is not covered: the owner's verdict on it is pending (W623 B).
+        _crispasr_aligners = {}
+        for _n, _pipe, _model in _crispasr_passes:
+            _choice = getattr(args, f"pass{_n}_word_timestamps", None)
+            _aligner = crispasr_aligner_for(_pipe, _choice) if _choice else None
+            if _aligner:
+                _crispasr_aligners[_n] = _aligner
         if _crispasr_passes:
-            ensure_crispasr_ready(_crispasr_passes, device=args.device, temp_dir=args.temp_dir)
+            ensure_crispasr_ready(_crispasr_passes, device=args.device, temp_dir=args.temp_dir,
+                                  aligners=_crispasr_aligners)
     elif resolved_config:
         _seg_cfg = resolved_config.get("params", {}).get("speech_segmenter") or {}
         ensure_segmenter_backend_available(_seg_cfg.get("backend"))
