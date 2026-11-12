@@ -183,7 +183,7 @@ class WhisperVadSpeechSegmenter:
         audio_path = self._resolve_audio_path(audio, sample_rate)
         if audio_path is None:
             logger.error("[WhisperVAD] Failed to resolve audio path")
-            return self._empty_result(start_time)
+            return self._empty_result(start_time, error="the scene's audio could not be read")
 
         try:
             # Get audio duration
@@ -231,15 +231,7 @@ class WhisperVadSpeechSegmenter:
 
         except Exception as e:
             logger.error(f"[WhisperVAD] Segmentation failed: {e}", exc_info=True)
-            elapsed = time.time() - start_time
-            return SegmentationResult(
-                segments=[],
-                groups=[],
-                method=f"{self.name}:error",
-                audio_duration_sec=0,
-                parameters=self._get_parameters(),
-                processing_time_sec=elapsed,
-            )
+            return self._empty_result(start_time, error=str(e) or type(e).__name__)
 
     def _ensure_model(self) -> None:
         """Load Whisper model if not already loaded."""
@@ -492,8 +484,9 @@ class WhisperVadSpeechSegmenter:
         except Exception as e:
             logger.warning(f"[WhisperVAD] Failed to save cache: {e}")
 
-    def _empty_result(self, start_time: float) -> SegmentationResult:
-        """Return empty result on error."""
+    def _empty_result(self, start_time: float, error: str) -> SegmentationResult:
+        """The empty result of a failure, with its reason: not silence, so the GGUF pipelines count the scene as
+        failed (1.10.2, still-open item 4)."""
         return SegmentationResult(
             segments=[],
             groups=[],
@@ -501,6 +494,7 @@ class WhisperVadSpeechSegmenter:
             audio_duration_sec=0,
             parameters=self._get_parameters(),
             processing_time_sec=time.time() - start_time,
+            error=error,
         )
 
     def _get_parameters(self) -> Dict[str, Any]:
