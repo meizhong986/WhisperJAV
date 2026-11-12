@@ -40,7 +40,10 @@ PROVIDER_CONFIGS = {
     },
     'claude': {
         'pysubtrans_name': 'Claude',
-        'model': 'claude-3-5-haiku-20241022',
+        # 1.10.2 (owner W622 2, W624 A): Claude Haiku 5.5. Anthropic's model list for a key (2026-11-12) no longer
+        # held claude-3-5-haiku-20241022, the default until 1.10.1; claude-haiku-5-5 translated a test file, exit 0.
+        # Named here, not left to PySubtrans, whose own defaults are fixed names too (W623 A).
+        'model': 'claude-haiku-5-5',
         'env_var': 'ANTHROPIC_API_KEY'
     },
     'gpt': {
