@@ -1001,11 +1001,16 @@ def ensure_crispasr_ready(passes, *, device=None, temp_dir=None, exit_on_fail: b
     except install.CrispASRSetupError as exc:
         if not exit_on_fail:
             return False
-        names = ", ".join(f"{pipeline} (pass {n})" for n, pipeline, _m in passes)
+        aligners = aligners or {}
+        names = ", ".join(f"{pipeline} (pass {n})" + (f" with the aligner {aligners[n]}" if aligners.get(n) else "")
+                          for n, pipeline, _m in passes)
+        # With an aligner the pass needs two models (owner W624 D1); without, the sentence of 1.10.0 (T4).
+        what = ("its models the first time they are needed" if any(aligners.get(n) for n, _p, _m in passes)
+                else "its model the first time it is needed")
         lines = ["CrispASR is not ready for this run", ""]
         # Wrapped, so the box keeps its frame however many passes are named.
-        lines += textwrap.wrap(f"This run uses {names}. WhisperJAV checks CrispASR and downloads its model "
-                               f"the first time it is needed. That did not work:", BOX_WIDTH - 4)
+        lines += textwrap.wrap(f"This run uses {names}. WhisperJAV checks CrispASR and downloads {what}. "
+                               f"That did not work:", BOX_WIDTH - 4)
         lines += [""]
         lines += [f"  {chunk}" for chunk in textwrap.wrap(str(exc), BOX_WIDTH - 8)[:4]]
         lines += [
