@@ -2957,8 +2957,14 @@ def main():
     if args.model and resolved_config is not None:
         logger.info(f"Overriding model with CLI argument: {args.model}")
         # Determine device and compute_type for model override
-        # Priority: CLI args > auto-detection
-        override_device = args.device if args.device and args.device != "auto" else get_best_device()
+        # Priority: CLI args > the device the resolver chose for this mode > auto-detection. 1.10.2 (still-open
+        # item 7): the resolver's device applies its CTranslate2 rule for balanced, fast and faster ("cuda" only
+        # when CTranslate2 itself sees a CUDA device, resolver_v3.py); PyTorch's device alone sent a run with
+        # --model to "cuda" on a PyTorch whose GPU CTranslate2 cannot use (Own PyTorch, ROCm).
+        if args.device and args.device != "auto":
+            override_device = args.device
+        else:
+            override_device = (resolved_config.get("model") or {}).get("device") or get_best_device()
         override_compute_type = args.compute_type if args.compute_type and args.compute_type != "auto" else "auto"
         # Create a model configuration for the CLI-specified model
         override_model_config = {
