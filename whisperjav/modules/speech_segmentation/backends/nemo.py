@@ -214,6 +214,8 @@ class NemoSpeechSegmenter:
                 audio_duration_sec=0,
                 parameters=self._get_parameters(),
                 processing_time_sec=time.time() - start_time,
+                # A failure, not silence: the GGUF pipelines count the scene as failed (1.10.2, still-open item 4).
+                error=str(e) or type(e).__name__,
             )
 
         # Branch based on variant
@@ -237,6 +239,7 @@ class NemoSpeechSegmenter:
                     audio_duration_sec=duration,
                     parameters=self._get_parameters(),
                     processing_time_sec=elapsed,
+                    error=str(e) or type(e).__name__,
                 )
             except Exception as e:
                 logger.warning(f"[NeMo] NeuralDiarizer failed: {e}")
@@ -255,6 +258,7 @@ class NemoSpeechSegmenter:
                         audio_duration_sec=duration,
                         parameters=self._get_parameters(),
                         processing_time_sec=elapsed,
+                        error=str(e2) or type(e2).__name__,
                     )
                 except Exception as e2:
                     logger.error(f"[NeMo] Fallback VAD also failed: {e2}", exc_info=True)
@@ -267,6 +271,7 @@ class NemoSpeechSegmenter:
                         audio_duration_sec=duration,
                         parameters=self._get_parameters(),
                         processing_time_sec=elapsed,
+                        error=str(e2) or type(e2).__name__,
                     )
         else:
             # nemo-lite: lightweight frame VAD
@@ -285,6 +290,7 @@ class NemoSpeechSegmenter:
                     audio_duration_sec=duration,
                     parameters=self._get_parameters(),
                     processing_time_sec=elapsed,
+                    error=str(e) or type(e).__name__,
                 )
             except Exception as e:
                 logger.error(f"[NeMo] Frame VAD failed: {e}", exc_info=True)
@@ -297,6 +303,7 @@ class NemoSpeechSegmenter:
                     audio_duration_sec=duration,
                     parameters=self._get_parameters(),
                     processing_time_sec=elapsed,
+                    error=str(e) or type(e).__name__,
                 )
 
         # Group segments
