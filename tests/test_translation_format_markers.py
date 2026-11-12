@@ -13,7 +13,10 @@ from importlib.resources import files
 from types import SimpleNamespace
 
 from PySubtrans.Options import Options
-from PySubtrans.SubtitleError import TranslationValidationError
+try:
+    from PySubtrans.ValidationError import TranslationValidationError  # PySubtrans 1.8.0 and later
+except ImportError:
+    from PySubtrans.SubtitleError import TranslationValidationError
 from PySubtrans.TranslationParser import TranslationParser
 from PySubtrans.Translation import Translation
 
@@ -60,21 +63,31 @@ def test_normal_answer_gives_no_marker_error():
     assert parser.errors == []
 
 
-def test_each_malformed_answer_is_an_error_naming_its_subtitle():
-    expected = {
-        "text_before_marker": 21,
-        "empty_after_marker": 21,
-        "extra_marker": 21,
-        "extra_marker_and_text": 21,
-        "wrapped_cues": 11,
-    }
-    for name, number in expected.items():
+def test_no_malformed_answer_keeps_a_label_without_an_error_naming_its_subtitle():
+    # 1.10.2 (PySubtrans 1.8.0, the fix of our report llm-subtrans #541): PySubtrans parses "text before the label"
+    # cleanly, gives a blank line (an error) for "nothing after the label" and the wrapped cues, and reports a label
+    # left after the translation itself (RepeatedResponseLabelError), before WhisperJAV's check runs. What must hold
+    # whichever check reports it: a label left in a subtitle's text always comes with an error naming that subtitle.
+    for name in ("text_before_marker", "empty_after_marker", "extra_marker", "extra_marker_and_text", "wrapped_cues"):
         parser = _checked_parser()
-        parser.ProcessTranslation(Translation({"text": SAMPLES[name]}))
-        errors = _marker_errors(parser)
-        assert len(errors) == 1, name
-        assert f"#{number}" in str(errors[0]), name
-        assert [line.number for line in errors[0].lines] == [number], name
+        lines = parser.ProcessTranslation(Translation({"text": SAMPLES[name]})) or []
+        assert parser.errors or not format_marker_lines(lines), name
+        labelled = set(format_marker_lines(lines))
+        named = {line.number for error in parser.errors if isinstance(error, TranslationValidationError)
+                 for line in (getattr(error, "lines", None) or [])}
+        assert labelled <= named, name
+    for name in ("extra_marker", "extra_marker_and_text"):
+        parser = _checked_parser()
+        lines = parser.ProcessTranslation(Translation({"text": SAMPLES[name]}))
+        assert format_marker_lines(lines) == [21], name
+
+
+def test_chinese_labels_are_still_an_error_from_whisperjavs_check():
+    # PySubtrans 1.8.0 checks only "Translation>"; the Chinese labels (#460, 2026-11-02) stay WhisperJAV's.
+    parser = _checked_parser()
+    parser.ProcessTranslation(Translation({"text": "#21\n原题>\nこんにちは\n翻译>\nHello."}))
+    errors = _marker_errors(parser)
+    assert len(errors) == 1 and [line.number for line in errors[0].lines] == [21]
 
 
 def test_ordinary_text_with_hash_or_angle_bracket_is_not_a_marker():
@@ -171,7 +184,9 @@ def test_marked_answer_is_retried_and_the_clean_retry_is_saved(tmp_path, capsys)
 
     assert result == output
     assert len(requests) == 2
-    assert "answer-format labels" in requests[1]["messages"][-1]["content"]
+    # The retry names the label problem: WhisperJAV's text, or PySubtrans 1.8.0's own (it checks "Translation>").
+    retry = requests[1]["messages"][-1]["content"]
+    assert "answer-format labels" in retry or "Unexpected response label Translation" in retry
     text = output.read_text(encoding="utf-8")
     assert "Translation>" not in text
     assert text.count("Hello.") == 1
