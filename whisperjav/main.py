@@ -6,10 +6,15 @@
 # Windows. Relaunches in UTF-8 mode so open() defaults to UTF-8. See #190.
 # ===========================================================================
 import os as _os, sys as _sys  # noqa: E401 — early minimal imports
+# v1.10.2 (1.10.1 install test, finding 4): also when started as the `whisperjav` command (Scripts\whisperjav.exe
+# imports this module, so __name__ is not '__main__' there; sys.argv[0] is the command's path). Without it, the
+# processes the run starts (the ensemble pass worker) wrote cp1252 to a pipe or file and logged errors on "→".
 if (
     _os.name == 'nt'
     and not getattr(_sys.flags, 'utf8_mode', False)
-    and __name__ == '__main__'
+    and (__name__ == '__main__'
+         or (bool(_sys.argv) and _os.path.basename(_sys.argv[0]).lower()
+             in ('whisperjav.exe', 'whisperjav', 'whisperjav-script.py')))
 ):
     from whisperjav.utils.console import relaunch_for_utf8
     relaunch_for_utf8('whisperjav.main')
@@ -2757,6 +2762,15 @@ def main():
             logger.error("--pipeline decoupled does not support --async-processing yet. "
                          "Use synchronous mode (the default).")
             sys.exit(1)
+
+    # 1.10.2 (known fault K1 of 1.10.1): the async route runs only the balanced, fast, faster and fidelity pipelines.
+    # transformers and qwen have no legacy config for it (resolved_config is None) and it would hand them to the
+    # fidelity pipeline, so the run stopped with an error. The GUI never sends the flag for these modes.
+    if (getattr(args, 'async_processing', False) and args.mode in ("transformers", "qwen")
+            and getattr(args, 'pipeline', None) != "decoupled" and not getattr(args, 'ensemble', False)):
+        logger.error(f"--async-processing works only with --mode balanced, fast, faster or fidelity. "
+                     f"Leave it out for --mode {args.mode}.")
+        sys.exit(1)
 
     # Skip input validation if --dump-params is used (diagnostic mode)
     if not args.input and not args.dump_params:
