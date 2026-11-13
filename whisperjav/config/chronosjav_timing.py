@@ -252,3 +252,12 @@ def chronosjav_files(*, timestamps: Optional[str], aligner_id: Optional[str], al
         aligner = PYTORCH_ALIGNER
     timing = timing_model if (timing_model or "none") != "none" else None
     return ChronosFiles(mode, backend, aligner, timing)
+
+
+def pass_files(qwen_params: Optional[dict]) -> ChronosFiles:
+    """The files an Ensemble ChronosJAV pass with these --passN-qwen-params uses: the pass worker's own steps
+    (pass_start_values, generator_for_pass, pass_timing), then chronosjav_files. Read by main's start check
+    (chronosjav_runs) and by the GUI's ChronosJAV CrispASR status panel (1.10.2, owner W632 4), so neither keeps a
+    copy of the rule."""
+    qp = qwen_params or {}
+    return chronosjav_files(**pass_timing(pass_start_values(qp), qp, generator_for_pass(qp)))
