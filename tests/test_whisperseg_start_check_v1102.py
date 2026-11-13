@@ -98,7 +98,7 @@ def test_a_short_hint_stays_on_the_install_line(monkeypatch, capsys):
     ("transformers", f"Install with: pip install {TRANSFORMERS}"),
 ])
 def test_whisperseg_own_import_errors_give_the_same_safe_line(monkeypatch, package, line):
-    # Reached when a package is there but cannot be imported (the start check finds it, the import fails).
+    # A package that is not installed (find_spec finds nothing): the same install line as the start check.
     import sys
     from whisperjav.modules.speech_segmentation.backends.whisperseg import WhisperSegSpeechSegmenter, _install_line
     monkeypatch.setitem(sys.modules, package, None)   # "import <package>" now raises ImportError
@@ -106,6 +106,45 @@ def test_whisperseg_own_import_errors_give_the_same_safe_line(monkeypatch, packa
         WhisperSegSpeechSegmenter()._ensure_model()
     assert str(err.value).endswith(line)
     assert _install_line("huggingface_hub") == f"pip install {HUB}"
+
+
+def _break_import(monkeypatch, package):
+    """The package is installed (find_spec finds it) but importing it fails, as a broken onnxruntime-gpu does."""
+    import builtins
+    real_import = builtins.__import__
+
+    def fake(name, *args, **kwargs):
+        if name == package or name.startswith(package + "."):
+            raise ImportError("DLL load failed while importing onnxruntime_pybind11_state: test")
+        return real_import(name, *args, **kwargs)
+    monkeypatch.setattr(builtins, "__import__", fake)
+
+
+@pytest.mark.parametrize("package, tail", [
+    ("onnxruntime", "reinstall the copy this install uses (onnxruntime, or onnxruntime-gpu for an NVIDIA GPU) with "
+                    "pip install --force-reinstall --no-deps <that name>."),
+    ("transformers", f"reinstall it with pip install --force-reinstall --no-deps {TRANSFORMERS}."),
+])
+def test_an_installed_package_that_will_not_load_is_reinstalled_not_installed_again(monkeypatch, package, tail):
+    # Owner W632 3: "pip install onnxruntime" does nothing there, or puts the CPU package beside the GPU one.
+    from whisperjav.modules.speech_segmentation.backends.whisperseg import WhisperSegSpeechSegmenter
+    assert _real_find_spec(package) is not None   # installed in this environment
+    _break_import(monkeypatch, package)
+    with pytest.raises(ImportError) as err:
+        WhisperSegSpeechSegmenter()._ensure_model()
+    text = str(err.value)
+    assert text.startswith(f"WhisperSeg cannot load {package} (DLL load failed while importing")
+    assert "It is installed but does not work: " + tail in text
+    assert "Install with" not in text
+
+
+def test_huggingface_hub_that_will_not_load_is_reinstalled(monkeypatch):
+    from whisperjav.modules.speech_segmentation.backends.whisperseg import WhisperSegSpeechSegmenter
+    assert _real_find_spec("huggingface_hub") is not None
+    _break_import(monkeypatch, "huggingface_hub")
+    with pytest.raises(ImportError) as err:
+        WhisperSegSpeechSegmenter()._download_model()
+    assert str(err.value).endswith(f"reinstall it with pip install --force-reinstall --no-deps {HUB}.")
 
 
 @pytest.mark.parametrize("backend", ["ten", "firered-vad", "silero", "none"])
