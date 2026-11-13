@@ -184,5 +184,10 @@ NEXT STEPS:
 """)
 
 
+# A helper of this script, not a pytest test: pytest collected it by its name and stopped with "fixture 'name' not
+# found". Run the script itself (python tests/test_redos_all_patterns.py) for the timings.
+test_pattern.__test__ = False
+
+
 if __name__ == "__main__":
     main()
