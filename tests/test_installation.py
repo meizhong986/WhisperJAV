@@ -211,10 +211,16 @@ class TestEntryPoints:
     def test_cli_module_exists(self):
         """Test whisperjav.cli module can be imported."""
         # The main entry point may have optional deps checks
-        # So we just verify the module structure exists
-        from whisperjav import cli
-        assert hasattr(cli, "main")
-        assert callable(cli.main)
+        # So we just verify the module structure exists.
+        # In its own process with -X utf8: on Windows, importing whisperjav.cli outside UTF-8 mode relaunches the
+        # program in UTF-8 mode (#190) with this process's arguments -- pytest's here, which it rejects (exit 2).
+        result = subprocess.run(
+            [sys.executable, "-X", "utf8", "-c",
+             "from whisperjav import cli; print(hasattr(cli, 'main') and callable(cli.main))"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
+        )
+        assert result.returncode == 0, result.stderr[-2000:]
+        assert result.stdout.strip().splitlines()[-1] == "True"
 
     def test_upgrade_help(self):
         """Test whisperjav-upgrade --help."""
