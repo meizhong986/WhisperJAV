@@ -159,6 +159,7 @@ def validate_pyproject_sync(pyproject_path: Path = None) -> List[str]:
         "cu130",
         "cu128",
         "cpu",
+        "vulkan",   # the GPU-through-Vulkan install's PyTorch and CrispASR build (design 22.2.1, owner W234)
         "colab",    # Google Colab optimized
         "kaggle",   # Kaggle optimized
         "unix",     # Linux/macOS CLI focused
