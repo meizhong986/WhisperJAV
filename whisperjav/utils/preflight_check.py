@@ -1069,17 +1069,22 @@ def _ensure_pytorch_aligner(model_id: str) -> None:
         raise install.CrispASRSetupError(f"Downloading the model {model_id} failed: {first}") from exc
 
 
-def ensure_chronosjav_ready(runs, *, exit_on_fail: bool = True) -> bool:
+def ensure_chronosjav_ready(runs, *, exit_on_fail: bool = True, devices=None) -> bool:
     """
     Download the files a ChronosJAV run or pass uses -- its CrispASR aligner, PyTorch aligner and timing model --
     before any audio is read (1.10.2, owner W624 C, W626). Before, each was fetched when the pass first needed it,
     after its first file's ASR, and on failure the pass went on without it (subtitles at the VAD groups' edges, or no
     timing step), with a note. Now a failure stops the run.
 
+    For the CrispASR aligner and the timing model it first runs the checks their loads run (CrispAligner /
+    CrispTimer.check_runtime: a CrispASR build for this computer, the package, AVX2, the --device rule, the library),
+    with the device the pass hands them (``devices``: label -> device, from main.chronosjav_device; 1.10.2, owner
+    W632 2): a pass that CrispASR cannot serve stops here too, instead of going on without them after its first file.
+
     ``runs`` lists (label, ChronosFiles) from main.chronosjav_runs: "ChronosJAV" for --mode qwen, "ChronosJAV (pass
     N)" for an Ensemble pass. A name that is not offered is left to the pipeline, which stops on it as before. On
-    failure this prints the box (text agreed by the owner, W625 3) and ends the run with status 1;
-    ``exit_on_fail=False`` returns False instead.
+    failure this prints the box (texts agreed by the owner: the download box W625 3; the CrispASR box drafted for his
+    word, W632 2) and ends the run with status 1; ``exit_on_fail=False`` returns False instead.
     """
     from whisperjav.crispasr import install, manifest
 
@@ -1090,26 +1095,46 @@ def ensure_chronosjav_ready(runs, *, exit_on_fail: bool = True) -> bool:
             return None  # not offered: the pipeline stops on it, as before
 
     for label, files in runs:
-        named, steps = [], []
+        device = (devices or {}).get(label)
+        named, crispasr_named, steps = [], [], []   # steps: (kind, call); kind "runtime" or "download"
         if files.aligner:
             named.append(f"the aligner {files.aligner}")
             if files.aligner_backend == "crispasr":
                 model = offered(manifest.aligner_model_for, files.aligner)
                 if model is not None:
-                    steps.append(lambda m=model: install.ensure_model(m))
+                    from whisperjav.crispasr.aligner import CrispAligner
+                    crispasr_named.append(f"the aligner {files.aligner}")
+                    steps.append(("runtime", lambda d=device: CrispAligner.check_runtime(d)))
+                    steps.append(("download", lambda m=model: install.ensure_model(m)))
             else:
-                steps.append(lambda a=files.aligner: _ensure_pytorch_aligner(a))
+                steps.append(("download", lambda a=files.aligner: _ensure_pytorch_aligner(a)))
         if files.timing_model:
             model = offered(manifest.timing_model_for, files.timing_model)
             named.append(f"the timing model {model.label if model is not None else files.timing_model}")
             if model is not None:
-                steps.append(lambda m=model: install.ensure_model(m))
+                from whisperjav.crispasr.timer import CrispTimer
+                crispasr_named.append(f"the timing model {model.label}")
+                steps.append(("runtime", lambda d=device: CrispTimer.check_runtime(d)))
+                steps.append(("download", lambda m=model: install.ensure_model(m)))
+        kind = None
         try:
-            for step in steps:
+            # Every CrispASR check before any download: nothing is fetched for a pass CrispASR cannot serve.
+            for kind, step in sorted(steps, key=lambda s: s[0] != "runtime"):
                 step()
         except install.CrispASRSetupError as exc:
             if not exit_on_fail:
                 return False
+            if kind == "runtime":
+                # CrispASR cannot run here: the GGUF box's heading (ensure_crispasr_ready), the CrispASR parts named.
+                lines = ["CrispASR is not ready for this run", ""]
+                lines += textwrap.wrap(f"This run uses {label} with {' and '.join(crispasr_named)}, run by "
+                                       f"CrispASR. WhisperJAV checks CrispASR before any audio is read. That did not "
+                                       f"work:", BOX_WIDTH - 4)
+                lines += [""]
+                lines += [f"  {chunk}" for chunk in textwrap.wrap(str(exc), BOX_WIDTH - 8)[:4]]
+                lines += ["", "Nothing has been transcribed."]
+                _print_box(lines, Fore.RED)
+                sys.exit(1)
             what = ("these models the first time they are needed" if len(named) > 1
                     else "this model the first time it is needed")
             lines = ["A model this run needs could not be downloaded", ""]
