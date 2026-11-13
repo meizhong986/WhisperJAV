@@ -170,11 +170,16 @@ from whisperjav.crispasr.pass_settings import (models_help as crispasr_models_he
                                                scene_detector_for as crispasr_scene_detector_for)
 from whisperjav.crispasr.moss_prompt import MossSettings, help_text as moss_params_help
 from whisperjav.crispasr.errors import FAILURE_PREFIX as CRISPASR_FAILURE_PREFIX
+# ChronosJAV's timing settings and the files they use: the one place (1.10.2, owner W624 C, W626). Light module.
+from whisperjav.config.chronosjav_timing import (chronosjav_files, generator_for_pass as chronosjav_generator_for_pass,
+                                                 pass_start_values as chronosjav_pass_start_values,
+                                                 pass_timing as chronosjav_pass_timing, single_pass_timing)
 from whisperjav.__version__ import __version__, __version_display__
 
 
 from whisperjav.utils.preflight_check import (
     start_of_run_check,
+    ensure_chronosjav_ready,
     ensure_crispasr_ready,
     ensure_segmenter_backend_available,
     ensure_segmenter_model_available,
@@ -216,6 +221,41 @@ SPEECH_ENHANCER_CHOICES = ["none", "ffmpeg-dsp", "zipenhancer", "htdemucs", "mel
 # with AVAILABLE_EFFECTS in speech_enhancement/backends/ffmpeg_dsp.py.
 FFMPEG_DSP_EFFECTS = ["loudnorm", "normalize", "compress", "denoise",
                       "highpass", "lowpass", "deess", "amplify"]
+
+
+def _chronosjav_single_pass_timing(args) -> dict:
+    """--mode qwen's five timing settings for QwenPipeline (config/chronosjav_timing.py single_pass_timing)."""
+    return single_pass_timing(getattr(args, 'qwen_timestamps', 'word'), getattr(args, 'qwen_aligner', None),
+                              getattr(args, 'qwen_timing_model', 'none'), getattr(args, 'qwen_timestamp_mode', None))
+
+
+def chronosjav_runs(args) -> list:
+    """(pass number, label, ChronosFiles) for this run's ChronosJAV pipeline(s): --mode qwen (None, "ChronosJAV"), or
+    each Ensemble pass with the qwen pipeline (N, "ChronosJAV (pass N)"), from the same one place the pass worker and
+    QwenPipeline use (config/chronosjav_timing.py; 1.10.2, owner W624 C, W626). The dormant Cohere-in-ChronosJAV is
+    left out (W626 2). A --passN-qwen-params that is not a JSON object counts as empty here; the run reports it where
+    it reads it.
+    """
+    if not getattr(args, "ensemble", False):
+        if getattr(args, "mode", None) != "qwen":
+            return []
+        return [(None, "ChronosJAV", chronosjav_files(**_chronosjav_single_pass_timing(args)))]
+    runs = []
+    for n in (1, 2):
+        if getattr(args, f"pass{n}_pipeline", None) != "qwen":
+            continue
+        try:
+            qwen_params = json.loads(getattr(args, f"pass{n}_qwen_params", None) or "{}")
+        except (TypeError, ValueError):
+            qwen_params = {}
+        if not isinstance(qwen_params, dict):
+            qwen_params = {}
+        generator = chronosjav_generator_for_pass(qwen_params)
+        if generator == "cohere":
+            continue
+        timing = chronosjav_pass_timing(chronosjav_pass_start_values(qwen_params), qwen_params, generator)
+        runs.append((n, f"ChronosJAV (pass {n})", chronosjav_files(**timing)))
+    return runs
 
 
 def _word_timestamps_help(whose: str) -> str:
@@ -1746,7 +1786,6 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         # v1.9.4), WhisperSeg only; for TEN and FireRedVAD the longest segment
         # 4.0 s only (owner, 2026-10-08). User values kept.
         from whisperjav.config.chronosjav_vad import apply_chronosjav_segmenter_defaults
-        from whisperjav.config.chronosjav_timing import aligner_named, timestamp_mode_for
         apply_chronosjav_segmenter_defaults(
             _user_vad_overrides, _gen_backend_early, _qwen_segmenter, _qwen_sensitivity)
         # v1.9.0: VAD padding routed to pipeline scalars (segmenter_start/end_pad_ms)
@@ -1798,17 +1837,14 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             "batch_size": getattr(args, 'qwen_batch_size', 1),
             "max_new_tokens": getattr(args, 'qwen_max_tokens', 4096),
             "language": (lambda _l: None if _l in (None, "auto", "") else _l)(getattr(args, 'qwen_language', 'Japanese')),
-            "timestamps": getattr(args, 'qwen_timestamps', 'word'),
-            # None = not given: the aligner an aligner mode uses is then wav2vec2-ja (config/chronosjav_timing.py)
-            "aligner_id": getattr(args, 'qwen_aligner', None) or 'wav2vec2-ja',
-            "timing_model": getattr(args, 'qwen_timing_model', 'none'),
+            # timestamps, aligner_id, aligner_backend, timing_model, timestamp_mode: from the one place
+            # (config/chronosjav_timing.py single_pass_timing; 1.10.1 default vad_only and no aligner, owner W498
+            # D1; --qwen-aligner without --qwen-timestamp-mode brings aligner_vad_fallback, W501 1). The start-of-run
+            # check downloads the files they use (1.10.2, owner W624 C).
+            **_chronosjav_single_pass_timing(args),
             "context": getattr(args, 'qwen_context', ''),
             "context_file": getattr(args, 'qwen_context_file', None),
             "attn_implementation": getattr(args, 'qwen_attn', 'auto'),
-            # Timestamp resolution (1.10.1 default: vad_only, no aligner; owner W498 D1). --qwen-aligner without
-            # --qwen-timestamp-mode brings aligner_vad_fallback (owner W501 1); one rule with the pass worker.
-            "timestamp_mode": timestamp_mode_for(getattr(args, 'qwen_timestamp_mode', None),
-                                                 aligner_named(getattr(args, 'qwen_aligner', None))),
             # Japanese post-processing
             "japanese_postprocess": getattr(args, 'qwen_japanese_postprocess', False),
             "postprocess_preset": getattr(args, 'qwen_postprocess_preset', 'high_moan'),
@@ -3293,6 +3329,11 @@ def main():
                 "transformers_two_pass": getattr(args, 'transformers_two_pass', False),
             }
         }
+        # 1.10.2 (owner W626 1): --mode qwen's timing as the pipeline will run it (the timestamp mode, the aligner
+        # backend and aligner, the timing model), from the one place; these files are downloaded at the start check.
+        for _n, _label, _files in chronosjav_runs(args):
+            if _n is None:
+                dump_data["chronosjav_effective"] = _files.as_dict()
         # Add decoupled pipeline component info when applicable
         if getattr(args, 'pipeline', None) == "decoupled":
             dump_data["decoupled_components"] = {
@@ -3446,6 +3487,11 @@ def main():
                     from whisperjav.modules.scene_detection_backends.rscn.settings import RSCNSettings
                     _p["crispasr_effective"]["rscn_settings"] = RSCNSettings.for_pipeline(
                         _p["pipeline"], _pass_params).as_dict()
+            # 1.10.2 (owner W626 1): what a ChronosJAV pass's timing uses -- the timestamp mode, the aligner backend
+            # and aligner, the timing model -- from the one place the pass worker and QwenPipeline use; these files
+            # are downloaded at the start-of-run check. Not for the dormant Cohere-in-ChronosJAV (W626 2).
+            for _n, _label, _files in chronosjav_runs(args):
+                ensemble_dump[f"pass{_n}"]["chronosjav_effective"] = _files.as_dict()
             dump_data["ensemble_config"] = ensemble_dump
         try:
             with open(args.dump_params, 'w', encoding='utf-8') as f:
@@ -3528,6 +3574,12 @@ def main():
             ensure_segmenter_backend_available(getattr(args, "qwen_segmenter", None))
             # 1.10.2: a model downloaded on first use (FireRedVAD; CrispASR's sortformer, pyannote) is fetched here.
             ensure_segmenter_model_available(getattr(args, "qwen_segmenter", None))
+
+    # ChronosJAV's aligner and timing model (1.10.2, owner W624 C, W626): --mode qwen and every ChronosJAV Ensemble
+    # pass have the files they use downloaded here, before any audio is read, so a failed download stops the run
+    # instead of the pass going on without them after its first file's ASR. Which files: the one place the pass worker
+    # and QwenPipeline use (config/chronosjav_timing.py). The dormant Cohere-in-ChronosJAV is not covered (W626 2).
+    ensure_chronosjav_ready([(label, files) for _n, label, files in chronosjav_runs(args) if files.uses_files])
 
     # Setup temp directory
     if args.temp_dir:
