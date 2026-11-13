@@ -74,18 +74,27 @@ class CrispTimer:
     def is_loaded(self) -> bool:
         return self._model is not None
 
-    def load(self) -> None:
-        """CrispASR, the device and the model file. Raises CrispASRSetupError with the reason."""
-        if self._model is not None:
-            return
-        runtime = install.runtime_status(self.device)
+    @staticmethod
+    def check_runtime(device: Optional[str] = None):
+        """What load() checks before the model file: a CrispASR build for this computer, the package, AVX2, the
+        --device rule, the library and its Whisper class. Returns (RuntimeChoice, the crispasr module); raises
+        CrispASRSetupError with the reason. Also run by the start-of-run check for a ChronosJAV pass (1.10.2, owner
+        W632 2), so a pass whose timing model CrispASR cannot run stops before any audio is read."""
+        runtime = install.runtime_status(device)
         try:
             import crispasr
         except (ImportError, OSError) as e:
             raise CrispASRSetupError(install.NOT_LOADED_TEXT.format(reason=e)) from e
-        native_log.quiet_debug_lines(crispasr)   # its GPU library's DEBUG lines only with --debug (W350)
         if not hasattr(crispasr, "CrispASR"):
             raise CrispASRSetupError(NO_WHISPER_TEXT.format(version=runtime.version))
+        return runtime, crispasr
+
+    def load(self) -> None:
+        """CrispASR, the device and the model file. Raises CrispASRSetupError with the reason."""
+        if self._model is not None:
+            return
+        runtime, crispasr = self.check_runtime(self.device)
+        native_log.quiet_debug_lines(crispasr)   # its GPU library's DEBUG lines only with --debug (W350)
         path = install.stage_model(install.ensure_model(self.model), self.temp_dir, self.model.sha256,
                                    keep_name=True)
         try:
