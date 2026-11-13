@@ -24,6 +24,7 @@ Reference:
 
 from typing import Union, List, Dict, Any, Tuple, Optional
 from pathlib import Path
+import importlib.util
 import json
 import logging
 import multiprocessing
@@ -45,6 +46,30 @@ def _install_line(package: str) -> str:
     (factory.WHISPERSEG_PIP_NAMES; owner W624 D3, W625 2). Not "pip install whisperjav[whisperseg]", which could
     fetch WhisperJAV itself again from PyPI, with a PyTorch that runs on the CPU only on Windows."""
     return f"pip install {WHISPERSEG_PIP_NAMES[package]}"
+
+
+# What WhisperSeg needs each package for, in the text for one that is not installed (the texts of 1.10.1).
+_REQUIRES = {"onnxruntime": "onnxruntime", "transformers": "transformers",
+             "huggingface_hub": "the huggingface_hub package"}
+
+
+def _import_failure(package: str, error: Exception) -> str:
+    """The text for a package WhisperSeg imports that would not load. Not installed: the install line. Installed but
+    it cannot be loaded (a broken onnxruntime-gpu, say), where "pip install" does nothing or puts the CPU package
+    beside the GPU one: reinstall the copy that is there (text agreed by the owner, W632 3; drafted 2026-11-13)."""
+    try:
+        installed = importlib.util.find_spec(package) is not None
+    except (ImportError, ValueError):
+        installed = False
+    if not installed:
+        return f"WhisperSeg requires {_REQUIRES[package]}. Install with: {_install_line(package)}"
+    reason = (str(error).strip().splitlines() or [type(error).__name__])[0]
+    if package == "onnxruntime":
+        return (f"WhisperSeg cannot load onnxruntime ({reason}). It is installed but does not work: reinstall the "
+                "copy this install uses (onnxruntime, or onnxruntime-gpu for an NVIDIA GPU) with pip install "
+                "--force-reinstall --no-deps <that name>.")
+    return (f"WhisperSeg cannot load {package} ({reason}). It is installed but does not work: reinstall it with "
+            f"pip install --force-reinstall --no-deps {WHISPERSEG_PIP_NAMES[package]}.")
 
 # --- Pinned upstream revision (prevents silent upstream changes) ---
 _HF_REPO_ID = "TransWithAI/Whisper-Vad-EncDec-ASMR-onnx"
@@ -312,10 +337,7 @@ class WhisperSegSpeechSegmenter:
         try:
             from huggingface_hub import hf_hub_download
         except ImportError as e:
-            raise ImportError(
-                "WhisperSeg requires the huggingface_hub package. "
-                f"Install with: {_install_line('huggingface_hub')}"
-            ) from e
+            raise ImportError(_import_failure("huggingface_hub", e)) from e
 
         try:
             model_path = hf_hub_download(
@@ -374,18 +396,12 @@ class WhisperSegSpeechSegmenter:
             try:
                 import onnxruntime as ort
             except ImportError as e:
-                raise ImportError(
-                    "WhisperSeg requires onnxruntime. "
-                    f"Install with: {_install_line('onnxruntime')}"
-                ) from e
+                raise ImportError(_import_failure("onnxruntime", e)) from e
 
             try:
                 from transformers import WhisperFeatureExtractor
             except ImportError as e:
-                raise ImportError(
-                    "WhisperSeg requires transformers. "
-                    f"Install with: {_install_line('transformers')}"
-                ) from e
+                raise ImportError(_import_failure("transformers", e)) from e
 
             model_path, metadata_path = self._download_model()
             self._metadata = self._load_metadata(metadata_path)
