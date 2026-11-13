@@ -661,10 +661,14 @@ class TestImportsStayLight:
             "import sys\n"
             "import whisperjav.crispasr.install, whisperjav.crispasr.engine, whisperjav.crispasr.lines\n"
             "import whisperjav.crispasr.manifest, whisperjav.crispasr.errors, whisperjav.crispasr.pass_settings\n"
+            # whisperjav.modules.model_audio (the audio a model is given; standard library only, read by engine, aligner
+            # and timer since 2e09e91) is light; its package's __init__ imports nothing.
+            "light = {'whisperjav.modules', 'whisperjav.modules.model_audio'}\n"
             "heavy = sorted(m for m in sys.modules\n"
             "               if m.split('.')[0] in ('torch', 'requests', 'huggingface_hub', 'transformers',\n"
             "                                      'crispasr', 'stable_whisper')\n"
-            "               or m.startswith(('whisperjav.modules', 'whisperjav.pipelines', 'whisperjav.main')))\n"
+            "               or (m.startswith(('whisperjav.modules', 'whisperjav.pipelines', 'whisperjav.main'))\n"
+            "                   and m not in light))\n"
             "print(','.join(heavy))\n"
         )
         done = subprocess.run([sys.executable, "-B", "-c", code], cwd=str(REPO), capture_output=True, text=True,
