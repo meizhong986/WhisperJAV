@@ -46,6 +46,12 @@ class MockUpdateCheckResult(NamedTuple):
     version_info: MockVersionInfo = None
     from_cache: bool = False
     error: str = None
+    # The development track's fields (version_checker.UpdateCheckResult since the dual-track update check): the API
+    # reads them for every result.
+    current_commit: str = None
+    installation_type: str = "release"
+    dev_update_available: bool = False
+    dev_info: object = None
 
 
 # =============================================================================
@@ -193,8 +199,8 @@ class TestCheckForUpdates:
             with patch('whisperjav.version_checker.get_update_notification_level', return_value='minor'):
                 mock_api.check_for_updates(force=True)
 
-        # Verify force=True was passed
-        mock_check.assert_called_once_with(force=True)
+        # Verify force=True was passed (with the development track, which the API always asks for)
+        mock_check.assert_called_once_with(force=True, include_dev=True)
 
     def test_release_notes_truncation(self, mock_api):
         """Test that long release notes are truncated."""
