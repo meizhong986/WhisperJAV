@@ -246,7 +246,8 @@ class TestGeneratorConfig:
             AnimeWhisperGenerator,
         )
         gen = AnimeWhisperGenerator()
-        assert gen._config["no_repeat_ngram_size"] == 5
+        # 0 = off, the model card's value (43f60d1, 2026-03-03: "greedy decoding"); this test pinned the 5 before it.
+        assert gen._config["no_repeat_ngram_size"] == 0
 
     def test_default_max_new_tokens(self):
         from whisperjav.modules.subtitle_pipeline.generators.anime_whisper import (
@@ -472,7 +473,9 @@ class TestAnimeFramerBindsAllVadParams:
         assert framer._segmenter_config["end_pad_ms"] == 100
 
     def test_qwen3_framer_config_not_pad_forwarded(self, tmp_path):
-        """Anime-scoped: qwen3 framer must NOT get the pad-scalar forward."""
+        """The qwen3 framer gets the pad scalars too (10de5f0, 2026-08-14: with vad_only the default for qwen3,
+        --qwen-vad-start-pad / --qwen-vad-end-pad and the GUI pad sliders had no effect on qwen3 subtitle timing
+        without them). The name is kept from when the forward was anime-scoped."""
         from whisperjav.pipelines.qwen_pipeline import QwenPipeline
         pipeline = QwenPipeline(
             output_dir=str(tmp_path / "out"),
@@ -482,5 +485,5 @@ class TestAnimeFramerBindsAllVadParams:
             segmenter_end_pad_ms=50,
         )
         framer = pipeline._subtitle_pipeline.framer
-        assert "start_pad_ms" not in framer._segmenter_config
-        assert "end_pad_ms" not in framer._segmenter_config
+        assert framer._segmenter_config["start_pad_ms"] == 50
+        assert framer._segmenter_config["end_pad_ms"] == 50
