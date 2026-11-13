@@ -1027,21 +1027,44 @@ def ensure_crispasr_ready(passes, *, device=None, temp_dir=None, exit_on_fail: b
         sys.exit(1)
 
 
+# The files of a PyTorch aligner's repository that its from_pretrained reads (config, weights, tokenizer and processor
+# files); README.md, .gitattributes and the like are left out. For Qwen/Qwen3-ForcedAligner-0.6B: chat_template.json,
+# config.json, generation_config.json, merges.txt, model.safetensors, preprocessor_config.json, tokenizer_config.json,
+# vocab.json (its Hugging Face cache on the developer's PC, 2026-11-13).
+PYTORCH_ALIGNER_FILES = ["*.json", "*.safetensors", "*.txt", "*.model", "*.tiktoken"]
+
+
+def _pytorch_aligner_cached(model_id: str) -> bool:
+    """True when the Hugging Face cache holds the aligner's config and its weights (a file is listed in the snapshot
+    only once its download is complete). No network is used."""
+    try:
+        from huggingface_hub import try_to_load_from_cache
+        config = try_to_load_from_cache(model_id, "config.json")
+    except Exception:
+        return False
+    if not isinstance(config, str):
+        return False
+    folder = Path(config).parent
+    return any(folder.glob("*.safetensors")) or any(folder.glob("*.bin"))
+
+
 def _ensure_pytorch_aligner(model_id: str) -> None:
     """The PyTorch aligner's files in the Hugging Face cache, where its from_pretrained reads them; a local folder
-    is taken as it is. Raises CrispASRSetupError (the start check's one error type) when they cannot be had."""
+    is taken as it is. A model already in the cache is used as it is, without asking the Hub (as the CrispASR files
+    are): snapshot_download would also want files the load never reads (README.md, .gitattributes) and stopped an
+    --offline run whose model was there (review, 2026-11-13). Raises CrispASRSetupError (the start check's one error
+    type) when the files cannot be had."""
     from whisperjav.crispasr import install
 
-    if os.path.isdir(model_id):
+    if os.path.isdir(model_id) or _pytorch_aligner_cached(model_id):
         return
-    offline = install.hub_offline()
+    if install.hub_offline():
+        raise install.CrispASRSetupError(
+            f"The model {model_id} is not downloaded yet, and --offline allows no download.")
     try:
         from huggingface_hub import snapshot_download
-        snapshot_download(repo_id=model_id, local_files_only=offline)
+        snapshot_download(repo_id=model_id, allow_patterns=PYTORCH_ALIGNER_FILES)
     except Exception as exc:
-        if offline:
-            raise install.CrispASRSetupError(
-                f"The model {model_id} is not downloaded yet, and --offline allows no download.") from exc
         first = (str(exc).strip().splitlines() or [type(exc).__name__])[0]
         raise install.CrispASRSetupError(f"Downloading the model {model_id} failed: {first}") from exc
 
