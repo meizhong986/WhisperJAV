@@ -99,7 +99,7 @@ def test_pathless_passes_arrays_and_writes_no_wavs(tmp_path):
     wav = _make_scene_wav(tmp_path)
     orch = _orchestrator(tmp_path, accepts_array=True)
 
-    _frames, frame_audio, _regions = orch._step1_frame_and_slice([wav], [1.0], None, None)
+    _frames, frame_audio, _regions, _starts = orch._step1_frame_and_slice([wav], [1.0], None, None)
 
     entries = frame_audio[0]
     assert all(isinstance(e, np.ndarray) for e in entries)
@@ -111,7 +111,7 @@ def test_fallback_writes_one_wav_per_frame(tmp_path):
     wav = _make_scene_wav(tmp_path)
     orch = _orchestrator(tmp_path, accepts_array=False)
 
-    _frames, frame_audio, _regions = orch._step1_frame_and_slice([wav], [1.0], None, None)
+    _frames, frame_audio, _regions, _starts = orch._step1_frame_and_slice([wav], [1.0], None, None)
 
     entries = frame_audio[0]
     assert all(isinstance(e, Path) for e in entries)
@@ -136,7 +136,7 @@ def test_pathless_when_aligner_is_array_capable(tmp_path):
     wav = _make_scene_wav(tmp_path)
     orch = _orchestrator(tmp_path, accepts_array=True, aligner=_StubAligner(accepts_array=True))
 
-    _frames, frame_audio, _regions = orch._step1_frame_and_slice([wav], [1.0], None, None)
+    _frames, frame_audio, _regions, _starts = orch._step1_frame_and_slice([wav], [1.0], None, None)
 
     assert all(isinstance(e, np.ndarray) for e in frame_audio[0])
     assert glob.glob(str(tmp_path / "dsp_*.wav")) == []
@@ -147,7 +147,7 @@ def test_fallback_when_aligner_not_array_capable(tmp_path):
     wav = _make_scene_wav(tmp_path)
     orch = _orchestrator(tmp_path, accepts_array=True, aligner=_StubAligner(accepts_array=False))
 
-    _frames, frame_audio, _regions = orch._step1_frame_and_slice([wav], [1.0], None, None)
+    _frames, frame_audio, _regions, _starts = orch._step1_frame_and_slice([wav], [1.0], None, None)
 
     assert all(isinstance(e, Path) for e in frame_audio[0])
     assert len(glob.glob(str(tmp_path / "dsp_*.wav"))) == 2
