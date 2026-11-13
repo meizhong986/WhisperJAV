@@ -218,6 +218,46 @@ def test_main_names_each_chronosjav_pass_and_leaves_out_cohere(monkeypatch, tmp_
     assert wj_main.chronosjav_runs(_args(monkeypatch, tmp_path, ["--mode", "balanced"])) == []
 
 
+def test_decoupled_runs_instead_of_mode_qwen_so_no_chronosjav_files(monkeypatch, tmp_path):
+    """--pipeline decoupled runs instead of --mode's pipeline (process_files_sync): nothing of ChronosJAV's to
+    download or show (review, 2026-11-13; the decoupled pipeline's own aligner is not covered, his word)."""
+    from whisperjav import main as wj_main
+    args = _args(monkeypatch, tmp_path, ["--mode", "qwen", "--qwen-aligner", "wav2vec2-ja", "--pipeline", "decoupled"])
+    assert wj_main.chronosjav_runs(args) == []
+
+
+@pytest.mark.parametrize("backend, aligner", [("crispasr", "wav2vec2-ja"), ("qwen3", PT)])
+def test_a_backend_named_with_no_model_takes_its_default_everywhere(monkeypatch, tmp_path, backend, aligner):
+    """Review 2026-11-13: {"qwen_aligner_backend": ..., "qwen_aligner": null} named no file at the start check while
+    the pass loaded the CrispASR default during the run (or, for the PyTorch backend, failed to load with no ID)."""
+    import whisperjav.ensemble.pass_worker as pw
+    from whisperjav import main as wj_main
+    from whisperjav.pipelines.qwen_pipeline import QwenPipeline
+
+    params = {"qwen_aligner_backend": backend, "qwen_aligner": None, "timestamp_mode": "aligner_vad_fallback"}
+    args = _args(monkeypatch, tmp_path, ["--ensemble", "--pass1-pipeline", "qwen", "--pass1-qwen-params",
+                                         json.dumps(params)])
+    [(_n, _label, files)] = wj_main.chronosjav_runs(args)
+    assert _files_tuple(files) == ("aligner_vad_fallback", backend, aligner, None)
+    seen = {}
+
+    def recorder(**kwargs):
+        seen.update(kwargs)
+        raise _Built()
+
+    monkeypatch.setattr(pw, "QwenPipeline", recorder)
+    monkeypatch.setitem(pw.PIPELINE_CLASSES, "qwen", recorder)
+    config = {"pipeline": "qwen", "sensitivity": "balanced", "scene_detector": None, "speech_segmenter": None,
+              "speech_enhancer": None, "model": None, "params": None, "qwen_params": params, "language": "ja",
+              "device": None}
+    with pytest.raises(_Built):
+        pw._build_pipeline(config, 1, str(tmp_path / "out"), False, "native", {}, tmp_path / "pass")
+    built = QwenPipeline(**{**seen, "output_dir": str(tmp_path / "o"), "temp_dir": str(tmp_path / "t")})
+    sub = built._subtitle_pipeline
+    model = sub.aligner._config.get("model") or sub.aligner._config.get("aligner_id")
+    assert model == aligner
+
+
 def test_timestamp_modes_are_the_pipelines():
     from whisperjav.modules.subtitle_pipeline.types import TimestampMode
     assert set(ct.TIMESTAMP_MODES) == {m.value for m in TimestampMode}
@@ -238,16 +278,24 @@ def downloads(monkeypatch):
             raise install.CrispASRSetupError(f"Downloading the model {model.label} failed: stand-in refused")
         return Path("model.gguf")
 
-    def snapshot_download(repo_id, local_files_only=False, **kwargs):
-        state.asked.append(f"{repo_id} local_files_only={local_files_only}")
+    def snapshot_download(repo_id, allow_patterns=None, **kwargs):
+        state.asked.append(f"download {repo_id}")
+        state.patterns = allow_patterns
         if state.fail_on == repo_id:
             raise OSError("stand-in connection refused\nsecond line")
         return "folder"
+
+    state.cache = {}   # model ID -> path of its cached config.json (the stand-in Hugging Face cache)
+
+    def try_to_load_from_cache(repo_id, filename, **kwargs):
+        assert filename == "config.json"
+        return state.cache.get(repo_id)
 
     import huggingface_hub
     monkeypatch.setattr(install, "ensure_model", ensure_model)
     monkeypatch.setattr(install, "hub_offline", lambda: state.offline)
     monkeypatch.setattr(huggingface_hub, "snapshot_download", snapshot_download)
+    monkeypatch.setattr(huggingface_hub, "try_to_load_from_cache", try_to_load_from_cache)
     return state
 
 
@@ -267,11 +315,34 @@ def test_the_crispasr_aligner_and_the_timing_model_are_downloaded(downloads, cap
     assert capsys.readouterr().out == ""
 
 
-@pytest.mark.parametrize("offline", [False, True])
-def test_the_pytorch_aligner_is_fetched_into_the_hugging_face_cache(downloads, offline):
-    downloads.offline = offline
+def test_the_pytorch_aligner_is_fetched_into_the_hugging_face_cache(downloads):
     pf.ensure_chronosjav_ready([("ChronosJAV", _files(backend="qwen3", aligner=PT, timing=None))])
-    assert downloads.asked == [f"{PT} local_files_only={offline}"]
+    assert downloads.asked == [f"download {PT}"]
+    assert downloads.patterns == pf.PYTORCH_ALIGNER_FILES   # the files its load reads, not README.md and the like
+
+
+def _cached(downloads, tmp_path, *names):
+    folder = tmp_path / "snapshot"
+    folder.mkdir()
+    for name in ("config.json", *names):
+        (folder / name).write_bytes(b"x")
+    downloads.cache[PT] = str(folder / "config.json")
+
+
+@pytest.mark.parametrize("offline", [False, True])
+def test_a_pytorch_aligner_in_the_cache_is_used_without_asking_the_hub(downloads, tmp_path, offline):
+    """Review 2026-11-13, shown on the developer's PC: with --offline, snapshot_download refused a complete model
+    because its stored file list named README.md and .gitattributes, which the load never reads."""
+    downloads.offline = offline
+    _cached(downloads, tmp_path, "model.safetensors")
+    assert pf.ensure_chronosjav_ready([("ChronosJAV", _files(backend="qwen3", aligner=PT, timing=None))]) is True
+    assert downloads.asked == []
+
+
+def test_a_cached_config_without_its_weights_is_not_enough(downloads, tmp_path):
+    _cached(downloads, tmp_path)
+    pf.ensure_chronosjav_ready([("ChronosJAV", _files(backend="qwen3", aligner=PT, timing=None))])
+    assert downloads.asked == [f"download {PT}"]
 
 
 def test_a_local_folder_aligner_is_taken_as_it_is(downloads, tmp_path):
