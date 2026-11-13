@@ -237,7 +237,9 @@ def chronosjav_runs(args) -> list:
     it reads it.
     """
     if not getattr(args, "ensemble", False):
-        if getattr(args, "mode", None) != "qwen":
+        # --pipeline decoupled (also implied by --pipeline-config) runs instead of --mode's pipeline (process_files_sync),
+        # so a ChronosJAV aligner named for --mode qwen is not used: nothing to download or show (review, 2026-11-13).
+        if getattr(args, "mode", None) != "qwen" or getattr(args, "pipeline", None) == "decoupled":
             return []
         return [(None, "ChronosJAV", chronosjav_files(**_chronosjav_single_pass_timing(args)))]
     runs = []
