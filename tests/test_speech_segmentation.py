@@ -416,16 +416,18 @@ class TestSileroV6SpeechSegmenter:
         segmenter.cleanup()
 
     def test_neg_threshold_none_by_default(self, silero_v6_available):
-        """Test neg_threshold is None by default (v6.2 auto-calculates)."""
+        """neg_threshold is silero-vad's own (max(threshold - 0.15, 0.01)): the segmenter has no setting for it since
+        0e18dbc (2026-04-22, "remove neg_threshold from speech-segmenter VADs")."""
         segmenter = SpeechSegmenterFactory.create("silero-v6.2")
-        assert segmenter.neg_threshold is None
+        assert not hasattr(segmenter, "neg_threshold")
+        assert "neg_threshold" not in segmenter._get_parameters()
         segmenter.cleanup()
 
     def test_jav_tuned_defaults(self, silero_v6_available):
         """Test JAV-tuned default values."""
         segmenter = SpeechSegmenterFactory.create("silero-v6.2")
         assert segmenter.threshold == 0.35
-        assert segmenter.speech_pad_ms == 250
+        assert segmenter.speech_pad_ms == 350   # since c092db9 (2026-03-06); 250 before
         assert segmenter.min_speech_duration_ms == 100
         assert segmenter.min_silence_duration_ms == 100
         segmenter.cleanup()
@@ -436,11 +438,11 @@ class TestSileroV6SpeechSegmenter:
         params = segmenter._get_parameters()
 
         expected_keys = {
-            "threshold", "neg_threshold", "min_speech_duration_ms",
+            "threshold", "min_speech_duration_ms",
             "max_speech_duration_s", "min_silence_duration_ms",
             "speech_pad_ms", "min_silence_at_max_speech",
             "use_max_poss_sil_at_max_speech", "chunk_threshold_s",
-            "max_group_duration_s",
+            "max_group_duration_s", "min_group_duration_s",
         }
         assert expected_keys == set(params.keys())
         segmenter.cleanup()
@@ -1054,11 +1056,13 @@ class TestParameterSanitizationSileroV6:
             pytest.skip("silero-vad>=6.2 not installed")
 
     def test_none_neg_threshold_stays_none(self):
-        """None neg_threshold for v6.2 should stay None (auto-calculated)."""
+        """A neg_threshold in older saved settings is accepted and not used: silero-vad computes its own
+        (0e18dbc, 2026-04-22)."""
         segmenter = SpeechSegmenterFactory.create(
             "silero-v6.2", config={"neg_threshold": None}
         )
-        assert segmenter.neg_threshold is None
+        assert not hasattr(segmenter, "neg_threshold")
+        assert "neg_threshold" not in segmenter._get_parameters()
         segmenter.cleanup()
 
     def test_bool_coercion(self):
