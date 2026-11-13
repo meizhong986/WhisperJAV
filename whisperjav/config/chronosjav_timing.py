@@ -239,7 +239,16 @@ def chronosjav_files(*, timestamps: Optional[str], aligner_id: Optional[str], al
     backend = aligner_backend_for(aligner_backend, aligner_id)
     if mode == "vad_only" or backend == "none" or timestamps != "word":
         backend, aligner = None, None
-    else:
+    elif aligner_id:
         aligner = aligner_id
+    elif backend == "crispasr":
+        # A backend named with no model (only reachable through hand-written qwen_* keys) takes its default: what
+        # the CrispASR aligner loads for no name anyway (manifest.aligner_model_for), so the start check names the
+        # file the run loads (review, 2026-11-13).
+        from whisperjav.crispasr.manifest import DEFAULT_ALIGNER
+        aligner = DEFAULT_ALIGNER
+    else:
+        # The PyTorch backend with no model ID: its default (before, the pipeline handed it no ID and its load failed).
+        aligner = PYTORCH_ALIGNER
     timing = timing_model if (timing_model or "none") != "none" else None
     return ChronosFiles(mode, backend, aligner, timing)
