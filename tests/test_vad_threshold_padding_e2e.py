@@ -161,7 +161,8 @@ def _make_test_audio(duration_s: float = 5.0, sr: int = 16000):
 
 
 class TestTenPaddingArithmetic:
-    """Mathematically verify TEN's _flags_to_segments() padding arithmetic."""
+    """Mathematically verify TEN's padding arithmetic: steps 2-5 of segment() (raw segments, merge, padding,
+    split) on given flags. The padding was inside _flags_to_segments() when these tests were written."""
 
     def _make_segmenter(
         self,
@@ -177,7 +178,16 @@ class TestTenPaddingArithmetic:
             start_pad_ms=start_pad_ms,
             end_pad_ms=end_pad_ms,
             min_speech_duration_ms=min_speech_duration_ms,
+            min_silence_duration_ms=0,  # no merge of short gaps: each test sees the segments it sets up
         )
+
+    @staticmethod
+    def _segments(seg, flags, probs, audio_duration):
+        """Steps 2-5 of TenSpeechSegmenter.segment() on given flags (ten.py: raw segments, merge, padding, split)."""
+        raw = seg._flags_to_segments(flags, probs, VAD_SR, audio_duration)
+        merged = seg._merge_by_silence(raw)
+        padded = seg._apply_padding(merged, audio_duration)
+        return seg._split_long_segments(padded, probs, seg.hop_size / VAD_SR)
 
     def _frame_time(self, frame_idx: int, hop_size: int = 256, sr: int = 16000):
         """Compute time in seconds for a given frame index."""
@@ -192,7 +202,7 @@ class TestTenPaddingArithmetic:
         flags = [0, 0, 1, 1, 1, 0, 0]
         probs = [0.1, 0.1, 0.8, 0.9, 0.7, 0.1, 0.1]
 
-        result = seg._flags_to_segments(flags, probs, VAD_SR, audio_duration=10.0)
+        result = self._segments(seg, flags, probs, 10.0)
 
         assert len(result) == 1
         # Speech starts at frame 2, ends at frame 5 (first 0 after speech)
@@ -207,7 +217,7 @@ class TestTenPaddingArithmetic:
         flags = [0, 1, 1, 0, 0, 1, 1, 1, 0]
         probs = [0.1, 0.8, 0.9, 0.1, 0.1, 0.7, 0.8, 0.9, 0.1]
 
-        result = seg._flags_to_segments(flags, probs, VAD_SR, audio_duration=10.0)
+        result = self._segments(seg, flags, probs, 10.0)
 
         assert len(result) == 2
         # Segment 1: frames 1-3
@@ -223,7 +233,7 @@ class TestTenPaddingArithmetic:
         flags = [0, 0, 1, 1, 1]
         probs = [0.1, 0.1, 0.8, 0.9, 0.7]
 
-        result = seg._flags_to_segments(flags, probs, VAD_SR, audio_duration=10.0)
+        result = self._segments(seg, flags, probs, 10.0)
 
         assert len(result) == 1
         assert result[0].start_sec == pytest.approx(self._frame_time(2), abs=1e-6)
@@ -240,8 +250,8 @@ class TestTenPaddingArithmetic:
         flags = [0, 0, 1, 1, 1, 0, 0, 0, 0, 0]
         probs = [0.1] * 10
 
-        raw = seg_nopad._flags_to_segments(flags, probs, VAD_SR, audio_duration=10.0)
-        padded = seg_padded._flags_to_segments(flags, probs, VAD_SR, audio_duration=10.0)
+        raw = self._segments(seg_nopad, flags, probs, 10.0)
+        padded = self._segments(seg_padded, flags, probs, 10.0)
 
         assert len(raw) == 1
         assert len(padded) == 1
@@ -259,8 +269,8 @@ class TestTenPaddingArithmetic:
         flags = [0, 0, 0, 0, 0, 1, 1, 1, 0, 0]
         probs = [0.1] * 10
 
-        raw = seg_nopad._flags_to_segments(flags, probs, VAD_SR, audio_duration=10.0)
-        padded = seg_padded._flags_to_segments(flags, probs, VAD_SR, audio_duration=10.0)
+        raw = self._segments(seg_nopad, flags, probs, 10.0)
+        padded = self._segments(seg_padded, flags, probs, 10.0)
 
         assert len(raw) == 1
         assert len(padded) == 1
@@ -276,7 +286,7 @@ class TestTenPaddingArithmetic:
         flags = ([0] * 20) + [1, 1, 1] + ([0] * 10)
         probs = [0.1] * len(flags)
 
-        result = seg._flags_to_segments(flags, probs, VAD_SR, audio_duration=10.0)
+        result = self._segments(seg, flags, probs, 10.0)
 
         raw_start = self._frame_time(20)  # 20 * 256/16000 = 0.32s
         raw_end = self._frame_time(23)    # 23 * 256/16000 = 0.368s
@@ -290,7 +300,7 @@ class TestTenPaddingArithmetic:
         flags = [0, 0, 0, 1, 1, 0, 0]
         probs = [0.1] * 7
 
-        result = seg._flags_to_segments(flags, probs, VAD_SR, audio_duration=10.0)
+        result = self._segments(seg, flags, probs, 10.0)
 
         assert len(result) == 1
         raw_start = self._frame_time(3)
@@ -310,7 +320,7 @@ class TestTenPaddingArithmetic:
         flags = [1, 1, 1, 0, 0]
         probs = [0.8] * 5
 
-        result = seg._flags_to_segments(flags, probs, VAD_SR, audio_duration=10.0)
+        result = self._segments(seg, flags, probs, 10.0)
 
         assert len(result) == 1
         assert result[0].start_sec == 0.0  # clamped, not negative
@@ -322,7 +332,7 @@ class TestTenPaddingArithmetic:
         probs = [0.1, 0.1, 0.8, 0.9, 0.7]
         audio_duration = 0.1  # Very short
 
-        result = seg._flags_to_segments(flags, probs, VAD_SR, audio_duration=audio_duration)
+        result = self._segments(seg, flags, probs, audio_duration)
 
         assert len(result) == 1
         assert result[0].end_sec == pytest.approx(audio_duration, abs=1e-6)
@@ -338,7 +348,7 @@ class TestTenPaddingArithmetic:
         flags = [0, 1, 1, 0, 0, 1, 1, 0, 0]
         probs = [0.1] * 9
 
-        result = seg._flags_to_segments(flags, probs, VAD_SR, audio_duration=10.0)
+        result = self._segments(seg, flags, probs, 10.0)
 
         assert len(result) == 2
         # Segment 2's start must not be before segment 1's padded end
@@ -355,7 +365,7 @@ class TestTenPaddingArithmetic:
         flags = [0, 1, 0, 0, 0]
         probs = [0.1, 0.8, 0.1, 0.1, 0.1]
 
-        result = seg._flags_to_segments(flags, probs, VAD_SR, audio_duration=10.0)
+        result = self._segments(seg, flags, probs, 10.0)
 
         assert len(result) == 0  # filtered out
 
@@ -368,7 +378,7 @@ class TestTenPaddingArithmetic:
         flags = [0, 1, 1, 1, 0]
         probs = [0.1, 0.8, 0.9, 0.7, 0.1]
 
-        result = seg._flags_to_segments(flags, probs, VAD_SR, audio_duration=10.0)
+        result = self._segments(seg, flags, probs, 10.0)
 
         assert len(result) == 1
 
@@ -380,7 +390,7 @@ class TestTenPaddingArithmetic:
         flags = [0, 1, 1, 1, 0]
         probs = [0.1, 0.6, 0.8, 0.7, 0.1]
 
-        result = seg._flags_to_segments(flags, probs, VAD_SR, audio_duration=10.0)
+        result = self._segments(seg, flags, probs, 10.0)
 
         expected_confidence = (0.6 + 0.8 + 0.7) / 3
         assert result[0].confidence == pytest.approx(expected_confidence, abs=1e-6)
@@ -814,43 +824,46 @@ class TestPaddingConstruction:
 class TestSensitivityPresetResolution:
     """resolve_qwen_sensitivity() returns correct preset values per backend."""
 
+    # The values of the v4 YAML tool files (whisperjav/config/v4/ecosystems/tools/*-speech-segmentation.yaml,
+    # retuned in v1.8.10-hf2/hf3 per forensic analysis); these tests pinned the values before that.
+
     # ─── Silero v6.2 ──────────────────────────────────────────────
 
     def test_silero_v6_aggressive(self):
         result = resolve_qwen_sensitivity("silero-v6.2", "aggressive")
-        assert result["threshold"] == 0.2
+        assert result["threshold"] == 0.12
         assert result["speech_pad_ms"] == 150
-        assert result["min_speech_duration_ms"] == 50
+        assert result["min_speech_duration_ms"] == 100
 
     def test_silero_v6_balanced(self):
         result = resolve_qwen_sensitivity("silero-v6.2", "balanced")
-        assert result["threshold"] == 0.35
+        assert result["threshold"] == 0.32
         assert result["speech_pad_ms"] == 250
-        assert result["min_speech_duration_ms"] == 100
+        assert result["min_speech_duration_ms"] == 150
 
     def test_silero_v6_conservative(self):
         result = resolve_qwen_sensitivity("silero-v6.2", "conservative")
-        assert result["threshold"] == 0.5
+        assert result["threshold"] == 0.42
         assert result["speech_pad_ms"] == 350
-        assert result["min_speech_duration_ms"] == 150
+        assert result["min_speech_duration_ms"] == 200
 
     # ─── Silero v4.0 ──────────────────────────────────────────────
 
     def test_silero_v4_aggressive(self):
         result = resolve_qwen_sensitivity("silero-v4.0", "aggressive")
-        assert result["threshold"] == 0.05
+        assert result["threshold"] == 0.18
         assert result["speech_pad_ms"] == 300
-        assert result["min_speech_duration_ms"] == 30
+        assert result["min_speech_duration_ms"] == 80
 
     def test_silero_v4_balanced(self):
         result = resolve_qwen_sensitivity("silero-v4.0", "balanced")
-        assert result["threshold"] == 0.18
+        assert result["threshold"] == 0.28
         assert result["speech_pad_ms"] == 400
         assert result["min_speech_duration_ms"] == 100
 
     def test_silero_v4_conservative(self):
         result = resolve_qwen_sensitivity("silero-v4.0", "conservative")
-        assert result["threshold"] == 0.35
+        assert result["threshold"] == 0.41
         assert result["speech_pad_ms"] == 500
         assert result["min_speech_duration_ms"] == 150
 
@@ -858,19 +871,19 @@ class TestSensitivityPresetResolution:
 
     def test_ten_aggressive(self):
         result = resolve_qwen_sensitivity("ten", "aggressive")
-        assert result["threshold"] == 0.10
+        assert result["threshold"] == 0.22
         assert result["end_pad_ms"] == 100
         assert result["start_pad_ms"] == 0
 
     def test_ten_balanced(self):
         result = resolve_qwen_sensitivity("ten", "balanced")
-        assert result["threshold"] == 0.20
+        assert result["threshold"] == 0.32
         assert result["end_pad_ms"] == 200
         assert result["start_pad_ms"] == 0
 
     def test_ten_conservative(self):
         result = resolve_qwen_sensitivity("ten", "conservative")
-        assert result["threshold"] == 0.5
+        assert result["threshold"] == 0.42
         assert result["end_pad_ms"] == 300
         assert result["start_pad_ms"] == 0
 
