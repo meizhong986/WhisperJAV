@@ -172,8 +172,7 @@ from whisperjav.crispasr.moss_prompt import MossSettings, help_text as moss_para
 from whisperjav.crispasr.errors import FAILURE_PREFIX as CRISPASR_FAILURE_PREFIX
 # ChronosJAV's timing settings and the files they use: the one place (1.10.2, owner W624 C, W626). Light module.
 from whisperjav.config.chronosjav_timing import (chronosjav_files, generator_for_pass as chronosjav_generator_for_pass,
-                                                 pass_start_values as chronosjav_pass_start_values,
-                                                 pass_timing as chronosjav_pass_timing, single_pass_timing)
+                                                 pass_files as chronosjav_pass_files, single_pass_timing)
 from whisperjav.__version__ import __version__, __version_display__
 
 
@@ -229,6 +228,30 @@ def _chronosjav_single_pass_timing(args) -> dict:
                               getattr(args, 'qwen_timing_model', 'none'), getattr(args, 'qwen_timestamp_mode', None))
 
 
+def _pass_qwen_params(args, n: int) -> dict:
+    """Pass N's --passN-qwen-params as a dict; one that is not a JSON object counts as empty here (the run reports it
+    where it reads it)."""
+    try:
+        qwen_params = json.loads(getattr(args, f"pass{n}_qwen_params", None) or "{}")
+    except (TypeError, ValueError):
+        return {}
+    return qwen_params if isinstance(qwen_params, dict) else {}
+
+
+def chronosjav_device(args, pass_number) -> str:
+    """The device a ChronosJAV run or pass hands its CrispASR aligner and timing model (QwenPipeline's device):
+    --mode qwen (pass_number None) pass_device(--device), as main sets --qwen-device; an Ensemble pass
+    pass_device(--device, its own "device" / "qwen_device" value, the later key winning), as the pass worker
+    (prepare_qwen_params, _build_pipeline). Used by the start check (1.10.2, owner W632 2)."""
+    if pass_number is None:
+        return pass_device(getattr(args, "device", None))
+    own = "auto"   # the pass worker's DEFAULT_QWEN_PARAMS qwen_device
+    for key, value in _pass_qwen_params(args, pass_number).items():
+        if key in ("device", "qwen_device"):
+            own = value
+    return pass_device(getattr(args, "device", None), own)
+
+
 def chronosjav_runs(args) -> list:
     """(pass number, label, ChronosFiles) for this run's ChronosJAV pipeline(s): --mode qwen (None, "ChronosJAV"), or
     each Ensemble pass with the qwen pipeline (N, "ChronosJAV (pass N)"), from the same one place the pass worker and
@@ -246,17 +269,10 @@ def chronosjav_runs(args) -> list:
     for n in (1, 2):
         if getattr(args, f"pass{n}_pipeline", None) != "qwen":
             continue
-        try:
-            qwen_params = json.loads(getattr(args, f"pass{n}_qwen_params", None) or "{}")
-        except (TypeError, ValueError):
-            qwen_params = {}
-        if not isinstance(qwen_params, dict):
-            qwen_params = {}
-        generator = chronosjav_generator_for_pass(qwen_params)
-        if generator == "cohere":
+        qwen_params = _pass_qwen_params(args, n)
+        if chronosjav_generator_for_pass(qwen_params) == "cohere":
             continue
-        timing = chronosjav_pass_timing(chronosjav_pass_start_values(qwen_params), qwen_params, generator)
-        runs.append((n, f"ChronosJAV (pass {n})", chronosjav_files(**timing)))
+        runs.append((n, f"ChronosJAV (pass {n})", chronosjav_pass_files(qwen_params)))
     return runs
 
 
@@ -3581,7 +3597,10 @@ def main():
     # pass have the files they use downloaded here, before any audio is read, so a failed download stops the run
     # instead of the pass going on without them after its first file's ASR. Which files: the one place the pass worker
     # and QwenPipeline use (config/chronosjav_timing.py). The dormant Cohere-in-ChronosJAV is not covered (W626 2).
-    ensure_chronosjav_ready([(label, files) for _n, label, files in chronosjav_runs(args) if files.uses_files])
+    # Since W632 2 it first runs the checks the CrispASR aligner's and timing model's loads run, with each pass's device.
+    _chronos = [(_n, label, files) for _n, label, files in chronosjav_runs(args) if files.uses_files]
+    ensure_chronosjav_ready([(label, files) for _n, label, files in _chronos],
+                            devices={label: chronosjav_device(args, _n) for _n, label, _f in _chronos})
 
     # Setup temp directory
     if args.temp_dir:
