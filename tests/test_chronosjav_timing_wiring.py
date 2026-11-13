@@ -271,11 +271,14 @@ def test_pass_worker_timing_model_key():
 
 def test_pass_worker_no_longer_forces_step_down_off_for_anime_whisper():
     """anime-whisper has no step-down rule of its own since 1.10.0; its timing defaults are Qwen3-ASR's (W498 D1)."""
+    import whisperjav.config.chronosjav_timing as timing
     import whisperjav.ensemble.pass_worker as pw
 
     src = Path(pw.__file__).read_text(encoding="utf-8")
     assert 'qwen_pipeline_params["stepdown_enabled"] = False' not in src
-    assert 'if _gen_backend in ("qwen3", "anime-whisper"):' in src
+    # Since 1.10.2 the rule lives in the one place (config/chronosjav_timing.py pass_timing), which the pass worker calls.
+    assert 'if generator in ("qwen3", "anime-whisper"):' in Path(timing.__file__).read_text(encoding="utf-8")
+    assert "chronosjav_pass_timing(qwen_defaults, " in src
 
 
 # --- the GUI ------------------------------------------------------------------------------------------
