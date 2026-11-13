@@ -271,6 +271,20 @@ def test_timestamp_modes_are_the_pipelines():
 def downloads(monkeypatch):
     state = type("S", (), {})()
     state.asked, state.fail_on, state.offline = [], None, False
+    state.runtime, state.runtime_fail = [], None   # the CrispASR checks asked (part, device); a reason makes them fail
+
+    from whisperjav.crispasr.aligner import CrispAligner
+    from whisperjav.crispasr.timer import CrispTimer
+
+    def check_runtime(part):
+        def check(device=None):
+            state.runtime.append((part, device))
+            if state.runtime_fail:
+                raise install.CrispASRSetupError(state.runtime_fail)
+            return None, None
+        return staticmethod(check)
+    monkeypatch.setattr(CrispAligner, "check_runtime", check_runtime("aligner"))
+    monkeypatch.setattr(CrispTimer, "check_runtime", check_runtime("timer"))
 
     def ensure_model(model, offline=None):
         state.asked.append(model.name)
@@ -388,6 +402,83 @@ def test_without_exit_on_fail_it_returns_false(downloads):
     assert pf.ensure_chronosjav_ready([("ChronosJAV", _files())], exit_on_fail=False) is False
 
 
+# --- CrispASR must be able to run them (owner W632 2) ------------------------------------------------------------
+
+NO_AVX2 = "this processor lacks AVX2, which CrispASR needs; the CrispASR pipelines cannot run here"
+
+
+def test_crispasr_is_checked_with_the_pass_device_before_any_download(downloads):
+    assert pf.ensure_chronosjav_ready([("ChronosJAV (pass 2)", _files())],
+                                      devices={"ChronosJAV (pass 2)": "cpu"}) is True
+    assert downloads.runtime == [("aligner", "cpu"), ("timer", "cpu")]
+    assert downloads.asked == ["wav2vec2-ja", "whisper-small"]
+
+
+def test_crispasr_that_cannot_run_stops_the_run_with_its_box_and_downloads_nothing(downloads, capsys):
+    downloads.runtime_fail = NO_AVX2
+    with pytest.raises(SystemExit) as stop:
+        pf.ensure_chronosjav_ready([("ChronosJAV (pass 2)", _files())])
+    assert stop.value.code == 1
+    assert downloads.asked == []
+    text = _box_text(capsys.readouterr().out)
+    assert ("CrispASR is not ready for this run This run uses ChronosJAV (pass 2) with the aligner "
+            "wav2vec2-ja and the timing model Whisper small, run by CrispASR. WhisperJAV checks CrispASR "
+            "before any audio is read. That did not work: " + NO_AVX2 + " Nothing has been transcribed.") in text
+    assert "--offline" not in text   # the download box's offline lines do not belong here
+
+
+def test_the_crispasr_box_names_only_what_crispasr_runs(downloads, capsys):
+    # The PyTorch aligner is not CrispASR's: only the timing model is named, and the PyTorch aligner is not fetched.
+    downloads.runtime_fail = NO_AVX2
+    with pytest.raises(SystemExit):
+        pf.ensure_chronosjav_ready([("ChronosJAV", _files(backend="qwen3", aligner=PT))])
+    assert downloads.runtime == [("timer", None)]
+    assert downloads.asked == []
+    text = _box_text(capsys.readouterr().out)
+    assert "This run uses ChronosJAV with the timing model Whisper small, run by CrispASR." in text
+    assert PT not in text
+
+
+def test_a_pytorch_aligner_alone_asks_nothing_of_crispasr(downloads):
+    downloads.runtime_fail = NO_AVX2   # would stop the run if CrispASR were asked
+    assert pf.ensure_chronosjav_ready([("ChronosJAV", _files(backend="qwen3", aligner=PT, timing=None))]) is True
+    assert downloads.runtime == []
+
+
+def test_the_loads_run_the_same_check(monkeypatch):
+    """CrispAligner.load and CrispTimer.load run check_runtime first: the start check and the run check alike."""
+    from whisperjav.crispasr.aligner import CrispAligner
+    from whisperjav.crispasr.timer import CrispTimer
+
+    def refuse(device=None):
+        raise install.CrispASRSetupError(f"refused for {device}")
+    for cls in (CrispAligner, CrispTimer):
+        monkeypatch.setattr(cls, "check_runtime", staticmethod(refuse))
+        with pytest.raises(install.CrispASRSetupError, match="refused for cuda"):
+            cls(device="cuda").load()
+
+
+@pytest.mark.parametrize("argv, n, device", [
+    (["--mode", "qwen"], None, "auto"),
+    (["--mode", "qwen", "--device", "cpu"], None, "cpu"),
+    (["--ensemble", "--pass1-pipeline", "qwen"], 1, "auto"),
+    (["--ensemble", "--pass1-pipeline", "qwen", "--pass1-qwen-params", '{"device": "cuda"}'], 1, "cuda"),
+    (["--ensemble", "--pass1-pipeline", "qwen", "--device", "cpu", "--pass1-qwen-params", '{"device": "cuda"}'],
+     1, "cpu"),                                                             # --device cpu is absolute
+    (["--ensemble", "--pass1-pipeline", "qwen", "--pass1-qwen-params", '{"device": "cpu", "qwen_device": "cuda"}'],
+     1, "cuda"),                                                            # the later key wins, as the pass worker
+], ids=["mode qwen", "mode qwen --device cpu", "pass", "pass device cuda", "--device cpu wins", "later key"])
+def test_each_pass_hands_the_check_the_device_the_pipeline_gets(monkeypatch, tmp_path, argv, n, device):
+    from whisperjav import main as wj_main
+    from whisperjav.ensemble.pass_worker import prepare_qwen_params
+    from whisperjav.utils.device_detector import pass_device
+    args = _args(monkeypatch, tmp_path, argv)
+    assert wj_main.chronosjav_device(args, n) == device
+    if n is not None:   # what the pass worker hands QwenPipeline (pass_worker._build_pipeline)
+        worker = prepare_qwen_params({"qwen_params": json.loads(getattr(args, f"pass{n}_qwen_params") or "{}")})
+        assert pass_device(args.device, worker["qwen_device"]) == device
+
+
 # --- main() hands the files to the check before any audio, and --dump-params shows them -------------------------
 
 STARTUP_PROBE = textwrap.dedent("""
@@ -408,6 +499,7 @@ STARTUP_PROBE = textwrap.dedent("""
 
     def chronosjav_ready(runs, **kwargs):
         asked["runs"] = [[label, files.as_dict()] for label, files in runs]
+        asked["devices"] = kwargs.get("devices")
         raise SystemExit(1)
 
     M.ensure_segmenter_backend_available = lambda backend, **kwargs: True
@@ -452,6 +544,8 @@ def test_main_hands_the_files_to_the_start_check_before_any_audio(tmp_path, extr
     result = _probe(tmp_path, extra)
     assert result["asked"]["runs"] == runs
     assert result["exit"] == 1 and "audio_read" not in result["asked"]   # the stand-in stopped the run first
+    # each run's device, for the CrispASR checks (owner W632 2): --device not given, so auto
+    assert result["asked"]["devices"] == {label: "auto" for label, _files in runs}
 
 
 @pytest.mark.slow
@@ -475,3 +569,75 @@ def test_dump_params_shows_the_files(tmp_path):
                 "--pass2-qwen-params", json.dumps(COHERE_ROW)])["ensemble_config"]
     assert ens["pass1"]["chronosjav_effective"] == _as_dict(GUI_ROWS["G8 aligner mode + timing model"][1])
     assert "chronosjav_effective" not in ens["pass2"]                      # the dormant Cohere (W626 2)
+
+
+# --- the GUI's status panel reads the one place (owner W632 4) -------------------------------------------------
+
+# What app.js gives the panel for a ChronosJAV pass: QwenManager.defaults, over which a customized pass's own values.
+JS_DEFAULTS = {"aligner_backend": "crispasr", "aligner_id": "wav2vec2-ja", "timing_model": "none",
+               "timestamp_mode": "vad_only"}
+PANEL_KEYS = ("aligner_backend", "aligner_id", "timing_model", "timestamp_mode")
+
+
+@pytest.fixture
+def panel(monkeypatch):
+    """The panel with its two outside reads stood in: each part line names the model; no CrispASR runtime asked."""
+    from whisperjav.webview_gui.api import WhisperJAVAPI
+    monkeypatch.setattr(WhisperJAVAPI, "_crispasr_part_line",
+                        classmethod(lambda cls, _install, part, model: f"{part}: {model.name}"))
+    monkeypatch.setattr(WhisperJAVAPI, "_with_crispasr_runtime",
+                        lambda self, lines: {"success": True, "lines": lines, "can_run": True})
+    api = WhisperJAVAPI()
+
+    def parts(values):
+        result = api.get_chronosjav_crispasr_status(*(values.get(k) for k in PANEL_KEYS))
+        assert result["success"], result
+        return [line for line in result["lines"] if line != api.CRISPASR_CHRONOSJAV_HEADING]
+    return api, parts
+
+
+def _expected_parts(api, files_tuple):
+    _mode, backend, aligner, timing = files_tuple
+    expected = []
+    if backend == "crispasr":
+        expected.append(f"{api.CRISPASR_PART_ALIGNER}: {aligner}")
+    if timing:
+        expected.append(f"{api.CRISPASR_PART_TIMING}: {timing}")
+    return expected
+
+
+@pytest.mark.parametrize("name", list(GUI_ROWS))
+def test_the_gui_status_panel_names_what_the_run_uses(panel, name):
+    """For each GUI row, the panel (given what app.js gives it) names the CrispASR files the run uses."""
+    api, parts = panel
+    params, expected = GUI_ROWS[name]
+    customized = "aligner_backend" in params        # as in test_the_rows_are_what_the_gui_sends
+    values = {**JS_DEFAULTS, **({k: params[k] for k in PANEL_KEYS if k in params} if customized else {})}
+    assert parts(values) == _expected_parts(api, expected)
+
+
+def test_the_panel_names_the_aligner_a_named_aligner_brings(panel):
+    """An aligner named with no timestamp mode (an older preset, a hand-written pass): the run takes
+    aligner_vad_fallback (owner W501 1) and loads the aligner. The panel's own copy took no mode as vad_only."""
+    api, parts = panel
+    values = {"aligner_backend": "crispasr", "aligner_id": "qwen3-fa-gguf"}
+    assert ct.pass_files(values).aligner == "qwen3-fa-gguf"
+    assert parts(values) == [f"{api.CRISPASR_PART_ALIGNER}: qwen3-fa-gguf"]
+
+
+def test_the_panel_names_no_crispasr_aligner_for_a_pytorch_model_id(panel):
+    """No backend named and a PyTorch model ID: the run runs the PyTorch aligner, not CrispASR. The panel's own copy
+    took no backend as crispasr and named wav2vec2-ja."""
+    _api, parts = panel
+    values = {"aligner_id": PT, "timestamp_mode": "aligner_vad_fallback"}
+    assert ct.pass_files(values).aligner_backend == "qwen3"
+    assert parts(values) == []
+
+
+def test_main_and_the_panel_read_the_same_function():
+    """One rule: main's start check (chronosjav_runs) and the panel both call chronosjav_timing.pass_files."""
+    import inspect
+    from whisperjav import main as wj_main
+    from whisperjav.webview_gui.api import WhisperJAVAPI
+    assert "chronosjav_pass_files(qwen_params)" in inspect.getsource(wj_main.chronosjav_runs)
+    assert "pass_files(named)" in inspect.getsource(WhisperJAVAPI.get_chronosjav_crispasr_status)
