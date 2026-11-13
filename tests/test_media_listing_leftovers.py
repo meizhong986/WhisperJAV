@@ -55,6 +55,10 @@ class TestLeftoverShapesAreLabelled:
             text = src.read_text(encoding="utf-8", errors="replace")
             # temp_dir / "name"  — how every working folder is built
             created.update(re.findall(r'temp_dir\s*/\s*[\'"]([a-z_]+)[\'"]', text))
+        # savepoint_srts is made only inside an Ensemble pass's own temp folder (<temp>/pass<N>_worker/,
+        # qwen_pipeline.py _write_save_point; the pass worker sets save_points), which the pass removes whole, or keeps
+        # on purpose for a failed file (owner W462, W463); it holds subtitle files, never media.
+        created -= {"savepoint_srts"}
         missing = created - set(WHISPERJAV_WORK_DIRS)
         assert not missing, (
             "these folders are created under the temp dir but are neither labelled nor "
