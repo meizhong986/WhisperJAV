@@ -108,32 +108,39 @@ class TestHtmlStructure:
 
     def test_version_elements_exist(self, index_html):
         """Test that version display elements exist."""
+        # The window has two tracks since the dual-track update check (stable release, development); these tests
+        # were written for the single-track window before it.
         required_ids = [
             "updateCurrentVersion",
-            "updateLatestVersion",
-            "updateTypeBadge",
+            "updateCurrentCommit",
+            "stableLatestVersion",
+            "stableNewVersion",
+            "stableUpdateBadge",
         ]
         for element_id in required_ids:
             assert f'id="{element_id}"' in index_html, f"Missing element: {element_id}"
 
     def test_up_to_date_message_exists(self, index_html):
-        """Test that up-to-date message exists."""
-        assert 'id="updateUpToDate"' in index_html
+        """Test that each track has its up-to-date message."""
+        assert 'id="stableUpToDate"' in index_html
+        assert 'id="devUpToDate"' in index_html
 
     def test_update_available_section_exists(self, index_html):
-        """Test that update available section exists."""
-        assert 'id="updateAvailableSection"' in index_html
+        """Test that each track has its update-available section."""
+        assert 'id="stableUpdateAvailable"' in index_html
+        assert 'id="devUpdateAvailable"' in index_html
 
     def test_release_notes_container_exists(self, index_html):
-        """Test that release notes container exists."""
-        assert 'id="updateReleaseNotes"' in index_html
+        """Test that the stable track's release notes container exists."""
+        assert 'id="stableReleaseNotes"' in index_html
+        assert 'id="stableReleaseNotesContent"' in index_html
 
     def test_action_buttons_exist(self, index_html):
         """Test that action buttons exist."""
         required_buttons = [
             "updateCheckLater",
-            "updateCheckNow",
-            "updateCheckDownload",
+            "updateToStable",
+            "updateToDev",
         ]
         for button_id in required_buttons:
             assert f'id="{button_id}"' in index_html, f"Missing button: {button_id}"
@@ -359,10 +366,10 @@ class TestJavaScriptLogic:
     """Tests for JavaScript business logic."""
 
     def test_major_update_shows_download_button(self, app_js):
-        """Test that major updates show Download button."""
-        # Check for level === 'major' condition
-        assert "'major'" in app_js
-        assert "updateCheckDownload" in app_js
+        """Every update level (major, minor, patch) sends the user to the release page; the level sets the badge."""
+        assert "updateToStable" in app_js
+        assert "openDownloadPage" in app_js
+        assert "result.notification_level" in app_js
 
     def test_patch_minor_show_update_button(self, app_js):
         """Test that patch/minor updates show Update Now button."""
@@ -380,7 +387,8 @@ class TestJavaScriptLogic:
 
     def test_up_to_date_display_logic(self, app_js):
         """Test that up-to-date message shows when no update."""
-        assert "updateUpToDate" in app_js
+        assert "stableUpToDate" in app_js
+        assert "devUpToDate" in app_js
         # Should show when update_available is false
         assert "update_available" in app_js.lower() or "updateavailable" in app_js.lower()
 
@@ -452,8 +460,7 @@ class TestAccessibility:
     def test_buttons_have_labels(self, index_html):
         """Test that buttons have visible text or aria-label."""
         # All action buttons should have text content
-        assert "Update Now" in index_html
-        assert "Download" in index_html
+        assert "Open Release Page" in index_html
         assert "Close" in index_html or "Later" in index_html
 
 
@@ -474,14 +481,24 @@ class TestConsistency:
             "updateCheckResult",
             "updateCheckError",
             "updateCurrentVersion",
-            "updateLatestVersion",
-            "updateTypeBadge",
-            "updateUpToDate",
-            "updateAvailableSection",
-            "updateReleaseNotes",
+            "updateCurrentCommit",
+            "stableUpToDate",
+            "stableLatestVersion",
+            "stableUpdateAvailable",
+            "stableNewVersion",
+            "stableUpdateBadge",
+            "stableReleaseNotes",
+            "stableReleaseNotesContent",
+            "stableActions",
+            "updateToStable",
+            "devUpToDate",
+            "devUpdateAvailable",
+            "devCommitsAhead",
+            "devCommitsList",
+            "devRecentCommits",
+            "devActions",
+            "updateToDev",
             "updateCheckLater",
-            "updateCheckNow",
-            "updateCheckDownload",
         ]
 
         for html_id in html_ids:
@@ -498,10 +515,11 @@ class TestConsistency:
             "update-check-loading",
             "update-check-result",
             "update-check-error",
-            "version-info",
-            "version-row",
+            "current-version-info",
+            "update-track",
+            "track-status",
+            "track-actions",
             "update-badge",
-            "update-up-to-date",
             "release-notes-details",
             "release-notes-content",
         ]
