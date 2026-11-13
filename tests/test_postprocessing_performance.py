@@ -243,6 +243,11 @@ def test_long_subtitle_edge_case():
             print(f"{name:<25} {len(text):>8} {elapsed:>12.2f} ERROR: {e}")
 
 
+# A helper of the two tests above and of the script, not a pytest test itself: pytest collected it by its name and
+# stopped with "fixture 'name' not found".
+test_component.__test__ = False
+
+
 if __name__ == "__main__":
     print("Starting post-processing performance test...")
     print()
