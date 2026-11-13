@@ -35,10 +35,12 @@ def _hide(monkeypatch, *missing):
 
 @pytest.mark.parametrize("missing, hint", [
     (("onnxruntime",), "pip install onnxruntime"),
+    # A minimal install (install.py --minimal): faster-whisper, which every install has, brings onnxruntime and
+    # huggingface-hub (uv.lock), so only transformers is missing (review, 2026-11-13).
     (("transformers",), f"pip install {TRANSFORMERS}"),
     (("huggingface_hub",), f"pip install {HUB}"),
-    (("transformers", "huggingface_hub"), f"pip install {TRANSFORMERS} {HUB}"),   # a minimal install
-], ids=["onnxruntime", "transformers", "huggingface_hub", "minimal install"])
+    (("transformers", "huggingface_hub"), f"pip install {TRANSFORMERS} {HUB}"),
+], ids=["onnxruntime", "transformers (a minimal install)", "huggingface_hub", "transformers and huggingface_hub"])
 def test_whisperseg_unavailable_and_the_hint_names_only_what_is_missing(monkeypatch, missing, hint):
     _hide(monkeypatch, *missing)
     assert SpeechSegmenterFactory.is_backend_available("whisperseg") == (False, hint)
@@ -60,7 +62,16 @@ def _box(out):
     return [line for line in re.sub(r"\x1b\[[0-9;]*m", "", out).splitlines() if line.startswith(("║", "╔", "╚"))]
 
 
-def test_start_check_stops_whisperseg_on_a_minimal_install_with_the_hint_on_its_own_line(monkeypatch, capsys):
+def test_start_check_stops_whisperseg_on_a_minimal_install(monkeypatch, capsys):
+    _hide(monkeypatch, "transformers")   # what install.py --minimal lacks
+    with pytest.raises(SystemExit) as stop:
+        preflight_check.ensure_segmenter_backend_available("whisperseg")
+    assert stop.value.code == 1
+    text = [line.strip("║").rstrip() for line in _box(capsys.readouterr().out)]
+    assert f"    - Install it, once:  pip install {TRANSFORMERS}" in text
+
+
+def test_two_missing_packages_put_the_hint_on_its_own_line(monkeypatch, capsys):
     _hide(monkeypatch, "transformers", "huggingface_hub")
     with pytest.raises(SystemExit) as stop:
         preflight_check.ensure_segmenter_backend_available("whisperseg")
