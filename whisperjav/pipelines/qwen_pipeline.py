@@ -429,14 +429,9 @@ class QwenPipeline(BasePipeline):
 
     @staticmethod
     def _aligner_backend_for(aligner_backend: Optional[str], aligner_id: Optional[str]) -> str:
-        """Which aligner backend runs: the one named, else the one the model value belongs to — a CrispASR
-        short name (manifest.ALIGNER_MODELS) means "crispasr", anything else (a PyTorch model ID) "qwen3"."""
-        if aligner_backend:
-            return aligner_backend
-        if not aligner_id:
-            return "none"
-        from whisperjav.crispasr.manifest import ALIGNER_MODELS
-        return "crispasr" if aligner_id in ALIGNER_MODELS else "qwen3"
+        """Which aligner backend runs (config/chronosjav_timing.py aligner_backend_for, the one rule since 1.10.2)."""
+        from whisperjav.config.chronosjav_timing import aligner_backend_for
+        return aligner_backend_for(aligner_backend, aligner_id)
 
     # ------------------------------------------------------------------
     # Context resolution
@@ -582,40 +577,40 @@ class QwenPipeline(BasePipeline):
         else:
             cleaner = TextCleanerFactory.create("passthrough")
 
-        # TextAligner: the CrispASR aligner (1.10.0 default, wav2vec2-ja), the Qwen3
-        # ForcedAligner (PyTorch), or None if timestamps are disabled.
-        # G1 fix: vad_only mode has no use for an aligner — skip loading
-        # entirely so we save VRAM and take Branch B (aligner-free) in the
-        # orchestrator's _step9_reconstruct_and_harden().
+        # Which aligner and timing model this pass uses: ONE rule, also read by main's start-of-run check (which
+        # downloads their files before any audio is read) and by --dump-params (1.10.2, owner W624 C, W626;
+        # config/chronosjav_timing.py chronosjav_files). No aligner in vad_only (Branch B, aligner-free, in the
+        # orchestrator's _step9_reconstruct_and_harden; no collapse, so step-down is irrelevant), with the backend
+        # "none" or with timestamps other than "word"; else the CrispASR aligner (wav2vec2-ja by default) or the
+        # Qwen3 ForcedAligner (PyTorch). The timing model (step 8: where speech starts in each VAD group and where a
+        # new sentence starts, design note 2026-10-28 section 5) also runs without an aligner: then it moves the
+        # subtitle's start only (rule T5).
+        from whisperjav.config.chronosjav_timing import chronosjav_files
+        files = chronosjav_files(timestamps=cfg["timestamps"], aligner_id=cfg["aligner_id"],
+                                 aligner_backend=cfg["aligner_backend"], timing_model=cfg["timing_model"],
+                                 timestamp_mode=self.timestamp_mode)
         aligner = None
-        if self.timestamp_mode == TimestampMode.VAD_ONLY or cfg["aligner_backend"] == "none":
-            # No aligner → Branch B; no collapse possible → step-down irrelevant
-            pass
-        elif cfg.get("use_aligner", True):
-            if cfg["aligner_backend"] == "crispasr":
-                aligner = TextAlignerFactory.create(
-                    "crispasr",
-                    model=cfg["aligner_id"],
-                    device=cfg["device"],
-                    language=cfg["language"] or "ja",
-                    temp_dir=self.temp_dir,
-                )
-            else:
-                aligner = TextAlignerFactory.create(
-                    "qwen3",
-                    aligner_id=cfg["aligner_id"],
-                    device=cfg["device"],
-                    dtype=cfg["dtype"],
-                    language=cfg["language"],
-                )
+        if files.aligner_backend == "crispasr":
+            aligner = TextAlignerFactory.create(
+                "crispasr",
+                model=files.aligner,
+                device=cfg["device"],
+                language=cfg["language"] or "ja",
+                temp_dir=self.temp_dir,
+            )
+        elif files.aligner_backend is not None:
+            aligner = TextAlignerFactory.create(
+                "qwen3",
+                aligner_id=files.aligner,
+                device=cfg["device"],
+                dtype=cfg["dtype"],
+                language=cfg["language"],
+            )
 
-        # Timing model (step 8): where speech starts in each VAD group and where a new
-        # sentence starts (design note 2026-10-28 section 5). It also runs without an
-        # aligner: then it moves the subtitle's start only (rule T5).
         timer = None
-        if cfg["timing_model"] != "none":
+        if files.timing_model:
             from whisperjav.modules.subtitle_pipeline.timers.crispasr import CrispASRTimer
-            timer = CrispASRTimer(model=cfg["timing_model"], device=cfg["device"], temp_dir=self.temp_dir)
+            timer = CrispASRTimer(model=files.timing_model, device=cfg["device"], temp_dir=self.temp_dir)
 
         # Step-down retry config (uses existing Qwen pipeline params)
         # Disabled when aligner is None (no alignment = no collapse = nothing to step-down)
