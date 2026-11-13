@@ -179,8 +179,11 @@ class TestCompareVersions:
     def test_post_suffix(self, mock_version_checker):
         """Test versions with .post suffix."""
         vc = mock_version_checker
-        # 1.7.4 (no suffix) > 1.7.4.post1 (has suffix)
-        assert vc.compare_versions("1.7.4", "1.7.4.post1") == 1
+        # PEP 440, as compare_versions follows: a post-release comes after its release (1.7.4 < 1.7.4.post1), so a
+        # user on 1.7.4 is told of 1.7.4.post1. This test expected the opposite order from before that rule.
+        assert vc.compare_versions("1.7.4", "1.7.4.post1") == -1
+        assert vc.compare_versions("1.7.4.post1", "1.7.4") == 1
+        assert vc.compare_versions("1.7.4.post1", "1.7.4.post2") == -1
 
 
 # =============================================================================
