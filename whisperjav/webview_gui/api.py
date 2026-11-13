@@ -3212,20 +3212,28 @@ class WhisperJAVAPI:
                                        timestamp_mode: Optional[str] = None) -> Dict[str, Any]:
         """The CrispASR status panel of a ChronosJAV pass: its CrispASR aligner and timing model, downloaded
         or not, and where CrispASR runs. No lines when the pass uses neither (another aligner or none, and no
-        timing model). Reads files only; never downloads."""
+        timing model). Reads files only; never downloads.
+
+        Which files: the one place the run uses (config/chronosjav_timing.py pass_files, as main's start check and
+        the pass worker; 1.10.2, owner W632 4), given the pass's values as the run's --passN-qwen-params would carry
+        them. Before, the panel kept its own copy of the rule (no backend counted as crispasr; no mode as vad_only)."""
         try:
+            from whisperjav.config.chronosjav_timing import pass_files
             from whisperjav.crispasr import install, manifest
 
+            named = {key: value for key, value in (("aligner_backend", aligner_backend), ("aligner_id", aligner),
+                                                   ("timing_model", timing_model),
+                                                   ("timestamp_mode", timestamp_mode))
+                     if value not in (None, "")}
+            files = pass_files(named)
             lines = []
-            uses_aligner = (timestamp_mode or "vad_only") != "vad_only"   # default vad_only since W498 D1
-            backend = aligner_backend or "crispasr"
-            if uses_aligner and backend == "crispasr":
-                name = aligner if aligner in manifest.ALIGNER_MODELS else None
+            if files.aligner and files.aligner_backend == "crispasr":
+                name = files.aligner if files.aligner in manifest.ALIGNER_MODELS else None
                 lines.append(self._crispasr_part_line(install, self.CRISPASR_PART_ALIGNER,
                                                       manifest.aligner_model_for(name)))
-            if (timing_model or "none") != "none":   # off by default since W498 D1
+            if files.timing_model:
                 lines.append(self._crispasr_part_line(install, self.CRISPASR_PART_TIMING,
-                                                      manifest.timing_model_for(timing_model or None)))
+                                                      manifest.timing_model_for(files.timing_model)))
             if not lines:
                 return {"success": True, "lines": [], "can_run": True}
             return self._with_crispasr_runtime([self.CRISPASR_CHRONOSJAV_HEADING] + lines)
