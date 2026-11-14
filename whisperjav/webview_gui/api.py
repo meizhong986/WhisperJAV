@@ -135,6 +135,40 @@ def _enhance_for_vad_args(n, pass_config) -> List[str]:
     on = pass_config.get('enhanceForVad', True)
     return [f"--pass{n}-enhance-for-vad" if on else f"--no-pass{n}-enhance-for-vad"]
 
+
+def _one_start_at_a_time(lock_name: str, busy: Dict[str, Any]):
+    """One start call at a time (1.10.2, owner W647 1).
+
+    pywebview runs every call from the page on its own thread, and a start method records its process only
+    when subprocess.Popen returns. Popen can take many seconds (about 20 s on the owner's PC on 2026-11-14),
+    and a second start call arriving in that time passed the "already running" check and launched one more
+    complete run of the same files. With this, a start call that arrives while
+    another is still launching answers ``busy`` and launches nothing. The same answer is given once the
+    window is closing (_end_runs_on_close). The wrapper names its one parameter, so pywebview shows the page
+    the same call as before.
+    """
+    def decorate(method):
+        def start(self, options):
+            lock = getattr(self, lock_name)
+            if not lock.acquire(blocking=False):
+                return dict(busy)
+            try:
+                if self._closing:
+                    return dict(busy)
+                return method(self, options)
+            finally:
+                lock.release()
+        start.__name__ = method.__name__
+        start.__qualname__ = method.__qualname__
+        start.__doc__ = method.__doc__
+        return start
+    return decorate
+
+
+_RUN_START_BUSY = {"success": False, "message": "Process already running"}
+_TRANSLATION_START_BUSY = {"success": False, "error": "Translation already in progress"}
+
+
 class WhisperJAVAPI:
     """
     API class exposed to JavaScript via PyWebView.
@@ -173,6 +207,41 @@ class WhisperJAVAPI:
         # The last run started (which start method, with which options), for "Run on the CPU
         # this time" (design 22.9.2, D-G).
         self._last_start: Optional[Tuple[str, Dict[str, Any]]] = None
+
+        # One start call at a time, and none once the window is closing (1.10.2, owner W647 1 and 3).
+        self._start_lock = threading.Lock()
+        self._translate_start_lock = threading.Lock()
+        self._closing = False
+
+    def _end_runs_on_close(self, wait_s: float = 30.0) -> List[int]:
+        """End every run this window started; called when the window has closed (1.10.2, owner W647 3).
+
+        Before this, closing the window left the run and its workers running, with the models in memory and
+        on the GPU, and the terminal the GUI was started from stayed open. A start call that is still
+        launching its process is waited for (up to ``wait_s`` seconds), so that its run is ended too. Not
+        callable from the page (the name starts with an underscore). Returns the process ids it ended.
+        """
+        self._closing = True
+        for lock in (self._start_lock, self._translate_start_lock):
+            if lock.acquire(timeout=wait_s):
+                lock.release()
+        ended = []
+        for proc in (self.process, getattr(self, "_translate_process", None)):
+            if proc is None or proc.poll() is not None:
+                continue
+            try:
+                if PSUTIL_AVAILABLE:
+                    terminate_process_tree(proc.pid, timeout=5.0, include_parent=True)
+                else:
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                ended.append(proc.pid)
+            except Exception as e:  # the window is gone; nothing to show it in
+                print(f"Could not end process {proc.pid}: {e}")
+        return ended
 
     def _output_dir(self, options: Dict[str, Any]) -> Any:
         """
@@ -511,6 +580,7 @@ class WhisperJAVAPI:
         method, options = self._last_start
         return getattr(self, method)({**options, "run_on_cpu": True})
 
+    @_one_start_at_a_time("_start_lock", _RUN_START_BUSY)
     def start_process(self, options: Dict[str, Any]) -> Dict[str, Any]:
         """
         Start WhisperJAV subprocess with given options.
@@ -711,6 +781,12 @@ class WhisperJAVAPI:
         # A run that ended without a run summary: the reason it printed, for the dialog (22.9.2).
         if self.status == "error" and self._run_summary is None:
             result["reason"] = self._stop_reason()
+            # The run refused to start because another run uses its working folder (1.10.2, owner W648 2):
+            # the page shows "The run did not start" with this text instead of "ended without a run summary".
+            from whisperjav.utils.run_lock import gui_refusal_text
+            in_use = gui_refusal_text(getattr(self, "_output_tail", []))
+            if in_use:
+                result["working_folder_in_use"] = in_use
 
         # Include output files when completed (for post-processing like translation)
         if self.status == "completed" and self._expected_output_files:
@@ -1848,6 +1924,7 @@ class WhisperJAVAPI:
                 "warnings": []
             }
 
+    @_one_start_at_a_time("_start_lock", _RUN_START_BUSY)
     def start_ensemble_process(self, options: Dict[str, Any]) -> Dict[str, Any]:
         """
         Start WhisperJAV subprocess with ensemble configuration.
@@ -3019,6 +3096,7 @@ class WhisperJAVAPI:
                 "error": str(e)
             }
 
+    @_one_start_at_a_time("_start_lock", _RUN_START_BUSY)
     def start_ensemble_twopass(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """
         Start two-pass ensemble processing.
@@ -4606,6 +4684,7 @@ class WhisperJAVAPI:
             return {"success": False, "message": "No .srt files found in selected folder"}
         return {"success": False, "message": "No folder selected"}
 
+    @_one_start_at_a_time("_translate_start_lock", _TRANSLATION_START_BUSY)
     def start_translation(self, options: Dict[str, Any]) -> Dict[str, Any]:
         """
         Start translation process.
