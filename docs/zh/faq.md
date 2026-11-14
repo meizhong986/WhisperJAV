@@ -72,8 +72,8 @@
 没有单一答案——每个都有取舍，且质量因内容而异。来自实地反馈的常见模式：
 
 - **DeepSeek**（v1.8.14 默认 `deepseek-v4-flash`）：每 token 成本低；用户经常报告它在日译英/中文方向是不错的平衡。思考变体 `deepseek-v4-pro` 可通过 `--model deepseek-v4-pro` 使用。
-- **Claude**（默认 `claude-3-5-haiku-20241022`）和 **OpenAI GPT**（默认 `gpt-4o-mini`）：每 token 成本较高；用户在涉及细微语义或上下文相关的段落时往往更偏爱它们。
-- **Gemini**（`gemini-2.0-flash`）：中等成本；质量因内容风格而差异较大。
+- **Claude**（默认 `claude-haiku-5-5`）和 **OpenAI GPT**（默认 `gpt-4o-mini`）：每 token 成本较高；用户在涉及细微语义或上下文相关的段落时往往更偏爱它们。
+- **Gemini**（默认 `gemini-3.6-flash`）：中等成本；质量因内容风格而差异较大。
 - **Ollama / 本地大语言模型**：完全在本机运行——数据不会离开您的电脑。质量取决于您运行的本地模型；推荐使用 `qwen2.5:7b-instruct` 或 `gemma3:12b` 以获得合理结果，避免使用思考型模型（其链式思维内容可能泄漏到 SRT 输出中）。
 - **OpenRouter**：多个上游模型的路由器。如果您希望对比多个提供商而又不想维护多份 API 密钥，可以使用它。
 
@@ -102,7 +102,7 @@
 ### 提示 "CUDA not available"，但我有 NVIDIA GPU
 
 1. 验证 NVIDIA 驱动版本：`nvidia-smi`
-2. 1.10.0 需要 Windows 驱动 580 或更新、Linux 驱动 570 或更新，以及 GTX 16 / RTX 20 系列或更新的显卡；可以先运行 `whisperjav --check`，它会说明安装的加速器以及 PyTorch 能否使用 GPU
+2. 1.10 需要 Windows 驱动 580 或更新、Linux 驱动 570 或更新，以及 GTX 16 / RTX 20 系列或更新的显卡；可以先运行 `whisperjav --check`，它会说明安装的加速器以及 PyTorch 能否使用 GPU
 3. 你**不需要**安装 CUDA Toolkit —— PyTorch 自带 CUDA 运行时
 4. 如果安装是为仅 CPU 制作的：使用 Windows 安装程序时，再次运行它；有受支持的 NVIDIA GPU 时，它会制作 NVIDIA GPU 安装。源码安装时，运行 `python install.py --accelerator nvidia`
 
@@ -128,7 +128,7 @@
 
 > **状态：** WhisperJAV 尚未提供 Cohere-Transcribe。暂无发布日期。
 
-> **关于 transformers：** WhisperJAV 1.10.0 安装 transformers 5.20，以及为它制作的 WhisperJAV 自有版 `qwen-asr`（[meizhong986/Qwen3-ASR](https://github.com/meizhong986/Qwen3-ASR)）。不要把 transformers 降级到 5.0 以下。如果 Qwen3-ASR 无法加载，请再次运行安装程序，它会恢复测试过的版本。
+> **关于 transformers：** WhisperJAV 1.10 安装 transformers 5.20，以及为它制作的 WhisperJAV 自有版 `qwen-asr`（[meizhong986/Qwen3-ASR](https://github.com/meizhong986/Qwen3-ASR)）。不要把 transformers 降级到 5.0 以下。如果 Qwen3-ASR 无法加载，请再次运行安装程序，它会恢复测试过的版本。
 
 下方的设置说明供日后提供时使用。
 
