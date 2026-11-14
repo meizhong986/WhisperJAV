@@ -36,33 +36,28 @@ WHAT'S NEW IN v{{VERSION}}
 {{! being built, because nobody rewrote it; v1.10.0 shipped v1.9.5's text.
 {{! Rewrite it or delete it; do not leave the previous release's text in place.
 {{! Lines starting {{! are stripped by build_release.py and never reach the user.
-Compared with 1.10.0, the release before it:
+Compared with 1.10.1, the release before it:
 
-- Five new GGUF pipelines, experimental, in the "Ensemble Mode" tab
-  (Pipeline menu, group "Experimental, open to feedback"): reazonspeech,
-  kotoba, whisper-turbo, whisper-large and MOSS. Japanese only. CrispASR,
-  which runs them, is updated to 0.8.50.
-- ChronosJAV (Qwen3-ASR, anime-whisper) now times each subtitle by its VAD
-  group by default. No aligner and no timing model run unless you choose
-  them under "Customize Parameters".
-- "Finish each file" is on by default: an Ensemble run finishes each file
-  before the next one starts, and loads each pass's models again for every
-  file.
-- Fixed: the Qwen3-ASR fine-tunes JA Anime-Galgame and JA-tuned writing
-  random text (#494). The timing model, when you choose it, is no longer
-  given audio under 0.2 s (#498, #500); a very short stretch inside longer
-  audio can still cause the crash.
-- Fixed in AI translation (#460): answer labels in other languages, such as
-  Chinese, left in the translation. Subtitles the model did not translate
-  are now named by number and the run ends with TRANSLATION INCOMPLETE;
-  they are still left out of the translated file.
-- Each GUI run writes a log file, raw_subs\whisperjav_run.log, in the output
-  folder; while "Save next to source video" is ticked, next to the first
-  item in the file list (inside it, if that item is a folder). Each run
-  replaces the last.
+- Two new GGUF pipelines, experimental, in the "Ensemble Mode" tab
+  (Pipeline menu, group "Experimental, open to feedback"): haas and
+  qwen3-asr. Japanese only. CrispASR, which runs them, is updated to 0.8.53.
+- New speech enhancers Mel-Band-RoFormer and Mini-BS-RoFormer (in place of
+  BS-RoFormer, which could not start), and two experimental speech
+  segmenters, Sortformer and pyannote 3.0, all run by CrispASR.
+- "For VAD only" is ticked by default in the Speech Enhancer menu of
+  fidelity, ChronosJAV and the GGUF pipelines: the cleaned-up audio is used
+  to find the speech, and the original audio goes to the ASR model.
+- A run downloads the aligner and timing model it uses, and the models of
+  the new speech enhancers and segmenters, before any audio is read; if
+  that fails, it stops at once and says why.
+- Claude translation: the Anthropic package it needs is now installed.
+  Claude's default model is Claude Haiku 5.5.
+- The installer now brings FFmpeg 8.1.2 (before: 7.1.1). WhisperJAV has an
+  entry in the Start menu, and the uninstaller removes this install's
+  desktop shortcut and Start-menu entry.
 - Not fixed yet: ZipEnhancer cleans only the first file of a single-pass
   run, and of an Ensemble run with "Finish each file" unticked. Planned for
-  1.10.2.
+  1.10.3.
 
 Full release notes:
 https://github.com/meizhong986/WhisperJAV/releases/tag/v{{VERSION}}
