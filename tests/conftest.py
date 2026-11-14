@@ -32,6 +32,15 @@ def _never_touch_real_desktop_shortcuts(monkeypatch):
     monkeypatch.setattr(win32com.client, "Dispatch", _no_windows_shell)
 
 
+@pytest.fixture(autouse=True)
+def _working_folder_lock_files_stay_out_of_the_real_temp_folder(monkeypatch, tmp_path_factory):
+    """A test that runs main() in this process claims its working folder (whisperjav/utils/run_lock.py, 1.10.2);
+    the lock file goes to a folder of the test session, never to the user's temporary folder."""
+    home = tmp_path_factory.getbasetemp() / "whisperjav_run_locks"
+    home.mkdir(exist_ok=True)
+    monkeypatch.setattr("whisperjav.utils.run_lock._lock_home", lambda: home)
+
+
 def pytest_configure(config):
     """Register custom pytest markers."""
     config.addinivalue_line(
