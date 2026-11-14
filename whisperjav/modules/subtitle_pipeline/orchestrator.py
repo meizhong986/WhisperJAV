@@ -1375,7 +1375,9 @@ class DecoupledSubtitlePipeline:
                 total_segments += segment_count
 
                 # Per-scene progress
-                (logger.debug if sentinel_status == "OK" else logger.info)(
+                # "N/A" (no aligner ran, the default since 1.10.1) is as ordinary as "OK": one line per scene
+                # at INFO put 268 lines into the console for one film (owner W647 5). Anything else is shown.
+                (logger.debug if sentinel_status in ("OK", "N/A") else logger.info)(
                     "Scene %d/%d: %d words → %d segments (sentinel: %s)",
                     scene_idx + 1, n_scenes, word_count, segment_count, sentinel_status,
                 )
