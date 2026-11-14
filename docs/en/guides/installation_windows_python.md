@@ -1,4 +1,4 @@
-# WhisperJAV 1.10.1 — Windows Installation from Source (Python)
+# WhisperJAV 1.10.2 — Windows Installation from Source (Python)
 
 This guide installs WhisperJAV from its source code into a Python environment you manage. If you just want it to work, use the [Windows Installer](installation_windows_standalone.md) instead.
 
@@ -47,7 +47,7 @@ Users in China: the installer downloads from GitHub, PyPI, download.pytorch.org 
 ## 2. Get the source code
 
 ```cmd
-git clone --branch v1.10.1 https://github.com/meizhong986/WhisperJAV.git
+git clone --branch v1.10.2 https://github.com/meizhong986/WhisperJAV.git
 cd WhisperJAV
 ```
 
@@ -151,7 +151,7 @@ git checkout v1.10.x
 python install.py
 ```
 
-(`v1.10.x` stands for the release you want.) A 1.9.x environment cannot be updated to 1.10.0: 1.10.0 needs Python 3.13. Make a new Python 3.13 environment and install there.
+(`v1.10.x` stands for the release you want.) A 1.9.x environment cannot be updated to 1.10: 1.10 needs Python 3.13. Make a new Python 3.13 environment and install there.
 
 Do not update with a plain `pip install -U whisperjav…`: on Windows, PyPI serves the CPU-only build of PyTorch, so it can replace your GPU build without a word.
 
@@ -161,7 +161,7 @@ Do not update with a plain `pip install -U whisperjav…`: on Windows, PyPI serv
 
 **"WhisperJAV 1.10 does not support …".** The computer is outside the [supported list](../getting-started/index.md#supported-computers); the message says why. Nothing was installed.
 
-**The installer refuses your Python.** WhisperJAV 1.10.0 needs Python 3.13. Make a 3.13 environment (section 3).
+**The installer refuses your Python.** WhisperJAV 1.10 needs Python 3.13. Make a 3.13 environment (section 3).
 
 **`--accelerator own-pytorch` stops: "none was found".** Install your PyTorch and torchaudio into the active environment first, then run the installer again.
 
