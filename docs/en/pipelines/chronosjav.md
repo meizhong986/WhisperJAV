@@ -92,7 +92,7 @@ In an Ensemble pass from the command line, the same choices go in `--pass1-qwen-
 
 ## First Run
 
-On first use, the model is downloaded from HuggingFace (~2-4 GB depending on model). This is a one-time download — subsequent runs use the cached model. The aligner (232 MB) and the timing model (488 MB) are downloaded only when a run chooses them (since 1.10.1; 1.10.0 downloaded both on its first ChronosJAV run).
+On first use, the model is downloaded from HuggingFace (~2-4 GB depending on model). This is a one-time download — subsequent runs use the cached model. The aligner (232 MB) and the timing model (488 MB) are downloaded only when a run chooses them (since 1.10.1; 1.10.0 downloaded both on its first ChronosJAV run), at the start of that run, before any audio is read; if the download fails, the run stops (since 1.10.2).
 
 Models are cached in your HuggingFace cache directory:
 
