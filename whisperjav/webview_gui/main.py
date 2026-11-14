@@ -285,6 +285,23 @@ After installation, restart WhisperJAV GUI."""
         print("=" * 60 + "\n")
 
 
+# The window's API object, set by create_window(); main() uses it to end the runs when the window has closed.
+_api = None
+
+
+def _end_runs_after_close():
+    """End every run the window started, once it has closed (1.10.2, owner W647 3). Before this, the run and
+    its workers went on after the window closed and kept the terminal the GUI was started from open."""
+    if _api is None:
+        return
+    try:
+        ended = _api._end_runs_on_close()
+        if ended:
+            print(f"Window closed: ended {len(ended)} running WhisperJAV process(es).")
+    except Exception as e:
+        print(f"Warning: could not end the running processes: {e}")
+
+
 def create_window():
     """
     Create and configure the PyWebView window.
@@ -299,7 +316,9 @@ def create_window():
     html_path = get_asset_path("index.html")
 
     # Create API instance
+    global _api
     api = WhisperJAVAPI()
+    _api = api   # main() ends its runs when the window has closed (1.10.2, owner W647 3)
 
     # Check for icon file with multiple fallback locations
     icon_path = None
@@ -541,6 +560,9 @@ def main():
             webview.start(debug=debug_mode, private_mode=True, func=_after_start)
         else:
             webview.start(debug=debug_mode, private_mode=True, func=lambda: bind_dom_events(window))
+
+        # webview.start() returns when the window has closed.
+        _end_runs_after_close()
 
     except FileNotFoundError as e:
         print("\nERROR: Asset file not found!")
