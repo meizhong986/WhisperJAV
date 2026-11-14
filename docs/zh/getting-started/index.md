@@ -1,6 +1,6 @@
 # 快速入门
 
-WhisperJAV 1.10.0 可在 Windows、Linux 和 Apple silicon Mac 上运行。请根据你的电脑选择安装方式。
+WhisperJAV 1.10 可在 Windows、Linux 和 Apple silicon Mac 上运行。请根据你的电脑选择安装方式。
 
 ## 我应该选择哪种安装方式？
 
@@ -13,7 +13,7 @@ WhisperJAV 1.10.0 可在 Windows、Linux 和 Apple silicon Mac 上运行。请�
 
 **从 1.9.x 升级？** 请全新安装最新的 1.10 版本。1.10 需要 Python 3.13，因此 `whisperjav-upgrade` 无法把 1.9.x 安装升级到 1.10。用户设置文件夹中的设置会保留。
 
-**Google Colab 和 Kaggle** 不受 1.10.0 支持：1.10.0 只为在你自己的电脑上安装而制作和测试。Colab 专家版 notebook 继续安装 1.9.5。
+**Google Colab 和 Kaggle** 不受 1.10 支持：1.10 只为在你自己的电脑上安装而制作和测试。Colab 专家版 notebook 继续安装 1.9.5。
 
 ## 是否加速 {#accelerated-or-not}
 
@@ -37,15 +37,15 @@ WhisperSeg 语音分割器在所有安装中都在 CPU 上运行。
 
 **某一次运行改用 CPU：** 在那次运行中加上 `--device cpu`。在 GUI 中，专家模式中每一轮的 Customize 窗口有一个 Device 菜单；选 "CPU (not accelerated)" 会让这一轮使用 CPU（GGUF 处理管线不提供此项）。当 NVIDIA GPU 安装的 GPU 无法使用时，GUI 会提供 "Run on the CPU this time"（这次在 CPU 上运行）。
 
-**WhisperJAV 1.10.0 中的 Intel GPU：** 在 Windows 上，GGUF 处理管线可以通过 Vulkan 使用 Intel GPU——实验性，未经测试。WhisperJAV 1.10.0 不通过 PyTorch（Intel 的 XPU 版本）使用 Intel GPU：使用这种 PyTorch 时，其他处理管线在 CPU 上运行。通过 PyTorch 支持 Intel GPU 计划在 1.10.1 中研究。
+**WhisperJAV 1.10 中的 Intel GPU：** 在 Windows 上，GGUF 处理管线可以通过 Vulkan 使用 Intel GPU——实验性，未经测试。WhisperJAV 1.10 不通过 PyTorch（Intel 的 XPU 版本）使用 Intel GPU：使用这种 PyTorch 时，其他处理管线在 CPU 上运行。
 
-**实验性：** 在 WhisperJAV 1.10.0 中，Windows 上通过 Vulkan 使用 GPU，以及你自己的 PyTorch，都属于实验性功能：我们已尽一切努力让它们可用，但无法在 AMD 或 Intel 显卡上测试。请告诉我们它们在你的电脑上表现如何：https://github.com/meizhong986/WhisperJAV/issues
+**实验性：** 在 WhisperJAV 1.10 中，Windows 上通过 Vulkan 使用 GPU，以及你自己的 PyTorch，都属于实验性功能：我们已尽一切努力让它们可用，但无法在 AMD 或 Intel 显卡上测试。请告诉我们它们在你的电脑上表现如何：https://github.com/meizhong986/WhisperJAV/issues
 
 ## 受支持的电脑 {#supported-computers}
 
 所有安装程序都会在安装任何内容之前检查电脑。如果电脑不在此列表中，安装程序会说明原因，并且不安装任何内容。
 
-| | WhisperJAV 1.10.0 支持 | 不支持 |
+| | WhisperJAV 1.10 支持 | 不支持 |
 |---|---|---|
 | Windows | Windows 10 或 11，64 位（x86-64） | Windows on ARM（例如 Snapdragon 笔记本）；早于 Windows 10 的版本 |
 | Linux | glibc 2.35 或更新的 x86-64 或 ARM64：Ubuntu 22.04 或更新、Debian 12 或更新、Fedora 36 或更新、openSUSE Leap 15.6，以及基于它们的发行版；滚动更新发行版 | glibc 早于 2.35：Ubuntu 20.04、Debian 11、openSUSE Leap 15.5（glibc 2.31）；Red Hat Enterprise Linux 9、Rocky Linux 9、AlmaLinux 9（glibc 2.34） |
