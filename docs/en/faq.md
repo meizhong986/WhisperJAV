@@ -95,8 +95,8 @@ A root-cause fix is still being investigated; no release date is set. The cap is
 No single answer - each has trade-offs and quality varies by content. Field-reported patterns:
 
 - **DeepSeek** (`deepseek-v4-flash` default in v1.8.14): low per-token cost; users frequently report it as a good balance for JA->EN/CN. The thinking variant `deepseek-v4-pro` is available via `--model deepseek-v4-pro`.
-- **Claude** (default `claude-3-5-haiku-20241022`) and **OpenAI GPT** (default `gpt-4o-mini`): higher per-token cost; users often prefer them for nuanced or context-dependent passages.
-- **Gemini** (`gemini-2.0-flash`): mid-tier cost; quality varies more by content style.
+- **Claude** (default `claude-haiku-5-5`) and **OpenAI GPT** (default `gpt-4o-mini`): higher per-token cost; users often prefer them for nuanced or context-dependent passages.
+- **Gemini** (default `gemini-3.6-flash`): mid-tier cost; quality varies more by content style.
 - **Ollama / Local LLM**: runs entirely on your machine - no data leaves your computer. Quality depends on the local model you run; use `qwen2.5:7b-instruct` or `gemma3:12b` for sensible results, avoid thinking models (their chain-of-thought can leak into the SRT output).
 - **OpenRouter**: a router for multiple upstream models. Useful if you want to compare providers without maintaining separate API keys.
 
@@ -132,7 +132,7 @@ The standalone installer respects standard proxy environment variables. Set them
 ```cmd
 set HTTPS_PROXY=http://user:pass@proxy.example.com:8080
 set HTTP_PROXY=http://user:pass@proxy.example.com:8080
-WhisperJAV-1.10.1-Windows-x86_64.exe
+WhisperJAV-1.10.2-Windows-x86_64.exe
 ```
 
 **Windows (persistent, all sessions):**
@@ -167,16 +167,16 @@ On macOS, the bundled Python may not trust the system certificate store by defau
 
 (This is for Python from python.org; Homebrew's Python uses the system certificates.) This installs the `certifi` CA bundle into the Python you are running. Re-run `python install.py` after.
 
-**Note**: avoid alpha or pre-release Python builds for production installs. WhisperJAV 1.10.0 needs a stable Python 3.13.
+**Note**: avoid alpha or pre-release Python builds for production installs. WhisperJAV 1.10 needs a stable Python 3.13.
 
 ### Qwen3-ASR fails with `TypeError: check_model_inputs() missing 1 required positional argument`
 
-This error came from running the original `qwen-asr` package on `transformers` 5. WhisperJAV 1.10.0 installs `transformers` 5.20 together with its own build of `qwen-asr` made for it ([meizhong986/Qwen3-ASR](https://github.com/meizhong986/Qwen3-ASR)). If you see this error on 1.10.0, your environment holds a different `qwen-asr`: run the installer again, which puts back the tested versions.
+This error came from running the original `qwen-asr` package on `transformers` 5. WhisperJAV 1.10 installs `transformers` 5.20 together with its own build of `qwen-asr` made for it ([meizhong986/Qwen3-ASR](https://github.com/meizhong986/Qwen3-ASR)). If you see this error on 1.10, your environment holds a different `qwen-asr`: run the installer again, which puts back the tested versions.
 
 ### "CUDA not available" but I have an NVIDIA GPU
 
 1. Run `whisperjav --check`: it names the accelerator of the install and whether PyTorch can use the GPU.
-2. Verify your NVIDIA driver version with `nvidia-smi`: 1.10.0 needs 580 or newer on Windows, 570 or newer on Linux, and a GTX 16 / RTX 20 series or newer card.
+2. Verify your NVIDIA driver version with `nvidia-smi`: 1.10 needs 580 or newer on Windows, 570 or newer on Linux, and a GTX 16 / RTX 20 series or newer card.
 3. You do NOT need to install the CUDA Toolkit — PyTorch brings its own.
 4. If the install was made for the CPU only: with the Windows installer, run it again; with a supported NVIDIA GPU it makes the NVIDIA GPU install. With a source install, run `python install.py --accelerator nvidia`.
 
@@ -266,7 +266,7 @@ Tips:- Avoid running other GPU-heavy applications simultaneously (Chrome, games,
 
 > **Status:** Cohere-Transcribe is not available in WhisperJAV yet. No release date is set. (Not to be confused with Cohere-CrispASR, the GGUF pipeline in Ensemble Mode: see [Parakeet-CrispASR and Cohere-CrispASR](pipelines/crispasr.md).)
 
-> **About transformers:** WhisperJAV 1.10.0 installs transformers 5.20 together with its own build of `qwen-asr` made for it ([meizhong986/Qwen3-ASR](https://github.com/meizhong986/Qwen3-ASR)). Do not downgrade transformers below 5.0. If Qwen3-ASR does not load, run the installer again; it puts back the tested versions.
+> **About transformers:** WhisperJAV 1.10 installs transformers 5.20 together with its own build of `qwen-asr` made for it ([meizhong986/Qwen3-ASR](https://github.com/meizhong986/Qwen3-ASR)). Do not downgrade transformers below 5.0. If Qwen3-ASR does not load, run the installer again; it puts back the tested versions.
 
 The setup notes below are for when it becomes available.
 
