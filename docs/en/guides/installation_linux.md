@@ -1,8 +1,8 @@
 # WhisperJAV Linux Installation Guide
 
-**Version:** 1.10.1
+**Version:** 1.10.2
 
-Nobody in the project has run WhisperJAV 1.10.0 on Linux yet. Please tell us how it works for you: https://github.com/meizhong986/WhisperJAV/issues
+Nobody in the project has run WhisperJAV 1.10 on Linux yet. Please tell us how it works for you: https://github.com/meizhong986/WhisperJAV/issues
 
 ---
 
@@ -23,7 +23,7 @@ Nobody in the project has run WhisperJAV 1.10.0 on Linux yet. Please tell us how
 
 ## Your computer
 
-| | WhisperJAV 1.10.0 needs |
+| | WhisperJAV 1.10 needs |
 |---|---|
 | Processor | x86-64 or ARM64 |
 | Linux | glibc 2.35 or newer: Ubuntu 22.04 or newer, Debian 12 or newer, Fedora 36 or newer, openSUSE Leap 15.6, and distributions built on them; rolling distributions such as Arch |
@@ -97,7 +97,7 @@ This step is Linux-only. Windows and macOS need nothing extra.
 
 ## Python 3.13
 
-WhisperJAV 1.10.0 runs on Python 3.13 only. `python3 --version` shows your system Python; if it is not 3.13:
+WhisperJAV 1.10 runs on Python 3.13 only. `python3 --version` shows your system Python; if it is not 3.13:
 
 - **Ubuntu 22.04 / 24.04:** install 3.13 from the deadsnakes PPA:
   ```bash
@@ -119,7 +119,7 @@ source ~/.venv/whisperjav/bin/activate
 
 ## NVIDIA driver
 
-For the NVIDIA GPU (CUDA) install you need the NVIDIA driver, 570 or newer; you do not need the CUDA Toolkit (PyTorch brings its own CUDA runtime). On Linux, 1.10.0 installs PyTorch for CUDA 12.8.
+For the NVIDIA GPU (CUDA) install you need the NVIDIA driver, 570 or newer; you do not need the CUDA Toolkit (PyTorch brings its own CUDA runtime). On Linux, 1.10 installs PyTorch for CUDA 12.8.
 
 ```bash
 nvidia-smi          # shows the driver version, or fails without a driver
@@ -139,7 +139,7 @@ To install the driver:
 With the virtual environment active:
 
 ```bash
-git clone --branch v1.10.1 https://github.com/meizhong986/WhisperJAV.git
+git clone --branch v1.10.2 https://github.com/meizhong986/WhisperJAV.git
 cd WhisperJAV
 chmod +x installer/install_linux.sh
 ./installer/install_linux.sh
@@ -225,7 +225,7 @@ git checkout v1.10.x      # the release you want
 python3 install.py
 ```
 
-A 1.9.x environment cannot be updated to 1.10.0: 1.10.0 needs Python 3.13. Make a new Python 3.13 environment and install there.
+A 1.9.x environment cannot be updated to 1.10: 1.10 needs Python 3.13. Make a new Python 3.13 environment and install there.
 
 ---
 
