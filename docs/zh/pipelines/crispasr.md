@@ -36,10 +36,10 @@ GGUF 处理管线共九个：Parakeet-CrispASR、Cohere-CrispASR；1.10.1 新增
 每一轮开始时，日志会说明请求 CrispASR 在哪里运行，例如：
 
 ```
-Parakeet-CrispASR asks CrispASR to use the NVIDIA GPU (CUDA) (CrispASR 0.8.50+cuda).
+Parakeet-CrispASR asks CrispASR to use the NVIDIA GPU (CUDA) (CrispASR 0.8.53+cuda).
 ```
 
-使用 Vulkan 版时为："Parakeet-CrispASR asks CrispASR's Vulkan build to use this PC's GPU (CrispASR 0.8.50+vulkan). GPUs through Vulkan are experimental and have not been tested on AMD or Intel graphics cards."（意思是：通过 Vulkan 使用 GPU 为实验性，尚未在 AMD 或 Intel 显卡上测试。）WhisperJAV 目前无法读取 CrispASR 实际使用的设备，这一行只说明它请求了什么。
+使用 Vulkan 版时为："Parakeet-CrispASR asks CrispASR's Vulkan build to use this PC's GPU (CrispASR 0.8.53+vulkan). GPUs through Vulkan are experimental and have not been tested on AMD or Intel graphics cards."（意思是：通过 Vulkan 使用 GPU 为实验性，尚未在 AMD 或 Intel 显卡上测试。）WhisperJAV 目前无法读取 CrispASR 实际使用的设备，这一行只说明它请求了什么。
 
 ---
 
@@ -102,7 +102,7 @@ Parakeet-CrispASR 使用 Fidelity 处理管线的语音分割器设置，另加 
 
 当某一轮使用这两个处理管线之一时：
 
-- **Sensitivity**、**Speech Segmenter**、**Model**、**Scene Detector**、**Speech Enhancer** 和 **Enhance for VAD only** 都可以设置，与其他 Pass 相同。语音分割器选 **无**（None）时不做语音检测：每个场景整段交给模型，因此静音和音乐也会交给模型。
+- **Sensitivity**、**Speech Segmenter**、**Model**、**Scene Detector**、**Speech Enhancer**（菜单中的 **仅用于 VAD**（For VAD only）框，从 1.10.2 起默认勾选）都可以设置，与其他 Pass 相同。语音分割器选 **无**（None）时不做语音检测：每个场景整段交给模型，因此静音和音乐也会交给模型。
 - **自定义参数**（Customize Parameters）打开四个选项卡：**分割器**（Segmenter）、**增强器**（Enhancer）、**场景**（Scene）和 **计时**（Timing；只有一个菜单 **词级时间戳来源**（Word timestamps）：**来自模型**（From the model）或 **来自对齐器（wav2vec2-ja）**，处理管线的默认项标有（默认））；MOSS 另有 **MOSS** 选项卡。初始值就是这一轮实际使用的值。
 - 这一轮一行下方会显示一个状态面板，说明模型和 CrispASR 将在哪里运行，例如：
 
@@ -142,7 +142,7 @@ whisperjav video.mp4 --ensemble --pass1-pipeline parakeet-crispasr --pass2-pipel
 | 灵敏度 | Sensitivity | `--pass1-sensitivity` | `conservative`、`balanced`、`aggressive`；Parakeet-、ReazonSpeech-、Haas- 和 Qwen3-ASR-CrispASR 默认 `aggressive`，其他默认 `balanced` |
 | 场景检测器 | Scene Detector | `--pass1-scene-detector` | `semantic`（默认）、`auditok`、`silero`：场景最长 48 秒，semantic 的场景最短 12 秒（MOSS-CrispASR：最长 240 秒，semantic 最短 90 秒）；`none`（每个文件一个场景） |
 | 语音增强器 | Speech Enhancer | `--pass1-speech-enhancer` | `none`（默认），或其他 Pass 可用的语音增强器，例如 `ffmpeg-dsp`、`zipenhancer` 或 `htdemucs` |
-| 仅用于 VAD 的增强 | Enhance for VAD only | `--pass1-enhance-for-vad` | 增强后的音频只交给语音分割器；CrispASR 听到的是原始音频 |
+| 仅用于 VAD 的增强 | 仅用于 VAD（Speech Enhancer 菜单中） | `--pass1-enhance-for-vad` | 增强后的音频只交给语音分割器；CrispASR 听到的是原始音频 |
 | 检测阈值 | Customize，Segmenter 选项卡 | `--pass1-vad-threshold` | 0 到 1；覆盖灵敏度设定的值 |
 | 前后填充 | Customize，Segmenter 选项卡 | `--pass1-speech-pad-ms` | 每段语音前后各加的毫秒数。Cohere-、Kotoba-、Whisper-Turbo-、Whisper-Large-CrispASR：前后都加。Parakeet-、ReazonSpeech-、Haas-、Qwen3-ASR-CrispASR：仅对有此设置的语音分割器（例如 WhisperSeg）生效；使用 FireRedVAD 或 TEN VAD 时会被忽略并给出警告。MOSS-CrispASR：仅对有此设置的语音分割器生效 |
 | 字幕时间 | Customize，计时（Timing）选项卡：**词级时间戳来源**（Word timestamps） | `--pass1-word-timestamps model` 或 `aligner` | Cohere-CrispASR 和 Qwen3-ASR-CrispASR 默认 `aligner`，其他默认 `model`（MOSS-CrispASR：它自己的段落时间）。使用 `aligner` 时，对齐器标出时间的 VAD 组按 Cohere-CrispASR 的方式切分（见下文）；对齐器没有给出时间的组保留处理管线自己的规则 |
@@ -247,7 +247,7 @@ whisperjav --ensemble --pass1-pipeline parakeet-crispasr --dump-params settings.
 `whisperjav --check` 会列出 CrispASR 及其模型。在一切就绪的 NVIDIA GPU（CUDA）安装上显示：
 
 ```
-✓ CrispASR: 0.8.50+cuda (CUDA build), GGUF pipelines: asks for the NVIDIA GPU (CUDA)
+✓ CrispASR: 0.8.53+cuda (CUDA build), GGUF pipelines: asks for the NVIDIA GPU (CUDA)
 ✓ CrispASR model parakeet-tdt-0.6b-ja: Parakeet TDT 0.6B ja (q8_0), for parakeet-crispasr: downloaded
 ✓ CrispASR model parakeet-tdt-0.6b-ja-f16: Parakeet TDT 0.6B ja (f16), for parakeet-crispasr: downloaded
 ✓ CrispASR model cohere-asr-ja-v0.1: Cohere Transcribe ja v0.1 (q8_0), for cohere-crispasr: downloaded
@@ -301,7 +301,7 @@ whisperjav --ensemble --pass1-pipeline parakeet-crispasr --dump-params settings.
 
 - GUI 中，Transcription Mode 选项卡 Mode 菜单里的 **crispasr** 项已删除，专家模式（Ensemble Mode）选项卡中带 Backend 选项的旧 **CrispASR** 处理管线也已删除。
 - `whispercpp` 后端在新的处理管线中没有替代。
-- 1.10.0 不再使用你下载的 `crispasr` 程序及其保存的模型（默认位于 `~/.cache/whisperjav/crispasr_models`），可以删除。
+- 1.10 不再使用你下载的 `crispasr` 程序及其保存的模型（默认位于 `~/.cache/whisperjav/crispasr_models`），可以删除。
 
 改用：`--ensemble --pass1-pipeline parakeet-crispasr` 替代 `--mode crispasr --crispasr-backend parakeet`；`--ensemble --pass1-pipeline cohere-crispasr` 替代 `--mode crispasr --crispasr-backend cohere`。
 
