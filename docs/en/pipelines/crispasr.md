@@ -34,10 +34,10 @@ The processor must support AVX2 (Intel processors since 2013, AMD since 2015). W
 At the start of each pass, the log says where CrispASR is asked to run, for example:
 
 ```
-Parakeet-CrispASR asks CrispASR to use the NVIDIA GPU (CUDA) (CrispASR 0.8.50+cuda).
+Parakeet-CrispASR asks CrispASR to use the NVIDIA GPU (CUDA) (CrispASR 0.8.53+cuda).
 ```
 
-With the Vulkan build: "Parakeet-CrispASR asks CrispASR's Vulkan build to use this PC's GPU (CrispASR 0.8.50+vulkan). GPUs through Vulkan are experimental and have not been tested on AMD or Intel graphics cards." WhisperJAV cannot yet read which device CrispASR actually used; the line states what it asked for.
+With the Vulkan build: "Parakeet-CrispASR asks CrispASR's Vulkan build to use this PC's GPU (CrispASR 0.8.53+vulkan). GPUs through Vulkan are experimental and have not been tested on AMD or Intel graphics cards." WhisperJAV cannot yet read which device CrispASR actually used; the line states what it asked for.
 
 ---
 
@@ -100,7 +100,7 @@ Both take Parakeet-CrispASR's speech segmenter settings (TEN VAD, Aggressive, VA
 
 When a pass uses one of these pipelines:
 
-- **Sensitivity**, **Speech Segmenter**, **Model**, **Scene Detector**, **Speech Enhancer** and **Enhance for VAD only** can be set, as for the other passes. **None** as the speech segmenter skips speech detection: each scene goes to the model whole, so silence and music reach the model too.
+- **Sensitivity**, **Speech Segmenter**, **Model**, **Scene Detector**, **Speech Enhancer** (with its **For VAD only** box, ticked by default since 1.10.2) can be set, as for the other passes. **None** as the speech segmenter skips speech detection: each scene goes to the model whole, so silence and music reach the model too.
 - **Customize Parameters** opens four tabs: **Segmenter**, **Enhancer**, **Scene** and **Timing** (one menu, **Word timestamps**: **From the model** or **From the aligner (wav2vec2-ja)**, the pipeline's default marked "(default)"); for MOSS also a **MOSS** tab. They start from the values the pass runs with.
 - A status panel under the pass row shows the model and where CrispASR will run, for example:
 
@@ -140,7 +140,7 @@ Without `--merge-strategy`, two passes are combined with `pass1_primary` (in the
 | Sensitivity | Sensitivity | `--pass1-sensitivity` | `conservative`, `balanced`, `aggressive`; default `aggressive` for Parakeet-, ReazonSpeech-, Haas- and Qwen3-ASR-CrispASR, `balanced` for the others |
 | Scene detector | Scene Detector | `--pass1-scene-detector` | `semantic` (default), `auditok`, `silero`: scenes of at most 48 s, semantic ones of at least 12 s (MOSS-CrispASR: at most 240 s, semantic ones at least 90 s); `none` (one scene per file) |
 | Speech enhancer | Speech Enhancer | `--pass1-speech-enhancer` | `none` (default) or the speech enhancers of the other passes, for example `ffmpeg-dsp`, `zipenhancer` or `htdemucs` |
-| Enhance for VAD only | Enhance for VAD only | `--pass1-enhance-for-vad` | the cleaned audio goes to the speech segmenter only; CrispASR hears the original |
+| Enhance for VAD only | For VAD only (Speech Enhancer menu) | `--pass1-enhance-for-vad` | the cleaned audio goes to the speech segmenter only; CrispASR hears the original |
 | Detection threshold | Customize, Segmenter tab | `--pass1-vad-threshold` | 0 to 1; replaces the value the sensitivity sets |
 | Padding | Customize, Segmenter tab | `--pass1-speech-pad-ms` | milliseconds added before and after each piece of speech. Cohere-, Kotoba-, Whisper-Turbo- and Whisper-Large-CrispASR: both sides. Parakeet-, ReazonSpeech-, Haas- and Qwen3-ASR-CrispASR: only with a speech segmenter that has padding, such as WhisperSeg; with FireRedVAD or TEN VAD it is ignored, with a warning. MOSS-CrispASR: only with a speech segmenter that has padding |
 | Subtitle times | Customize, Timing tab: **Word timestamps** | `--pass1-word-timestamps model` or `aligner` | default `aligner` for Cohere-CrispASR and Qwen3-ASR-CrispASR, `model` for the others (MOSS-CrispASR: its own segment times). With `aligner`, a VAD group the aligner times is cut as Cohere-CrispASR's are (see below); a group it gives no times keeps the pipeline's own rule |
@@ -245,7 +245,7 @@ The aligner (232 MB; Cohere-CrispASR's default, and any pass set to From the ali
 `whisperjav --check` lists CrispASR and its models. On a PC with the NVIDIA GPU (CUDA) install where everything is ready:
 
 ```
-✓ CrispASR: 0.8.50+cuda (CUDA build), GGUF pipelines: asks for the NVIDIA GPU (CUDA)
+✓ CrispASR: 0.8.53+cuda (CUDA build), GGUF pipelines: asks for the NVIDIA GPU (CUDA)
 ✓ CrispASR model parakeet-tdt-0.6b-ja: Parakeet TDT 0.6B ja (q8_0), for parakeet-crispasr: downloaded
 ✓ CrispASR model parakeet-tdt-0.6b-ja-f16: Parakeet TDT 0.6B ja (f16), for parakeet-crispasr: downloaded
 ✓ CrispASR model cohere-asr-ja-v0.1: Cohere Transcribe ja v0.1 (q8_0), for cohere-crispasr: downloaded
@@ -299,7 +299,7 @@ If CrispASR's Vulkan build cannot load on Windows, the message adds: "With the G
 
 - In the GUI, the **crispasr** entry of the Mode menu in the Transcription Mode tab is gone, and so is the old **CrispASR** pipeline with its Backend choice in the Ensemble Mode tab.
 - The `whispercpp` backend has no replacement among the new pipelines.
-- 1.10.0 does not use the `crispasr` program you downloaded, or the models it saved (by default in `~/.cache/whisperjav/crispasr_models`). You can delete them.
+- 1.10 does not use the `crispasr` program you downloaded, or the models it saved (by default in `~/.cache/whisperjav/crispasr_models`). You can delete them.
 
 What to type instead: `--ensemble --pass1-pipeline parakeet-crispasr` in place of `--mode crispasr --crispasr-backend parakeet`, and `--ensemble --pass1-pipeline cohere-crispasr` in place of `--mode crispasr --crispasr-backend cohere`.
 
