@@ -312,8 +312,11 @@ class CrispASRPipeline(BasePipeline):
             logger.info(f"{self.LABEL}: no speech segmenter: {len(groups)} of {len(scenes)} scenes go to the model "
                         f"whole, {speech_s:.0f} s of audio in {duration:.0f} s")
         else:
-            logger.info(f"{self.LABEL}: {len(groups)} VAD groups over {len(scenes)} scenes, "
-                        f"{speech_s:.0f} s of speech in {duration:.0f} s")
+            # "the groups span", not "of speech": the figure is the summed length of the VAD groups, the pauses
+            # inside a group included; the audio analytics' "Speech detected in N%" is a different measure
+            # (text approved, owner W648 1).
+            logger.info(f"{self.LABEL}: {len(groups)} VAD groups over {len(scenes)} scenes; "
+                        f"the groups span {speech_s:.0f} s of {duration:.0f} s")
 
         self.progress.set_current_step("Transcribing with CrispASR", 5, 6)
         results: List[Tuple[_Group, List[CrispSegment]]] = []
