@@ -50,7 +50,7 @@ whisperjav [OPTIONS] INPUT [INPUT...]
 | `--qwen-timing-model` | `none` | `whisper-small`（488 MB；不使用它写出的文字）在对齐器没有给出时间的地方，把字幕的开始时间往后移到语音开始处；在对齐器标出时间的 VAD 组里，在新句子开始处附近的标点或空格处切分。`none`（从 1.10.1 起的默认值）不使用它 |
 | `--qwen-stepdown` | 关闭 | 用最长 6 秒的 VAD 组重新处理对齐坍塌的场景。关闭时（默认），在 `aligner_vad_fallback` 下，这样的场景采用其 VAD 组的时间 |
 
-对齐器和计时模型是 1.10.0 新增的，从 1.10.1 起默认关闭；在运行第一次使用它们时下载，在本安装的 CrispASR 运行的地方运行；`--device cpu` 不能把它们限制在 CPU 上。见[字幕时间](../pipelines/chronosjav.md#subtitle-timing-1100)。在专家模式的每一轮中，把它们写在 `--pass1-qwen-params` 里，例如 `'{"timestamp_mode": "aligner_vad_fallback", "timing_model": "whisper-small"}'`。
+对齐器和计时模型是 1.10.0 新增的，从 1.10.1 起默认关闭；在第一次使用它们的运行开始时、读取任何音频之前下载（从 1.10.2 起；下载失败时运行停止），在本安装的 CrispASR 运行的地方运行；`--device cpu` 不能把它们限制在 CPU 上。见[字幕时间](../pipelines/chronosjav.md#subtitle-timing-1100)。在专家模式的每一轮中，把它们写在 `--pass1-qwen-params` 里，例如 `'{"timestamp_mode": "aligner_vad_fallback", "timing_model": "whisper-small"}'`。
 
 ### 处理选项
 
