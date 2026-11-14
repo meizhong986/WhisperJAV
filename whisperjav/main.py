@@ -139,6 +139,7 @@ from whisperjav.utils.media_leftovers import (
     temp_dir_conflicts,
     looks_like_whisperjav_leftover,
 )
+from whisperjav.utils.run_lock import WorkingFolderInUse, claim_working_folder
 from whisperjav.pipelines.faster_pipeline import FasterPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
 from whisperjav.pipelines.fidelity_pipeline import FidelityPipeline
@@ -3610,7 +3611,17 @@ def main():
     temp_path.mkdir(parents=True, exist_ok=True)
     args.temp_dir = str(temp_path)
     logger.debug(f"Using temporary directory: {args.temp_dir}")
-    
+
+    # One run per working folder (1.10.2, owner W647 2). Two runs in one working folder delete and overwrite
+    # each other's scene files, pass results and unfinished subtitles (utils/run_lock.py), so a run that finds
+    # the folder held by another run stops here, before it extracts audio or writes any of those files. The
+    # claim lasts as long as this process and is given up by the operating system when it ends, however it ends.
+    try:
+        claim_working_folder(args.temp_dir)
+    except WorkingFolderInUse as _in_use:
+        logger.error(str(_in_use))
+        sys.exit(1)
+
     # Discover media files
     discovery = MediaDiscovery()
     media_files = discovery.discover(args.input)
