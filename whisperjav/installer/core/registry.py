@@ -100,8 +100,8 @@ class Extra(Enum):
     CORE = "core"           # Required for basic operation (in dependencies, not extras)
     CLI = "cli"             # Audio processing, VAD, scene detection
     GUI = "gui"             # PyWebView GUI
-    TRANSLATE = "translate" # AI translation (pysubtrans, OpenAI, Gemini)
-    ENHANCE = "enhance"     # Speech enhancement (ZipEnhancer, BS-RoFormer, htdemucs, FFmpeg-DSP)
+    TRANSLATE = "translate" # AI translation (pysubtrans, Anthropic, OpenAI, Gemini)
+    ENHANCE = "enhance"     # Speech enhancement (ZipEnhancer, htdemucs; FFmpeg-DSP needs none; the CrispASR RoFormers come with CrispASR's build extra)
     HUGGINGFACE = "huggingface"  # HuggingFace Transformers
     QWEN = "qwen"           # Qwen3-ASR support (v1.8.3+)
     ANALYSIS = "analysis"   # Scientific analysis and visualization
