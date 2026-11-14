@@ -50,7 +50,7 @@ whisperjav [OPTIONS] INPUT [INPUT...]
 | `--qwen-timing-model` | `none` | `whisper-small` (488 MB; its text is not used) moves a subtitle's start later, to where speech starts, where the aligner gave no time; where the aligner timed a piece of speech, it splits it at a punctuation mark or space near where a new sentence starts. `none` (default since 1.10.1) leaves it off |
 | `--qwen-stepdown` | Off | Retry a scene whose alignment collapses, with pieces of speech up to 6 s. When off (the default), such a scene takes the times of its pieces of speech with `aligner_vad_fallback` |
 
-The aligner and the timing model are new in 1.10.0 and off by default since 1.10.1; they are downloaded the first time a run uses them, and run where the install's CrispASR runs; `--device cpu` does not hold them on the CPU. See [Subtitle timing](../pipelines/chronosjav.md#subtitle-timing-1100). In an Ensemble pass, give them in `--pass1-qwen-params`, for example `'{"timestamp_mode": "aligner_vad_fallback", "timing_model": "whisper-small"}'`.
+The aligner and the timing model are new in 1.10.0 and off by default since 1.10.1; they are downloaded at the start of the first run that uses them, before any audio is read (since 1.10.2; a failed download stops the run), and run where the install's CrispASR runs; `--device cpu` does not hold them on the CPU. See [Subtitle timing](../pipelines/chronosjav.md#subtitle-timing-1100). In an Ensemble pass, give them in `--pass1-qwen-params`, for example `'{"timestamp_mode": "aligner_vad_fallback", "timing_model": "whisper-small"}'`.
 
 ### Processing Options
 
