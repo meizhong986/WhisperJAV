@@ -1,6 +1,6 @@
 # Getting Started
 
-WhisperJAV 1.10.0 runs on Windows, Linux and Apple silicon Macs. Choose the way of installing that fits your computer.
+WhisperJAV 1.10 runs on Windows, Linux and Apple silicon Macs. Choose the way of installing that fits your computer.
 
 ## Which install method should I use?
 
@@ -13,7 +13,7 @@ WhisperJAV 1.10.0 runs on Windows, Linux and Apple silicon Macs. Choose the way 
 
 **Coming from 1.9.x?** Install the newest 1.10 release fresh. 1.10 needs Python 3.13, so `whisperjav-upgrade` cannot take a 1.9.x install to 1.10. Your settings in the user settings folder are kept.
 
-**Google Colab and Kaggle** are not supported by 1.10.0: it is made and tested for installs on your own computer only. The Colab expert notebook keeps installing 1.9.5.
+**Google Colab and Kaggle** are not supported by 1.10: it is made and tested for installs on your own computer only. The Colab expert notebook keeps installing 1.9.5.
 
 ## Accelerated or not
 
@@ -37,15 +37,15 @@ The WhisperSeg speech segmenter runs on the CPU in every install.
 
 **One run on the CPU:** add `--device cpu` to that run. In the GUI, the Customize window of an Ensemble pass has a Device menu; "CPU (not accelerated)" puts that pass on the CPU (not offered for the GGUF pipelines). When the GPU of an NVIDIA GPU install cannot be used, the GUI offers "Run on the CPU this time".
 
-**Intel GPUs in WhisperJAV 1.10.0:** on Windows, the GGUF pipelines can use an Intel GPU through Vulkan — experimental, not tested. WhisperJAV 1.10.0 does not use Intel GPUs through PyTorch (Intel's XPU builds): with such a PyTorch, the other pipelines run on the CPU. Intel GPU support through PyTorch is planned for research in 1.10.1.
+**Intel GPUs in WhisperJAV 1.10:** on Windows, the GGUF pipelines can use an Intel GPU through Vulkan — experimental, not tested. WhisperJAV 1.10 does not use Intel GPUs through PyTorch (Intel's XPU builds): with such a PyTorch, the other pipelines run on the CPU.
 
-**Experimental:** GPUs through Vulkan on Windows, and your own PyTorch, are experimental in WhisperJAV 1.10.0: we have done everything we can to make them work, but we could not test them on AMD or Intel graphics cards. Please tell us how they work on your PC: https://github.com/meizhong986/WhisperJAV/issues
+**Experimental:** GPUs through Vulkan on Windows, and your own PyTorch, are experimental in WhisperJAV 1.10: we have done everything we can to make them work, but we could not test them on AMD or Intel graphics cards. Please tell us how they work on your PC: https://github.com/meizhong986/WhisperJAV/issues
 
 ## Supported computers
 
 Every installer checks the computer before anything is installed. On a computer outside this list it says why and installs nothing.
 
-| | WhisperJAV 1.10.0 supports | Not supported |
+| | WhisperJAV 1.10 supports | Not supported |
 |---|---|---|
 | Windows | Windows 10 or 11, 64-bit (x86-64) | Windows on ARM (for example Snapdragon laptops); Windows older than 10 |
 | Linux | x86-64 or ARM64 with glibc 2.35 or newer: Ubuntu 22.04 or newer, Debian 12 or newer, Fedora 36 or newer, openSUSE Leap 15.6, and distributions built on them; rolling distributions | glibc older than 2.35: Ubuntu 20.04, Debian 11, openSUSE Leap 15.5 (glibc 2.31); Red Hat Enterprise Linux 9, Rocky Linux 9, AlmaLinux 9 (glibc 2.34) |
