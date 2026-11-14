@@ -20,7 +20,7 @@ The GUI tells you when a new version is out: a notice with the new version appea
    "%LOCALAPPDATA%\WhisperJAV\Scripts\whisperjav.exe" --version
    ```
 
-Start the upgrade with the install's `python.exe`, as above, not with `Scripts\whisperjav-upgrade.exe`: when WhisperJAV is installed on another drive than Windows' temporary folder (normally drive C:), `whisperjav-upgrade.exe` of 1.10.0 and 1.10.1 stops halfway and WhisperJAV no longer starts.
+Start the upgrade with the install's `python.exe`, as above, not with `Scripts\whisperjav-upgrade.exe`: when WhisperJAV is installed on another drive than Windows' temporary folder (normally drive C:), `whisperjav-upgrade.exe` of 1.10.0, 1.10.1 and 1.10.2 stops halfway and WhisperJAV no longer starts.
 
 The same command with one option added:
 
