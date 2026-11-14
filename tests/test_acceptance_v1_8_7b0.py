@@ -287,27 +287,32 @@ class TestVADPaddingDefaults:
         from whisperjav.modules.speech_segmentation.factory import _PARAM_SCHEMAS
         assert _PARAM_SCHEMAS["ten"]["end_pad_ms"][1] == 200
 
-    def test_backend_and_factory_silero_agree(self):
-        from whisperjav.modules.speech_segmentation.backends.silero_v6 import SileroV6SpeechSegmenter
-        from whisperjav.modules.speech_segmentation.factory import _PARAM_SCHEMAS
-        backend_default = inspect.signature(SileroV6SpeechSegmenter.__init__).parameters["speech_pad_ms"].default
-        factory_default = _PARAM_SCHEMAS["silero-v6.2"]["speech_pad_ms"][1]
-        assert backend_default == factory_default, \
-            f"Silero backend ({backend_default}) and factory schema ({factory_default}) disagree"
+    # 1.8.7b0 wanted the backend's own default and the factory's fallback to be equal. Since v1.8.12 (1eb1237) the
+    # factory's fallback, used when a pad arrives empty (e.g. a cleared Customize field), is the balanced preset of
+    # the YAML tool file on purpose, while the backend's own default applies when no pad is passed at all; the two
+    # differ. Owner W634 1 (2026-11-14): the tests follow that choice; the factory and the backends stay as they are.
+    @staticmethod
+    def _balanced(tool_file, key):
+        import yaml
+        path = os.path.join(REPO, "whisperjav", "config", "v4", "ecosystems", "tools", tool_file)
+        with open(path, encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        return (data["presets"].get("balanced") or {}).get(key, data["spec"][key])   # balanced: the spec's values
 
-    def test_backend_and_factory_ten_start_agree(self):
-        from whisperjav.modules.speech_segmentation.backends.ten import TenSpeechSegmenter
+    def test_factory_fallback_is_the_silero_balanced_preset(self):
         from whisperjav.modules.speech_segmentation.factory import _PARAM_SCHEMAS
-        backend_default = inspect.signature(TenSpeechSegmenter.__init__).parameters["start_pad_ms"].default
-        factory_default = _PARAM_SCHEMAS["ten"]["start_pad_ms"][1]
-        assert backend_default == factory_default
+        assert _PARAM_SCHEMAS["silero-v6.2"]["speech_pad_ms"][1] == \
+            self._balanced("silero-v6-speech-segmentation.yaml", "speech_pad_ms")
 
-    def test_backend_and_factory_ten_end_agree(self):
-        from whisperjav.modules.speech_segmentation.backends.ten import TenSpeechSegmenter
+    def test_factory_fallback_is_the_ten_balanced_start_pad(self):
         from whisperjav.modules.speech_segmentation.factory import _PARAM_SCHEMAS
-        backend_default = inspect.signature(TenSpeechSegmenter.__init__).parameters["end_pad_ms"].default
-        factory_default = _PARAM_SCHEMAS["ten"]["end_pad_ms"][1]
-        assert backend_default == factory_default
+        assert _PARAM_SCHEMAS["ten"]["start_pad_ms"][1] == \
+            self._balanced("ten-speech-segmentation.yaml", "start_pad_ms")
+
+    def test_factory_fallback_is_the_ten_balanced_end_pad(self):
+        from whisperjav.modules.speech_segmentation.factory import _PARAM_SCHEMAS
+        assert _PARAM_SCHEMAS["ten"]["end_pad_ms"][1] == \
+            self._balanced("ten-speech-segmentation.yaml", "end_pad_ms")
 
     def test_silero_v6_not_old_250(self):
         from whisperjav.modules.speech_segmentation.backends.silero_v6 import SileroV6SpeechSegmenter
