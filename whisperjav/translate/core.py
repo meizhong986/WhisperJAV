@@ -345,6 +345,25 @@ def target_language_name(target_lang: str) -> str:
     return name[:1].upper() + name[1:] if name else "the target language"
 
 
+def shared_text_path(path, text: str) -> Path:
+    """The shared file for this text: ``path``'s name with a code made from the text
+    (instructions_standard.txt -> instructions_standard_<8 hex>.txt), so one name
+    always holds one text (1.10.2, owner W633 3)."""
+    import hashlib
+    path = Path(path)
+    digest = hashlib.sha1(text.encode("utf-8")).hexdigest()[:8]
+    return path.with_name(f"{path.stem}_{digest}{path.suffix}")
+
+
+def _read_as_written(path: Path):
+    """The file's text without newline translation, or None when it cannot be read (missing, or refused)."""
+    try:
+        with open(path, encoding="utf-8", newline="") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
 def write_shared_text(path, text: str) -> str:
     """Write a temp file that other runs may be reading, and return the path to use.
 
@@ -352,25 +371,51 @@ def write_shared_text(path, text: str) -> str:
     finding, 2026-10-06). Rewriting one while another run reads it could hand that
     run an empty file; on Windows a file another run has open cannot be replaced at
     all. So: a file that already holds this text is left alone (the usual case:
-    same tone, same bundled text); otherwise the text goes to a private temp file
-    that is swapped in, and if the swap is refused the private file is used instead.
+    same tone, same bundled text); otherwise the text goes to a private temp file,
+    which is put in place, and if that is refused the private file is used instead.
+
+    1.10.2 (owner W633 3): the shared file's name carries a code made from its text
+    (shared_text_path), and the private file is put in place with os.rename, which
+    on Windows never replaces a file that exists; elsewhere it replaces in one step,
+    and only a file of the same name, so of the same text. Before, every text of a
+    tone shared one name, instructions_<tone>.txt: a run of another text (an install
+    of 1.9.3 or older, or the Gist's text when a bundled file is missing) could
+    replace the file while a run used it, and the command line reads it again for
+    every file; and two runs creating it within milliseconds could have a read
+    refused on Windows ("Permission denied"), which gave instructions with a literal
+    {LANG} (fill_target_language) or a failed translation (PySubtrans's read). Now
+    no run touches a file another text uses. A file of this name that reads as other
+    text (edited by hand) is not in use by any run, so it is replaced; one whose read
+    is refused is left alone. Written and compared without newline translation, so a
+    text with CR LF matches its file.
     """
     import tempfile
-    path = Path(path)
-    try:
-        if path.read_text(encoding="utf-8") == text:
-            return str(path)
-    except OSError:
-        pass
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(prefix=path.stem + "_", suffix=path.suffix, dir=str(path.parent))
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
+    shared = shared_text_path(path, text)
+    if _read_as_written(shared) == text:
+        return str(shared)
+    shared.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=shared.stem + "_", suffix=shared.suffix, dir=str(shared.parent))
+    with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
         f.write(text)
     try:
-        os.replace(tmp, path)
-        return str(path)
+        os.rename(tmp, shared)
+        return str(shared)
     except OSError:
-        return tmp          # the shared file is in use; this run reads its own copy
+        pass
+    seen = _read_as_written(shared)
+    if seen == text:                # another run put the same text in place first
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        return str(shared)
+    if seen is not None:            # it holds other text: no run uses it
+        try:
+            os.replace(tmp, shared)
+            return str(shared)
+        except OSError:
+            pass
+    return tmp          # the shared file cannot be used; this run reads its own copy
 
 
 def fill_target_language(instruction_file, target_lang: str) -> str:
