@@ -1,8 +1,8 @@
 # WhisperJAV Linux 安装指南
 
-**版本：** 1.10.1
+**版本：** 1.10.2
 
-项目中还没有人在 Linux 上运行过 WhisperJAV 1.10.0。请告诉我们它在你的电脑上表现如何：https://github.com/meizhong986/WhisperJAV/issues
+项目中还没有人在 Linux 上运行过 WhisperJAV 1.10。请告诉我们它在你的电脑上表现如何：https://github.com/meizhong986/WhisperJAV/issues
 
 ---
 
@@ -23,7 +23,7 @@
 
 ## 你的电脑 {#your-computer}
 
-| | WhisperJAV 1.10.0 需要 |
+| | WhisperJAV 1.10 需要 |
 |---|---|
 | 处理器 | x86-64 或 ARM64 |
 | Linux | glibc 2.35 或更新：Ubuntu 22.04 或更新、Debian 12 或更新、Fedora 36 或更新、openSUSE Leap 15.6，以及基于它们的发行版；Arch 等滚动更新发行版 |
@@ -97,7 +97,7 @@ pip install "pywebview[qt]"
 
 ## Python 3.13 {#python-313}
 
-WhisperJAV 1.10.0 只能在 Python 3.13 上运行。`python3 --version` 显示系统 Python 的版本；如果不是 3.13：
+WhisperJAV 1.10 只能在 Python 3.13 上运行。`python3 --version` 显示系统 Python 的版本；如果不是 3.13：
 
 - **Ubuntu 22.04 / 24.04：** 从 deadsnakes PPA 安装 3.13：
   ```bash
@@ -119,7 +119,7 @@ source ~/.venv/whisperjav/bin/activate
 
 ## NVIDIA 驱动 {#nvidia-driver}
 
-NVIDIA GPU（CUDA）安装需要 NVIDIA 驱动 570 或更新；不需要 CUDA Toolkit（PyTorch 自带 CUDA 运行库）。在 Linux 上，1.10.0 安装适用于 CUDA 12.8 的 PyTorch。
+NVIDIA GPU（CUDA）安装需要 NVIDIA 驱动 570 或更新；不需要 CUDA Toolkit（PyTorch 自带 CUDA 运行库）。在 Linux 上，1.10 安装适用于 CUDA 12.8 的 PyTorch。
 
 ```bash
 nvidia-smi          # 显示驱动版本；没有驱动时会失败
@@ -139,7 +139,7 @@ nvidia-smi          # 显示驱动版本；没有驱动时会失败
 在激活虚拟环境后：
 
 ```bash
-git clone --branch v1.10.1 https://github.com/meizhong986/WhisperJAV.git
+git clone --branch v1.10.2 https://github.com/meizhong986/WhisperJAV.git
 cd WhisperJAV
 chmod +x installer/install_linux.sh
 ./installer/install_linux.sh
@@ -225,7 +225,7 @@ git checkout v1.10.x      # 你想要的版本
 python3 install.py
 ```
 
-1.9.x 环境无法更新到 1.10.0：1.10.0 需要 Python 3.13。请新建一个 Python 3.13 环境并安装到那里。
+1.9.x 环境无法更新到 1.10：1.10 需要 Python 3.13。请新建一个 Python 3.13 环境并安装到那里。
 
 ---
 
