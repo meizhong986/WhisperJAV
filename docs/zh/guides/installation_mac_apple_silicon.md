@@ -1,8 +1,8 @@
 # WhisperJAV Apple silicon Mac 安装指南
 
-**版本：** 1.10.1
+**版本：** 1.10.2
 
-在 Apple silicon Mac 上，WhisperJAV 1.10.1 会自动为 **Apple GPU（Metal）** 制作安装：即 Apple 芯片内置的 GPU。部分处理管线使用它，其他的在 CPU 上运行（见[各处理管线在哪里运行](#4-where-each-pipeline-runs)）。Mac 没有类似 `.exe` 的安装程序；你需要用一个脚本从源码安装。
+在 Apple silicon Mac 上，WhisperJAV 1.10 会自动为 **Apple GPU（Metal）** 制作安装：即 Apple 芯片内置的 GPU。部分处理管线使用它，其他的在 CPU 上运行（见[各处理管线在哪里运行](#4-where-each-pipeline-runs)）。Mac 没有类似 `.exe` 的安装程序；你需要用一个脚本从源码安装。
 
 项目中还没有人在 Mac 上运行过 WhisperJAV 1.10。标为"尚未在 Mac 上测试"的部分已经具备，应当可以工作，但我们无法检查。请告诉我们它在你的 Mac 上表现如何：https://github.com/meizhong986/WhisperJAV/issues
 
@@ -22,7 +22,7 @@
 
 ## 1. 你的 Mac {#1-your-mac}
 
-| | WhisperJAV 1.10.1 需要 |
+| | WhisperJAV 1.10 需要 |
 |---|---|
 | 芯片 | Apple silicon（M1 或更新） |
 | macOS | 14（Sonoma）或更新 |
@@ -30,7 +30,7 @@
 | 磁盘 | 约 10 GB，用于安装和首次使用时下载的模型 |
 | Python | 3.13，Apple silicon（arm64）版 |
 
-**不支持**（安装程序会说明原因，不安装任何内容）：Intel Mac，因为 WhisperJAV 1.10.1 需要的 PyTorch 2.11 没有为它们制作；macOS 13 及更早，因为 ONNX Runtime 1.29 需要 macOS 14 或更新。在 Apple silicon Mac 上通过 Rosetta（作为 Intel 程序）运行的 Python 也会被拒绝：请使用 arm64 的 Python，例如 Homebrew 提供的。
+**不支持**（安装程序会说明原因，不安装任何内容）：Intel Mac，因为 WhisperJAV 1.10 需要的 PyTorch 2.11 没有为它们制作；macOS 13 及更早，因为 ONNX Runtime 1.29 需要 macOS 14 或更新。在 Apple silicon Mac 上通过 Rosetta（作为 Intel 程序）运行的 Python 也会被拒绝：请使用 arm64 的 Python，例如 Homebrew 提供的。
 
 ---
 
@@ -63,7 +63,7 @@ source ~/venvs/whisperjav/bin/activate
 python3 --version          # 应显示 Python 3.13.x
 
 # 该版本的源码
-git clone --branch v1.10.1 https://github.com/meizhong986/WhisperJAV.git
+git clone --branch v1.10.2 https://github.com/meizhong986/WhisperJAV.git
 cd WhisperJAV
 
 # 安装脚本
