@@ -5,7 +5,7 @@ types: segments, words and tokens, with times measured from the start of the aud
 never sees CrispASR's objects, so a later change of route or of CrispASR's result changes this
 module only (route B design 5).
 
-Route B: CrispASR's Python binding, ``crispasr.Session`` (0.8.50 since 1.10.1; 0.8.44 in 1.10.0). The model is opened once per pass
+Route B: CrispASR's Python binding, ``crispasr.Session`` (0.8.53 since 1.10.2; 0.8.50 in 1.10.1; 0.8.44 in 1.10.0). The model is opened once per pass
 (owner W202 5a) and closed by ``cleanup()``, which ``BasePipeline.cleanup()`` calls at the end of
 the pass. ``crispasr`` is imported only when an engine opens, so importing this module stays light.
 """
