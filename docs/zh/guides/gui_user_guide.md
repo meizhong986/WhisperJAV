@@ -157,6 +157,8 @@ WhisperJAV 接受扩展名为 .mp4、.mkv、.avi、.mov、.wmv、.flv、.webm、
 - **原语言**（默认） — 以原始语言输出字幕
 - **直接转英语** — Whisper 在转写过程中翻译为英语（质量低于专门的翻译工具）
 
+已知问题：使用 transformers 处理管线的默认模型 Kotoba Bilingual v1.0 时，模型给出的英语文字没有时间，因此字幕无法使用。
+
 ---
 
 ## 6. 高级选项
@@ -199,8 +201,8 @@ WhisperJAV 接受扩展名为 .mp4、.mkv、.avi、.mov、.wmv、.flv、.webm、
 | **处理管线** | 基于 Whisper：Balanced、Fast、Faster、Fidelity；HuggingFace：Transformers (HF)；ChronosJAV：Qwen3-ASR、Anime-Whisper；外部 (BYOP)：XXL Faster Whisper；GGUF via crispasr：parakeet、cohere；实验性，欢迎反馈：reazonspeech、kotoba、whisper-turbo、whisper-large、MOSS、haas、qwen3-asr | 第一轮：cohere；第二轮：parakeet（勾选前不运行） |
 | **灵敏度** | 高灵敏、中灵敏、低灵敏 | 选择处理管线时随之设定：第一轮（cohere）中灵敏，第二轮（parakeet）高灵敏 |
 | **场景检测器** | Auditok、Silero、Semantic、None | Semantic |
-| **语音增强器** | None、FFmpeg DSP、ZipEnhancer、htdemucs（BS-RoFormer 和 ZipEnhancer ONNX：即将推出） | None |
-| **语音分割器** | Silero v4.0、Silero v3.1、Silero v6.2、TEN VAD、WhisperSeg (JA-ASMR)、FireRedVAD、无（None）；Balanced 时改为其内置 VAD 的 Silero 版本：3.1、4.0（默认）、6.2；GGUF 处理管线选 无 时，每个场景整段交给模型 | 选择处理管线时随之设定：第一轮（cohere）FireRedVAD，第二轮（parakeet）TEN VAD |
+| **语音增强器** | 无；人声分离：Mel-Band-RoFormer、Mini-BS-RoFormer、htdemucs (Demucs v4)；噪声抑制：ZipEnhancer；DSP：FFmpeg 音频滤镜...；菜单中的 **仅用于 VAD**（For VAD only）默认勾选（Fidelity、Qwen3-ASR、Anime-Whisper 和 GGUF 处理管线；Balanced、Fast、Faster、Transformers 和 XXL 不提供） | 无 |
+| **语音分割器** | FireRedVAD、TEN VAD、WhisperSeg (JA-ASMR)、Silero v3.1、Silero v4.0、Silero v6.2；在 **实验性，欢迎反馈** 下：Sortformer (NVIDIA Nemotron)、pyannote 3.0；无（None）；Balanced 时改为其内置 VAD 的 Silero 版本：3.1、4.0（默认）、6.2；GGUF 处理管线选 无 时，每个场景整段交给模型 | 选择处理管线时随之设定：第一轮（cohere）FireRedVAD，第二轮（parakeet）TEN VAD |
 | **模型** | 所选处理管线的模型 | 该处理管线的默认模型 |
 
 ### 可用处理管线
