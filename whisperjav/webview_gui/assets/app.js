@@ -334,6 +334,9 @@ const AppState = {
     // UI state
     activeTab: 'tab1',
     isRunning: false,
+    // True from the click on Start until the start call returns (1.10.2, owner W647 1). The call can take
+    // many seconds; while it is true the Start button is greyed and a second click starts nothing.
+    isStarting: false,
 
     // Process monitoring
     logPollInterval: null,
@@ -852,8 +855,9 @@ const FileListManager = {
         const hasFiles = AppState.selectedFiles.length > 0;
         const hasSelection = AppState.selectedIndices.size > 0;
 
-        document.getElementById('removeSelectedBtn').disabled = !hasSelection || AppState.isRunning;
-        document.getElementById('clearBtn').disabled = !hasFiles || AppState.isRunning;
+        const busy = AppState.isRunning || AppState.isStarting;
+        document.getElementById('removeSelectedBtn').disabled = !hasSelection || busy;
+        document.getElementById('clearBtn').disabled = !hasFiles || busy;
     },
 
     handleKeyboard(e) {
@@ -1011,8 +1015,8 @@ const FormManager = {
         const hasFiles = AppState.selectedFiles.length > 0;
         const startBtn = document.getElementById('startBtn');
 
-        // Disable start button if no files selected or process running
-        startBtn.disabled = !hasFiles || AppState.isRunning;
+        // Disable start button if no files selected, a run is starting, or a run is running
+        startBtn.disabled = !hasFiles || AppState.isRunning || AppState.isStarting;
 
         // Also update the SRT Translate tab's Start button (shared file list)
         const translatorStartBtn = document.getElementById('translatorStartBtn');
@@ -1232,7 +1236,15 @@ const RunStopDialog = {
     async runOnCpu() {
         // "Run on the CPU this time": the same run again with --device cpu (every part on the CPU).
         this.close();
-        const result = await pywebview.api.rerun_on_cpu();
+        if (!ProcessManager.beginStart()) return;   // one start at a time (owner W647 1)
+        let result = null;
+        try {
+            result = await pywebview.api.rerun_on_cpu();
+        } catch (error) {
+            result = { success: false, message: error.toString() };
+        } finally {
+            ProcessManager.endStart(!!(result && result.success));
+        }
         if (result && result.success) {
             AppState.isRunning = true;
             ProcessManager.updateButtonStates();
@@ -1253,13 +1265,41 @@ const RunStopDialog = {
 // Process Management (Real API Integration)
 // ============================================================
 const ProcessManager = {
+    // One start at a time (1.10.2, owner W647 1). beginStart() is called at the click, before the start call:
+    // it answers false when a run is already starting or running, else it greys the Start button and shows
+    // "Starting...". endStart(started) is called when the start call has returned.
+    beginStart() {
+        if (AppState.isStarting || AppState.isRunning) return false;
+        AppState.isStarting = true;
+        this.updateButtonStates();
+        // What the status line said before; a start that fails puts it back (it may name why the last run stopped).
+        this._statusBeforeStart = ProgressManager.statusLabel.textContent;
+        ProgressManager.setIndeterminate(true);
+        ProgressManager.setStatus('Starting...');
+        return true;
+    },
+
+    endStart(started) {
+        AppState.isStarting = false;
+        if (!started) {
+            ProgressManager.setIndeterminate(false);
+            ProgressManager.setStatus(this._statusBeforeStart);
+        }
+        this.updateButtonStates();
+    },
+
     async start() {
+        // A run is already starting or running: this click starts nothing.
+        if (AppState.isStarting || AppState.isRunning) return;
+
         // Validate form
         if (!FormManager.validateForm()) {
             ErrorHandler.show('No Files Selected', 'Please add at least one file or folder before starting.');
             return;
         }
 
+        if (!this.beginStart()) return;
+        let started = false;
         try {
             // Collect form options
             const options = FormManager.collectFormData();
@@ -1272,6 +1312,7 @@ const ProcessManager = {
 
             if (result.success) {
                 // Update UI state
+                started = true;
                 AppState.isRunning = true;
                 this.updateButtonStates();
 
@@ -1296,6 +1337,8 @@ const ProcessManager = {
             }
         } catch (error) {
             ErrorHandler.show('Start Error', error.toString());
+        } finally {
+            this.endStart(started);
         }
     },
 
@@ -1324,6 +1367,8 @@ const ProcessManager = {
     },
 
     startLogPolling() {
+        // Never two readers: an earlier one left running would take lines out of the queue and drop them.
+        this.stopLogPolling();
         // Poll every 100ms for new logs
         AppState.logPollInterval = setInterval(async () => {
             try {
@@ -1356,6 +1401,8 @@ const ProcessManager = {
     },
 
     startStatusMonitoring() {
+        // Never two monitors (same reason as the log reader above).
+        this.stopStatusMonitoring();
         // Poll every 500ms for process status
         AppState.statusPollInterval = setInterval(async () => {
             try {
@@ -1440,6 +1487,11 @@ const ProcessManager = {
                             ProgressManager.setStatus(`Finished with failures · ${tally}`);
                             ErrorHandler.show('Finished with failures',
                                 `Files: ${tally}. Exit status ${status.exit_code}; a run fails on: ${(summary.fails_on || ['failed']).join(', ')}. See the RUN SUMMARY in the console.`);
+                        } else if (status.working_folder_in_use) {
+                            // Another run uses the working folder: this run refused to start (1.10.2, owner W648 2).
+                            ProgressManager.setStatus(`The run did not start (exit status ${status.exit_code})`);
+                            RunStopDialog.show('The run did not start',
+                                `${status.working_folder_in_use} Nothing was processed.`, false);
                         } else if (status.exit_code === 3) {
                             // design 22.9.2 (owner D-G): this install's NVIDIA GPU cannot be used now.
                             ProgressManager.setStatus('The run did not start (exit status 3)');
@@ -1526,8 +1578,8 @@ const ProcessManager = {
         const cancelBtn = document.getElementById('cancelBtn');
         const hasFiles = AppState.selectedFiles.length > 0;
 
-        // Start button: enabled only if files exist and not running
-        startBtn.disabled = !hasFiles || AppState.isRunning;
+        // Start button: enabled only if files exist and no run is starting or running
+        startBtn.disabled = !hasFiles || AppState.isRunning || AppState.isStarting;
 
         // Cancel button: enabled only if running
         cancelBtn.disabled = !AppState.isRunning;
@@ -6988,6 +7040,9 @@ const EnsembleManager = {
     },
 
     async startProcessing() {
+        // A run is already starting or running: this click starts nothing (1.10.2, owner W647 1).
+        if (AppState.isStarting || AppState.isRunning) return;
+
         // Validate
         if (AppState.selectedFiles.length === 0) {
             ErrorHandler.show('No Files Selected', 'Please add at least one file or folder before starting.');
@@ -7010,6 +7065,10 @@ const EnsembleManager = {
             return;
         }
 
+        // From here to the end of the start call the Start button is greyed and shows "Starting...": the call
+        // launches the run and can take many seconds, and every click in that time used to start one more run.
+        if (!ProcessManager.beginStart()) return;
+        let started = false;
         try {
             const config = this.collectConfig();
 
@@ -7030,6 +7089,7 @@ const EnsembleManager = {
 
             if (result.success) {
                 // Update UI state
+                started = true;
                 AppState.isRunning = true;
                 ProcessManager.updateButtonStates();
 
@@ -7051,6 +7111,8 @@ const EnsembleManager = {
             }
         } catch (error) {
             ErrorHandler.show('Start Error', error.toString());
+        } finally {
+            ProcessManager.endStart(started);
         }
     },
 
@@ -8677,6 +8739,9 @@ const TranslatorManager = {
     },
 
     async startTranslation() {
+        // A translation is already starting or running: this click starts nothing (1.10.2, owner W647 1).
+        if (this.state.isRunning) return;
+
         if (AppState.selectedFiles.length === 0) {
             ErrorHandler.show('No Files', 'Add SRT files in the Source section above, then start translation.');
             return;
