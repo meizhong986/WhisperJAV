@@ -330,7 +330,7 @@ Not supported by 1.10, which is made and tested for installs on your own compute
 Prerequisites: Python 3.13, Git, FFmpeg in PATH.
 
 ```batch
-git clone --branch v1.10.1 https://github.com/meizhong986/whisperjav.git
+git clone --branch v1.10.2 https://github.com/meizhong986/whisperjav.git
 cd whisperjav
 installer\install_windows.bat                    :: a supported NVIDIA GPU is used; otherwise it asks
 installer\install_windows.bat --accelerator cpu  :: or choose: nvidia, vulkan, own-pytorch, cpu
@@ -346,7 +346,7 @@ Full guide: [docs/en/guides/installation_windows_python.md](docs/en/guides/insta
 xcode-select --install
 brew install python@3.13 ffmpeg portaudio git
 
-git clone --branch v1.10.1 https://github.com/meizhong986/whisperjav.git
+git clone --branch v1.10.2 https://github.com/meizhong986/whisperjav.git
 cd whisperjav
 python3.13 -m venv ~/venvs/whisperjav && source ~/venvs/whisperjav/bin/activate
 chmod +x installer/install_mac.sh && ./installer/install_mac.sh
@@ -370,7 +370,7 @@ sudo apt-get install -y python3 python3-pip python3-venv python3-dev \
 Then:
 
 ```bash
-git clone --branch v1.10.1 https://github.com/meizhong986/whisperjav.git
+git clone --branch v1.10.2 https://github.com/meizhong986/whisperjav.git
 cd whisperjav
 chmod +x installer/install_linux.sh && ./installer/install_linux.sh
 ```
