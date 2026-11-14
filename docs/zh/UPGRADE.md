@@ -20,7 +20,7 @@ GUI 会提示有新版本：顶部栏会出现显示新版本号的提示，顶�
    "%LOCALAPPDATA%\WhisperJAV\Scripts\whisperjav.exe" --version
    ```
 
-请如上用安装文件夹中的 `python.exe` 启动升级，不要用 `Scripts\whisperjav-upgrade.exe`：当 WhisperJAV 安装在与 Windows 临时文件夹（通常在 C 盘）不同的盘上时，1.10.0 和 1.10.1 的 `whisperjav-upgrade.exe` 会在中途停止，之后 WhisperJAV 无法启动。
+请如上用安装文件夹中的 `python.exe` 启动升级，不要用 `Scripts\whisperjav-upgrade.exe`：当 WhisperJAV 安装在与 Windows 临时文件夹（通常在 C 盘）不同的盘上时，1.10.0、1.10.1 和 1.10.2 的 `whisperjav-upgrade.exe` 会在中途停止，之后 WhisperJAV 无法启动。
 
 同一命令加上一个选项：
 
