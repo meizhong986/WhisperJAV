@@ -118,6 +118,11 @@ class CrispTimer:
             # The shortest audio a model is given (owner W461; modules/model_audio.py): no timing for a piece under
             # 0.2 s, which by rule T3 changes nothing. Shorter pieces can stop the process in CrispASR's DTW step.
             return []
+        # Minimum length for the timing model to avoid native abort in whisper.cpp
+        MIN_TIMER_SAMPLES = int(0.1 * 16000)  # 1600 samples (0.1 seconds)
+        if pcm.size < MIN_TIMER_SAMPLES:
+            logger.debug(f"{self.label}: frame of {pcm.size} samples is below the timing model's minimum; skipped")
+            return []
         try:
             segments = self._model.transcribe_pcm(pcm, language=LANGUAGE, decode_options=dict(DECODE_OPTIONS))
         except (RuntimeError, OSError, ValueError) as e:
