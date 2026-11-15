@@ -1,11 +1,22 @@
 """
-Tests for presets - verify values match asr_config.json.
+Tests for presets - pin the CURRENT intended sensitivity values.
+
+HISTORY: this file originally verified Pydantic presets against the legacy
+sections of asr_config.json. Those sections were removed in the v1.8.9
+config cleanup (asr_config.json now only carries ui_preferences), which
+left every comparison raising KeyError. As of v1.9.0 the Pydantic presets
+in whisperjav/config/schemas/presets.py ARE the source of truth, so these
+tests pin the intended values inline instead.
+
+Value provenance (update the pins ONLY with a matching release-note entry):
+- v1.8.10-hf2: logprob_threshold -0.75 -> -1.00, logprob_margin 0.2 -> 0.0
+- v1.8.10-hf3: silero thresholds 0.18/0.35/0.05 -> 0.28/0.41/0.18;
+  best_of 1 -> 2, patience 2.0 -> 1.6 (balanced pipeline mapping)
+- v1.8.12:     silero max_speech/max_group tightened (components registry)
+- C1 fix:      hallucination_silence_threshold None = disabled, no fallback
+- CL1b:        balanced temperature [0.0]
 """
 
-import json
-from pathlib import Path
-
-import pytest
 
 from whisperjav.config.schemas import (
     DECODER_PRESETS,
@@ -24,263 +35,212 @@ from whisperjav.config.schemas import (
 )
 
 
-@pytest.fixture
-def asr_config():
-    """Load asr_config.json for comparison."""
-    config_path = Path(__file__).parent.parent.parent / "whisperjav" / "config" / "asr_config.json"
-    with open(config_path) as f:
-        return json.load(f)
-
-
 class TestTranscriberPresets:
-    """Test TranscriberOptions presets match asr_config.json."""
+    """Pin TranscriberOptions preset values."""
 
-    def test_balanced_values(self, asr_config):
-        """Test balanced preset matches JSON."""
+    def test_balanced_values(self):
         preset = TRANSCRIBER_PRESETS[Sensitivity.BALANCED]
-        json_values = asr_config["common_transcriber_options"]["balanced"]
+        assert preset.temperature == [0.0]                     # CL1b
+        assert preset.compression_ratio_threshold == 2.4
+        assert preset.logprob_threshold == -1.0                # v1.8.10-hf2
+        assert preset.logprob_margin == 0.0                    # v1.8.10-hf2
+        assert preset.no_speech_threshold == 0.65              # v1.8.10-hf3
+        assert preset.condition_on_previous_text is False
+        assert preset.word_timestamps is True
 
-        assert preset.temperature == json_values["temperature"]
-        assert preset.compression_ratio_threshold == json_values["compression_ratio_threshold"]
-        assert preset.logprob_threshold == json_values["logprob_threshold"]
-        assert preset.no_speech_threshold == json_values["no_speech_threshold"]
-        assert preset.word_timestamps == json_values["word_timestamps"]
-
-    def test_conservative_values(self, asr_config):
-        """Test conservative preset matches JSON."""
+    def test_conservative_values(self):
         preset = TRANSCRIBER_PRESETS[Sensitivity.CONSERVATIVE]
-        json_values = asr_config["common_transcriber_options"]["conservative"]
+        assert preset.temperature == [0.0]
+        assert preset.compression_ratio_threshold == 2.2
+        assert preset.logprob_threshold == -0.84
+        assert preset.no_speech_threshold == 0.54
 
-        assert preset.temperature == json_values["temperature"]
-        assert preset.no_speech_threshold == json_values["no_speech_threshold"]
-        assert preset.logprob_threshold == json_values["logprob_threshold"]
-
-    def test_aggressive_values(self, asr_config):
-        """Test aggressive preset matches JSON."""
+    def test_aggressive_values(self):
         preset = TRANSCRIBER_PRESETS[Sensitivity.AGGRESSIVE]
-        json_values = asr_config["common_transcriber_options"]["aggressive"]
-
-        assert preset.temperature == json_values["temperature"]
-        assert preset.compression_ratio_threshold == json_values["compression_ratio_threshold"]
-        assert preset.no_speech_threshold == json_values["no_speech_threshold"]
-
-    def test_getter_function(self):
-        """Test get_transcriber_preset returns correct preset."""
-        preset = get_transcriber_preset(Sensitivity.AGGRESSIVE)
-        assert preset == TRANSCRIBER_PRESETS[Sensitivity.AGGRESSIVE]
+        assert preset.temperature == [0.0, 0.2]
+        assert preset.compression_ratio_threshold == 2.6
+        assert preset.logprob_threshold == -1.0
+        assert preset.no_speech_threshold == 0.72
 
 
 class TestDecoderPresets:
-    """Test DecoderOptions presets match asr_config.json."""
+    """Pin DecoderOptions preset values."""
 
-    def test_balanced_values(self, asr_config):
-        """Test balanced preset matches JSON."""
+    def test_balanced_values(self):
         preset = DECODER_PRESETS[Sensitivity.BALANCED]
-        json_values = asr_config["common_decoder_options"]["balanced"]
+        assert preset.task == "transcribe"
+        assert preset.language == "ja"
+        assert preset.beam_size == 2
+        assert preset.best_of == 2                             # v1.8.10-hf3
+        assert preset.patience == 1.2
+        assert preset.suppress_blank is True
+        # None -> whisper library default applies (dropped on export)
+        assert preset.suppress_tokens is None
 
-        assert preset.beam_size == json_values["beam_size"]
-        assert preset.patience == json_values["patience"]
-        assert preset.suppress_blank == json_values["suppress_blank"]
-
-    def test_conservative_values(self, asr_config):
-        """Test conservative preset matches JSON."""
+    def test_conservative_values(self):
         preset = DECODER_PRESETS[Sensitivity.CONSERVATIVE]
-        json_values = asr_config["common_decoder_options"]["conservative"]
+        assert preset.beam_size == 2
+        assert preset.best_of == 2
+        assert preset.patience == 1.0
 
-        assert preset.beam_size == json_values["beam_size"]
-        assert preset.patience == json_values["patience"]
-
-    def test_aggressive_values(self, asr_config):
-        """Test aggressive preset matches JSON."""
+    def test_aggressive_values(self):
         preset = DECODER_PRESETS[Sensitivity.AGGRESSIVE]
-        json_values = asr_config["common_decoder_options"]["aggressive"]
-
-        assert preset.beam_size == json_values["beam_size"]
-        assert preset.patience == json_values["patience"]
-        assert preset.suppress_blank == json_values["suppress_blank"]
-        assert preset.suppress_tokens == json_values["suppress_tokens"]
-
-    def test_getter_function(self):
-        """Test get_decoder_preset returns correct preset."""
-        preset = get_decoder_preset(Sensitivity.BALANCED)
-        assert preset == DECODER_PRESETS[Sensitivity.BALANCED]
+        assert preset.beam_size == 3
+        assert preset.best_of == 2
+        assert preset.patience == 1.3
 
 
 class TestSileroVADPresets:
-    """Test SileroVADOptions presets from v4 YAML configuration."""
+    """Pin Silero VAD preset values (schemas copy)."""
 
-    @pytest.fixture
-    def silero_tool(self):
-        """Load Silero speech segmentation tool from v4 YAML."""
-        from whisperjav.config.v4.registries.tool_registry import get_tool_registry
-        registry = get_tool_registry()
-        return registry.get("silero-speech-segmentation")
+    def test_balanced_values(self):
+        preset = SILERO_VAD_PRESETS[Sensitivity.BALANCED]
+        assert preset.threshold == 0.28                        # v1.8.10-hf3
+        assert preset.min_speech_duration_ms == 100
+        assert preset.max_speech_duration_s == 5.0             # v1.8.12
+        assert preset.min_silence_duration_ms == 300
+        assert preset.speech_pad_ms == 400
 
-    def test_balanced_values(self, silero_tool):
-        """Test balanced preset values from v4 YAML."""
-        # Balanced uses spec defaults
-        spec = silero_tool.spec
+    def test_conservative_values(self):
+        preset = SILERO_VAD_PRESETS[Sensitivity.CONSERVATIVE]
+        assert preset.threshold == 0.41                        # v1.8.10-hf3
+        assert preset.min_speech_duration_ms == 150
+        assert preset.max_speech_duration_s == 6.0
+        assert preset.speech_pad_ms == 500
 
-        assert spec["vad.threshold"] == 0.18
-        assert spec["vad.min_speech_duration_ms"] == 100
-        assert spec["vad.max_speech_duration_s"] == 11.0
-        assert spec["vad.speech_pad_ms"] == 400
+    def test_aggressive_values(self):
+        preset = SILERO_VAD_PRESETS[Sensitivity.AGGRESSIVE]
+        assert preset.threshold == 0.18                        # v1.8.10-hf3
+        assert preset.min_speech_duration_ms == 30
+        assert preset.max_speech_duration_s == 4.0             # v1.8.12
+        assert preset.speech_pad_ms == 300
 
-    def test_conservative_values(self, silero_tool):
-        """Test conservative preset values from v4 YAML."""
-        config = silero_tool.get_resolved_config("conservative")
+    def test_matches_runtime_registry(self):
+        """Guard: the schemas copy must not drift from the runtime registry.
 
-        assert config["vad.threshold"] == 0.35
-        assert config["vad.neg_threshold"] == 0.3
-        assert config["vad.min_speech_duration_ms"] == 150
-        assert config["vad.max_speech_duration_s"] == 9.0
+        resolve_config_v3 reads presets from the components VAD registry
+        (whisperjav/config/components/vad/silero.py), NOT from this schemas
+        copy. Before v1.9.0 the two silently diverged (schemas kept the
+        pre-v1.8.12 max_speech caps). Grouping keys (chunk_threshold_s,
+        max_group_duration_s) exist only in the registry by design - see
+        SegmenterGroupingOptions.
+        """
+        from whisperjav.config.components.base import get_vad_registry
 
-    def test_aggressive_values(self, silero_tool):
-        """Test aggressive preset values from v4 YAML."""
-        config = silero_tool.get_resolved_config("aggressive")
-
-        assert config["vad.threshold"] == 0.05
-        assert config["vad.neg_threshold"] == 0.1
-        assert config["vad.min_speech_duration_ms"] == 30
-        assert config["vad.speech_pad_ms"] == 600
-
-    def test_legacy_getter_function(self):
-        """Test legacy get_silero_vad_preset still works."""
-        # Legacy function still available for backward compatibility
-        preset = get_silero_vad_preset(Sensitivity.CONSERVATIVE)
-        assert preset == SILERO_VAD_PRESETS[Sensitivity.CONSERVATIVE]
-
-    def test_v4_presets_available(self, silero_tool):
-        """Test all expected presets exist in v4 YAML."""
-        assert "conservative" in silero_tool.presets
-        assert "balanced" in silero_tool.presets
-        assert "aggressive" in silero_tool.presets
+        component = get_vad_registry()["silero"]
+        shared_keys = (
+            "threshold", "min_speech_duration_ms", "max_speech_duration_s",
+            "min_silence_duration_ms", "speech_pad_ms",
+        )
+        for sens in Sensitivity:
+            schemas_preset = SILERO_VAD_PRESETS[sens].model_dump()
+            registry_preset = component.get_preset(sens.value).model_dump()
+            for key in shared_keys:
+                assert schemas_preset[key] == registry_preset[key], (
+                    f"schemas/presets.py diverged from components registry: "
+                    f"{sens.value}.{key}: {schemas_preset[key]} != {registry_preset[key]}"
+                )
 
 
 class TestStableTSVADPresets:
-    """Test StableTSVADOptions presets match asr_config.json."""
+    """Pin Stable-TS VAD preset values."""
 
-    def test_balanced_values(self, asr_config):
-        """Test balanced preset matches JSON."""
+    def test_balanced_values(self):
         preset = STABLE_TS_VAD_PRESETS[Sensitivity.BALANCED]
-        json_values = asr_config["stable_ts_vad_options"]["balanced"]
+        assert preset.vad is True
+        assert preset.vad_threshold == 0.25
 
-        assert preset.vad == json_values["vad"]
-        assert preset.vad_threshold == json_values["vad_threshold"]
-
-    def test_conservative_values(self, asr_config):
-        """Test conservative preset matches JSON."""
+    def test_conservative_values(self):
         preset = STABLE_TS_VAD_PRESETS[Sensitivity.CONSERVATIVE]
-        json_values = asr_config["stable_ts_vad_options"]["conservative"]
+        assert preset.vad_threshold == 0.35
 
-        assert preset.vad_threshold == json_values["vad_threshold"]
-
-    def test_aggressive_values(self, asr_config):
-        """Test aggressive preset matches JSON."""
+    def test_aggressive_values(self):
         preset = STABLE_TS_VAD_PRESETS[Sensitivity.AGGRESSIVE]
-        json_values = asr_config["stable_ts_vad_options"]["aggressive"]
-
-        assert preset.vad_threshold == json_values["vad_threshold"]
-
-    def test_getter_function(self):
-        """Test get_stable_ts_vad_preset returns correct preset."""
-        preset = get_stable_ts_vad_preset(Sensitivity.AGGRESSIVE)
-        assert preset == STABLE_TS_VAD_PRESETS[Sensitivity.AGGRESSIVE]
+        assert preset.vad_threshold == 0.1
 
 
 class TestFasterWhisperEnginePresets:
-    """Test FasterWhisperEngineOptions presets match asr_config.json."""
+    """Pin Faster-Whisper engine preset values."""
 
-    def test_balanced_values(self, asr_config):
-        """Test balanced preset matches JSON."""
+    def test_balanced_values(self):
         preset = FASTER_WHISPER_ENGINE_PRESETS[Sensitivity.BALANCED]
-        json_values = asr_config["faster_whisper_engine_options"]["balanced"]
+        assert preset.repetition_penalty == 1.5
+        assert preset.no_repeat_ngram_size == 3                # H1
+        assert preset.multilingual is False
 
-        assert preset.repetition_penalty == json_values["repetition_penalty"]
-        # JSON has 2.0 but we use int 2
-        assert preset.no_repeat_ngram_size == int(json_values["no_repeat_ngram_size"])
-
-    def test_conservative_values(self, asr_config):
-        """Test conservative preset matches JSON."""
+    def test_conservative_values(self):
         preset = FASTER_WHISPER_ENGINE_PRESETS[Sensitivity.CONSERVATIVE]
-        json_values = asr_config["faster_whisper_engine_options"]["conservative"]
+        assert preset.repetition_penalty == 1.8
+        assert preset.no_repeat_ngram_size == 3
 
-        assert preset.repetition_penalty == json_values["repetition_penalty"]
-
-    def test_aggressive_values(self, asr_config):
-        """Test aggressive preset matches JSON."""
+    def test_aggressive_values(self):
         preset = FASTER_WHISPER_ENGINE_PRESETS[Sensitivity.AGGRESSIVE]
-        json_values = asr_config["faster_whisper_engine_options"]["aggressive"]
-
-        assert preset.chunk_length == json_values["chunk_length"]
-        assert preset.repetition_penalty == json_values["repetition_penalty"]
-
-    def test_getter_function(self):
-        """Test get_faster_whisper_engine_preset returns correct preset."""
-        preset = get_faster_whisper_engine_preset(Sensitivity.BALANCED)
-        assert preset == FASTER_WHISPER_ENGINE_PRESETS[Sensitivity.BALANCED]
+        assert preset.repetition_penalty == 1.3
+        assert preset.no_repeat_ngram_size == 3
+        # chunk_length=30 is NOT a bug - empirically confirmed, see
+        # memory/project_v1813_session_lessons.md lesson 1
+        assert preset.chunk_length == 30
 
 
 class TestStableTSEngineOptions:
-    """Test StableTSEngineOptions values match asr_config.json."""
+    """Pin Stable-TS engine option defaults."""
 
-    def test_default_values(self, asr_config):
-        """Test stable-ts engine options match JSON (same across sensitivities)."""
-        json_values = asr_config["stable_ts_engine_options"]["balanced"]
-
-        assert STABLE_TS_ENGINE_OPTIONS.gap_padding == json_values["gap_padding"]
-        assert STABLE_TS_ENGINE_OPTIONS.regroup == json_values["regroup"]
-        assert STABLE_TS_ENGINE_OPTIONS.suppress_silence == json_values["suppress_silence"]
-        assert STABLE_TS_ENGINE_OPTIONS.q_levels == json_values["q_levels"]
-        assert STABLE_TS_ENGINE_OPTIONS.k_size == json_values["k_size"]
+    def test_default_values(self):
+        opts = STABLE_TS_ENGINE_OPTIONS
+        assert opts.gap_padding == " ..."
+        assert opts.max_instant_words == 0.5
+        assert opts.nonspeech_error == 0.1
+        assert opts.ignore_compatibility is True
+        assert opts.regroup is True
+        assert opts.q_levels == 20
+        assert opts.k_size == 5
 
 
 class TestHallucinationThresholds:
-    """Test hallucination threshold values match asr_config.json."""
+    """hallucination_silence_threshold: None = disabled (C1 fix)."""
 
-    def test_values(self, asr_config):
-        """Test hallucination thresholds match JSON."""
-        json_values = asr_config["exclusive_whisper_plus_faster_whisper"]
+    def test_values(self):
+        for sens in Sensitivity:
+            assert HALLUCINATION_THRESHOLDS[sens] is None, (
+                f"C1 fix: hallucination_silence_threshold must be None "
+                f"(disabled) for {sens.value}"
+            )
 
-        assert HALLUCINATION_THRESHOLDS[Sensitivity.BALANCED] == json_values["balanced"]["hallucination_silence_threshold"]
-        assert HALLUCINATION_THRESHOLDS[Sensitivity.CONSERVATIVE] == json_values["conservative"]["hallucination_silence_threshold"]
-        assert HALLUCINATION_THRESHOLDS[Sensitivity.AGGRESSIVE] == json_values["aggressive"]["hallucination_silence_threshold"]
+
+class TestPresetGetters:
+    """Getter functions return the same objects as the dicts."""
+
+    def test_getters_match_dicts(self):
+        for sens in Sensitivity:
+            assert get_transcriber_preset(sens) == TRANSCRIBER_PRESETS[sens]
+            assert get_decoder_preset(sens) == DECODER_PRESETS[sens]
+            assert get_silero_vad_preset(sens) == SILERO_VAD_PRESETS[sens]
+            assert get_stable_ts_vad_preset(sens) == STABLE_TS_VAD_PRESETS[sens]
+            assert get_faster_whisper_engine_preset(sens) == FASTER_WHISPER_ENGINE_PRESETS[sens]
 
 
 class TestPresetExport:
-    """Test presets can be exported without None values."""
+    """Test presets export without None values."""
 
     def test_transcriber_export(self):
-        """Test transcriber preset exports correctly."""
         preset = TRANSCRIBER_PRESETS[Sensitivity.BALANCED]
         result = preset.model_dump_without_none()
-
-        # Should not contain None values
         assert "initial_prompt" not in result
         assert "prepend_punctuations" not in result
-
-        # Should contain actual values
-        assert result["temperature"] == [0.0, 0.1]
+        assert result["temperature"] == [0.0]                  # CL1b
         assert result["word_timestamps"] is True
 
     def test_decoder_export(self):
-        """Test decoder preset exports correctly."""
         preset = DECODER_PRESETS[Sensitivity.AGGRESSIVE]
         result = preset.model_dump_without_none()
-
-        # Should contain empty list, not None
-        assert "suppress_tokens" in result
-        assert result["suppress_tokens"] == []
-
-        # Should not contain None values
+        # suppress_tokens is None -> dropped on export, whisper default applies
+        assert "suppress_tokens" not in result
         assert "length_penalty" not in result
+        assert result["beam_size"] == 3
 
     def test_vad_export(self):
-        """Test VAD preset exports all values."""
         preset = SILERO_VAD_PRESETS[Sensitivity.AGGRESSIVE]
         result = preset.model_dump_without_none()
-
-        # All VAD params are required, so all should be present
-        assert result["threshold"] == 0.05
+        assert result["threshold"] == 0.18                     # v1.8.10-hf3
         assert result["min_speech_duration_ms"] == 30
-        assert result["speech_pad_ms"] == 600
+        assert result["speech_pad_ms"] == 300
