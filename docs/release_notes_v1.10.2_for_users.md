@@ -129,6 +129,10 @@ You choose your kind of computer once, when you install WhisperJAV.
 - `Scripts\whisperjav-upgrade.exe` of 1.10.0, 1.10.1 and 1.10.2 stops halfway on an install on another drive than Windows' temporary folder (normally drive C:), and WhisperJAV then no longer starts. Upgrade with `"%LOCALAPPDATA%\WhisperJAV\python.exe" -m whisperjav.upgrade` instead.
 - `whisperjav-upgrade` does not remove packages a new release no longer uses. 1.10.2 no longer uses five: bs-roformer-infer, rotary-embedding-torch, beartype, ml-collections and absl-py.
 - XXL Faster Whisper as pass 1 crashed once when closing, on one of our test files.
+- A run refused because another run uses its working folder is refused only after its start-of-run checks and model downloads are done.
+- Closing the GUI window while a run is still starting: if the start takes longer than 30 seconds, that run goes on. End it in Task Manager.
+- If a run's main process is ended from outside (for example in Task Manager) and one of its worker processes goes on, a new run can start in the same working folder.
+- In the Chinese GUI, the text under "The run did not start" for a working folder in use is in English.
 
 ## Installation
 
