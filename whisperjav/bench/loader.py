@@ -358,8 +358,8 @@ def _find_final_srt(test_dir: Path, master_metadata: dict) -> Optional[Path]:
 
     Strategy:
     1. Check srt_path / output_files.final_srt from master metadata
-    2. Search test_dir for *.ja.whisperjav.srt
-    3. Search test_dir parent for *.ja.whisperjav.srt
+    2. Search test_dir for *.whisperjav.ja.srt
+    3. Search test_dir parent for *.whisperjav.ja.srt
     """
     # Try paths from metadata
     for key in ("srt_path", ):
@@ -378,7 +378,7 @@ def _find_final_srt(test_dir: Path, master_metadata: dict) -> Optional[Path]:
 
     # Search in test directory and parent
     for search_dir in (test_dir, test_dir.parent):
-        candidates = sorted(search_dir.glob("*.whisperjav.srt"))
+        candidates = sorted(search_dir.glob("*.whisperjav.ja.srt"))
         if candidates:
             return candidates[0]
 

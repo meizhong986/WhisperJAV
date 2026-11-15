@@ -113,7 +113,7 @@ Saved in `raw_subs/` alongside existing artifacts (debug mode only).
 | Word-level timestamps per scene | YES | `raw_subs/*_merged.json` |
 | Per-scene SRT | YES | `scene_srts/*_scene_NNNN.srt` |
 | Sanitization actions | YES | `raw_subs/*_stitched.artifacts.srt` |
-| Final SRT | YES | `*.ja.whisperjav.srt` |
+| Final SRT | YES | `*.whisperjav.ja.srt` |
 | **Per-scene sentinel assessment** | **NEW** | `scene_NNNN_diagnostics.json` |
 | **Per-scene sentinel recovery** | **NEW** | `scene_NNNN_diagnostics.json` |
 | **Per-scene timing source breakdown** | **NEW** | `scene_NNNN_diagnostics.json` |

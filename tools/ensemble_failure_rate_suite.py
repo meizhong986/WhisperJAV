@@ -35,7 +35,7 @@ Output structure:
           log.txt            # full whisperjav stdout/stderr
           *.pass1.srt        # produced subtitle files (if any)
           *.pass2.srt
-          *.merged.whisperjav.srt
+          *.merged.whisperjav.*.srt
         002_A_fid_bal_<timestamp>/
         ...
 
@@ -332,7 +332,7 @@ def run_single_iteration(
     # Locate produced SRT files
     pass1_srt  = find_first_glob(run_dir, "*.pass1.srt")           or run_dir / "_missing_pass1.srt"
     pass2_srt  = find_first_glob(run_dir, "*.pass2.srt")           or run_dir / "_missing_pass2.srt"
-    merged_srt = find_first_glob(run_dir, "*.merged.whisperjav.srt") or run_dir / "_missing_merged.srt"
+    merged_srt = find_first_glob(run_dir, "*.merged.whisperjav.*.srt") or run_dir / "_missing_merged.srt"
 
     p1_count = count_srt_entries(pass1_srt)
     p2_count = count_srt_entries(pass2_srt)

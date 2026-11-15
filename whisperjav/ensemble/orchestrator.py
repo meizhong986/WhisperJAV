@@ -15,6 +15,7 @@ from whisperjav.modules.qwen_errors import NOT_STARTED, PREFIX as UNUSABLE_PREFI
 from whisperjav.utils.logger import logger, pass_log_file
 from whisperjav.utils.metadata_manager import MetadataManager
 from whisperjav.utils.parameter_tracer import NullTracer
+from whisperjav.utils.output_naming import ensemble_srt_name
 
 from .merge import MergeEngine
 from .pass_worker import WorkerPayload, partial_result_file, run_pass_worker
@@ -491,7 +492,7 @@ class EnsembleOrchestrator:
                         tmp_merge = self.temp_dir / f"{basename}.merge.tmp.srt"
                         tmp_merge.parent.mkdir(parents=True, exist_ok=True)
                         file_output_dir = Path(media_info.get('output_dir', str(self.output_dir)))
-                        final_candidate = file_output_dir / f"{basename}.{lang_code}.merged.whisperjav.srt"
+                        final_candidate = file_output_dir / ensemble_srt_name(basename, lang_code)
                         try:
                             merge_stats = self.merge_engine.merge(
                                 srt1_path=pass1_srt,

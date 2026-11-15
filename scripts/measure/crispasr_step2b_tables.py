@@ -156,7 +156,7 @@ def main(argv=None) -> int:
                                               for n in ("The.Naked.Director.S01E04.Scene.4.ja.srt",
                                                         "The.Naked.Director.S02E02.Scene.5.Bubble.More.srt")])]
     for p, _, _, label in configs:
-        rows.append(shape_row(f"{label} (own)", [batch / label / f"{f}.ja.whisperjav.srt" for f in FILMS]))
+        rows.append(shape_row(f"{label} (own)", [batch / label / f"{f}.whisperjav.ja.srt" for f in FILMS]))
         if "segments" in step2b.LINE_MODES[p]:
             v = step2b.variant_name("segments", "text+overlap")
             rows.append(shape_row(f"{label} / {v}", [batch / label / v / f"{f}.{v}.srt" for f in FILMS]))

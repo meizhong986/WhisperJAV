@@ -2,7 +2,7 @@
 step 2 report's item 10 (b)).
 
 For each configuration folder and film found in both batches, byte for byte:
-    the pipeline's own SRT          <config>/<film>.ja.whisperjav.srt
+    the pipeline's own SRT          <config>/<film>.whisperjav.ja.srt
     every variant's SRT             <config>/lines-*/<film>.lines-*.srt
     the cut points                  <config>/<film>.cuts.json
     the program's JSON output       <config>/temp/crispasr_out/<film's run folder>/out.json; when the bytes differ,
@@ -61,7 +61,7 @@ def compare(first: Path, rerun: Path) -> list:
             out_a, out_b = program_output(a, film), program_output(b, film)
             out_same = same_bytes(out_a, out_b)
             row = {"configuration": config.name, "film": film,
-                   "own_srt_same": same_bytes(a / f"{film}.ja.whisperjav.srt", b / f"{film}.ja.whisperjav.srt"),
+                   "own_srt_same": same_bytes(a / f"{film}.whisperjav.ja.srt", b / f"{film}.whisperjav.ja.srt"),
                    "variants": len(variants), "variants_same": sum(1 for v in variant_same.values() if v),
                    "variant_files": variant_same,
                    "cuts_same": same_bytes(a / f"{film}.cuts.json", b / f"{film}.cuts.json"),

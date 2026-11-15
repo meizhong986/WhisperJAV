@@ -94,7 +94,7 @@ def program_files(temp: Path) -> dict:
 
 
 def compare(check_srt: Path, check_cuts, scored_folder: Path, film: Path) -> dict:
-    scored_srt = scored_folder / f"{film.stem}.ja.whisperjav.srt"
+    scored_srt = scored_folder / f"{film.stem}.whisperjav.ja.srt"
     scored_cuts = scored_folder / f"{film.stem}.cuts.json"
     mine, theirs = srt_lines(check_srt), srt_lines(scored_srt) if scored_srt.is_file() else []
     same_text = [m[2] for m in mine] == [t[2] for t in theirs]

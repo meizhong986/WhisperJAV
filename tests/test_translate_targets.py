@@ -26,6 +26,7 @@ from whisperjav.translate.output_naming import (
     strip_language_suffix,
 )
 from whisperjav.translate.providers import SUPPORTED_TARGETS
+from whisperjav.utils.output_naming import language_filename_code
 
 ROOT = Path(__file__).resolve().parents[1]
 MAIN = ROOT / "whisperjav" / "main.py"
@@ -88,28 +89,28 @@ def test_gui_dropdowns_match_supported_targets_exactly(select_id):
 @pytest.mark.parametrize("target", sorted(SUPPORTED_TARGETS))
 def test_an_existing_target_suffix_is_replaced_not_stacked(target):
     out = Path(generate_output_path("/media/SONE-853.french.srt", target)).name
-    assert out == "SONE-853.%s.srt" % target
+    assert out == "SONE-853.%s.srt" % language_filename_code(target)
 
 
 @pytest.mark.parametrize("suffix", sorted(SOURCE_LANGUAGE_SUFFIXES))
 def test_source_language_suffixes_are_replaced(suffix):
     out = Path(generate_output_path("/media/SONE-853.%s.srt" % suffix, "english")).name
-    assert out == "SONE-853.english.srt"
+    assert out == "SONE-853.en.srt"
 
 
 @pytest.mark.parametrize("target", sorted(SUPPORTED_TARGETS))
 def test_every_target_survives_a_round_trip(target):
     """Translate to X, feed the result back, translate to English."""
     first = generate_output_path("/media/SONE-853.srt", target)
-    assert Path(first).name == "SONE-853.%s.srt" % target
+    assert Path(first).name == "SONE-853.%s.srt" % language_filename_code(target)
     second = generate_output_path(first, "english")
-    assert Path(second).name == "SONE-853.english.srt", (
+    assert Path(second).name == "SONE-853.en.srt", (
         "round trip through %s stacked suffixes: %s" % (target, Path(second).name))
 
 
 def test_an_unrelated_dotted_stem_is_left_alone():
     assert Path(generate_output_path("/media/SONE-853.v2.srt", "english")).name \
-        == "SONE-853.v2.english.srt"
+        == "SONE-853.v2.en.srt"
     assert strip_language_suffix("SONE-853.v2") == "SONE-853.v2"
 
 
@@ -124,7 +125,7 @@ def test_both_naming_paths_use_the_shared_helper():
     cli_src = (TRANSLATE / "cli.py").read_text(encoding="utf-8")
     svc_src = (TRANSLATE / "service.py").read_text(encoding="utf-8")
     assert "from .output_naming import generate_output_path" in cli_src
-    assert "from .output_naming import strip_language_suffix" in svc_src
+    assert "from .output_naming import generate_output_path" in svc_src
     for src, name in ((cli_src, "cli.py"), (svc_src, "service.py")):
         assert "'japanese', 'english', 'ja', 'en', 'jp'" not in src, (
             "%s has a hand-kept language list again" % name)
