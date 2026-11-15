@@ -15,6 +15,7 @@ These notes compare 1.10.2 with 1.10.1, the release before it.
 - **A run now downloads the aligner and timing model it uses before any audio is read** (the GGUF pipelines that run the aligner; ChronosJAV when you choose them), and the models of the new speech enhancers and speech segmenters, and checks WhisperSeg's packages. If one of these is missing or cannot run, the run stops at once and says why, instead of going on without it.
 - **Claude translation:** the Anthropic package it needs is now installed; 1.10.0 and 1.10.1 lacked it. Claude's default model is Claude Haiku 5.5.
 - **The Windows installer's changes come with a fresh install only:** FFmpeg 8.1.2, a WhisperJAV entry in the Start menu, and an uninstaller that removes this install's shortcuts. An install upgraded from 1.10.1 keeps FFmpeg 7.1.1, its Start menu and its uninstaller.
+- **FFmpeg 8.1.2 can change your subtitles slightly, and we would like your feedback.** For the same video, a fresh install (FFmpeg 8.1.2) and an install upgraded from 1.10.1 (FFmpeg 7.1.1) gave subtitles that differ in some lines and times in our test. We have not yet measured which is better. If your results got better or worse with 1.10.2, please open a GitHub issue and say whether you installed fresh or upgraded.
 - **Not fixed yet:** ZipEnhancer cleans only the first file of a single-pass run, and of an Ensemble run with "Finish each file" unticked. MOSS's token limit and its 30-second pieces are unchanged. Both are planned for 1.10.3; see [Limits](#limits-and-known-issues-in-1102).
 
 ## New in this release
@@ -54,7 +55,7 @@ To keep 1.10.1's behaviour:
 
 - Updated CrispASR to 0.8.53 (from 0.8.50)
 - Updated PySubtrans to 1.8.0 (from 1.6.0); a re-run retries batches with errors
-- The Windows installer now brings FFmpeg 8.1.2 (before: 7.1.1).
+- The Windows installer now brings FFmpeg 8.1.2 (before: 7.1.1). Subtitles can differ slightly from 7.1.1's; feedback is welcome.
 - Changed the Speech Enhancer menu: Vocal Separation, Noise Suppression, DSP
 - WhisperSeg's message names only the missing packages, with their install line
 - A saved speech enhancer no longer offered is marked, and Start is refused
