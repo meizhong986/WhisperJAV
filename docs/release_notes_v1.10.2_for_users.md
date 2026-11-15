@@ -43,6 +43,9 @@ These notes compare 1.10.2 with 1.10.1, the release before it.
 - `--async-processing` with `--mode transformers` or `--mode qwen` stops, saying why
 - Merge strategy "Smart Merge (Best Quality)" is now called "Smart Merge"
 - Kotoba Bilingual is asked for English with Direct to English (#469); see Limits
+- Start is greyed while a run starts; the status line shows "Starting..."
+- A run stops at the start if another run uses its working folder (`--temp-dir`)
+- Closing the GUI window ends the running run
 
 To keep 1.10.1's behaviour:
 - Cleaned-up audio to the ASR model too: untick "For VAD only" in the Speech Enhancer menu. On the command line: `--no-pass1-enhance-for-vad`, `--no-pass2-enhance-for-vad`, or `--no-enhance-for-vad` for `--mode qwen`.
@@ -56,6 +59,8 @@ To keep 1.10.1's behaviour:
 - WhisperSeg's message names only the missing packages, with their install line
 - A saved speech enhancer no longer offered is marked, and Start is refused
 - anime-whisper's Text Cleaner names its own cleaner, not "Passthrough"
+- ChronosJAV prints no console line per scene when no aligner runs
+- GGUF pipelines' log says "the groups span N s of M s", not "N s of speech"
 
 ## Fixed
 
@@ -78,6 +83,10 @@ To keep 1.10.1's behaviour:
 - Fixed the Start-menu folder holding only "Git Bash" (1.10.2 installer)
 - Fixed console errors of `whisperjav.exe` when its output is redirected
 - Fixed `whisperjav-translate --help` showing "usage: cli.py"
+- Fixed the GUI starting several runs when Start was clicked again while starting
+- Fixed two runs in one working folder deleting each other's files
+- Fixed a run going on after the GUI window was closed
+- Fixed the GUI console losing lines after a second start
 
 ## Which pipeline for which computer
 
