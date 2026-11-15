@@ -972,7 +972,9 @@ def payload_facts(ev_a, ev_b, ev_c, probes):
     checks = {pid: call_checks(rec) for pid, rec in first.items()}
     allc = list(checks.values())
     tot = total(allc) if allc else {}
-    spc = max((c["segments"] for c in allc), default=0)
+    # Segments per call only on calls of VAD-group size (up to 30 s): CrispASR's session cuts a longer call into pieces
+    # of at most 30 s itself, and each piece comes back as a segment, which says nothing about the model's own times.
+    spc = max((c["segments"] for pid, c in checks.items() if first[pid]["seconds"] <= 30.0), default=0)
     facts = {"crispasr": opened[0]["crispasr"] if opened else None, "backend": opened[0]["backend"] if opened else None,
              "per_probe": {pid: dict(c, seconds=first[pid]["seconds"], call_s=first[pid].get("call_s"),
                                      text=text_of(first[pid])[:300]) for pid, c in checks.items()},

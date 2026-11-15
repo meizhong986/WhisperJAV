@@ -24,6 +24,27 @@
       "shipped_as": "parakeet-crispasr (whisperjav/crispasr/manifest.py, default model)",
       "row": {"line_rule": "tokens", "onsets": false, "cut_at_pauses": true, "cleanup": "srt"}
     },
+    "parakeet-tdt-0.6b-ja-f16": {
+      "label": "Parakeet TDT 0.6B ja (f16)",
+      "repo": "cstr/parakeet-tdt-0.6b-ja-GGUF",
+      "file": "parakeet-tdt-0.6b-ja.gguf",
+      "revision": "d9e3ba65a6579796389ea89e5939509ed257f972",
+      "backend": "parakeet",
+      "licence": "CC-BY-4.0 (nvidia/parakeet-tdt_ctc-0.6b-ja)",
+      "shipped_as": "parakeet-crispasr (whisperjav/crispasr/manifest.py parakeet-tdt-0.6b-ja-f16, a menu choice)",
+      "row": {"line_rule": "tokens", "onsets": false, "cut_at_pauses": true, "cleanup": "srt"}
+    },
+    "qwen3-asr-1.7b-f16": {
+      "label": "Qwen3-ASR 1.7B (f16)",
+      "repo": "cstr/qwen3-asr-1.7b-GGUF",
+      "file": "qwen3-asr-1.7b-f16.gguf",
+      "revision": "674df5d44b50a63e7102a18895ed20e3f91de301",
+      "backend": "qwen3",
+      "base_model": "Qwen/Qwen3-ASR-1.7B",
+      "note": "The model of ChronosJAV's Qwen3-ASR (which runs it through PyTorch), here as GGUF through CrispASR (owner W572, W573). Row set from the payload stage.",
+      "row": {"line_rule": "group", "onsets": false, "cut_at_pauses": true, "cleanup": "srt"},
+      "baseline": "parakeet-tdt-0.6b-ja-f16"
+    },
     "haas-ja-v1.0-q8_0": {
       "label": "Haas ja v1.0 (q8_0)",
       "repo": "cstr/Haas-ja-v1.0-GGUF",
