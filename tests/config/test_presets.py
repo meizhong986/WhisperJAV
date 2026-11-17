@@ -57,8 +57,8 @@ class TestTranscriberPresets:
 
     def test_aggressive_values(self):
         preset = TRANSCRIBER_PRESETS[Sensitivity.AGGRESSIVE]
-        assert preset.temperature == [0.0, 0.2]
-        assert preset.compression_ratio_threshold == 2.6
+        assert preset.temperature == [0.0]                     # 1.10.2 value
+        assert preset.compression_ratio_threshold == 2.2       # 1.10.2 value
         assert preset.logprob_threshold == -1.0
         assert preset.no_speech_threshold == 0.72
 
@@ -97,7 +97,7 @@ class TestSileroVADPresets:
         preset = SILERO_VAD_PRESETS[Sensitivity.BALANCED]
         assert preset.threshold == 0.28                        # v1.8.10-hf3
         assert preset.min_speech_duration_ms == 100
-        assert preset.max_speech_duration_s == 5.0             # v1.8.12
+        assert preset.max_speech_duration_s == 6.0             # 1.10.2 value
         assert preset.min_silence_duration_ms == 300
         assert preset.speech_pad_ms == 400
 
@@ -105,14 +105,14 @@ class TestSileroVADPresets:
         preset = SILERO_VAD_PRESETS[Sensitivity.CONSERVATIVE]
         assert preset.threshold == 0.41                        # v1.8.10-hf3
         assert preset.min_speech_duration_ms == 150
-        assert preset.max_speech_duration_s == 6.0
+        assert preset.max_speech_duration_s == 7.0             # 1.10.2 value
         assert preset.speech_pad_ms == 500
 
     def test_aggressive_values(self):
         preset = SILERO_VAD_PRESETS[Sensitivity.AGGRESSIVE]
         assert preset.threshold == 0.18                        # v1.8.10-hf3
-        assert preset.min_speech_duration_ms == 30
-        assert preset.max_speech_duration_s == 4.0             # v1.8.12
+        assert preset.min_speech_duration_ms == 80             # 1.10.2 value
+        assert preset.max_speech_duration_s == 6.0             # 1.10.2 value
         assert preset.speech_pad_ms == 300
 
     def test_matches_runtime_registry(self):
@@ -242,5 +242,5 @@ class TestPresetExport:
         preset = SILERO_VAD_PRESETS[Sensitivity.AGGRESSIVE]
         result = preset.model_dump_without_none()
         assert result["threshold"] == 0.18                     # v1.8.10-hf3
-        assert result["min_speech_duration_ms"] == 30
+        assert result["min_speech_duration_ms"] == 80              # 1.10.2 value
         assert result["speech_pad_ms"] == 300
