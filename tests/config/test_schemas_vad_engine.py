@@ -21,12 +21,13 @@ class TestSileroVADOptions:
 
     def test_valid_balanced_preset(self):
         """Test balanced preset values are valid."""
+        # neg_threshold was removed from SileroVADOptions - VAD internal
+        # logic handles it (see components/vad/silero.py preset comments)
         config = SileroVADOptions(
             threshold=0.18,
             min_speech_duration_ms=100,
             max_speech_duration_s=11,
             min_silence_duration_ms=300,
-            neg_threshold=0.15,
             speech_pad_ms=400
         )
         assert config.threshold == 0.18
@@ -39,7 +40,6 @@ class TestSileroVADOptions:
                 min_speech_duration_ms=100,
                 max_speech_duration_s=11,
                 min_silence_duration_ms=300,
-                neg_threshold=0.15,
                 speech_pad_ms=400
             )
 
@@ -276,7 +276,9 @@ class TestJAVAudioConfig:
         adjustments = config.get_vad_adjustments()
 
         assert "min_speech_duration_ms" in adjustments
-        assert "neg_threshold" in adjustments
+        # neg_threshold adjustment removed with the schema field - VAD
+        # internal logic handles negative-threshold behavior now
+        assert "neg_threshold" not in adjustments
 
     def test_invalid_noise_profile(self):
         """Test invalid noise profile is rejected."""
