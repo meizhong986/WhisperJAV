@@ -128,21 +128,21 @@ SILERO_VAD_PRESETS = {
     Sensitivity.BALANCED: SileroVADOptions(
         threshold=0.28,                       # v1.8.10-hf3: 0.18→0.28
         min_speech_duration_ms=100,
-        max_speech_duration_s=5.0,            # v1.8.12: 7.0→5.0, sync with components registry
+        max_speech_duration_s=6.0,            # as config/components/vad/silero.py in 1.10.2
         min_silence_duration_ms=300,
         speech_pad_ms=400
     ),
     Sensitivity.CONSERVATIVE: SileroVADOptions(
         threshold=0.41,                       # v1.8.10-hf3: 0.35→0.41
         min_speech_duration_ms=150,
-        max_speech_duration_s=6.0,            # v1.8.10-hf3: 9.0→6.0
+        max_speech_duration_s=7.0,            # as config/components/vad/silero.py in 1.10.2
         min_silence_duration_ms=300,
         speech_pad_ms=500
     ),
     Sensitivity.AGGRESSIVE: SileroVADOptions(
         threshold=0.18,                       # v1.8.10-hf3: 0.05→0.18
-        min_speech_duration_ms=30,
-        max_speech_duration_s=4.0,            # v1.8.12: 8.0→4.0, sync with components registry
+        min_speech_duration_ms=80,            # as config/components/vad/silero.py in 1.10.2
+        max_speech_duration_s=6.0,            # as config/components/vad/silero.py in 1.10.2
         min_silence_duration_ms=300,
         speech_pad_ms=300
     ),
