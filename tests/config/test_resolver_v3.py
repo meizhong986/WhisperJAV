@@ -104,9 +104,9 @@ class TestSensitivityPresets:
 
         # Aggressive: permissive thresholds (v1.8.10-hf3 retune)
         assert config['params']['vad']['threshold'] == 0.18
-        assert config['params']['asr']['beam_size'] == 3
+        assert config['params']['asr']['beam_size'] == 2          # 1.10.2 value
         assert config['params']['asr']['no_speech_threshold'] == 0.72
-        assert config['params']['asr']['patience'] == 1.3
+        assert config['params']['asr']['patience'] == 1.0         # 1.10.2 value
 
     def test_presets_differ(self):
         """Test presets produce different values.
