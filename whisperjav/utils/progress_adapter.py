@@ -11,6 +11,7 @@ from contextlib import contextmanager
 
 from whisperjav.utils.unified_progress import UnifiedProgressManager
 from whisperjav.utils.logger import logger
+from whisperjav.utils.progress_markers import emit_marker, progress_marker
 
 
 class ProgressDisplayAdapter:
@@ -27,6 +28,14 @@ class ProgressDisplayAdapter:
         self.current_step_context = None
         self.current_task_context = None
         self.enabled = True  # Always enabled through unified manager
+        # Overall (file + scene) progress tracking for the GUI progress marker
+        self._current_file_number = 0
+        self._scene_total = 0
+        self._scene_done = 0
+        self._last_overall_pct = -1
+        # No percent is sent until a scene update arrives. Pipelines that report no scenes
+        # then keep the GUI's moving bar instead of a bar stuck at 0%.
+        self._scene_seen = False
         
     def close(self):
         """Clean up progress display."""
@@ -40,9 +49,15 @@ class ProgressDisplayAdapter:
     
     def set_current_file(self, filename: str, file_number: int):
         """Set current file being processed."""
+        self._current_file_number = file_number
+        self._scene_total = 0
+        self._scene_done = 0
         self.current_file_context = self.unified_manager.start_file_processing(
             filename, file_number, self.total_files
         )
+        # After the first scene update, emit at each file start too, so the bar
+        # moves even for single-scene files later in the run.
+        self._emit_overall_progress()
     
     def set_current_step(self, step_name: str, step_number: Optional[int] = None, total_steps: int = 5):
         """Set current processing step."""
@@ -56,6 +71,8 @@ class ProgressDisplayAdapter:
     def start_subtask(self, task_name: str, total_items: int):
         """Start a subtask (e.g., scene transcription)."""
         if total_items > 1:  # Only create task context for meaningful subtasks
+            self._scene_total = total_items
+            self._scene_done = 0
             self.current_task_context = self.unified_manager.start_task(
                 task_name, total_items, self.current_step_context
             )
@@ -63,7 +80,30 @@ class ProgressDisplayAdapter:
     def update_subtask(self, increment: int = 1):
         """Update subtask progress."""
         if self.current_task_context:
+            self._scene_done += increment
+            self._scene_seen = True
+            self._emit_overall_progress()
             self.unified_manager.update_task_progress(self.current_task_context, increment)
+
+    def _emit_overall_progress(self):
+        """Emit a GUI progress marker blending file index + scene fraction.
+
+        Printed through `emit_marker`, so only runs the GUI started get it. Nothing is
+        printed before the first scene update. Throttled to whole-percent changes.
+        """
+        if not self._scene_seen:
+            return
+
+        total_files = self.total_files or 1
+        scene_frac = (self._scene_done / self._scene_total) if self._scene_total else 0.0
+        scene_frac = min(max(scene_frac, 0.0), 1.0)
+        completed = max(self._current_file_number - 1, 0)
+        pct = int(((completed + scene_frac) / total_files) * 100)
+        pct = min(max(pct, 0), 100)
+        if pct == self._last_overall_pct:
+            return
+        self._last_overall_pct = pct
+        emit_marker(progress_marker(pct))
     
     def finish_subtask(self):
         """Finish the current subtask."""

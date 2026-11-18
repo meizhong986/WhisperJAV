@@ -190,6 +190,7 @@ from whisperjav.utils.device_detector import pass_device, resolve_run_device
 from whisperjav.utils.progress_aggregator import VerbosityLevel, create_progress_handler
 from whisperjav.utils.async_processor import AsyncPipelineManager, ProcessingStatus
 from whisperjav.utils.parameter_tracer import create_tracer
+from whisperjav.utils.progress_markers import emit_marker, transcribe_marker
 from whisperjav.config.manager import ConfigManager, quick_update_ui_preference
 
 # Translation service - direct function call instead of subprocess
@@ -1996,6 +1997,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                 per_file_dir.mkdir(parents=True, exist_ok=True)
 
             progress.set_current_file(file_path_str, i)
+            # GUI per-file progress marker (parsed by webview_gui/api.py)
+            emit_marker(transcribe_marker(file_name, i, len(media_files)))
 
             outcome = None  # the outcome recorded for this file, if any
             try:
@@ -2241,10 +2244,19 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
     resolved_config['model_refresh_audio_minutes'] = getattr(args, 'model_refresh_audio_minutes', DEFAULT_MODEL_REFRESH_AUDIO_MINUTES)
 
     # Create async manager
+    # Each file sends two file_start messages with the same file_number, so mark each number once.
+    _marked_files = set()
+
     def progress_callback(message: Dict):
         """Handle progress messages."""
         msg_type = message.get('type')
         if msg_type == 'file_start':
+            file_number = message.get('file_number', 1)
+            if file_number not in _marked_files:
+                _marked_files.add(file_number)
+                # GUI per-file progress marker (parsed by webview_gui/api.py)
+                emit_marker(transcribe_marker(Path(message['filename']).name, file_number,
+                                              message.get('total_files', len(files_to_process))))
             print(f"\nProcessing: {message['filename']}")
         elif msg_type == 'task_complete':
             if message['success']:
