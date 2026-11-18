@@ -2,8 +2,13 @@
 
 Model IDs were read from each provider's model page on 2026-11-10.
 """
+import json
 import re
+import shutil
+import subprocess
 from pathlib import Path
+
+import pytest
 
 from whisperjav.translate.providers import PROVIDER_CONFIGS
 
@@ -51,3 +56,26 @@ class TestGuiModelLists:
         for key, models in _gui_model_lists().items():
             if models:
                 assert models[0] == PROVIDER_CONFIGS[key]["model"], key
+
+
+# Runs the real modelOptionsHtml from app.js against the real table and prints each provider's option values.
+_OPTIONS_JS = r"""
+const s = require("fs").readFileSync(process.argv[1], "utf8");
+const table = eval("(" + s.match(/providerModels: (\{[\s\S]*?\r?\n    \}),/)[1] + ")");
+const body = s.match(/modelOptionsHtml\(provider\) \{([\s\S]*?)\r?\n    \},/)[1];
+const tm = {providerModels: table, modelOptionsHtml: new Function("provider", body)};
+const out = {};
+for (const key of Object.keys(table)) {
+    out[key] = [...tm.modelOptionsHtml(key).matchAll(/value="([^"]*)"/g)].map(m => m[1]);
+}
+console.log(JSON.stringify(out));
+"""
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="needs Node.js")
+def test_dropdown_lists_the_default_under_its_own_name_too():
+    # A remembered pick of the default model must still be an option, so it is restored exactly.
+    result = subprocess.run(["node", "-e", _OPTIONS_JS, str(APP_JS)], capture_output=True, text=True, check=True)
+    lists = _gui_model_lists()
+    for key, values in json.loads(result.stdout).items():
+        assert values == [""] + lists[key], key

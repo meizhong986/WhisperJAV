@@ -8473,7 +8473,7 @@ const ProviderUIManager = {
         // Non-Ollama providers — flat list
         modelSelect.innerHTML = TranslatorManager.modelOptionsHtml(provider);
 
-        // A value the list no longer offers (such as the default itself) falls back to "Default"
+        // A value the list no longer offers falls back to "Default"
         if (currentValue && Array.from(modelSelect.options).some(o => o.value === currentValue)) {
             modelSelect.value = currentValue;
         }
@@ -8569,7 +8569,7 @@ const TranslatorManager = {
     },
 
     // Provider model options (Ollama models are now driven by OllamaStateManager).
-    // The first entry is the default in providers.py. The "Default" option names it and replaces it.
+    // The first entry is the default in providers.py. The "Default" option names it.
     providerModels: {
         // #325: deepseek-chat/-reasoner deprecate 2026-07-24; v4 names per
         // https://api-docs.deepseek.com/ (pro = thinking; flash is sent with thinking off).
@@ -8594,15 +8594,17 @@ const TranslatorManager = {
 
     /**
      * Build the model drop-down options of a cloud provider.
-     * The blank option names the default model, so the default is not listed twice.
+     * The blank option names the default model and follows a later change of the default.
+     * Every model, the default too, is also listed under its own name.
+     * So a remembered pick of the default by name is restored exactly.
      * @param {string} provider - Provider key, such as 'claude'.
      * @returns {string} The option elements as HTML.
      */
     modelOptionsHtml(provider) {
-        const [defaultModel, ...others] = this.providerModels[provider] || [];
-        const label = defaultModel ? `Default (${defaultModel})` : 'No default - type a model';
+        const models = this.providerModels[provider] || [];
+        const label = models.length ? `Default (${models[0]})` : 'No default - type a model';
         return `<option value="">${label}</option>` +
-            others.map(m => `<option value="${m}">${m}</option>`).join('');
+            models.map(m => `<option value="${m}">${m}</option>`).join('');
     },
 
     /**
