@@ -187,6 +187,7 @@ class WhisperJAVAPI:
         self.process: Optional[subprocess.Popen] = None
         self.status = "idle"  # idle, running, completed, cancelled, error
         self.exit_code: Optional[int] = None
+        self._reset_transcribe_progress_state()
 
         # Log streaming
         self.log_queue: queue.Queue = queue.Queue()
@@ -784,23 +785,18 @@ class WhisperJAVAPI:
                 self.status = "error"
                 self.log_queue.put(f"\n{self._finish_line()}\n")
 
-        _tc = getattr(self, '_transcribe_files_current', 0)
-        _tt = getattr(self, '_transcribe_files_total', 0)
-        _scene_pct = getattr(self, '_transcribe_scene_progress', None)
-        _file_pct = int(100 * max(_tc - 1, 0) / _tt) if _tt > 0 else 0
         result = {
             "status": self.status,
             "exit_code": self.exit_code,
             "has_logs": not self.log_queue.empty(),
             "run_summary": self._run_summary if self.status in ("completed", "error") else None,
-            "current_file": getattr(self, '_transcribe_current_file', None),
-            "files_current": _tc,
-            "files_total": _tt,
-            "pass_number": getattr(self, '_transcribe_pass_number', None),
-            "pass_total": getattr(self, '_transcribe_pass_total', None),
-            # Prefer the fine-grained scene-blended percentage; fall back to the
-            # per-file (lag-by-one) percentage when no scene marker has arrived.
-            "progress": _scene_pct if _scene_pct is not None else _file_pct,
+            "current_file": self._transcribe_current_file,
+            "files_current": self._transcribe_files_current,
+            "files_total": self._transcribe_files_total,
+            "pass_number": self._transcribe_pass_number,
+            "pass_total": self._transcribe_pass_total,
+            # None until the first scene percent arrives, so the GUI keeps its moving bar.
+            "progress": self._transcribe_scene_progress,
         }
         # A run that ended without a run summary: the reason it printed, for the dialog (22.9.2).
         if self.status == "error" and self._run_summary is None:

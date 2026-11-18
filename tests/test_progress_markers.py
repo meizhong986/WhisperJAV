@@ -1,3 +1,6 @@
+from unittest.mock import MagicMock
+
+from whisperjav.utils.progress_adapter import ProgressDisplayAdapter
 from whisperjav.utils.progress_markers import (
     GUI_MARKERS_ENV,
     emit_marker,
@@ -80,3 +83,18 @@ def test_emit_marker_prints_for_gui_runs(monkeypatch, capsys):
     emit_marker("Transcribing [1/1]: a.mp4")
     assert _marker_lines(capsys) == ["Transcribing [1/1]: a.mp4"]
 
+
+def test_adapter_sends_no_percent_until_a_scene_update(monkeypatch, capsys):
+    monkeypatch.setenv(GUI_MARKERS_ENV, "1")
+    monkeypatch.setattr("sys.__stderr__", None)
+    adapter = ProgressDisplayAdapter(MagicMock(), total_files=2)
+    adapter.set_current_file("a.mp4", 1)
+    assert _marker_lines(capsys) == []
+
+    adapter.start_subtask("scenes", 4)
+    adapter.update_subtask()
+    assert _marker_lines(capsys) == ["Transcribing-progress [12]"]
+
+    # Once scenes were seen, a later file start sends its percent too.
+    adapter.set_current_file("b.mp4", 2)
+    assert _marker_lines(capsys) == ["Transcribing-progress [50]"]

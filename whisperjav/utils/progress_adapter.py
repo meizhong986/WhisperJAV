@@ -33,6 +33,9 @@ class ProgressDisplayAdapter:
         self._scene_total = 0
         self._scene_done = 0
         self._last_overall_pct = -1
+        # No percent is sent until a scene update arrives. Pipelines that report no scenes
+        # then keep the GUI's moving bar instead of a bar stuck at 0%.
+        self._scene_seen = False
         
     def close(self):
         """Clean up progress display."""
@@ -52,7 +55,8 @@ class ProgressDisplayAdapter:
         self.current_file_context = self.unified_manager.start_file_processing(
             filename, file_number, self.total_files
         )
-        # Emit at each file start so the bar moves even for single-scene files.
+        # After the first scene update, emit at each file start too, so the bar
+        # moves even for single-scene files later in the run.
         self._emit_overall_progress()
     
     def set_current_step(self, step_name: str, step_number: Optional[int] = None, total_steps: int = 5):
@@ -77,15 +81,19 @@ class ProgressDisplayAdapter:
         """Update subtask progress."""
         if self.current_task_context:
             self._scene_done += increment
+            self._scene_seen = True
             self._emit_overall_progress()
             self.unified_manager.update_task_progress(self.current_task_context, increment)
 
     def _emit_overall_progress(self):
         """Emit a GUI progress marker blending file index + scene fraction.
 
-        Printed through `emit_marker`, so only runs the GUI started get it.
-        Throttled to whole-percent changes.
+        Printed through `emit_marker`, so only runs the GUI started get it. Nothing is
+        printed before the first scene update. Throttled to whole-percent changes.
         """
+        if not self._scene_seen:
+            return
+
         total_files = self.total_files or 1
         scene_frac = (self._scene_done / self._scene_total) if self._scene_total else 0.0
         scene_frac = min(max(scene_frac, 0.0), 1.0)

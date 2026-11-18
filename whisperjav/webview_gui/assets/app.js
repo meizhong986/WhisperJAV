@@ -1317,7 +1317,7 @@ const ProcessManager = {
                 this.updateButtonStates();
 
                 // Start progress indication
-                ProgressManager.setProgress(0);
+                ProgressManager.setIndeterminate(true);
                 ProgressManager.setStatus('Running...');
 
                 // Log command
@@ -7108,7 +7108,7 @@ const EnsembleManager = {
                 ProcessManager.updateButtonStates();
 
                 // Start progress indication
-                ProgressManager.setProgress(0);
+                ProgressManager.setIndeterminate(true);
                 ProgressManager.setStatus('Running...');
 
                 // Log command
