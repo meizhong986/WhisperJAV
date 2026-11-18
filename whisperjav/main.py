@@ -2244,16 +2244,19 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
     resolved_config['model_refresh_audio_minutes'] = getattr(args, 'model_refresh_audio_minutes', DEFAULT_MODEL_REFRESH_AUDIO_MINUTES)
 
     # Create async manager
-    _async_progress = {"n": 0}
+    # Each file sends two file_start messages with the same file_number, so mark each number once.
+    _marked_files = set()
 
     def progress_callback(message: Dict):
         """Handle progress messages."""
         msg_type = message.get('type')
         if msg_type == 'file_start':
-            _async_progress["n"] += 1
-            # GUI per-file progress marker (parsed by webview_gui/api.py)
-            emit_marker(transcribe_marker(Path(message['filename']).name,
-                                          _async_progress["n"], len(files_to_process)))
+            file_number = message.get('file_number', 1)
+            if file_number not in _marked_files:
+                _marked_files.add(file_number)
+                # GUI per-file progress marker (parsed by webview_gui/api.py)
+                emit_marker(transcribe_marker(Path(message['filename']).name, file_number,
+                                              message.get('total_files', len(files_to_process))))
             print(f"\nProcessing: {message['filename']}")
         elif msg_type == 'task_complete':
             if message['success']:
