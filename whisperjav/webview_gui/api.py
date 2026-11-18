@@ -26,6 +26,7 @@ from whisperjav.utils.process_manager import (
     PSUTIL_AVAILABLE,
 )
 from whisperjav.config.qwen3_whisperseg_vad import QWEN3_WHISPERSEG_DEFAULTS
+from whisperjav.utils.progress_markers import GUI_MARKERS_ENV, parse_progress_marker, parse_transcribe_marker
 
 
 # Determine REPO_ROOT for module resolution
@@ -621,6 +622,7 @@ class WhisperJAVAPI:
             # Force UTF-8 stdio in the child so logging can print ✓ and JP chars
             env = os.environ.copy()
             env["PYTHONUTF8"] = "1"
+            env[GUI_MARKERS_ENV] = "1"  # the CLI prints progress markers only for GUI runs
             env["PYTHONIOENCODING"] = "utf-8:replace"
 
             # Log command for debugging
@@ -905,7 +907,6 @@ class WhisperJAVAPI:
         This runs in a separate thread to avoid blocking the main thread.
         """
         self._output_tail = collections.deque(maxlen=80)
-        from whisperjav.utils.progress_markers import parse_progress_marker, parse_transcribe_marker
         try:
             if self.process and self.process.stdout:
                 for line in self.process.stdout:
@@ -2012,6 +2013,7 @@ class WhisperJAVAPI:
             # Force UTF-8 stdio
             env = os.environ.copy()
             env["PYTHONUTF8"] = "1"
+            env[GUI_MARKERS_ENV] = "1"  # the CLI prints progress markers only for GUI runs
             env["PYTHONIOENCODING"] = "utf-8:replace"
 
             # Log command
@@ -3183,6 +3185,7 @@ class WhisperJAVAPI:
             # Force UTF-8 stdio
             env = os.environ.copy()
             env["PYTHONUTF8"] = "1"
+            env[GUI_MARKERS_ENV] = "1"  # the CLI prints progress markers only for GUI runs
             env["PYTHONIOENCODING"] = "utf-8:replace"
 
             # Log command

@@ -190,7 +190,7 @@ from whisperjav.utils.device_detector import pass_device, resolve_run_device
 from whisperjav.utils.progress_aggregator import VerbosityLevel, create_progress_handler
 from whisperjav.utils.async_processor import AsyncPipelineManager, ProcessingStatus
 from whisperjav.utils.parameter_tracer import create_tracer
-from whisperjav.utils.progress_markers import transcribe_marker
+from whisperjav.utils.progress_markers import emit_marker, transcribe_marker
 from whisperjav.config.manager import ConfigManager, quick_update_ui_preference
 
 # Translation service - direct function call instead of subprocess
@@ -1998,8 +1998,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
 
             progress.set_current_file(file_path_str, i)
             # GUI per-file progress marker (parsed by webview_gui/api.py)
-            print(transcribe_marker(file_name, i, len(media_files)),
-                  file=sys.stderr, flush=True)
+            emit_marker(transcribe_marker(file_name, i, len(media_files)))
 
             outcome = None  # the outcome recorded for this file, if any
             try:
@@ -2253,9 +2252,8 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
         if msg_type == 'file_start':
             _async_progress["n"] += 1
             # GUI per-file progress marker (parsed by webview_gui/api.py)
-            print(transcribe_marker(Path(message['filename']).name,
-                                    _async_progress["n"], len(files_to_process)),
-                  file=sys.stderr, flush=True)
+            emit_marker(transcribe_marker(Path(message['filename']).name,
+                                          _async_progress["n"], len(files_to_process)))
             print(f"\nProcessing: {message['filename']}")
         elif msg_type == 'task_complete':
             if message['success']:

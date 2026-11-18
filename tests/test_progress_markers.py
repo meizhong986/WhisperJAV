@@ -1,4 +1,6 @@
 from whisperjav.utils.progress_markers import (
+    GUI_MARKERS_ENV,
+    emit_marker,
     parse_progress_marker,
     parse_transcribe_marker,
     progress_marker,
@@ -59,3 +61,22 @@ def test_progress_marker_rejects_non_markers():
 def test_marker_after_prefix_is_rejected():
     assert parse_transcribe_marker("DEBUG: Transcribing [1/5]: foo.mp4") is None
     assert parse_transcribe_marker("2026-06-19 Transcribing [2/3]: bar.mp4") is None
+
+
+def _marker_lines(capsys):
+    return [line for line in capsys.readouterr().err.splitlines() if line.startswith("Transcribing")]
+
+
+def test_emit_marker_prints_nothing_outside_the_gui(monkeypatch, capsys):
+    monkeypatch.delenv(GUI_MARKERS_ENV, raising=False)
+    monkeypatch.setattr("sys.__stderr__", None)
+    emit_marker("Transcribing [1/1]: a.mp4")
+    assert _marker_lines(capsys) == []
+
+
+def test_emit_marker_prints_for_gui_runs(monkeypatch, capsys):
+    monkeypatch.setenv(GUI_MARKERS_ENV, "1")
+    monkeypatch.setattr("sys.__stderr__", None)
+    emit_marker("Transcribing [1/1]: a.mp4")
+    assert _marker_lines(capsys) == ["Transcribing [1/1]: a.mp4"]
+

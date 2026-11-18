@@ -4,7 +4,6 @@ import json
 import multiprocessing as mp
 import pickle
 import shutil
-import sys
 import time
 # ProcessPoolExecutor removed - using raw mp.Process with Drop-Box pattern
 # from concurrent.futures import ProcessPoolExecutor
@@ -16,7 +15,7 @@ from whisperjav.modules.qwen_errors import NOT_STARTED, PREFIX as UNUSABLE_PREFI
 from whisperjav.utils.logger import logger, pass_log_file
 from whisperjav.utils.metadata_manager import MetadataManager
 from whisperjav.utils.parameter_tracer import NullTracer
-from whisperjav.utils.progress_markers import transcribe_marker
+from whisperjav.utils.progress_markers import emit_marker, transcribe_marker
 
 from .merge import MergeEngine
 from .pass_worker import WorkerPayload, partial_result_file, run_pass_worker
@@ -672,9 +671,8 @@ class EnsembleOrchestrator:
             )
             _serial_pt = 2 if pass2_config else 1
             _serial_name = Path(media_info.get("path", basename)).name
-            print(transcribe_marker(_serial_name, file_idx, total_files,
-                                    pass_number=1, pass_total=_serial_pt),
-                  file=sys.stderr, flush=True)
+            emit_marker(transcribe_marker(_serial_name, file_idx, total_files,
+                                          pass_number=1, pass_total=_serial_pt))
             pass1_results = self._run_pass_in_subprocess(
                 pass_number=1,
                 media_files=[media_info],
@@ -702,9 +700,8 @@ class EnsembleOrchestrator:
                     "[%d/%d] %s — Pass 2 (%s)...",
                     file_idx, total_files, basename, pass2_config['pipeline'],
                 )
-                print(transcribe_marker(_serial_name, file_idx, total_files,
-                                        pass_number=2, pass_total=2),
-                      file=sys.stderr, flush=True)
+                emit_marker(transcribe_marker(_serial_name, file_idx, total_files,
+                                              pass_number=2, pass_total=2))
                 pass2_results = self._run_pass_in_subprocess(
                     pass_number=2,
                     media_files=[media_info],

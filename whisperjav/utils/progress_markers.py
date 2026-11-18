@@ -5,8 +5,30 @@ the webview GUI consumer (api.py) parses it to drive the live progress indicator
 Kept in a single module so the producer string and the parser cannot drift.
 """
 
+import os
 import re
+import sys
 from typing import Any
+
+# The GUI sets this to "1" in the environment of the runs it starts.
+# Markers are printed only then, so command-line output stays as it was.
+GUI_MARKERS_ENV = "WHISPERJAV_GUI_MARKERS"
+
+
+def emit_marker(line: str) -> None:
+    """Print a marker line to the original stderr, only for runs the GUI started.
+
+    The original stderr bypasses any stdout/stderr capture in the pipelines.
+
+    Args:
+        line: The marker line to print.
+    """
+    if os.environ.get(GUI_MARKERS_ENV) != "1":
+        return
+    try:
+        print(line, file=sys.__stderr__ or sys.stderr, flush=True)
+    except (ValueError, OSError):
+        pass
 
 # Matches both:
 #   "Transcribing [4/20]: name.mp4"

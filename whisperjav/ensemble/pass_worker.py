@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-import sys
 import warnings
 
 # Suppress transformers warnings BEFORE any imports that might trigger them
@@ -732,18 +731,15 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
         _write_dropbox_and_exit(result_file, error_result, tracer, 1)
 
     try:
-        from pathlib import Path as _Path
-
-        from whisperjav.utils.progress_markers import transcribe_marker
+        from whisperjav.utils.progress_markers import emit_marker, transcribe_marker
 
         for idx, media_info in enumerate(media_files, 1):
             basename = media_info["basename"]
             if payload.emit_file_progress:
-                _name = _Path(media_info.get("path", basename)).name
-                print(transcribe_marker(_name, idx, len(media_files),
-                                        pass_number=pass_number,
-                                        pass_total=payload.pass_total),
-                      file=sys.stderr, flush=True)
+                _name = Path(media_info.get("path", basename)).name
+                emit_marker(transcribe_marker(_name, idx, len(media_files),
+                                              pass_number=pass_number,
+                                              pass_total=payload.pass_total))
             logger.info(
                 "Pass %s processing %s",
                 pass_number,

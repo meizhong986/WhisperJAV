@@ -5,14 +5,13 @@ This adapter bridges the old ProgressDisplay interface to the new UnifiedProgres
 to maintain compatibility while migrating to the unified system.
 """
 
-import sys
 from pathlib import Path
 from typing import Optional
 from contextlib import contextmanager
 
 from whisperjav.utils.unified_progress import UnifiedProgressManager
 from whisperjav.utils.logger import logger
-from whisperjav.utils.progress_markers import progress_marker
+from whisperjav.utils.progress_markers import emit_marker, progress_marker
 
 
 class ProgressDisplayAdapter:
@@ -34,12 +33,6 @@ class ProgressDisplayAdapter:
         self._scene_total = 0
         self._scene_done = 0
         self._last_overall_pct = -1
-        # Resolved once, since _emit_overall_progress runs on every scene update.
-        self._marker_stream = sys.__stderr__ or sys.stderr
-        try:
-            self._emit_markers = self._marker_stream is not None and not self._marker_stream.isatty()
-        except (ValueError, OSError, AttributeError):
-            self._emit_markers = False
         
     def close(self):
         """Clean up progress display."""
@@ -90,15 +83,9 @@ class ProgressDisplayAdapter:
     def _emit_overall_progress(self):
         """Emit a GUI progress marker blending file index + scene fraction.
 
-        Written to the original stderr (``sys.__stderr__``) so it bypasses
-        ExternalProgressCapture's stdout/stderr redirection, and only when that
-        stream is NOT a TTY. An interactive terminal keeps its own in-place
-        progress bar uncluttered, while the GUI (piped) gets a parseable marker.
+        Printed through `emit_marker`, so only runs the GUI started get it.
         Throttled to whole-percent changes.
         """
-        if not self._emit_markers:
-            return
-
         total_files = self.total_files or 1
         scene_frac = (self._scene_done / self._scene_total) if self._scene_total else 0.0
         scene_frac = min(max(scene_frac, 0.0), 1.0)
@@ -108,10 +95,7 @@ class ProgressDisplayAdapter:
         if pct == self._last_overall_pct:
             return
         self._last_overall_pct = pct
-        try:
-            print(progress_marker(pct), file=self._marker_stream, flush=True)
-        except (ValueError, OSError):
-            pass
+        emit_marker(progress_marker(pct))
     
     def finish_subtask(self):
         """Finish the current subtask."""
