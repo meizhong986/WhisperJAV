@@ -48,19 +48,22 @@ PROVIDER_CONFIGS = {
     },
     'gpt': {
         'pysubtrans_name': 'OpenAI',
-        'model': 'gpt-4o-mini',
+        # OpenAI removes gpt-4o-mini on 2027-01-14 and names gpt-6-luna as its replacement.
+        'model': 'gpt-6-luna',
         'env_var': 'OPENAI_API_KEY'
     },
     'glm': {
         'pysubtrans_name': 'Custom Server',  # Custom Server avoids Responses API misrouting (#178)
-        'model': 'glm-4-flash',
+        # Zhipu's model list no longer has the bare glm-4 names. glm-4.7-flash is the free model.
+        'model': 'glm-4.7-flash',
         'env_var': 'GLM_API_KEY',
         'server_address': 'https://open.bigmodel.cn',
         'endpoint': '/api/paas/v4/chat/completions',
     },
     'groq': {
         'pysubtrans_name': 'Custom Server',  # Custom Server avoids Responses API misrouting (#178)
-        'model': 'llama-3.3-70b-versatile',
+        # Groq shut the Llama 3 models down on 2026-08-16 and names gpt-oss-120b as the replacement.
+        'model': 'openai/gpt-oss-120b',
         'env_var': 'GROQ_API_KEY',
         'server_address': 'https://api.groq.com',
         'endpoint': '/openai/v1/chat/completions',
