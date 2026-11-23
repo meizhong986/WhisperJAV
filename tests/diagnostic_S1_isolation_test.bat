@@ -28,10 +28,10 @@ REM ============================================================================
 setlocal enabledelayedexpansion
 
 REM ============================================================================
-REM CONFIGURATION - ABSOLUTE PATHS
+REM CONFIGURATION - PATHS (the repository folder is the parent of this file's folder)
 REM ============================================================================
-set "TEST_FILE=C:\BIN\git\whisperJav_V1_Minami_Edition\test_media\173_acceptance_test\SONE-966-15_sec_test-966-00_01_45-00_01_59.wav"
-set "BASE_DIR=C:\BIN\git\whisperJav_V1_Minami_Edition"
+set "BASE_DIR=%~dp0.."
+set "TEST_FILE=%BASE_DIR%\test_media\173_acceptance_test\SONE-966-15_sec_test-966-00_01_45-00_01_59.wav"
 set "TIMESTAMP=%date:~-4%%date:~4,2%%date:~7,2%_%time:~0,2%%time:~3,2%%time:~6,2%"
 set "TIMESTAMP=%TIMESTAMP: =0%"
 set "OUTPUT_DIR=%BASE_DIR%\test_results\diagnostic_isolation_%TIMESTAMP%"
