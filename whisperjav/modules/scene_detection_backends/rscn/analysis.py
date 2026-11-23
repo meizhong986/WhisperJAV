@@ -1,6 +1,6 @@
 """R-SCN analysis: the sound's measures over time, the change strength, digital silence and quiet stretches.
 
-Adapted from the owner's reference R-SCN 1.0 (D:\\Git\\MOSS-Transcrive-Concept-Implementation\\r_scn_detector_v1_0.py:
+Adapted from the owner's reference R-SCN 1.0 (his private reference implementation, r_scn_detector_v1_0.py:
 extract_features, digital_silence_spans, quiet_intervals). One change, by the owner's requirements (study 5a (2), 5b):
 the change strength is absolute. Each measure is divided by a fixed unit (settings.unit_*), and the strength at a moment
 is the root-mean-square difference of the measures' means before and after it, so the threshold means the same on every
