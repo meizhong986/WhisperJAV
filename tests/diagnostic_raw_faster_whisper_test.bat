@@ -18,7 +18,7 @@ echo  Raw Faster-Whisper Crash Reproduction Test
 echo ============================================================================
 echo.
 
-cd /d C:\BIN\git\whisperJav_V1_Minami_Edition
+cd /d "%~dp0.."
 
 REM Clear old trace files
 if exist raw_fw_trace.log del raw_fw_trace.log
