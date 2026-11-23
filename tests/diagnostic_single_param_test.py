@@ -26,7 +26,8 @@ import sys
 import time
 from pathlib import Path
 
-TEST_FILE = Path(r"C:\BIN\git\whisperJav_V1_Minami_Edition\test_media\173_acceptance_test\SONE-966-15_sec_test-966-00_01_45-00_01_59.wav")
+TEST_FILE = (Path(__file__).resolve().parents[1]  # the repository folder
+             / "test_media" / "173_acceptance_test" / "SONE-966-15_sec_test-966-00_01_45-00_01_59.wav")
 MODEL_SIZE = "large-v2"
 
 # Baseline params that CAUSE the crash
