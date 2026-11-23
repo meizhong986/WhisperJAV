@@ -31,6 +31,8 @@ import pytest
 
 from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
 from whisperjav.config.chronosjav_vad import (
+    GROUP_KEYS,
+    anime_whisper_group_defaults,
     apply_chronosjav_segmenter_defaults,
     chronosjav_end_pad_default,
     resolve_chronosjav_segmenter_config,
@@ -230,3 +232,56 @@ def test_both_entry_points_apply_the_end_pad_default_unless_the_user_set_one():
     # the user's GUI / qwen-params / speech_pad_ms values are applied after it, so they win
     assert worker.index('_end_pad = qwen_defaults.get("qwen_vad_end_pad")') > j
     assert worker.index('_legacy_pad = pass_config.get("speech_pad_ms")') > j
+
+
+# ---- anime-whisper's gap, longest group and pads per segmenter (1.10.3, owner W753 CL3) -----------
+# Before 1.10.3 the WhisperSeg table applied whatever the segmenter (the bug); now the table applies with WhisperSeg
+# and the segmenter's own preset otherwise.
+
+@pytest.mark.parametrize("sens", SENSITIVITIES)
+def test_anime_group_values_with_whisperseg_are_the_table(sens):
+    row = anime_whisperseg_defaults(sens)
+    assert anime_whisper_group_defaults("whisperseg", sens) == {k: row[k] for k in GROUP_KEYS}
+    assert anime_whisper_group_defaults(None, sens) == anime_whisper_group_defaults("whisperseg", sens)
+    assert anime_whisper_group_defaults(" WhisperSeg ", sens) == anime_whisper_group_defaults("whisperseg", sens)
+
+
+@pytest.mark.parametrize("sens", SENSITIVITIES)
+@pytest.mark.parametrize("segmenter", ["ten", "firered-vad", "silero-v6.2"])
+def test_anime_group_values_with_other_segmenters_are_their_own_preset(segmenter, sens):
+    own = resolve_segmenter_sensitivity(segmenter, sens, None)
+    got = anime_whisper_group_defaults(segmenter, sens)
+    assert got == {k: own[k] for k in GROUP_KEYS if own.get(k) is not None}
+    assert got != {k: anime_whisperseg_defaults(sens)[k] for k in GROUP_KEYS}
+
+
+def test_anime_group_values_with_firered_balanced_are_its_yaml_values():
+    # v4/ecosystems/tools/firered-vad-speech-segmentation.yaml spec (balanced): gap 1.0 s, group 6 s, pads 50 / 150 ms
+    assert anime_whisper_group_defaults("firered-vad", "balanced") == {
+        "chunk_threshold_s": 1.0, "max_group_duration_s": 6, "start_pad_ms": 50, "end_pad_ms": 150}
+
+
+def test_anime_group_values_without_a_segmenter_are_none():
+    assert anime_whisper_group_defaults("none", "balanced") == {}
+
+
+@pytest.mark.parametrize("sens", SENSITIVITIES)
+@pytest.mark.parametrize("segmenter", ["ten", "firered-vad"])
+def test_dialog_anime_pipeline_values_follow_the_segmenter(segmenter, sens):
+    audio, own = _dialog(sens, "anime-whisper", segmenter), anime_whisper_group_defaults(segmenter, sens)
+    assert audio["chunk_threshold_ms"]["default"] == int(round(own["chunk_threshold_s"] * 1000))
+    assert audio["max_group_duration"]["default"] == own["max_group_duration_s"]
+    assert audio["vad_start_pad"]["default"] == own["start_pad_ms"]
+    assert audio["vad_end_pad"]["default"] == own["end_pad_ms"]
+
+
+def test_both_entry_points_take_anime_group_values_from_the_one_place():
+    main = (REPO / "whisperjav/main.py").read_text(encoding="utf-8")
+    worker = (REPO / "whisperjav/ensemble/pass_worker.py").read_text(encoding="utf-8")
+    assert "anime_whisper_group_defaults(_qwen_segmenter, _qwen_sensitivity)" in main
+    assert "anime_whisper_group_defaults(segmenter_backend, qwen_sensitivity)" in worker
+    assert "anime_whisperseg_defaults(" not in main and "anime_whisperseg_defaults(" not in worker
+    # the user's own values still win: the worker's gates on the pass's qwen_params are kept
+    i = worker.index("anime_whisper_group_defaults(segmenter_backend, qwen_sensitivity)")
+    block = worker[i:i + 1600]
+    assert '"chunk_threshold" not in _user_qwen' in block and '"max_group_duration" not in _user_qwen' in block
