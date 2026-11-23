@@ -304,6 +304,39 @@ class TestOnsetTimes:
         items = [("3.", 0.0, 0.02), ("5", 0.3, 0.32), ("キ", 0.6, 0.62), ("ロ。", 0.9, 1.2)]
         assert len(build([seg(items)], 1.2)) == 2
 
+    # 1.10.3 (owner W751 B1 1): two sentences the aligner gives one onset are kept, as two lines of one subtitle.
+    # Before, the first ended where the second starts (its own start), had no length, and srt.compose skipped it.
+    SAME_START = [("はい。", 1.0, 1.02), ("そう。", 1.0, 1.02), ("行こう。", 2.0, 2.5)]
+
+    def test_two_sentences_with_one_onset_become_two_lines_of_one_subtitle(self):
+        stats = lines.LineStats()
+        subs = rounded(lines.build("tokens", G0, G0 + 2.5, [seg(self.SAME_START)], stats, onsets=True))
+        assert subs == [("はい。\nそう。", 1.0, 2.0), ("行こう。", 2.0, 2.5)]
+        assert stats.joined_same_start == 1
+
+    def test_the_groups_last_sentence_without_length_joins_the_one_before(self):
+        items = [("行", 0.0, 0.1), ("こう。", 2.4, 2.5), ("はい。", 2.5, 2.5)]
+        stats = lines.LineStats()
+        assert rounded(lines.build("tokens", G0, G0 + 2.5, [seg(items)], stats, onsets=True)) == [
+            ("行こう。\nはい。", 0.0, 2.5)]
+        assert stats.joined_same_start == 1
+
+    def test_no_sentence_is_lost_by_the_srt_writer(self):
+        from datetime import timedelta
+        import srt
+        subs = lines.build("tokens", G0, G0 + 2.5, [seg(self.SAME_START)], onsets=True)
+        entries = [srt.Subtitle(index=n + 1, start=timedelta(seconds=s), end=timedelta(seconds=e), content=t)
+                   for n, (t, s, e) in enumerate(subs)]
+        written = "\n".join(e.content for e in srt.parse(srt.compose(entries)))
+        for sentence in ("はい。", "そう。", "行こう。"):
+            assert sentence in written
+
+    def test_subtitles_with_length_are_unchanged(self):
+        stats = lines.LineStats()
+        assert self.onsets(self.SPIKES, 3.79) == [("ったた。", 2.6, 3.1), ("それで？", 3.1, 3.79)]
+        lines.build("tokens", G0, G0 + 3.79, [seg(self.SPIKES)], stats, onsets=True)
+        assert stats.joined_same_start == 0
+
 
 class TestTheRule:
     def test_an_unknown_rule_is_refused(self):
