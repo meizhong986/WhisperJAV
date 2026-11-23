@@ -3,9 +3,9 @@
 Run once on the stack before item 3 (transformers 4.57.6, PyPI qwen-asr 0.0.6) and once after (transformers 5.20, the
 patched qwen-asr fork); `--compare` then says whether the text is identical and how far the aligner timestamps moved.
 
-    python item3_qwen_ref.py run --out D:\\WJ110_measure\\F2_ref_qwen\\before
-    python item3_qwen_ref.py run --out D:\\WJ110_measure\\F2_ref_qwen\\after
-    python item3_qwen_ref.py compare D:\\WJ110_measure\\F2_ref_qwen\\before D:\\WJ110_measure\\F2_ref_qwen\\after
+    python item3_qwen_ref.py run --out <measurement folder>\\F2_ref_qwen\\before
+    python item3_qwen_ref.py run --out <measurement folder>\\F2_ref_qwen\\after
+    python item3_qwen_ref.py compare <measurement folder>\\F2_ref_qwen\\before <measurement folder>\\F2_ref_qwen\\after
 
 The clips are 60 seconds of each reference film from second 30, 16 kHz mono, cut with ffmpeg into <out>/clips/.
 """
