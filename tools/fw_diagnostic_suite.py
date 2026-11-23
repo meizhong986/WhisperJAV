@@ -50,8 +50,8 @@ from typing import Any, Dict, List, Optional, Tuple
 # ----------------------------------------------------------------------------
 # Defaults
 # ----------------------------------------------------------------------------
-DEFAULT_INPUT = Path(r"C:\BIN\git\WhisperJav_V1_Minami_Edition\test_media\293sec-S01E04-scene4.mkv")
-DEFAULT_OUTDIR = Path(r"F:\MEDIA_DLNA\SONE-853\DIAG_FW")
+# The repository's test clip, worked out from this file's location (tools/).
+DEFAULT_INPUT = Path(__file__).resolve().parents[1] / "test_media" / "293sec-S01E04-scene4.mkv"
 DEFAULT_MODEL = "large-v2"
 DEFAULT_DEVICE = "cuda"
 DEFAULT_COMPUTE_TYPE = "float16"
@@ -658,8 +658,8 @@ Runs:
     )
     p.add_argument("--input", type=Path, default=DEFAULT_INPUT,
                    help=f"Input media file (default: {DEFAULT_INPUT})")
-    p.add_argument("--outdir", type=Path, default=DEFAULT_OUTDIR,
-                   help=f"Output directory (default: {DEFAULT_OUTDIR})")
+    p.add_argument("--outdir", type=Path, required=True,
+                   help="Output directory (required)")
     p.add_argument("--run", default="A",
                    help="Comma-separated run IDs or 'all' (e.g. 'A', 'A,C,E', 'all')")
     p.add_argument("--model", default=DEFAULT_MODEL)
