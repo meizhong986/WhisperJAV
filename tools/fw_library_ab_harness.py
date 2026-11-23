@@ -79,12 +79,12 @@ USAGE
 -----
   python tools/fw_library_ab_harness.py --label WJ \
       --files "test_media/Ground_Truths/Netflix/*.mkv" \
-      --out F:/fw_ab_results
+      --out <results folder>
 
   python tools/fw_library_ab_harness.py --label WJ --recipe fwdefaults \
       --arms wj_native_file,wj_external_group \
-      --files "F:/MEDIA_DLNA/EKAI-023/EKAI-023.mp4" \
-      --out "F:/MEDIA_DLNA/EKAI-023/ab_results_WJ"
+      --files "<media folder>/<film>.mp4" \
+      --out "<media folder>/ab_results_WJ"
 
   See tools/fw_library_ab_harness.md for the full procedure.
 """
