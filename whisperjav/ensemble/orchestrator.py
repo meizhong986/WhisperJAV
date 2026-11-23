@@ -1040,11 +1040,16 @@ class EnsembleOrchestrator:
         """Return the output directory for a specific file.
 
         In source mode, SRTs go next to each input file.
-        Otherwise, all SRTs go to the single configured output_dir.
+        Otherwise, the configured output_dir; a file found in a subfolder of a folder input goes into the same
+        subfolder under it (1.10.3, owner W750 B8, W756 3; modules/media_discovery.py output_folder_for).
         """
         if self.source_output_mode:
             return Path(media_info['path']).parent
-        return self.output_dir
+        from whisperjav.modules.media_discovery import output_folder_for
+        target = output_folder_for(media_info, str(self.output_dir))
+        if target != self.output_dir:
+            target.mkdir(parents=True, exist_ok=True)
+        return target
 
     def _format_status(self, result: Optional[Dict[str, Any]]) -> str:
         """Render status for summary table."""
