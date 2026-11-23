@@ -135,35 +135,37 @@ torch = [
 # v1.10.0 (item 3, owner W78 C2): torchvision left with ClearVoice, its only user.
 # CrispASR's Python package (route B, owner W176-W178), one line per platform in each extra: the
 # CUDA build (+cuda, its own CUDA 12.8 libraries inside) and the Vulkan build (+vulkan) from the
-# v0.8.53 GitHub release, each pinned by URL and SHA-256 (decision record D10; the hashes equal the
+# v0.8.55 GitHub release, each pinned by URL and SHA-256 (decision record D10; the hashes equal the
 # release's own digests); everywhere else PyPI's build (CPU on Windows and Linux, Metal inside on
 # Apple silicon; owner W217 13, W217 15, W225). 1.10.1: 0.8.44 -> 0.8.50 for MOSS-CrispASR's sampling
 # and beam size (CrispASR #564; owner W492 M1, W501), the same builds for the same platforms.
 # 1.10.2: 0.8.50 -> 0.8.53, the newest release, which holds the fix of our CrispASR #574 for MOSS
 # (owner W618 3); the same builds for the same platforms.
+# 1.10.3: 0.8.53 -> 0.8.55, the newest release (owner W749 6, W750 A6); the same builds for the same
+# platforms.
 cu130 = [
     "torch==2.11.0",
     "torchaudio==2.11.0",
-    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bcuda-py3-none-win_amd64.whl#sha256=8460e67defeb7301240fc919552f147b923a615cb6fbb4831e1953ee310eb697 ; sys_platform == 'win32' and platform_machine == 'AMD64'",
-    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bcuda-py3-none-manylinux_2_35_x86_64.whl#sha256=f942de093b2996990315f91c101ee0b8416c37d34c3b0836671949ba2d559e88 ; sys_platform == 'linux' and platform_machine == 'x86_64'",
-    "crispasr==0.8.53 ; sys_platform == 'linux' and platform_machine == 'aarch64'",
+    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.55/crispasr-0.8.55%2Bcuda-py3-none-win_amd64.whl#sha256=a0c94a002de018114d4644879b04e6557d9ef56cacb0b27afe1a9a0819c6a9d7 ; sys_platform == 'win32' and platform_machine == 'AMD64'",
+    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.55/crispasr-0.8.55%2Bcuda-py3-none-manylinux_2_35_x86_64.whl#sha256=3ffd563d777f7ae3adec0c6c08b25b6f1dbe86e42c55fc765c08e91bfa9eaa4a ; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "crispasr==0.8.55 ; sys_platform == 'linux' and platform_machine == 'aarch64'",
 ]
 cu128 = [
     "torch==2.11.0",
     "torchaudio==2.11.0",
-    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bcuda-py3-none-win_amd64.whl#sha256=8460e67defeb7301240fc919552f147b923a615cb6fbb4831e1953ee310eb697 ; sys_platform == 'win32' and platform_machine == 'AMD64'",
-    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bcuda-py3-none-manylinux_2_35_x86_64.whl#sha256=f942de093b2996990315f91c101ee0b8416c37d34c3b0836671949ba2d559e88 ; sys_platform == 'linux' and platform_machine == 'x86_64'",
-    "crispasr==0.8.53 ; sys_platform == 'linux' and platform_machine == 'aarch64'",
+    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.55/crispasr-0.8.55%2Bcuda-py3-none-win_amd64.whl#sha256=a0c94a002de018114d4644879b04e6557d9ef56cacb0b27afe1a9a0819c6a9d7 ; sys_platform == 'win32' and platform_machine == 'AMD64'",
+    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.55/crispasr-0.8.55%2Bcuda-py3-none-manylinux_2_35_x86_64.whl#sha256=3ffd563d777f7ae3adec0c6c08b25b6f1dbe86e42c55fc765c08e91bfa9eaa4a ; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "crispasr==0.8.55 ; sys_platform == 'linux' and platform_machine == 'aarch64'",
 ]
 vulkan = [
     "torch==2.11.0",
     "torchaudio==2.11.0",
-    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.53/crispasr-0.8.53%2Bvulkan-py3-none-win_amd64.whl#sha256=f7d668d4746d8ecabe1567bdbdfdb6c918437a19210289bfd7e8cef732c070e3 ; sys_platform == 'win32' and platform_machine == 'AMD64'",
+    "crispasr @ https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.55/crispasr-0.8.55%2Bvulkan-py3-none-win_amd64.whl#sha256=ca315e72a71328d291838fe8c62898e3a766cf1e7e6af92989fd52bb6abeebd8 ; sys_platform == 'win32' and platform_machine == 'AMD64'",
 ]
 cpu = [
     "torch==2.11.0",
     "torchaudio==2.11.0",
-    "crispasr==0.8.53 ; (sys_platform == 'win32' and platform_machine == 'AMD64') or (sys_platform == 'linux' and platform_machine == 'x86_64') or (sys_platform == 'linux' and platform_machine == 'aarch64') or (sys_platform == 'darwin' and platform_machine == 'arm64')",
+    "crispasr==0.8.55 ; (sys_platform == 'win32' and platform_machine == 'AMD64') or (sys_platform == 'linux' and platform_machine == 'x86_64') or (sys_platform == 'linux' and platform_machine == 'aarch64') or (sys_platform == 'darwin' and platform_machine == 'arm64')",
 ]
 
 # CLI audio processing features
