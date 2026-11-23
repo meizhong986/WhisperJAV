@@ -8,7 +8,7 @@ characters or duration; every time from the tokens. Cohere (line rule "group"): 
 VAD group's edges.
 
 The token data of groups 3 and 4 are Parakeet's own, from the binding check of 2026-10-24
-(D:\\WJ110_measure\\crisp_binding_check_2026-10-24\\out\\check_binding.json); the check saved the first 12
+(private measurement record, check_binding.json); the check saved the first 12
 tokens of group 4, so the rest of that group below is made for the test. No ASR import.
 
 Run with: python -m pytest tests/test_crispasr_lines.py -q
