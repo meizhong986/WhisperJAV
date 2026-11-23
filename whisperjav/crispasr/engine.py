@@ -5,7 +5,7 @@ types: segments, words and tokens, with times measured from the start of the aud
 never sees CrispASR's objects, so a later change of route or of CrispASR's result changes this
 module only (route B design 5).
 
-Route B: CrispASR's Python binding, ``crispasr.Session`` (0.8.53 since 1.10.2; 0.8.50 in 1.10.1; 0.8.44 in 1.10.0). The model is opened once per pass
+Route B: CrispASR's Python binding, ``crispasr.Session`` (0.8.55 since 1.10.3; 0.8.53 in 1.10.2; 0.8.50 in 1.10.1; 0.8.44 in 1.10.0). The model is opened once per pass
 (owner W202 5a) and closed by ``cleanup()``, which ``BasePipeline.cleanup()`` calls at the end of
 the pass. ``crispasr`` is imported only when an engine opens, so importing this module stays light.
 """
@@ -197,6 +197,7 @@ class BindingEngine:
         # max(token_floor, ceil(tokens_per_second x the seconds of the longest piece CrispASR decodes)) tokens:
         # the audio's seconds, counting at most CrispASR's piece (session_piece_seconds; 30 s), because CrispASR
         # applies the call's limit to each piece (EngineRow.tokens_per_second, EngineRow.token_floor; owner W505 2 a).
+        # Since 1.10.3 CrispASR is also given the rate itself, so each piece gets its own limit (_set_token_rate).
         self.tokens_per_second = tokens_per_second
         self.token_floor = int(token_floor)
         # A fixed limit for every call (MOSS-CrispASR's max_new_tokens, moss_prompt.py); wins over tokens_per_second.
@@ -263,7 +264,25 @@ class BindingEngine:
                 # each file" each file's pass runs in its own process, so the line comes once per file there.
                 _LINES_SHOWN.add(line)
                 logger.warning(line)
+        self._set_token_rate(session)
         self._session = session
+
+    def _set_token_rate(self, session) -> None:
+        """1.10.3 (owner W756 2; scope record 2026-11-23 section 4, B6): CrispASR applies the rate to each piece it
+        decodes, max(token_floor, round(tokens_per_second x the piece's seconds)) (Session.set_max_new_tokens_per_second,
+        CrispASR 0.8.53 and later), so the short last piece of a long VAD group gets a limit of its own size instead
+        of a full piece's. The per-call limit (token_limit, set before every call) stays as the cap, so a full piece
+        gets what it got before. Not with a fixed limit (MOSS tab), which is the limit of every piece. A CrispASR
+        without the call keeps the per-call limit alone, as before."""
+        if not self.tokens_per_second or self.max_new_tokens:
+            return
+        setter = getattr(session, "set_max_new_tokens_per_second", None)
+        if setter is None:
+            return
+        try:
+            setter(float(self.tokens_per_second), int(self.token_floor))
+        except RuntimeError as e:   # the binding has the call but its library does not
+            logger.debug("CrispASR takes no token rate per piece (%s); the limit per call applies", e)
 
     @staticmethod
     def _set_decoding(session, decoding: Mapping[str, Any]) -> None:
