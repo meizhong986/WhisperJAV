@@ -23,7 +23,7 @@ python tools/forensic_csv_generator.py --pass-number 2 --output <output.csv> --b
 |------|----------|--------|---------|---------|
 | `--pass-number` | Yes | 1 or 2 | — | Which ensemble pass to analyze |
 | `--output` | Yes | CSV filename | — | Output CSV path (relative paths resolve against `--base-dir`) |
-| `--base-dir` | No | Directory path | `F:\MEDIA_DLNA\SONE-853\S0104\R1` | Root directory containing test artifacts |
+| `--base-dir` | Yes | Directory path | — | Root directory containing test artifacts (the run folder, e.g. `<runs folder>\S0104\R1`) |
 
 ## Required Input Files
 
@@ -131,9 +131,9 @@ Generating forensic CSV for Pass <N>...
 ## Example Usage (runs R1-R7)
 
 ```bash
-cd F:\MEDIA_DLNA\SONE-853\S0104\R1\TEMP
-python forensic_csv_generator.py --pass-number 1 --output S0104_R5_PASS1_FORENSIC.csv --base-dir F:\MEDIA_DLNA\SONE-853\S0104\R5
-python forensic_csv_generator.py --pass-number 2 --output S0104_R5_PASS2_FORENSIC.csv --base-dir F:\MEDIA_DLNA\SONE-853\S0104\R5
+cd <runs folder>\S0104\R1\TEMP
+python forensic_csv_generator.py --pass-number 1 --output S0104_R5_PASS1_FORENSIC.csv --base-dir <runs folder>\S0104\R5
+python forensic_csv_generator.py --pass-number 2 --output S0104_R5_PASS2_FORENSIC.csv --base-dir <runs folder>\S0104\R5
 ```
 
 ## Adapting to Different Test Media
