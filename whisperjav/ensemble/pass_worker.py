@@ -15,12 +15,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from whisperjav.modules.audio_integrity import AudioIntegrityStop
-from whisperjav.config.chronosjav_vad import apply_chronosjav_segmenter_defaults, chronosjav_end_pad_default
+from whisperjav.config.chronosjav_vad import (anime_whisper_group_defaults, apply_chronosjav_segmenter_defaults,
+                                              chronosjav_end_pad_default)
 from whisperjav.config.chronosjav_timing import (PASS_START as CHRONOSJAV_PASS_START,
                                                  TIMING_KEYS as CHRONOSJAV_TIMING_KEYS,
                                                  apply_aligner_choice as chronosjav_apply_aligner_choice,
                                                  pass_timing as chronosjav_pass_timing)
-from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
 from whisperjav.config.legacy import resolve_legacy_pipeline, apply_balanced_vad_defaults
 from whisperjav.pipelines.balanced_pipeline import BalancedPipeline
 from whisperjav.pipelines.fast_pipeline import FastPipeline
@@ -1405,24 +1405,25 @@ def _build_pipeline(
             chronosjav_pass_timing(qwen_defaults, pass_config.get("qwen_params") or {}, _gen_backend))
         if _gen_backend == "anime-whisper":
             _user_qwen = pass_config.get("qwen_params") or {}
-            # v1.9.0: per-sensitivity WhisperSeg VAD defaults (owner table, single
-            # source of truth). Balanced is the fallback for unknown sensitivity.
-            # Each still gated on the user NOT having set it explicitly, so GUI
-            # sliders / CLI (applied below via qwen_defaults) win.
-            _aw_vad = anime_whisperseg_defaults(qwen_sensitivity)
+            # The gap, longest group and pads: with WhisperSeg the per-sensitivity anime-whisper table (v1.9.0, owner
+            # table), with any other segmenter that segmenter's own preset (1.10.3, owner W753 CL3: before it the
+            # WhisperSeg table applied whatever the segmenter; config/chronosjav_vad.py). Balanced is the fallback for
+            # an unknown sensitivity. Each still gated on the user NOT having set it explicitly, so GUI sliders / CLI
+            # (applied below via qwen_defaults) win.
+            _aw_vad = anime_whisper_group_defaults(segmenter_backend, qwen_sensitivity)
             if "model_id" not in _user_qwen and not pass_config.get("model"):
                 qwen_pipeline_params["model_id"] = "litagin/anime-whisper"
             # The timestamp mode and timing model follow the same defaults as Qwen3-ASR (since 1.10.1
             # vad_only and none, owner W498 D1; in 1.10.0 the aligner and timing model, W254 Q6).
             if "assembly_cleaner" not in _user_qwen:
                 qwen_pipeline_params["assembly_cleaner"] = False
-            if "chunk_threshold" not in _user_qwen:
+            if "chunk_threshold" not in _user_qwen and "chunk_threshold_s" in _aw_vad:
                 qwen_pipeline_params["segmenter_chunk_threshold"] = _aw_vad["chunk_threshold_s"]
-            if "max_group_duration" not in _user_qwen:
+            if "max_group_duration" not in _user_qwen and "max_group_duration_s" in _aw_vad:
                 qwen_pipeline_params["segmenter_max_group_duration"] = _aw_vad["max_group_duration_s"]
-            if "vad_padding" not in _user_qwen and "vad_start_pad" not in _user_qwen:
+            if "vad_padding" not in _user_qwen and "vad_start_pad" not in _user_qwen and "start_pad_ms" in _aw_vad:
                 qwen_pipeline_params["segmenter_start_pad_ms"] = int(_aw_vad["start_pad_ms"])
-            if "vad_padding" not in _user_qwen and "vad_end_pad" not in _user_qwen:
+            if "vad_padding" not in _user_qwen and "vad_end_pad" not in _user_qwen and "end_pad_ms" in _aw_vad:
                 qwen_pipeline_params["segmenter_end_pad_ms"] = int(_aw_vad["end_pad_ms"])
         elif _gen_backend == "qwen3":
             # Qwen3-ASR + WhisperSeg: end pad 0 ms at every sensitivity (owner, 2026-10-09);
