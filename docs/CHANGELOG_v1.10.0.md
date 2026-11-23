@@ -11,7 +11,7 @@
 > VAD-group times) committed on 2026-10-29 (`0568cac`, `14af1fa`, `606eea8`). Installer built on 2026-10-29 from
 > `606eea8`: `WhisperJAV-1.10.0-Windows-x86_64.exe`, 351,195,281 bytes, SHA-256
 > `5000FBC98D93C85D9BC466F2120D16F6B14429C00A022C2C3753B2D28E68CDE1`; installed and checked on an NVIDIA PC
-> (evidence `D:\WJ110_measure\build_2026-10-29\`). After it, two release edits: this paragraph, and the GitHub
+> (evidence: private measurement record of 2026-10-29). After it, two release edits: this paragraph, and the GitHub
 > check `automated-execution.yml` on Python 3.13 (was 3.12). Nothing pushed; every push on the owner's word.
 >
 > **State, 2026-10-27:** items 1, 2a–2f, 3 and 4 (CrispASR, as the GGUF pipelines) done, and the accelerator
@@ -57,7 +57,7 @@ held 50 `asr_config.backup.*.json` files with local program paths.
   (`780f745`, `840301f`; W30 (2), W40).
 
 **Checked.** Baseline: six pipelines (Balanced, Fast, Faster, Fidelity, ChronosJAV Qwen3-ASR, ChronosJAV anime-whisper) on the two
-reference films, run on the owner's fresh 1.9.5 install `D:\195`, scored with subeval: `D:\WJ110_measure\F0_195\`. Build checks H1–H3
+reference films, run on the owner's fresh 1.9.5 install, scored with subeval (private measurement record). Build checks H1–H3
 passed (spec item 1).
 
 ---
@@ -233,7 +233,7 @@ file): the owner, "Both G5 and G6 passed." (W90). One `assessment-adversary` rev
 
 **Checked.** End-to-end runs on WJ110 (NVIDIA GPU): Parakeet GGUF on the GPU, 57 subtitles; Parakeet with auditok,
 ffmpeg-dsp and Enhance for VAD only, 62; Cohere with `--device cpu`, 76; a GGUF pass with ZipEnhancer and `--device cpu`
-loaded the enhancer on the CPU (`D:\WJ110_measure\step3_2026-10-27\e2e\`). The Vulkan build loaded and transcribed on this
+loaded the enhancer on the CPU (private measurement record of 2026-10-27). The Vulkan build loaded and transcribed on this
 PC's NVIDIA card through Vulkan; no AMD or Intel GPU has been tried. Design and decisions:
 `docs/plans/design/2026-10-25-crispasr-route-b-design.md` (v3 and section 22 v2), decision record `…-decision-record.md`.
 
@@ -265,7 +265,7 @@ PC's NVIDIA card through Vulkan; no AMD or Intel GPU has been tried. Design and 
 - Lock: a fourth extra `vulkan`; CrispASR on every platform of each extra (PyPI CPU builds, the `+cuda` and `+vulkan` wheels
   by URL and SHA-256). Only two packages were added to `uv.lock` (253 → 255); no other version changed.
 
-**Checked.** Plan step 3 P8 (`D:\WJ110_measure\step3_2026-10-27\`): WJ110 runs above; a CPU-only source install into a scratch
+**Checked.** Plan step 3 P8 (private measurement record of 2026-10-27): WJ110 runs above; a CPU-only source install into a scratch
 environment (exit 0, record `cpu`, `--check` exit 0); the Vulkan load check; the Japanese install folder. One
 `assessment-adversary` review of P2–P6, 17 findings, each checked; fixed with tests or answered (decision record §14.12);
 20 test files after the fixes, all passed (`p7_fix_tests.log`). Not checked: any AMD or Intel GPU; a real Own PyTorch install
@@ -314,7 +314,7 @@ ended at the VAD group's edges, and two sentences (often two speakers) in one VA
 
 **Checked.** Unit tests (new: `test_crispasr_aligner.py`, `test_crispasr_timer.py`, `test_timing_rules.py`,
 `test_subtitle_pipeline_timer.py`, `test_chronosjav_timing_wiring.py`) and the affected files, one per process. Real runs on
-The Naked Director S02E02 Scene 5 (`D:\WJ110_measure\timing_design_2026-10-27\s5_qwen_default\`, `…\s6\`): Qwen3-ASR with each
+The Naked Director S02E02 Scene 5 (private measurement records of 2026-10-27): Qwen3-ASR with each
 aligner and the PyTorch one, timing model off, `vad_only`, anime-whisper — all exit 0; the two-speaker VAD group split at the
 speaker change. The owner's GUI click passed (W264). One `assessment-adversary` review; its findings fixed or decided (W266;
 design note v3 §15). Not run: a real step-down retry, a real load failure, `--device cpu`, Cohere inside ChronosJAV (gated
@@ -352,7 +352,7 @@ every ChronosJAV run.
   counts only its own scenes; since 1.9.5 the second and later files of a batch also counted the earlier files' scenes.
 - The benchmark tools (`whisperjav/bench/provenance.py`, `report.py`) still read the older nested record; not changed.
 
-**Measured** (`D:\WJ110_measure\tune_2026-10-28\`, `compare_t2a.py`, `compare_w300.py`; 7 scenes, Japanese audio):
+**Measured** (private measurement record of 2026-10-28, `compare_t2a.py`, `compare_w300.py`; 7 scenes, Japanese audio):
 
 | ChronosJAV | starts within 0.5 s: 1.9.5 / shipped / now | median start error | typical start (signed) | CER |
 |---|---|---|---|---|
@@ -408,7 +408,7 @@ worker with a stand-in XXL program (a script that records its arguments): XXL as
 the side-file warning; a failing XXL in both passes gives both lines. With pass 1's XXL settings removed from `main.py`, the first
 fails (`s6_mutation_check.py`). 17 related test files, one per process: all passed except one `test_htdemucs_enhancer.py` check of
 the installer build script, which this item does not touch. Real runs on The Naked Director S02E02 Scene 5 with the local XXL
-r245.2 (`D:\WJ110_measure\xxl_pass1_2026-10-27\s3\`): XXL large-v2 → Qwen3-ASR, Qwen3-ASR → XXL large-v2, XXL large-v2 → XXL
+r245.2 (private measurement record of 2026-10-27): XXL large-v2 → Qwen3-ASR, Qwen3-ASR → XXL large-v2, XXL large-v2 → XXL
 large-v3, XXL with no model (ran large-v2) — all exit 0, XXL's log naming the model it loaded; a failing XXL as pass 1 (d3) and in
 both passes (f) — exit 1 with the plain lines. The owner's GUI click passed (W273). One `assessment-adversary` review; its findings
 fixed or brought to the owner. Not run: Large V3 Turbo and Medium with the real XXL (they would download); the Extra Args warning
@@ -453,7 +453,7 @@ console line names entry 1 of the saved file, where the model's #2 landed). With
 first two fail (`s11c_mutation_check.py`). 11 translation test files, one per process: all passed. One `assessment-adversary`
 review: the console line's numbers (fixed: read from the saved SRT), the cause stated too broadly, a wrong code comment, Windows
 line ends and the task type (fixed), the limits above (written here). Real run: `whisperjav-translate --provider
-ollama --model qwen2.5:7b -t chinese` on the seven Netflix reference SRTs (`D:\WJ110_measure\translate_460_2026-10-27\`), twice:
+ollama --model qwen2.5:7b -t chinese` on the seven Netflix reference SRTs (private measurement record of 2026-10-27), twice:
 before the review (`run1_before_review\`) 39 batches, 2 retried; on the final code 39 batches, 3 retried — every retry passed
 validation (the log does not say which check failed), exit 0, no label in any output, no warning line. Not seen: a real model
 writing labels (the reporter's model was not run).
@@ -545,7 +545,7 @@ writes straight to the error output, which the probe showed bypass ggml's logger
 WARNING: alignment collapse suspected …" (warnings stay, W350) and "[wav2vec2] vocab=…". FFmpeg stays 7.1.1 in 1.10.0
 (W350 1). Checked: probe (`ggml_log_probe2.py`, 40 pieces of S01E04 Scene 4: 71 warmup lines reached the handler at DEBUG,
 the aligner lines bypassed it); `test_crispasr_native_log.py` 15 passed, the aligner, timer, engine and pipeline test files
-passed; one Cohere pass on S01E04 Scene 4 without / with `--debug` (`D:\WJ110_measure\console_quiet_2026-10-29\`): exit 0
+passed; one Cohere pass on S01E04 Scene 4 without / with `--debug` (private measurement record of 2026-10-29): exit 0
 both, 106 / 183 console lines, warmup 0 / 8, framer 0 / 10, the same subtitles byte for byte. Not run: a ChronosJAV run (its
 timing model registers the same handler), any build other than CUDA.
 
