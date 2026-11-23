@@ -68,8 +68,10 @@ class AnimeWhisperGenerator:
                 Set to 5-10 if repetition hallucinations are noticeable.
             max_new_tokens: Maximum generated tokens per utterance.
                 444 = max safe value (max_target_positions 448 minus 4 special
-                tokens).  Must be set explicitly because the model's
-                generation_config defaults to 4096, which exceeds 448.
+                tokens), which is also the model's own limit: its
+                generation_config sets max_length 448. A value below it is
+                passed to generate(); 444 or more is not passed, since the
+                model applies its own limit (1.10.3, see generate()).
                 litagin's demo uses 64 for 15s clips; 444 is appropriate
                 for our 6-48s framed audio.
             leading_silence_ms: silence placed before every audio window.
@@ -259,6 +261,15 @@ class AnimeWhisperGenerator:
     # Generation
     # ------------------------------------------------------------------
 
+    # Whisper's start tokens before the text: start of transcript, language, task, no timestamps.
+    START_TOKENS = 4
+
+    def _own_new_token_limit(self) -> Optional[int]:
+        """The new tokens the model's own generation_config allows (its max_length less the start tokens), or None
+        when the model names no max_length."""
+        max_length = getattr(getattr(self._model, "generation_config", None), "max_length", None)
+        return int(max_length) - self.START_TOKENS if max_length else None
+
     def generate(
         self,
         audio_path: Union[Path, np.ndarray],
@@ -311,8 +322,13 @@ class AnimeWhisperGenerator:
 
         # Generate text tokens — match litagin's demo pattern:
         # greedy decoding (num_beams=1, do_sample=False).
-        # max_new_tokens MUST be set explicitly — the model's
-        # generation_config defaults to 4096, exceeding max_target_positions=448.
+        # The length limit (1.10.3, owner W751 C4 1): the model's own generation_config holds max_length 448, its
+        # max_target_positions, which transformers applies by itself (444 new tokens after the 4 start tokens).
+        # Passing max_new_tokens as well makes transformers 5.x print "Both `max_new_tokens` ... and `max_length` ...
+        # seem to have been set" on every call, which flooded the GUI console, while giving the same text (measured on
+        # 548 VAD groups, docs/plans/review/2026-11-17-anime-whisper-ensemble-diagnosis.md section 3). So it is
+        # passed only when it is smaller than the model's own limit. (Before 1.10.3 it was always passed, on the
+        # belief that the model's default was 4096; anime-whisper's generation_config.json says 448.)
         with torch.no_grad():
             gen_kwargs = {
                 "input_features": input_features,
@@ -321,8 +337,10 @@ class AnimeWhisperGenerator:
                 "do_sample": False,
                 "num_beams": 1,
                 "no_repeat_ngram_size": cfg["no_repeat_ngram_size"],
-                "max_new_tokens": cfg["max_new_tokens"],
             }
+            own = self._own_new_token_limit()
+            if own is None or cfg["max_new_tokens"] < own:
+                gen_kwargs["max_new_tokens"] = cfg["max_new_tokens"]
             generated_ids = self._model.generate(**gen_kwargs)
 
         # Decode tokens to text
