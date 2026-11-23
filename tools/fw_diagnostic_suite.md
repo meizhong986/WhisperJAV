@@ -21,8 +21,8 @@ python tools/fw_diagnostic_suite.py --run all
 
 | Flag | Default | Purpose |
 |------|---------|---------|
-| `--input` | `C:\BIN\git\WhisperJav_V1_Minami_Edition\test_media\293sec-S01E04-scene4.mkv` | Input media file |
-| `--outdir` | `F:\MEDIA_DLNA\SONE-853\DIAG_FW` | Output directory (created at runtime) |
+| `--input` | `test_media\293sec-S01E04-scene4.mkv` in the repository | Input media file |
+| `--outdir` | required, no default | Output directory (created at runtime) |
 | `--run` | `A` | Run IDs: single (`A`), comma-separated (`A,C,E`), or `all` |
 | `--model` | `large-v2` | Whisper model name |
 | `--device` | `cuda` | Faster-Whisper device |
@@ -93,7 +93,7 @@ Faster-Whisper stdout/stderr are also redirected per-group to `<outdir>/run_<X>_
 
 ## Output Files
 
-All outputs go to `--outdir` (default `F:\MEDIA_DLNA\SONE-853\DIAG_FW`).
+All outputs go to `--outdir` (required).
 
 ### Saved Once (shared across runs)
 
