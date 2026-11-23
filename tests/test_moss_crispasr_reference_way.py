@@ -107,7 +107,7 @@ class TestSchemaFiles:
 
 
 class TestReferenceInstruction:
-    """The reference's build_prompt (C:\\BIN\\MyScripts\\Python\\moss_transcribe_diarize_hybrid_v3_grok.py)."""
+    """The reference's build_prompt (the owner's moss_transcribe_diarize_hybrid_v3_grok.py)."""
 
     def test_jav_optimized_with_a_language_hint(self):
         assert MossSettings().prompt() == (
@@ -127,9 +127,11 @@ class TestReferenceInstruction:
         assert MossSettings.from_params({"language_hint": ""}).prompt() == PROMPT_EN
 
     def test_the_reference_scripts_own_build_prompt_gives_the_same_text(self):
-        script = Path(r"C:\BIN\MyScripts\Python\moss_transcribe_diarize_hybrid_v3_grok.py")
-        if not script.is_file():
-            pytest.skip("the owner's reference script is not on this computer")
+        # Where the owner's reference script is: the environment variable WHISPERJAV_MOSS_REFERENCE_SCRIPT.
+        script = Path(os.environ.get("WHISPERJAV_MOSS_REFERENCE_SCRIPT", ""))
+        if not os.environ.get("WHISPERJAV_MOSS_REFERENCE_SCRIPT") or not script.is_file():
+            pytest.skip("the owner's reference script is not on this computer "
+                        "(set WHISPERJAV_MOSS_REFERENCE_SCRIPT to its path)")
         import ast
         tree = ast.parse(script.read_text(encoding="utf-8"))
         func = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "build_prompt")
