@@ -2327,7 +2327,8 @@ class WhisperJAVAPI:
           segmenters; Max Speech Duration for Silero v3.1/v4.0 and None; the VAD
           Threshold for None.
         - anime-whisper's pipeline values (Frame Gap, Max Group, Start/End Pad)
-          come from its per-sensitivity table, as in a run; its Silence Before
+          come from its per-sensitivity table with WhisperSeg and from the
+          segmenter's own preset otherwise (1.10.3), as in a run; its Silence Before
           Each Window is 0 with Silero (2026-10-09). Qwen3-ASR with WhisperSeg
           shows End Pad 0 (2026-10-09).
         Balanced is the fallback for an unknown sensitivity.
@@ -2337,8 +2338,8 @@ class WhisperJAVAPI:
             return result
         audio = result["schema"]["audio"]
         if generator_backend == "anime-whisper":
-            from whisperjav.config.anime_whisper_vad import (
-                anime_leading_silence_default, anime_whisperseg_defaults)
+            from whisperjav.config.anime_whisper_vad import anime_leading_silence_default
+            from whisperjav.config.chronosjav_vad import anime_whisper_group_defaults
             # v1.9.4 (owner, 2026-10-06): the lead-in silence and its off switch (0);
             # 0 by default with Silero (owner, 2026-10-09), as a run uses it.
             result["schema"]["generation"]["leading_silence_ms"] = {
@@ -2350,11 +2351,17 @@ class WhisperJAVAPI:
                 "min": 0, "max": 500, "step": 50,
                 "default": anime_leading_silence_default(segmenter),
             }
-            aw = anime_whisperseg_defaults(sensitivity)
-            audio["chunk_threshold_ms"]["default"] = int(round(aw["chunk_threshold_s"] * 1000))
-            audio["max_group_duration"]["default"] = aw["max_group_duration_s"]
-            audio["vad_start_pad"]["default"] = int(aw["start_pad_ms"])
-            audio["vad_end_pad"]["default"] = int(aw["end_pad_ms"])
+            # As a run takes them (1.10.3, owner W753 CL3): the anime-whisper table with WhisperSeg, otherwise the
+            # segmenter's own preset (config/chronosjav_vad.py anime_whisper_group_defaults).
+            aw = anime_whisper_group_defaults(segmenter, sensitivity)
+            if "chunk_threshold_s" in aw:
+                audio["chunk_threshold_ms"]["default"] = int(round(aw["chunk_threshold_s"] * 1000))
+            if "max_group_duration_s" in aw:
+                audio["max_group_duration"]["default"] = aw["max_group_duration_s"]
+            if "start_pad_ms" in aw:
+                audio["vad_start_pad"]["default"] = int(aw["start_pad_ms"])
+            if "end_pad_ms" in aw:
+                audio["vad_end_pad"]["default"] = int(aw["end_pad_ms"])
             # 1.10.2 (guide point d): anime-whisper always runs its own text cleaner (qwen_pipeline.py: the cleaner
             # follows the model; the Qwen3 cleaner is off), so the menu showed "Passthrough (no cleaning)" wrongly and
             # its choice had no effect. One entry, named for what runs; the value sent stays "passthrough" (unchanged).
