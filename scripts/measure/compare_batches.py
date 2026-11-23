@@ -6,7 +6,7 @@ lines whose text is the same. Signature lines added by WhisperJAV are not treate
 that differs would show as one changed line.
 
 Usage (from the repository root):
-    python scripts/measure/compare_batches.py D:\\WJ110_measure\\F1_stack D:\\WJ110_measure\\F2_tf5
+    python scripts/measure/compare_batches.py <measurement folder>\\F1_stack <measurement folder>\\F2_tf5
 """
 import re
 import sys
