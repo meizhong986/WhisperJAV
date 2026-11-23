@@ -6,7 +6,7 @@ Local-codebase inventory of the existing integration surfaces that any future Cr
 
 ## 0. Snapshot
 
-- Repo path: `C:\BIN\git\WhisperJav_V1_Minami_Edition`
+- Repo path: the WhisperJAV repository folder
 - Branch: `dev_v1.9.0`
 - Latest commit at research time: `225b471` (2026-05-13, "docs(tracker): rev49.9 + rev49.10 — v1.8.14 RELEASED state + 8 ship-notifications posted")
 - Python range (per CLAUDE.md / pyproject.toml): 3.10–3.12
