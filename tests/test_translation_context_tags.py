@@ -53,6 +53,37 @@ def test_incomplete_tag_cannot_consume_the_next_numbered_cue():
     assert (cleaned, context, count) == (raw, {}, 0)
 
 
+# --- 1.10.3 (owner W752 1, #460): a block closed by another of the three tags ---
+
+def test_a_mismatched_pair_is_removed_and_its_value_kept_under_the_opening_tag():
+    # #460 (2026-11-17): ten subtitles kept "<scene>...</summary>".
+    raw = "#5\nTranslation>\nGood morning.\n<scene>A morning at the office</summary>"
+    cleaned, context, count = strip_translation_context_tags(raw)
+    assert cleaned.rstrip() == "#5\nTranslation>\nGood morning."
+    assert context == {"scene": "A morning at the office"} and count == 1
+
+
+def test_every_combination_of_the_three_tags_is_removed():
+    for opening in ("summary", "scene", "synopsis"):
+        for closing in ("summary", "scene", "synopsis"):
+            raw = f"Hello\n<{opening}>note</{closing}>"
+            assert strip_translation_context_tags(raw)[0].rstrip() == "Hello", (opening, closing)
+
+
+def test_a_mismatched_pair_cannot_consume_the_next_numbered_cue():
+    raw = "#1\nTranslation>\nHello <scene>unfinished\n#2\nTranslation>\nWorld</summary>"
+    assert strip_translation_context_tags(raw) == (raw, {}, 0)
+
+
+def test_the_mismatched_pair_is_removed_before_pysubtrans_parses_cues():
+    raw = ("#1\nTranslation>\nFirst\n<scene>Scene one</summary>\n\n"
+           "#2\nTranslation>\nSecond\n<summary>Latest</summary>")
+    result = _filtered(raw)
+    assert "<scene>" not in result.text and "</summary>" not in result.text
+    parser = TranslationParser("Translation", Options({}))
+    assert [(line.number, line.text) for line in parser.ProcessTranslation(result)] == [(1, "First"), (2, "Second")]
+
+
 def test_resumed_project_lines_are_cleaned_before_they_are_skipped():
     translated = SimpleNamespace(text="Hello\n<summary>Notes</summary>\n<scene>Scene</scene>")
     original = SimpleNamespace(translation=translated.text)
