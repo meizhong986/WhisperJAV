@@ -1541,7 +1541,7 @@ weifu8435 (exclusion overturned by his #416 comment).
 
 **Decision:** owner — fix shape for the installer, beta yes/no, invitations per thread.
 
-**Owner's second manual test (2026-09-11, `F:\MEDIA_DLNA\SNOS-388\LOG-TESTRUN balanced+fidleity.txt`):**
+**Owner's second manual test (2026-09-11, his run log):**
 SNOS-388 (6,979 s), Balanced/balanced/Silero 4.0 → Fidelity/aggressive/WhisperSeg, semantic, large-v2,
 merge pass2_primary, `--debug`: exit 0, 533 cues / 99.4%, 40.0 min, no warnings. Pass 1: 62 scenes
 (28/240), decode 327 s = 21× realtime, 455→432 cues, 9 scenes empty — all genuine (first 10 min of the
@@ -1579,7 +1579,7 @@ faster-whisper; #372's markers are on the English-only path, so promoting them h
 reverting the semantic default is five places, not one; Silero 4.0 admits 1.4–2.3× (not "twice");
 `gpu_constraints.txt` pins only the torch family; c8dae7a UNPINS the community 0.7b notebook.
 
-**Owner's acceptance run (later on 2026-09-11, `F:\MEDIA_DLNA\EKAI-023\192_acceptancetest_1\5-LOG-…`):**
+**Owner's acceptance run (later on 2026-09-11, his run log):**
 two-pass ensemble on EKAI-023 (10,729 s), Balanced conservative → Balanced aggressive, semantic, Silero
 4.0, large-v2, RTX 3060, v1.9.2: exit 0, 1,961 merged cues spanning 99.8%, 40.9 min; 89 scenes per pass,
 longest 240 s; 8 refreshes per pass; no warnings. Pass 2 (aggressive): 10,760 s decoded in 1,222 s =
