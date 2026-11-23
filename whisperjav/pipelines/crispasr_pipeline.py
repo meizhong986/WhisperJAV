@@ -880,7 +880,9 @@ class CrispASRPipeline(BasePipeline):
 
         md["stages"]["lines"] = {"subtitles": total, "scenes_with_lines": len(scene_srt_info),
                                  "clamped_times": stats.clamped_times,
-                                 "segments_without_token_times": stats.fallback_segments}
+                                 "segments_without_token_times": stats.fallback_segments,
+                                 # 1.10.3 (owner W751 B1 1): sentences given the next one's start, kept as a line
+                                 "joined_same_start": stats.joined_same_start}
         stitched = self.temp_dir / f"{basename}_stitched.srt"
         count = 0
         if scene_srt_info:
