@@ -101,7 +101,7 @@ At one-unit resolution over the range the GUI slider exposes (5–30, `api.py:22
 `dev_v1.9.2`, unreleased): 43 for 5–13, 45–46 for 14–23, 50 for 24–29, 58 at 30. On the 293 s clip:
 6 for 5–11, 7 for 12–24, 8 for 25–27, 7 for 28–40, then 1 from threshold 90.
 
-The owner's EKAI-023 runs (`F:\MEDIA_DLNA\EKAI-023\*\EKAI-023.semantic.scenes.json`): **119 scenes at
+The owner's EKAI-023 runs (`<media folder>\EKAI-023\*\EKAI-023.semantic.scenes.json`): **119 scenes at
 threshold 50, 121 at 90**, both `min_duration` 20.
 
 **Reading.** The threshold does what it says on *clusters* (4029 → 1) but the scene count does not
