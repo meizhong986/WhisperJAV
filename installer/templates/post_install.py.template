@@ -131,7 +131,7 @@ if USE_UV:
 # ship as source only.)
 # Installer tools, not application dependencies, so not in the lock (owner W57, D2):
 # pinned exactly here. nvidia-ml-py is pure Python; lief 1.0.0 has a cp312-abi3 Windows
-# wheel, and is the version 1.9.5 installs got (D:\195, 2026-10-13).
+# wheel, and is the version 1.9.5 installs got (checked on a 1.9.5 install, 2026-10-13).
 NVIDIA_ML_PY_REQUIREMENT = "nvidia-ml-py==13.615.71"
 LIEF_REQUIREMENT = "lief==1.0.0"
 def _load_accelerators():
