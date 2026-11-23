@@ -23,9 +23,7 @@ from pathlib import Path
 
 from tools.vad_hypothesis_suite import configs as C
 
-DEFAULT_OUT = os.path.join(
-    r"D:\Git\WhisperJav_V1_Minami_Edition\test_media\1815acceptance\T3", "vad_sweep"
-)
+DEFAULT_OUT = os.path.join(os.path.dirname(C.GROUND_TRUTH), "vad_sweep")  # test_media/1815acceptance/T3/vad_sweep
 
 
 def _find_srt(out_dir: str) -> str | None:
