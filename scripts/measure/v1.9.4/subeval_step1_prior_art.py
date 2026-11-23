@@ -17,7 +17,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-sys.path.insert(0, "D:/Git/WhisperJav_V1_Minami_Edition/docs/measurements/v1.9.4/measure-scripts")
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "docs/measurements/v1.9.4/measure-scripts"))
 from rapidfuzz.distance import Levenshtein
 
 from score_segmenters import REFS, norm
@@ -26,8 +26,10 @@ from whisperjav.bench.metrics import normalize_text
 from whisperjav.bench.timing import load_srt
 from whisperjav.bench.timing_cli import clip_id_of, find_hyp
 
-R = Path("D:/WJ194_measure/req2_ten_firered")
-runs = sorted(p.parent for p in R.glob("baseline/*/run*/DONE")) + sorted(p.parent for p in R.glob("levers/*/run1/DONE"))
+if len(sys.argv) != 2:
+    sys.exit("usage: python subeval_step1_prior_art.py <REQ2 run folder (req2_ten_firered)>")
+R = Path(sys.argv[1])
+runs =sorted(p.parent for p in R.glob("baseline/*/run*/DONE")) + sorted(p.parent for p in R.glob("levers/*/run1/DONE"))
 REF = {clip_id_of(rp): load_srt(rp, reference=True) for rp in REFS}
 
 
