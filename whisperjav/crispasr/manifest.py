@@ -35,7 +35,7 @@ class ModelFile:
     licence: str
     # The GPU memory the model needs while it transcribes, in MiB: the card's peak use over its use before the
     # model was opened, measured on the Netflix reference clip's VAD groups through CrispASR 0.8.44 (CUDA
-    # build, RTX 3060) on 2026-10-31 (D:\WJ110_measure\gguf6_2026-10-31\sizes). 0 for the aligners and the
+    # build, RTX 3060) on 2026-10-31 (private measurement record). 0 for the aligners and the
     # timing model, which are not offered in a model menu.
     vram_mib: int = 0
 
@@ -160,7 +160,7 @@ MODELS = {m.name: m for m in (
               "Apache-2.0 (OpenMOSS-Team/MOSS-Transcribe-Diarize)",
               vram_mib=1673),
     # 1.10.2 (owner W574): the models of two new pipelines, each file first run through the GGUF model test tool
-    # (tools/crispasr_model_test.py, owner W568-W573; its runs D:\WJ110_measure\haas_2026-11-06\). Their GPU memory
+    # (tools/crispasr_model_test.py, owner W568-W573; its runs of 2026-11-06, private record). Their GPU memory
     # is the tool's measuring stage figure: the card's peak over its use before the model was opened, on the VAD
     # groups of the seven Netflix reference clips, through CrispASR 0.8.50 (CUDA build, RTX 3060), 2026-11-06.
     # Haas-ja-v1.0 is a Parakeet-TDT model, which CrispASR 0.8.50 opens as the parakeet family (#561).
@@ -324,7 +324,7 @@ def timing_model_for(name: Optional[str]) -> ModelFile:
 # The speech segmenter backends `sortformer` and `pyannote`, and the speech enhancer backends `mel-band-roformer`
 # and `mini-bs-roformer`, run by CrispASR (1.10.2, owner W594, W596). Keyed by the backend's name. Repository,
 # file, commit, size and SHA-256 as the viability tests fetched and checked them against Hugging Face's listing
-# (D:\WJ110_measure\phase_a2b_diar_2026-11-08\_fetch, D:\WJ110_measure\phase_a_2026-11-07\_fetch). The
+# (private measurement records of 2026-11-07 and 2026-11-08). The
 # `backend` field: the separators' CrispASR backend name (passed to Session); for the diarization files, which
 # CrispASR opens through its diarization functions and not as a Session, the method's name.
 SEGMENTER_MODELS = {
