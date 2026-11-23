@@ -117,6 +117,8 @@ class LineStats:
     units: int = 0
     fallback_segments: int = 0  # segments read from words or as a whole, because a token time was missing; for
                                 # the "segments" rule, CrispASR raw-text answers split by WhisperJAV (_moss_pieces)
+    joined_same_start: int = 0  # 1.10.3: stretches left without length (the next starts at the same time), kept as
+                                # a line of a neighbouring subtitle (_keep_without_length)
 
 
 def _is_mark_char(ch: str) -> bool:
@@ -343,7 +345,36 @@ def tokens_rule(group_start: float, group_end: float, segments: Sequence[CrispSe
     if end_at_group and subtitles and group_end > subtitles[-1][1]:
         text, start, _ = subtitles[-1]
         subtitles[-1] = (text, start, group_end)
-    return subtitles
+    return _keep_without_length(subtitles, stats)
+
+
+def _keep_without_length(subtitles: List[Subtitle], stats: LineStats) -> List[Subtitle]:
+    """1.10.3 (owner W751 B1 1: "keep both by merging the sentences in to two lines in the same subtitle").
+
+    A stretch whose end is not after its start (the next one starts at the same time: a CTC aligner can give two
+    sentences one onset, and with onsets each subtitle ends where the next starts) becomes the first line of the next
+    subtitle; the group's last becomes the last line of the one before. An SRT writer skips a subtitle without length
+    (srt.compose), so before 1.10.3 its sentence was lost without a word. Counted in ``stats.joined_same_start``."""
+    out: List[Subtitle] = []
+    pending: List[Tuple[str, float]] = []
+    for text, start, end in subtitles:
+        if end <= start:
+            pending.append((text, start))
+            stats.joined_same_start += 1
+            continue
+        if pending:
+            text = "\n".join([t for t, _ in pending] + [text])
+            start = min([s for _, s in pending] + [start])
+            pending = []
+        out.append((text, start, end))
+    if pending:
+        if out:
+            last_text, last_start, last_end = out[-1]
+            out[-1] = ("\n".join([last_text] + [t for t, _ in pending]), last_start, last_end)
+        else:
+            start = min(s for _, s in pending)
+            out.append(("\n".join(t for t, _ in pending), start, start + MIN_DISPLAY_S))
+    return out
 
 
 def group_rule(group_start: float, group_end: float, segments: Sequence[CrispSegment]) -> List[Subtitle]:
