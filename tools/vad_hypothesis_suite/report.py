@@ -20,9 +20,7 @@ import sys
 from tools.vad_hypothesis_suite import configs as C
 from tools.vad_hypothesis_suite.score import score_srt
 
-DEFAULT_OUT = os.path.join(
-    r"D:\Git\WhisperJav_V1_Minami_Edition\test_media\1815acceptance\T3", "vad_sweep"
-)
+DEFAULT_OUT = os.path.join(os.path.dirname(C.GROUND_TRUTH), "vad_sweep")  # test_media/1815acceptance/T3/vad_sweep
 _T3 = os.path.dirname(C.GROUND_TRUTH)
 _BASELINES = {
     "z_ship_BALANCED_p1": os.path.join(_T3, "293sec-The.Naked.Director.S01E04.Scene4.ja.pass1.srt"),
