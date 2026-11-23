@@ -1757,7 +1757,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         # Dedicated Qwen3-ASR pipeline (ADR-004)
         from whisperjav.pipelines.qwen_pipeline import QwenPipeline
         from whisperjav.ensemble.pass_worker import resolve_qwen_sensitivity, SEGMENTER_PARAMS
-        from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults
+        from whisperjav.config.chronosjav_vad import anime_whisper_group_defaults
         initial_output_dir = str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir
         # Resolve sensitivity preset into segmenter_config
         _qwen_sensitivity = getattr(args, 'qwen_sensitivity', 'balanced')
@@ -1916,24 +1916,28 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
         # unless the user explicitly set them via CLI flags
         _gen_backend = qwen_kwargs.get("generator_backend", "qwen3")
         if _gen_backend == "anime-whisper":
-            # v1.9.0: per-sensitivity WhisperSeg VAD defaults (owner table, single
-            # source of truth). Balanced is the fallback for unknown sensitivity.
-            _aw_vad = anime_whisperseg_defaults(_qwen_sensitivity)
+            # The gap, longest group and pads: with WhisperSeg the per-sensitivity anime-whisper table (v1.9.0, owner
+            # table), with any other segmenter that segmenter's own preset (1.10.3, owner W753 CL3; before it the
+            # WhisperSeg table applied whatever the segmenter). Balanced is the fallback for unknown sensitivity.
+            _aw_vad = anime_whisper_group_defaults(_qwen_segmenter, _qwen_sensitivity)
             if not any(a.startswith('--qwen-model-id') for a in sys.argv):
                 qwen_kwargs["model_id"] = "litagin/anime-whisper"
             # The timestamp mode and timing model follow the same defaults as Qwen3-ASR (since 1.10.1
             # vad_only and none, owner W498 D1; in 1.10.0 the aligner and timing model, W254 Q6).
             if not any(a.startswith('--qwen-assembly-cleaner') for a in sys.argv):
                 qwen_kwargs["assembly_cleaner"] = False
-            if not any(a.startswith('--qwen-chunk-threshold') for a in sys.argv):
+            if "chunk_threshold_s" in _aw_vad and not any(a.startswith('--qwen-chunk-threshold') for a in sys.argv):
                 qwen_kwargs["segmenter_chunk_threshold"] = _aw_vad["chunk_threshold_s"]
-            if not any(a.startswith('--qwen-max-group-duration') for a in sys.argv):
+            if "max_group_duration_s" in _aw_vad and not any(
+                    a.startswith('--qwen-max-group-duration') for a in sys.argv):
                 qwen_kwargs["segmenter_max_group_duration"] = _aw_vad["max_group_duration_s"]
             # Per-sensitivity padding. The explicit pad flags (applied above) win;
             # --qwen-vad-padding sets both sides symmetrically, so it gates both.
-            if not any(a.startswith(('--qwen-vad-start-pad', '--qwen-vad-padding')) for a in sys.argv):
+            if "start_pad_ms" in _aw_vad and not any(
+                    a.startswith(('--qwen-vad-start-pad', '--qwen-vad-padding')) for a in sys.argv):
                 qwen_kwargs["segmenter_start_pad_ms"] = int(_aw_vad["start_pad_ms"])
-            if not any(a.startswith(('--qwen-vad-end-pad', '--qwen-vad-padding')) for a in sys.argv):
+            if "end_pad_ms" in _aw_vad and not any(
+                    a.startswith(('--qwen-vad-end-pad', '--qwen-vad-padding')) for a in sys.argv):
                 qwen_kwargs["segmenter_end_pad_ms"] = int(_aw_vad["end_pad_ms"])
         else:
             # Qwen3-ASR + WhisperSeg: end pad 0 ms at every sensitivity (owner, 2026-10-09);
