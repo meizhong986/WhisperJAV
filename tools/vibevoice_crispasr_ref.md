@@ -153,8 +153,8 @@ calls. Entries CrispASR judges to be non-speech markers are dropped by CrispASR.
 
 ## Seen in the first runs (2026-11-06, CrispASR 0.8.50, RTX 3060 12 GB)
 
-One clip (The Naked Director S01E04 scene 4, 294.5 s, the Netflix reference); results in
-`D:\WJ110_measure\vibevoice_2026-11-06\` (`step4_report.md`, `tags_removed_report.md`).
+One clip (The Naked Director S01E04 scene 4, 294.5 s, the Netflix reference); results in a private measurement
+record of 2026-11-06 (`step4_report.md`, `tags_removed_report.md`).
 - GPU memory over the card's use before loading: q8_0 about 9.0 GB once open, 9.5 GB at its peak with pieces of up to
   30 s; with pieces of 60 s the card was full (12,088 of 12,288 MiB). q4_k: 4.7 GB open, 6.0 GB at its peak with
   30 s pieces.
