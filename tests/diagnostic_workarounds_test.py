@@ -9,7 +9,9 @@ import sys
 import subprocess
 from pathlib import Path
 
-TEST_AUDIO = r"C:\BIN\git\whisperJav_V1_Minami_Edition\test_media\173_acceptance_test\SONE-966-15_sec_test-966-00_01_45-00_01_59.wav"
+# The repository folder, worked out from this file's location (tests/).
+REPO = str(Path(__file__).resolve().parents[1])
+TEST_AUDIO = str(Path(REPO) / "test_media" / "173_acceptance_test" / "SONE-966-15_sec_test-966-00_01_45-00_01_59.wav")
 
 # Use repr() for Python literal syntax in subprocess
 CRASH_PARAMS_STR = """{
@@ -41,7 +43,7 @@ def run_test(test_name, params_str, audio_transform=""):
     code = f'''
 import os
 import sys
-os.chdir(r"C:\\BIN\\git\\whisperJav_V1_Minami_Edition")
+os.chdir(r"{REPO}")
 
 import soundfile as sf
 import numpy as np
