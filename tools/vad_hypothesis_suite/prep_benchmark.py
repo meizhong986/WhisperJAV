@@ -13,7 +13,7 @@ For each (name, source, start, end):
 Writes/updates test_media/reference_benchmarks/manifest.json.
 
 Usage:
-    python -m tools.vad_hypothesis_suite.prep_benchmark [--only NAME[,NAME]]
+    python -m tools.vad_hypothesis_suite.prep_benchmark --source-dir <folder of the source MKVs> [--only NAME[,NAME]]
 """
 
 from __future__ import annotations
@@ -27,20 +27,15 @@ import sys
 
 import pysrt
 
-ROOT = r"D:\Git\WhisperJav_V1_Minami_Edition"
+# The repository folder, worked out from this file's location (tools/vad_hypothesis_suite/).
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BENCH_DIR = os.path.join(ROOT, "test_media", "reference_benchmarks")
 
-# (name, source mkv, start, end)
+# (name, source MKV file name inside --source-dir, start, end)
 SOURCES = [
-    ("S02E02_more",
-     r"F:\The.Naked.Director\The.Naked.Director.S02E02\The.Naked.Director.S02E02.More.More.More.1080p.NF.WEB-DL.DDP5.1.Atmos.x264-TEPES.mkv",
-     "00:19:40.420", "00:21:57.840"),
-    ("S02E04_dream",
-     r"F:\The.Naked.Director\The.Naked.Director.S02E04\The.Naked.Director.S02E04.Our.Dream.1080p.NF.WEB-DL.DDP5.1.Atmos.x264-TEPES.mkv",
-     "00:36:38.540", "00:40:07.780"),
-    ("S02E05_bubble",
-     r"F:\The.Naked.Director\The.Naked.Director.S02E05\The.Naked.Director.S02E05.The.Bubble.Bursts.1080p.NF.WEB-DL.DDP5.1.Atmos.x264-TEPES.mkv",
-     "00:00:23.600", "00:04:10.416"),
+    ("S02E02_more", "S02E02.mkv", "00:19:40.420", "00:21:57.840"),
+    ("S02E04_dream", "S02E04.mkv", "00:36:38.540", "00:40:07.780"),
+    ("S02E05_bubble", "S02E05.mkv", "00:00:23.600", "00:04:10.416"),
 ]
 
 # Original benchmark (already prepared) — recorded in the manifest for the sweep.
@@ -131,16 +126,18 @@ def prep_one(name, source, start, end) -> dict:
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--source-dir", required=True,
+                    help="Folder holding the source MKVs, named as in SOURCES (S02E02.mkv, ...)")
     ap.add_argument("--only", default=None)
     args = ap.parse_args(argv)
     only = set(args.only.split(",")) if args.only else None
 
     entries = [ORIGINAL]
-    for name, source, start, end in SOURCES:
+    for name, source_name, start, end in SOURCES:
         if only and name not in only:
             continue
         print(f">>> {name} ...", flush=True)
-        rec = prep_one(name, source, start, end)
+        rec = prep_one(name, os.path.join(args.source_dir, source_name), start, end)
         entries.append(rec)
         flag = "OK" if rec["aligned"] else "!! ALIGN?"
         print(f"    {flag}  dur={rec['duration']}s  gt={rec['gt_entries']} entries "
