@@ -19,7 +19,7 @@ echo  This will run WhisperJAV with --crash-trace enabled.
 echo  Trace files will be written to: crash_traces\
 echo.
 
-cd /d C:\BIN\git\whisperJav_V1_Minami_Edition
+cd /d "%~dp0.."
 
 REM Run with crash tracing on the test file
 python -m whisperjav.main ^
