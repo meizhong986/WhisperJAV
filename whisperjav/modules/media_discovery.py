@@ -10,6 +10,20 @@ import glob
 
 from whisperjav.utils.logger import logger
 
+# The media files a run takes: the one list, which the GUI's Add File(s) window also offers (webview_gui/api.py).
+# 1.10.3 (owner W750 A7): .ts and .m2ts (MPEG transport streams) and .vob (DVD video) added; FFmpeg reads them as it
+# reads .mpg. Before, the window offered .ts while a run refused it, and a run took .mov, .m4v and .wma, which the
+# window did not offer.
+VIDEO_EXTENSIONS = frozenset({'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.mpg', '.mpeg',
+                              '.ts', '.m2ts', '.vob'})
+AUDIO_EXTENSIONS = frozenset({'.mp3', '.wav', '.flac', '.aac', '.ogg', '.wma', '.m4a', '.m4b', '.opus'})
+SUPPORTED_EXTENSIONS = VIDEO_EXTENSIONS | AUDIO_EXTENSIONS
+
+
+def media_file_filter() -> str:
+    """The Add File(s) window's filter: the files a run takes (pywebview's 'Name (*.a;*.b)' form)."""
+    return 'Media Files (' + ';'.join('*' + ext for ext in sorted(SUPPORTED_EXTENSIONS)) + ')'
+
 
 def _canonical_path(path: Path) -> Path:
     """Return a canonical form of *path* for de-duplication purposes.
@@ -42,9 +56,9 @@ class MediaDiscovery:
         """Initialize media discovery module."""
         self.ffprobe_available = self._check_ffprobe()
         
-        # Supported extensions
-        self.video_extensions = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.mpg', '.mpeg'}
-        self.audio_extensions = {'.mp3', '.wav', '.flac', '.aac', '.ogg', '.wma', '.m4a', '.m4b', '.opus'}
+        # Supported extensions (the module's one list, above)
+        self.video_extensions = set(VIDEO_EXTENSIONS)
+        self.audio_extensions = set(AUDIO_EXTENSIONS)
         self.supported_extensions = self.video_extensions | self.audio_extensions
     
     def _check_ffprobe(self) -> bool:
