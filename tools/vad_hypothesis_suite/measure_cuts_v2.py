@@ -15,16 +15,19 @@ Both are reported for the ACTUAL adaptive pads and for the legacy fixed
 change. Uses the vendor's own components so numbers match the pipeline.
 """
 import json
+import os
 import sys
 import numpy as np
 
-sys.path.insert(0, r"D:\Git\WhisperJav_V1_Minami_Edition")
+# The repository folder, worked out from this file's location (tools/vad_hypothesis_suite/).
+_REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, _REPO)
 from whisperjav.vendor.semantic_audio_clustering import (
     SegmentationConfig, StreamFeatureExtractor, SemanticSegmenter,
     compute_silence_floor, smoothed_rms, compute_adaptive_pads,
 )
 
-MANIFEST = r"D:\Git\WhisperJav_V1_Minami_Edition\test_media\reference_benchmarks\manifest.json"
+MANIFEST = os.path.join(_REPO, "test_media", "reference_benchmarks", "manifest.json")
 benches = json.load(open(MANIFEST, encoding="utf-8"))["benchmarks"]
 
 FIXED_PAD = 0.35
