@@ -9,16 +9,21 @@ from pathlib import Path
 
 # PySubtrans extracts only the last occurrence of each context tag. Some local
 # models repeat these tags after every cue, leaving earlier copies in the SRT.
+# 1.10.3 (owner W752 1, #460): a block opened by any of the three tags and closed by any of them is removed, as a
+# model may close <scene> with </summary> (the poster's 10 lines); before, only a block closed by its own tag was.
+# The text between such tags is the model's context note, never a subtitle. The guard is unchanged: a block never
+# runs past the next cue's "#number" line.
 _CONTEXT_TAG_PAIR = re.compile(
     r"<(?P<tag>summary|scene|synopsis)>"
     r"(?P<value>(?:(?!\n[ \t]*#\d+\b)[\s\S])*?)"
-    r"</(?P=tag)>",
+    r"</(?:summary|scene|synopsis)>",
     re.IGNORECASE,
 )
 
 
 def strip_translation_context_tags(text: str) -> tuple[str, dict[str, str], int]:
-    """Remove complete context tags and retain the last value of each kind."""
+    """Remove complete context-tag blocks (opened and closed by any of the three tags) and retain the last value of
+    each kind, named by its opening tag."""
     context = {}
     count = 0
 
