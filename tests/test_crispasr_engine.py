@@ -209,6 +209,56 @@ class TestTokenLimit:
         assert rates.pop("moss-crispasr") == 20.0
         assert set(rates.values()) == {None}
 
+    @staticmethod
+    def _session_with_rate(binding, error=None):
+        """The stand-in Session plus CrispASR 0.8.53's set_max_new_tokens_per_second (records it, or raises)."""
+        base = sys.modules["crispasr"].Session
+
+        class Session(base):
+            def set_max_new_tokens_per_second(self, rate, minimum=16):
+                binding.calls.append(("set_max_new_tokens_per_second", rate, minimum))
+                if error is not None:
+                    raise error
+
+        sys.modules["crispasr"].Session = Session
+
+    def test_crispasr_gets_the_rate_for_each_piece_and_the_call_limit_stays_the_cap(self, binding, tmp_path):
+        # 1.10.3 (owner W756 2): the rate goes to CrispASR once, when the model opens; the per-call limit is still
+        # set before every call, so a full 30 s piece keeps its 600 tokens and a short last piece gets its own.
+        self._session_with_rate(binding)
+        binding.backend = "moss-diarize"
+        e = BindingEngine(tmp_path / "m.gguf", "moss-diarize", True, tokens_per_second=20.0, token_floor=128)
+        e.open()
+        e.transcribe(audio(137.0))
+        assert binding.calls == [("set_max_new_tokens_per_second", 20.0, 128), ("set_max_new_tokens", 600),
+                                 ("transcribe", 16000 * 137)]
+
+    def test_a_fixed_limit_is_not_turned_into_a_rate(self, binding, tmp_path):
+        self._session_with_rate(binding)
+        binding.backend = "moss-diarize"
+        e = BindingEngine(tmp_path / "m.gguf", "moss-diarize", True, tokens_per_second=20.0, token_floor=128,
+                          max_new_tokens=300)
+        e.open()
+        e.transcribe(audio(137.0))
+        assert binding.calls == [("set_max_new_tokens", 300), ("transcribe", 16000 * 137)]
+
+    def test_a_pipeline_without_a_rate_gives_crispasr_none(self, binding, tmp_path):
+        self._session_with_rate(binding)
+        e = BindingEngine(tmp_path / "m.gguf", "parakeet", True)
+        e.open()
+        e.transcribe(audio(3.0))
+        assert binding.calls == [("transcribe", 48000)]
+
+    def test_a_library_without_the_call_keeps_the_limit_per_call(self, binding, tmp_path):
+        self._session_with_rate(binding, error=RuntimeError("not present in this libcrispasr build"))
+        binding.backend = "moss-diarize"
+        e = BindingEngine(tmp_path / "m.gguf", "moss-diarize", True, tokens_per_second=20.0, token_floor=128)
+        e.open()
+        assert e.is_open
+        e.transcribe(audio(5.0))
+        assert binding.calls == [("set_max_new_tokens_per_second", 20.0, 128), ("set_max_new_tokens", 128),
+                                 ("transcribe", 80000)]
+
     def test_the_limit_counts_at_most_crispasrs_piece_and_has_a_floor(self, tmp_path):
         e = BindingEngine(tmp_path / "m.gguf", "moss-diarize", True, tokens_per_second=20.0, token_floor=128)
         limits = [e.token_limit(int(s * 16000)) for s in (0.5, 3.5, 6.4, 6.5, 29.9, 30.0, 137.0, 240.0)]
