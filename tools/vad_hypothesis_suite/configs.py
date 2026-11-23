@@ -12,7 +12,8 @@ sanitized ground-truth SRT.
 
 import os
 
-_ROOT = r"D:\Git\WhisperJav_V1_Minami_Edition"
+# The repository folder, worked out from this file's location (tools/vad_hypothesis_suite/).
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 REFERENCE_MEDIA = os.path.join(_ROOT, r"test_media\293sec-The.Naked.Director.S01E04.Scene4.mkv")
 GROUND_TRUTH = os.path.join(
     _ROOT, r"test_media\1815acceptance\T3\Ground_Truth-293sec-The.Naked.Director.S01E04.Scene4-sanitized.srt"
