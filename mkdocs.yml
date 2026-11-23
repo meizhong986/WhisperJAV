@@ -119,6 +119,8 @@ exclude_docs: |
   Reference_code_*.py
   release_notes_*.md
   sprint*.md
+  CHANGELOG_*.md
+  release_v*_merge_guide.md
   # Root-level dev artifact directories (use !en/ to avoid excluding nav content)
   plans/
   plan/
@@ -131,6 +133,7 @@ exclude_docs: |
   drafts/
   external_review/
   research/
+  measurements/
   # Root-level architecture/ has non-nav dev artifacts.
   # Nav-listed architecture files live in en/architecture/ (not excluded).
   architecture/A3-*.md
