@@ -3,7 +3,7 @@ one that cannot take the copy stops the run with a plain message.
 
 The menu check reads the model files' headers from this computer's cache only (no model is loaded); a model not in
 the cache is skipped. The GPU load and transcription check of the fine-tunes is a separate script with its output
-(``D:\\WJ110_measure\\b_2026-11-03\\``).
+(private measurement record of 2026-11-03).
 """
 import json
 import re
