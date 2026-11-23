@@ -126,7 +126,7 @@ from whisperjav.utils.run_outcome import (
     skipped_outcome,
     write_manifest,
 )
-from whisperjav.modules.media_discovery import MediaDiscovery
+from whisperjav.modules.media_discovery import MediaDiscovery, output_folder_for
 from whisperjav.modules.audio_integrity import AudioIntegrityStop
 from whisperjav.modules.qwen_errors import (
     NOT_STARTED as QWEN_NOT_STARTED,
@@ -1978,12 +1978,13 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
             file_name = Path(file_path_str).name
             media_basename = media_info.get('basename', Path(file_path_str).stem)
 
+            # The file's output folder: beside it ("source"), or the chosen folder with the input's subfolders kept
+            # (1.10.3, owner W750 B8, W756 3; modules/media_discovery.py output_folder_for).
+            per_file_dir = output_folder_for(media_info, args.output_dir)
+
             # Check if output already exists (--skip-existing)
             if getattr(args, 'skip_existing', False):
-                if output_to_source:
-                    expected_dir = Path(file_path_str).parent
-                else:
-                    expected_dir = Path(args.output_dir)
+                expected_dir = per_file_dir
                 expected_srt = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.srt"
                 expected_vtt = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.vtt"
                 if expected_srt.exists() or expected_vtt.exists():
@@ -1993,11 +1994,12 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                     outcomes.append(skipped_outcome(file_path_str))
                     continue
 
-            # Per-file output directory override for "source" mode
-            if output_to_source:
-                per_file_dir = Path(file_path_str).parent
+            # Per-file output directory ("source" mode, or a subfolder kept under the chosen folder)
+            if output_to_source or per_file_dir != Path(args.output_dir):
                 pipeline.output_dir = per_file_dir
                 per_file_dir.mkdir(parents=True, exist_ok=True)
+            elif Path(getattr(pipeline, "output_dir", per_file_dir)) != per_file_dir:
+                pipeline.output_dir = per_file_dir   # back to the chosen folder after a file of a subfolder
 
             progress.set_current_file(file_path_str, i)
 
@@ -2227,12 +2229,11 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
 
     # Update resolved config with runtime options
     resolved_config['output_dir'] = str(Path(media_files[0]['path']).parent) if output_to_source else args.output_dir
-    if output_to_source:
-        # Each file's outputs go beside that file. The async processor builds
-        # one pipeline per task and honours a per-file 'output_dir'; without
-        # this every file in the batch landed beside the first one.
-        for _m in media_files:
-            _m['output_dir'] = str(Path(_m['path']).parent)
+    # Each file's outputs go beside that file ("source"), or into the chosen folder with the input's subfolders kept
+    # (1.10.3, owner W750 B8, W756 3). The async processor builds one pipeline per task and honours a per-file
+    # 'output_dir'; without this every file in the batch landed beside the first one.
+    for _m in media_files:
+        _m['output_dir'] = str(output_folder_for(_m, args.output_dir))
     resolved_config['temp_dir'] = args.temp_dir
     resolved_config['keep_temp_files'] = args.keep_temp
     resolved_config['subs_language'] = args.subs_language
@@ -2275,10 +2276,7 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
         for media_info in media_files:
             file_path_str = media_info.get('path', 'Unknown File')
             media_basename = media_info.get('basename', Path(file_path_str).stem)
-            if output_to_source:
-                expected_dir = Path(file_path_str).parent
-            else:
-                expected_dir = Path(args.output_dir)
+            expected_dir = output_folder_for(media_info, args.output_dir)
             expected_srt = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.srt"
             expected_vtt = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.vtt"
             if expected_srt.exists() or expected_vtt.exists():
@@ -3858,12 +3856,11 @@ def main():
             _all_media_files = media_files
             if getattr(args, 'skip_existing', False):
                 _out_lang = 'en' if args.subs_language == 'direct-to-english' else language_code
-                _to_source = str(args.output_dir).lower().strip() == "source"
                 _remaining = []
                 for media_info in media_files:
                     _src = Path(media_info.get('path', ''))
                     _base = media_info.get('basename', _src.stem)
-                    _dir = _src.parent if _to_source else Path(args.output_dir)
+                    _dir = output_folder_for(media_info, args.output_dir)   # 1.10.3: subfolders kept
                     if (_dir / f"{_base}.{_out_lang}.merged.whisperjav.srt").exists():
                         logger.info(f"Skipping (merged output exists): {_src.name}")
                         outcomes.append(skipped_outcome(str(_src), "merged output already exists"))
