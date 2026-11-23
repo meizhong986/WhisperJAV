@@ -22,7 +22,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const REPO = 'D:/Git/WhisperJav_V1_Minami_Edition';
+const REPO = path.join(__dirname, '..');  // the repository folder (this file is in tools/)
 const html = fs.readFileSync(path.join(REPO, 'whisperjav/webview_gui/assets/index.html'), 'utf8');
 
 // --- pull the real <option> lists for the two segmenter selects out of index.html
