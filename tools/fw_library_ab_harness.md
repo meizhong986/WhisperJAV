@@ -19,14 +19,14 @@ The script imports **nothing from whisperjav**. It needs only `faster_whisper`,
 | Label | Library | CTranslate2 | Silero VAD asset | Python | What it represents |
 |---|---|---|---|---|---|
 | `WJ` | faster-whisper 1.2.1 | 4.6.2 | v6 | conda `WJ` | WhisperJAV dev environment (torch 2.9.1+cu130 present) |
-| `WJ-clean` | faster-whisper 1.2.1 | 4.6.2 | v6 | `D:\Git\faster-whisper2\venv_fw121` | the same upstream library in a venv built exactly like `FW2` (no torch): the cleaner "A" arm |
-| `FW2` | faster-whisper2 2.1.1 | 4.6.2 | v6 (identical file) | `D:\Git\faster-whisper2\venv` | the candidate fork, CT2 held equal |
+| `WJ-clean` | faster-whisper 1.2.1 | 4.6.2 | v6 | `<faster-whisper2 clone>\venv_fw121` | the same upstream library in a venv built exactly like `FW2` (no torch): the cleaner "A" arm |
+| `FW2` | faster-whisper2 2.1.1 | 4.6.2 | v6 (identical file) | `<faster-whisper2 clone>\venv` | the candidate fork, CT2 held equal |
 | `FW2-ct2-4.8.1` | faster-whisper2 2.1.1 | 4.8.1 | v6 | same venv, CT2 pin swapped for the run | the candidate with the CT2 that `uv.lock` ships to users |
-| `V07B` | faster-whisper 1.0.2 | 4.4.0 | **v4** | `D:\Git\faster-whisper2\venv_v07b` | the v0.7b community notebook stack |
+| `V07B` | faster-whisper 1.0.2 | 4.4.0 | **v4** | `<faster-whisper2 clone>\venv_v07b` | the v0.7b community notebook stack |
 
 All four venvs exist and have been exercised (2026-09-08). Their recipes are in
 `docs/research/faster_whisper2_candidate/README.md`, section "Install guide".
-**Run the harness from the WhisperJAV repo root, not from inside `D:\Git\faster-whisper2`**,
+**Run the harness from the WhisperJAV repo root, not from inside the faster-whisper2 clone**,
 otherwise the clone's source folder shadows the installed package.
 
 ## Arms
@@ -154,17 +154,17 @@ in `kwargs_dropped_by_library`.
 
 ```bash
 # WJ environment (from the repo root)
-C:/Users/MK/anaconda3/envs/WJ/python.exe tools/fw_library_ab_harness.py --label WJ --repeat 2 --shuffle-arms \
+<WJ env>/python.exe tools/fw_library_ab_harness.py --label WJ --repeat 2 --shuffle-arms \
     --files "test_media/Ground_Truths/Netflix/*.mkv" --out test_media/ab_results
 
 # FW2 environment
-D:/Git/faster-whisper2/venv/Scripts/python.exe tools/fw_library_ab_harness.py --label FW2 --repeat 2 --shuffle-arms \
+<faster-whisper2 clone>/venv/Scripts/python.exe tools/fw_library_ab_harness.py --label FW2 --repeat 2 --shuffle-arms \
     --files "test_media/Ground_Truths/Netflix/*.mkv" --out test_media/ab_results
 
 # Call pattern under faster-whisper's own parameters, on one long file
-C:/Users/MK/anaconda3/envs/WJ/python.exe tools/fw_library_ab_harness.py --label WJ --recipe fwdefaults \
+<WJ env>/python.exe tools/fw_library_ab_harness.py --label WJ --recipe fwdefaults \
     --repeat 1 --shuffle-arms --arms "wj_native_file,wj_external_group" \
-    --files "F:/MEDIA_DLNA/EKAI-023/EKAI-023.mp4" --out "F:/MEDIA_DLNA/EKAI-023/ab_results_WJ"
+    --files "<media folder>/<film>.mp4" --out "<media folder>/ab_results_WJ"
 ```
 
 | Flag | Default | Notes |
