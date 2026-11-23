@@ -20,7 +20,8 @@ import time
 from pathlib import Path
 
 # Test audio file
-TEST_AUDIO = Path(r"C:\BIN\git\whisperJav_V1_Minami_Edition\test_media\173_acceptance_test\SONE-966-15_sec_test-966-00_01_45-00_01_59.wav")
+TEST_AUDIO = (Path(__file__).resolve().parents[1]  # the repository folder
+              / "test_media" / "173_acceptance_test" / "SONE-966-15_sec_test-966-00_01_45-00_01_59.wav")
 
 # Exact parameters from crash trace
 CRASH_PARAMS = {
