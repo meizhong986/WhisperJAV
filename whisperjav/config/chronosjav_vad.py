@@ -24,11 +24,15 @@ presets stays theirs. Other pipelines using TEN or FireRedVAD are not touched.
 The end pad of Qwen3-ASR with WhisperSeg is 0 ms at every sensitivity (owner,
 2026-10-09; it is a pipeline value, not part of the segmenter config):
 chronosjav_end_pad_default().
+
+The group and pad values of an anime-whisper pass follow the same rule since 1.10.3
+(owner W753 CL3, a bug fix): the anime-whisper table with WhisperSeg, otherwise the
+segmenter's own preset: anime_whisper_group_defaults().
 """
 
 from typing import Any, Dict, Optional
 
-from whisperjav.config.anime_whisper_vad import apply_anime_segmenter_defaults
+from whisperjav.config.anime_whisper_vad import anime_whisperseg_defaults, apply_anime_segmenter_defaults
 from whisperjav.config.qwen3_whisperseg_vad import apply_qwen3_segmenter_defaults
 from whisperjav.config.segmenter_presets import resolve_segmenter_sensitivity
 
@@ -51,6 +55,28 @@ def chronosjav_end_pad_default(generator: str, segmenter: str) -> Optional[int]:
     if generator == "qwen3" and (segmenter or "whisperseg").strip().lower() == "whisperseg":
         return QWEN3_WHISPERSEG_END_PAD_MS
     return None
+
+
+# The pipeline values of a pass's VAD groups: the gap that starts a new group, the longest group, the pads.
+GROUP_KEYS = ("chunk_threshold_s", "max_group_duration_s", "start_pad_ms", "end_pad_ms")
+
+
+def anime_whisper_group_defaults(segmenter: str, sensitivity: str) -> Dict[str, Any]:
+    """The gap, longest group and pads of an anime-whisper pass when the user set none.
+
+    WhisperSeg: the anime-whisper table (config/anime_whisper_vad.py), which holds WhisperSeg-scale values. Any other
+    segmenter: that segmenter's own preset at the sensitivity, as the fidelity pipeline takes it
+    (resolve_segmenter_sensitivity); a value the preset does not have is left out, so the pipeline's own default
+    applies. "none": nothing. Before 1.10.3 the table applied whatever the segmenter (owner W753 CL3: a bug).
+    Read by main.py, the ensemble worker and the Customize dialog (webview_gui/api.py), so they cannot disagree."""
+    seg = (segmenter or "whisperseg").strip().lower()
+    if seg == "whisperseg":
+        row = anime_whisperseg_defaults(sensitivity)
+        return {k: row[k] for k in GROUP_KEYS}
+    if seg == "none":
+        return {}
+    preset = resolve_segmenter_sensitivity(seg, sensitivity)
+    return {k: preset[k] for k in GROUP_KEYS if preset.get(k) is not None}
 
 
 def apply_chronosjav_segmenter_defaults(
