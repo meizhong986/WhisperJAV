@@ -8,18 +8,21 @@ For each semantic cut boundary, report:
 Uses the vendor's own extractor/segmenter/classifier so numbers match the pipeline.
 """
 import json
+import os
 import sys
 import numpy as np
 from scipy.ndimage import median_filter
 
-sys.path.insert(0, r"D:\Git\WhisperJav_V1_Minami_Edition")
+# The repository folder, worked out from this file's location (tools/vad_hypothesis_suite/).
+_REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, _REPO)
 from whisperjav.vendor.semantic_audio_clustering import (
     SegmentationConfig, StreamFeatureExtractor, SemanticSegmenter,
     AdaptiveClassifier, FeatureRegistry,
 )
 
 PAD = 0.35
-MANIFEST = r"D:\Git\WhisperJav_V1_Minami_Edition\test_media\reference_benchmarks\manifest.json"
+MANIFEST = os.path.join(_REPO, "test_media", "reference_benchmarks", "manifest.json")
 benches = json.load(open(MANIFEST, encoding="utf-8"))["benchmarks"]
 
 all_left, all_right, all_is_sil, all_rms_ratio = [], [], [], []
