@@ -371,7 +371,8 @@ def read_segments(path, offset):
     try:
         rows = json.loads(text)
         if isinstance(rows, dict):
-            rows = rows.get("segments") or rows.get("groups") or []
+            # A .jsonl of one line is one JSON object: one piece, not a container (2026-11-23).
+            rows = [rows] if "start" in rows and "end" in rows else (rows.get("segments") or rows.get("groups") or [])
     except json.JSONDecodeError:
         rows = [json.loads(line) for line in text.splitlines() if line.strip()]
     out = []
