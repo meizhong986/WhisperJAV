@@ -254,9 +254,52 @@ class TestGeneratorConfig:
             AnimeWhisperGenerator,
         )
         gen = AnimeWhisperGenerator()
-        # 444 = max_target_positions (448) minus 4 special tokens.
-        # Must be explicit because model's generation_config defaults to 4096.
+        # 444 = max_target_positions (448) minus 4 special tokens; also the model's own limit (its
+        # generation_config sets max_length 448), so since 1.10.3 it is not passed to generate().
         assert gen._config["max_new_tokens"] == 444
+
+    @staticmethod
+    def _generate_kwargs(max_new_tokens=None, model_max_length=448):
+        """Run generate() with a stand-in model and processor; return the kwargs model.generate() got."""
+        import types
+        import numpy as np
+        from whisperjav.modules.subtitle_pipeline.generators.anime_whisper import AnimeWhisperGenerator
+        gen = AnimeWhisperGenerator() if max_new_tokens is None else AnimeWhisperGenerator(max_new_tokens=max_new_tokens)
+        got = {}
+
+        class Features:
+            def to(self, device=None, dtype=None):
+                return "features"
+
+        class Processor:
+            def __call__(self, audio, sampling_rate, return_tensors):
+                return types.SimpleNamespace(input_features=Features())
+
+            def batch_decode(self, ids, skip_special_tokens):
+                return ["テスト"]
+
+        class Model:
+            generation_config = types.SimpleNamespace(max_length=model_max_length)
+
+            def generate(self, **kwargs):
+                got.update(kwargs)
+                return [[1]]
+
+        gen._loaded, gen._processor, gen._model, gen._device, gen._dtype = True, Processor(), Model(), "cpu", None
+        result = gen.generate(np.zeros(16000, dtype=np.float32))
+        assert result.text == "テスト"
+        return got
+
+    def test_the_models_own_length_limit_is_not_passed_again(self):
+        # 1.10.3 (owner W751 C4 1): passing 444 next to the model's max_length 448 made transformers 5 print a
+        # "Both max_new_tokens and max_length" line on every call (the console flood); the limit is the same.
+        assert "max_new_tokens" not in self._generate_kwargs()
+
+    def test_a_smaller_limit_is_still_passed(self):
+        assert self._generate_kwargs(max_new_tokens=128)["max_new_tokens"] == 128
+
+    def test_without_the_models_own_limit_the_limit_is_passed(self):
+        assert self._generate_kwargs(model_max_length=None)["max_new_tokens"] == 444
 
     def test_not_loaded_initially(self):
         from whisperjav.modules.subtitle_pipeline.generators.anime_whisper import (
