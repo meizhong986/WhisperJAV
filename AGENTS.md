@@ -34,7 +34,7 @@ unilaterally change a contract. The orchestrator coordinates the affected areas.
 
 ## 2. Build / test / run (verified commands)
 
-**Dev environment is the `WJ` Anaconda env** (`C:\Users\MK\anaconda3\envs\WJ`). Activate it
+**Dev environment is the `WJ` Anaconda env** (`<user folder>\anaconda3\envs\WJ`). Activate it
 first; run all commands inside it. The repo-local `.venv` is an unused leftover — ignore it.
 
 ```bash
@@ -92,11 +92,11 @@ The **interface contracts** between these areas: `docs/architecture/MODULE_CONTR
 
 ## 5. Environment notes (post-folder-move, 2026-06)
 
-The project moved `C:\bin\git\…` → `D:\Git\WhisperJav_V1_Minami_Edition`. The **`WJ` conda env
+The project moved from an old folder to its current one. The **`WJ` conda env
 is the dev env and is healthy** (reports current version 1.8.14). Other conda envs exist
 (`WJ2`, `WJ_TEST`, `HF`, `QWEN`) for testing/scratch. The repo-local **`.venv` is a stale
 leftover** whose editable finder still points at the old path — it is NOT used; do not judge
-the environment by it. The old `C:\bin\git\…` folder also still exists on disk.
+the environment by it. The old folder also still exists on disk.
 
 ---
 
