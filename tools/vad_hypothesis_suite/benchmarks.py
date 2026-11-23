@@ -4,7 +4,8 @@
 import json
 import os
 
-ROOT = r"D:\Git\WhisperJav_V1_Minami_Edition"
+# The repository folder, worked out from this file's location (tools/vad_hypothesis_suite/).
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MANIFEST = os.path.join(ROOT, "test_media", "reference_benchmarks", "manifest.json")
 
 # Focused cross-clip VALIDATION subset (names must exist in configs.CONFIGS):
