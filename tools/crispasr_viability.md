@@ -131,7 +131,7 @@ python tools/crispasr_viability.py selfcheck --out ROOT [--clip S01E04.Scene.1] 
   probability. The self-check `check-ten-diar` (TEN's own frames through this path) gave 42.2 % against the baseline's
   39.78 % with the same speech (VAD F1 71.5 % against 71.6 %, 1,190.7 s against 1,190.5 s of VAD groups): the place of
   these cuts alone moved CER by 2.4 points over TEN's 111 cuts inside continuous speech. The diarization candidates make
-  few such cuts (Sortformer 18, pyannote 12; `D:\WJ110_measure\phase_a2b_diar_2026-11-08\count_cuts.out`), so their share of
+  few such cuts (Sortformer 18, pyannote 12; private measurement record of 2026-11-08), so their share of
   this effect is small but not measured.
 - The 0.5-point margin of `table` covers repeating a run only; differences on seven clips need the bootstrap range
   (`docs/plans/design/2026-11-07-phase-a-results.md`, section 0).
