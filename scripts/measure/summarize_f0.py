@@ -6,7 +6,7 @@ and one per pipeline over both films. Text columns first, timing after. The refe
 <batch>/refs/ first, if they are not there yet.
 
 Usage (from the repository root, any Python 3.10+; subeval uses the standard library only):
-    python scripts/measure/summarize_f0.py --batch D:\\WJ110_measure\\F0_195 [--window 1.0]
+    python scripts/measure/summarize_f0.py --batch <measurement folder>\\F0_195 [--window 1.0]
 
 Writes <batch>/summary.md and <batch>/summary.json.
 """
