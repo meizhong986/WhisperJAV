@@ -83,7 +83,7 @@ class TestOrdinaryInputIsNotLabelled:
     @pytest.mark.parametrize("p", [
         "/media/SONE-853.mp4",
         "/media/holiday.wav",
-        "F:/MEDIA_DLNA/MIMK-276/MIMK-276.mkv",
+        "E:/videos/ABC-123/ABC-123.mkv",
         "/media/my_extracted_footage.mp4",     # 'extracted' but not the _extracted.wav shape
         "/media/scenes_from_a_play.mp4",       # 'scenes' in the file name, not a folder
         "/media/behind the scenes/clip.mp4",   # folder is 'behind the scenes', not 'scenes'
