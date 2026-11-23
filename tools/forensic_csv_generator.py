@@ -31,7 +31,6 @@ from typing import Dict, List, Optional, Tuple, Any
 # Configuration
 # ============================================================================
 
-DEFAULT_BASE_DIR = Path(r"F:\MEDIA_DLNA\SONE-853\S0104\R1")
 BASENAME = "293sec-S01E04-scene4"
 GT_FILENAME = "Ground-Truth-Netflix-Reference-Subs.srt"
 MATCH_TOLERANCE_SEC = 3.0
@@ -357,10 +356,10 @@ def classify_loss_stage(
 # Main Generator
 # ============================================================================
 
-def generate_forensic_csv(pass_number: int, output_path: Path, base_dir: Path = None):
-    """Generate the forensic CSV for a given pass."""
+def generate_forensic_csv(pass_number: int, output_path: Path, base_dir: Path):
+    """Generate the forensic CSV for a given pass (base_dir: the run's artifacts folder)."""
 
-    BASE_DIR = base_dir or DEFAULT_BASE_DIR
+    BASE_DIR = base_dir
     GT_SRT = BASE_DIR / GT_FILENAME
 
     print(f"Generating forensic CSV for Pass {pass_number}...")
@@ -545,11 +544,11 @@ if __name__ == '__main__':
                         help='Pass number (1 or 2)')
     parser.add_argument('--output', type=str, required=True,
                         help='Output CSV file path')
-    parser.add_argument('--base-dir', type=str, default=None,
-                        help='Base directory for test artifacts (default: S0104/R1)')
+    parser.add_argument('--base-dir', type=str, required=True,
+                        help='Base directory for test artifacts (required; the S0104/R1 run folder)')
     args = parser.parse_args()
 
-    base_dir = Path(args.base_dir) if args.base_dir else DEFAULT_BASE_DIR
+    base_dir = Path(args.base_dir)
     output_path = Path(args.output)
     if not output_path.is_absolute():
         output_path = base_dir / output_path
