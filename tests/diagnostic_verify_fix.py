@@ -7,11 +7,12 @@ import os
 import sys
 import subprocess
 
-# Change to project directory
-os.chdir(r"C:\BIN\git\whisperJav_V1_Minami_Edition")
-sys.path.insert(0, r"C:\BIN\git\whisperJav_V1_Minami_Edition")
+# Change to project directory (the repository folder, worked out from this file's location: tests/)
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(REPO)
+sys.path.insert(0, REPO)
 
-TEST_AUDIO = r"C:\BIN\git\whisperJav_V1_Minami_Edition\test_media\173_acceptance_test\SONE-966-15_sec_test-966-00_01_45-00_01_59.wav"
+TEST_AUDIO = os.path.join(REPO, "test_media", "173_acceptance_test", "SONE-966-15_sec_test-966-00_01_45-00_01_59.wav")
 
 
 def test_direct_transcription():
@@ -96,7 +97,7 @@ def test_via_whisperjav():
         capture_output=True,
         text=True,
         timeout=180,
-        cwd=r"C:\BIN\git\whisperJav_V1_Minami_Edition",
+        cwd=REPO,
         env={**os.environ, "PYTHONIOENCODING": "utf-8"}
     )
 
