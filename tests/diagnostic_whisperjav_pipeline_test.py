@@ -15,7 +15,8 @@ import gc
 from pathlib import Path
 import numpy as np
 
-TEST_FILE = Path(r"C:\BIN\git\whisperJav_V1_Minami_Edition\test_media\173_acceptance_test\SONE-966-15_sec_test-966-00_01_45-00_01_59.wav")
+TEST_FILE = (Path(__file__).resolve().parents[1]  # the repository folder
+             / "test_media" / "173_acceptance_test" / "SONE-966-15_sec_test-966-00_01_45-00_01_59.wav")
 
 def test_1_direct_faster_whisper():
     """Control test - direct faster-whisper without WhisperJAV."""
