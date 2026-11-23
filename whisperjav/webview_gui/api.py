@@ -119,6 +119,31 @@ def _with_device_cpu(args: List[str]) -> List[str]:
     return out + ["--device", "cpu"]
 
 
+# 1.10.3 (owner W751 B1 5): an API key is shown masked wherever a command is printed in the GUI console (and returned
+# to the page), so a console pasted into an issue holds no key (#304). The process still gets the real key.
+KEY_FLAGS = ("--translate-api-key", "--api-key")
+MASKED_KEY = "********"
+
+
+def display_command(program: str, args: List[str]) -> str:
+    """The command as the GUI console shows it: arguments with a space quoted, the value of a key flag masked."""
+    def quote_arg(a: str) -> str:
+        return f'"{a}"' if (" " in a or "\t" in a) else a
+
+    shown, mask_next = [], False
+    for a in args:
+        if mask_next:
+            shown.append(MASKED_KEY)
+            mask_next = False
+            continue
+        flag, eq, _value = a.partition("=")
+        if eq and flag in KEY_FLAGS:
+            shown.append(f"{flag}={MASKED_KEY}")
+            continue
+        mask_next = a in KEY_FLAGS
+        shown.append(a)
+    return program + " " + " ".join(quote_arg(a) for a in shown)
+
 
 # The pass pipelines (GUI values) that keep one track: balanced finds the speech inside faster-whisper on the audio it
 # transcribes (the flag is refused there), the others run no separate speech segmenter.
@@ -624,10 +649,7 @@ class WhisperJAVAPI:
             env["PYTHONIOENCODING"] = "utf-8:replace"
 
             # Log command for debugging
-            def quote_arg(a: str) -> str:
-                return f'"{a}"' if (" " in a or "\t" in a) else a
-
-            cmd_display = "whisperjav.main " + " ".join(quote_arg(a) for a in args)
+            cmd_display = display_command("whisperjav.main", args)   # an API key shown masked (1.10.3)
             self.log_queue.put(f"\n> {cmd_display}\n")
 
             # Start subprocess
@@ -1982,10 +2004,7 @@ class WhisperJAVAPI:
             env["PYTHONIOENCODING"] = "utf-8:replace"
 
             # Log command
-            def quote_arg(a: str) -> str:
-                return f'"{a}"' if (" " in a or "\t" in a) else a
-
-            cmd_display = "whisperjav.main " + " ".join(quote_arg(a) for a in args)
+            cmd_display = display_command("whisperjav.main", args)   # an API key shown masked (1.10.3)
             self.log_queue.put(f"\n> {cmd_display}\n")
 
             # Start subprocess
@@ -3159,10 +3178,7 @@ class WhisperJAVAPI:
             env["PYTHONIOENCODING"] = "utf-8:replace"
 
             # Log command
-            def quote_arg(a: str) -> str:
-                return f'"{a}"' if (" " in a or "\t" in a) else a
-
-            cmd_display = "whisperjav.main " + " ".join(quote_arg(a) for a in args)
+            cmd_display = display_command("whisperjav.main", args)   # an API key shown masked (1.10.3)
             self.log_queue.put(f"\n> {cmd_display}\n")
 
             # Start subprocess
