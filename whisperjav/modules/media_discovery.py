@@ -25,6 +25,28 @@ def media_file_filter() -> str:
     return 'Media Files (' + ';'.join('*' + ext for ext in sorted(SUPPORTED_EXTENSIONS)) + ')'
 
 
+def output_folder_for(media_info: Dict, output_dir: str) -> Path:
+    """The folder one file's outputs go into.
+
+    ``output_dir`` "source": beside the file. A chosen folder: that folder; for a file found in a subfolder of a
+    folder input, the same subfolder under it (1.10.3, owner W750 B8, W756 3 "always"; #126), so the input's tree is
+    kept and two files of the same name in two subfolders no longer write the same subtitle file. Files directly in
+    the folder input, and files given one by one, go into the chosen folder itself, as before."""
+    path = Path(media_info['path'])
+    if str(output_dir).lower().strip() == "source":
+        return path.parent
+    base = Path(output_dir)
+    root = media_info.get('input_folder')
+    if root:
+        try:
+            relative = path.parent.relative_to(Path(root))
+        except ValueError:
+            relative = Path()
+        if relative.parts:
+            return base / relative
+    return base
+
+
 def _canonical_path(path: Path) -> Path:
     """Return a canonical form of *path* for de-duplication purposes.
 
@@ -107,6 +129,9 @@ class MediaDiscovery:
                             if canonical_path not in processed_paths:
                                 media_info = self._analyze_file(str(item))
                                 if media_info['type'] in ['video', 'audio']:
+                                    # The folder input it was found in: a chosen output folder keeps the subfolders
+                                    # below it (output_folder_for, 1.10.3).
+                                    media_info['input_folder'] = str(path.absolute())
                                     final_media_list.append(media_info)
                                     processed_paths.add(canonical_path)
                 
