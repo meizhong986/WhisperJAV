@@ -460,16 +460,22 @@ class DecoupledPipeline(BasePipeline):
         scenes_dir = self.temp_dir / "scenes"
         scenes_dir.mkdir(exist_ok=True)
 
-        from whisperjav.modules.scene_detection_backends import SceneDetectorFactory
+        from whisperjav.modules.scene_detection_backends import MERGING_SCENE_DETECTORS, SceneDetectorFactory
 
         scene_detector_kwargs = {"method": self.scene_method}
 
         if self.safe_chunking:
-            scene_detector_kwargs["min_duration"] = self.scene_min_duration
+            # 1.10.3 (owner W751 C9): the minimum only for a detector that joins shorter scenes to their neighbours
+            # (semantic); auditok and silero drop a scene under the minimum, with its speech, so they keep their own.
             scene_detector_kwargs["max_duration"] = self.scene_max_duration
+            if self.scene_method in MERGING_SCENE_DETECTORS:
+                scene_detector_kwargs["min_duration"] = self.scene_min_duration
+                min_text = f"{self.scene_min_duration:.0f}s"
+            else:
+                min_text = "the scene detector's own"
             logger.info(
-                "[DecoupledPipeline PID %s] Phase 2: Safe chunking (min=%.0fs, max=%.0fs)",
-                os.getpid(), self.scene_min_duration, self.scene_max_duration,
+                "[DecoupledPipeline PID %s] Phase 2: Safe chunking (min=%s, max=%.0fs)",
+                os.getpid(), min_text, self.scene_max_duration,
             )
 
         if self.scene_clustering_threshold is not None:
