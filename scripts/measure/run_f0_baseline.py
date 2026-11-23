@@ -7,7 +7,7 @@ lines are what the 1.9.5 GUI builds for a pass-1-only Ensemble run (webview_gui/
 Qwen3-ASR with the GUI's pass-1 defaults (FireRedVAD), anime-whisper with its pass-2 defaults (TEN) run as pass 1.
 
 Usage:
-    python run_f0_baseline.py --python D:\\195\\python.exe --out D:\\WJ110_measure\\F0_195 [--pipelines balanced ...]
+    python run_f0_baseline.py --python <1.9.5 install>\\python.exe --out <measurement folder>\\F0_195 [--pipelines balanced ...]
 
 Each command runs with its output folder as working folder, so `python -m whisperjav.main` loads the WhisperJAV
 installed in --python, never a repository checkout. Each pipeline goes to <out>/<pipeline>/ with command.json,
