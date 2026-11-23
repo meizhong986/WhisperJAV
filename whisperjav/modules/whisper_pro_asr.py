@@ -50,6 +50,10 @@ class WhisperProASR:
             self.device = get_best_device()
         if self.device == "mps":
             logger.info(APPLE_SILICON_FIDELITY_TEXT)  # T52 (design 22.8)
+            # 1.10.3 (owner W750 A4, #515): openai-whisper's word-timing step converts to float64 on the Apple GPU,
+            # which fails; this moves the table to the CPU first (modules/mps_word_timing.py).
+            from whisperjav.modules import mps_word_timing
+            mps_word_timing.install()
 
         decoder_params = params["decoder"]
         vad_params = params["vad"]
