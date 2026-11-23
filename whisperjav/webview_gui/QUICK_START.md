@@ -169,7 +169,7 @@ Verbosity: verbose
 **Solution:**
 ```bash
 # Ensure you're in the repository root
-cd C:\BIN\git\WhisperJav_V1_Minami_Edition
+cd <the WhisperJAV repository folder>
 
 # Run from source
 python -m whisperjav.webview_gui.main
