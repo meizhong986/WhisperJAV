@@ -1,7 +1,6 @@
 # v1.8.12 Release — Manual Merge / Tag / Push Guide
 
-Step-by-step instructions for shipping `v1.8.12`. Run from the repo root
-(`C:\BIN\git\WhisperJav_V1_Minami_Edition`).
+Step-by-step instructions for shipping `v1.8.12`. Run from the repo root.
 
 **Pre-flight assumptions:**
 - You are on branch `dev_v1.8.12` with a clean working tree.
@@ -164,7 +163,7 @@ git push origin main --tags
 
 ```bash
 # Extract body (skip H1 line) into a temp file
-cd C:\BIN\git\WhisperJav_V1_Minami_Edition
+cd <the WhisperJAV repository folder>
 tail -n +3 docs/release_notes_v1.8.12.md > /tmp/release_body.md
 
 gh release create v1.8.12 \
