@@ -959,8 +959,10 @@ class WhisperJAVAPI:
         # File filters must be a list/tuple of filter strings. A single string will be
         # iterated character-by-character by pywebview and cause parse errors (e.g., 'M').
         # Use semicolon-separated patterns without spaces for compatibility.
+        # The same list a run takes (1.10.3, owner W750 A7; modules/media_discovery.py SUPPORTED_EXTENSIONS).
+        from whisperjav.modules.media_discovery import media_file_filter
         file_types = [
-            'Media Files (*.mp4;*.mkv;*.avi;*.flv;*.wmv;*.webm;*.mpg;*.mpeg;*.ts;*.mp3;*.wav;*.aac;*.m4a;*.m4b;*.flac;*.ogg;*.opus)',
+            media_file_filter(),
             'All Files (*.*)'
         ]
 
