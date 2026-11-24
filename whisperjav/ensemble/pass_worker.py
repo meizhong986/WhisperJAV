@@ -318,6 +318,8 @@ class WorkerPayload:
     log_level: str = "INFO"  # Propagate log level to subprocess workers
     trace_file_path: Optional[str] = None  # Path for parameter tracer output
     log_file: Optional[str] = None  # this pass's log file beside the run's --log-file (owner W509, way B)
+    pass_total: int = 1  # Total number of ensemble passes (for the GUI pass label)
+    emit_file_progress: bool = False  # Worker emits per-file GUI markers (parallel mode)
 
 
 @dataclass
@@ -729,8 +731,15 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
         _write_dropbox_and_exit(result_file, error_result, tracer, 1)
 
     try:
-        for media_info in media_files:
+        from whisperjav.utils.progress_markers import emit_marker, transcribe_marker
+
+        for idx, media_info in enumerate(media_files, 1):
             basename = media_info["basename"]
+            if payload.emit_file_progress:
+                _name = Path(media_info.get("path", basename)).name
+                emit_marker(transcribe_marker(_name, idx, len(media_files),
+                                              pass_number=pass_number,
+                                              pass_total=payload.pass_total))
             logger.info(
                 "Pass %s processing %s",
                 pass_number,
