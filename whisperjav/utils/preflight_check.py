@@ -235,6 +235,7 @@ class PreflightChecker:
         self._check_disk_space()
         self._check_dependencies()
         self._check_downloaded_segmenter_models()
+        self._check_ten_vad()
         self._check_crispasr()
         self._check_network()
 
@@ -709,6 +710,21 @@ class PreflightChecker:
                     ],
                     fatal=False,
                 ))
+
+    def _check_ten_vad(self):
+        """Whether TEN VAD, one of the speech segmenters, loads here (1.10.3, owner W753 CL5; wording W764 2, texts sheet
+        item 4). Its library needs the libc++ runtime, which a Linux system may lack (owner W751 B1 4). Never fatal."""
+        try:
+            from ten_vad import TenVad
+            TenVad(hop_size=256, threshold=0.5)
+        except Exception as e:
+            reason = (str(e).strip().splitlines() or [type(e).__name__])[0]
+            hint = ". On Ubuntu or Debian: sudo apt-get install -y libc++1 libc++abi1" if sys.platform.startswith(
+                "linux") else ""
+            self.results.append(CheckResult(name="TEN VAD", status=CheckStatus.FAIL,
+                                            message=f"cannot load ({reason}){hint}", fatal=False))
+            return
+        self.results.append(CheckResult(name="TEN VAD", status=CheckStatus.PASS, message="loads"))
 
     def _check_crispasr(self):
         """CrispASR and its models, for the CrispASR pipelines (1.10.0, route B).

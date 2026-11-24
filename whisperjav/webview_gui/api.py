@@ -1406,7 +1406,7 @@ class WhisperJAVAPI:
             "widget": "slider", "min": 1.0, "max": 60.0, "step": 1.0,
             "data_type": "float", "label": "Max Speech (s)", "group": "grouping",
             "description": "A speech chunk longer than this is split. A subtitle-length "
-                           "knob: it does not change how fast the recognizer runs.",
+                           "knob: it does not change how fast the ASR model runs.",
         },
         "speech_pad_ms": {
             "widget": "spinner", "min": 0, "max": 2000, "step": 50,

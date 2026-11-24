@@ -1093,6 +1093,12 @@ class QwenPipeline(BasePipeline):
                 self.degradations.append(self._subtitle_pipeline.alignment_partial)
             else:
                 self.notes.append(self._subtitle_pipeline.alignment_partial)
+        # 1.10.3 (owner W751 B1 3; the GGUF pipelines' words, W764 2 texts sheet item 2): scenes whose speech segmenter
+        # failed are named in the run summary.
+        _failed = getattr(self._subtitle_pipeline, "segmenter_failed_scenes", 0)
+        if _failed:
+            self.notes.append(f"ChronosJAV: the speech segmenter failed on {_failed} scene(s); their speech was not "
+                              f"transcribed.")
         # The timing model (1.10.0, item 12): the subtitles are kept, unsplit; a degradation, as before.
         if getattr(self._subtitle_pipeline, "timing_unavailable", None):
             self.degradations.append(self._subtitle_pipeline.timing_unavailable)

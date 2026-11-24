@@ -1102,6 +1102,16 @@ class TestFailures:
                                           "speech was not transcribed."]
         assert md["stages"]["groups"]["failed_scenes"] == 1
 
+    def test_a_failed_segmenter_is_not_called_no_speech_in_the_console(self, stage, tmp_path, caplog):
+        """1.10.3 (owner W752 5; texts sheet item 3): every scene failed in the speech segmenter, so no VAD group."""
+        stage.frames = {0: RuntimeError("segmenter broke"), 1: {"error": "model missing"}}
+        with caplog.at_level("INFO", logger="whisperjav"):
+            make(ParakeetCrispASRPipeline, tmp_path).process(stage.media())
+        messages = [r.getMessage() for r in caplog.records]
+        assert ("Parakeet-CrispASR: the speech segmenter failed on 2 of 2 scene(s) of film; their speech was not "
+                "transcribed (the error is above)") in messages
+        assert not any("no speech was found" in m for m in messages)
+
     def test_groups_are_clamped_to_their_scenes_audio_and_tiny_ones_dropped(self, stage, tmp_path):
         stage.frames = {0: [(9.5, 12.0), (5.0, 5.05)], 1: []}
         make(ParakeetCrispASRPipeline, tmp_path).process(stage.media())

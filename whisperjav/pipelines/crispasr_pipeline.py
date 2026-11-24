@@ -328,6 +328,11 @@ class CrispASRPipeline(BasePipeline):
                     self._clean_texts(scenes, results, md)
                 if self.engine.aligner:
                     aligned = self._align(scenes, results, md)
+            elif failed_scenes:
+                # 1.10.3 (owner W752 5; wording W764 2, texts sheet item 3): not "no speech was found" when the
+                # speech segmenter failed; its error is in the lines above.
+                logger.info(f"{self.LABEL}: the speech segmenter failed on {failed_scenes} of {len(scenes)} scene(s) "
+                            f"of {basename}; their speech was not transcribed (the error is above)")
             else:
                 logger.info(f"{self.LABEL}: no speech was found in {basename}")
         finally:

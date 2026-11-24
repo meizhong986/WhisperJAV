@@ -147,3 +147,35 @@ def test_backticks_inside_a_line_are_kept():
     raw = "#1\nTranslation>\nHe typed ``` in the chat."
     result = _filtered(raw)
     assert result.text == raw
+
+
+# --- 1.10.3 (owner W752 1 (b), W764 2: texts sheet item 8): the end warning names lines still holding a tag ---
+
+def _srt(tmp_path, texts):
+    path = tmp_path / "out.english.srt"
+    path.write_text("".join(f"{n}\n00:00:0{n},000 --> 00:00:0{n},900\n{t}\n\n" for n, t in enumerate(texts, 1)),
+                    encoding="utf-8")
+    return path
+
+
+def test_the_end_check_names_a_subtitle_with_a_tag_left(tmp_path):
+    from whisperjav.translate.core import srt_format_marker_entries
+    path = _srt(tmp_path, ["Hello.", "Good night. <scene>unfinished note", "A note</summary>", "Bye."])
+    assert srt_format_marker_entries(path) == [2, 3]
+
+
+def test_the_end_check_passes_a_clean_file(tmp_path):
+    from whisperjav.translate.core import srt_format_marker_entries
+    assert srt_format_marker_entries(_srt(tmp_path, ["Hello.", "<i>Good night.</i>", "Bye."])) == []
+
+
+def test_the_end_warning_text_and_the_retry_check():
+    """The warning's list of what it looks for gains the tags (the approved wording); the retry check and the retry's
+    instruction to the model do not change."""
+    from whisperjav.translate.core import END_LABELS_TEXT, FORMAT_LABELS_TEXT, format_marker_lines
+    assert END_LABELS_TEXT == ("Translation>, Original>, the same labels in another language such as 翻译>, "
+                               "or a #number line, or a <summary>, <scene> or <synopsis> tag")
+    assert FORMAT_LABELS_TEXT == ("Translation>, Original>, the same labels in another language such as 翻译>, "
+                                  "or a #number line")
+    lines = [SimpleNamespace(number=1, text="Hello <scene>note")]
+    assert format_marker_lines(lines) == []

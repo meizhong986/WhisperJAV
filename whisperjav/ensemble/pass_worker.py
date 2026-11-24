@@ -1167,7 +1167,7 @@ def _build_pipeline(
             logger.info(
                 "Pass %s: --pass%s-enhance-for-vad has no effect on the %s pipeline, "
                 "which does not run a separate speech segmenter. The audio clean-up "
-                "still runs; it is simply not split between detection and recognition.",
+                "still runs, and the ASR model hears the cleaned-up audio.",
                 pass_number, pass_number, pipeline_name)
 
     pass_temp_dir.mkdir(parents=True, exist_ok=True)

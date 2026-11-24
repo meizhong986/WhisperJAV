@@ -312,7 +312,7 @@ class WhisperProASR:
                 logger.debug("Dual-track lengths differ by %d samples; using the "
                              "cleaned-up copy for detection as given",
                              abs(len(vad_audio_data) - len(audio_data)))
-            logger.info("Detecting speech in the cleaned-up audio; the recogniser "
+            logger.info("Detecting speech in the cleaned-up audio; the ASR model "
                         "hears the original")
 
         # v1.9.2 (owner in1): "no segmentation" is honoured up front rather than
@@ -410,6 +410,10 @@ class WhisperProASR:
 
         logger.info(f"Starting speech segmentation with: {self._external_segmenter.name}")
 
+        # 1.10.3 (owner W751 B1 3): the last scene's segmenter failure, read by the fidelity pipeline for its run
+        # summary: an error raised, or one the segmenter caught itself (then it returns no groups, which looks like
+        # silence). None when the segmenter worked.
+        self.last_segmenter_error = None
         try:
             result = self._external_segmenter.segment(audio_data, sample_rate=sample_rate)
             logger.debug(
@@ -417,8 +421,10 @@ class WhisperProASR:
                 f"{result.num_segments} segments in {result.num_groups} groups "
                 f"({result.processing_time_sec:.2f}s)"
             )
+            self.last_segmenter_error = getattr(result, "error", None)
             return result.to_legacy_format()
         except Exception as e:
+            self.last_segmenter_error = str(e) or type(e).__name__
             logger.error(f"Speech Segmenter failed: {e}")
             raise
 

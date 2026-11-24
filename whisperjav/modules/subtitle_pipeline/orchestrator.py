@@ -271,6 +271,10 @@ class DecoupledSubtitlePipeline:
         # 1.10.2 (#501): True when the aligner gave times for no VAD group with text (it ran, but timed nothing).
         self.alignment_none = False
         self.timing_unavailable = None
+        # 1.10.3 (owner W751 B1 3): scenes whose speech segmenter failed (it caught its own error and returned no
+        # groups, so the scene has no frame and its speech is not transcribed); the pipeline names them in the run
+        # summary as the GGUF pipelines do. Counted in the first pass only, not in a step-down retry.
+        self.segmenter_failed_scenes = 0
 
         logger.info(
             "Processing %d scenes (aligner=%s, timer=%s, step-down=%s%s)",
@@ -583,6 +587,8 @@ class DecoupledSubtitlePipeline:
                 )
             else:
                 framing_result = self.framer.frame(framing_audio, sr)
+                if framing_result.metadata.get("segmenter_error"):
+                    self.segmenter_failed_scenes = getattr(self, "segmenter_failed_scenes", 0) + 1
             frames = framing_result.frames
             scene_frames.append(frames)
 

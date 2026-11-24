@@ -831,9 +831,9 @@ def parse_arguments():
                             help="Do not write the per-scene ASR telemetry file.")
     async_group.add_argument("--model-refresh-audio-minutes", type=float,
                             default=DEFAULT_MODEL_REFRESH_AUDIO_MINUTES, metavar="MINUTES",
-                            help="Minutes of scene AUDIO handed to the recognizer before it is "
+                            help="Minutes of scene AUDIO handed to the ASR model before it is "
                                  "unloaded and reloaded as a fresh instance at the next scene "
-                                 "boundary (Balanced and Fidelity). Counted per recognizer "
+                                 "boundary (Balanced and Fidelity). Counted per ASR model "
                                  "instance: a Balanced batch shares one instance across its files, "
                                  "while Fidelity and --async-processing load one per file, so the "
                                  "count restarts with each file there. Containment for the "
@@ -2625,6 +2625,46 @@ def apply_enhance_for_vad_default(args) -> None:
                             and _runs_speech_enhancer(getattr(args, "qwen_enhancer", None)))
 
 
+# 1.10.3 (owner W750 A3; wording W764 2, texts sheet item 1): Kotoba-Whisper bilingual gives the English of Direct to
+# English without times (kotoba-tech/kotoba-whisper#5; #515: a two-hour film came back as one untimed chunk).
+KOTOBA_BILINGUAL = "kotoba-whisper-bilingual"
+TRANSFORMERS_DEFAULT_MODEL = "kotoba-tech/kotoba-whisper-bilingual-v1.0"   # --hf-model-id, and the pass worker's
+KOTOBA_DIRECT_TO_ENGLISH_TEXT = (
+    "Direct to English does not work with Kotoba-Whisper bilingual: it gives the English text without times, so the "
+    "subtitles would be unusable. Make Japanese subtitles instead (subtitle language: Japanese), then translate them "
+    "with AI translation.")
+
+
+def transformers_models(args) -> list:
+    """The Hugging Face model of each transformers run or pass: --mode transformers (--hf-model-id), or each Ensemble
+    pass with the transformers pipeline (--passN-model, else --passN-hf-params' model_id, else the pass worker's
+    default; ensemble/pass_worker.py prepare_transformers_params and the "model" override)."""
+    if not getattr(args, "ensemble", False):
+        if getattr(args, "mode", None) == "transformers" and getattr(args, "pipeline", None) is None:
+            return [getattr(args, "hf_model_id", None) or TRANSFORMERS_DEFAULT_MODEL]
+        return []
+    models = []
+    for n in (1, 2):
+        if getattr(args, f"pass{n}_pipeline", None) != "transformers":
+            continue
+        try:
+            hf_params = json.loads(getattr(args, f"pass{n}_hf_params", None) or "{}")
+        except (TypeError, ValueError):
+            hf_params = {}
+        own = hf_params.get("model_id") if isinstance(hf_params, dict) else None
+        models.append(getattr(args, f"pass{n}_model", None) or own or TRANSFORMERS_DEFAULT_MODEL)
+    return models
+
+
+def validate_direct_to_english_models(args) -> None:
+    """Kotoba-Whisper bilingual with Direct to English stops before any audio is read (1.10.3, owner W750 A3).
+    Raises ValueError; main() turns it into exit status 2 (the GUI then says "The run did not start")."""
+    if getattr(args, "subs_language", None) != "direct-to-english":
+        return
+    if any(KOTOBA_BILINGUAL in str(model).lower() for model in transformers_models(args)):
+        raise ValueError(KOTOBA_DIRECT_TO_ENGLISH_TEXT)
+
+
 def validate_balanced_vad_options(args) -> None:
     """
     Enforce requirements S2/S9: the balanced pipeline offers no external speech segmenter.
@@ -2769,6 +2809,8 @@ def main():
         # 1.10.0: a CrispASR pass needs a model it knows, Japanese audio and a speech
         # segmenter (CrispASR master plan 2.4; owner Q14, Q19).
         validate_crispasr_passes(args)
+        # 1.10.3 (owner W750 A3): Kotoba-Whisper bilingual with Direct to English stops here.
+        validate_direct_to_english_models(args)
         # 1.10.2 (owner W596 3): enhance for VAD only, the default for every speech enhancer.
         apply_enhance_for_vad_default(args)
     except ValueError as exc:

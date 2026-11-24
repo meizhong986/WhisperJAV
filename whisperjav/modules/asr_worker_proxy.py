@@ -290,7 +290,7 @@ class RemoteFasterWhisperASR:
 
     def _refresh(self) -> None:
         logger.info(
-            "Model refresh %d: unloading the recogniser after %.1f min of scene audio "
+            "Model refresh %d: unloading the ASR model after %.1f min of scene audio "
             "(budget %.0f min) and loading a fresh instance (scene boundary).",
             self.policy.refresh_count + 1, self.policy.consumed_minutes, self.policy.budget_minutes,
         )

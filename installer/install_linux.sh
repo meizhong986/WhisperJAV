@@ -148,6 +148,26 @@ echo -e "${GREEN}Python found: $(python3 --version)${NC}"
 # Check PEP 668 / venv requirement
 check_venv_requirement
 
+# 1.10.3 (owner W751 B1 4; wording W764 2, texts sheet item 5): TEN VAD's library needs the libc++ runtime. A
+# warning, not a stop: the other speech segmenters work without it. No ldconfig: nothing is said.
+check_libcxx() {
+    local libs how
+    libs=$( (ldconfig -p || /sbin/ldconfig -p) 2>/dev/null ) || return 0
+    [[ -z "$libs" ]] && return 0
+    if grep -q 'libc++\.so\.1' <<<"$libs" && grep -q 'libc++abi\.so\.1' <<<"$libs"; then
+        return 0
+    fi
+    if command -v apt-get >/dev/null 2>&1; then
+        how="Install it with: sudo apt-get install -y libc++1 libc++abi1."
+    else
+        how="Install your system's libc++ package."
+    fi
+    echo ""
+    echo -e "${YELLOW}WARNING: TEN VAD, one of the speech segmenters, needs the libc++ runtime, which is not installed. ${how} Until then, a pass that uses TEN VAD fails.${NC}"
+    echo ""
+}
+check_libcxx
+
 # Navigate to repository root
 cd "$REPO_ROOT"
 

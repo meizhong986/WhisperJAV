@@ -91,6 +91,12 @@ def apply_translation_context_filter(translator) -> bool:
 # short word followed by ">" is never subtitle text either.
 FORMAT_LABELS_TEXT = "Translation>, Original>, the same labels in another language such as 翻译>, or a #number line"
 
+# 1.10.3 (owner W752 1 (b), W764 2: texts sheet item 8): a context tag the removal could not take (opened and not
+# closed within one subtitle, or a closing tag alone) is named by the end-of-translation warning too. Only that warning:
+# PySubtrans's retry check and the retry's instruction to the model keep FORMAT_LABELS_TEXT and _format_marker.
+_CONTEXT_TAG_LEFT = re.compile(r"</?(?:summary|scene|synopsis)>", re.IGNORECASE)
+END_LABELS_TEXT = FORMAT_LABELS_TEXT + ", or a <summary>, <scene> or <synopsis> tag"
+
 
 def _format_marker(task_type: str = "Translation"):
     word = re.escape(task_type if isinstance(task_type, str) and task_type else "Translation")
@@ -159,7 +165,7 @@ def apply_format_marker_check(translator) -> bool:
 
 
 def srt_format_marker_entries(path, task_type: str = "Translation") -> list:
-    """Entry numbers of the saved SRT whose text holds a format label.
+    """Entry numbers of the saved SRT whose text holds a format label or a context tag (END_LABELS_TEXT).
 
     Read from the written file: PySubtrans numbers the SRT entries again,
     so its own line numbers differ once an earlier line is untranslated.
@@ -168,7 +174,7 @@ def srt_format_marker_entries(path, task_type: str = "Translation") -> list:
 
     marker = _format_marker(task_type)
     return [item.index for item in pysrt.open(str(path), encoding="utf-8-sig")
-            if marker.search(item.text)]
+            if marker.search(item.text) or _CONTEXT_TAG_LEFT.search(item.text)]
 
 
 def clean_resumed_translation_tags(project) -> int:
@@ -1294,7 +1300,7 @@ def translate_subtitle(
             if _marked:
                 _shown = ", ".join(f"#{n}" for n in _marked[:20]) + (", …" if len(_marked) > 20 else "")
                 print(f"[TRANSLATE] WARNING: {len(_marked)} translated subtitles still contain answer-format "
-                      f"labels ({FORMAT_LABELS_TEXT}): {_shown} — "
+                      f"labels ({END_LABELS_TEXT}): {_shown} — "
                       f"check them in {output_path.name}", file=sys.stderr)
 
         # #460: subtitles without a translation are left out of the written file; say how many and which

@@ -404,6 +404,7 @@ class DecoupledPipeline(BasePipeline):
         # than only in the log. Reset per file -- the pipeline object is reused
         # across the whole run.
         self.degradations = []
+        self.notes = []   # 1.10.3: notes for the run summary, as ChronosJAV and the GGUF pipelines have
         input_file = Path(media_info["path"])
         media_basename = media_info["basename"]
         pipeline_start = time.time()
@@ -689,6 +690,12 @@ class DecoupledPipeline(BasePipeline):
         # A failed aligner load no longer ends the job (#436); say so in the summary.
         if getattr(self._subtitle_pipeline, "alignment_unavailable", None):
             self.degradations.append(self._subtitle_pipeline.alignment_unavailable)
+        # 1.10.3 (owner W751 B1 3; the GGUF pipelines' words, W764 2 texts sheet item 2): scenes whose speech segmenter
+        # failed (the VAD-grouped framer) are named in the run summary.
+        _failed = getattr(self._subtitle_pipeline, "segmenter_failed_scenes", 0)
+        if _failed:
+            self.notes.append(f"Decoupled: the speech segmenter failed on {_failed} scene(s); their speech was not "
+                              f"transcribed.")
 
         # Convert to Phase 6 format: (WhisperResult, scene_idx)
         scene_results: List[Tuple[Optional[stable_whisper.WhisperResult], int]] = []
@@ -873,6 +880,7 @@ class DecoupledPipeline(BasePipeline):
         # the same way: the plain path, the async path, and a pass running in
         # its own process (agreed error-handling table, 2026-09-17).
         master_metadata["summary"]["degradations"] = list(getattr(self, "degradations", None) or [])
+        master_metadata["summary"]["notes"] = list(getattr(self, "notes", None) or [])
 
         logger.info(
             "[DecoupledPipeline PID %s] Complete: %s (%d subtitles in %s)",

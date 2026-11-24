@@ -199,7 +199,9 @@ class FidelityPipeline(BasePipeline):
         # than only in the log. Reset per file -- the pipeline object is reused
         # across the whole run.
         self.degradations = []
-        
+        self.notes = []   # 1.10.3: notes for the run summary, as ChronosJAV and the GGUF pipelines have
+        segmenter_failed_scenes = 0   # 1.10.3 (owner W751 B1 3)
+
         input_file = media_info['path']
         media_basename = media_info['basename']
         
@@ -345,7 +347,7 @@ class FidelityPipeline(BasePipeline):
                             f"scenes but {len(scene_paths)} original scenes.")
                     logger.info(
                         "Enhance-for-VAD: speech is detected in the cleaned-up "
-                        "audio, and the recogniser hears the original")
+                        "audio, and the ASR model hears the original")
                 else:
                     scene_paths = enhanced_paths
 
@@ -455,6 +457,7 @@ class FidelityPipeline(BasePipeline):
                 # Dual-track: this scene's cleaned-up copy, for detection only.
                 vad_scene_path = vad_scene_paths[idx][0] if vad_scene_paths else None
 
+                asr.last_segmenter_error = None   # set by this scene's speech segmentation (whisper_pro_asr.py)
                 try:
                     # Use unified progress manager's external suppression if available
                     if unified_manager:
@@ -484,6 +487,8 @@ class FidelityPipeline(BasePipeline):
                     master_metadata["scenes_detected"][idx]["transcribed"] = False
                     master_metadata["scenes_detected"][idx]["error"] = str(e)
                     self.progress.update_subtask(1)
+                if getattr(asr, "last_segmenter_error", None):
+                    segmenter_failed_scenes += 1
 
                 # v1.9.2 (CFF1 / D2): every scene handed to the instance counts
                 # toward the budget (failed ones included); refresh at the
@@ -593,6 +598,11 @@ class FidelityPipeline(BasePipeline):
             # the same way: the plain path, the async path, and a pass running in
             # its own process (agreed error-handling table, 2026-09-17).
             master_metadata["summary"]["degradations"] = list(getattr(self, "degradations", None) or [])
+            # 1.10.3 (owner W751 B1 3; the GGUF pipelines' words, W764 2 texts sheet item 2)
+            if segmenter_failed_scenes:
+                self.notes.append(f"Fidelity: the speech segmenter failed on {segmenter_failed_scenes} scene(s); "
+                                  f"their speech was not transcribed.")
+            master_metadata["summary"]["notes"] = list(self.notes)
             master_metadata["metadata_master"]["updated_at"] = datetime.now().isoformat() + "Z"
             
             self.metadata_manager.save_master_metadata(master_metadata, media_basename)
