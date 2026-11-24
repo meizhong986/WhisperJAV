@@ -1,16 +1,14 @@
-"""Clean-up gating (1.10.3, owner W753 CL2, W754; default strict, W756 5).
+"""Subtitle sanitization gate (1.10.3, owner W753 CL2, W754; default strict, W756 5; named W772).
 
 strict keeps today's behaviour; relaxed keeps a line holding a relaxed term (気持ちいい, イク, じゃあ, ...) where the
 hallucination filter, the assembly cleaner's hallucination list or the non-linguistic filter would remove it. Lines of
 sounds only stay removed in both; the non-verbal filter's lone tokens (a lone はい or うん) are not reached.
 """
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 
-from whisperjav.modules.subtitle_pipeline.cleaners import cleanup_gating as g
+from whisperjav.modules.subtitle_pipeline.cleaners import subs_sanitization_gate as g
 from whisperjav.modules.subtitle_pipeline.cleaners.nonlinguistic_utterance_filter import _should_remove_entry
 from whisperjav.modules.subtitle_pipeline.cleaners.nonverbal_line_filter import NonverbalLineFilter
 
@@ -103,28 +101,35 @@ def test_the_assembly_cleaner_list_follows_the_setting(monkeypatch):
     assert cleaner._stage_hallucination_filter("ご視聴ありがとうございました。")[0] == ""
 
 
-def test_the_flag_is_in_help_and_sets_the_environment():
+def test_the_switch_is_in_help_and_sets_the_environment():
     src = (REPO / "whisperjav" / "main.py").read_text(encoding="utf-8")
-    assert 'add_argument("--cleanup-gating", choices=["strict", "relaxed"], default="strict"' in src
-    assert "os.environ[CLEANUP_GATING_ENV] = getattr(args, 'cleanup_gating', None) or \"strict\"" in src
+    assert 'add_argument("--subs-sanitization-gate", choices=["strict", "relaxed"], default="strict"' in src
+    assert ("os.environ[SUBS_SANITIZATION_GATE_ENV] = getattr(args, 'subs_sanitization_gate', None) or \"strict\""
+            in src)
+    assert "--cleanup-gating" not in src                       # the name of the 82nd session's draft is gone (W772)
 
 
-def test_the_gui_passes_relaxed_only(monkeypatch):
+def test_the_gui_passes_relaxed_only_and_shows_the_new_name(monkeypatch):
     api_src = (REPO / "whisperjav" / "webview_gui" / "api.py").read_text(encoding="utf-8")
-    assert api_src.count('if options.get("cleanup_gating") == "relaxed":') == 3
-    assert api_src.count('if config.get("cleanup_gating") == "relaxed":') == 1
-    assert '"cleanup_gating":            "cleanupGating"' in api_src
+    assert api_src.count('if options.get("subs_sanitization_gate") == "relaxed":') == 3
+    assert api_src.count('if config.get("subs_sanitization_gate") == "relaxed":') == 1
+    assert api_src.count('args += ["--subs-sanitization-gate", "relaxed"]') == 4
+    assert '"subs_sanitization_gate":    "subsSanitizationGate"' in api_src
     js = (REPO / "whisperjav" / "webview_gui" / "assets" / "app.js").read_text(encoding="utf-8")
-    assert js.count("cleanup_gating: document.getElementById('cleanupGating')?.value || 'strict',") == 2
+    assert js.count("subs_sanitization_gate: document.getElementById('subsSanitizationGate')?.value || 'strict',") == 2
     html = (REPO / "whisperjav" / "webview_gui" / "assets" / "index.html").read_text(encoding="utf-8")
     assert '<option value="strict" selected>Strict (default)</option>' in html
+    assert ">Subtitle sanitization gate:</label>" in html
+    assert "Same as --subs-sanitization-gate." in html
+    zh = (REPO / "whisperjav" / "webview_gui" / "assets" / "i18n_zh.js").read_text(encoding="utf-8")
+    assert '"Subtitle sanitization gate:": "字幕清理关卡：",' in zh
 
 
 def test_a_remembered_relaxed_comes_back(tmp_path, monkeypatch):
     """Review of 2026-11-24: load_gui_settings reads back only the keys of DEFAULT_GUI_SETTINGS."""
     from whisperjav.settings import gui_settings as s
-    assert s.DEFAULT_GUI_SETTINGS["cleanup_gating"] == "strict"
+    assert s.DEFAULT_GUI_SETTINGS["subs_sanitization_gate"] == "strict"
     path = tmp_path / "gui_settings.json"                      # a test folder: the user's settings are never read
     monkeypatch.setattr(s, "get_gui_settings_path", lambda: path)
-    assert s.save_gui_settings(dict(s.DEFAULT_GUI_SETTINGS, cleanup_gating="relaxed"))
-    assert s.load_gui_settings()["cleanup_gating"] == "relaxed"
+    assert s.save_gui_settings(dict(s.DEFAULT_GUI_SETTINGS, subs_sanitization_gate="relaxed"))
+    assert s.load_gui_settings()["subs_sanitization_gate"] == "relaxed"

@@ -1044,8 +1044,8 @@ const FormManager = {
             skip_existing: document.getElementById('skipExisting').checked,
             fail_on_empty: document.getElementById('failOnEmpty').checked,
             fail_on_suspect: document.getElementById('failOnSuspect').checked,
-            // 1.10.3 (owner W753 CL2, W754): Advanced Options' clean-up gating, strict by default
-            cleanup_gating: document.getElementById('cleanupGating')?.value || 'strict',
+            // 1.10.3 (owner W753 CL2, W754): Advanced Options' subtitle sanitization gate, strict by default
+            subs_sanitization_gate: document.getElementById('subsSanitizationGate')?.value || 'strict',
             asr_telemetry: document.getElementById('asrTelemetry').checked,
             // v1.9.2 (CFF1): minutes of scene audio before the recognizer is reloaded (0 = never)
             model_refresh_audio_minutes: document.getElementById('modelRefreshAudioMinutes').value,
@@ -7078,8 +7078,8 @@ const EnsembleManager = {
             skip_existing: document.getElementById('skipExisting').checked,
             fail_on_empty: document.getElementById('failOnEmpty').checked,
             fail_on_suspect: document.getElementById('failOnSuspect').checked,
-            // 1.10.3 (owner W753 CL2, W754): Advanced Options' clean-up gating, strict by default
-            cleanup_gating: document.getElementById('cleanupGating')?.value || 'strict',
+            // 1.10.3 (owner W753 CL2, W754): Advanced Options' subtitle sanitization gate, strict by default
+            subs_sanitization_gate: document.getElementById('subsSanitizationGate')?.value || 'strict',
             asr_telemetry: document.getElementById('asrTelemetry').checked,
             // #415: shared Advanced-options checkbox (Transcription tab), like asrTelemetry
             offline_mode: document.getElementById('offlineMode').checked,
@@ -8693,9 +8693,10 @@ const TranslatorManager = {
      * @param {HTMLSelectElement|null} select - The model menu.
      * @param {string} provider - Provider key, such as 'claude'.
      * @param {string[]} ids - The models the provider lists.
+     * @param {string} [name] - The provider's name as the menu shows it (api.py "provider_name"; 1.10.3, owner W772).
      * @returns {number} How many models were added.
      */
-    addListedModels(select, provider, ids) {
+    addListedModels(select, provider, ids, name) {
         if (!select || !Array.isArray(ids) || !ids.length) return 0;
         const chosen = select.value;
         const fixed = this.providerModels[provider] || [];
@@ -8703,7 +8704,7 @@ const TranslatorManager = {
         select.innerHTML = this.modelOptionsHtml(provider);
         if (extra.length) {
             const group = document.createElement('optgroup');
-            group.label = `Listed by ${provider} for this key`;
+            group.label = `Listed by ${name || provider} for this key`;
             for (const id of extra) {
                 const option = document.createElement('option');
                 option.value = id;
@@ -8823,8 +8824,9 @@ const TranslatorManager = {
                     statusEl.textContent = 'Connected';
                     statusEl.className = 'api-status configured';
                 }
-                const added = this.addListedModels(document.getElementById('translatorModel'), provider, result.models);
-                if (added) ConsoleManager.log(`Model menu: ${added} more model(s) listed by ${provider} for this key`, 'info');
+                const listedBy = result.provider_name || provider;
+                const added = this.addListedModels(document.getElementById('translatorModel'), provider, result.models, listedBy);
+                if (added) ConsoleManager.log(`Model menu: ${added} more model(s) listed by ${listedBy} for this key`, 'info');
             } else {
                 ConsoleManager.log(`Connection to ${provider} failed: ${result.error}`, 'error');
                 if (statusEl) {
@@ -9500,9 +9502,10 @@ const TranslationSettingsModal = {
                     statusEl.textContent = 'Connected';
                     statusEl.className = 'api-status connected';
                     ConsoleManager.log(`API connection successful: ${provider}`, 'success');
+                    const listedBy = result.provider_name || provider;
                     const added = TranslatorManager.addListedModels(
-                        document.getElementById('ensembleTranslateModel'), provider, result.models);
-                    if (added) ConsoleManager.log(`Model menu: ${added} more model(s) listed by ${provider} for this key`, 'info');
+                        document.getElementById('ensembleTranslateModel'), provider, result.models, listedBy);
+                    if (added) ConsoleManager.log(`Model menu: ${added} more model(s) listed by ${listedBy} for this key`, 'info');
                 } else {
                     statusEl.textContent = 'Failed';
                     statusEl.className = 'api-status error';
@@ -9567,7 +9570,7 @@ const SettingsPersistence = {
         'offlineMode':      { key: 'offlineMode',    prop: 'checked' },
         'failOnEmpty':      { key: 'failOnEmpty',    prop: 'checked' },
         'failOnSuspect':    { key: 'failOnSuspect',  prop: 'checked' },
-        'cleanupGating':    { key: 'cleanupGating',  prop: 'value' },
+        'subsSanitizationGate': { key: 'subsSanitizationGate', prop: 'value' },
         'asrTelemetry':     { key: 'asrTelemetry',   prop: 'checked' },
         'modelRefreshAudioMinutes': { key: 'modelRefreshAudioMinutes', prop: 'value' },
         // v1.9.3 (D1/#381): the Ensemble tab's two-pass selectors. The backend has

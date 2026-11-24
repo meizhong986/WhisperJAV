@@ -277,17 +277,18 @@ def ctranslate2_device(requested: Optional[str], best: Optional[str] = None) -> 
 
 
 # The Apple silicon lines (design 22.8, owner W225 option 1, W219): each pipeline says where it runs.
+# 1.10.3 (owner W772, W773; texts sheet D6): on a Mac, users are pointed to the GGUF pipelines first, which CrispASR
+# runs on the Apple GPU.
 APPLE_SILICON_CTRANSLATE2_TEXT = (  # T53
     "On an Apple silicon Mac, balanced, fast and faster run on the CPU (not accelerated), several times "
-    "slower: their engine (CTranslate2) cannot use the Apple GPU. The transformers pipeline uses the Apple "
-    "GPU (Metal). For English subtitles, make Japanese subtitles first and translate them with AI translation: "
-    "with its default model (Kotoba-Whisper bilingual), the transformers pipeline cannot do Direct to English.")
-# 1.10.3 (#515, owner W750 A4; texts sheet item 15, W769): fidelity's word-timing step uses a fix on the Apple GPU
-# (modules/mps_word_timing.py), not yet run on a Mac.
+    "slower: their engine (CTranslate2) cannot use the Apple GPU. For the Apple GPU, try a GGUF pipeline as "
+    "pass 1 in the Ensemble Mode tab (on the command line: --ensemble --pass1-pipeline cohere-crispasr); "
+    "CrispASR runs it on the Apple GPU (Metal).")
+# 1.10.3 (#515, owner W750 A4; texts sheet item 15, W764, W772 D5, W773): fidelity's word-timing step uses a fix on
+# the Apple GPU (modules/mps_word_timing.py), not yet run on a Mac.
 APPLE_SILICON_FIDELITY_TEXT = (  # T52
-    "Fidelity asks PyTorch for the Apple GPU (Metal, through MPS). Its word-timing step uses a fix for the "
-    "Apple GPU that has not been tested on a Mac yet. If fidelity fails, use the transformers pipeline, or run "
-    "fidelity on the CPU (--device cpu).")
+    "Fidelity asks PyTorch for the Apple GPU (Metal, through MPS). Its word timestamps use a fix that has not "
+    "been tested on a Mac yet; if fidelity fails, untick word timestamps or try a GGUF pipeline.")
 APPLE_SILICON_CHRONOSJAV_TEXT = (  # T51
     "ChronosJAV does not use the Apple GPU (Metal) in 1.10: its ASR model runs on the CPU (not "
     "accelerated), several times slower than on a GPU.")

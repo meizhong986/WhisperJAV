@@ -100,20 +100,20 @@ chmod +x installer/install_mac.sh
 
 | 处理管线 | 在 Apple silicon Mac 上 |
 |---|---|
-| **transformers** | Apple GPU（Metal）——**在 Mac 上推荐**。要英文字幕时，请先生成日文字幕，再用 AI 翻译译成英文：使用默认模型（Kotoba-Whisper bilingual）时，transformers 处理管线无法使用 Direct to English。 |
-| **fidelity** | 向 PyTorch 请求使用 Apple GPU（Metal）；其单词计时步骤使用了针对 Apple GPU 的修正（1.10.3 新增），尚未在 Mac 上测试。如果失败，请使用 transformers 处理管线，或加上 `--device cpu`。 |
-| **GGUF 处理管线**（parakeet、cohere、reazonspeech、kotoba、whisper-turbo、whisper-large、MOSS、haas、qwen3-asr） | 请求使用 Apple GPU（Metal）；尚未在 Mac 上测试 |
+| **GGUF 处理管线**（parakeet、cohere、reazonspeech、kotoba、whisper-turbo、whisper-large、MOSS、haas、qwen3-asr），作为 Ensemble 的一轮 | 请求使用 Apple GPU（Metal），由 CrispASR 运行——**在 Mac 上请先试这些**；尚未在 Mac 上测试。在 GUI 中，在「专家模式」标签页把其中一个选为第一轮（默认是 Cohere-CrispASR）。它们生成日文字幕；要英文字幕时，请用 AI 翻译译成英文。 |
+| **transformers** | Apple GPU（Metal）。要英文字幕时，请先生成日文字幕，再用 AI 翻译译成英文：使用默认模型（Kotoba-Whisper bilingual）时，transformers 处理管线无法使用 Direct to English。 |
+| **fidelity** | 向 PyTorch 请求使用 Apple GPU（Metal）；其单词时间戳使用了一项修正（1.10.3 新增），尚未在 Mac 上测试。如果失败，请取消勾选单词时间戳，或试用 GGUF 处理管线。 |
 | **balanced、fast、faster** | CPU（不加速），慢好几倍：它们的引擎（CTranslate2）无法使用 Apple GPU |
 | **ChronosJAV**（Qwen3-ASR、anime-whisper） | 在 1.10 中为 CPU（不加速）：其 ASR 模型尚不使用 Apple GPU |
 | WhisperSeg 语音分割器 | CPU，所有安装中都是 |
 
 Apple GPU 可用时，运行开始时不显示任何内容；每个处理管线启动时会在控制台中说明自己在哪里运行（例如 balanced、fast 和 faster 会说明它们在 CPU 上运行）。如果 Apple GPU 不可用，运行开始时会有一个框说明各部分在哪里运行。安装脚本结束时会显示：
 
-> On an Apple silicon Mac, the transformers pipeline is recommended: it asks for the Apple GPU (Metal).
-> For English subtitles, make Japanese subtitles first and translate them with AI translation:
-> with its default model (Kotoba-Whisper bilingual), the transformers pipeline cannot do Direct to English.
+> On an Apple silicon Mac, try the GGUF pipelines first: choose one as pass 1 in the Ensemble Mode tab
+> (Cohere-CrispASR is its default). CrispASR runs them on the Apple GPU (Metal). They write Japanese
+> subtitles; for English, translate them with AI translation.
 
-（意思是：在 Apple silicon Mac 上推荐 transformers 处理管线：它请求使用 Apple GPU（Metal）。要英文字幕时，请先生成日文字幕，再用 AI 翻译译成英文：使用默认模型（Kotoba-Whisper bilingual）时，transformers 处理管线无法使用 Direct to English。）
+（意思是：在 Apple silicon Mac 上，请先试 GGUF 处理管线：在「专家模式」标签页把其中一个选为第一轮（默认是 Cohere-CrispASR）。CrispASR 在 Apple GPU（Metal）上运行它们。它们生成日文字幕；要英文字幕时，请用 AI 翻译译成英文。）
 
 ---
 
@@ -123,7 +123,8 @@ Apple GPU 可用时，运行开始时不显示任何内容；每个处理管线�
 
 ```bash
 whisperjav-gui                                  # GUI
-whisperjav video.mp4 --mode transformers        # 在 Apple GPU 上（推荐）
+whisperjav video.mp4 --ensemble --pass1-pipeline cohere-crispasr   # GGUF 处理管线，在 Apple GPU 上（请先试）
+whisperjav video.mp4 --mode transformers        # 在 Apple GPU 上
 whisperjav video.mp4                            # balanced，在 CPU 上
 whisperjav --check                              # 加速器、各部分在哪里运行、CrispASR、模型
 whisperjav video.mp4 --device cpu               # 这次运行使用 CPU
@@ -161,9 +162,9 @@ git checkout v1.10.x      # 你想要的版本
 
 **找不到 FFmpeg。** 运行 `brew install ffmpeg`，然后打开新的终端。
 
-**处理很慢。** 在 Mac 上，大多数处理管线在 CPU 上运行（第 4 节）。请使用 transformers 处理管线以使用 Apple GPU。
+**处理很慢。** 在 Mac 上，大多数处理管线在 CPU 上运行（第 4 节）。要使用 Apple GPU，请使用 GGUF 处理管线（「专家模式」标签页，第一轮）或 transformers 处理管线。
 
-**fidelity 在 Apple GPU 上失败。** 改用 transformers 处理管线，或加上 `--device cpu` 让 fidelity 在 CPU 上运行。
+**fidelity 在 Apple GPU 上失败。** 取消勾选单词时间戳，或试用 GGUF 处理管线。
 
 **GUI 无法打开。** 检查环境中 `python3 -c "import webview"` 是否成功；如果不成功，运行 `xcode-select --install` 后再次运行安装脚本。不用 GUI 也可以使用命令行。
 

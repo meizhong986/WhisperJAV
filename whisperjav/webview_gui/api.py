@@ -409,9 +409,9 @@ class WhisperJAVAPI:
         _fail_on = [s for s in ("empty", "suspect") if options.get(f"fail_on_{s}", False)]
         if _fail_on:
             args += ["--fail-on", ",".join(_fail_on)]
-        # 1.10.3 (owner W753 CL2, W754): the clean-up gating (Advanced Options); strict, the default, adds nothing.
-        if options.get("cleanup_gating") == "relaxed":
-            args += ["--cleanup-gating", "relaxed"]
+        # 1.10.3 (owner W753 CL2, W754): the subtitle sanitization gate (Advanced Options); strict, the default, adds nothing.
+        if options.get("subs_sanitization_gate") == "relaxed":
+            args += ["--subs-sanitization-gate", "relaxed"]
 
         # Per-scene ASR telemetry is on by default; the checkbox only opts out.
         if options.get('asr_telemetry', True) is False:
@@ -552,9 +552,9 @@ class WhisperJAVAPI:
         _fail_on = [s for s in ("empty", "suspect") if options.get(f"fail_on_{s}", False)]
         if _fail_on:
             args += ["--fail-on", ",".join(_fail_on)]
-        # 1.10.3 (owner W753 CL2, W754): the clean-up gating (Advanced Options); strict, the default, adds nothing.
-        if options.get("cleanup_gating") == "relaxed":
-            args += ["--cleanup-gating", "relaxed"]
+        # 1.10.3 (owner W753 CL2, W754): the subtitle sanitization gate (Advanced Options); strict, the default, adds nothing.
+        if options.get("subs_sanitization_gate") == "relaxed":
+            args += ["--subs-sanitization-gate", "relaxed"]
 
         # Per-scene ASR telemetry is on by default; the checkbox only opts out.
         if options.get('asr_telemetry', True) is False:
@@ -2178,9 +2178,9 @@ class WhisperJAVAPI:
         _fail_on = [s for s in ("empty", "suspect") if options.get(f"fail_on_{s}", False)]
         if _fail_on:
             args += ["--fail-on", ",".join(_fail_on)]
-        # 1.10.3 (owner W753 CL2, W754): the clean-up gating (Advanced Options); strict, the default, adds nothing.
-        if options.get("cleanup_gating") == "relaxed":
-            args += ["--cleanup-gating", "relaxed"]
+        # 1.10.3 (owner W753 CL2, W754): the subtitle sanitization gate (Advanced Options); strict, the default, adds nothing.
+        if options.get("subs_sanitization_gate") == "relaxed":
+            args += ["--subs-sanitization-gate", "relaxed"]
 
         # Per-scene ASR telemetry is on by default; the checkbox only opts out.
         if options.get('asr_telemetry', True) is False:
@@ -3788,9 +3788,9 @@ class WhisperJAVAPI:
         _fail_on = [s for s in ("empty", "suspect") if config.get(f"fail_on_{s}", False)]
         if _fail_on:
             args += ["--fail-on", ",".join(_fail_on)]
-        # 1.10.3 (owner W753 CL2, W754): the clean-up gating (Advanced Options); strict, the default, adds nothing.
-        if config.get("cleanup_gating") == "relaxed":
-            args += ["--cleanup-gating", "relaxed"]
+        # 1.10.3 (owner W753 CL2, W754): the subtitle sanitization gate (Advanced Options); strict, the default, adds nothing.
+        if config.get("subs_sanitization_gate") == "relaxed":
+            args += ["--subs-sanitization-gate", "relaxed"]
 
         # Per-scene ASR telemetry is on by default; the checkbox only opts out.
         if config.get('asr_telemetry', True) is False:
@@ -4343,7 +4343,7 @@ class WhisperJAVAPI:
         "remember_settings":         "rememberSettings",
         "fail_on_empty":             "failOnEmpty",
         "fail_on_suspect":           "failOnSuspect",
-        "cleanup_gating":            "cleanupGating",   # 1.10.3 (owner W753 CL2, W754)
+        "subs_sanitization_gate":    "subsSanitizationGate",   # 1.10.3 (owner W753 CL2, W754; name W772)
         "asr_telemetry":             "asrTelemetry",
         "model_refresh_audio_minutes": "modelRefreshAudioMinutes",
         "temp_dir":                  "tempDir",
@@ -4607,12 +4607,14 @@ class WhisperJAVAPI:
                     status_code = response.status
                 # 1.10.3 (owner W624 A): the chat models the provider lists for this key, read again on every test;
                 # the page adds them to the model menu.
-                from whisperjav.translate.providers import fetch_model_ids
+                from whisperjav.translate.providers import PROVIDER_NAMES, fetch_model_ids
                 return {
                     "success": True,
                     "message": f"Connected to {provider}",
                     "status_code": status_code,
                     "models": fetch_model_ids(provider, key, cache=False) or [],
+                    # 1.10.3 (owner W772): the name the provider menu shows, for the menu heading and console line
+                    "provider_name": PROVIDER_NAMES.get(provider, provider),
                 }
             except urllib.error.HTTPError as e:
                 try:

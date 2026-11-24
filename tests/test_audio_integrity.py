@@ -213,10 +213,10 @@ def test_a_closed_time_jump_is_not_called_filled():
     assert [f.kind for f in rep.findings] == ["hole"]      # the length difference is the hole itself
     msg = console_message(rep, "rec.ts")
     assert "filled the gaps with silence, so subtitle times stay in step" not in msg
-    assert ("FFmpeg closed 12.0 s of these gaps instead of filling them with silence (it does so for a time "
-            "jump of more than 10 s, as in some MPEG-TS and HLS recordings), so in a player that keeps that "
-            "time, subtitles after it come out early by up to 12.0 s; any speech inside the gaps is missing "
-            "from the file. Transcription continues.") in msg
+    assert ("FFmpeg removed 12.0 s of these gaps instead of filling them with silence (it does this for a time "
+            "jump of more than 10 s, found in some MPEG-TS and HLS recordings). Subtitles after the gap can show "
+            "up to 12.0 s too early, and any speech inside the gaps is missing from the file. "
+            "Transcription continues.") in msg
 
 
 def test_a_filled_gap_keeps_the_filled_wording():

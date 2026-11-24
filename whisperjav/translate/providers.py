@@ -93,6 +93,13 @@ PROVIDER_CONFIGS = {
 for _provider_key, _provider_config in PROVIDER_CONFIGS.items():
     _provider_config.setdefault('whisperjav_provider', _provider_key)
 
+# 1.10.3 (owner W772, texts sheet D2): each provider's name as the GUI's provider menus show it (index.html), for the
+# lines a user reads; the keys are the names typed after --translate-provider.
+PROVIDER_NAMES = {
+    'deepseek': 'DeepSeek', 'openrouter': 'OpenRouter', 'gemini': 'Gemini', 'claude': 'Claude', 'gpt': 'GPT',
+    'glm': 'GLM (Zhipu AI)', 'groq': 'Groq', 'ollama': 'Ollama', 'custom': 'Custom (OpenAI-compatible)',
+}
+
 
 # The GUI's Test Connection checks a key at the provider's own models list (#465). Until 1.10.1 every provider
 # without 'api_base' was checked at OpenAI's address, so a working Gemini, Claude, GLM or Groq key showed
@@ -240,7 +247,8 @@ def missing_model_line(provider: str, model: str, ids, flag: str = '--model'):
     shown = family if family else ids
     more = len(shown) - MODELS_SHOWN
     names = ', '.join(shown[:MODELS_SHOWN]) + (f' (and {more} more)' if more > 0 else '')
-    return (f"Translation: {provider} does not list the model '{model}' for this API key, so the translation may "
+    name = PROVIDER_NAMES.get(provider, provider)
+    return (f"Translation: {name} does not list the model '{model}' for this API key, so the translation may "
             f"fail. The models it lists include: {names}. Choose one with {flag}, or in the model menu of the GUI.")
 
 

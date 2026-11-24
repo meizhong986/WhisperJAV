@@ -62,7 +62,8 @@ check_supported_mac() {
 
 detect_architecture() {
     # T31 (design 22.10)
-    echo -e "${GREEN}Apple silicon Mac: the transformers pipeline asks for the Apple GPU (Metal); the GGUF pipelines and fidelity ask for it too (not yet tested on a Mac); balanced, fast, faster and ChronosJAV run on the CPU (not accelerated).${NC}"
+    # 1.10.3 (owner W772, W773): the GGUF pipelines first
+    echo -e "${GREEN}Apple silicon Mac: the GGUF pipelines (run by CrispASR), transformers and fidelity ask for the Apple GPU (Metal); balanced, fast, faster and ChronosJAV run on the CPU (not accelerated).${NC}"
 }
 
 # ==============================================================================
@@ -394,10 +395,10 @@ fi
 echo "  Or from Terminal:"
 echo -e "    ${GREEN}whisperjav-gui${NC}"
 echo ""
-# T31b (design 22.10)
-echo "  On an Apple silicon Mac, the transformers pipeline is recommended: it asks for the Apple GPU (Metal)."
-echo "  For English subtitles, make Japanese subtitles first and translate them with AI translation:"
-echo "  with its default model (Kotoba-Whisper bilingual), the transformers pipeline cannot do Direct to English."
+# T31b (design 22.10; 1.10.3, owner W772, W773: the GGUF pipelines first)
+echo "  On an Apple silicon Mac, try the GGUF pipelines first: choose one as pass 1 in the Ensemble Mode tab"
+echo "  (Cohere-CrispASR is its default). CrispASR runs them on the Apple GPU (Metal). They write Japanese"
+echo "  subtitles; for English, translate them with AI translation."
 echo ""
 
 exit 0

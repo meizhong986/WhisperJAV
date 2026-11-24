@@ -193,7 +193,7 @@ class TestS01FirstLaunch:
         "pass2_speech_enhancer": "pass2-enhancer",
         "pass2_speech_segmenter": "pass2-segmenter",
         "merge_strategy": "merge-strategy",
-        "cleanup_gating": "cleanupGating",   # 1.10.3 (owner W753 CL2, W754)
+        "subs_sanitization_gate": "subsSanitizationGate",   # 1.10.3 (owner W753 CL2, W754)
     }
 
     def test_static_selects_match_html(self):
@@ -910,7 +910,7 @@ class TestCompleteness:
         #  1.10.0: -accept_cpu_mode, design 22.5.1; +ui_language, item 6;
         #  1.10.1: +ensemble_serial, "Finish each file" remembered, owner W501;
         #  1.10.2: +pass1_enhance_for_vad, +pass2_enhance_for_vad, "For VAD only" remembered, owner W596 3;
-        #  1.10.3: +cleanup_gating, owner W753 CL2, W754)
+        #  1.10.3: +subs_sanitization_gate, owner W753 CL2, W754)
         assert len(data_keys) == 40, (
             f"Expected 40 settings keys, got {len(data_keys)}: {data_keys}"
         )

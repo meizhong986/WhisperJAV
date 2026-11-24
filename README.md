@@ -352,7 +352,7 @@ python3.13 -m venv ~/venvs/whisperjav && source ~/venvs/whisperjav/bin/activate
 chmod +x installer/install_mac.sh && ./installer/install_mac.sh
 ```
 
-Apple silicon, macOS 14 or newer; the install is made for the Apple GPU (Metal). The transformers pipeline uses the Apple GPU and is recommended on a Mac; fidelity and the GGUF pipelines ask for it (not yet tested on a Mac); balanced, fast, faster and ChronosJAV run on the CPU. Intel Macs are not supported by 1.10.
+Apple silicon, macOS 14 or newer; the install is made for the Apple GPU (Metal). On a Mac, try the GGUF pipelines first (Ensemble Mode tab): CrispASR runs them on the Apple GPU. transformers uses the Apple GPU too; fidelity asks for it; balanced, fast, faster and ChronosJAV run on the CPU. Intel Macs are not supported by 1.10.
 
 Full guide: [docs/en/guides/installation_mac_apple_silicon.md](docs/en/guides/installation_mac_apple_silicon.md)
 </details>

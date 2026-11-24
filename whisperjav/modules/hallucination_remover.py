@@ -488,9 +488,9 @@ class HallucinationRemover:
         # Normalize text for comparison: lowercase and remove leading/trailing whitespace
         normalized_text = text.strip().lower()
 
-        # 1.10.3 (owner W753 CL2, W754): with --cleanup-gating relaxed, a line with a relaxed word (e.g. 気持ちいい,
+        # 1.10.3 (owner W753 CL2, W754): with --subs-sanitization-gate relaxed, a line with a relaxed word (e.g. 気持ちいい,
         # also as 「気持ちいい♡」 or 「気持ちいい」 in brackets) passes every stage below whole.
-        from whisperjav.modules.subtitle_pipeline.cleaners.cleanup_gating import relaxed_keeps
+        from whisperjav.modules.subtitle_pipeline.cleaners.subs_sanitization_gate import relaxed_keeps
         if relaxed_keeps(text):
             return text, []
 

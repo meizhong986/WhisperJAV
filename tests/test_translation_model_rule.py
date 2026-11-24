@@ -71,7 +71,7 @@ def test_a_listed_model_or_an_unread_list_says_nothing():
 def test_a_missing_model_is_named_with_the_models_of_its_family():
     ids = ["claude-haiku-5-5", "claude-opus-5-5", "claude-sonnet-5-5"]
     line = p.missing_model_line("claude", "claude-3-5-haiku-20241022", ids, flag="--translate-model")
-    assert line == ("Translation: claude does not list the model 'claude-3-5-haiku-20241022' for this API key, so "
+    assert line == ("Translation: Claude does not list the model 'claude-3-5-haiku-20241022' for this API key, so "
                     "the translation may fail. The models it lists include: claude-haiku-5-5, claude-opus-5-5, "
                     "claude-sonnet-5-5. Choose one with --translate-model, or in the model menu of the GUI.")
 
@@ -90,7 +90,7 @@ def test_the_list_is_read_once_per_key_and_the_line_shown_once(monkeypatch):
     urlopen, seen = answer({"data": [{"id": "deepseek-flash"}]})
     monkeypatch.setattr(urllib.request, "urlopen", urlopen)
     first = p.missing_model_line_once("deepseek", "deepseek-v4-flash", KEY)
-    assert first.startswith("Translation: deepseek does not list the model 'deepseek-v4-flash'")
+    assert first.startswith("Translation: DeepSeek does not list the model 'deepseek-v4-flash'")
     assert p.missing_model_line_once("deepseek", "deepseek-v4-flash", KEY) is None
     assert len(seen) == 1
     assert p.fetch_model_ids("deepseek", KEY, cache=False) == ["deepseek-flash"] and len(seen) == 2
@@ -113,3 +113,15 @@ def test_both_translation_starts_apply_the_rule():
     assert "missing_model_line_once(provider, resolved_model, resolved_api_key, flag='--translate-model')" in service
     api = (root / "webview_gui" / "api.py").read_text(encoding="utf-8")
     assert '"models": fetch_model_ids(provider, key, cache=False) or [],' in api
+    assert '"provider_name": PROVIDER_NAMES.get(provider, provider),' in api
+    js = (root / "webview_gui" / "assets" / "app.js").read_text(encoding="utf-8")
+    assert js.count("const listedBy = result.provider_name || provider;") == 2
+
+
+def test_every_provider_has_the_name_the_gui_shows():
+    """1.10.3 (owner W772): the lines a user reads name the provider as the GUI's menu does."""
+    assert set(p.PROVIDER_NAMES) == set(p.PROVIDER_CONFIGS)
+    html = (Path(__file__).resolve().parents[1] / "whisperjav" / "webview_gui" / "assets" / "index.html"
+            ).read_text(encoding="utf-8")
+    for key, name in p.PROVIDER_NAMES.items():
+        assert f'<option value="{key}">{name}</option>' in html, key

@@ -368,7 +368,7 @@ def closed_gap_seconds(report: IntegrityReport, hole: IntegrityFinding) -> float
 
 def console_message(report: IntegrityReport, media_name: str, stopping: bool = False) -> str:
     """The line printed during the run (wording approved 2026-10-05; the closed-gap
-    sentence 1.10.3, owner W639 2, W769)."""
+    sentence 1.10.3, owner W639 2, W769, W772)."""
     if not report.checked:
         return f"Audio check: not run ({report.facts.get('not_checked', 'unknown reason')})."
     if not report.suspect:
@@ -382,10 +382,10 @@ def console_message(report: IntegrityReport, media_name: str, stopping: bool = F
             text += "; " + "; ".join(others)
         closed = closed_gap_seconds(report, hole)
         if closed:
-            text += (f". FFmpeg closed {closed:.1f} s of these gaps instead of filling them with silence (it "
-                     f"does so for a time jump of more than 10 s, as in some MPEG-TS and HLS recordings), so "
-                     f"in a player that keeps that time, subtitles after it come out early by up to "
-                     f"{closed:.1f} s; any speech inside the gaps is missing from the file.")
+            text += (f". FFmpeg removed {closed:.1f} s of these gaps instead of filling them with silence (it "
+                     f"does this for a time jump of more than 10 s, found in some MPEG-TS and HLS recordings). "
+                     f"Subtitles after the gap can show up to {closed:.1f} s too early, and any speech inside "
+                     f"the gaps is missing from the file.")
         else:
             text += (". WhisperJAV filled the gaps with silence, so subtitle times stay in step with the video; "
                      "any speech inside the gaps is missing from the file.")

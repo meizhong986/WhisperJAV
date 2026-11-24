@@ -1,9 +1,9 @@
-"""Clean-up gating (1.10.3, owner W753 CL2, W754; default strict, W756 5).
+"""Subtitle sanitization gate (1.10.3, owner W753 CL2, W754; default strict, W756 5; named W772).
 
-One setting decides how hard the clean-up removes lines that carry words:
+One setting decides how strictly subtitle sanitization removes lines that carry words:
   strict   today's behaviour, unchanged (the default);
   relaxed  a line that holds one of RELAXED_TERMS is kept where the hallucination filter or the non-linguistic
-           (sound-line) filter would remove it.
+           filter would remove it.
 Lines of sounds only stay removed in both states, and so do the lone tokens of the non-verbal filter (あ, え, ん, ...,
 a lone はい or うん: owner CFF5 and the standing decision of 2026-09-26), which this setting does not reach.
 
@@ -21,7 +21,7 @@ setting. XXL has no WhisperJAV clean-up. Not reached: the legacy sanitizer's rea
 suppress list of the Whisper modules, the English-output cleaner.
 
 The setting reaches every process of a run through the environment, as --fail-on suspect does: main.py sets ENV from
---cleanup-gating, and the Ensemble's pass processes inherit it.
+--subs-sanitization-gate, and the Ensemble's pass processes inherit it.
 
 RELAXED_TERMS is a first list (W769: Claude's proposal, for the owner to settle, W754 "we shall work together to
 define the relaxed terms"): his examples (kimochi 気持ちいい, iku iku イクイク) and the lines with words that
@@ -30,7 +30,7 @@ from the hallucination list. See holds_relaxed_term for where in a line a term c
 """
 import os
 
-ENV = "WHISPERJAV_CLEANUP_GATING"
+ENV = "WHISPERJAV_SUBS_SANITIZATION_GATE"
 CHOICES = ("strict", "relaxed")
 DEFAULT = "strict"
 
