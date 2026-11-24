@@ -49,6 +49,11 @@ class CrispASRTimer:
         return self._timer is not None
 
     @property
+    def failed_calls(self) -> int:
+        """1.10.3 (owner W776): the loaded model's failed calls since it was loaded (0 when none is loaded)."""
+        return getattr(self._timer, "failed_calls", 0) if self._timer is not None else 0
+
+    @property
     def display_name(self) -> str:
         """The timing model as the run summary names it: its label (Whisper small)."""
         from whisperjav.crispasr.manifest import timing_model_for

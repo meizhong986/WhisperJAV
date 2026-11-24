@@ -26,6 +26,9 @@ class _FramerFailingOnScene:
     def reframe(self, audio, sample_rate, max_group_duration_s=None):
         return FramingResult(frames=[], metadata={"segmenter_error": "model missing"})
 
+    def cleanup(self):
+        """The framer protocol's release; since 1.10.3 (owner W776) step 1 calls it once every scene is framed."""
+
 
 class _Generator:
     accepts_array = False

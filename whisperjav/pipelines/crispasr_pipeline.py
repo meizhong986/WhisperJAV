@@ -234,8 +234,8 @@ class CrispASRPipeline(BasePipeline):
         self.cues: lines.CueSettings = cues or lines.DEFAULT_CUES
 
         self.audio_extractor = None
-        self.asr: Optional[BindingEngine] = None  # opened once per pass; BasePipeline.cleanup() closes it
-        self.aligner: Optional[CrispAligner] = None  # loaded once per pass when ENGINE.aligner; cleanup() unloads it
+        self.asr: Optional[BindingEngine] = None  # opened for each file's ASR step, closed after it (1.10.3, W776)
+        self.aligner: Optional[CrispAligner] = None  # loaded for each file to align, unloaded after it (1.10.3, W776)
         self._aligner_error: Optional[str] = None
         self._runtime: Optional[install.RuntimeChoice] = None
         self._model_path: Optional[Path] = None
@@ -324,6 +324,10 @@ class CrispASRPipeline(BasePipeline):
         try:
             if groups:
                 results = self._transcribe(scenes, groups, md)
+                # 1.10.3 (owner W764, W776; model-memory inspection F4): the model is closed once its text is in,
+                # before the aligner opens, so the two never hold GPU memory together.
+                if self.asr is not None and self.asr.is_open:
+                    self.asr.close()
                 if self.engine.aligner and self.engine.text_cleanup:
                     self._clean_texts(scenes, results, md)
                 if self.engine.aligner:
@@ -336,14 +340,15 @@ class CrispASRPipeline(BasePipeline):
             else:
                 logger.info(f"{self.LABEL}: no speech was found in {basename}")
         finally:
-            if self.enhancer_backend not in ("", "none"):
-                # With a speech enhancer the model is opened for each file's ASR step and closed after
-                # it, also when the step fails, so the enhancer and the CrispASR model never hold GPU
-                # memory together (W217 19; review P7 finding 15). The aligner goes with it.
-                if self.asr is not None and self.asr.is_open:
-                    self.asr.close()
-                if self.aligner is not None:
-                    self.aligner.unload()
+            # The model is opened for each file's ASR step and closed after it, also when the step fails, and the
+            # aligner goes with it, so the next file's speech enhancer and speech segmenter never share GPU memory
+            # with them (W217 19; review P7 finding 15). 1.10.3 (owner W764, W776; inspection F4, F6): for every
+            # file, with or without a speech enhancer; until 1.10.2, without one they stayed open for the whole pass
+            # (W202 5a), at the cost of no reload per file.
+            if self.asr is not None and self.asr.is_open:
+                self.asr.close()
+            if self.aligner is not None:
+                self.aligner.unload()
 
         self.progress.set_current_step("Building subtitles", 6, 6)
         stitched, count_raw = self._build_subtitles(scenes, results, basename, md, aligned)
@@ -431,7 +436,7 @@ class CrispASRPipeline(BasePipeline):
         return self._runtime, self._model_path
 
     def _engine(self, md: Dict) -> BindingEngine:
-        """The engine, opened at the first file's ASR step and kept for the pass (W202 5a)."""
+        """The engine, opened at each file's ASR step (1.10.3, owner W776; kept for the pass until 1.10.2, W202 5a)."""
         if self._setup_error is not None:
             raise self._setup_error
         if self.asr is None:
@@ -780,8 +785,8 @@ class CrispASRPipeline(BasePipeline):
         """Each group's text aligned to its audio, in place: an aligned group's segments become one segment whose
         tokens are the aligner's timed characters. Returns the indices (into ``results``) of the aligned groups.
 
-        The aligner is loaded once per pass; if it cannot be loaded, no group is aligned for the pass and each
-        file's summary says so. A group the aligner gives nothing for keeps the model's result.
+        The aligner is loaded for each file (1.10.3, owner W776; once per pass until 1.10.2); if it cannot be
+        loaded, no group is aligned for the pass and each file's summary says so. A group the aligner gives nothing for keeps the model's result.
         """
         if self._aligner_error is None and (self.aligner is None or not self.aligner.is_loaded):
             try:

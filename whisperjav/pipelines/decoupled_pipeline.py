@@ -543,12 +543,21 @@ class DecoupledPipeline(BasePipeline):
             def _enhancement_progress(scene_num, total, scene_name):
                 logger.debug(f"Enhancing scene {scene_num}/{total}: {scene_name}")
 
-            enhanced_paths = enhance_scenes(
-                scene_paths, enhancer, self.temp_dir,
-                progress_callback=_enhancement_progress,
-                degradations=self.degradations,
-            )
-            original_16k_paths = resample_scenes(scene_paths, self.temp_dir)
+            try:
+                enhanced_paths = enhance_scenes(
+                    scene_paths, enhancer, self.temp_dir,
+                    progress_callback=_enhancement_progress,
+                    degradations=self.degradations,
+                )
+                original_16k_paths = resample_scenes(scene_paths, self.temp_dir)
+            except BaseException:
+                # 1.10.3 (owner W776; model-memory inspection, section 3): the enhancer is released also when
+                # enhancing fails. A failure of the release itself is logged only, so the run's own error goes on.
+                try:
+                    enhancer.cleanup()
+                except Exception:  # noqa: BLE001
+                    logger.debug("Speech enhancer release after a failed enhancement failed", exc_info=True)
+                raise
 
             # VRAM Block 1 cleanup — release enhancer before loading ASR
             enhancer.cleanup()
@@ -577,11 +586,20 @@ class DecoupledPipeline(BasePipeline):
             def _enhancement_progress(scene_num, total, scene_name):
                 logger.debug(f"Enhancing scene {scene_num}/{total}: {scene_name}")
 
-            scene_paths = enhance_scenes(
-                scene_paths, enhancer, self.temp_dir,
-                progress_callback=_enhancement_progress,
-                degradations=self.degradations,
-            )
+            try:
+                scene_paths = enhance_scenes(
+                    scene_paths, enhancer, self.temp_dir,
+                    progress_callback=_enhancement_progress,
+                    degradations=self.degradations,
+                )
+            except BaseException:
+                # 1.10.3 (owner W776; model-memory inspection, section 3): the enhancer is released also when
+                # enhancing fails. A failure of the release itself is logged only, so the run's own error goes on.
+                try:
+                    enhancer.cleanup()
+                except Exception:  # noqa: BLE001
+                    logger.debug("Speech enhancer release after a failed enhancement failed", exc_info=True)
+                raise
 
             # VRAM Block 1 cleanup — release enhancer before loading ASR
             enhancer.cleanup()

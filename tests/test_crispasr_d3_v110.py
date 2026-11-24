@@ -196,9 +196,10 @@ def _process_until_transcribe(pipe, tmp_path, transcribe):
     return pipe.asr
 
 
-@pytest.mark.parametrize("enhancer,closed", [("zipenhancer", True), ("none", False)])
-def test_with_an_enhancer_the_model_is_closed_even_when_the_asr_step_fails(tmp_path, enhancer, closed):
-    # Review P7 findings 15 and 16: the next file's enhancer must not run beside an open model.
+@pytest.mark.parametrize("enhancer", ["zipenhancer", "none"])
+def test_the_model_is_closed_even_when_the_asr_step_fails(tmp_path, enhancer):
+    # Review P7 findings 15 and 16: the next file's enhancer must not run beside an open model. 1.10.3 (owner W776;
+    # inspection F4, F6): without an enhancer too, so the next file's speech segmenter never runs beside it.
     pipe = make(ParakeetCrispASRPipeline, tmp_path, speech_enhancer=enhancer)
 
     def fails(scenes, groups, md):
@@ -206,7 +207,7 @@ def test_with_an_enhancer_the_model_is_closed_even_when_the_asr_step_fails(tmp_p
     model = _process_until_transcribe(pipe, tmp_path, fails)
     with pytest.raises(RuntimeError):
         pipe.process({"path": str(tmp_path / "a.mp4"), "basename": "a"})
-    assert model.is_open is (not closed)
+    assert model.is_open is False
 
 
 def test_the_pass_worker_and_the_gui_hand_these_settings_on():

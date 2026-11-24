@@ -15,11 +15,12 @@ processing flow defined in ADR-006 Section 9.2:
     9. Word merging (frame-relative → scene-relative), Sentinel +
        Reconstruction + Hardening (per scene)
 
-VRAM swap pattern:
-    generator.load() → generate → generator.unload()
-    → safe_cuda_cleanup()
+VRAM swap pattern (1.10.3, owner W776: each model is released before the next loads, also in an Ensemble pass):
+    framer.frame() for every scene → framer.cleanup() (the speech segmenter goes before the ASR model loads)
+    → generator.load() → generate → generator.unload()
+    → _safe_cuda_cleanup() (PyTorch's cached GPU memory given back)
     → aligner.load() → align → aligner.unload()
-    → safe_cuda_cleanup()
+    → _safe_cuda_cleanup()
     → timer.load() → time → timer.unload()
 """
 
@@ -137,6 +138,10 @@ TIMING_NOT_LOADED_TEXT = ("ChronosJAV's timing model ({name}) could not be loade
 GROUPS_NOT_ALIGNED_TEXT = ("ChronosJAV's aligner ({name}) gave no times for {n} of {m} VAD group(s): each keeps "
                            "its text as one unsplit subtitle, timed from its VAD group (the timing model may "
                            "still move its start).")
+# 1.10.3 (owner W776, approved as drafted): the timing model loaded but failed on some VAD groups. A failed group gets
+# no timed segment, so it is not split and its start is not moved (timing_rules.pieces: no segment counts).
+TIMING_FAILED_TEXT = ("ChronosJAV's timing model ({name}) failed on {n} of {m} VAD group(s): those subtitles are not "
+                      "split, and their start times come from the aligner or the VAD group; the text is kept.")
 
 
 def _is_full_scene(frames: list, scene_s: float) -> bool:
@@ -228,6 +233,10 @@ class DecoupledSubtitlePipeline:
         # Set when the timing model could not be loaded for the current file: the
         # subtitles keep their times and no frame is split. Reset per file.
         self.timing_unavailable: Optional[str] = None
+        # 1.10.3 (owner W776): set when the timing model loaded but failed on some VAD groups with text (first pass
+        # only); the pipeline puts it in the run summary as a note. Reset per file.
+        self.timing_partial: Optional[str] = None
+        self._last_timing_counts = (0, 0)
 
         # Temp files for cleanup
         self._temp_files: list[Path] = []
@@ -271,6 +280,7 @@ class DecoupledSubtitlePipeline:
         # 1.10.2 (#501): True when the aligner gave times for no VAD group with text (it ran, but timed nothing).
         self.alignment_none = False
         self.timing_unavailable = None
+        self.timing_partial = None
         # 1.10.3 (owner W751 B1 3): scenes whose speech segmenter failed (it caught its own error and returned no
         # groups, so the scene has no frame and its speech is not transcribed); the pipeline names them in the run
         # summary as the GGUF pipelines do. Counted in the first pass only, not in a step-down retry.
@@ -287,6 +297,7 @@ class DecoupledSubtitlePipeline:
 
         # --- Pass 1: Normal processing ---
         self._last_align_counts = (0, 0)
+        self._last_timing_counts = (0, 0)
         results = self._run_pass(
             scene_audio_paths, scene_durations, scene_speech_regions,
             vad_audio_paths=vad_audio_paths,
@@ -297,6 +308,11 @@ class DecoupledSubtitlePipeline:
             self.alignment_partial = GROUPS_NOT_ALIGNED_TEXT.format(
                 name=getattr(self.aligner, "display_name", "aligner"), n=unaligned, m=with_text)
             self.alignment_none = unaligned >= with_text
+        # 1.10.3 (owner W776): the VAD groups the timing model failed on, from the first pass only, as the aligner's.
+        timed, untimed = self._last_timing_counts
+        if untimed:
+            self.timing_partial = TIMING_FAILED_TEXT.format(
+                name=getattr(self.timer, "display_name", "timing model"), n=untimed, m=timed)
 
         # --- Identify collapsed scenes ---
         collapsed_indices = [
@@ -652,6 +668,11 @@ class DecoupledSubtitlePipeline:
             "Step 1: Complete — %d scenes, %d total frames",
             n_scenes, total_frames,
         )
+        # 1.10.3 (owner W764 "A model shall not be loaded into VRAM or RAM before it is needed", W776; inspection F2,
+        # F7): the framer's speech segmenter is released once every scene is framed, before the ASR model loads. The
+        # next file, or a step-down re-framing, builds it again, so the two never coexist. framer.cleanup() is the
+        # framer's own release, safe to call twice (the end-of-run cleanup calls it again).
+        self.framer.cleanup()
 
         return scene_frames, frame_audio_paths, frame_speech_regions, frame_speech_starts
 
@@ -1084,12 +1105,20 @@ class DecoupledSubtitlePipeline:
                         ext=".json",
                     )
         finally:
+            # 1.10.3 (owner W776): the model's count of failed calls (each logged at DEBUG), read before it closes.
+            failed_calls = getattr(self.timer, "failed_calls", 0) or 0
             self.timer.unload()
 
         logger.info(
             "Step 8: Timing model done — %d scenes (%.1fs)",
             len(scene_timings), _time.monotonic() - step8_start,
         )
+        # 1.10.3 (owner W776, text approved): one line per file for the VAD groups the timing model failed on, as the
+        # aligner's "gave no times" line; the run summary's note is made in process_scenes.
+        timed_groups = sum(1 for texts in scene_texts for t in texts if t.strip())
+        self._last_timing_counts = (timed_groups, failed_calls)
+        if failed_calls:
+            logger.warning("The timing model failed on %d of %d VAD group(s)", failed_calls, timed_groups)
         return scene_timings
 
     def _timing_of(
@@ -1719,10 +1748,28 @@ class DecoupledSubtitlePipeline:
 
     @staticmethod
     def _safe_cuda_cleanup() -> None:
-        """Centralized CUDA cache cleanup."""
-        from whisperjav.utils.gpu_utils import safe_cuda_cleanup
+        """Give PyTorch's cached GPU memory back after a model is released, before the next model loads.
 
-        safe_cuda_cleanup()
+        1.10.3 (owner W764, W776; model-memory inspection F1, F5): also in an Ensemble pass process, where the shared
+        gpu_utils.safe_cuda_cleanup() skips it (issue #82, a Windows crash put down to PyTorch beside CTranslate2).
+        Only this pipeline's release points call it; the shared function, which balanced, fast and faster use, is
+        unchanged. Before ADR-006's audit item M5 these release points emptied the cache themselves, as the
+        speech-enhancer helper still does after every scene in the same pass process. torch is not imported here:
+        without it, nothing was cached.
+        """
+        import gc
+        import sys
+
+        gc.collect()
+        torch = sys.modules.get("torch")
+        if torch is None:
+            return
+        try:
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                logger.debug("CUDA cache cleared (subtitle pipeline release point)")
+        except Exception as e:  # noqa: BLE001 - a cache release never stops the run
+            logger.debug(f"CUDA cache clear failed (non-fatal): {e}")
 
     # -----------------------------------------------------------------------
     # Cleanup

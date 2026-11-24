@@ -69,6 +69,9 @@ class CrispTimer:
         self.temp_dir = Path(temp_dir) if temp_dir else Path(tempfile.gettempdir()) / "whisperjav"
         self.label = label
         self._model = None
+        # 1.10.3 (owner W776): the calls that failed since this object was made (each logged at DEBUG); ChronosJAV's
+        # orchestrator names the count once per file.
+        self.failed_calls = 0
 
     @property
     def is_loaded(self) -> bool:
@@ -122,6 +125,7 @@ class CrispTimer:
             segments = self._model.transcribe_pcm(pcm, language=LANGUAGE, decode_options=dict(DECODE_OPTIONS))
         except (RuntimeError, OSError, ValueError) as e:
             logger.debug(f"{self.label}: the {self.model.label} timing model failed on one VAD group: {e}")
+            self.failed_calls += 1
             return []
         return segments_from_binding(segments)
 

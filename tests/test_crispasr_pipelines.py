@@ -710,13 +710,25 @@ class TestCohereAligned:
                 "failed: offline): each VAD group is one subtitle at the group's edges, as before 1.10.0."]
         assert len(stage.aligners) == 1 and stage.aligners[0].loads == 1
 
-    def test_the_aligner_loads_once_per_pass_and_unloads_at_cleanup(self, stage, tmp_path):
+    def test_the_aligner_opens_after_the_model_is_closed_and_unloads_after_each_file(self, stage, tmp_path,
+                                                                                    monkeypatch):
+        # 1.10.3 (owner W776; inspection F4, F6): the ASR model is closed before the aligner opens, and the aligner
+        # is released after each file (until 1.10.2: loaded once per pass, beside the open model).
+        model_open_at_load = []
+
+        class Watched(chain.CrispAligner):
+            def load(self):
+                model_open_at_load.append(any(e.is_open for e in stage.engines))
+                super().load()
+
+        monkeypatch.setattr(chain, "CrispAligner", Watched)
         pipe = make(CohereCrispASRPipeline, tmp_path)
         pipe.process(stage.media("a"))
         pipe.process(stage.media("b"))
-        assert len(stage.aligners) == 1 and stage.aligners[0].loads == 1 and stage.aligners[0].unloads == 0
+        assert len(stage.aligners) == 1 and stage.aligners[0].loads == 2 and stage.aligners[0].unloads == 2
+        assert model_open_at_load == [False, False]
         pipe.cleanup()
-        assert stage.aligners[0].unloads == 1
+        assert stage.aligners[0].unloads == 2
 
     def test_with_a_speech_enhancer_the_aligner_unloads_after_each_files_asr_step(self, stage, tmp_path, monkeypatch):
         monkeypatch.setattr(CrispASRPipeline, "_enhance", lambda self, scenes, md: (scenes, scenes))
@@ -1014,14 +1026,16 @@ class TestPostProcessing:
 
 
 class TestOncePerPass:
-    def test_readiness_and_the_model_open_once_for_every_file_and_close_at_the_end(self, stage, tmp_path):
+    def test_readiness_once_per_pass_and_the_model_opened_and_closed_for_each_file(self, stage, tmp_path):
+        # 1.10.3 (owner W776; inspection F4, F6): the model no longer stays open from one file to the next (W202 5a
+        # until 1.10.2); what is made ready once per pass (the runtime, the model file) still is.
         pipe = make(ParakeetCrispASRPipeline, tmp_path)
         pipe.process(stage.media("a"))
         pipe.process(stage.media("b"))
         assert (stage.calls["prepare"], stage.calls["ensure"], stage.calls["stage"]) == (1, 1, 1)
-        assert len(stage.engines) == 1 and stage.engines[0].opened == 1 and stage.engines[0].closed == 0
+        assert len(stage.engines) == 1 and stage.engines[0].opened == 2 and stage.engines[0].closed == 2
         pipe.cleanup()
-        assert stage.engines[0].closed == 1
+        assert stage.engines[0].closed == 2 and not stage.engines[0].is_open
 
     def test_a_model_file_gone_since_it_was_prepared_is_prepared_again(self, stage, tmp_path):
         pipe = make(ParakeetCrispASRPipeline, tmp_path)
