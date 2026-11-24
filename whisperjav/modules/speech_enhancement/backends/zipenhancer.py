@@ -53,6 +53,20 @@ ONNX_COMPRESS_FACTOR = 0.3
 MAX_CHUNK_DURATION = 10.0  # seconds
 OVERLAP_DURATION = 0.5  # 500ms overlap for crossfade
 
+# PyTorch threads for ZipEnhancer's CPU work.
+TORCH_THREADS = 8
+
+
+def _set_interop_threads(torch, n: int) -> None:
+    """torch.set_num_interop_threads(n), which PyTorch accepts only once per process and only before any parallel
+    work has started; a later call raises RuntimeError. The pipelines make a new ZipEnhancer for each file, so from a
+    run's second file that error stopped ZipEnhancer from starting and the file kept its original audio (1.10.3;
+    requirements of 1.10.0, section 5, F2). Now the count already in force is kept."""
+    try:
+        torch.set_num_interop_threads(n)
+    except RuntimeError as e:
+        logger.debug("ZipEnhancer: the inter-op thread count stays at %s (%s)", torch.get_num_interop_threads(), e)
+
 
 class ZipEnhancerBackend:
     """
@@ -148,9 +162,9 @@ class ZipEnhancerBackend:
             from modelscope.pipelines import pipeline
             from modelscope.utils.constant import Tasks
 
-            # Set torch threads for better CPU performance
-            torch.set_num_threads(8)
-            torch.set_num_interop_threads(8)
+            # Set torch threads for better CPU performance (the inter-op count once per process)
+            torch.set_num_threads(TORCH_THREADS)
+            _set_interop_threads(torch, TORCH_THREADS)
 
             logger.info("Loading ZipEnhancer via ModelScope (torch)...")
 
