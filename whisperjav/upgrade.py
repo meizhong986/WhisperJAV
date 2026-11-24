@@ -488,7 +488,8 @@ def install_locked_requirements(install_dir: Path, stack: str, lines: List[str])
     try:
         rest_file.write_text("\n".join(rest) + "\n", encoding="utf-8")
         for cmd, _ in _pin_commands(pip_exe, stack, str(rest_file), torch_lines, dry_run=False):
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600,
+                                    env=pip_env(install_dir))   # pip's temporary folder on the install's drive
             if result.returncode != 0:
                 print_error(f"Installing the release's pinned packages failed: {(result.stderr or '')[:500]}")
                 return False
@@ -1006,7 +1007,8 @@ def rollback_to_snapshot(install_dir: Path, snapshot_path: Path) -> bool:
             [str(pip_exe), 'install', '-r', str(requirements_file)],
             capture_output=True,
             text=True,
-            timeout=1800  # 30 minute timeout
+            timeout=1800,  # 30 minute timeout
+            env=pip_env(install_dir),   # pip's temporary folder on the install's drive (1.10.3)
         )
 
         if result.returncode != 0:
@@ -1065,6 +1067,77 @@ def _kill_process_tree(pid: int) -> None:
             os.kill(pid, 9)
         except OSError:
             pass
+
+
+# 1.10.3 (owner W753 CL4; wording W764 2, texts sheet item 6): on an install made with the Windows installer the
+# tool neither suggests nor tries a rollback, which cannot work there (upgrade test of 2026-11-05, C5, confirmed).
+INSTALLER_UPGRADE_FAILED_TEXT = (
+    "The upgrade did not finish. On an install made with the Windows installer, going back with --rollback does not "
+    "work. To get a working WhisperJAV: uninstall it (Windows Settings > Apps), then run the installer of the version "
+    "you want.")
+INSTALLER_ROLLBACK_TEXT = (
+    "--rollback does not work on an install made with the Windows installer: uninstall WhisperJAV, then run the "
+    "installer of the version you want.")
+
+
+def made_by_windows_installer(install_dir: Path) -> bool:
+    """An install made with the Windows installer: on Windows, a conda environment (conda-meta) that is not a git
+    clone. Its pip freeze names conda's packages by the build folders they were made in ("name @ file:///..."), which
+    do not exist on the user's PC, so a rollback (pip install -r of that list) stops with an OSError whatever caused
+    the upgrade to fail (upgrade test of 2026-11-05, C5, confirmed)."""
+    return IS_WINDOWS and (Path(install_dir) / "conda-meta").is_dir() and _find_source_root() is None
+
+
+# 1.10.3 (owner W764: "whisperjav-upgrade.exe shall be able to run from whisperjav installed folder"; scope record
+# 2026-11-23 section 10 item 7; the upgrade test of 2026-11-05, causes C1, C2 and C6).
+PIP_TEMP_NAME = ".whisperjav_upgrade_temp"
+# Run on its own after the upgrade has ended: removes the folder once the old launcher in it no longer runs.
+_REMOVE_WHEN_FREE = ("import os, shutil, sys, time\n"
+                     "for _ in range(900):\n"
+                     "    time.sleep(2)\n"
+                     "    shutil.rmtree(sys.argv[1], ignore_errors=True)\n"
+                     "    if not os.path.exists(sys.argv[1]):\n"
+                     "        break\n")
+
+
+def pip_env(install_dir: Path) -> Dict[str, str]:
+    """The environment for the pip commands that replace WhisperJAV's files: pip's temporary folder (TMPDIR, TEMP and
+    TMP, which Python's tempfile reads in that order) inside the install folder.
+
+    pip moves each file it replaces aside into its temporary folder first, the running Scripts\\whisperjav-upgrade.exe
+    too. On the same drive that is a rename, which Windows allows for a running program; across drives (the install on
+    D:, Windows' temporary folder on C:) it is a copy and a delete, and Windows refuses the delete (WinError 5): pip
+    stopped halfway and WhisperJAV no longer started (1.10.0 to 1.10.2). On the same drive the renamed launcher (40 KB)
+    stayed in Windows' temporary folder. Inside the install folder the move is always a rename, and remove_pip_temp()
+    removes the folder at the end.
+    """
+    folder = Path(install_dir) / PIP_TEMP_NAME
+    folder.mkdir(parents=True, exist_ok=True)
+    env = dict(os.environ)
+    for name in ("TMPDIR", "TEMP", "TMP"):
+        env[name] = str(folder)
+    return env
+
+
+def remove_pip_temp(install_dir: Path, later: bool = True) -> None:
+    """Remove pip_env()'s folder. When the upgrade runs as Scripts\\whisperjav-upgrade.exe, pip has moved that running
+    launcher into the folder, so it cannot be removed yet: with ``later`` (at the end of the upgrade) a small process of
+    its own removes it once the launcher has ended (it tries every 2 seconds, for at most 30 minutes). Without
+    ``later`` (at the start, for a folder an earlier upgrade left) only what can be removed now goes: a process that
+    went on removing could take this upgrade's own pip files."""
+    folder = Path(install_dir) / PIP_TEMP_NAME
+    if not folder.exists():
+        return
+    shutil.rmtree(folder, ignore_errors=True)
+    if not folder.exists() or not later:
+        return
+    flags = (getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+             | getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    try:
+        subprocess.Popen([sys.executable, "-c", _REMOVE_WHEN_FREE, str(folder)], creationflags=flags, close_fds=True,
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError:
+        pass   # the folder stays; the next upgrade removes it first
 
 
 def _run_bounded(cmd: List[str], timeout: float) -> subprocess.CompletedProcess:
@@ -1457,7 +1530,10 @@ def upgrade_package_wheel_only(install_dir: Path) -> bool:
             [str(pip_exe), 'install', '-U', '--no-deps', GITHUB_REPO],
             capture_output=True,
             text=True,
-            timeout=600  # 10 minute timeout
+            timeout=600,  # 10 minute timeout
+            # pip's temporary folder on the install's drive, so the running whisperjav-upgrade.exe can be moved
+            # aside (1.10.3; pip_env)
+            env=pip_env(install_dir),
         )
         if result.returncode != 0:
             print_error(f"Package upgrade failed: {result.stderr[:500]}")
@@ -1641,6 +1717,11 @@ def main() -> int:
         return 1
 
     print(f"Installation found: {install_dir}")
+    # pip's temporary folder inside the install (pip_env): one an earlier upgrade left goes now, this upgrade's when the
+    # tool ends, whichever way it ends (1.10.3).
+    remove_pip_temp(install_dir, later=False)
+    import atexit
+    atexit.register(remove_pip_temp, install_dir)
 
     # Get current version
     current_version = get_current_version(install_dir)
@@ -1674,6 +1755,9 @@ def main() -> int:
 
     # Handle --rollback
     if args.rollback:
+        if made_by_windows_installer(install_dir):
+            print_error(INSTALLER_ROLLBACK_TEXT)
+            return 1
         snapshots = list_snapshots(install_dir)
         if not snapshots:
             print_error("No snapshots available for rollback.")
@@ -1810,6 +1894,8 @@ def main() -> int:
         print_step(1, total_steps, "Upgrading WhisperJAV package (wheel only)...")
         if not upgrade_package_wheel_only(install_dir):
             print_error("Upgrade failed.")
+            if made_by_windows_installer(install_dir):
+                print(INSTALLER_UPGRADE_FAILED_TEXT)
             return 1
 
         print_step(2, total_steps, "Verifying installation...")
@@ -1844,9 +1930,12 @@ def main() -> int:
     print_step(1, total_steps, f"Upgrading WhisperJAV[{args.extras}]...")
     upgrade_success = upgrade_package_with_extras(install_dir, args.extras, locked_lines)
 
+    installer_install = made_by_windows_installer(install_dir)
     if not upgrade_success:
         print_error("Upgrade failed.")
-        if snapshot_path:
+        if installer_install:
+            print(INSTALLER_UPGRADE_FAILED_TEXT)
+        elif snapshot_path:
             print("\nAttempting rollback to pre-upgrade state...")
             if rollback_to_snapshot(install_dir, snapshot_path):
                 print_success("Rollback successful - installation restored")
@@ -1872,7 +1961,9 @@ def main() -> int:
 
     if not success or not new_version:
         print_error("Could not verify installation")
-        if snapshot_path:
+        if installer_install:
+            print(INSTALLER_UPGRADE_FAILED_TEXT)
+        elif snapshot_path:
             print("\nAttempting rollback to pre-upgrade state...")
             if rollback_to_snapshot(install_dir, snapshot_path):
                 print_success("Rollback successful - installation restored")
@@ -1915,7 +2006,7 @@ def main() -> int:
         print("  You can now run WhisperJAV with: whisperjav <video>")
     print()
     print("  Note: Your AI models and settings have been preserved.")
-    if snapshot_path:
+    if snapshot_path and not installer_install:
         print(f"  Rollback snapshot: {snapshot_path.name}")
         print("  Use: whisperjav-upgrade --rollback to revert if needed")
     print()
