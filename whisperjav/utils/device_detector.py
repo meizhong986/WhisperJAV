@@ -280,10 +280,14 @@ def ctranslate2_device(requested: Optional[str], best: Optional[str] = None) -> 
 APPLE_SILICON_CTRANSLATE2_TEXT = (  # T53
     "On an Apple silicon Mac, balanced, fast and faster run on the CPU (not accelerated), several times "
     "slower: their engine (CTranslate2) cannot use the Apple GPU. The transformers pipeline uses the Apple "
-    "GPU (Metal).")
+    "GPU (Metal). For English subtitles, make Japanese subtitles first and translate them with AI translation: "
+    "with its default model (Kotoba-Whisper bilingual), the transformers pipeline cannot do Direct to English.")
+# 1.10.3 (#515, owner W750 A4; texts sheet item 15, W769): fidelity's word-timing step uses a fix on the Apple GPU
+# (modules/mps_word_timing.py), not yet run on a Mac.
 APPLE_SILICON_FIDELITY_TEXT = (  # T52
-    "Fidelity asks PyTorch for the Apple GPU (Metal, through MPS); this has not been tested on a Mac. If it "
-    "fails, use the transformers pipeline.")
+    "Fidelity asks PyTorch for the Apple GPU (Metal, through MPS). Its word-timing step uses a fix for the "
+    "Apple GPU that has not been tested on a Mac yet. If fidelity fails, use the transformers pipeline, or run "
+    "fidelity on the CPU (--device cpu).")
 APPLE_SILICON_CHRONOSJAV_TEXT = (  # T51
     "ChronosJAV does not use the Apple GPU (Metal) in 1.10: its ASR model runs on the CPU (not "
     "accelerated), several times slower than on a GPU.")

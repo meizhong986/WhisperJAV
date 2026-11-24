@@ -1044,6 +1044,8 @@ const FormManager = {
             skip_existing: document.getElementById('skipExisting').checked,
             fail_on_empty: document.getElementById('failOnEmpty').checked,
             fail_on_suspect: document.getElementById('failOnSuspect').checked,
+            // 1.10.3 (owner W753 CL2, W754): Advanced Options' clean-up gating, strict by default
+            cleanup_gating: document.getElementById('cleanupGating')?.value || 'strict',
             asr_telemetry: document.getElementById('asrTelemetry').checked,
             // v1.9.2 (CFF1): minutes of scene audio before the recognizer is reloaded (0 = never)
             model_refresh_audio_minutes: document.getElementById('modelRefreshAudioMinutes').value,
@@ -1114,6 +1116,60 @@ const FormManager = {
 const ConsoleManager = {
     init() {
         document.getElementById('clearConsoleBtn').addEventListener('click', () => this.clear());
+        const copyBtn = document.getElementById('copyConsoleBtn');
+        if (copyBtn) copyBtn.addEventListener('click', () => this.copy());
+    },
+
+    // 1.10.3 (owner W749 4): the console's text to the clipboard, every API key masked by
+    // api.py mask_keys (the keys typed in the two key boxes are passed so that they are masked
+    // wherever they appear). If the masking cannot run, nothing is copied.
+    async copy() {
+        const btn = document.getElementById('copyConsoleBtn');
+        const output = document.getElementById('consoleOutput');
+        const text = Array.from(output.querySelectorAll('.console-line'))
+            .map(line => line.textContent).join('\n');
+        const keys = ['translatorApiKey', 'translationApiKey']
+            .map(id => (document.getElementById(id) || {}).value || '')
+            .filter(value => value.trim());
+        let masked = null;
+        try {
+            const result = await pywebview.api.console_text_for_copy(text, keys);
+            if (result && result.success) masked = result.text;
+        } catch (e) {
+            masked = null;
+        }
+        if (masked === null) return;
+        if (await this._toClipboard(masked) && btn) {
+            btn.textContent = 'Copied';
+            clearTimeout(this._copyTimer);
+            this._copyTimer = setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+        }
+    },
+
+    async _toClipboard(text) {
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(text);
+                return true;
+            }
+        } catch (e) {
+            // the page may not be allowed the Clipboard API: the older way below
+        }
+        const area = document.createElement('textarea');
+        area.value = text;
+        area.setAttribute('readonly', '');
+        area.style.position = 'fixed';
+        area.style.opacity = '0';
+        document.body.appendChild(area);
+        area.select();
+        let copied = false;
+        try {
+            copied = document.execCommand('copy');
+        } catch (e) {
+            copied = false;
+        }
+        document.body.removeChild(area);
+        return copied;
     },
 
     log(message, type = 'info') {
@@ -7022,6 +7078,8 @@ const EnsembleManager = {
             skip_existing: document.getElementById('skipExisting').checked,
             fail_on_empty: document.getElementById('failOnEmpty').checked,
             fail_on_suspect: document.getElementById('failOnSuspect').checked,
+            // 1.10.3 (owner W753 CL2, W754): Advanced Options' clean-up gating, strict by default
+            cleanup_gating: document.getElementById('cleanupGating')?.value || 'strict',
             asr_telemetry: document.getElementById('asrTelemetry').checked,
             // #415: shared Advanced-options checkbox (Transcription tab), like asrTelemetry
             offline_mode: document.getElementById('offlineMode').checked,
@@ -8628,6 +8686,36 @@ const TranslatorManager = {
      * @param {string} provider - Provider key, such as 'claude'.
      * @returns {void}
      */
+    /**
+     * 1.10.3 (owner W624 A): after a successful Test Connection, the model menu also offers every
+     * chat model the provider lists for this key (api.py test_provider_connection "models"), in a
+     * group of its own below the fixed entries. The chosen entry stays chosen.
+     * @param {HTMLSelectElement|null} select - The model menu.
+     * @param {string} provider - Provider key, such as 'claude'.
+     * @param {string[]} ids - The models the provider lists.
+     * @returns {number} How many models were added.
+     */
+    addListedModels(select, provider, ids) {
+        if (!select || !Array.isArray(ids) || !ids.length) return 0;
+        const chosen = select.value;
+        const fixed = this.providerModels[provider] || [];
+        const extra = ids.filter(id => typeof id === 'string' && id && !fixed.includes(id));
+        select.innerHTML = this.modelOptionsHtml(provider);
+        if (extra.length) {
+            const group = document.createElement('optgroup');
+            group.label = `Listed by ${provider} for this key`;
+            for (const id of extra) {
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = id;
+                group.appendChild(option);
+            }
+            select.appendChild(group);
+        }
+        if (Array.from(select.options).some(o => o.value === chosen)) select.value = chosen;
+        return extra.length;
+    },
+
     setOverridePlaceholder(input, provider) {
         if (!input) return;
         if (!('placeholder' in input.dataset)) input.dataset.placeholder = input.placeholder;
@@ -8735,6 +8823,8 @@ const TranslatorManager = {
                     statusEl.textContent = 'Connected';
                     statusEl.className = 'api-status configured';
                 }
+                const added = this.addListedModels(document.getElementById('translatorModel'), provider, result.models);
+                if (added) ConsoleManager.log(`Model menu: ${added} more model(s) listed by ${provider} for this key`, 'info');
             } else {
                 ConsoleManager.log(`Connection to ${provider} failed: ${result.error}`, 'error');
                 if (statusEl) {
@@ -9410,6 +9500,9 @@ const TranslationSettingsModal = {
                     statusEl.textContent = 'Connected';
                     statusEl.className = 'api-status connected';
                     ConsoleManager.log(`API connection successful: ${provider}`, 'success');
+                    const added = TranslatorManager.addListedModels(
+                        document.getElementById('ensembleTranslateModel'), provider, result.models);
+                    if (added) ConsoleManager.log(`Model menu: ${added} more model(s) listed by ${provider} for this key`, 'info');
                 } else {
                     statusEl.textContent = 'Failed';
                     statusEl.className = 'api-status error';
@@ -9474,6 +9567,7 @@ const SettingsPersistence = {
         'offlineMode':      { key: 'offlineMode',    prop: 'checked' },
         'failOnEmpty':      { key: 'failOnEmpty',    prop: 'checked' },
         'failOnSuspect':    { key: 'failOnSuspect',  prop: 'checked' },
+        'cleanupGating':    { key: 'cleanupGating',  prop: 'value' },
         'asrTelemetry':     { key: 'asrTelemetry',   prop: 'checked' },
         'modelRefreshAudioMinutes': { key: 'modelRefreshAudioMinutes', prop: 'value' },
         // v1.9.3 (D1/#381): the Ensemble tab's two-pass selectors. The backend has

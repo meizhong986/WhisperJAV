@@ -364,7 +364,8 @@ Install system packages first (Ubuntu example; see the guide for Fedora/Arch):
 
 ```bash
 sudo apt-get install -y python3 python3-pip python3-venv python3-dev \
-    build-essential ffmpeg git libsndfile1 libsndfile1-dev
+    build-essential ffmpeg git libsndfile1 libsndfile1-dev \
+    libc++1 libc++abi1    # libc++ for the TEN VAD speech segmenter
 ```
 
 Then:
@@ -455,6 +456,8 @@ MIT. See [LICENSE](LICENSE).
 Built on the shoulders of: [OpenAI Whisper](https://github.com/openai/whisper) · [faster-whisper](https://github.com/guillaumekln/faster-whisper) · [stable-ts](https://github.com/jianfch/stable-ts) · [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) · [anime-whisper](https://huggingface.co/litagin/anime-whisper) · [Kotoba-Whisper](https://huggingface.co/kotoba-tech/kotoba-whisper-v2.2) · [HuggingFace Transformers](https://github.com/huggingface/transformers) · [PySubtrans](https://github.com/machinewrapped/llm-subtrans) · [CrispASR](https://github.com/CrispStrobe/CrispASR) — and the testing community, whose feedback and bug reports shape every release.
 
 Special thanks to [CrispASR](https://github.com/CrispStrobe/CrispASR), which runs the GGUF pipelines and ChronosJAV's aligner and timing model, for its rapid response and support.
+
+Cohere-CrispASR runs [efwkjn](https://huggingface.co/efwkjn)'s Japanese fine-tunes of Cohere's ASR model: cohere-asr-ja-v0.1 (its default; GGUF files by [TransWithAI](https://huggingface.co/TransWithAI)) and cohere-asr-ja (GGUF files by [CKHO](https://huggingface.co/CKHO)). efwkjn's whisper-ja-anime is offered in the transformers pipeline.
 
 ## Disclaimer
 

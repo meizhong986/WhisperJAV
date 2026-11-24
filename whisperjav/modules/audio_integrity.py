@@ -347,8 +347,28 @@ def stop_requested() -> bool:
     return os.environ.get(STOP_ENV) == "1"
 
 
+def closed_gap_seconds(report: IntegrityReport, hole: IntegrityFinding) -> float:
+    """How much of the holes the extracted audio does NOT hold, in seconds; 0.0 when the
+    holes were filled with silence or the lengths are unknown.
+
+    The extraction fills holes with silence (``aresample=async=1``), so the extracted audio
+    is as long as the track's timeline. FFmpeg's demuxer closes a time jump of more than
+    10 s in an MPEG-TS or HLS stream itself (``-dts_delta_threshold``, default 10 s) before
+    that filter sees it: the audio is then shorter than the timeline by the jump
+    (1.10.3, owner W639 2; shown on a 30 s TS file with a 12 s jump: WAV 30.0 s, packet
+    timeline 42.0 s). Counted as closed when the shortfall is over half the holes."""
+    extracted = report.facts.get("extracted_s")
+    timeline = (report.facts.get("track_timeline_s") or report.facts.get("audio_dur")
+                or report.facts.get("format_dur"))
+    if extracted is None or not timeline or hole.size_s <= 0:
+        return 0.0
+    short = timeline - extracted
+    return short if short > hole.size_s / 2 else 0.0
+
+
 def console_message(report: IntegrityReport, media_name: str, stopping: bool = False) -> str:
-    """The line printed during the run (wording approved 2026-10-05)."""
+    """The line printed during the run (wording approved 2026-10-05; the closed-gap
+    sentence 1.10.3, owner W639 2, W769)."""
     if not report.checked:
         return f"Audio check: not run ({report.facts.get('not_checked', 'unknown reason')})."
     if not report.suspect:
@@ -360,8 +380,15 @@ def console_message(report: IntegrityReport, media_name: str, stopping: bool = F
                hole.detail.replace(" in the audio track", "", 1)
         if others:
             text += "; " + "; ".join(others)
-        text += (". WhisperJAV filled the gaps with silence, so subtitle times stay in step with the video; "
-                 "any speech inside the gaps is missing from the file.")
+        closed = closed_gap_seconds(report, hole)
+        if closed:
+            text += (f". FFmpeg closed {closed:.1f} s of these gaps instead of filling them with silence (it "
+                     f"does so for a time jump of more than 10 s, as in some MPEG-TS and HLS recordings), so "
+                     f"in a player that keeps that time, subtitles after it come out early by up to "
+                     f"{closed:.1f} s; any speech inside the gaps is missing from the file.")
+        else:
+            text += (". WhisperJAV filled the gaps with silence, so subtitle times stay in step with the video; "
+                     "any speech inside the gaps is missing from the file.")
     else:
         text = f"Audio check: {media_name}: " + "; ".join(others) + "."
     if stopping:

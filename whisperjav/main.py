@@ -856,7 +856,15 @@ def parse_arguments():
                                  "'empty' and 'suspect' are reported and exit 0. With 'suspect', "
                                  "a file whose audio check finds the audio track damaged is stopped "
                                  "before transcription.")
-    
+    # 1.10.3 (owner W753 CL2, W754; default strict W756 5; wording W769).
+    async_group.add_argument("--cleanup-gating", choices=["strict", "relaxed"], default="strict",
+                            help="How hard the clean-up removes subtitle lines that carry words. strict "
+                                 "(default): as before. relaxed: a line that starts with one of the relaxed "
+                                 "words, or has one right after a punctuation mark (for example 気持ちいい, "
+                                 "イク, じゃあ), is kept where the hallucination filter or the sound-line filter "
+                                 "would remove it. Lines of sounds only and a lone はい or うん are removed in "
+                                 "both; the other clean-up rules, such as the reading-speed check, do not change.")
+
     # Subtitle signature options
     signature_group = parser.add_argument_group("Subtitle Attribution")
     signature_group.add_argument("--credit", type=str,
@@ -2825,6 +2833,11 @@ def main():
     if "suspect" in parse_fail_on(getattr(args, 'fail_on', None)):
         from whisperjav.modules.audio_integrity import STOP_ENV
         os.environ[STOP_ENV] = "1"
+
+    # 1.10.3 (owner W753 CL2, W754): the clean-up gating reaches every run path, the Ensemble's pass processes
+    # included, through the environment, as above. Set always, so a value left in the shell cannot change a run.
+    from whisperjav.modules.subtitle_pipeline.cleaners.cleanup_gating import ENV as CLEANUP_GATING_ENV
+    os.environ[CLEANUP_GATING_ENV] = getattr(args, 'cleanup_gating', None) or "strict"
 
     # Run environment checks if requested
     if args.check or args.check_verbose:

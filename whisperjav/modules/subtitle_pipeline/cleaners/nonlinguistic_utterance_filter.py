@@ -293,6 +293,10 @@ def _should_remove_entry(text: str) -> bool:
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     if not lines:
         return False
+    # 1.10.3 (owner W753 CL2, W754): with --cleanup-gating relaxed, an entry holding a relaxed term is kept.
+    from whisperjav.modules.subtitle_pipeline.cleaners.cleanup_gating import relaxed_keeps
+    if relaxed_keeps(text):
+        return False
     ja_lines = [ln for ln in lines if _contains_japanese(ln)]
     if not ja_lines:
         return False

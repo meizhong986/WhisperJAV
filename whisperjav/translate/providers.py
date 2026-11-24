@@ -142,6 +142,108 @@ def is_invalid_key_response(provider: str, status: int, body: str = '') -> bool:
     return provider == 'gemini' and status == 400 and ('API_KEY_INVALID' in body or 'API key not valid' in body)
 
 
+# 1.10.3 (owner W624 A; scope record of 1.10.2, section 2): the translation model rule. WhisperJAV's fixed defaults
+# went stale three times (Gemini 2.0 Flash #291/#346, DeepSeek #325, Claude 3.5 Haiku). At the start of a translation
+# the chosen model is looked up in the provider's own list of models for the key; when it is missing, one line says so
+# and names the models the key can use. The GUI's Test Connection fills the model menu from the same list. The list is
+# read with the key only (no translation is sent); when it cannot be read (no network, a provider without a list),
+# nothing is said and the translation goes on as before. Ollama and custom servers are not looked up.
+OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models'
+NO_MODEL_LIST = frozenset({'ollama', 'custom'})
+# Entries of a models list that are not chat models (OpenAI's and Groq's lists carry them too).
+_NOT_CHAT = ('embedding', 'embed', 'tts', 'whisper', 'dall-e', 'moderation', 'transcribe', 'realtime', 'image',
+             'audio', 'search', 'guard', 'davinci', 'babbage')
+MODELS_SHOWN = 12
+
+
+def models_list_request(provider: str, key: str):
+    """(url, headers) of `provider`'s list of models for `key`, or None for a provider without one."""
+    if provider in NO_MODEL_LIST or provider not in PROVIDER_CONFIGS:
+        return None
+    if provider == 'openrouter':
+        return OPENROUTER_MODELS_URL, {'Authorization': f'Bearer {key}', 'User-Agent': _user_agent()}
+    url, headers = key_check_request(provider, key)
+    if provider == 'gemini':
+        url += '?pageSize=1000'
+    elif provider == 'claude':
+        url += '?limit=1000'
+    return url, headers
+
+
+def model_ids_from_list(provider: str, payload) -> list:
+    """The chat models a models-list answer names, in the form --model takes."""
+    ids = []
+    if provider == 'gemini':
+        for entry in (payload or {}).get('models') or []:
+            methods = entry.get('supportedGenerationMethods') or ['generateContent']
+            name = str(entry.get('name') or '')
+            if name and 'generateContent' in methods:
+                ids.append(name[len('models/'):] if name.startswith('models/') else name)
+    else:
+        for entry in (payload or {}).get('data') or []:
+            if entry.get('id'):
+                ids.append(str(entry['id']))
+    return sorted({i for i in ids if not any(word in i.lower() for word in _NOT_CHAT)})
+
+
+# One read per provider and key in a process (a run that translates several files asks once); the key itself is
+# not kept, only a digest of it.
+_LISTS_READ: dict = {}
+_LINES_SHOWN: set = set()
+
+
+def fetch_model_ids(provider: str, key: str, timeout: float = 10.0, cache: bool = True):
+    """The chat models `provider` lists for `key`, or None when the list cannot be read. `cache=False` (the GUI's
+    Test Connection) reads the list again."""
+    request = models_list_request(provider, key) if key or provider == 'openrouter' else None
+    if request is None:
+        return None
+    import hashlib
+    import json
+    import urllib.request
+    seen = (provider, hashlib.sha256((key or '').encode('utf-8')).hexdigest())
+    if cache and seen in _LISTS_READ:
+        return _LISTS_READ[seen]
+    url, headers = request
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=timeout) as response:
+            ids = model_ids_from_list(provider, json.loads(response.read().decode('utf-8', 'replace')))
+    except Exception:  # noqa: BLE001 - no list: nothing is said, the translation goes on
+        ids = None
+    _LISTS_READ[seen] = ids
+    return ids
+
+
+def missing_model_line_once(provider: str, model: str, key: str, flag: str = '--model'):
+    """missing_model_line for the start of a translation, read from the live list, at most once per process."""
+    line = missing_model_line(provider, model, fetch_model_ids(provider, key), flag)
+    if line is None or (provider, model) in _LINES_SHOWN:
+        return None
+    _LINES_SHOWN.add((provider, model))
+    return line
+
+
+def _family(model: str) -> str:
+    """The part of a model name that names its maker or family: before '/' (OpenRouter), else before the first '-'."""
+    return model.split('/', 1)[0] if '/' in model else model.split('-', 1)[0]
+
+
+def missing_model_line(provider: str, model: str, ids, flag: str = '--model'):
+    """The line printed at the start of a translation when `provider` does not list `model` for the key, or None.
+
+    `ids`: the provider's list (fetch_model_ids); None or empty means the list could not be read: nothing is said."""
+    if not ids or not model or model in ids:
+        return None
+    if any(word in model.lower() for word in _NOT_CHAT):
+        return None      # the list leaves such names out, so it cannot say this one is missing
+    family = [i for i in ids if _family(i) == _family(model)]
+    shown = family if family else ids
+    more = len(shown) - MODELS_SHOWN
+    names = ', '.join(shown[:MODELS_SHOWN]) + (f' (and {more} more)' if more > 0 else '')
+    return (f"Translation: {provider} does not list the model '{model}' for this API key, so the translation may "
+            f"fail. The models it lists include: {names}. Choose one with {flag}, or in the model menu of the GUI.")
+
+
 # v1.10.0 (REQ2, owner W22 (1), W42 (2)): the 'local' provider -- the llama-cpp-python
 # server WhisperJAV started itself -- is removed; Ollama is the only local translator.
 # A saved 'local' choice is read as 'ollama' with one console line (settings.py);

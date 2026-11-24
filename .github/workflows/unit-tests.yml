@@ -1,0 +1,64 @@
+name: Unit tests
+
+# Runs WhisperJAV's unit tests on every pull request (1.10.3). Python 3.13, as the
+# package declares; the dependencies are the locked versions of uv.lock, CPU build.
+# A first version of this check was proposed in #377 (Mimic-me), on Python 3.11.
+#
+# One test file per process, as the release test run does: several files do things at
+# import that a shared pytest process does not survive.
+# Left out: test_gui_refactor.py and test_tab_spacing.py (they open windows and wait for
+# a person), and the files that load real models or run whole films (they need the
+# models and a GPU; the release test run covers them).
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    runs-on: windows-latest
+    timeout-minutes: 150
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install the locked dependencies (CPU build)
+        shell: bash
+        run: uv sync --frozen --python 3.13 --extra all --extra dev --extra cpu
+
+      - name: Run the unit tests, one file per process
+        shell: bash
+        run: |
+          set +e   # GitHub starts bash with -e; every file gets its own result
+          left_out=" test_gui_refactor.py test_tab_spacing.py test_speech_enhancer_spec.py \
+            test_qwen_real_transcription.py test_zipenhancer.py test_htdemucs_enhancer.py \
+            test_enhance_for_vad_dual_track.py test_local_chat_check.py test_speech_segmentation.py \
+            test_vad_threshold_padding_e2e.py test_acceptance_v1_8_7b0.py test_release_acceptance.py "
+          failed=""
+          count=0
+          for f in tests/test_*.py tests/config/test_*.py; do
+            name=$(basename "$f")
+            case "$left_out" in *" $name "*) echo "left out: $f"; continue;; esac
+            count=$((count + 1))
+            echo "::group::$f"
+            uv run --frozen --no-sync python -m pytest "$f" -q --no-header -p no:cacheprovider
+            rc=$?
+            echo "::endgroup::"
+            # 5 = no tests collected (a file whose tests all skip themselves at import)
+            if [ $rc -ne 0 ] && [ $rc -ne 5 ]; then
+              echo "::error file=$f::$f failed (exit $rc)"
+              failed="$failed $f"
+            fi
+          done
+          echo "$count test files run."
+          if [ -n "$failed" ]; then
+            echo "Not clean:$failed"
+            exit 1
+          fi
+          echo "Everything clean."

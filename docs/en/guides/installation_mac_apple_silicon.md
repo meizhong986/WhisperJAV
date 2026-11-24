@@ -98,8 +98,8 @@ The install's accelerator is recorded in `whisperjav_stack.txt` in the environme
 
 | Pipeline | On an Apple silicon Mac |
 |---|---|
-| **transformers** | the Apple GPU (Metal) — **recommended on a Mac** |
-| **fidelity** | asks PyTorch for the Apple GPU (Metal); not yet tested on a Mac. If it fails, use the transformers pipeline. |
+| **transformers** | the Apple GPU (Metal) — **recommended on a Mac**. For English subtitles, make Japanese subtitles first and translate them with AI translation: with its default model (Kotoba-Whisper bilingual), it cannot do Direct to English. |
+| **fidelity** | asks PyTorch for the Apple GPU (Metal); its word-timing step uses a fix for the Apple GPU (new in 1.10.3) that has not been tested on a Mac yet. If it fails, use the transformers pipeline, or add `--device cpu`. |
 | **The GGUF pipelines** (parakeet, cohere, reazonspeech, kotoba, whisper-turbo, whisper-large, MOSS, haas, qwen3-asr) | ask for the Apple GPU (Metal); not yet tested on a Mac |
 | **balanced, fast, faster** | the CPU (not accelerated), several times slower: their engine (CTranslate2) cannot use the Apple GPU |
 | **ChronosJAV** (Qwen3-ASR, anime-whisper) | the CPU (not accelerated) in 1.10: its ASR model does not use the Apple GPU yet |
@@ -108,6 +108,8 @@ The install's accelerator is recorded in `whisperjav_stack.txt` in the environme
 When the Apple GPU can be used, nothing is shown at the start of a run; each pipeline says in the console where it runs as it starts (for example, balanced, fast and faster say they run on the CPU). If the Apple GPU cannot be used, a box at the start says where each part runs. The installer ends with:
 
 > On an Apple silicon Mac, the transformers pipeline is recommended: it asks for the Apple GPU (Metal).
+> For English subtitles, make Japanese subtitles first and translate them with AI translation:
+> with its default model (Kotoba-Whisper bilingual), the transformers pipeline cannot do Direct to English.
 
 ---
 

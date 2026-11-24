@@ -1750,7 +1750,11 @@ def main() -> int:
             print(f"     Created: {timestamp}")
             print()
 
-        print(f"To rollback: whisperjav-upgrade --rollback <snapshot_name>")
+        # 1.10.3 (owner W753 CL4, W769): no rollback is offered where it cannot work.
+        if made_by_windows_installer(install_dir):
+            print(INSTALLER_ROLLBACK_TEXT)
+        else:
+            print(f"To rollback: whisperjav-upgrade --rollback <snapshot_name>")
         return 0
 
     # Handle --rollback
@@ -1827,7 +1831,8 @@ def main() -> int:
         extras_msg = f"[{args.extras}]" if args.extras != "all" else "[all]"
         print(f"This will upgrade WhisperJAV{extras_msg} to the latest version.")
         print("Your models and settings will be preserved.")
-        if not args.no_snapshot:
+        # 1.10.3 (owner W753 CL4, W769): on an installer install a rollback cannot work, so it is not promised.
+        if not args.no_snapshot and not made_by_windows_installer(install_dir):
             print("A snapshot will be created for rollback if needed.")
         print()
         try:

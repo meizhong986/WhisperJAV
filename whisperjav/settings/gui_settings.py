@@ -55,6 +55,9 @@ DEFAULT_GUI_SETTINGS = {
     "remember_settings": False,
     "fail_on_empty": False,
     "fail_on_suspect": False,
+    # 1.10.3 (owner W753 CL2, W754; default strict W756 5): the clean-up gating. Without this entry a saved
+    # "relaxed" was dropped at load (only keys named here are read back).
+    "cleanup_gating": "strict",
     "asr_telemetry": True,
     "model_refresh_audio_minutes": 20,
     "temp_dir": "",

@@ -71,7 +71,7 @@
 
 没有单一答案——每个都有取舍，且质量因内容而异。来自实地反馈的常见模式：
 
-- **DeepSeek**（v1.8.14 默认 `deepseek-v4-flash`）：每 token 成本低；用户经常报告它在日译英/中文方向是不错的平衡。思考变体 `deepseek-v4-pro` 可通过 `--model deepseek-v4-pro` 使用。
+- **DeepSeek**（默认 `deepseek-flash`）：每 token 成本低；用户经常报告它在日译英/中文方向是不错的平衡。DeepSeek 更大的模型 `deepseek-v4-pro` 可通过 `--model deepseek-v4-pro` 使用。
 - **Claude**（默认 `claude-haiku-5-5`）和 **OpenAI GPT**（默认 `gpt-6-luna`）：每 token 成本较高；用户在涉及细微语义或上下文相关的段落时往往更偏爱它们。
 - **Gemini**（默认 `gemini-3.6-flash`）：中等成本；质量因内容风格而差异较大。
 - **Ollama / 本地大语言模型**：完全在本机运行——数据不会离开您的电脑。质量取决于您运行的本地模型；推荐使用 `qwen2.5:7b-instruct` 或 `gemma3:12b` 以获得合理结果，避免使用思考型模型（其链式思维内容可能泄漏到 SRT 输出中）。

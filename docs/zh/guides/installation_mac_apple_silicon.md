@@ -100,8 +100,8 @@ chmod +x installer/install_mac.sh
 
 | 处理管线 | 在 Apple silicon Mac 上 |
 |---|---|
-| **transformers** | Apple GPU（Metal）——**在 Mac 上推荐** |
-| **fidelity** | 向 PyTorch 请求使用 Apple GPU（Metal）；尚未在 Mac 上测试。如果失败，请使用 transformers 处理管线。 |
+| **transformers** | Apple GPU（Metal）——**在 Mac 上推荐**。要英文字幕时，请先生成日文字幕，再用 AI 翻译译成英文：使用默认模型（Kotoba-Whisper bilingual）时，transformers 处理管线无法使用 Direct to English。 |
+| **fidelity** | 向 PyTorch 请求使用 Apple GPU（Metal）；其单词计时步骤使用了针对 Apple GPU 的修正（1.10.3 新增），尚未在 Mac 上测试。如果失败，请使用 transformers 处理管线，或加上 `--device cpu`。 |
 | **GGUF 处理管线**（parakeet、cohere、reazonspeech、kotoba、whisper-turbo、whisper-large、MOSS、haas、qwen3-asr） | 请求使用 Apple GPU（Metal）；尚未在 Mac 上测试 |
 | **balanced、fast、faster** | CPU（不加速），慢好几倍：它们的引擎（CTranslate2）无法使用 Apple GPU |
 | **ChronosJAV**（Qwen3-ASR、anime-whisper） | 在 1.10 中为 CPU（不加速）：其 ASR 模型尚不使用 Apple GPU |
@@ -110,8 +110,10 @@ chmod +x installer/install_mac.sh
 Apple GPU 可用时，运行开始时不显示任何内容；每个处理管线启动时会在控制台中说明自己在哪里运行（例如 balanced、fast 和 faster 会说明它们在 CPU 上运行）。如果 Apple GPU 不可用，运行开始时会有一个框说明各部分在哪里运行。安装脚本结束时会显示：
 
 > On an Apple silicon Mac, the transformers pipeline is recommended: it asks for the Apple GPU (Metal).
+> For English subtitles, make Japanese subtitles first and translate them with AI translation:
+> with its default model (Kotoba-Whisper bilingual), the transformers pipeline cannot do Direct to English.
 
-（意思是：在 Apple silicon Mac 上推荐 transformers 处理管线：它请求使用 Apple GPU（Metal）。）
+（意思是：在 Apple silicon Mac 上推荐 transformers 处理管线：它请求使用 Apple GPU（Metal）。要英文字幕时，请先生成日文字幕，再用 AI 翻译译成英文：使用默认模型（Kotoba-Whisper bilingual）时，transformers 处理管线无法使用 Direct to English。）
 
 ---
 

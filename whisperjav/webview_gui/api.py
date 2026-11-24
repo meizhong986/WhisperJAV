@@ -146,6 +146,23 @@ def display_command(program: str, args: List[str]) -> str:
     return program + " " + " ".join(quote_arg(a) for a in shown)
 
 
+# 1.10.3 (owner W749 4; texts sheet item 9, W769): the console's Copy button copies the console's text with every API
+# key in it shown as MASKED_KEY, so a console pasted into an issue holds no key (#304). Three kinds are masked: the
+# value after a key flag (a line a program printed itself, not through display_command), the keys typed into the
+# GUI's key boxes (passed by the page), and strings in the form of the providers' keys.
+_KEY_FLAG_VALUE = re.compile(r"(--(?:translate-)?api-key)(=|\s+)(\"[^\"]*\"|'[^']*'|\S+)")
+_KEY_SHAPES = re.compile(r"(?<![A-Za-z0-9])(?:sk-[A-Za-z0-9_\-]{16,}|gsk_[A-Za-z0-9]{16,}|AIza[0-9A-Za-z_\-]{30,})")
+
+
+def mask_keys(text: str, known_keys=()) -> str:
+    """``text`` with every API key in it replaced by MASKED_KEY."""
+    text = _KEY_FLAG_VALUE.sub(lambda m: m.group(1) + m.group(2) + MASKED_KEY, text or "")
+    # Longest first, so a key that contains another is masked whole. Short values are not keys.
+    for key in sorted({k.strip() for k in known_keys or () if k and len(k.strip()) >= 8}, key=len, reverse=True):
+        text = text.replace(key, MASKED_KEY)
+    return _KEY_SHAPES.sub(MASKED_KEY, text)
+
+
 # The pass pipelines (GUI values) that keep one track: balanced finds the speech inside faster-whisper on the audio it
 # transcribes (the flag is refused there), the others run no separate speech segmenter.
 ONE_TRACK_PIPELINES = frozenset({"balanced", "transformers", "xxl", "fast", "faster"})
@@ -239,6 +256,13 @@ class WhisperJAVAPI:
         self._start_lock = threading.Lock()
         self._translate_start_lock = threading.Lock()
         self._closing = False
+
+    def console_text_for_copy(self, text: str, known_keys: Optional[List[str]] = None) -> Dict[str, Any]:
+        """The console's text as the Copy button puts it on the clipboard: API keys masked (1.10.3, W749 4)."""
+        try:
+            return {"success": True, "text": mask_keys(text or "", known_keys or [])}
+        except Exception as e:  # noqa: BLE001 - the page then copies nothing
+            return {"success": False, "error": str(e)}
 
     def _end_runs_on_close(self, wait_s: float = 30.0) -> List[int]:
         """End every run this window started; called when the window has closed (1.10.2, owner W647 3).
@@ -385,6 +409,9 @@ class WhisperJAVAPI:
         _fail_on = [s for s in ("empty", "suspect") if options.get(f"fail_on_{s}", False)]
         if _fail_on:
             args += ["--fail-on", ",".join(_fail_on)]
+        # 1.10.3 (owner W753 CL2, W754): the clean-up gating (Advanced Options); strict, the default, adds nothing.
+        if options.get("cleanup_gating") == "relaxed":
+            args += ["--cleanup-gating", "relaxed"]
 
         # Per-scene ASR telemetry is on by default; the checkbox only opts out.
         if options.get('asr_telemetry', True) is False:
@@ -525,6 +552,9 @@ class WhisperJAVAPI:
         _fail_on = [s for s in ("empty", "suspect") if options.get(f"fail_on_{s}", False)]
         if _fail_on:
             args += ["--fail-on", ",".join(_fail_on)]
+        # 1.10.3 (owner W753 CL2, W754): the clean-up gating (Advanced Options); strict, the default, adds nothing.
+        if options.get("cleanup_gating") == "relaxed":
+            args += ["--cleanup-gating", "relaxed"]
 
         # Per-scene ASR telemetry is on by default; the checkbox only opts out.
         if options.get('asr_telemetry', True) is False:
@@ -2148,6 +2178,9 @@ class WhisperJAVAPI:
         _fail_on = [s for s in ("empty", "suspect") if options.get(f"fail_on_{s}", False)]
         if _fail_on:
             args += ["--fail-on", ",".join(_fail_on)]
+        # 1.10.3 (owner W753 CL2, W754): the clean-up gating (Advanced Options); strict, the default, adds nothing.
+        if options.get("cleanup_gating") == "relaxed":
+            args += ["--cleanup-gating", "relaxed"]
 
         # Per-scene ASR telemetry is on by default; the checkbox only opts out.
         if options.get('asr_telemetry', True) is False:
@@ -3755,6 +3788,9 @@ class WhisperJAVAPI:
         _fail_on = [s for s in ("empty", "suspect") if config.get(f"fail_on_{s}", False)]
         if _fail_on:
             args += ["--fail-on", ",".join(_fail_on)]
+        # 1.10.3 (owner W753 CL2, W754): the clean-up gating (Advanced Options); strict, the default, adds nothing.
+        if config.get("cleanup_gating") == "relaxed":
+            args += ["--cleanup-gating", "relaxed"]
 
         # Per-scene ASR telemetry is on by default; the checkbox only opts out.
         if config.get('asr_telemetry', True) is False:
@@ -4307,6 +4343,7 @@ class WhisperJAVAPI:
         "remember_settings":         "rememberSettings",
         "fail_on_empty":             "failOnEmpty",
         "fail_on_suspect":           "failOnSuspect",
+        "cleanup_gating":            "cleanupGating",   # 1.10.3 (owner W753 CL2, W754)
         "asr_telemetry":             "asrTelemetry",
         "model_refresh_audio_minutes": "modelRefreshAudioMinutes",
         "temp_dir":                  "tempDir",
@@ -4567,11 +4604,16 @@ class WhisperJAVAPI:
 
             try:
                 with urllib.request.urlopen(req, timeout=10) as response:
-                    return {
-                        "success": True,
-                        "message": f"Connected to {provider}",
-                        "status_code": response.status
-                    }
+                    status_code = response.status
+                # 1.10.3 (owner W624 A): the chat models the provider lists for this key, read again on every test;
+                # the page adds them to the model menu.
+                from whisperjav.translate.providers import fetch_model_ids
+                return {
+                    "success": True,
+                    "message": f"Connected to {provider}",
+                    "status_code": status_code,
+                    "models": fetch_model_ids(provider, key, cache=False) or [],
+                }
             except urllib.error.HTTPError as e:
                 try:
                     body = e.read().decode("utf-8", "replace")

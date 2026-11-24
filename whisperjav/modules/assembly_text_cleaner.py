@@ -527,6 +527,8 @@ class AssemblyTextCleaner:
         original = text
         sentences = self._split_sentences(text)
         kept = []
+        # 1.10.3 (owner W753 CL2, W754): with --cleanup-gating relaxed, a sentence holding a relaxed term is kept.
+        from whisperjav.modules.subtitle_pipeline.cleaners.cleanup_gating import relaxed_keeps
 
         for sentence in sentences:
             stripped = sentence.strip()
@@ -535,7 +537,7 @@ class AssemblyTextCleaner:
 
             # Check exact match (case-insensitive, stripped)
             normalized = stripped.lower()
-            if normalized in self._hallucination_set:
+            if normalized in self._hallucination_set and not relaxed_keeps(stripped):
                 stats["lines_removed"] += 1
                 stats["modifications"] += 1
                 logger.debug(

@@ -84,3 +84,35 @@ def test_rollback_on_an_installer_install_says_what_works(install, monkeypatch, 
     captured = capsys.readouterr()
     assert upgrade.INSTALLER_ROLLBACK_TEXT in captured.out + captured.err
     assert calls == []                                  # no snapshot looked up, nothing installed
+
+
+def _one_snapshot(folder):
+    return [{"name": "snap", "path": folder / "snap", "whisperjav_version": "1.10.2", "timestamp": "t"}]
+
+
+def test_list_snapshots_on_an_installer_install_offers_no_rollback(install, monkeypatch, capsys):
+    folder, _ = install
+    (folder / "conda-meta").mkdir()
+    monkeypatch.setattr(upgrade, "list_snapshots", lambda d: _one_snapshot(folder))
+    assert run(monkeypatch, "--list-snapshots") == 0
+    out = capsys.readouterr().out
+    assert "To rollback" not in out and upgrade.INSTALLER_ROLLBACK_TEXT in out
+
+
+def test_list_snapshots_on_another_install_still_names_the_rollback(install, monkeypatch, capsys):
+    folder, _ = install
+    monkeypatch.setattr(upgrade, "list_snapshots", lambda d: _one_snapshot(folder))
+    assert run(monkeypatch, "--list-snapshots") == 0
+    assert "To rollback: whisperjav-upgrade --rollback <snapshot_name>" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("installer, promised", [(True, False), (False, True)])
+def test_the_confirmation_promises_a_rollback_only_where_it_works(install, monkeypatch, capsys, installer, promised):
+    folder, _ = install
+    if installer:
+        (folder / "conda-meta").mkdir()
+    monkeypatch.setattr("builtins.input", lambda prompt="": "n")    # the user answers no: nothing runs
+    assert run(monkeypatch) == 0
+    out = capsys.readouterr().out
+    assert "Upgrade cancelled." in out
+    assert ("A snapshot will be created for rollback if needed." in out) is promised

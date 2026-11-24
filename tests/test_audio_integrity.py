@@ -198,6 +198,33 @@ def test_console_wording():
     assert console_message(unchecked, "x.mp4") == "Audio check: not run (ffprobe not found)."
 
 
+def _ts_jump_report(extracted_s):
+    """The MPEG-TS case of 2026-11-14 (owner W639 2): a 12 s time jump in a 30 s file; the
+    packet timeline is 42.0 s. FFmpeg closes such a jump (WAV 30.0 s) instead of filling it."""
+    pts = [i * 0.1 for i in range(150)] + [27.0 + i * 0.1 for i in range(150)]
+    dur = [0.1] * 300
+    findings = assess({"n_audio": 1, "has_video": False}, pts, dur, extracted_s)
+    facts = {"extracted_s": extracted_s, "track_timeline_s": 42.0}
+    return IntegrityReport(findings=findings, facts=facts, seconds=0.4)
+
+
+def test_a_closed_time_jump_is_not_called_filled():
+    rep = _ts_jump_report(30.0)
+    assert [f.kind for f in rep.findings] == ["hole"]      # the length difference is the hole itself
+    msg = console_message(rep, "rec.ts")
+    assert "filled the gaps with silence, so subtitle times stay in step" not in msg
+    assert ("FFmpeg closed 12.0 s of these gaps instead of filling them with silence (it does so for a time "
+            "jump of more than 10 s, as in some MPEG-TS and HLS recordings), so in a player that keeps that "
+            "time, subtitles after it come out early by up to 12.0 s; any speech inside the gaps is missing "
+            "from the file. Transcription continues.") in msg
+
+
+def test_a_filled_gap_keeps_the_filled_wording():
+    msg = console_message(_ts_jump_report(42.0), "rec.ts")
+    assert msg.endswith("WhisperJAV filled the gaps with silence, so subtitle times stay in step with the video; "
+                        "any speech inside the gaps is missing from the file. Transcription continues.")
+
+
 # ---------------------------------------------------------------------------
 # Extraction command: an FFmpeg that rejects "-loglevel level+info"
 # ---------------------------------------------------------------------------

@@ -488,6 +488,12 @@ class HallucinationRemover:
         # Normalize text for comparison: lowercase and remove leading/trailing whitespace
         normalized_text = text.strip().lower()
 
+        # 1.10.3 (owner W753 CL2, W754): with --cleanup-gating relaxed, a line with a relaxed word (e.g. 気持ちいい,
+        # also as 「気持ちいい♡」 or 「気持ちいい」 in brackets) passes every stage below whole.
+        from whisperjav.modules.subtitle_pipeline.cleaners.cleanup_gating import relaxed_keeps
+        if relaxed_keeps(text):
+            return text, []
+
         bracket_info = self._is_bracketed_context(text)
         if bracket_info:
             modifications = [{

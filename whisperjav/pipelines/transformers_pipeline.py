@@ -25,6 +25,7 @@ import stable_whisper
 
 from whisperjav.pipelines.base_pipeline import BasePipeline
 from whisperjav.modules.audio_extraction import AudioExtractor
+from whisperjav.modules.audio_integrity import AudioIntegrityStop, apply_to_run as apply_audio_integrity
 from whisperjav.modules.transformers_asr import TransformersASR
 from whisperjav.modules.srt_postprocessing import SRTPostProcessor, normalize_language_code
 from whisperjav.modules.srt_stitching import SRTStitcher
@@ -590,6 +591,11 @@ class TransformersPipeline(BasePipeline):
 
             audio_path = self.temp_dir / f"{media_basename}_extracted.wav"
             extracted_audio, duration = self.audio_extractor.extract(input_file, audio_path)
+            # 1.10.3 (owner W749 2): as in the other pipelines, a damaged audio track makes this file
+            # 'suspect' with its reason in the run summary, or stops it here with --fail-on suspect.
+            # Until 1.10.2 the transformers pipeline printed the audio check's line but kept the file 'done'.
+            apply_audio_integrity(self.audio_extractor.last_integrity, self.degradations,
+                                  in_summary=self.audio_integrity_in_summary)
             master_metadata["input_info"]["processed_audio_file"] = str(extracted_audio)
             master_metadata["input_info"]["audio_duration_seconds"] = duration
             self.metadata_manager.update_processing_stage(
@@ -921,7 +927,7 @@ class TransformersPipeline(BasePipeline):
 
         except Exception as e:
             self.progress.show_message(f"Pipeline error: {str(e)}", "error", 0)
-            logger.error(f"Pipeline error: {e}", exc_info=True)
+            logger.error(f"Pipeline error: {e}", exc_info=not isinstance(e, AudioIntegrityStop))
             self.metadata_manager.update_processing_stage(
                 master_metadata, "error", "failed", error_message=str(e)
             )

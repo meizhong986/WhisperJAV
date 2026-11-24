@@ -396,6 +396,8 @@ echo -e "    ${GREEN}whisperjav-gui${NC}"
 echo ""
 # T31b (design 22.10)
 echo "  On an Apple silicon Mac, the transformers pipeline is recommended: it asks for the Apple GPU (Metal)."
+echo "  For English subtitles, make Japanese subtitles first and translate them with AI translation:"
+echo "  with its default model (Kotoba-Whisper bilingual), the transformers pipeline cannot do Direct to English."
 echo ""
 
 exit 0
