@@ -95,7 +95,7 @@ A root-cause fix is still being investigated; no release date is set. The cap is
 No single answer - each has trade-offs and quality varies by content. Field-reported patterns:
 
 - **DeepSeek** (`deepseek-v4-flash` default in v1.8.14): low per-token cost; users frequently report it as a good balance for JA->EN/CN. The thinking variant `deepseek-v4-pro` is available via `--model deepseek-v4-pro`.
-- **Claude** (default `claude-haiku-5-5`) and **OpenAI GPT** (default `gpt-4o-mini`): higher per-token cost; users often prefer them for nuanced or context-dependent passages.
+- **Claude** (default `claude-haiku-5-5`) and **OpenAI GPT** (default `gpt-6-luna`): higher per-token cost; users often prefer them for nuanced or context-dependent passages.
 - **Gemini** (default `gemini-3.6-flash`): mid-tier cost; quality varies more by content style.
 - **Ollama / Local LLM**: runs entirely on your machine - no data leaves your computer. Quality depends on the local model you run; use `qwen2.5:7b-instruct` or `gemma3:12b` for sensible results, avoid thinking models (their chain-of-thought can leak into the SRT output).
 - **OpenRouter**: a router for multiple upstream models. Useful if you want to compare providers without maintaining separate API keys.
