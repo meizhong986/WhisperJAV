@@ -1227,13 +1227,34 @@ def update_launcher(install_dir: Path) -> bool:
         return True  # Not a fatal error
 
 
-def update_desktop_shortcut(install_dir: Path, new_version: str) -> bool:
+def _shortcut_opens_install(shell, link_path: str, install_dir: Path) -> bool:
+    """Whether a desktop shortcut opens this install: its target or its start-in folder is the install folder or inside
+    it. A shortcut that cannot be read is taken as another install's and left alone."""
+    try:
+        link = shell.CreateShortcut(link_path)
+        places = [link.TargetPath or "", link.WorkingDirectory or ""]
+    except Exception:
+        return False
+    root = os.path.normcase(os.path.realpath(str(install_dir)))
+    for place in places:
+        if place:
+            where = os.path.normcase(os.path.realpath(place))
+            if where == root or where.startswith(root + os.sep):
+                return True
+    return False
+
+
+def update_desktop_shortcut(install_dir: Path, new_version: str, desktop: Optional[str] = None) -> bool:
     """
     Update the desktop shortcut with the new version name.
+
+    Only this install's shortcuts named "WhisperJAV v..." are removed; those of other installs stay (1.10.3: before,
+    every such shortcut went, whichever install it opened).
 
     Args:
         install_dir: Path to installation directory
         new_version: New version string
+        desktop: The desktop folder; None = the user's desktop (tests give a folder of their own)
 
     Returns:
         True if successful, False otherwise
@@ -1251,12 +1272,13 @@ def update_desktop_shortcut(install_dir: Path, new_version: str) -> bool:
 
     try:
         shell = win32com.client.Dispatch("WScript.Shell")
-        desktop = shell.SpecialFolders("Desktop")
+        desktop = desktop or shell.SpecialFolders("Desktop")
 
-        # Remove old shortcuts
+        # Remove this install's old shortcuts
         removed_count = 0
         for f in os.listdir(desktop):
-            if f.startswith("WhisperJAV v") and f.endswith(".lnk"):
+            if (f.startswith("WhisperJAV v") and f.endswith(".lnk")
+                    and _shortcut_opens_install(shell, os.path.join(desktop, f), install_dir)):
                 try:
                     os.remove(os.path.join(desktop, f))
                     print_success(f"Removed: {f}")
