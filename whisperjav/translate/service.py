@@ -313,11 +313,13 @@ def translate_with_config(
     resolved_model = _resolve_model(provider_config, model, settings)
 
     # 1.10.3 (owner W624 A): the chosen model looked up in the provider's own list for this key; a missing model
-    # is named once, with the models the key can use. The translation goes on either way.
-    from .providers import missing_model_line_once
-    _missing = missing_model_line_once(provider, resolved_model, resolved_api_key, flag='--translate-model')
-    if _missing:
-        logger.warning(_missing)
+    # is named once, with the models the key can use. The translation goes on either way. Not with a custom
+    # endpoint: the list is read at the provider's own address, and the key may be meant for the user's server.
+    if not endpoint:
+        from .providers import missing_model_line_once
+        _missing = missing_model_line_once(provider, resolved_model, resolved_api_key, flag='--translate-model')
+        if _missing:
+            logger.warning(_missing)
 
     # Resolve instruction file
     if instruction_file:

@@ -547,11 +547,13 @@ def main():
     model = merged.get('model') or provider_config['model']
 
     # 1.10.3 (owner W624 A): the chosen model looked up in the provider's own list for this key; a missing model
-    # is named at the start with the models the key can use. The translation goes on either way.
-    from .providers import missing_model_line_once
-    _missing = missing_model_line_once(provider_name, model, api_key, flag='--model')
-    if _missing:
-        print(f"WARNING: {_missing}", file=sys.stderr)
+    # is named at the start with the models the key can use. The translation goes on either way. Not with
+    # --endpoint: the list is read at the provider's own address, and the key may be meant for the user's server.
+    if not (hasattr(args, 'endpoint') and args.endpoint):
+        from .providers import missing_model_line_once
+        _missing = missing_model_line_once(provider_name, model, api_key, flag='--model')
+        if _missing:
+            print(f"WARNING: {_missing}", file=sys.stderr)
 
     # Get languages
     source_lang = merged.get('source', 'japanese')

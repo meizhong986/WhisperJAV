@@ -118,6 +118,31 @@ def test_both_translation_starts_apply_the_rule():
     assert js.count("const listedBy = result.provider_name || provider;") == 2
 
 
+def test_with_a_custom_endpoint_no_list_is_read(tmp_path, monkeypatch):
+    """1.10.3 review 7.1 F5: with a custom endpoint the key may be meant for the user's server; the list would be read at
+    the provider's own address, so it is not read. Through translate_with_config itself (the GUI's and main.py's
+    start); a missing instruction file stops it right after the check, so nothing is translated or sent."""
+    from whisperjav.translate import service
+    srt = tmp_path / "x.srt"
+    srt.write_text("1\n00:00:00,000 --> 00:00:01,000\nこんにちは\n", encoding="utf-8")
+    asked = []
+    monkeypatch.setattr(p, "missing_model_line_once", lambda *a, **k: asked.append(a))
+
+    def refuse(request, timeout=None):
+        raise AssertionError(f"a request was sent: {getattr(request, 'full_url', request)}")
+
+    monkeypatch.setattr(urllib.request, "urlopen", refuse)
+    for endpoint, times in ((None, 1), ("https://my.server.example/v1", 0)):
+        asked.clear()
+        with pytest.raises(FileNotFoundError):
+            service.translate_with_config(str(srt), provider="gpt", api_key="not-a-real-key", endpoint=endpoint,
+                                          instruction_file=str(tmp_path / "no_such_instructions.txt"))
+        assert len(asked) == times, endpoint
+    cli = (Path(__file__).resolve().parents[1] / "whisperjav" / "translate" / "cli.py").read_text(encoding="utf-8")
+    assert "if not (hasattr(args, 'endpoint') and args.endpoint):\n        from .providers import missing_model_line_once" \
+        in cli.replace("\r\n", "\n")
+
+
 def test_every_provider_has_the_name_the_gui_shows():
     """1.10.3 (owner W772): the lines a user reads name the provider as the GUI's menu does."""
     assert set(p.PROVIDER_NAMES) == set(p.PROVIDER_CONFIGS)

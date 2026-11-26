@@ -75,6 +75,29 @@ def test_a_mismatched_pair_cannot_consume_the_next_numbered_cue():
     assert strip_translation_context_tags(raw) == (raw, {}, 0)
 
 
+def test_a_block_holding_another_kinds_block_is_removed_whole():
+    """Review 7.1 F6: removed whole, as in 1.10.2 (the block ends at its own closing tag)."""
+    raw = "#3\nTranslation>\nHello.\n<summary>Batch <scene>Sc</scene> rest</summary>"
+    cleaned, context, count = strip_translation_context_tags(raw)
+    assert cleaned.rstrip() == "#3\nTranslation>\nHello."
+    assert context == {"summary": "Batch <scene>Sc</scene> rest"} and count == 1
+
+
+def test_a_lone_opening_tag_in_the_last_cue_keeps_its_line():
+    """Review 7.1 F6: a lone <synopsis> never reaches into the context blocks after it; the line stays (as 1.10.2)."""
+    raw = "#9\nTranslation>\nSee you <synopsis>tomorrow.\n<summary>Batch summary</summary>\n<scene>Scene</scene>"
+    cleaned, context, count = strip_translation_context_tags(raw)
+    assert cleaned.rstrip() == "#9\nTranslation>\nSee you <synopsis>tomorrow."
+    assert context == {"summary": "Batch summary", "scene": "Scene"} and count == 2
+
+
+def test_a_mismatched_pair_before_a_block_of_its_own_kind():
+    raw = "#4\nTranslation>\nHi.\n<scene>A</summary>\nThere.\n<scene>B</scene>"
+    cleaned, context, count = strip_translation_context_tags(raw)
+    assert cleaned.split("\n") == ["#4", "Translation>", "Hi.", "", "There.", ""]
+    assert context == {"scene": "B"} and count == 2
+
+
 def test_the_mismatched_pair_is_removed_before_pysubtrans_parses_cues():
     raw = ("#1\nTranslation>\nFirst\n<scene>Scene one</summary>\n\n"
            "#2\nTranslation>\nSecond\n<summary>Latest</summary>")

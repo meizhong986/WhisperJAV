@@ -11,12 +11,18 @@ from pathlib import Path
 # models repeat these tags after every cue, leaving earlier copies in the SRT.
 # 1.10.3 (owner W752 1, #460): a block opened by any of the three tags and closed by any of them is removed, as a
 # model may close <scene> with </summary> (the poster's 10 lines); before, only a block closed by its own tag was.
-# The text between such tags is the model's context note, never a subtitle. The guard is unchanged: a block never
-# runs past the next cue's "#number" line.
+# The text between such tags is the model's context note, never a subtitle. A block ends at its own closing tag when
+# one comes before another opening tag of its kind (so a block holding another kind's block, <summary> ... <scene>
+# ... </scene> ... </summary>, is removed whole, as in 1.10.2); otherwise at another closing tag, with no opening tag
+# between (so a lone opening tag never reaches into the blocks after it; review 7.1 F6). The guard is unchanged: a
+# block never runs past the next cue's "#number" line.
 _CONTEXT_TAG_PAIR = re.compile(
     r"<(?P<tag>summary|scene|synopsis)>"
-    r"(?P<value>(?:(?!\n[ \t]*#\d+\b)[\s\S])*?)"
-    r"</(?:summary|scene|synopsis)>",
+    r"(?:"
+    r"(?P<own>(?:(?!\n[ \t]*#\d+\b)(?!<(?P=tag)>)[\s\S])*?)</(?P=tag)>"
+    r"|"
+    r"(?P<other>(?:(?!\n[ \t]*#\d+\b)(?!<(?:summary|scene|synopsis)>)[\s\S])*?)</(?:summary|scene|synopsis)>"
+    r")",
     re.IGNORECASE,
 )
 
@@ -30,7 +36,8 @@ def strip_translation_context_tags(text: str) -> tuple[str, dict[str, str], int]
     def remove(match):
         nonlocal count
         count += 1
-        context[match.group("tag").lower()] = match.group("value").strip()
+        value = match.group("own") if match.group("own") is not None else match.group("other")
+        context[match.group("tag").lower()] = value.strip()
         return ""
 
     return _CONTEXT_TAG_PAIR.sub(remove, text), context, count
