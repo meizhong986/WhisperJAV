@@ -326,6 +326,9 @@ class WorkerPayload:
 class FileResult:
     basename: str
     status: str
+    # The file's path exactly as the Ensemble sent it (media_info["path"]): the Ensemble files each result under it,
+    # so two inputs of one name in two folders keep their own results (1.10.3, owner W808-W811, D2). Required.
+    path: str
     srt_path: Optional[str] = None
     subtitles: int = 0
     processing_time: float = 0.0
@@ -520,6 +523,91 @@ def partial_result_file(result_file: str) -> str:
     return result_file + ".partial"
 
 
+def save_point_name(basename: str, position: int) -> str:
+    """The name ChronosJAV's save-point of the file at ``position`` (1, 2, ...) of a pass's list takes in the pass's
+    working folder: ``<name>.<position>``, so two inputs of one name in one pass keep their own (1.10.3, D2 1b). The
+    pass worker gives it to the pipeline; the Ensemble, which made the list, reads the same name."""
+    return f"{basename}.{position}"
+
+
+# The pass pipeline's own output folder inside the pass's working folder (1.10.3, owner W811 Q1 (i)): a pass never
+# writes into a user's folder; the worker moves the pass file and the file's side files out after each file.
+PASS_OUTPUT_FOLDER = "output"
+
+
+def _side_file_target(name: str, basename: str, language_code: str, pass_number: int, pipeline: str,
+                      in_raw_subs: bool) -> Optional[str]:
+    """The name a side file of ``basename`` takes in the file's own folder, with the pass in it (owner W811 Q1 (i)),
+    or None when the file is not one of this file's side files. In ``raw_subs``: ``<name>_<rest>`` becomes
+    ``<name>.pass<N>.<pipeline>_<rest>`` and ``<name>.<rest>`` becomes ``<name>.pass<N>.<rest>`` (the names of
+    ChronosJAV's and the GGUF passes' raw copies, crispasr/cleanup.py: file_stem); beside the subtitle file:
+    ``<name>.<lang>.whisperjav.<rest>`` becomes ``<name>.<lang>.pass<N>.<rest>``."""
+    tag = f"pass{pass_number}"
+    if not name.startswith(basename):
+        return None
+    rest = name[len(basename):]
+    if in_raw_subs:
+        if rest.startswith("_"):
+            return f"{basename}.{tag}.{pipeline}{rest}"
+        if rest.startswith(f".{tag}."):
+            return name
+        if rest.startswith("."):
+            return f"{basename}.{tag}{rest}"
+        return None
+    prefix = f".{language_code}.whisperjav."
+    if rest.startswith(prefix) and not rest.endswith(".whisperjav.srt"):
+        return f"{basename}.{language_code}.{tag}.{rest[len(prefix):]}"
+    return None
+
+
+def _move_side_files(pipeline_output_dir: Path, file_output_dir: Path, basename: str, language_code: str,
+                     pass_number: int, pipeline: str) -> int:
+    """Move one file's side files from the pass pipeline's own output folder into the file's own output folder,
+    named with the pass (owner W811 Q1 (i)): the raw copies, the sanitizer's artifacts file, the English clean-up's
+    log, the GGUF passes' group record (``raw_subs``), ChronosJAV's analytics file (beside the pass file). Moved, not
+    copied, so nothing of this file is left for a later file of the same name in the pass. A file that cannot be moved
+    stays in the working folder; nothing here stops the run. Returns how many were moved."""
+    moved = 0
+    places = ((pipeline_output_dir / "raw_subs", Path(file_output_dir) / "raw_subs", True),
+              (pipeline_output_dir, Path(file_output_dir), False))
+    for source_dir, target_dir, in_raw_subs in places:
+        if not source_dir.is_dir():
+            continue
+        for item in list(source_dir.iterdir()):
+            if not item.is_file():
+                continue
+            target_name = _side_file_target(item.name, basename, language_code, pass_number, pipeline, in_raw_subs)
+            if target_name is None:
+                continue
+            try:
+                target_dir.mkdir(parents=True, exist_ok=True)
+                target = target_dir / target_name
+                if target.exists():
+                    target.unlink()     # an earlier run's copy of the same name is replaced
+                shutil.move(str(item), str(target))
+                moved += 1
+            except OSError as e:
+                logger.debug("[Worker %s] Pass %s: side file %s not moved to %s: %s",
+                             os.getpid(), pass_number, item, target_dir, e)
+    return moved
+
+
+def _set_aside_output(pipeline_output_dir: Path, position: int) -> None:
+    """After a file the pass did not finish: what it left in the pass pipeline's own output folder goes into
+    ``<pass working folder>/output_file<position>`` (kept with the working folder), and the output folder starts empty
+    for the next file. Nothing here stops the run."""
+    try:
+        if not pipeline_output_dir.is_dir() or not any(pipeline_output_dir.iterdir()):
+            return
+        aside = pipeline_output_dir.parent / f"{PASS_OUTPUT_FOLDER}_file{position}"
+        if aside.exists():
+            shutil.rmtree(aside, ignore_errors=True)
+        pipeline_output_dir.rename(aside)
+        pipeline_output_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        logger.debug("[Worker %s] The pass output folder could not be set aside: %s", os.getpid(), e)
+
+
 def _write_partial_results(result_file: str, results: List["FileResult"]) -> None:
     """Each file's result as soon as it is known, so that a crash later in the pass (a native abort, which no
     Python handler sees) does not lose the files already done. Written whole, then renamed; a failure to write it
@@ -694,17 +782,22 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
         logger.error("[Worker %s] Pass %s: %s", os.getpid(), pass_number, unknown)
         _write_dropbox_and_exit(result_file, {
             "results": [
-                FileResult(basename=info["basename"], status="failed", error=unknown).__dict__
+                FileResult(basename=info["basename"], status="failed", path=info["path"], error=unknown).__dict__
                 for info in media_files
             ],
             "worker_error": unknown,
         }, tracer, 1)
 
+    # The pass pipeline's own output folder is inside the pass's working folder, in every output mode (1.10.3, owner
+    # W811 Q1 (i)): what it writes first under the file's name (its subtitle file, its side files) never lands in a
+    # user's folder, where it replaced, and then moved away, a subtitle file of that name already there. The worker
+    # moves the pass file and the file's side files into the file's own output folder after each file.
+    pipeline_output_dir = pass_temp_dir / PASS_OUTPUT_FOLDER
     try:
         pipeline = _build_pipeline(
             pass_config=pass_config,
             pass_number=pass_number,
-            output_dir=payload.output_dir,
+            output_dir=str(pipeline_output_dir),
             keep_temp_files=payload.keep_temp_files,
             subs_language=payload.subs_language,
             extra_kwargs=payload.extra_kwargs,
@@ -725,6 +818,7 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                 FileResult(
                     basename=info["basename"],
                     status="failed",
+                    path=info["path"],
                     error="Pipeline initialization failure",
                 ).__dict__
                 for info in media_files
@@ -759,9 +853,11 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
             # The CrispASR pipelines' raw copy and artifacts file, and ChronosJAV's raw copy (1.10.1, R-RAW), go to
             # the same folder.
             _configure_trace(pipeline, pass_number, Path(media_info.get('output_dir', payload.output_dir)))
-            # An Ensemble pass keeps its save-points (owner W462, W463 C1); pipelines without them ignore this.
+            # An Ensemble pass keeps its save-points (owner W462, W463 C1); pipelines without them ignore this. Named
+            # by the file's position in this pass's list (1.10.3, D2 1b), as the Ensemble reads them.
             if hasattr(pipeline, "save_points"):
                 pipeline.save_points = True
+                pipeline.save_point_name = save_point_name(basename, idx)
             _configure_telemetry(
                 pipeline, pass_config, pass_number,
                 Path(media_info.get('output_dir', payload.output_dir)),
@@ -790,6 +886,9 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                 final_srt = Path(final_srt_path)
                 # Per-file output dir (source mode) takes precedence over payload default
                 file_output_dir = Path(media_info.get('output_dir', payload.output_dir))
+                # The pipeline no longer writes there itself (PASS_OUTPUT_FOLDER), so the folder is made here, as the
+                # XXL pass does.
+                file_output_dir.mkdir(parents=True, exist_ok=True)
                 pass_output = file_output_dir / f"{basename}.{language_code}.pass{pass_number}.srt"
 
                 if not final_srt.exists():
@@ -840,10 +939,16 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                         f"File operation succeeded but output file not found: {pass_output}"
                     )
 
+                # This file's side files, from the pass's own output folder into the file's own folder, named
+                # with the pass (1.10.3, owner W811 Q1 (i)).
+                _move_side_files(pipeline_output_dir, file_output_dir, basename, language_code, pass_number,
+                                 str(pass_config.get("pipeline") or "pass"))
+
                 results.append(
                     FileResult(
                         basename=basename,
                         status="completed",
+                        path=media_info["path"],
                         srt_path=str(pass_output),
                         subtitles=result["summary"].get("final_subtitles_refined", 0),
                         processing_time=result["summary"].get("total_processing_time_seconds", 0.0),
@@ -863,13 +968,14 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
             except AudioIntegrityStop as stop:
                 # --fail-on suspect: a requested stop, not a crash.
                 logger.error("[Worker %s] Pass %s: %s: %s", os.getpid(), pass_number, basename, stop)
-                results.append(FileResult(basename=basename, status="failed", error=str(stop)))
+                results.append(FileResult(basename=basename, status="failed", path=media_info["path"],
+                                          error=str(stop)))
             except QwenModelUnusable as stop:
                 # The pass's Qwen3-ASR model cannot give real text for any file (R-QFT, #494; owner W491 2): the pass
                 # stops here, and every file not yet done fails with the same plain reason, without a new load.
                 logger.error("[Worker %s] Pass %s: %s: %s", os.getpid(), pass_number, basename, stop)
                 position = next(k for k, m in enumerate(media_files) if m is media_info)
-                results.extend(FileResult(basename=m["basename"], status="failed", error=str(stop))
+                results.extend(FileResult(basename=m["basename"], status="failed", path=m["path"], error=str(stop))
                                for m in media_files[position:])
                 _write_partial_results(result_file, results)
                 break
@@ -877,7 +983,7 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                 # CrispASR or its model failed, with the reason in plain words: the run summary
                 # shows it, prefixed, instead of a traceback.
                 logger.error("[Worker %s] Pass %s: %s: %s", os.getpid(), pass_number, basename, failure)
-                results.append(FileResult(basename=basename, status="failed",
+                results.append(FileResult(basename=basename, status="failed", path=media_info["path"],
                                           error=f"{CRISPASR_FAILURE_PREFIX}{failure}"))
             except Exception:
                 logger.exception(
@@ -887,9 +993,14 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                     FileResult(
                         basename=basename,
                         status="failed",
+                        path=media_info["path"],
                         error=traceback.format_exc(),
                     )
                 )
+            # A file this pass did not finish leaves its side files in the pass's own output folder; they are set
+            # aside in the working folder (kept with it), so a later file of a similar name cannot take them.
+            if results and results[-1].status != "completed":
+                _set_aside_output(pipeline_output_dir, idx)
             # Step 3 (owner W462, W463): this file's result is on disk before the next file starts.
             _write_partial_results(result_file, results)
     finally:
@@ -963,7 +1074,7 @@ def _run_xxl_pass(
 
     The orchestrator sees identical FileResult dicts regardless of whether
     a pass used a WhisperJAV pipeline or XXL — the merge step just needs
-    SRT file paths keyed by basename.
+    SRT file paths filed by the input file's path (1.10.3).
     """
     import time as _time
 
@@ -983,6 +1094,7 @@ def _run_xxl_pass(
                 FileResult(
                     basename=info["basename"],
                     status="failed",
+                    path=info["path"],
                     error=error_msg,
                 ).__dict__
                 for info in media_files
@@ -1052,6 +1164,7 @@ def _run_xxl_pass(
                 FileResult(
                     basename=basename,
                     status="completed",
+                    path=media_info["path"],
                     srt_path=str(pass_output),
                     subtitles=subtitle_count,
                     processing_time=elapsed,
@@ -1074,6 +1187,7 @@ def _run_xxl_pass(
                 FileResult(
                     basename=basename,
                     status="failed",
+                    path=media_info["path"],
                     # The plain reason first: the Ensemble summary shows the start of the first line.
                     error=f"{failure_reason(xxl_error)}\n{traceback.format_exc()}",
                 )
@@ -1102,8 +1216,9 @@ def _run_xxl_pass(
 
 def _configure_trace(pipeline: Any, pass_number: int, file_output_dir: Path) -> None:
     """Point a CrispASR pipeline's raw copy and artifacts file, and ChronosJAV's raw copy (1.10.1, requirement R-RAW;
-    crispasr/cleanup.py, qwen_pipeline.py: _keep_raw_copy) at this file's pass output folder, named with the pass. As for the telemetry below: in ``--output-dir source`` mode
-    the pipeline's own ``output_dir`` is the temp directory, which is removed. Other pipelines are left alone."""
+    crispasr/cleanup.py, qwen_pipeline.py: _keep_raw_copy) at this file's pass output folder, named with the pass. As for the telemetry below: the pipeline's own
+    ``output_dir`` is inside the pass's working folder (PASS_OUTPUT_FOLDER, 1.10.3). The other pipelines' side files
+    are moved out by _move_side_files after each file."""
     if hasattr(pipeline, "raw_subs_dir") and hasattr(pipeline, "pass_tag"):
         pipeline.raw_subs_dir = str(Path(file_output_dir) / "raw_subs")
         pipeline.pass_tag = f"pass{pass_number}"
@@ -1116,9 +1231,8 @@ def _configure_telemetry(pipeline: Any, pass_config: Dict[str, Any],
     The pipeline resolves the final path itself (see
     ``whisperjav.utils.asr_telemetry.resolve_telemetry_path``): with no user
     override it is ``<file_output_dir>/raw_subs/<name>.pass<N>.asr_telemetry.jsonl``.
-    The pipeline's own ``output_dir`` cannot be used for this, because in
-    ``--output-dir source`` mode the orchestrator points it at the temp
-    directory and moves only the SRT out afterwards.
+    The pipeline's own ``output_dir`` cannot be used for this: it is inside the
+    pass's working folder (PASS_OUTPUT_FOLDER, 1.10.3).
     """
     enabled = bool(pass_config.get("asr_telemetry_enabled", True))
     override = pass_config.get("asr_telemetry")

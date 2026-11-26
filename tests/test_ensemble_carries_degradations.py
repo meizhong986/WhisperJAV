@@ -33,25 +33,25 @@ SHORTFALL = "2 of 40 scenes went through without being cleaned up by htdemucs"
 
 class TestTheWorkerCanCarryThem:
     def test_the_result_has_somewhere_to_put_them(self):
-        result = FileResult(basename="clip", status="completed",
+        result = FileResult(basename="clip", status="completed", path="clip.mp4",
                             degradations=[SHORTFALL])
         assert result.degradations == [SHORTFALL]
 
     def test_it_defaults_to_empty_rather_than_none(self):
         # Everything downstream iterates it; None would be a crash on the
         # ordinary path where nothing went wrong.
-        assert FileResult(basename="clip", status="completed").degradations == []
+        assert FileResult(basename="clip", status="completed", path="clip.mp4").degradations == []
 
     def test_each_result_gets_its_own_list(self):
         # A shared default would leak one file's shortfalls onto every other.
-        first = FileResult(basename="a", status="completed")
-        second = FileResult(basename="b", status="completed")
+        first = FileResult(basename="a", status="completed", path="a.mp4")
+        second = FileResult(basename="b", status="completed", path="b.mp4")
         first.degradations.append(SHORTFALL)
         assert second.degradations == []
 
     def test_it_survives_the_trip_through_the_dropbox(self):
         # The worker hands results back as plain dicts via __dict__.
-        carried = FileResult(basename="clip", status="completed",
+        carried = FileResult(basename="clip", status="completed", path="clip.mp4",
                              degradations=[SHORTFALL]).__dict__
         assert carried["degradations"] == [SHORTFALL]
 
@@ -77,8 +77,8 @@ class TestTheOrchestratorGathersThem:
 
         metadata, _row = orchestrator._process_single_file_merge(
             media_info=media_info,
-            pass1_results={"clip": pass1},
-            pass2_results={"clip": pass2} if pass2 else {},
+            pass1_results={media_info["path"]: pass1},
+            pass2_results={media_info["path"]: pass2} if pass2 else {},
             pass1_config={"pipeline": "fidelity"},
             pass2_config=pass2_config,
             merge_strategy="pass1_primary",

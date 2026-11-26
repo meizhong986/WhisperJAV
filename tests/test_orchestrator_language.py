@@ -45,10 +45,11 @@ def test_process_batch_handles_none_overrides(tmp_path, monkeypatch):
         "processing_time": 1.0,
     }
 
+    # Filed by the file's path, as the Ensemble files the worker's results (1.10.3, D2).
     def fake_run_pass(*args, **kwargs):
         if kwargs["pass_number"] == 1:
-            return {"sample": pass1_result}
-        return {"sample": pass2_result}
+            return {media_info["path"]: pass1_result}
+        return {media_info["path"]: pass2_result}
 
     monkeypatch.setattr(orchestrator, "_run_pass_in_subprocess", fake_run_pass)
 
@@ -101,8 +102,8 @@ def test_process_batch_reports_merge_failure_and_summary(tmp_path, monkeypatch):
 
     def fake_run_pass(*args, **kwargs):
         if kwargs["pass_number"] == 1:
-            return {"sample": pass1_result}
-        return {"sample": pass2_result}
+            return {media_info["path"]: pass1_result}
+        return {media_info["path"]: pass2_result}
 
     monkeypatch.setattr(orchestrator, "_run_pass_in_subprocess", fake_run_pass)
 

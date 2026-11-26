@@ -11,6 +11,20 @@ import os
 import shutil
 
 
+def own_files(folder: Path, media_basename: str) -> list:
+    """The files in ``folder`` that belong to the media file ``media_basename``: named ``<name>.`` or ``<name>_``
+    followed by anything. The name is escaped first, so a name with square brackets such as "[ABC-123] Film" finds
+    its own files (as a glob pattern it is a character class and matched nothing), and "Film" does not take
+    "Film 2"'s. The rule of the clean-up below; used by the raw-copy step of balanced, fast, faster, fidelity and
+    transformers (1.10.3, owner W811 Q1 (i), D2)."""
+    found = []
+    for item in Path(folder).glob(f"{glob.escape(media_basename)}*"):
+        rest = item.name[len(media_basename):]
+        if item.is_file() and rest[:1] in (".", "_"):
+            found.append(item)
+    return found
+
+
 class BasePipeline(ABC):
     """Abstract base class for all WhisperJAV pipelines."""
     

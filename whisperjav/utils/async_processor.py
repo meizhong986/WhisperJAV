@@ -73,6 +73,9 @@ class AsyncPipelineProcessor:
         # Task tracking
         self.tasks: Dict[str, ProcessingTask] = {}
         self.task_lock = threading.RLock()
+        # A running number in every task name (1.10.3, owner W811 Q2, D2 1c): the files are queued at once, so two
+        # inputs of one name queued in the same millisecond had one name and the second replaced the first.
+        self._task_count = 0
         
         # Progress queue for inter-thread communication
         self.progress_queue = Queue()
@@ -104,8 +107,10 @@ class AsyncPipelineProcessor:
         Returns:
             Task ID for tracking
         """
-        # Generate task ID
-        task_id = f"{Path(media_info['path']).stem}_{int(time.time()*1000)}"
+        # Generate task ID: the name, the time and a running number, unique in the run (1.10.3, D2 1c)
+        with self.task_lock:
+            self._task_count += 1
+            task_id = f"{Path(media_info['path']).stem}_{int(time.time()*1000)}_{self._task_count}"
         
         # Create cancellation token
         cancellation_token = threading.Event()

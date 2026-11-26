@@ -7,7 +7,7 @@ from typing import Dict, List
 import time
 from datetime import datetime
 
-from whisperjav.pipelines.base_pipeline import BasePipeline
+from whisperjav.pipelines.base_pipeline import BasePipeline, own_files
 from whisperjav.modules.audio_extraction import AudioExtractor
 from whisperjav.modules.audio_integrity import AudioIntegrityStop, apply_to_run as apply_audio_integrity
 from whisperjav.modules import analytics
@@ -743,8 +743,8 @@ class BalancedPipeline(BasePipeline):
                 # Create raw_subs directory if it doesn't exist
                 final_raw_subs_path.mkdir(exist_ok=True)
 
-                # Copy only files related to current media_basename to avoid ghost files
-                for file in temp_raw_subs_path.glob(f"{media_basename}*"):
+                # Copy only files related to current media_basename to avoid ghost files (escaped name, 1.10.3)
+                for file in own_files(temp_raw_subs_path, media_basename):
                     dest_file = final_raw_subs_path / file.name
                     shutil.copy2(file, dest_file)
                     logger.debug(f"Copied {file.name} to raw_subs")

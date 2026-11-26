@@ -145,9 +145,11 @@ GATHER_PROBE = textwrap.dedent("""
     root = Path(sys.argv[1])
     out = {}
 
-    a, b = FileResult(basename="a", status="completed"), FileResult(basename="b", status="completed")
+    a = FileResult(basename="a", status="completed", path="a.mp4")
+    b = FileResult(basename="b", status="completed", path="b.mp4")
     a.notes.append("x")
-    out["default"] = [b.notes, FileResult(basename="c", status="completed", notes=["n"]).__dict__["notes"]]
+    out["default"] = [b.notes, FileResult(basename="c", status="completed", path="c.mp4",
+                                          notes=["n"]).__dict__["notes"]]
 
     class Merge:
         def merge(self, srt1_path, srt2_path, output_path, strategy):
@@ -169,9 +171,10 @@ GATHER_PROBE = textwrap.dedent("""
         return result
 
     def merge(pass1, pass2):
+        key = str(root / "clip.mp4")
         md, _row = orchestrator._process_single_file_merge(
-            media_info={"path": str(root / "clip.mp4"), "basename": "clip"},
-            pass1_results={"clip": pass1}, pass2_results={"clip": pass2} if pass2 else {},
+            media_info={"path": key, "basename": "clip"},
+            pass1_results={key: pass1}, pass2_results={key: pass2} if pass2 else {},
             pass1_config={"pipeline": "parakeet-crispasr"},
             pass2_config={"pipeline": "cohere-crispasr"} if pass2 else None,
             merge_strategy="pass1_primary", pass_languages={1: "ja", 2: "ja"})

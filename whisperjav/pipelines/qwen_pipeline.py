@@ -649,11 +649,17 @@ class QwenPipeline(BasePipeline):
     SAVE_POINT_STAGE_SUFFIX = ".savepoint.json"   # {"stage": ..., "subtitles": n}, read by the Ensemble
     # Set by the Ensemble pass worker (owner W462, W463 C1): only an Ensemble pass keeps a failed pass's save-point.
     save_points = False
+    # Set by the Ensemble pass worker before each file: the save-point's name, <name>.<position in the pass's list>
+    # (1.10.3, D2 1b; pass_worker.save_point_name), so two inputs of one name in one pass keep their own.
+    save_point_name: Optional[str] = None
+
+    def _save_point_stem(self, media_basename: str) -> str:
+        return self.save_point_name or media_basename
 
     def _clear_save_point(self, media_basename: str) -> None:
         """No earlier save-point may pass for this run's (a cancelled or crashed run, --keep-temp)."""
         for suffix in (self.SAVE_POINT_SUFFIX, self.SAVE_POINT_STAGE_SUFFIX):
-            (self.temp_dir / f"{media_basename}{suffix}").unlink(missing_ok=True)
+            (self.temp_dir / f"{self._save_point_stem(media_basename)}{suffix}").unlink(missing_ok=True)
 
     def _write_save_point(self, draft: list, scene_paths: list, media_basename: str, stage: str) -> None:
         """The save-point SRT (owner W462, W463 C1): the orchestrator's scene results (``stage``: before the timing
@@ -676,14 +682,14 @@ class QwenPipeline(BasePipeline):
                 continue
             if scene_srt_path.exists() and scene_srt_path.stat().st_size > 0:
                 scene_srt_info.append((scene_srt_path, scene_paths[idx][1]))
-        target = self.temp_dir / f"{media_basename}{self.SAVE_POINT_SUFFIX}"
+        target = self.temp_dir / f"{self._save_point_stem(media_basename)}{self.SAVE_POINT_SUFFIX}"
         if scene_srt_info:
             count = self.stitcher.stitch(scene_srt_info, target)
         else:
             target.write_text("", encoding="utf-8")
             count = 0
         import json as _json
-        (self.temp_dir / f"{media_basename}{self.SAVE_POINT_STAGE_SUFFIX}").write_text(
+        (self.temp_dir / f"{self._save_point_stem(media_basename)}{self.SAVE_POINT_STAGE_SUFFIX}").write_text(
             _json.dumps({"stage": stage, "subtitles": count}), encoding="utf-8")
         logger.info("Save-point (%s): %d subtitles in %s", stage, count, target)
 

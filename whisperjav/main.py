@@ -126,7 +126,8 @@ from whisperjav.utils.run_outcome import (
     skipped_outcome,
     write_manifest,
 )
-from whisperjav.modules.media_discovery import MediaDiscovery, output_folder_for
+from whisperjav.modules.media_discovery import (MediaDiscovery, left_out_lines, left_out_reason, output_folder_for,
+                                                same_subtitle_files)
 from whisperjav.modules.audio_integrity import AudioIntegrityStop
 from whisperjav.modules.qwen_errors import (
     NOT_STARTED as QWEN_NOT_STARTED,
@@ -1086,10 +1087,12 @@ def parse_arguments():
                                 "none")
     qwen_audio_group.add_argument("--qwen-max-group-duration", type=float, default=None,
                            help="Max duration (seconds) for VAD segment grouping (default: 3.0 for Qwen3-ASR; "
-                                "anime-whisper 3.0 / 2.5 / 2.0 by sensitivity)")
+                                "anime-whisper: with WhisperSeg 3.0 / 2.5 / 2.0 by sensitivity, with another "
+                                "speech segmenter its own value)")
     qwen_audio_group.add_argument("--qwen-chunk-threshold", type=float, default=None,
                            help="Silence gap (seconds) above which segments are NOT grouped (default: 0.3 for Qwen3-ASR; "
-                                "anime-whisper 0.3 / 0.25 / 0.2 by sensitivity)")
+                                "anime-whisper: with WhisperSeg 0.3 / 0.25 / 0.2 by sensitivity, with another "
+                                "speech segmenter its own value)")
     qwen_audio_group.add_argument("--qwen-input-mode", type=str, default="assembly",
                            choices=["assembly", "context_aware", "vad_slicing"],
                            help="Audio input strategy: 'assembly' (default). "
@@ -1115,11 +1118,12 @@ def parse_arguments():
                                 "Prefer --qwen-vad-start-pad / --qwen-vad-end-pad.")
     qwen_audio_group.add_argument("--qwen-vad-start-pad", type=int, default=None,
                            help="VAD padding before speech onset, ms (default: 100 for Qwen3-ASR; "
-                                "anime-whisper 100 / 50 / 0 by sensitivity)")
+                                "anime-whisper: with WhisperSeg 100 / 50 / 0 by sensitivity, with another "
+                                "speech segmenter its own value)")
     qwen_audio_group.add_argument("--qwen-vad-end-pad", type=int, default=None,
                            help="VAD padding after speech offset, ms (default for Qwen3-ASR: 0 with "
-                                "WhisperSeg, 100 with other segmenters; anime-whisper 100 / 50 / 30 "
-                                "by sensitivity)")
+                                "WhisperSeg, 100 with other segmenters; anime-whisper: with WhisperSeg "
+                                "100 / 50 / 30 by sensitivity, with another speech segmenter its own value)")
     qwen_audio_group.add_argument("--qwen-max-speech-duration", type=float, default=None,
                            help="Force-split any single speech segment longer than this (seconds). "
                                 "Default with the WhisperSeg, TEN and FireRedVAD segmenters: 4 for "
@@ -3713,6 +3717,15 @@ def main():
                      "and WhisperJAV will use your system's temporary folder.")
         sys.exit(1)
 
+    # Two inputs that would write their subtitle file into the same folder under the same name (1.10.3, owner W808
+    # D2, W810, W811): the first is kept, the others are left out, named here and in the run summary ("skipped").
+    media_files, _left_out = same_subtitle_files(media_files, args.output_dir)
+    if _left_out:
+        for _line in left_out_lines(_left_out):
+            logger.warning(_line)
+    # The files this run takes up, for the interrupted-run line (main: "after N of M file(s)").
+    _files_to_run = list(media_files)
+
     logger.info(f"Found {len(media_files)} "
                 f"file{'' if len(media_files) == 1 else 's'} to process:")
     leftover_paths = []
@@ -3759,8 +3772,10 @@ def main():
     import datetime as _dt
     _run_started_at = _dt.datetime.now()
     # The run's outcomes, one per file, shared by every execution path so an
-    # interrupted run still reports the files that finished.
-    outcomes: List[FileOutcome] = []
+    # interrupted run still reports the files that finished. The files left out at intake are in it from the start
+    # (1.10.3, owner W811 Q2, Q5: state "skipped", which never fails a run).
+    outcomes: List[FileOutcome] = [skipped_outcome(str(_info['path']), left_out_reason(_earlier))
+                                   for _info, _earlier in _left_out]
 
     # Create parameter tracer for ensemble mode (must be created before try block)
     tracer = create_tracer(args.trace_params) if args.ensemble else None
@@ -4264,19 +4279,40 @@ def main():
         if not args.keep_temp:
             logger.debug("Cleaning up temporary files...")
             cleanup_temp_directory(args.temp_dir)
+        _ran, _to_run = _interrupted_counts(outcomes, _files_to_run)
         sys.exit(_finish_interrupted_run(
             outcomes, args, media_files, _run_started_at,
-            f"Interrupted by user after {len(outcomes)} of {len(media_files)} file(s); "
+            f"Interrupted by user after {_ran} of {_to_run} file(s); "
             "the table covers the files that finished."))
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}", exc_info=True)
         if not args.keep_temp:
             logger.debug("Cleaning up temporary files...")
             cleanup_temp_directory(args.temp_dir)
+        _ran, _to_run = _interrupted_counts(outcomes, _files_to_run)
         sys.exit(_finish_interrupted_run(
             outcomes, args, media_files, _run_started_at,
-            f"Run stopped by an unexpected error after {len(outcomes)} of "
-            f"{len(media_files)} file(s): {e}"))
+            f"Run stopped by an unexpected error after {_ran} of "
+            f"{_to_run} file(s): {e}"))
+
+
+# The run-summary reasons of files that never started because of a check before the run (1.10.3, D2): left out at
+# intake (media_discovery.left_out_reason), or skipped by --skip-existing (skipped_outcome's reasons in this file).
+_SKIP_EXISTING_REASONS = ("output already exists", "merged output already exists")
+
+
+def _skipped_before_start(outcome: FileOutcome) -> bool:
+    return outcome.state == "skipped" and (outcome.detail in _SKIP_EXISTING_REASONS
+                                           or outcome.detail.startswith("left out: "))
+
+
+def _interrupted_counts(outcomes: List[FileOutcome], files_to_run: List[Dict]) -> tuple:
+    """N and M of the interrupted-run line "after N of M file(s)" (1.10.3, D2): N, the files with a row that started;
+    M, the files this run took up after the intake check, less those --skip-existing skipped. Before, both counted
+    the rows of files that never started."""
+    skipped_existing = sum(1 for o in outcomes if o.state == "skipped" and o.detail in _SKIP_EXISTING_REASONS)
+    ran = sum(1 for o in outcomes if not _skipped_before_start(o))
+    return ran, max(len(files_to_run) - skipped_existing, 0)
 
 
 def _finish_interrupted_run(outcomes, args, media_files, started_at, note: str) -> int:

@@ -26,15 +26,16 @@ def _orchestrator(tmp_path, serial, unusable_pass, calls):
 
     def run_pass(pass_number, media_files, pass_config, language_code, **_progress):
         calls.append((pass_number, [m["basename"] for m in media_files]))
+        # Filed by the file's path, as the Ensemble files the worker's results (1.10.3, D2).
         if pass_number == unusable_pass:
-            return {m["basename"]: {"status": "failed", "error": MESSAGE} for m in media_files}
+            return {m["path"]: {"status": "failed", "error": MESSAGE} for m in media_files}
         out = {}
         for m in media_files:
             srt = tmp_path / "out" / f"{m['basename']}.ja.pass{pass_number}.srt"
             srt.parent.mkdir(parents=True, exist_ok=True)
             srt.write_text(SRT, encoding="utf-8")
-            out[m["basename"]] = {"status": "completed", "srt_path": str(srt), "subtitles": 1,
-                                  "processing_time": 1.0}
+            out[m["path"]] = {"status": "completed", "srt_path": str(srt), "subtitles": 1,
+                              "processing_time": 1.0}
         return out
 
     orch._run_pass_in_subprocess = run_pass
@@ -136,7 +137,7 @@ def test_an_ordinary_failure_does_not_stop_the_run(tmp_path):
                  **progress):
         if pass_number == 1 and media_files[0]["basename"] == "a":
             calls.append((1, ["a"]))
-            return {"a": {"status": "failed", "error": "Traceback ... RuntimeError: boom"}}
+            return {media_files[0]["path"]: {"status": "failed", "error": "Traceback ... RuntimeError: boom"}}
         return _orig(pass_number, media_files, pass_config, language_code, **progress)
 
     orch._run_pass_in_subprocess = run_pass
@@ -153,10 +154,11 @@ def test_the_worker_never_started_files_keep_no_work(tmp_path):
     orch = EnsembleOrchestrator(output_dir=str(tmp_path / "out"), temp_dir=str(tmp_path / "temp"))
     orch.temp_dir.mkdir(parents=True, exist_ok=True)
     media = _media(tmp_path)
-    results = {m["basename"]: {"status": "failed", "error": MESSAGE} for m in media}
+    results = {m["path"]: {"status": "failed", "error": MESSAGE} for m in media}
     orch._keep_failed_pass_work(1, media, results, "ja", "qwen")
-    assert "save_points" in results["a"]
-    assert "save_points" not in results["b"] and "save_points" not in results["c"]
+    a, b, c = (m["path"] for m in media)
+    assert "save_points" in results[a]
+    assert "save_points" not in results[b] and "save_points" not in results[c]
 
 
 def test_the_run_summary_shows_skipped(tmp_path, monkeypatch):

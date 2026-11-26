@@ -23,7 +23,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import srt
 import stable_whisper
 
-from whisperjav.pipelines.base_pipeline import BasePipeline
+from whisperjav.pipelines.base_pipeline import BasePipeline, own_files
 from whisperjav.modules.audio_extraction import AudioExtractor
 from whisperjav.modules.audio_integrity import AudioIntegrityStop, apply_to_run as apply_audio_integrity
 from whisperjav.modules.transformers_asr import TransformersASR
@@ -868,7 +868,7 @@ class TransformersPipeline(BasePipeline):
             if temp_raw_subs.exists():
                 final_raw_subs = self.output_dir / "raw_subs"
                 final_raw_subs.mkdir(exist_ok=True)
-                for file in temp_raw_subs.glob(f"{media_basename}*"):
+                for file in own_files(temp_raw_subs, media_basename):   # escaped name (1.10.3)
                     shutil.copy2(file, final_raw_subs / file.name)
 
             # Copy Qwen debug artifacts to raw_subs (when using Qwen backend)

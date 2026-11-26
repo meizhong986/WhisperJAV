@@ -3,8 +3,9 @@
 What is pinned here:
   - the pass worker writes each file's result as soon as it is known (``<result file>.partial``);
   - for a file a pass did not finish, the Ensemble keeps the pass's working folder under ``<temp>/kept/<time>_pass<N>``
-    without its audio (owner W485), then copies the pipeline's last save-point (``<basename>.savepoint.srt``, its
-    stage in ``.savepoint.json``) beside the video as ``<basename>.<lang>.pass<N>.unfinished.srt`` (W485), and names
+    without its audio (owner W485), then copies the pipeline's last save-point (``<basename>.<k>.savepoint.srt``, k the
+    file's position in the pass's list since 1.10.3, its stage in ``.savepoint.json``) beside the video as
+    ``<basename>.<lang>.pass<N>.unfinished.srt`` (W485), and names
     both in the file's record;
   - the words for the run summary (W485, the plainer wording) are true for every pipeline: the unfinished subtitles
     with their count and how far they got; "stopped before any of its subtitles were ready" only for a pipeline that
@@ -45,10 +46,11 @@ def _media(tmp_path, name):
 
 def test_the_worker_writes_each_files_result_as_it_finishes(tmp_path):
     result_file = str(tmp_path / "worker_result_pass2.pkl")
-    _write_partial_results(result_file, [FileResult(basename="a", status="completed", srt_path="a.srt")])
+    _write_partial_results(result_file, [FileResult(basename="a", status="completed", path="videos/in/a.mp4",
+                                                    srt_path="a.srt")])
     with open(partial_result_file(result_file), "rb") as f:
         carried = pickle.load(f)
-    assert [r["basename"] for r in carried["results"]] == ["a"]
+    assert [(r["basename"], r["path"]) for r in carried["results"]] == [("a", "videos/in/a.mp4")]
     assert not Path(partial_result_file(result_file) + ".tmp").exists()
 
 
@@ -58,21 +60,22 @@ def test_a_failed_chronosjav_file_keeps_its_save_point_and_the_working_files(tmp
     orch = _orchestrator(tmp_path)
     work = orch.temp_dir / "pass2_worker"
     work.mkdir()
-    (work / "clip.savepoint.srt").write_text(SRT, encoding="utf-8")
-    (work / "clip.savepoint.json").write_text(
+    (work / "clip.1.savepoint.srt").write_text(SRT, encoding="utf-8")
+    (work / "clip.1.savepoint.json").write_text(
         json.dumps({"stage": "after the aligner, before the timing model", "subtitles": 1}), encoding="utf-8")
     media = [_media(tmp_path, "clip")]
-    results = {"clip": {"status": "failed", "error": "Worker crash: exit code 3221226505, no result file"}}
+    key = media[0]["path"]
+    results = {key: {"status": "failed", "error": "Worker crash: exit code 3221226505, no result file"}}
 
     orch._keep_failed_pass_work(2, media, results, "ja", "qwen")
 
     saved = Path(media[0]["path"]).parent / "clip.ja.pass2.unfinished.srt"
     assert saved.read_text(encoding="utf-8") == SRT
-    entry = results["clip"]
+    entry = results[key]
     assert entry["savepoint_srt"] == str(saved) and entry["savepoint_subtitles"] == 1
     kept = Path(entry["kept_dir"])
     assert kept.parent == orch.temp_dir / "kept" and kept.name.endswith("_pass2")
-    assert (kept / "clip.savepoint.srt").exists() and not work.exists()
+    assert (kept / "clip.1.savepoint.srt").exists() and not work.exists()
     assert _kept_work_sentences(2, entry) == [
         f"pass 2's unfinished subtitles are saved as {saved} (1 subtitle, timed by the aligner; the timing model did "
         f"not run)",
@@ -84,9 +87,10 @@ def test_a_chronosjav_file_without_a_save_point_is_said_so(tmp_path):
 
     orch = _orchestrator(tmp_path)
     (orch.temp_dir / "pass2_worker").mkdir()
-    results = {"clip": {"status": "failed", "error": "x"}}
-    orch._keep_failed_pass_work(2, [_media(tmp_path, "clip")], results, "ja", "qwen")
-    sentences = _kept_work_sentences(2, results["clip"])
+    media = [_media(tmp_path, "clip")]
+    results = {media[0]["path"]: {"status": "failed", "error": "x"}}
+    orch._keep_failed_pass_work(2, media, results, "ja", "qwen")
+    sentences = _kept_work_sentences(2, results[media[0]["path"]])
     assert sentences[0] == "pass 2 stopped before any of its subtitles were ready, so none could be saved"
     assert sentences[1].startswith("pass 2's working files are kept in ")
 
@@ -96,9 +100,10 @@ def test_a_pipeline_without_save_points_gets_no_word_about_them(tmp_path):
 
     orch = _orchestrator(tmp_path)
     (orch.temp_dir / "pass1_worker").mkdir()
-    results = {"clip": {"status": "failed", "error": "x"}}
-    orch._keep_failed_pass_work(1, [_media(tmp_path, "clip")], results, "ja", "moss-crispasr")
-    sentences = _kept_work_sentences(1, results["clip"])
+    media = [_media(tmp_path, "clip")]
+    results = {media[0]["path"]: {"status": "failed", "error": "x"}}
+    orch._keep_failed_pass_work(1, media, results, "ja", "moss-crispasr")
+    sentences = _kept_work_sentences(1, results[media[0]["path"]])
     assert len(sentences) == 1 and sentences[0].startswith("pass 1's working files are kept in ")
 
 
@@ -106,15 +111,18 @@ def test_a_pass_that_finished_every_file_leaves_nothing_behind(tmp_path):
     orch = _orchestrator(tmp_path)
     work = orch.temp_dir / "pass1_worker"
     work.mkdir()
-    results = {"clip": {"status": "completed", "srt_path": "x.srt"}}
-    orch._keep_failed_pass_work(1, [_media(tmp_path, "clip")], results, "ja", "qwen")
+    media = [_media(tmp_path, "clip")]
+    results = {media[0]["path"]: {"status": "completed", "srt_path": "x.srt"}}
+    orch._keep_failed_pass_work(1, media, results, "ja", "qwen")
     assert work.exists() and not (orch.temp_dir / "kept").exists()
-    assert "kept_dir" not in results["clip"]
+    assert "kept_dir" not in results[media[0]["path"]]
 
 
 def _merge(orch, tmp_path, pass1, pass2):
+    media_info = _media(tmp_path, "clip")
     return orch._process_single_file_merge(
-        media_info=_media(tmp_path, "clip"), pass1_results={"clip": pass1}, pass2_results={"clip": pass2},
+        media_info=media_info, pass1_results={media_info["path"]: pass1},
+        pass2_results={media_info["path"]: pass2},
         pass1_config={"pipeline": "moss-crispasr"}, pass2_config={"pipeline": "qwen"},
         merge_strategy="pass1_primary", pass_languages={1: "ja", 2: "ja"})[0]
 
@@ -152,7 +160,8 @@ def test_main_prints_them_in_the_files_line():
 def test_after_a_crash_the_finished_files_keep_their_results():
     src = (Path(__file__).resolve().parent.parent / "whisperjav" / "ensemble" / "orchestrator.py").read_text(
         encoding="utf-8")
-    assert "done.get(info['basename']) or {" in src and "partial_file.unlink(missing_ok=True)" in src
+    assert "done = {r['path']: r for r in" in src and "done.get(_key(info)) or {" in src
+    assert "partial_file.unlink(missing_ok=True)" in src
 
 
 def test_how_far_the_unfinished_subtitles_got_in_the_users_words():
@@ -191,16 +200,17 @@ def test_a_kept_folder_keeps_subtitles_and_records_but_not_the_audio(tmp_path):
     (work / "clip_extracted.wav").write_bytes(b"RIFF" + b"\0" * 64)
     (work / "scenes" / "clip_scene_0001.wav").write_bytes(b"RIFF" + b"\0" * 64)
     (work / "scenes" / "clip_scene_0001.srt").write_text(SRT, encoding="utf-8")
-    (work / "clip.savepoint.srt").write_text(SRT, encoding="utf-8")
-    (work / "clip.savepoint.json").write_text(json.dumps({"stage": "after the ASR", "subtitles": 1}), encoding="utf-8")
+    (work / "clip.1.savepoint.srt").write_text(SRT, encoding="utf-8")
+    (work / "clip.1.savepoint.json").write_text(json.dumps({"stage": "after the ASR", "subtitles": 1}),
+                                                encoding="utf-8")
     (work / "run.log").write_text("log", encoding="utf-8")
     media = [_media(tmp_path, "clip")]
-    results = {"clip": {"status": "failed", "error": "x"}}
+    results = {media[0]["path"]: {"status": "failed", "error": "x"}}
 
     orch._keep_failed_pass_work(2, media, results, "ja", "qwen")
 
-    kept = Path(results["clip"]["kept_dir"])
+    kept = Path(results[media[0]["path"]]["kept_dir"])
     assert sorted(p.name for p in kept.rglob("*.wav")) == []
-    assert (kept / "scenes" / "clip_scene_0001.srt").exists() and (kept / "clip.savepoint.srt").exists()
-    assert (kept / "clip.savepoint.json").exists() and (kept / "run.log").exists()
+    assert (kept / "scenes" / "clip_scene_0001.srt").exists() and (kept / "clip.1.savepoint.srt").exists()
+    assert (kept / "clip.1.savepoint.json").exists() and (kept / "run.log").exists()
     assert (Path(media[0]["path"]).parent / "clip.ja.pass2.unfinished.srt").read_text(encoding="utf-8") == SRT

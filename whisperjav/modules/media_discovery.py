@@ -2,11 +2,12 @@
 """Media discovery module for analyzing input media files."""
 
 from pathlib import Path
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Tuple
 import os
 import subprocess
 import json
 import glob
+import unicodedata
 
 from whisperjav.utils.logger import logger
 
@@ -45,6 +46,63 @@ def output_folder_for(media_info: Dict, output_dir: str) -> Path:
         if relative.parts:
             return base / relative
     return base
+
+
+def _subtitle_file_key(media_info: Dict, output_dir: str) -> Tuple[str, str]:
+    """Where a file's subtitle file goes and under what name: (its output folder, its name without extension). The
+    folder as the system resolves it (``normcase(realpath)``, as media_leftovers.py compares folders), so a drive
+    letter and a network path to one folder are one; the name in one Unicode form (NFC) and in lower case, on every
+    platform (owner W811 Q4): Windows and macOS, and Linux on a USB drive or a network share, treat ``Ep01`` and
+    ``ep01`` as one name. ``lower()``, not ``casefold()``, which would make ``Straße`` and ``Strasse`` one name."""
+    folder = str(output_folder_for(media_info, output_dir))
+    try:
+        folder = os.path.realpath(folder)
+    except (OSError, ValueError):
+        folder = os.path.abspath(folder)
+    folder = os.path.normcase(folder)
+    name = unicodedata.normalize("NFC", str(media_info['basename'])).lower()
+    return folder, name
+
+
+def same_subtitle_files(media_files: List[Dict], output_dir: str) -> Tuple[List[Dict], List[Tuple[Dict, Dict]]]:
+    """Split the discovered files into those that run and those left out (1.10.3, owner W808 D2, W810, W811): a file
+    is left out when an earlier file of the list would write its subtitle file into the same folder under the same
+    name (``_subtitle_file_key``); every subtitle file's name starts with that name (``<name>.<lang>.whisperjav.srt``,
+    the Ensemble's pass and merged files, the .vtt and translated files). The first is kept, in the order of the list.
+    Files of one name in different subfolders of one input folder go to different folders (output_folder_for) and do
+    not clash. Returns (kept, [(left out, the earlier file it clashes with), ...])."""
+    first: Dict[Tuple[str, str], Dict] = {}
+    kept: List[Dict] = []
+    left_out: List[Tuple[Dict, Dict]] = []
+    for info in media_files:
+        key = _subtitle_file_key(info, output_dir)
+        if key in first:
+            left_out.append((info, first[key]))
+        else:
+            first[key] = info
+            kept.append(info)
+    return kept, left_out
+
+
+def left_out_reason(earlier: Dict) -> str:
+    """The run summary's reason for a file left out by same_subtitle_files (owner W811 Q2)."""
+    return f"left out: same name as {earlier['path']}, which writes the same subtitle file"
+
+
+def left_out_lines(left_out: List[Tuple[Dict, Dict]]) -> List[str]:
+    """The warning printed before the list of files to process (owner W811 Q2), one line per list item."""
+    count = len(left_out)
+    if count == 1:
+        head = ("1 input file is left out: it has the same name as an earlier input file and would write its "
+                "subtitles to the same file in the same folder.")
+    else:
+        head = (f"{count} input files are left out: each has the same name as an earlier input file and would write "
+                f"its subtitles to the same file in the same folder.")
+    lines = [head]
+    lines.extend(f"  left out: {info['path']} (same name as {earlier['path']})" for info, earlier in left_out)
+    lines.append("To process a file that was left out, rename it, or run it on its own with another output folder. "
+                 "Files in different subfolders of one input folder do not clash.")
+    return lines
 
 
 def _canonical_path(path: Path) -> Path:

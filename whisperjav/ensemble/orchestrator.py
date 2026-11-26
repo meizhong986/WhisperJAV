@@ -18,11 +18,18 @@ from whisperjav.utils.parameter_tracer import NullTracer
 from whisperjav.utils.progress_markers import emit_marker, transcribe_marker
 
 from .merge import MergeEngine
-from .pass_worker import WorkerPayload, partial_result_file, run_pass_worker
+from .pass_worker import WorkerPayload, partial_result_file, run_pass_worker, save_point_name
 from .utils import resolve_language_code
 
 
 _KEPT_KEYS = ('savepoint_srt', 'savepoint_stage', 'savepoint_subtitles', 'kept_dir', 'save_points')
+
+
+def _key(info: Dict[str, Any]) -> str:
+    """The key the Ensemble files a file's pass results under: its path, as sent to the pass worker and returned in
+    each result (pass_worker.FileResult.path). Two inputs of one name in two folders keep their own results (1.10.3,
+    owner W808-W811, D2); before, they were filed by the bare name and the later replaced the earlier."""
+    return str(info['path'])
 
 
 def _model_unusable(result: Optional[Dict[str, Any]]) -> bool:
@@ -33,7 +40,7 @@ def _model_unusable(result: Optional[Dict[str, Any]]) -> bool:
 def _first_unusable(media_files: List[Dict[str, Any]], results: Dict[str, Dict[str, Any]]) -> Optional[int]:
     """The position of the first file whose pass stopped because its ASR model cannot be used, or None. The pass
     worker stops on that file and gives every later file of its list the same message without starting it."""
-    return next((k for k, info in enumerate(media_files) if _model_unusable(results.get(info['basename']))), None)
+    return next((k for k, info in enumerate(media_files) if _model_unusable(results.get(_key(info)))), None)
 
 
 def _not_started() -> Dict[str, Any]:
@@ -264,7 +271,7 @@ class EnsembleOrchestrator:
         if stop_at is not None:
             stopped = serialized_media[stop_at]['basename']
             for info in serialized_media[stop_at + 1:]:
-                pass1_results[info['basename']] = _not_started()
+                pass1_results[_key(info)] = _not_started()
             pass2_media = serialized_media[:stop_at]
             later = len(serialized_media) - stop_at - 1
             logger.warning(
@@ -384,8 +391,8 @@ class EnsembleOrchestrator:
             media_info, pass1_config, pass2_config, merge_strategy
         )
 
-        pass1 = pass1_results.get(basename)
-        pass2 = pass2_results.get(basename) if pass2_config else None
+        pass1 = pass1_results.get(_key(media_info))
+        pass2 = pass2_results.get(_key(media_info)) if pass2_config else None
 
         row_display = {
             'file': basename,
@@ -655,7 +662,7 @@ class EnsembleOrchestrator:
 
             if run_stopped:
                 metadata, row = self._process_single_file_merge(
-                    media_info, {basename: _not_started()}, {},
+                    media_info, {_key(media_info): _not_started()}, {},
                     pass1_config, pass2_config, merge_strategy, pass_languages,
                 )
                 all_metadata.append(metadata)
@@ -681,7 +688,7 @@ class EnsembleOrchestrator:
                 pass_total=_serial_pt,
                 emit_file_progress=False,
             )
-            pass1_stopped = _model_unusable(pass1_results.get(basename))
+            pass1_stopped = _model_unusable(pass1_results.get(_key(media_info)))
 
             # --- Pass 2 (if enabled; skipped when pass 1's ASR model cannot be used, owner W501) ---
             pass2_results: Dict[str, Dict[str, Any]] = {}
@@ -693,7 +700,7 @@ class EnsembleOrchestrator:
                 # The same result the pass worker gives the files after its stop in the normal mode.
                 logger.warning("[%d/%d] %s — Pass 2 not run: its ASR model cannot be used; output is pass 1 alone",
                                file_idx, total_files, basename)
-                pass2_results = {basename: {'status': 'failed', 'error': pass2_stop}}
+                pass2_results = {_key(media_info): {'status': 'failed', 'error': pass2_stop}}
             elif pass2_config:
                 pass2_ran = True
                 logger.info(
@@ -728,8 +735,8 @@ class EnsembleOrchestrator:
                 if file_idx < total_files:
                     logger.warning("Pass 1 stopped on %s: its ASR model cannot be used. The %d file(s) after it "
                                    "are not started.", basename, total_files - file_idx)
-            elif pass2_ran and _model_unusable(pass2_results.get(basename)):
-                pass2_stop = str(pass2_results[basename].get('error') or '')
+            elif pass2_ran and _model_unusable(pass2_results.get(_key(media_info))):
+                pass2_stop = str(pass2_results[_key(media_info)].get('error') or '')
                 if file_idx < total_files:
                     logger.warning("Pass 2 stopped on %s: its ASR model cannot be used. The %d file(s) after it "
                                    "get pass 1 alone.", basename, total_files - file_idx)
@@ -881,11 +888,11 @@ class EnsembleOrchestrator:
             if partial_file.exists():
                 try:
                     with open(partial_file, 'rb') as f:
-                        done = {r['basename']: r for r in (pickle.load(f).get('results') or [])}
+                        done = {r['path']: r for r in (pickle.load(f).get('results') or [])}
                 except Exception as e:
                     logger.error("Pass %s: Failed to read the per-file results: %s", pass_number, e)
             formatted_crash = {
-                info['basename']: done.get(info['basename']) or {
+                _key(info): done.get(_key(info)) or {
                     'status': 'failed',
                     'error': f'Worker crash: exit code {p.exitcode}, no result file',
                 }
@@ -908,21 +915,22 @@ class EnsembleOrchestrator:
         if not results:
             fallback_error = worker_error or 'Worker produced no results'
             return {
-                info['basename']: {
+                _key(info): {
                     'status': 'failed',
                     'error': fallback_error,
                 }
                 for info in media_files
             }
 
+        # Each result under the file's path (1.10.3, D2): two inputs of one name keep their own.
         formatted: Dict[str, Dict[str, Any]] = {}
         for item in results:
-            formatted[item['basename']] = item
+            formatted[str(item['path'])] = item
 
         # Ensure every media file has an entry even if the worker skipped it
         for info in media_files:
             basename = info['basename']
-            if basename not in formatted:
+            if _key(info) not in formatted:
                 # Log when a file has no matching result - helps diagnose Unicode/encoding issues
                 logger.warning(
                     "Pass %s: No result for basename (len=%d chars, %d UTF-8 bytes). "
@@ -931,7 +939,7 @@ class EnsembleOrchestrator:
                     len(basename),
                     len(basename.encode('utf-8')),
                 )
-                formatted[basename] = {
+                formatted[_key(info)] = {
                     'status': 'failed',
                     'error': 'Worker returned no result for this file',
                 }
@@ -957,15 +965,17 @@ class EnsembleOrchestrator:
         ``<temp>/kept/<time>_pass<N>`` (the next pass or file would reuse its name), without its audio (W485), then the
         file's last save-point, if the pipeline wrote one, is copied beside the video as
         ``<basename>.<lang>.pass<N>.unfinished.srt``. Both are named in the file's result (``savepoint_srt``,
-        ``savepoint_stage``, ``kept_dir``, ``save_points``) for the run summary, and in a warning now."""
-        failed = [info for info in media_files
-                  if (results.get(info['basename']) or {}).get('status') != 'completed']
+        ``savepoint_stage``, ``kept_dir``, ``save_points``) for the run summary, and in a warning now. The save-point of
+        the file at position k (1, 2, ...) of the pass's list is ``<basename>.<k>.savepoint.srt`` (1.10.3, D2 1b;
+        pass_worker.save_point_name)."""
+        # (position in this pass's list, file), for the files the pass did not finish.
+        failed = [(position, info) for position, info in enumerate(media_files, 1)
+                  if (results.get(_key(info)) or {}).get('status') != 'completed']
         # After a stop because the pass's ASR model cannot be used, the worker started no later file of its list
         # (owner W501): those have no work to keep and get no "stopped before any subtitles" warning.
         stop_at = _first_unusable(media_files, results)
         if stop_at is not None:
-            never_started = {info['basename'] for info in media_files[stop_at + 1:]}
-            failed = [info for info in failed if info['basename'] not in never_started]
+            failed = [(position, info) for position, info in failed if position <= stop_at + 1]
         if not failed:
             return
         work_dir = self.temp_dir / f"pass{pass_number}_worker"
@@ -983,13 +993,14 @@ class EnsembleOrchestrator:
             self._drop_kept_audio(pass_number, kept)
             logger.warning("Pass %s: its working files are kept in %s", pass_number, kept)
         writes_save_points = str(pipeline or "") in self.SAVE_POINT_PIPELINES
-        for info in failed:
+        for position, info in failed:
             basename = info['basename']
-            entry = results.setdefault(basename, {'status': 'failed'})
+            entry = results.setdefault(_key(info), {'status': 'failed'})
             entry['save_points'] = writes_save_points
             if kept.is_dir():
                 entry['kept_dir'] = str(kept)
-            saved = kept / f"{basename}{self.SAVE_POINT_SUFFIX}"
+            point = save_point_name(basename, position)
+            saved = kept / f"{point}{self.SAVE_POINT_SUFFIX}"
             if not saved.is_file():
                 if writes_save_points:
                     logger.warning("Pass %s stopped on %s before any of its subtitles were ready, so none could be "
@@ -997,7 +1008,7 @@ class EnsembleOrchestrator:
                 continue
             stage, count = "", None
             try:
-                meta = json.loads((kept / f"{basename}.savepoint.json").read_text(encoding="utf-8"))
+                meta = json.loads((kept / f"{point}.savepoint.json").read_text(encoding="utf-8"))
                 stage, count = str(meta.get("stage") or ""), meta.get("subtitles")
             except (OSError, ValueError):
                 pass
