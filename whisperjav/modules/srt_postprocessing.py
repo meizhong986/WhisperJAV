@@ -138,14 +138,20 @@ class SRTPostProcessor:
             Tuple of (processed_file_path, statistics_dict)
         """
         srt_path = Path(srt_path)
+        # 1.10.3 subtitle sanitization gate: with relaxed, one line per file on the lines kept for the
+        # pass-through words (modules/subs_sanitization_gate.py); strict says nothing.
+        from whisperjav.modules import subs_sanitization_gate as gate
+        gate.reset_file()
 
         if self.language in ('ja', 'ko', 'zh'):
-            return self._process_cjk(srt_path, output_path)
+            result = self._process_cjk(srt_path, output_path)
         elif self.language == 'en':
-            return self._process_english(srt_path, output_path)
+            result = self._process_english(srt_path, output_path)
         else:
             logger.warning(f"Unknown language '{self.language}', defaulting to English sanitizer")
-            return self._process_english(srt_path, output_path)
+            result = self._process_english(srt_path, output_path)
+        gate.report_file()
+        return result
     
     
     def _process_cjk(self, srt_path: Path, output_path: Optional[Path]) -> Tuple[Path, Dict]:

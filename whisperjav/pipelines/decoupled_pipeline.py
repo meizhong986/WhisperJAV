@@ -405,6 +405,10 @@ class DecoupledPipeline(BasePipeline):
         # across the whole run.
         self.degradations = []
         self.notes = []   # 1.10.3: notes for the run summary, as ChronosJAV and the GGUF pipelines have
+        # 1.10.3 subtitle sanitization gate: this file's count of lines kept for the pass-through words starts at 0
+        # (its text cleaner adds to it; said where Phase 8 would run, with relaxed).
+        from whisperjav.modules import subs_sanitization_gate as gate
+        gate.reset_file()
         input_file = Path(media_info["path"])
         media_basename = media_info["basename"]
         pipeline_start = time.time()
@@ -831,6 +835,7 @@ class DecoupledPipeline(BasePipeline):
         # ==============================================================
         logger.info("[DecoupledPipeline PID %s] Phase 8: Skipped (sanitizer not yet implemented for generic pipeline)", os.getpid())
         phase8_start = time.time()
+        gate.report_file()   # 1.10.3 subtitle sanitization gate (relaxed): the file's line
 
         final_srt_path = self.output_dir / f"{media_basename}.{self.lang_code}.whisperjav.srt"
 

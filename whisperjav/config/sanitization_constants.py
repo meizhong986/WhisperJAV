@@ -14,6 +14,10 @@ class HallucinationConstants:
     """Constants for hallucination detection"""
     EXACT_LIST_URL: str = "https://gist.githubusercontent.com/meizhong986/ecca22c8ddb9dcab4f6df7813c275a00/raw/WhisperJAV_hallucination_regexp_v09.json"
     FILTER_LIST_URL: str = "https://gist.githubusercontent.com/meizhong986/4882bdb3f4f5aa4034a112cebd2e0845/raw/WhisperJAV_hallucination_filter_sorted_v08.json"
+    # 1.10.3 subtitle sanitization gate: the owner's pass-through words, read with --subs-sanitization-gate relaxed
+    # only (owner W790 6; in the filter list's gist, W799 10). Shipped copy:
+    # whisperjav/data/hallucination_filters/passthrough_v01.json.
+    PASSTHROUGH_LIST_URL: str = "https://gist.githubusercontent.com/meizhong986/4882bdb3f4f5aa4034a112cebd2e0845/raw/WhisperJAV_sanitization_passthrough_v01.json"
     FUZZY_MATCH_THRESHOLD: float = 0.9
     MIN_CONFIDENCE_THRESHOLD: float = 0.5
 
@@ -94,11 +98,11 @@ class TimingConstants:
     DEFAULT_DURATION: float = 2.0
     
     
-    # The minimum reading speed in Characters Per Second.
+    # The minimum CPS (characters per second): a hallucination test of the sanitizer's CPS check.
     # Subtitles below this will be sent to the TimingAdjuster for recalculation.
     MIN_SAFE_CPS: float = 1.0 
 
-    # The maximum reading speed in Characters Per Second.
+    # The maximum CPS (characters per second): a hallucination test of the sanitizer's CPS check.
     # Subtitles above this will be completely removed as artifacts.
     MAX_SAFE_CPS: float = 30.0
 

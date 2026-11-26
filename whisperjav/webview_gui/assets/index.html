@@ -426,14 +426,15 @@
                                     <input type="number" id="modelRefreshAudioMinutes" class="form-input" value="20" min="0" step="1" style="max-width: 6em;">
                                 </div>
                             </div>
-                            <!-- 1.10.3 (owner W753 CL2, W754; default strict W756 5): the subtitle sanitization gate. Same as
-                                 --subs-sanitization-gate. Read by both the Transcription and Ensemble runs. -->
+                            <!-- 1.10.3 (owner W753 CL2, W754; default strict W756 5; texts approved W802 3, W803 3): the subtitle
+                                 sanitization gate. Same as --subs-sanitization-gate. Read by both the Transcription
+                                 and Ensemble runs. -->
                             <div class="form-row" id="adv-row-6">
                                 <div class="form-group inline-field">
-                                    <label for="subsSanitizationGate" class="form-label" style="white-space: nowrap;" title="How strictly subtitle sanitization removes lines that contain words. Strict (default): as before. Relaxed: a line that begins with one of a short list of words, or has one right after a punctuation mark (for example 気持ちいい, イク, じゃあ), is kept even where sanitization would remove it. Lines of sounds only, and a lone はい or うん, are removed in both settings. Other sanitization rules, such as the reading-speed check, do not change. Same as --subs-sanitization-gate.">Subtitle sanitization gate:</label>
+                                    <label for="subsSanitizationGate" class="form-label" style="white-space: nowrap;" title="How strictly the subtitle clean-up treats words that are also common hallucinations. Strict (default): the clean-up as before. Relaxed: lets more terms through, such as 気持ちいい and イク, that strict can remove. Same as --subs-sanitization-gate.">Subtitle sanitization gate:</label>
                                     <select id="subsSanitizationGate" class="form-select" style="max-width: 22em;">
                                         <option value="strict" selected>Strict (default)</option>
-                                        <option value="relaxed">Relaxed: keep more lines with words</option>
+                                        <option value="relaxed">Relaxed: let more terms through</option>
                                     </select>
                                 </div>
                             </div>

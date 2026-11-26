@@ -11,6 +11,7 @@ from typing import Dict, List, Set, Tuple, Optional, Any
 from difflib import SequenceMatcher
 from whisperjav.utils.logger import logger
 from whisperjav.config.sanitization_constants import HallucinationConstants
+from whisperjav.modules import subs_sanitization_gate as gate
 
 
 # Cache configuration
@@ -452,6 +453,32 @@ class HallucinationRemover:
         return blacklist_phrases
         
     def remove_hallucinations(self, text: str, language: Optional[str] = None) -> Tuple[str, List[Dict[str, Any]]]:
+        """Strict's hallucination filter (_remove_hallucinations_strict, unchanged); with --subs-sanitization-gate
+        relaxed (1.10.3, modules/subs_sanitization_gate.py), a line the filter would remove that is made only of the
+        owner's pass-through words, and is not a loop, is returned as it came in. A line the filter keeps, or only
+        changes, is the filter's own result in both settings."""
+        result, modifications = self._remove_hallucinations_strict(text, language)
+        if result.strip() or not modifications or not gate.relaxed():
+            return result, modifications
+        if gate.spares(text, gate.key_for(self._list_key(language))):
+            gate.note(gate.HALLUCINATION_FILTER)
+            return text, []
+        return result, modifications
+
+    def _list_key(self, language: Optional[str]) -> Optional[str]:
+        """The key of the exact list _remove_hallucinations_strict uses for ``language`` (its fallback chain)."""
+        effective_language = (language or self.primary_language or 'ja').lower()
+        mapped_language = self.LANGUAGE_CODE_MAP.get(effective_language, effective_language)
+        for key in (mapped_language, effective_language):
+            if (self._exact_lists or {}).get(key):
+                return key
+        for fallback in ('japanese', 'ja'):
+            if fallback in (self._exact_lists or {}):
+                return fallback
+        return None
+
+    def _remove_hallucinations_strict(self, text: str,
+                                      language: Optional[str] = None) -> Tuple[str, List[Dict[str, Any]]]:
         """
         Multi-stage hallucination detection: bracket detection, exact matching
         (with punctuation normalization), and regex pattern matching.
@@ -487,12 +514,6 @@ class HallucinationRemover:
 
         # Normalize text for comparison: lowercase and remove leading/trailing whitespace
         normalized_text = text.strip().lower()
-
-        # 1.10.3 (owner W753 CL2, W754): with --subs-sanitization-gate relaxed, a line with a relaxed word (e.g. 気持ちいい,
-        # also as 「気持ちいい♡」 or 「気持ちいい」 in brackets) passes every stage below whole.
-        from whisperjav.modules.subtitle_pipeline.cleaners.subs_sanitization_gate import relaxed_keeps
-        if relaxed_keeps(text):
-            return text, []
 
         bracket_info = self._is_bracketed_context(text)
         if bracket_info:

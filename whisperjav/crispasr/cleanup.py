@@ -41,6 +41,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from whisperjav.modules import subs_sanitization_gate as gate
 from whisperjav.utils.logger import logger
 
 # SRT-level stages, in the order they run.
@@ -72,7 +73,14 @@ _JAPANESE_INTERJECTIONS = re.compile(r"^(?:あ+っ?|うん|えっ)+$")
 
 
 def is_interjection_line(text: str) -> bool:
-    """True for a line MOSS-CrispASR's interjection rules drop: rule (b) or rule (c)."""
+    """True for a line MOSS-CrispASR's interjection rules drop: rule (b) or rule (c), unless with
+    --subs-sanitization-gate relaxed it is made only of the pass-through words and is not a loop (1.10.3;
+    modules/subs_sanitization_gate.py)."""
+    return _interjection_rule(text) and not gate.spares(text, gate.JAPANESE)
+
+
+def _interjection_rule(text: str) -> bool:
+    """Rule (b) or rule (c), whatever the gate's setting."""
     core = _PUNCT.sub("", text or "")
     if not core:
         return False
@@ -186,6 +194,7 @@ class SrtCleanup:
                 except FileNotFoundError:
                     pass
         if count == 0 and not (trace and text_changes):
+            gate.report_file()
             return stats, 0
         began = time.time()
         sanitizer = None
@@ -238,7 +247,13 @@ class SrtCleanup:
                 self._record_filter(sanitizer, before, self._read(stitched), "scene_overlap")
         if count and INTERJECTIONS in self.stages:
             before = self._read(stitched)
-            kept = [s for s in before if not is_interjection_line(s.text)]
+            kept = []
+            for s in before:
+                if _interjection_rule(s.text):
+                    if not gate.spares(s.text, gate.JAPANESE):
+                        continue
+                    gate.note(gate.INTERJECTIONS)          # kept: made only of the pass-through words (relaxed)
+                kept.append(s)
             stats["interjections_dropped"] = len(before) - len(kept)
             if len(kept) != len(before):
                 import pysrt
@@ -256,6 +271,7 @@ class SrtCleanup:
             sanitizer._save_artifacts_srt(artifacts, count)
             stats["artifacts_srt"] = str(artifacts)
         stats["seconds"] = round(time.time() - began, 2)
+        gate.report_file()   # relaxed: the file's line on the lines kept for the pass-through words
         return stats, count
 
     @staticmethod

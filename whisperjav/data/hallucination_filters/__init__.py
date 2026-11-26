@@ -2,7 +2,7 @@
 """
 Bundled hallucination filter data.
 
-These files are snapshots of the online hallucination filter lists,
+These files are snapshots of the online lists (the owner's gists),
 bundled with the package for:
 1. Offline use (China, air-gapped networks)
 2. Faster startup (no network request needed)
@@ -11,9 +11,10 @@ bundled with the package for:
 Files:
 - filter_list_v08.json: Exact match phrases by language
 - regexp_v09.json: Regex patterns for hallucination detection
+- passthrough_v01.json: the subtitle sanitization gate's pass-through words by language (1.10.3; read only with
+  --subs-sanitization-gate relaxed)
 
-To update bundled files, run:
-    python -m whisperjav.utils.update_bundled_data
+The shipped copies are refreshed from the gists at release time (a step of the release checklist; no tool does it).
 """
 from pathlib import Path
 
@@ -29,3 +30,8 @@ def get_bundled_filter_list_path() -> Path:
 def get_bundled_regexp_path() -> Path:
     """Return path to bundled regexp patterns JSON."""
     return BUNDLED_DATA_DIR / "regexp_v09.json"
+
+
+def get_bundled_passthrough_path() -> Path:
+    """Return path to the bundled pass-through words JSON (subtitle sanitization gate, 1.10.3)."""
+    return BUNDLED_DATA_DIR / "passthrough_v01.json"

@@ -723,6 +723,10 @@ class QwenPipeline(BasePipeline):
         # Routine notes, printed under the file's row in the run summary; they never change its state (main.py,
         # "Routine notes from the passes"). 1.10.2 (#501): the aligner events go here, as in the GGUF pipelines.
         self.notes = []
+        # 1.10.3 subtitle sanitization gate: this file's count of lines kept for the pass-through words starts at 0
+        # (the text cleaner and Phase 8 add to it; said at the end of Phase 8, with relaxed).
+        from whisperjav.modules import subs_sanitization_gate as gate
+        gate.reset_file()
         input_file = Path(media_info["path"])
         media_basename = media_info["basename"]
         pipeline_start = time.time()
@@ -1383,6 +1387,7 @@ class QwenPipeline(BasePipeline):
             )
 
         final_srt_path = self.output_dir / f"{media_basename}.{self.lang_code}.whisperjav.srt"
+        gate.report_file()   # 1.10.3 subtitle sanitization gate (relaxed): the file's line
 
         if num_subtitles > 0:
             shutil.copy2(stitched_srt_path, final_srt_path)

@@ -16,6 +16,8 @@ import requests
 import json
 import logging
 
+from whisperjav.modules import subs_sanitization_gate as gate
+
 # --- English Sanitization Constants ---
 ENGLISH_CONSTANTS = {
     "HALLUCINATION_LIST_URL": "https://gist.githubusercontent.com/meizhong986/4882bdb3f4f5aa4034a112cebd2e0845/raw/WhisperJAV_hallucination_filter_sorted_v08.json",
@@ -234,6 +236,9 @@ class EnglishSubtitleCleaner:
         self.subs = []
         self.log_subs = []
         self.hallucinations = self._load_hallucination_phrases()
+        # 1.10.3 subtitle sanitization gate (relaxed): the lines a step kept for the English pass-through words
+        # (counted once each, at the end, if still there).
+        self._kept_for_words = set()
 
         self.artefact_patterns = [re.compile(p) for p in [
             r'\(.*?\)', r'\[.*?\]', r'★.*?★', r'【.*?】', r'「.*?」',
@@ -302,6 +307,8 @@ class EnglishSubtitleCleaner:
         self._remove_internal_repetitions()
         self._remove_hallucinations()
         self._drop_empty_subs()
+        for _ in self._kept_for_words & {s.index for s in self.subs}:   # before _finalize renumbers the lines
+            gate.note(gate.ENGLISH_CLEANUP)
         self._finalize()
         return self._write_output()
 
@@ -311,6 +318,11 @@ class EnglishSubtitleCleaner:
             for pattern in self.artefact_patterns:
                 sub.content = pattern.sub('', sub.content)
             sub.content = re.sub(r'\s+', ' ', sub.content).strip()
+            # 1.10.3 subtitle sanitization gate (relaxed): strips that would empty a line made only of the English
+            # pass-through words, and not a loop, are not made (an emptied line is dropped later).
+            if not sub.content and original and gate.spares(original, gate.ENGLISH):
+                sub.content = original
+                self._kept_for_words.add(sub.index)
             if original != sub.content:
                 self._add_log(sub, f"[REMOVED ARTEFACTS] {original} -> {sub.content}")
 
@@ -335,7 +347,13 @@ class EnglishSubtitleCleaner:
         filtered = []
         for sub in self.subs:
             if self._is_hallucinated(sub.content):
-                self._add_log(sub, f"[REMOVED HALLUCINATION] {sub.content}")
+                # 1.10.3 subtitle sanitization gate (relaxed): a line made only of the English pass-through words,
+                # and not a loop, is kept; strict, removed as before.
+                if gate.spares(sub.content, gate.ENGLISH):
+                    self._kept_for_words.add(sub.index)
+                    filtered.append(sub)
+                else:
+                    self._add_log(sub, f"[REMOVED HALLUCINATION] {sub.content}")
             else:
                 filtered.append(sub)
         self.subs = filtered

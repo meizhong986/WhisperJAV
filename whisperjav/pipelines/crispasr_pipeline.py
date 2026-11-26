@@ -274,6 +274,10 @@ class CrispASRPipeline(BasePipeline):
         self.notes = []
         self._text_changes = []
         self._model_texts = {}
+        # 1.10.3 subtitle sanitization gate: this file's count of lines kept for the pass-through words starts at 0
+        # (the text cleaner adds to it; cleanup.SrtCleanup.run says it, with relaxed).
+        from whisperjav.modules import subs_sanitization_gate as gate
+        gate.reset_file()
         input_file = Path(media_info["path"])
         basename = media_info["basename"]
         md = self._new_metadata(input_file, basename)

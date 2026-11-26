@@ -643,6 +643,9 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
     pass_number = payload.pass_number
     media_files = payload.media_files
     language_code = payload.language_code or resolve_language_code(pass_config, payload.subs_language)
+    # 1.10.3 subtitle sanitization gate (owner W799 6): its console lines in this process name the pass.
+    from whisperjav.modules import subs_sanitization_gate
+    subs_sanitization_gate.set_pass(pass_number)
 
     logger.info(
         "Starting pass %s for %s file(s)",

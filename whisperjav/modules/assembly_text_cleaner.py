@@ -35,6 +35,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 import regex
 
+from whisperjav.modules import subs_sanitization_gate as gate
 from whisperjav.utils.logger import logger
 
 
@@ -232,6 +233,8 @@ class AssemblyTextCleaner:
 
         # Lazy-loaded hallucination data (only if stage 3 is enabled)
         self._hallucination_set: Optional[set] = None
+        # 1.10.3 subtitle sanitization gate: the key of the list stage 3 uses (its pass-through words follow it)
+        self._hallucination_key: str = "japanese"
 
         logger.debug(
             "AssemblyTextCleaner initialized (language=%s, enabled=%s, stages=%s)",
@@ -527,8 +530,11 @@ class AssemblyTextCleaner:
         original = text
         sentences = self._split_sentences(text)
         kept = []
-        # 1.10.3 (owner W753 CL2, W754): with --subs-sanitization-gate relaxed, a sentence holding a relaxed term is kept.
-        from whisperjav.modules.subtitle_pipeline.cleaners.subs_sanitization_gate import relaxed_keeps
+        # 1.10.3 subtitle sanitization gate (modules/subs_sanitization_gate.py): relaxed, a sentence the list would
+        # remove that is made only of the pass-through words is kept, unless the whole text is a loop (owner W803
+        # N14: judged on the whole text, not sentence by sentence); strict, as before.
+        words_key = gate.key_for(self._hallucination_key)
+        text_is_loop = None
 
         for sentence in sentences:
             stripped = sentence.strip()
@@ -537,7 +543,14 @@ class AssemblyTextCleaner:
 
             # Check exact match (case-insensitive, stripped)
             normalized = stripped.lower()
-            if normalized in self._hallucination_set and not relaxed_keeps(stripped):
+            if normalized in self._hallucination_set:
+                if gate.spares(stripped, words_key):
+                    if text_is_loop is None:
+                        text_is_loop = gate.is_loop(original)
+                    if not text_is_loop:
+                        gate.note(gate.TEXT_CLEANER)
+                        kept.append(sentence)
+                        continue
                 stats["lines_removed"] += 1
                 stats["modifications"] += 1
                 logger.debug(
@@ -592,12 +605,15 @@ class AssemblyTextCleaner:
             mapped = code_map.get(lang_key, lang_key)
 
             phrases = exact_lists.get(mapped, set())
+            self._hallucination_key = mapped
             if not phrases:
                 # Try original key
                 phrases = exact_lists.get(lang_key, set())
+                self._hallucination_key = lang_key
             if not phrases:
                 # Final fallback to Japanese
                 phrases = exact_lists.get('japanese', set())
+                self._hallucination_key = 'japanese'
 
             # Normalize all phrases to lowercase for matching
             normalized = {p.lower().strip() for p in phrases if p and p.strip()}

@@ -1,0 +1,12 @@
+{
+  "meta": {
+    "name": "WhisperJAV subtitle sanitization pass-through words",
+    "version": 1,
+    "updated": "2026-11-25",
+    "use": "Words that --subs-sanitization-gate relaxed lets through. One word per entry; list each written form (気持ちいい, きもちいい)."
+  },
+  "japanese": ["気持ちいい", "きもちいい", "気持ち良い", "キモチイイ", "イク", "いく", "逝く"],
+  "english": [],
+  "chinese": [],
+  "korean": []
+}

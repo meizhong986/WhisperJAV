@@ -22,6 +22,7 @@ from typing import Dict, Union
 
 import pysrt
 
+from whisperjav.modules import subs_sanitization_gate as gate
 from whisperjav.utils.logger import logger
 
 
@@ -278,7 +279,14 @@ def _is_japanese_sound_line(text: str) -> bool:
 
 
 def _should_remove_entry(text: str) -> bool:
-    """Decide whether a subtitle entry should be removed.
+    """True when the entry is sounds only (_is_sound_entry), unless with --subs-sanitization-gate relaxed it is made
+    only of the pass-through words and is not a loop (1.10.3; modules/subs_sanitization_gate.py): the filter's
+    decision, also for the split check (orchestrator.line_filter_test)."""
+    return _is_sound_entry(text) and not gate.spares(text, gate.JAPANESE)
+
+
+def _is_sound_entry(text: str) -> bool:
+    """Decide whether a subtitle entry is sounds only (the rule, whatever the gate's setting).
 
     The decision is based solely on the Japanese lines (bilingual entries'
     translation lines are ignored). The entry is removed only when EVERY
@@ -292,10 +300,6 @@ def _should_remove_entry(text: str) -> bool:
     """
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     if not lines:
-        return False
-    # 1.10.3 (owner W753 CL2, W754): with --subs-sanitization-gate relaxed, an entry holding a relaxed term is kept.
-    from whisperjav.modules.subtitle_pipeline.cleaners.subs_sanitization_gate import relaxed_keeps
-    if relaxed_keeps(text):
         return False
     ja_lines = [ln for ln in lines if _contains_japanese(ln)]
     if not ja_lines:
@@ -344,9 +348,12 @@ class NonlinguisticUtteranceFilter:
             if not text:
                 stats["dropped_empty"] += 1
                 continue
-            if _should_remove_entry(text):
-                stats["dropped_nonlinguistic"] += 1
-                continue
+            if _is_sound_entry(text):
+                if gate.spares(text, gate.JAPANESE):
+                    gate.note(gate.NONLINGUISTIC)     # kept: made only of the pass-through words (relaxed)
+                else:
+                    stats["dropped_nonlinguistic"] += 1
+                    continue
             kept.append(sub)
 
         for new_idx, sub in enumerate(kept, start=1):

@@ -36,6 +36,7 @@ from typing import Dict, Union
 
 import pysrt
 
+from whisperjav.modules import subs_sanitization_gate as gate
 from whisperjav.utils.logger import logger
 
 # Owner-curated whole-line nonverbal / truncation tokens (v1.9.0), plus the lone
@@ -91,7 +92,14 @@ class NonverbalLineFilter:
         """
         if not text:
             return False
-        return bool(_NONVERBAL_RE.match(_without_punctuation(text)))
+        # 1.10.3 subtitle sanitization gate (relaxed): a lone token made only of the owner's pass-through words
+        # (none of NONVERBAL_TOKENS is one today) is kept; the split check (orchestrator.line_filter_test) agrees.
+        return NonverbalLineFilter._is_lone_token(text) and not gate.spares(text, gate.JAPANESE)
+
+    @staticmethod
+    def _is_lone_token(text: str) -> bool:
+        """The rule, whatever the gate's setting: the line without punctuation is one curated token."""
+        return bool(text) and bool(_NONVERBAL_RE.match(_without_punctuation(text)))
 
     def filter_srt_file(self, srt_path: Union[str, Path]) -> Dict[str, int]:
         """Drop empty + nonverbal-token entries in place, renumber, write back.
@@ -129,9 +137,12 @@ class NonverbalLineFilter:
                 # empty, or nothing left after whitespace and punctuation (#413)
                 stats["dropped_empty"] += 1
                 continue
-            if self.is_nonverbal_line(text):
-                stats["dropped_nonverbal"] += 1
-                continue
+            if self._is_lone_token(text):
+                if gate.spares(text, gate.JAPANESE):
+                    gate.note(gate.NONVERBAL)         # kept: made only of the pass-through words (relaxed)
+                else:
+                    stats["dropped_nonverbal"] += 1
+                    continue
             kept.append(sub)
 
         # Renumber surviving entries (1, 2, 3, ...).
