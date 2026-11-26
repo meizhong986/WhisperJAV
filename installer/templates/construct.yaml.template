@@ -29,6 +29,10 @@ specs:
   - git=2.56.0      # Required for GitHub installs
   - ffmpeg=8.1.2=gpl_ha77653d_912  # Audio/video processing. v1.10.2 (owner W610): FFmpeg 8.1.2, with the build a conda solve of these six entries gave on 2026-11-08 (before: 7.1.1)
   - menuinst=2.5.2  # Desktop/Start Menu shortcut creation
+  # v1.10.3 (owner W57, W820): conda installs packaging as a dependency of glib (with ffmpeg), and post_install
+  # stops when its version is not the lock's. Fixed here at the lock's version; it changes only together with
+  # the lock's packaging line (uv.lock and whisperjav/installer/locked/requirements_*.txt), in a larger release.
+  - packaging=26.3
 
 
 # Default installation path (user can override during install)
