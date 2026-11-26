@@ -20,7 +20,7 @@ import numpy as np
 import soundfile as sf
 
 from .base import SceneDetectionError, SceneDetectionResult, SceneInfo
-from .utils import brute_force_split, save_scene_wav
+from .utils import brute_force_split, join_short_scenes, save_scene_wav
 
 logger = logging.getLogger("whisperjav")
 
@@ -98,9 +98,11 @@ class AuditokSceneDetector:
     Pass 2 chunks each chapter to the consumer's max_duration.
 
     If Pass 2 finds no sub-regions, falls back to brute-force splitting.
+    A piece shorter than min_duration (the shortest scene) is joined to its neighbour, never dropped (1.10.3, owner
+    W808 D1, W813; utils.join_short_scenes).
 
     Fixes from DynamicSceneDetector:
-    - Counting bug: counts only scenes that survive min_duration filter
+    - Counting bug: counts the scenes saved
     - Silent failure: raises SceneDetectionError on audio load failure
     - Mutable state: cleared at start of each detect_scenes() call
     """
@@ -407,14 +409,21 @@ class AuditokSceneDetector:
         media_basename: str,
     ) -> Tuple[List[SceneInfo], Dict[str, int]]:
         """
-        Process each story line: direct save if small enough, else Pass 2 split.
+        Cut the story lines into pieces, join the short ones, then save the scenes (1.10.3, owner W808 D1, W813).
 
-        Returns (scenes, counters) where counters tracks direct/granular/brute counts.
+        A story line within max_duration is one piece, whatever its length; a longer one goes to Pass 2 (or, when Pass 2
+        finds nothing, to the fixed-length split), and every piece it gives is kept. Then a piece shorter than
+        min_duration (the shortest scene) is joined to its neighbour (utils.join_short_scenes): nothing is dropped for
+        being short. Before 1.10.3 a story line or a piece shorter than min_duration was dropped with its audio.
+
+        Returns (scenes, counters); counters count the scenes by where their pieces came from: "direct" (all from
+        Pass 1), "brute_force" (any from the fixed-length split), "granular" (the others).
         """
         cfg = self._config
         scenes: List[SceneInfo] = []
-        scene_idx = 0
         counters = {"direct": 0, "granular": 0, "brute_force": 0}
+        # (start, end, origin) of every piece, origin "direct", "granular" or "brute_force"
+        pieces: List[Tuple[float, float, str]] = []
 
         total_storylines = len(story_lines)
         last_logged_pct = -1
@@ -433,21 +442,10 @@ class AuditokSceneDetector:
             region_end = region.end
             region_duration = region_end - region_start
 
-            # Direct save if fits within max_duration
-            if cfg.min_duration <= region_duration <= cfg.max_duration:
-                s, e = self._clamp_with_pad(region_start, region_end, total_duration)
-                start_sample = int(s * sample_rate)
-                end_sample = int(e * sample_rate)
-                scene_path = save_scene_wav(
-                    audio_data[start_sample:end_sample],
-                    sample_rate, scene_idx, output_dir, media_basename,
-                )
-                scenes.append(SceneInfo(
-                    start_sec=s, end_sec=e, scene_path=scene_path,
-                    detection_pass=1,
-                ))
-                scene_idx += 1
-                counters["direct"] += 1
+            # Within max_duration: one piece as it is, short or not (it is joined below if short)
+            if region_duration <= cfg.max_duration:
+                if region_duration > 0:
+                    pieces.append((region_start, region_end, "direct"))
                 continue
 
             # Pass 2: Split oversized region
@@ -462,22 +460,8 @@ class AuditokSceneDetector:
                 for sub in sub_regions:
                     sub_start = region_start + sub.start
                     sub_end = region_start + sub.end
-                    sub_dur = sub_end - sub_start
-                    if sub_dur < cfg.min_duration:
-                        continue
-                    s, e = self._clamp_with_pad(sub_start, sub_end, total_duration)
-                    start_sample = int(s * sample_rate)
-                    end_sample = int(e * sample_rate)
-                    scene_path = save_scene_wav(
-                        audio_data[start_sample:end_sample],
-                        sample_rate, scene_idx, output_dir, media_basename,
-                    )
-                    scenes.append(SceneInfo(
-                        start_sec=s, end_sec=e, scene_path=scene_path,
-                        detection_pass=2,
-                    ))
-                    scene_idx += 1
-                    counters["granular"] += 1  # Count AFTER min_duration filter
+                    if sub_end > sub_start:
+                        pieces.append((sub_start, sub_end, "granular"))
             else:
                 # Brute-force fallback
                 if not cfg.brute_force_fallback:
@@ -496,22 +480,35 @@ class AuditokSceneDetector:
                     cfg.brute_force_chunk_s, cfg.min_duration,
                 )
                 for bf in bf_scenes:
-                    s, e = self._clamp_with_pad(
-                        bf.start_sec, bf.end_sec, total_duration
-                    )
-                    start_sample = int(s * sample_rate)
-                    end_sample = int(e * sample_rate)
-                    scene_path = save_scene_wav(
-                        audio_data[start_sample:end_sample],
-                        sample_rate, scene_idx, output_dir, media_basename,
-                    )
-                    scenes.append(SceneInfo(
-                        start_sec=s, end_sec=e, scene_path=scene_path,
-                        detection_pass=2,
-                        metadata={"split_method": "brute_force"},
-                    ))
-                    scene_idx += 1
-                    counters["brute_force"] += 1
+                    pieces.append((bf.start_sec, bf.end_sec, "brute_force"))
+
+        pieces.sort(key=lambda p: (p[0], p[1]))
+        groups = join_short_scenes([(p[0], p[1]) for p in pieces], cfg.min_duration, cfg.max_duration)
+
+        for scene_idx, group in enumerate(groups):
+            origins = {pieces[i][2] for i in group}
+            s, e = self._clamp_with_pad(pieces[group[0]][0], pieces[group[-1]][1], total_duration)
+            start_sample = int(s * sample_rate)
+            end_sample = int(e * sample_rate)
+            scene_path = save_scene_wav(
+                audio_data[start_sample:end_sample],
+                sample_rate, scene_idx, output_dir, media_basename,
+            )
+            metadata: Dict[str, Any] = {}
+            if "brute_force" in origins:
+                metadata["split_method"] = "brute_force"
+                counters["brute_force"] += 1
+            elif origins == {"direct"}:
+                counters["direct"] += 1
+            else:
+                counters["granular"] += 1
+            if len(group) > 1:
+                metadata["joined_pieces"] = len(group)
+            scenes.append(SceneInfo(
+                start_sec=s, end_sec=e, scene_path=scene_path,
+                detection_pass=1 if origins == {"direct"} else 2,
+                metadata=metadata,
+            ))
 
         return scenes, counters
 

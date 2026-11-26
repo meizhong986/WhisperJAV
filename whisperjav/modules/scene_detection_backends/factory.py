@@ -62,12 +62,6 @@ _BACKEND_DEPENDENCIES: Dict[str, Dict[str, Any]] = {
     },
 }
 
-# 1.10.3 (owner W751 C9): the scene detectors that join a scene shorter than min_duration to its neighbours. The others
-# (auditok, silero) drop such a scene, and its speech, so a minimum meant for merging (ChronosJAV's and the decoupled
-# pipeline's 12 s) is given only to these.
-MERGING_SCENE_DETECTORS = frozenset({"semantic"})
-
-
 class SceneDetectorFactory:
     """
     Factory for creating scene detector instances.

@@ -1039,7 +1039,8 @@ def parse_arguments():
                            action="store_false",
                            help="Disable safe chunking, allow longer scenes")
     qwen_audio_group.add_argument("--qwen-scene-min-duration", type=float, default=None,
-                           help="Minimum scene duration in seconds (default: 12)")
+                           help="Shortest scene in seconds; a shorter piece is joined to its neighbour, never "
+                                "dropped (default: 12)")
     qwen_audio_group.add_argument("--qwen-scene-max-duration", type=float, default=None,
                            help="Maximum scene duration in seconds (default: 48)")
     qwen_audio_group.add_argument("--qwen-scene-clustering-threshold", type=float, default=None,

@@ -2679,7 +2679,7 @@ class WhisperJAVAPI:
                     "scene_min_duration": {
                         "type": "slider",
                         "label": "Min Duration",
-                        "description": "Minimum scene length (default: 12s)",
+                        "description": "Shortest scene: a shorter piece is joined to its neighbour (default: 12 s)",
                         "group": "scene_bounds",
                         "min": 5, "max": 60, "step": 1,
                         "default": 12,
@@ -3127,8 +3127,8 @@ class WhisperJAVAPI:
                                         scene_detector: str = None) -> Dict[str, Any]:
         """The values a CrispASR pass runs with, for its Customize window (design 22.9.1; owner W214 2,
         W232 8): the Segmenter tab as segmenter_settings() resolves them, the Scene tab as the pipeline
-        sets its scene detector (semantic with the pipeline's minimum, 12 s, MOSS-CrispASR 90 s, W482; auditok and
-        silero their own minimum; the pipeline's longest scene, 48 s, MOSS-CrispASR 240 s; rscn the values of its
+        sets its scene detector (semantic, auditok and silero with the pipeline's minimum, 12 s, MOSS-CrispASR 90 s,
+        W482, W813 Q4; the pipeline's longest scene, 48 s, MOSS-CrispASR 240 s; rscn the values of its
         preset for the tab's controls, 1.10.1, owner W455), and for MOSS-CrispASR its MOSS tab (1.10.1, W428 I1 4:
         crispasr/moss_prompt.py; "model": schema and values; None for the other pipelines).
         Light: no PyTorch, no CrispASR."""
@@ -3155,7 +3155,9 @@ class WhisperJAVAPI:
                 from whisperjav.modules.scene_detection_backends.silero_backend import SileroSceneDetector
                 build = (SileroSceneDetector._build_silero_config if method == "silero"
                          else AuditokSceneDetector._build_config_from_kwargs)
-                for key, value in dataclasses.asdict(build({"max_duration": longest})).items():
+                shortest = scene_min_s_for(pipeline)   # 1.10.3 (W813 Q4): joined, not dropped, so given to all
+                for key, value in dataclasses.asdict(build({"max_duration": longest,
+                                                            "min_duration": shortest})).items():
                     scene[key] = value
                     if not key.endswith("_s"):
                         scene[key + "_s"] = value  # the spelling the Scene tab's controls use

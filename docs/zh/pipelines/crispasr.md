@@ -140,7 +140,7 @@ whisperjav video.mp4 --ensemble --pass1-pipeline parakeet-crispasr --pass2-pipel
 | 模型 | Model | `--pass1-model`、`--pass2-model` | 各处理管线的模型，见上面两张表 |
 | 语音分割器 | Speech Segmenter | `--pass1-speech-segmenter` | 任一；`none` 不做语音检测，把每个场景整段交给模型 |
 | 灵敏度 | Sensitivity | `--pass1-sensitivity` | `conservative`、`balanced`、`aggressive`；Parakeet-、ReazonSpeech-、Haas- 和 Qwen3-ASR-CrispASR 默认 `aggressive`，其他默认 `balanced` |
-| 场景检测器 | Scene Detector | `--pass1-scene-detector` | `semantic`（默认）、`auditok`、`silero`：场景最长 48 秒，semantic 的场景最短 12 秒（MOSS-CrispASR：最长 240 秒，semantic 最短 90 秒）；`none`（每个文件一个场景） |
+| 场景检测器 | Scene Detector | `--pass1-scene-detector` | `semantic`（默认）、`auditok`、`silero`：场景通常为 12 到 48 秒，更短的片段并入相邻片段（MOSS-CrispASR：90 到 240 秒）；`none`（每个文件一个场景） |
 | 语音增强器 | Speech Enhancer | `--pass1-speech-enhancer` | `none`（默认），或其他 Pass 可用的语音增强器，例如 `ffmpeg-dsp`、`zipenhancer` 或 `htdemucs` |
 | 仅用于 VAD 的增强 | 仅用于 VAD（Speech Enhancer 菜单中） | `--pass1-enhance-for-vad` | 增强后的音频只交给语音分割器；CrispASR 听到的是原始音频 |
 | 检测阈值 | Customize，Segmenter 选项卡 | `--pass1-vad-threshold` | 0 到 1；覆盖灵敏度设定的值 |

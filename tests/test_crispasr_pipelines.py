@@ -866,9 +866,10 @@ class TestMoss:
             assert s.config["min_group_duration_s"] == 0.0
             assert s.config["threshold"] == resolve_segmenter_sensitivity("firered-vad", sensitivity)["threshold"]
             assert pipe.scene_detector_kwargs() == {"method": "semantic", "min_duration": 90, "max_duration": 240}
-        # a user who chooses silero (W482: their choice): its own minimum, MOSS's longest scene; Silero's 0.7 (W426 2)
+        # a user who chooses silero (W482: their choice): MOSS's shortest (since 1.10.3, W813 Q4: joined, not dropped)
+        # and longest scene; Silero's 0.7 (W426 2)
         pipe = make(MossCrispASRPipeline, tmp_path, scene_detector="silero", speech_segmenter="silero-v6.2")
-        assert pipe.scene_detector_kwargs() == {"method": "silero", "max_duration": 240}
+        assert pipe.scene_detector_kwargs() == {"method": "silero", "min_duration": 90, "max_duration": 240}
         assert pipe.segmenter.config["threshold"] == 0.7
         # the Customize Scene values on top
         pipe = make(MossCrispASRPipeline, tmp_path, scene_params={"min_duration": 120, "max_duration": 300})

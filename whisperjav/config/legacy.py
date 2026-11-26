@@ -113,11 +113,12 @@ LEGACY_PIPELINES = {
         # minutes until 2026-09-11; measured on a 179-minute film, 1200 s left 60% of the
         # film in scenes over 240 s, and each such scene is decoded as one long chain of
         # 30 s recogniser windows. The keys differ by backend because the backends read
-        # different names, and 28 is only SAFE on semantic, whose min_duration merges. On
-        # auditok min_duration DISCARDS shorter regions, so only the ceiling is set there,
-        # and auditok's own ceiling deliberately stays at 20 minutes (owner decision:
-        # semantic first; other backends after user feedback). fast declares nothing here
-        # and keeps the backend's own defaults.
+        # different names. 28 was set on semantic only because auditok's min_duration then
+        # DISCARDED shorter regions (since 1.10.3, owner W808 D1, W813, it joins them to a
+        # neighbour); only the ceiling is set for auditok, and auditok's own ceiling
+        # deliberately stays at 20 minutes (owner decision: semantic first; other backends
+        # after user feedback; W813 Q5 keeps it so). fast declares nothing here and keeps
+        # the backend's own defaults.
         "scene_overrides": {
             "semantic": {
                 "scene_detection.min_duration": 28.0,
@@ -161,9 +162,9 @@ LEGACY_PIPELINES = {
         # so 47% of the audio took 64% of the pass. A short scene still costs a whole
         # padded 30 s window.
         #
-        # 28 is only SAFE on the semantic detector, whose min_duration merges short pieces
-        # into their neighbour. On auditok min_duration DISCARDS a shorter region, which
-        # would lose speech, so nothing is set for auditok here.
+        # 28 was set on the semantic detector only, because auditok's min_duration then
+        # DISCARDED a shorter region, which would lose speech (since 1.10.3, owner W808 D1,
+        # W813, it joins it to a neighbour); nothing is set for auditok here (W813 Q5).
         "scene_overrides": {
             "semantic": {
                 "scene_detection.min_duration": 28.0,
@@ -188,8 +189,9 @@ LEGACY_PIPELINES = {
 #
 # Resolving the feature from the effective method also closes a trap that appears once
 # a semantic component exists: the auditok backend falls back to the bare names when
-# the _s ones are absent, and its min_duration DISCARDS shorter regions, so handing
-# auditok a semantic min_duration of 28 would delete every region under 28 seconds.
+# the _s ones are absent, so handing auditok a semantic min_duration of 28 would make
+# 28 s its shortest scene (before 1.10.3, when its min_duration discarded shorter
+# regions, it would have deleted every region under 28 seconds).
 SCENE_FEATURE_BY_METHOD = {
     "auditok": "auditok_scene_detection",
     "silero": "silero_scene_detection",

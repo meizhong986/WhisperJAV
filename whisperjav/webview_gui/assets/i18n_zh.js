@@ -720,7 +720,7 @@ window.WJ_I18N_ZH = {
   "Safe Chunking": "安全分块",
   "Gives the scene detector Min Duration and Max Duration (12 s and 48 s by default) as the shortest and longest scene. Off: the scene detector's own lengths.": "把最短时长和最长时长（默认 12 秒和 48 秒）作为最短和最长场景交给场景检测器。关闭：使用场景检测器自己的长度。",
   "Min Duration": "最短时长",
-  "Minimum scene length (default: 12s)": "最短场景长度（默认：12 秒）",
+  "Shortest scene: a shorter piece is joined to its neighbour (default: 12 s)": "最短场景长度：更短的片段会并入相邻片段（默认：12 秒）",
   "Max Duration": "最长时长",
   "Maximum scene length (default: 48s)": "最长场景长度（默认：48 秒）",
   "Scene Change Threshold": "场景切换阈值",

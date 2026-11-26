@@ -5,6 +5,7 @@ Contains common operations used across multiple backends:
 - Audio loading (load_audio_unified)
 - WAV file saving (save_scene_wav)
 - Brute-force time-based splitting (brute_force_split)
+- Joining pieces shorter than the shortest scene to a neighbour (join_short_scenes, 1.10.3)
 """
 
 import logging
@@ -152,6 +153,55 @@ def save_scene_wav(
     return scene_path
 
 
+def join_short_scenes(spans: List[Tuple[float, float]], min_duration: float,
+                      max_duration: float) -> List[List[int]]:
+    """Group a scene detector's pieces so that no scene is shorter than the shortest scene (Min Duration), without
+    dropping any (1.10.3, owner W808 D1: "smaller pieces would be grouped until it reaches above more than the Minimum
+    Duration"; W813 Q1-Q3).
+
+    ``spans`` are the pieces' (start, end) in seconds, in time order and not overlapping. A piece (or group) shorter
+    than ``min_duration`` is joined to the neighbour with the shorter silence between them (on a tie, the one before),
+    first only where the joined scene stays within ``max_duration``; a piece still short then is joined anyway where
+    the joined scene passes ``max_duration`` by at most ``min_duration``, as the semantic detector does (W813 Q2 (a)).
+    A scene's length is from its start to its end, the silence between its pieces included (W813 Q3 (a)). A piece that
+    cannot be joined within those limits stays a scene of its own. Returns the groups as lists of piece indices, in
+    time order; every index appears once."""
+    groups: List[List[int]] = [[i] for i in range(len(spans))]
+    if len(groups) < 2 or min_duration <= 0:
+        return groups
+
+    def span(group: List[int]) -> Tuple[float, float]:
+        return spans[group[0]][0], spans[group[-1]][1]
+
+    def length(group: List[int]) -> float:
+        s, e = span(group)
+        return e - s
+
+    for limit in (max_duration, max_duration + min_duration):
+        changed = True
+        while changed and len(groups) > 1:
+            changed = False
+            for i, group in enumerate(groups):
+                if length(group) >= min_duration:
+                    continue
+                neighbours = []
+                if i > 0:
+                    neighbours.append((span(group)[0] - span(groups[i - 1])[1], 0, i - 1))
+                if i < len(groups) - 1:
+                    neighbours.append((span(groups[i + 1])[0] - span(group)[1], 1, i + 1))
+                for _gap, _order, j in sorted(neighbours):
+                    first, last = (groups[j], group) if j < i else (group, groups[j])
+                    if span(last)[1] - span(first)[0] <= limit:
+                        merged = first + last
+                        lo = min(i, j)
+                        groups[lo:lo + 2] = [merged]
+                        changed = True
+                        break
+                if changed:
+                    break
+    return groups
+
+
 def brute_force_split(
     start_sec: float,
     end_sec: float,
@@ -169,7 +219,9 @@ def brute_force_split(
         start_sec: Start of the range to split (seconds)
         end_sec: End of the range to split (seconds)
         chunk_duration: Target duration for each chunk (seconds)
-        min_duration: Minimum duration for a chunk to be kept (seconds)
+        min_duration: Not a filter since 1.10.3 (owner W808 D1, W813): every chunk is kept, a short last one too;
+            the caller joins a chunk shorter than the shortest scene to its neighbour (join_short_scenes). Kept so the
+            chunk count stays as before.
 
     Returns:
         List of SceneInfo with time boundaries (scene_path not set,
@@ -188,7 +240,7 @@ def brute_force_split(
         sub_end = min(start_sec + (i + 1) * chunk_duration, end_sec)
         sub_dur = sub_end - sub_start
 
-        if sub_dur < min_duration:
+        if sub_dur <= 0:
             continue
 
         scenes.append(SceneInfo(

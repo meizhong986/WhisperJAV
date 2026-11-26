@@ -42,8 +42,9 @@ from whisperjav.crispasr.manifest import CRISPASR_PIPELINES, JAPANESE_NAMES
 # The scene detector the CrispASR pipelines run when the pass names none (owner W214 2), the shortest semantic scene
 # (ChronosJAV's 12 s, W202 5d) and the longest scene.
 # MOSS-CrispASR (owner W482; docs/plans/design/2026-11-03-moss-default-semantic-firered.md): semantic scenes of 90 to
-# 240 s. The 90 s is semantic's real merge floor (shorter pieces join a neighbour; no audio is dropped); auditok and
-# silero keep their own minimum. The 240 s is the longest scene the pass asks for, whatever scene detector it runs;
+# 240 s. The 90 s is the shortest scene for semantic, auditok and silero alike (shorter pieces join a neighbour; since
+# 1.10.3, owner W808 D1, W813 Q4, auditok and silero too; before, they kept their own minimum because they dropped
+# a shorter piece). The 240 s is the longest scene the pass asks for, whatever scene detector it runs;
 # semantic can pass it when its final clean-up joins a piece shorter than 90 s to a neighbour (it logs a warning). The
 # VAD groups, what MOSS hears, stay at most 240 s (MOSS_MAX_GROUP_S), except with the speech segmenter none. Before W482:
 # silero with a 420 s maximum (W426 4), whose first pass ends a scene at a short silence, so a short scene gave MOSS a
@@ -62,7 +63,7 @@ def scene_detector_for(pipeline: str) -> str:
 
 
 def scene_min_s_for(pipeline: str) -> float:
-    """The shortest semantic scene of a CrispASR pass (auditok and silero keep their own minimum)."""
+    """The shortest scene of a CrispASR pass (semantic, auditok and silero alike since 1.10.3, W813 Q4)."""
     return SCENE_MIN_S_FOR.get(pipeline, CRISPASR_SCENE_MIN_S)
 
 

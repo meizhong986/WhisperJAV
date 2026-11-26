@@ -794,7 +794,7 @@ class QwenPipeline(BasePipeline):
         scenes_dir = self.temp_dir / "scenes"
         scenes_dir.mkdir(exist_ok=True)
 
-        from whisperjav.modules.scene_detection_backends import MERGING_SCENE_DETECTORS, SceneDetectorFactory
+        from whisperjav.modules.scene_detection_backends import SceneDetectorFactory
 
         # Configure scene detector parameters
         scene_detector_kwargs = {"method": self.scene_method}
@@ -804,22 +804,17 @@ class QwenPipeline(BasePipeline):
         # scenes within the Qwen ASR + ForcedAligner sweet spot.
         # Tight scenes (12-48s) reduce timestamp drift and give the
         # aligner shorter, more manageable audio to align.
-        # 1.10.3 (owner W751 C9): the 12 s minimum only for a detector that joins shorter scenes to their neighbours
-        # (semantic); auditok and silero drop a scene under the minimum, with its speech, so they keep their own
-        # minimum unless the user set one.
+        # 1.10.3 (owner W808 D1, W813 Q4): the minimum for every scene detector; each joins a shorter piece to its
+        # neighbour (auditok and silero too since 1.10.3; before, they dropped it with its speech).
         if self.safe_chunking:
             max_dur = self.scene_max_override if self.scene_max_override is not None else 48
+            min_dur = self.scene_min_override if self.scene_min_override is not None else 12
             scene_detector_kwargs["max_duration"] = max_dur
-            if self.scene_min_override is not None or self.scene_method in MERGING_SCENE_DETECTORS:
-                min_dur = self.scene_min_override if self.scene_min_override is not None else 12
-                scene_detector_kwargs["min_duration"] = min_dur
-                min_text = f"{min_dur}s"
-            else:
-                min_text = "the scene detector's own"
+            scene_detector_kwargs["min_duration"] = min_dur
             logger.info(
                 "Phase 2: Safe chunking "
-                "(min=%s, max=%ss)",
-                min_text, max_dur,
+                "(min=%ss, max=%ss)",
+                min_dur, max_dur,
             )
 
         # v1.9.2 (CFF2): semantic clustering threshold, independent of safe chunking.

@@ -32,10 +32,9 @@ class AuditokSceneDetectionOptions(BaseModel):
         0.2,
         ge=0.1, le=10.0,
         description=(
-            "Minimum scene duration in seconds. NOTE: on the auditok and silero backends this is a "
-            "DISCARD filter, not a merge floor -- a region shorter than this is dropped together "
-            "with its audio. Keep it small; a scene-length floor is only enforceable on the "
-            "semantic backend, whose min_duration merges short segments into their neighbours."
+            "Shortest scene in seconds: a shorter piece is joined to its neighbour, never dropped "
+            "(since 1.10.3, owner W808 D1, W813; before, the auditok and silero backends dropped it "
+            "with its audio)."
         )
     )
     target_sr: int = Field(
@@ -186,10 +185,9 @@ class SileroSceneDetectionOptions(BaseModel):
         0.2,
         ge=0.1, le=10.0,
         description=(
-            "Minimum scene duration in seconds. NOTE: on the auditok and silero backends this is a "
-            "DISCARD filter, not a merge floor -- a region shorter than this is dropped together "
-            "with its audio. Keep it small; a scene-length floor is only enforceable on the "
-            "semantic backend, whose min_duration merges short segments into their neighbours."
+            "Shortest scene in seconds: a shorter piece is joined to its neighbour, never dropped "
+            "(since 1.10.3, owner W808 D1, W813; before, the auditok and silero backends dropped it "
+            "with its audio)."
         )
     )
     target_sr: int = Field(
@@ -451,8 +449,8 @@ class SemanticSceneDetectionOptions(BaseModel):
         20.0,
         ge=1.0, le=1200.0,
         description=(
-            "Minimum segment duration in seconds. Unlike the auditok/silero backends, this is a "
-            "real merge floor: shorter segments are merged into a neighbour, so no audio is lost."
+            "Minimum segment duration in seconds: shorter segments are merged into a neighbour, so "
+            "no audio is lost (auditok and silero do the same since 1.10.3)."
         )
     )
     max_duration: float = Field(

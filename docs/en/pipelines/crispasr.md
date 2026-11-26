@@ -138,7 +138,7 @@ Without `--merge-strategy`, two passes are combined with `pass1_primary` (in the
 | Model | Model | `--pass1-model`, `--pass2-model` | each pipeline's models, in the two tables above |
 | Speech segmenter | Speech Segmenter | `--pass1-speech-segmenter` | any; `none` sends each scene to the model whole |
 | Sensitivity | Sensitivity | `--pass1-sensitivity` | `conservative`, `balanced`, `aggressive`; default `aggressive` for Parakeet-, ReazonSpeech-, Haas- and Qwen3-ASR-CrispASR, `balanced` for the others |
-| Scene detector | Scene Detector | `--pass1-scene-detector` | `semantic` (default), `auditok`, `silero`: scenes of at most 48 s, semantic ones of at least 12 s (MOSS-CrispASR: at most 240 s, semantic ones at least 90 s); `none` (one scene per file) |
+| Scene detector | Scene Detector | `--pass1-scene-detector` | `semantic` (default), `auditok`, `silero`: scenes of normally 12 to 48 s, a shorter piece joined to its neighbour (MOSS-CrispASR: 90 to 240 s); `none` (one scene per file) |
 | Speech enhancer | Speech Enhancer | `--pass1-speech-enhancer` | `none` (default) or the speech enhancers of the other passes, for example `ffmpeg-dsp`, `zipenhancer` or `htdemucs` |
 | Enhance for VAD only | For VAD only (Speech Enhancer menu) | `--pass1-enhance-for-vad` | the cleaned audio goes to the speech segmenter only; CrispASR hears the original |
 | Detection threshold | Customize, Segmenter tab | `--pass1-vad-threshold` | 0 to 1; replaces the value the sensitivity sets |

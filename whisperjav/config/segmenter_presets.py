@@ -194,8 +194,8 @@ SINGLE_PASS_EXTERNAL_OK = {"fidelity": frozenset({"firered-vad", "ten", "whisper
 # since v1.8.11 — so the two entry points disagreed until now. Single-sourced here and
 # read by main.py, ensemble/pass_worker.py and webview_gui/api.py so they cannot drift.
 #
-# Semantic is the only backend whose min_duration MERGES short segments, which is what
-# makes a scene-length floor expressible at all; auditok and silero discard them.
+# Every backend's min_duration merges short segments into a neighbour (semantic always;
+# auditok and silero since 1.10.3, owner W808 D1, W813; before, they discarded them).
 DEFAULT_SCENE_DETECTOR = "semantic"
 
 # REMOVED in v1.9.2: BALANCED_SINGLE_PASS_EXTERNAL.

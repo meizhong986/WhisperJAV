@@ -23,8 +23,9 @@ def make(cls, tmp_path, **kwargs):
 @pytest.mark.parametrize("detector,expected", [
     (None, {"method": "semantic", "min_duration": 12, "max_duration": 48}),   # owner W214 2: the default
     ("semantic", {"method": "semantic", "min_duration": 12, "max_duration": 48}),
-    ("auditok", {"method": "auditok", "max_duration": 48}),                    # its own minimum (22.9.1)
-    ("silero", {"method": "silero", "max_duration": 48}),
+    # 1.10.3 (owner W808 D1, W813 Q4): the pipeline's minimum for auditok and silero too (they join, not drop)
+    ("auditok", {"method": "auditok", "min_duration": 12, "max_duration": 48}),
+    ("silero", {"method": "silero", "min_duration": 12, "max_duration": 48}),
     ("none", {"method": "none"}),                                              # one scene per file
 ])
 def test_the_scene_detector_settings_per_detector(tmp_path, detector, expected):
@@ -70,7 +71,7 @@ def test_analytics_only_with_semantic_scenes(tmp_path, monkeypatch, caplog):
     pipe = make(ParakeetCrispASRPipeline, tmp_path, scene_detector="auditok")
     with caplog.at_level("INFO", logger="whisperjav"):
         scenes = pipe._detect_scenes(tmp_path / "x.wav", "x", {"stages": {}})
-    assert len(scenes) == 1 and seen == [{"method": "auditok", "max_duration": 48}]
+    assert len(scenes) == 1 and seen == [{"method": "auditok", "min_duration": 12, "max_duration": 48}]
     assert ("Parakeet-CrispASR: audio analytics need the semantic scene detector; this pass uses auditok, "
             "so they are not made.") in caplog.text
 
@@ -170,6 +171,7 @@ def test_customize_seeds_the_scene_values_the_pass_runs_with(tmp_path, method):
     runs_with.pop("method")
     assert dataclasses.asdict(build({**runs_with, **result["scene"]})) == dataclasses.asdict(build(runs_with))
     assert result["scene"]["max_duration_s"] == 48 and result["scene"]["pass1_min_duration_s"] == 0.3
+    assert result["scene"]["min_duration_s"] == 12        # 1.10.3 (W813 Q4): the pass's minimum, as it runs
 
 
 class _FakeModel:
