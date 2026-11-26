@@ -192,6 +192,27 @@ def test_the_interjection_rules_keep(text):
     assert not cleanup.is_interjection_line(text)
 
 
+def test_rule_c_matches_the_same_lines_as_its_1_10_1_form():
+    """1.10.3 (owner W799 8): the rewritten rule (c) gives the 1.10.1 pattern's answer on every string of 1-6
+    characters over あ っ う ん え and one other character."""
+    import itertools
+    import re
+    old = re.compile(r"^(?:あ+っ?|うん|えっ)+$")
+    for n in range(1, 7):
+        for chars in itertools.product("あっうんえx", repeat=n):
+            s = "".join(chars)
+            assert bool(cleanup._JAPANESE_INTERJECTIONS.match(s)) == bool(old.match(s)), s
+
+
+@pytest.mark.parametrize("text", ["あ" * 75 + "�", "あ" * 40 + "ん", "ああ" * 200 + "監督"])
+def test_rule_c_is_fast_on_a_long_run_of_a(text):
+    """A long run of あ ending in another character took exponential time in the 1.10.1 pattern."""
+    import time
+    began = time.time()
+    assert not cleanup.is_interjection_line(text)
+    assert time.time() - began < 0.5
+
+
 def test_the_interjection_stage_drops_and_lists_them(tmp_path):
     entries = [("Ah.", 1.0, 1.5), ("監督、本番です。", 2.0, 3.0), ("ああああ", 3.5, 4.0), ("Honey.", 4.5, 5.0)]
     stitched, stats, count = run(tmp_path, entries, stages=cleanup.MOSS_STAGES)

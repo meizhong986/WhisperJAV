@@ -68,8 +68,11 @@ _PUNCT = re.compile(r"[\s。、！？!?.,…‥・ー〜～「」『』（）()\
 _LATIN_INTERJECTION = re.compile(r"^(?:a+h+|o+h+|u+h+|u*m+|h+m+|e+h+|ha(?:ha)*|ah+a*)$", re.I)
 _CHINESE_INTERJECTION = re.compile(r"^[啊嗯哦呃唔哈嘿呀哎噢喔嗷]+$")
 # (c) a line made only of ああ / あっ / うん / えっ, all such lines (W501 M3, W505 2 d; the Netflix reference, a
-# drama, has 7 such lines of 68).
-_JAPANESE_INTERJECTIONS = re.compile(r"^(?:あ+っ?|うん|えっ)+$")
+# drama, has 7 such lines of 68). 1.10.3 (owner W799 8): written so that each unit starts with its own character
+# (あ, う, え), so a long run of あ that ends in another character fails at once; the 1.10.1 form ^(?:あ+っ?|...)+$
+# matched the same lines but took exponential time on such a run (20 あ + ん 0.06 s, 24 + ん 0.9 s; a run of 75 あ
+# held a whole clean-up).
+_JAPANESE_INTERJECTIONS = re.compile(r"^(?:あっ?|うん|えっ)+$")
 
 
 def is_interjection_line(text: str) -> bool:
