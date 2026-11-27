@@ -105,7 +105,7 @@ def test_run_pass_worker_removes_legacy_file_when_not_keeping_temp(tmp_path, mon
     output_dir.mkdir()
     temp_dir.mkdir()
 
-    legacy_file = output_dir / "sample.ja.whisperjav.srt"
+    legacy_file = output_dir / "sample.whisperjav.ja.srt"
     _install_dummy_pipeline(monkeypatch, legacy_file)
 
     payload = WorkerPayload(
@@ -139,7 +139,7 @@ def test_run_pass_worker_removes_legacy_file_when_not_keeping_temp(tmp_path, mon
 
     run_pass_worker(payload, result_file)
 
-    pass_file = output_dir / "sample.ja.pass1.srt"
+    pass_file = output_dir / "sample.pass1.ja.srt"
     assert pass_file.exists(), "Pass-specific copy should exist"
     assert not legacy_file.exists(), "Legacy pipeline output should be removed"
     assert captured["results"][0]["srt_path"] == str(pass_file)
@@ -159,7 +159,7 @@ def test_run_pass_worker_moves_legacy_file_even_when_keeping_temp(tmp_path, monk
     output_dir.mkdir()
     temp_dir.mkdir()
 
-    legacy_file = output_dir / "sample.ja.whisperjav.srt"
+    legacy_file = output_dir / "sample.whisperjav.ja.srt"
     _install_dummy_pipeline(monkeypatch, legacy_file)
 
     payload = WorkerPayload(
@@ -189,6 +189,6 @@ def test_run_pass_worker_moves_legacy_file_even_when_keeping_temp(tmp_path, monk
 
     run_pass_worker(payload, result_file)
 
-    pass_file = output_dir / "sample.ja.pass1.srt"
+    pass_file = output_dir / "sample.pass1.ja.srt"
     assert pass_file.exists(), "Pass-specific file should exist"
     assert not legacy_file.exists(), "Legacy file should be moved (not copied), so it should not exist"

@@ -46,6 +46,7 @@ from whisperjav.crispasr.pass_settings import (ignored_hardware_message, ignored
                                                unused_settings_message)
 from whisperjav.utils.device_detector import pass_device
 from whisperjav.utils.logger import logger, quiet_library_loggers, setup_logger
+from whisperjav.utils.output_naming import pass_name, pass_side_file_name
 from whisperjav.utils.parameter_tracer import create_tracer, NullTracer
 
 from .utils import resolve_language_code
@@ -541,7 +542,7 @@ def _side_file_target(name: str, basename: str, language_code: str, pass_number:
     or None when the file is not one of this file's side files. In ``raw_subs``: ``<name>_<rest>`` becomes
     ``<name>.pass<N>.<pipeline>_<rest>`` and ``<name>.<rest>`` becomes ``<name>.pass<N>.<rest>`` (the names of
     ChronosJAV's and the GGUF passes' raw copies, crispasr/cleanup.py: file_stem); beside the subtitle file:
-    ``<name>.<lang>.whisperjav.<rest>`` becomes ``<name>.<lang>.pass<N>.<rest>``."""
+    ``<name>.whisperjav.<lang>.<rest>`` becomes ``<name>.pass<N>.<lang>.<rest>``, as the pass file itself."""
     tag = f"pass{pass_number}"
     if not name.startswith(basename):
         return None
@@ -554,10 +555,7 @@ def _side_file_target(name: str, basename: str, language_code: str, pass_number:
         if rest.startswith("."):
             return f"{basename}.{tag}{rest}"
         return None
-    prefix = f".{language_code}.whisperjav."
-    if rest.startswith(prefix) and not rest.endswith(".whisperjav.srt"):
-        return f"{basename}.{language_code}.{tag}.{rest[len(prefix):]}"
-    return None
+    return pass_side_file_name(name, basename, language_code, pass_number)
 
 
 def _move_side_files(pipeline_output_dir: Path, file_output_dir: Path, basename: str, language_code: str,
@@ -889,7 +887,7 @@ def run_pass_worker(payload: WorkerPayload, result_file: str) -> None:
                 # The pipeline no longer writes there itself (PASS_OUTPUT_FOLDER), so the folder is made here, as the
                 # XXL pass does.
                 file_output_dir.mkdir(parents=True, exist_ok=True)
-                pass_output = file_output_dir / f"{basename}.{language_code}.pass{pass_number}.srt"
+                pass_output = file_output_dir / pass_name(basename, language_code, pass_number)
 
                 if not final_srt.exists():
                     # BUG FIX: Previously this case silently fell through and marked as "completed"
@@ -1139,10 +1137,10 @@ def _run_xxl_pass(
             )
 
             # Move SRT to standard pass output location (same convention as
-            # normal pipelines: {basename}.{lang}.pass{N}.srt)
+            # normal pipelines: {basename}.pass{N}.{lang}.srt)
             file_output_dir = Path(media_info.get('output_dir', payload.output_dir))
             file_output_dir.mkdir(parents=True, exist_ok=True)
-            pass_output = file_output_dir / f"{basename}.{language_code}.pass{pass_number}.srt"
+            pass_output = file_output_dir / pass_name(basename, language_code, pass_number)
 
             if pass_output.exists():
                 pass_output.unlink()

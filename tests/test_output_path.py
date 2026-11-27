@@ -13,6 +13,8 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 import pytest
 
+from whisperjav.utils.output_naming import transcription_exists
+
 
 def _make_args(**overrides):
     """Create a minimal argparse.Namespace for testing."""
@@ -120,7 +122,7 @@ class TestSkipExistingWithSourceMode:
         video_file.touch()
 
         # Simulate existing output
-        existing_srt = video_dir / "test_video.ja.whisperjav.srt"
+        existing_srt = video_dir / "test_video.whisperjav.ja.srt"
         existing_srt.touch()
 
         output_to_source = True
@@ -133,15 +135,14 @@ class TestSkipExistingWithSourceMode:
         else:
             expected_dir = Path('./output')
 
-        expected_output = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.srt"
-        assert expected_output.exists()
+        assert transcription_exists(expected_dir, media_basename, output_lang_code)
 
     def test_skip_existing_normal_mode(self, tmp_path):
         """In normal mode, expected SRT should be in the output dir."""
         output_dir = tmp_path / "output"
         output_dir.mkdir()
 
-        existing_srt = output_dir / "test_video.ja.whisperjav.srt"
+        existing_srt = output_dir / "test_video.whisperjav.ja.srt"
         existing_srt.touch()
 
         output_to_source = False
@@ -153,8 +154,7 @@ class TestSkipExistingWithSourceMode:
         else:
             expected_dir = output_dir
 
-        expected_output = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.srt"
-        assert expected_output.exists()
+        assert transcription_exists(expected_dir, media_basename, output_lang_code)
 
     def test_skip_existing_source_mode_no_srt(self, tmp_path):
         """In source mode, if no SRT exists, should not skip."""
@@ -173,8 +173,7 @@ class TestSkipExistingWithSourceMode:
         else:
             expected_dir = Path('./output')
 
-        expected_output = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.srt"
-        assert not expected_output.exists()
+        assert not transcription_exists(expected_dir, media_basename, output_lang_code)
 
 
 class TestPipelineOutputDirOverride:

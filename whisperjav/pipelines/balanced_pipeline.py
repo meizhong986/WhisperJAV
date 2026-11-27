@@ -18,6 +18,7 @@ from whisperjav.modules.scene_detection_backends import SceneDetectorFactory
 
 from whisperjav.modules.srt_stitching import SRTStitcher
 from whisperjav.utils.logger import logger
+from whisperjav.utils.output_naming import transcription_name
 from whisperjav.utils.asr_telemetry import AsrTelemetry, resolve_telemetry_path
 from whisperjav.utils.model_refresh import DEFAULT_MODEL_REFRESH_AUDIO_MINUTES
 
@@ -728,7 +729,7 @@ class BalancedPipeline(BasePipeline):
                 self.progress_reporter.report_step("Post-processing subtitles", 6, 6)
             self.progress.set_current_step("Post-processing subtitles", 6, 6)
 
-            final_srt_path = self.output_dir / f"{media_basename}.{self.lang_code}.whisperjav.srt"
+            final_srt_path = self.output_dir / transcription_name(media_basename, self.lang_code)
             processed_srt_path, stats = self.standard_postprocessor.process(stitched_srt_path, final_srt_path)
 
             # Ensure the final SRT is in the output directory

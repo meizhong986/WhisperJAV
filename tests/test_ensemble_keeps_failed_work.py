@@ -69,7 +69,7 @@ def test_a_failed_chronosjav_file_keeps_its_save_point_and_the_working_files(tmp
 
     orch._keep_failed_pass_work(2, media, results, "ja", "qwen")
 
-    saved = Path(media[0]["path"]).parent / "clip.ja.pass2.unfinished.srt"
+    saved = Path(media[0]["path"]).parent / "clip.pass2.unfinished.ja.srt"
     assert saved.read_text(encoding="utf-8") == SRT
     entry = results[key]
     assert entry["savepoint_srt"] == str(saved) and entry["savepoint_subtitles"] == 1
@@ -213,4 +213,4 @@ def test_a_kept_folder_keeps_subtitles_and_records_but_not_the_audio(tmp_path):
     assert sorted(p.name for p in kept.rglob("*.wav")) == []
     assert (kept / "scenes" / "clip_scene_0001.srt").exists() and (kept / "clip.1.savepoint.srt").exists()
     assert (kept / "clip.1.savepoint.json").exists() and (kept / "run.log").exists()
-    assert (Path(media[0]["path"]).parent / "clip.ja.pass2.unfinished.srt").read_text(encoding="utf-8") == SRT
+    assert (Path(media[0]["path"]).parent / "clip.pass2.unfinished.ja.srt").read_text(encoding="utf-8") == SRT

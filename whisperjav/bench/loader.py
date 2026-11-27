@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from whisperjav.utils.output_naming import is_final_subtitle_name
+
 logger = logging.getLogger(__name__)
 
 
@@ -358,8 +360,8 @@ def _find_final_srt(test_dir: Path, master_metadata: dict) -> Optional[Path]:
 
     Strategy:
     1. Check srt_path / output_files.final_srt from master metadata
-    2. Search test_dir for *.ja.whisperjav.srt
-    3. Search test_dir parent for *.ja.whisperjav.srt
+    2. Search test_dir for *.whisperjav.ja.srt (or the 1.10.3 *.ja.whisperjav.srt)
+    3. Search test_dir parent the same way
     """
     # Try paths from metadata
     for key in ("srt_path", ):
@@ -378,7 +380,7 @@ def _find_final_srt(test_dir: Path, master_metadata: dict) -> Optional[Path]:
 
     # Search in test directory and parent
     for search_dir in (test_dir, test_dir.parent):
-        candidates = sorted(search_dir.glob("*.whisperjav.srt"))
+        candidates = sorted(p for p in search_dir.glob("*.srt") if is_final_subtitle_name(p.name))
         if candidates:
             return candidates[0]
 

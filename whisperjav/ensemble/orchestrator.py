@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 from whisperjav.modules.qwen_errors import NOT_STARTED, PREFIX as UNUSABLE_PREFIX
 from whisperjav.utils.logger import logger, pass_log_file
 from whisperjav.utils.metadata_manager import MetadataManager
+from whisperjav.utils.output_naming import merged_name, pass_name
 from whisperjav.utils.parameter_tracer import NullTracer
 from whisperjav.utils.progress_markers import emit_marker, transcribe_marker
 
@@ -503,7 +504,7 @@ class EnsembleOrchestrator:
                         tmp_merge = self.temp_dir / f"{basename}.merge.tmp.srt"
                         tmp_merge.parent.mkdir(parents=True, exist_ok=True)
                         file_output_dir = Path(media_info.get('output_dir', str(self.output_dir)))
-                        final_candidate = file_output_dir / f"{basename}.{lang_code}.merged.whisperjav.srt"
+                        final_candidate = file_output_dir / merged_name(basename, lang_code)
                         try:
                             merge_stats = self.merge_engine.merge(
                                 srt1_path=pass1_srt,
@@ -949,7 +950,6 @@ class EnsembleOrchestrator:
 
     # Owner W462, W463 (step 1 and C1): a pass that did not finish a file keeps what it made.
     SAVE_POINT_SUFFIX = ".savepoint.srt"   # what the pipeline writes in its temp folder (qwen_pipeline.py)
-    UNFINISHED_SUFFIX = ".unfinished.srt"  # the copy beside the video: <basename>.<lang>.pass<N>.unfinished.srt (W485)
     KEPT_DIR = "kept"
     # A kept folder keeps the subtitles, records and logs, not the audio (owner W485): the extracted audio and the scene
     # files are about 0.5 GB for a 2-hour film and can be made again. WhisperJAV's own working files only.
@@ -964,7 +964,7 @@ class EnsembleOrchestrator:
         """For each file this pass did not finish: the pass's working folder is kept under
         ``<temp>/kept/<time>_pass<N>`` (the next pass or file would reuse its name), without its audio (W485), then the
         file's last save-point, if the pipeline wrote one, is copied beside the video as
-        ``<basename>.<lang>.pass<N>.unfinished.srt``. Both are named in the file's result (``savepoint_srt``,
+        ``<basename>.pass<N>.unfinished.<lang>.srt`` (W485). Both are named in the file's result (``savepoint_srt``,
         ``savepoint_stage``, ``kept_dir``, ``save_points``) for the run summary, and in a warning now. The save-point of
         the file at position k (1, 2, ...) of the pass's list is ``<basename>.<k>.savepoint.srt`` (1.10.3, D2 1b;
         pass_worker.save_point_name)."""
@@ -1014,8 +1014,8 @@ class EnsembleOrchestrator:
                 pass
             entry['savepoint_stage'] = stage
             entry['savepoint_subtitles'] = count
-            target = (self._resolve_file_output_dir(info)
-                      / f"{basename}.{language_code}.pass{pass_number}{self.UNFINISHED_SUFFIX}")
+            target = self._resolve_file_output_dir(info) / pass_name(basename, language_code, pass_number,
+                                                                     unfinished=True)
             try:
                 shutil.copy2(saved, target)
                 entry['savepoint_srt'] = str(target)

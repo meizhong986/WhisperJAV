@@ -44,6 +44,7 @@ from whisperjav.modules.subtitle_pipeline.types import HardeningConfig, Timestam
 from whisperjav.pipelines.base_pipeline import BasePipeline
 from whisperjav.utils.device_detector import pass_device
 from whisperjav.utils.logger import logger
+from whisperjav.utils.output_naming import transcription_name
 
 # Lazy imports to avoid loading heavy modules until needed:
 #   - SceneDetectorFactory (from whisperjav.modules.scene_detection_backends)
@@ -833,7 +834,7 @@ class DecoupledPipeline(BasePipeline):
         phase8_start = time.time()
         gate.report_file()   # 1.10.3 subtitle sanitization gate (relaxed): the file's line
 
-        final_srt_path = self.output_dir / f"{media_basename}.{self.lang_code}.whisperjav.srt"
+        final_srt_path = self.output_dir / transcription_name(media_basename, self.lang_code)
 
         if num_subtitles > 0:
             shutil.copy2(stitched_srt_path, final_srt_path)
