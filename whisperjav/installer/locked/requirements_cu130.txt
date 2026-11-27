@@ -618,7 +618,7 @@ tokenizers==0.23.3
     # via
     #   faster-whisper
     #   transformers
-torch==2.11.0+cu130
+torch==2.13.0
     # via
     #   accelerate
     #   demucs
