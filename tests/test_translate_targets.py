@@ -20,12 +20,9 @@ from pathlib import Path
 
 import pytest
 
-from whisperjav.translate.output_naming import (
-    SOURCE_LANGUAGE_SUFFIXES,
-    generate_output_path,
-    strip_language_suffix,
-)
+from whisperjav.translate.output_naming import generate_output_path
 from whisperjav.translate.providers import SUPPORTED_TARGETS
+from whisperjav.utils.output_naming import LANGUAGE_CODES
 
 ROOT = Path(__file__).resolve().parents[1]
 MAIN = ROOT / "whisperjav" / "main.py"
@@ -84,37 +81,23 @@ def test_gui_dropdowns_match_supported_targets_exactly(select_id):
 
 
 # --- output naming: exercise the code, do not grep it --------------------------------
+# The full set of names is in tests/test_output_naming.py.
+
+@pytest.mark.parametrize("target", sorted(SUPPORTED_TARGETS - {"italian"}))
+def test_an_existing_translation_tag_is_replaced_not_stacked(target):
+    out = Path(generate_output_path("/media/SONE-853.translated.it.srt", target)).name
+    assert out == "SONE-853.translated.%s.srt" % LANGUAGE_CODES[target]
+
 
 @pytest.mark.parametrize("target", sorted(SUPPORTED_TARGETS))
-def test_an_existing_target_suffix_is_replaced_not_stacked(target):
+def test_a_legacy_full_name_suffix_is_replaced(target):
     out = Path(generate_output_path("/media/SONE-853.french.srt", target)).name
-    assert out == "SONE-853.%s.srt" % target
-
-
-@pytest.mark.parametrize("suffix", sorted(SOURCE_LANGUAGE_SUFFIXES))
-def test_source_language_suffixes_are_replaced(suffix):
-    out = Path(generate_output_path("/media/SONE-853.%s.srt" % suffix, "english")).name
-    assert out == "SONE-853.english.srt"
-
-
-@pytest.mark.parametrize("target", sorted(SUPPORTED_TARGETS))
-def test_every_target_survives_a_round_trip(target):
-    """Translate to X, feed the result back, translate to English."""
-    first = generate_output_path("/media/SONE-853.srt", target)
-    assert Path(first).name == "SONE-853.%s.srt" % target
-    second = generate_output_path(first, "english")
-    assert Path(second).name == "SONE-853.english.srt", (
-        "round trip through %s stacked suffixes: %s" % (target, Path(second).name))
+    assert out == "SONE-853.translated.%s.srt" % LANGUAGE_CODES[target]
 
 
 def test_an_unrelated_dotted_stem_is_left_alone():
-    assert Path(generate_output_path("/media/SONE-853.v2.srt", "english")).name \
-        == "SONE-853.v2.english.srt"
-    assert strip_language_suffix("SONE-853.v2") == "SONE-853.v2"
-
-
-def test_a_stem_with_no_dot_is_left_alone():
-    assert strip_language_suffix("SONE-853") == "SONE-853"
+    out = Path(generate_output_path("/media/SONE-853.v2.srt", "english")).name
+    assert out == "SONE-853.v2.translated.en.srt"
 
 
 # --- neither naming path may keep its own list again ---------------------------------
@@ -124,7 +107,7 @@ def test_both_naming_paths_use_the_shared_helper():
     cli_src = (TRANSLATE / "cli.py").read_text(encoding="utf-8")
     svc_src = (TRANSLATE / "service.py").read_text(encoding="utf-8")
     assert "from .output_naming import generate_output_path" in cli_src
-    assert "from .output_naming import strip_language_suffix" in svc_src
+    assert "from .output_naming import generate_output_path" in svc_src
     for src, name in ((cli_src, "cli.py"), (svc_src, "service.py")):
         assert "'japanese', 'english', 'ja', 'en', 'jp'" not in src, (
             "%s has a hand-kept language list again" % name)
