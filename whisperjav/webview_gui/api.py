@@ -88,6 +88,30 @@ def gui_log_file(output_dir: Any, inputs: List[Any]) -> Optional[Path]:
     return manifest.parent / "raw_subs" / GUI_LOG_NAME
 
 
+def describe_dropped_paths(paths: List[str]) -> List[Dict[str, Any]]:
+    """Tell the folders of a drop from its files, for `FileListManager.addDroppedFiles`.
+
+    The page only sees names, and a folder name can hold a dot (`SONE-853.1080p`).
+    A file says whether it is media, using the list the Add File(s) dialog offers.
+
+    Args:
+        paths: The full paths that were dropped.
+
+    Returns:
+        One dict per path with `path` and `is_dir`. A file also has `is_media`.
+    """
+    from whisperjav.modules.media_discovery import SUPPORTED_EXTENSIONS
+
+    entries = []
+    for path in paths:
+        if os.path.isdir(path):
+            entries.append({"path": path, "is_dir": True})
+        else:
+            is_media = Path(path).suffix.lower() in SUPPORTED_EXTENSIONS
+            entries.append({"path": path, "is_dir": False, "is_media": is_media})
+    return entries
+
+
 def _clear_gui_logs(path: Path) -> None:
     """Each GUI run replaces the last run's log files (W512 c): only the GUI's own names are removed."""
     folder = path.parent

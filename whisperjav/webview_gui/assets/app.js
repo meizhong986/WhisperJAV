@@ -690,15 +690,12 @@ const FileListManager = {
         const showDragFeedback = () => { if (fileList) fileList.classList.add('drag-over'); };
         const clearDragFeedback = () => { if (fileList) fileList.classList.remove('drag-over'); };
 
-        document.addEventListener('dragenter', (e) => {
-            e.preventDefault();
-            showDragFeedback();
-        });
-
-        document.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
-            showDragFeedback();
+        ['dragenter', 'dragover'].forEach((type) => {
+            document.addEventListener(type, (e) => {
+                e.preventDefault();
+                if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+                showDragFeedback();
+            });
         });
 
         document.addEventListener('dragleave', (e) => {
@@ -713,37 +710,27 @@ const FileListManager = {
         });
     },
 
-    // Drop filters: the AI SRT Translate tab (tab4) takes .srt, the other tabs take media.
-    SRT_EXTENSIONS: ['.srt'],
-    MEDIA_EXTENSIONS: [
-        '.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm', '.ts', '.m4v', '.mpg', '.mpeg',
-        '.mp3', '.wav', '.flac', '.m4a', '.m4b', '.aac', '.ogg', '.opus', '.wma'
-    ],
-
-    // Called by the Python drop handler in main.py with full file paths.
-    addDroppedFiles(paths) {
-        if (!Array.isArray(paths) || paths.length === 0) {
+    /**
+     * Add the items of a drop, filtered the way the Add File(s) and Add Folder buttons filter.
+     * Called by the Python drop handler in main.py, which tells folders from files and media from the rest.
+     * The AI SRT Translate tab (tab4) takes .srt files, and the other tabs take media files and folders.
+     * @param {Array<{path: string, is_dir: boolean, is_media?: boolean}>} entries - The dropped items.
+     * @returns {void}
+     */
+    addDroppedFiles(entries) {
+        if (!Array.isArray(entries) || entries.length === 0) {
             return;
         }
 
-        // Match the Add File(s) / Add Folder buttons. A path with no extension counts as a folder.
         const isSrtMode = AppState.activeTab === 'tab4';
-        const hasExt = (p, exts) => exts.some(ext => p.toLowerCase().endsWith(ext));
-        const looksLikeFolder = (p) => {
-            const last = p.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || '';
-            return !last.includes('.');
-        };
-        const isCompatible = (p) => isSrtMode
-            ? hasExt(p, this.SRT_EXTENSIONS)
-            : (hasExt(p, this.MEDIA_EXTENSIONS) || looksLikeFolder(p));
 
         let addedCount = 0;
         let duplicates = 0;
-        const rejected = [];
+        let rejected = 0;
 
-        paths.forEach(path => {
-            if (!isCompatible(path)) {
-                rejected.push(path);
+        entries.forEach(({ path, is_dir: isDir, is_media: isMedia }) => {
+            if (!(isSrtMode ? path.toLowerCase().endsWith('.srt') : (isDir || isMedia))) {
+                rejected++;
                 return;
             }
             if (!AppState.selectedFiles.includes(path)) {
@@ -763,12 +750,12 @@ const FileListManager = {
             ConsoleManager.log(`ℹ Skipped ${duplicates} duplicate(s)`, 'info');
         }
 
-        if (rejected.length > 0) {
+        if (rejected > 0) {
             const accepts = isSrtMode
                 ? '.srt subtitle files'
                 : 'video/audio files (or folders)';
             ConsoleManager.log(
-                `⚠ Ignored ${rejected.length} incompatible item(s) — the ${isSrtMode ? 'AI SRT Translate' : 'current'} tab accepts ${accepts}.`,
+                `⚠ Ignored ${rejected} incompatible item(s) — the ${isSrtMode ? 'AI SRT Translate' : 'current'} tab accepts ${accepts}.`,
                 'warning'
             );
         }

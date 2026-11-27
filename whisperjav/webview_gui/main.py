@@ -144,9 +144,10 @@ def on_drop_event(e):
     try:
         window = webview.windows[0]
         if paths:
-            # Escape backslashes for JavaScript string
-            paths_json = json.dumps(paths)
-            window.evaluate_js(f"FileListManager.addDroppedFiles({paths_json})")
+            # The page cannot tell a folder from a file, so say which is which.
+            from .api import describe_dropped_paths
+            entries_json = json.dumps(describe_dropped_paths(paths))
+            window.evaluate_js(f"FileListManager.addDroppedFiles({entries_json})")
 
         if unsupported:
             names_str = ', '.join(unsupported)
