@@ -51,6 +51,10 @@ class TestUsersOwnFilesAreNeverDeleted:
         "my_subtitles.srt",
         "SONE-853.japanese.srt",           # a subtitle the user keeps
         "SONE-853.english.srt",            # a translation WhisperJAV produced as OUTPUT
+        "SONE-853.whisperjav.ja.srt",      # a transcription, language code last
+        "SONE-853.merged.whisperjav.ja.srt",
+        "SONE-853.pass1.ja.srt",
+        "SONE-853.whisperjav.ja.translated.en.srt",
         "extracted.wav",                   # no basename prefix, not our shape
         "master.json",
         "archive_master.json.bak",

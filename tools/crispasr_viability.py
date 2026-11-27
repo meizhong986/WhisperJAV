@@ -926,7 +926,7 @@ def write_result_md(path, r):
     sr = r.get("stage_record") or {}
     if sr:
         L += ["", f"Swapped stage record: `{json.dumps(sr, ensure_ascii=False)[:1500]}`"]
-    L += ["", "Files: <clip>.ja.whisperjav.srt (final), raw_subs/ (per-group record, raw copy, artifacts), _scores/<clip>/ "
+    L += ["", "Files: <clip>.whisperjav.ja.srt (final), raw_subs/ (per-group record, raw copy, artifacts), _scores/<clip>/ "
               "(subeval), events.jsonl, run.log. Definitions: subeval/METHOD.md.", ""]
     Path(path).write_text("\n".join(L), encoding="utf-8")
 
@@ -1261,16 +1261,16 @@ def cmd_selfcheck(args):
     with open(cli / "cli.log", "w", encoding="utf-8") as log:
         code = subprocess.run(cmd, cwd=str(REPO_ROOT), stdout=log, stderr=subprocess.STDOUT).returncode
     base = run_candidate("baseline", root, clips, given_name="baseline")
-    ok, detail = same_srt(cli / f"{stem}.ja.pass1.srt", root / "baseline" / f"{stem}.ja.whisperjav.srt")
+    ok, detail = same_srt(cli / f"{stem}.pass1.ja.srt", root / "baseline" / f"{stem}.whisperjav.ja.srt")
     checks.append(("1 suite baseline = WhisperJAV command line (exit %d)" % code, ok, detail))
     # 2. The swap points change nothing but the stage
     swap = run_candidate("check-ten-swap", root, clips)
-    ok, detail = same_srt(root / "baseline" / f"{stem}.ja.whisperjav.srt", root / "check-ten-swap" / f"{stem}.ja.whisperjav.srt")
+    ok, detail = same_srt(root / "baseline" / f"{stem}.whisperjav.ja.srt", root / "check-ten-swap" / f"{stem}.whisperjav.ja.srt")
     checks.append(("2a TEN through the A2 swap point = baseline", ok, detail))
     run_candidate("wj-ffmpeg-dsp", root, clips)
     run_candidate("check-ffmpeg-dsp-swap", root, clips)
-    ok, detail = same_srt(root / "wj-ffmpeg-dsp" / f"{stem}.ja.whisperjav.srt",
-                          root / "check-ffmpeg-dsp-swap" / f"{stem}.ja.whisperjav.srt")
+    ok, detail = same_srt(root / "wj-ffmpeg-dsp" / f"{stem}.whisperjav.ja.srt",
+                          root / "check-ffmpeg-dsp-swap" / f"{stem}.whisperjav.ja.srt")
     checks.append(("2b ffmpeg-dsp through the A1 swap point = ffmpeg-dsp", ok, detail))
     # 3. One CrispASR candidate per area, end to end
     for n in args.crisp.split(","):

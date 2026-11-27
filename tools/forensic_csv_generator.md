@@ -32,7 +32,7 @@ The script reads these files from `<base_dir>`. If a file is missing, correspond
 | Path (relative to base_dir) | Purpose |
 |-----------------------------|---------|
 | `Ground-Truth-Netflix-Reference-Subs.srt` | Ground truth reference SRT |
-| `293sec-S01E04-scene4.ja.pass{N}.srt` | Final pass output (post-sanitization) |
+| `293sec-S01E04-scene4.pass{N}.ja.srt` | Final pass output (post-sanitization) |
 | `TEMP/pass{N}_worker/293sec-S01E04-scene4_stitched.srt` | Stitched SRT (pre-sanitization) |
 | `TEMP/pass{N}_worker/raw_subs/293sec-S01E04-scene4_stitched.artifacts.srt` | Sanitizer removal log |
 | `TEMP/pass{N}_worker/293sec-S01E04-scene4_master.json` | Pipeline metadata, scene list, quality metrics |

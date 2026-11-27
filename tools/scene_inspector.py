@@ -59,7 +59,7 @@ USAGE
 
     python tools/scene_inspector.py movie.mp4
     python tools/scene_inspector.py movie.mp4 --backend semantic --scene-threshold 10
-    python tools/scene_inspector.py movie.mp4 --backend auditok,semantic --speech-ratio --srt movie.ja.whisperjav.srt
+    python tools/scene_inspector.py movie.mp4 --backend auditok,semantic --speech-ratio --srt movie.whisperjav.ja.srt
     python tools/scene_inspector.py movie.mp4 --pipeline moss-crispasr --no-screenshots --markers
     python tools/scene_inspector.py movie.mp4 --pipeline moss-crispasr --backend semantic --param min_duration=90
         --param max_duration=240 --speech-segmenter firered-vad --segmenter-param max_group_duration_s=240

@@ -12,6 +12,7 @@ from whisperjav.modules.audio_extraction import AudioExtractor
 from whisperjav.modules.stable_ts_asr import StableTSASR
 from whisperjav.modules.srt_postprocessing import SRTPostProcessor
 from whisperjav.utils.logger import logger
+from whisperjav.utils.output_naming import transcription_name
 from whisperjav.utils.progress_display import DummyProgress
 from whisperjav.utils.progress_aggregator import AsyncProgressReporter
 from whisperjav.utils.parameter_tracer import NullTracer
@@ -207,7 +208,7 @@ class FasterPipeline(BasePipeline):
                 self.progress_reporter.report_step("Post-processing subtitles", 3, 3)
             self.progress.set_current_step("Post-processing subtitles", 3, 3)
 
-            final_srt_path = self.output_dir / f"{media_basename}.{self.lang_code}.whisperjav.srt"
+            final_srt_path = self.output_dir / transcription_name(media_basename, self.lang_code)
            
             # The postprocessor returns the path to the new sanitized file in the temp directory
             processed_srt, stats = self.postprocessor.process(raw_srt_path, final_srt_path)

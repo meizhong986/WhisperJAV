@@ -67,7 +67,7 @@ def _subtitle_file_key(media_info: Dict, output_dir: str) -> Tuple[str, str]:
 def same_subtitle_files(media_files: List[Dict], output_dir: str) -> Tuple[List[Dict], List[Tuple[Dict, Dict]]]:
     """Split the discovered files into those that run and those left out (1.10.3, owner W808 D2, W810, W811): a file
     is left out when an earlier file of the list would write its subtitle file into the same folder under the same
-    name (``_subtitle_file_key``); every subtitle file's name starts with that name (``<name>.<lang>.whisperjav.srt``,
+    name (``_subtitle_file_key``); every subtitle file's name starts with that name (``<name>.whisperjav.<lang>.srt``,
     the Ensemble's pass and merged files, the .vtt and translated files). The first is kept, in the order of the list.
     Files of one name in different subfolders of one input folder go to different folders (output_folder_for) and do
     not clash. Returns (kept, [(left out, the earlier file it clashes with), ...])."""

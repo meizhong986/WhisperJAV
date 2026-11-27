@@ -65,7 +65,7 @@ def test_a_folder_input_same_name_in_two_subfolders_both_run(tree):
     kept, left_out = _check(tree, ["in"], str(tree / "out"))
     assert "in/SeriesA/01.mp4" in kept and "in/SeriesB/01.mp4" in kept
     assert "in/Ep01.mp4" in kept and "in/sub/ep01.MP4" in kept
-    # x.mkv and x.mp4 write out/x.ja.whisperjav.srt: the first in the list is kept
+    # x.mkv and x.mp4 write out/x.whisperjav.ja.srt: the first in the list is kept
     assert left_out == [("in/x.mp4", "in/x.mkv")]
 
 
@@ -185,7 +185,7 @@ def _orchestrator(tmp_path, serial, failing=()):
             if Path(m["path"]).parent.name in failing:
                 out[m["path"]] = {"basename": m["basename"], "path": m["path"], "status": "failed", "error": "boom"}
                 continue
-            srt = Path(m["output_dir"]) / f"{m['basename']}.ja.pass{pass_number}.srt"
+            srt = Path(m["output_dir"]) / f"{m['basename']}.pass{pass_number}.ja.srt"
             srt.write_text(SRT_A if "SeriesA" in m["path"] else SRT_B, encoding="utf-8")
             out[m["path"]] = {"basename": m["basename"], "path": m["path"], "status": "completed",
                               "srt_path": str(srt), "subtitles": 1, "processing_time": 1.0}
@@ -209,8 +209,8 @@ def test_each_file_gets_its_own_merged_subtitles(tmp_path, serial):
     """The example of W809. Before 1.10.3's fix, unticked, SeriesA's merged file held SeriesB's subtitles."""
     results = _orchestrator(tmp_path, serial).process_batch(_two_series(tmp_path), P, P, "pass1_primary")
     assert [r["status"] for r in results] == ["completed", "completed"]
-    a = tmp_path / "out" / "SeriesA" / "01.ja.merged.whisperjav.srt"
-    b = tmp_path / "out" / "SeriesB" / "01.ja.merged.whisperjav.srt"
+    a = tmp_path / "out" / "SeriesA" / "01.merged.whisperjav.ja.srt"
+    b = tmp_path / "out" / "SeriesB" / "01.merged.whisperjav.ja.srt"
     assert a.read_text(encoding="utf-8") == SRT_A and b.read_text(encoding="utf-8") == SRT_B
     assert [r["summary"]["final_output"] for r in results] == [str(a), str(b)]
 
@@ -222,9 +222,9 @@ def test_a_failure_is_reported_for_the_file_that_failed(tmp_path, failing):
     states = {Path(r["input"]["file"]).parent.name: r["status"] for r in results}
     other = "SeriesB" if failing == "SeriesA" else "SeriesA"
     assert states == {failing: "failed", other: "completed"}
-    merged = tmp_path / "out" / other / "01.ja.merged.whisperjav.srt"
+    merged = tmp_path / "out" / other / "01.merged.whisperjav.ja.srt"
     assert merged.read_text(encoding="utf-8") == (SRT_A if other == "SeriesA" else SRT_B)
-    assert not (tmp_path / "out" / failing / "01.ja.merged.whisperjav.srt").exists()
+    assert not (tmp_path / "out" / failing / "01.merged.whisperjav.ja.srt").exists()
 
 
 def test_two_failed_chronosjav_files_of_one_name_keep_their_own_save_points(tmp_path):
@@ -243,8 +243,8 @@ def test_two_failed_chronosjav_files_of_one_name_keep_their_own_save_points(tmp_
 
     orch._keep_failed_pass_work(1, media, results, "ja", "qwen")
 
-    a = Path(media[0]["path"]).parent / "01.ja.pass1.unfinished.srt"
-    b = Path(media[1]["path"]).parent / "01.ja.pass1.unfinished.srt"
+    a = Path(media[0]["path"]).parent / "01.pass1.unfinished.ja.srt"
+    b = Path(media[1]["path"]).parent / "01.pass1.unfinished.ja.srt"
     assert a.read_text(encoding="utf-8") == SRT_A and b.read_text(encoding="utf-8") == SRT_B
     assert results[media[0]["path"]]["savepoint_srt"] == str(a)
 
@@ -282,10 +282,10 @@ def _run_worker(tmp_path, monkeypatch, media, failing=()):
             raw.mkdir(exist_ok=True)
             (raw / f"{name}_stitched.original.srt").write_text(text, encoding="utf-8")
             (raw / f"{name}.parakeet-crispasr.groups.jsonl").write_text("{}", encoding="utf-8")
-            (self.output_dir / f"{name}.ja.whisperjav.analytics.json").write_text(text, encoding="utf-8")
+            (self.output_dir / f"{name}.whisperjav.ja.analytics.json").write_text(text, encoding="utf-8")
             if Path(media_info["path"]).parent.name in failing:
                 raise RuntimeError("boom")
-            final = self.output_dir / f"{name}.ja.whisperjav.srt"
+            final = self.output_dir / f"{name}.whisperjav.ja.srt"
             final.write_text(text, encoding="utf-8")
             return {"output_files": {"final_srt": str(final)},
                     "summary": {"final_subtitles_refined": 1, "total_processing_time_seconds": 0.5}}
@@ -313,7 +313,7 @@ def _with_output_dirs(tmp_path, media):
 def test_side_files_go_to_each_files_own_folder_with_the_pass_and_a_users_file_is_untouched(tmp_path, monkeypatch):
     top = tmp_path / "out"
     top.mkdir()
-    earlier = top / "01.ja.whisperjav.srt"          # e.g. an earlier single-pass run into the same folder
+    earlier = top / "01.whisperjav.ja.srt"          # e.g. an earlier single-pass run into the same folder
     earlier.write_text("the user's earlier subtitles", encoding="utf-8")
     media = _with_output_dirs(tmp_path, _two_series(tmp_path))
 
@@ -323,14 +323,14 @@ def test_side_files_go_to_each_files_own_folder_with_the_pass_and_a_users_file_i
     assert [r["path"] for r in results] == [m["path"] for m in media]
     assert all(d == tmp_path / "temp" / "pass1_worker" / "output" for d in seen["output_dirs"])
     assert earlier.read_text(encoding="utf-8") == "the user's earlier subtitles"
-    assert not (top / "raw_subs").exists() and not (top / "01.ja.whisperjav.analytics.json").exists()
+    assert not (top / "raw_subs").exists() and not (top / "01.whisperjav.ja.analytics.json").exists()
     for series, text in (("SeriesA", SRT_A), ("SeriesB", SRT_B)):
         folder = top / series
-        assert (folder / "01.ja.pass1.srt").read_text(encoding="utf-8") == text
+        assert (folder / "01.pass1.ja.srt").read_text(encoding="utf-8") == text
         assert (folder / "raw_subs" / "01.pass1.balanced_stitched.original.srt").read_text(encoding="utf-8") == text
         assert (folder / "raw_subs" / "01.pass1.parakeet-crispasr.groups.jsonl").exists()
-        assert (folder / "01.ja.pass1.analytics.json").read_text(encoding="utf-8") == text
-        assert not (folder / "01.ja.whisperjav.srt").exists()
+        assert (folder / "01.pass1.ja.analytics.json").read_text(encoding="utf-8") == text
+        assert not (folder / "01.whisperjav.ja.srt").exists()
 
 
 def test_a_failed_files_side_files_are_set_aside_not_taken_by_the_next(tmp_path, monkeypatch):
@@ -353,8 +353,8 @@ def test_the_side_file_names():
         "01.pass1.cohere-crispasr.groups.jsonl"
     assert t("01.pass1.qwen_stitched.original.srt", "01", "ja", 1, "qwen", True) == \
         "01.pass1.qwen_stitched.original.srt"
-    assert t("01.ja.whisperjav.analytics.json", "01", "ja", 2, "qwen", False) == "01.ja.pass2.analytics.json"
-    assert t("01.ja.whisperjav.srt", "01", "ja", 2, "qwen", False) is None
+    assert t("01.whisperjav.ja.analytics.json", "01", "ja", 2, "qwen", False) == "01.pass2.ja.analytics.json"
+    assert t("01.whisperjav.ja.srt", "01", "ja", 2, "qwen", False) is None
     assert t("01 2_stitched.original.srt", "01", "ja", 1, "balanced", True) is None
 
 

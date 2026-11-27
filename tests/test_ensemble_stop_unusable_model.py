@@ -31,7 +31,7 @@ def _orchestrator(tmp_path, serial, unusable_pass, calls):
             return {m["path"]: {"status": "failed", "error": MESSAGE} for m in media_files}
         out = {}
         for m in media_files:
-            srt = tmp_path / "out" / f"{m['basename']}.ja.pass{pass_number}.srt"
+            srt = tmp_path / "out" / f"{m['basename']}.pass{pass_number}.ja.srt"
             srt.parent.mkdir(parents=True, exist_ok=True)
             srt.write_text(SRT, encoding="utf-8")
             out[m["path"]] = {"status": "completed", "srt_path": str(srt), "subtitles": 1,
@@ -79,7 +79,7 @@ def test_finish_each_file_pass_2_stops_the_later_files_get_pass_1_alone(tmp_path
     assert [(r["input"]["basename"], r["status"]) for r in results] == [
         ("a", "degraded"), ("b", "degraded"), ("c", "degraded")]
     for r in results:
-        assert r["summary"]["final_output"].endswith(f"{r['input']['basename']}.ja.pass1.srt")
+        assert r["summary"]["final_output"].endswith(f"{r['input']['basename']}.pass1.ja.srt")
         assert r["pass2"]["error"] == MESSAGE
         assert r["merge"]["status"] == "skipped"
 

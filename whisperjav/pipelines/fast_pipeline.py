@@ -16,6 +16,7 @@ from whisperjav.modules.scene_detection_backends import SceneDetectorFactory
 
 from whisperjav.modules.srt_stitching import SRTStitcher
 from whisperjav.utils.logger import logger
+from whisperjav.utils.output_naming import transcription_name
 
 from whisperjav.utils.progress_display import DummyProgress
 from whisperjav.utils.progress_aggregator import AsyncProgressReporter
@@ -388,7 +389,7 @@ class FastPipeline(BasePipeline):
                 self.progress_reporter.report_step("Post-processing final SRT", 5, 5)
             logger.info("Step 5: Post-processing final SRT")
 
-            final_srt_path = self.output_dir / f"{media_basename}.{self.lang_code}.whisperjav.srt"
+            final_srt_path = self.output_dir / transcription_name(media_basename, self.lang_code)
 
             # Capture the returned path
             processed_srt_path, stats = self.standard_postprocessor.process(stitched_srt_path, final_srt_path)

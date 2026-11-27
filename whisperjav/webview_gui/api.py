@@ -26,6 +26,7 @@ from whisperjav.utils.process_manager import (
     PSUTIL_AVAILABLE,
 )
 from whisperjav.config.qwen3_whisperseg_vad import QWEN3_WHISPERSEG_DEFAULTS
+from whisperjav.utils.output_naming import LANGUAGE_CODES, merged_name
 from whisperjav.utils.progress_markers import GUI_MARKERS_ENV, parse_progress_marker, parse_transcribe_marker
 
 
@@ -597,13 +598,7 @@ class WhisperJAVAPI:
         use_ensemble_naming = is_ensemble or mode == 'ensemble'
 
         # Map source language to ISO 639-1 code for filename
-        lang_codes = {
-            'japanese': 'ja',
-            'english': 'en',
-            'chinese': 'zh',
-            'korean': 'ko',
-        }
-        lang_code = lang_codes.get(source_language, 'ja')
+        lang_code = LANGUAGE_CODES.get(source_language, 'ja')
 
         # Detect "source" sentinel: output next to each input video
         output_to_source = isinstance(output_dir, str) and output_dir.lower().strip() == "source"
@@ -614,10 +609,10 @@ class WhisperJAVAPI:
             input_name = Path(input_path).stem
 
             # Determine output filename based on mode
-            # Ensemble mode: {basename}.{lang}.merged.whisperjav.srt
+            # Ensemble mode: {basename}.merged.whisperjav.{lang}.srt
             # Other modes: {basename}.srt (standard naming)
             if use_ensemble_naming:
-                output_name = f"{input_name}.{lang_code}.merged.whisperjav.srt"
+                output_name = merged_name(input_name, lang_code)
             else:
                 output_name = f"{input_name}.srt"
 

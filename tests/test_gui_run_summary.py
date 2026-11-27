@@ -394,11 +394,11 @@ class TestGuiLogFile:
         raw = tmp_path / "out" / "raw_subs"
         raw.mkdir(parents=True)
         for name in ("whisperjav_run.log", "whisperjav_run.pass1.log", "whisperjav_run.pass2.log",
-                     "film.ja.pass1.srt", "whisperjav_run.notes.log", "my_run.log"):
+                     "film.pass1.ja.srt", "whisperjav_run.notes.log", "my_run.log"):
             (raw / name).write_text("old", encoding="utf-8")
         assert launched.start_process(_base_options(tmp_path))["success"]
         left = sorted(p.name for p in raw.iterdir())
-        assert left == ["film.ja.pass1.srt", "my_run.log", "whisperjav_run.notes.log"]
+        assert left == ["film.pass1.ja.srt", "my_run.log", "whisperjav_run.notes.log"]
 
     def test_the_twopass_run_gets_it_too(self, launched, tmp_path):
         inp = tmp_path / "a.mp4"

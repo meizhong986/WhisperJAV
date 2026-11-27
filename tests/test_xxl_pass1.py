@@ -315,7 +315,7 @@ def test_an_xxl_pass_1_run_gets_its_model_and_the_extra_args(tmp_path, stand_in_
     extra = strip_model_args(shlex.split(_get_xxl_extra_args_from_config()))[0]
     assert call[len(call) - len(extra):] == extra or not extra
     assert f'contain "--model large-v3 ({SIDE_FILE_NAME})", which is not used. XXL runs large-v3-turbo' in log
-    assert (tmp_path / "out" / "clip.ja.pass1.srt").is_file()
+    assert (tmp_path / "out" / "clip.pass1.ja.srt").is_file()
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="the stand-in XXL is a Windows .cmd file")

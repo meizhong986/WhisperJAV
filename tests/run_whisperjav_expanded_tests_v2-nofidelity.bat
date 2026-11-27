@@ -368,11 +368,11 @@ set "CS_TESTNAME=%~2"
 set "CS_FINAL_SRT="
 
 REM Try merged output first (ensemble)
-for %%s in ("%OUTPUT_DIR%\%CS_BASENAME%.*.merged.whisperjav.srt") do set "CS_FINAL_SRT=%%~fs"
+for %%s in ("%OUTPUT_DIR%\%CS_BASENAME%.merged.whisperjav.*.srt") do set "CS_FINAL_SRT=%%~fs"
 REM Try pass1 fallback (ensemble artifacts)
-if not defined CS_FINAL_SRT for %%s in ("%OUTPUT_DIR%\%CS_BASENAME%.*.pass1.srt") do set "CS_FINAL_SRT=%%~fs"
+if not defined CS_FINAL_SRT for %%s in ("%OUTPUT_DIR%\%CS_BASENAME%.pass1.*.srt") do set "CS_FINAL_SRT=%%~fs"
 REM Try single-pass output
-if not defined CS_FINAL_SRT for %%s in ("%OUTPUT_DIR%\%CS_BASENAME%.*.whisperjav.srt") do set "CS_FINAL_SRT=%%~fs"
+if not defined CS_FINAL_SRT for %%s in ("%OUTPUT_DIR%\%CS_BASENAME%.whisperjav.*.srt") do set "CS_FINAL_SRT=%%~fs"
 
 if defined CS_FINAL_SRT (
     copy "!CS_FINAL_SRT!" "%OUTPUT_DIR%\%CS_TESTNAME%_%CS_BASENAME%.srt" >nul

@@ -27,8 +27,8 @@ def test_process_batch_handles_none_overrides(tmp_path, monkeypatch):
     # Create mock SRT files on disk — orchestrator verifies existence defensively
     out_dir = tmp_path / "out"
     out_dir.mkdir(parents=True, exist_ok=True)
-    pass1_file = out_dir / "sample.ja.pass1.srt"
-    pass2_file = out_dir / "sample.ja.pass2.srt"
+    pass1_file = out_dir / "sample.pass1.ja.srt"
+    pass2_file = out_dir / "sample.pass2.ja.srt"
     pass1_file.write_text("1\n00:00:00,000 --> 00:00:01,000\npass1\n", encoding="utf-8")
     pass2_file.write_text("1\n00:00:00,000 --> 00:00:01,000\npass2\n", encoding="utf-8")
 
@@ -67,7 +67,7 @@ def test_process_batch_handles_none_overrides(tmp_path, monkeypatch):
         merge_strategy="pass1_primary",
     )
 
-    assert results[0]["summary"]["final_output"].endswith("sample.ja.merged.whisperjav.srt")
+    assert results[0]["summary"]["final_output"].endswith("sample.merged.whisperjav.ja.srt")
     final_path = Path(results[0]["summary"]["final_output"])
     assert final_path.exists()
 
@@ -82,8 +82,8 @@ def test_process_batch_reports_merge_failure_and_summary(tmp_path, monkeypatch):
 
     out_dir = tmp_path / "out"
     out_dir.mkdir(parents=True, exist_ok=True)
-    pass1_file = out_dir / "sample.ja.pass1.srt"
-    pass2_file = out_dir / "sample.ja.pass2.srt"
+    pass1_file = out_dir / "sample.pass1.ja.srt"
+    pass2_file = out_dir / "sample.pass2.ja.srt"
     pass1_file.write_text("pass1", encoding="utf-8")
     pass2_file.write_text("pass2", encoding="utf-8")
 
@@ -120,8 +120,8 @@ def test_process_batch_reports_merge_failure_and_summary(tmp_path, monkeypatch):
     )
 
     # Merge failed → fallback to pass1 SRT as final output
-    assert results[0]["summary"]["final_output"].endswith("sample.ja.pass1.srt")
-    merged_path = out_dir / "sample.ja.merged.whisperjav.srt"
+    assert results[0]["summary"]["final_output"].endswith("sample.pass1.ja.srt")
+    merged_path = out_dir / "sample.merged.whisperjav.ja.srt"
     assert not merged_path.exists()
 
     # Summary JSON is written to temp_dir, not output_dir

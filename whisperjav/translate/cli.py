@@ -702,24 +702,30 @@ def main():
     fail_count = 0
 
     for i, input_path in enumerate(files_to_process):
-        # Determine output path for this file
-        if hasattr(args, 'output') and args.output:
-            # If explicit output provided:
-            # - If it's a directory (or looks like one): generate filename inside it
-            # - If it's a file path: use exactly what user gave (legacy single-file)
-            out_arg = Path(args.output)
-            if out_arg.is_dir() or len(files_to_process) > 1:
-                if not out_arg.exists():
-                    out_arg.mkdir(parents=True, exist_ok=True)
-                # Output filename is same as generated one but in the specified dir
-                default_name = Path(generate_output_path(str(input_path), target_lang)).name
-                output_path = out_arg / default_name
+        # Determine output path for this file. A translation that would overwrite its own
+        # input (`film.whisperjav.ja.translated.en.srt` into English) is left out.
+        try:
+            if hasattr(args, 'output') and args.output:
+                # If explicit output provided:
+                # - If it's a directory (or looks like one): generate filename inside it
+                # - If it's a file path: use exactly what user gave (legacy single-file)
+                out_arg = Path(args.output)
+                if out_arg.is_dir() or len(files_to_process) > 1:
+                    if not out_arg.exists():
+                        out_arg.mkdir(parents=True, exist_ok=True)
+                    # Output filename is same as generated one but in the specified dir
+                    default_name = Path(generate_output_path(str(input_path), target_lang)).name
+                    output_path = out_arg / default_name
+                else:
+                    # Single file mode with explicit file path
+                    output_path = out_arg
             else:
-                # Single file mode with explicit file path
-                output_path = out_arg
-        else:
-            # Auto-generate
-            output_path = Path(generate_output_path(str(input_path), target_lang))
+                # Auto-generate
+                output_path = Path(generate_output_path(str(input_path), target_lang))
+        except ValueError as e:
+            print(f"Error translating {input_path.name}: {e}", file=sys.stderr)
+            fail_count += 1
+            continue
 
         try:
             if not args.no_progress:

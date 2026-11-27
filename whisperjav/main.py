@@ -199,15 +199,7 @@ from whisperjav.translate import translate_with_config, TranslationError, Config
 
 # SRT → VTT conversion
 from whisperjav.modules.srt_postprocessing import convert_srt_to_vtt
-
-
-# Language code mapping for Whisper
-LANGUAGE_CODE_MAP = {
-    'japanese': 'ja',
-    'korean': 'ko',
-    'chinese': 'zh',
-    'english': 'en'
-}
+from whisperjav.utils.output_naming import LANGUAGE_CODES, merged_exists, transcription_exists
 
 
 # Speech-enhancement backends accepted on the CLI.  Kept in step with
@@ -1979,7 +1971,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
     if args.subs_language == 'direct-to-english':
         output_lang_code = 'en'
     else:
-        output_lang_code = LANGUAGE_CODE_MAP.get(getattr(args, 'language', 'japanese'), 'ja')
+        output_lang_code = LANGUAGE_CODES.get(getattr(args, 'language', 'japanese'), 'ja')
 
     skipped_count = 0
 
@@ -1995,10 +1987,8 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
 
             # Check if output already exists (--skip-existing)
             if getattr(args, 'skip_existing', False):
-                expected_dir = per_file_dir
-                expected_srt = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.srt"
-                expected_vtt = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.vtt"
-                if expected_srt.exists() or expected_vtt.exists():
+                # The 1.10.3 name (`film.ja.whisperjav.srt`) counts too, so older outputs are skipped.
+                if transcription_exists(per_file_dir, media_basename, output_lang_code):
                     logger.info(f"Skipping (output exists): {file_name}")
                     skipped_count += 1
                     all_stats.append({"file": file_path_str, "status": "skipped", "reason": "output_exists"})
@@ -2235,7 +2225,7 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
         verbosity = VerbosityLevel(ui_prefs.get('console_verbosity', 'summary'))
     
     # Map language name to Whisper language code
-    language_code = LANGUAGE_CODE_MAP.get(args.language, 'ja')
+    language_code = LANGUAGE_CODES.get(args.language, 'ja')
 
     # Detect "source" sentinel for async mode
     output_to_source = args.output_dir.lower().strip() == "source"
@@ -2299,9 +2289,7 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
             file_path_str = media_info.get('path', 'Unknown File')
             media_basename = media_info.get('basename', Path(file_path_str).stem)
             expected_dir = output_folder_for(media_info, args.output_dir)
-            expected_srt = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.srt"
-            expected_vtt = expected_dir / f"{media_basename}.{output_lang_code}.whisperjav.vtt"
-            if expected_srt.exists() or expected_vtt.exists():
+            if transcription_exists(expected_dir, media_basename, output_lang_code):
                 logger.info(f"Skipping (output exists): {Path(file_path_str).name}")
                 skipped_files.append(file_path_str)
             else:
@@ -2937,7 +2925,7 @@ def main():
                       "This may indicate a configuration issue.")
 
     # Map language name to Whisper language code
-    language_code = LANGUAGE_CODE_MAP.get(args.language, 'ja')
+    language_code = LANGUAGE_CODES.get(args.language, 'ja')
     logger.info(f"Transcription language: {args.language} ({language_code})")
 
     try:
@@ -3932,7 +3920,8 @@ def main():
 
             # --skip-existing (#328): filter out files whose merged output
             # already exists. Mirrors the sync/async single-pass behavior;
-            # ensemble's final artifact is <basename>.<lang>.merged.whisperjav.srt.
+            # ensemble's final artifact is <basename>.merged.whisperjav.<lang>.srt
+            # (or the 1.10.3 <basename>.<lang>.merged.whisperjav.srt).
             _all_media_files = media_files
             if getattr(args, 'skip_existing', False):
                 _out_lang = 'en' if args.subs_language == 'direct-to-english' else language_code
@@ -3941,7 +3930,7 @@ def main():
                     _src = Path(media_info.get('path', ''))
                     _base = media_info.get('basename', _src.stem)
                     _dir = output_folder_for(media_info, args.output_dir)   # 1.10.3: subfolders kept
-                    if (_dir / f"{_base}.{_out_lang}.merged.whisperjav.srt").exists():
+                    if merged_exists(_dir, _base, _out_lang):
                         logger.info(f"Skipping (merged output exists): {_src.name}")
                         outcomes.append(skipped_outcome(str(_src), "merged output already exists"))
                     else:
