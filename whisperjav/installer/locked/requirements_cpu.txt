@@ -344,7 +344,7 @@ packaging==26.3
     #   whisperjav
 pandas==3.0.5
     # via datasets
-pillow==12.3.0
+pillow==13.0.0
     # via
     #   imageio
     #   matplotlib
