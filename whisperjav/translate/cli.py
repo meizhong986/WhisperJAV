@@ -62,11 +62,10 @@ from typing import Optional
 from .providers import (PROVIDER_CONFIGS, REMOVED_LOCAL_PROVIDER, SUPPORTED_SOURCES,
                         SUPPORTED_TARGETS, removed_local_provider_error)
 from .core import translate_subtitle, _normalize_api_base, _api_base_to_custom_server, cap_batch_size_for_context, compute_max_output_tokens
-from .instructions import get_instruction_content, get_cache_dir
+from .instructions import get_cache_dir
 from .settings import load_settings, create_default_settings, show_settings, get_settings_path, resolve_config
 from .configure import configure_command
-
-import tempfile
+from .service import _resolve_instruction_file
 
 
 # Naming lives in output_naming.py so cli.py and service.py cannot drift apart again,
@@ -187,20 +186,11 @@ def resolve_instruction_file_or_content(args, merged: dict) -> Optional[str]:
     source_lang = merged.get('source', 'japanese')
     tone = merged.get('tone', 'standard')
 
-    # Get instruction content
-    instruction_content = get_instruction_content(tone=tone, refresh=False)
-
-    if instruction_content:
-        # Save to temp file
-        temp_dir = Path(tempfile.gettempdir()) / 'whisperjav_translate'
-        temp_dir.mkdir(exist_ok=True)
-        temp_file = temp_dir / f'instructions_{tone}.txt'
-
-        # Another run of the same tone may be reading this file right now.
-        from .core import write_shared_text
-        return write_shared_text(temp_file, instruction_content)
-
-    return None
+    # service.py writes the file, so the --translate step of a transcription gets the same text.
+    instruction_file = _resolve_instruction_file(tone, source_lang=source_lang)
+    if instruction_file and source_lang and source_lang.strip().lower() != 'japanese':
+        print(f"  Adapted instructions for source language: {source_lang.capitalize()}", file=sys.stderr)
+    return instruction_file
 
 
 def main():
@@ -588,8 +578,22 @@ def main():
     print(f"  Model: {model}", file=sys.stderr)
     print(f"  Source: {source_lang} -> Target: {target_lang}", file=sys.stderr)
     print(f"  Tone: {effective_tone}", file=sys.stderr)
+    # --- Advanced Settings (echoed so the GUI user can confirm they took effect) ---
     print(f"  Scene threshold: {merged.get('scene_threshold', 60.0)}s", file=sys.stderr)
     print(f"  Max batch size: {merged.get('max_batch_size', 30)}", file=sys.stderr)
+    print(f"  Max retries: {getattr(args, 'max_retries', 3)}", file=sys.stderr)
+    _rate_limit = getattr(args, 'rate_limit', None)
+    print(f"  Rate limit: {f'{_rate_limit} req/min' if _rate_limit else 'none'}", file=sys.stderr)
+    if getattr(args, 'endpoint', None):
+        print(f"  Custom endpoint: {args.endpoint}", file=sys.stderr)
+    _ctx_fields = []
+    if getattr(args, 'movie_title', None):
+        _ctx_fields.append('title')
+    if getattr(args, 'actress', None):
+        _ctx_fields.append('names')
+    if getattr(args, 'movie_plot', None):
+        _ctx_fields.append('plot')
+    print(f"  Movie context: {', '.join(_ctx_fields) if _ctx_fields else 'none'}", file=sys.stderr)
     if instruction_file:
         print(f"  Instructions: {instruction_file}", file=sys.stderr)
     print(f"  Provider options: {provider_options}", file=sys.stderr)

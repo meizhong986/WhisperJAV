@@ -196,6 +196,7 @@ from whisperjav.config.manager import ConfigManager, quick_update_ui_preference
 
 # Translation service - direct function call instead of subprocess
 from whisperjav.translate import translate_with_config, TranslationError, ConfigurationError
+from whisperjav.translate.service import source_language_of_run
 
 # SRT → VTT conversion
 from whisperjav.modules.srt_postprocessing import convert_srt_to_vtt
@@ -2082,6 +2083,7 @@ def process_files_sync(media_files: List[Dict], args: argparse.Namespace, resolv
                             tone=args.translate_tone,
                             api_key=getattr(args, 'translate_api_key', None),
                             model=getattr(args, 'translate_model', None),
+                            source_lang=source_language_of_run(args.language, args.subs_language),
                             stream=getattr(args, 'stream', False),
                             debug=getattr(args, 'debug', False),
                             extra_context=build_translation_context(args),
@@ -2421,6 +2423,7 @@ def process_files_async(media_files: List[Dict], args: argparse.Namespace, resol
                                     tone=args.translate_tone,
                                     api_key=getattr(args, 'translate_api_key', None),
                                     model=getattr(args, 'translate_model', None),
+                                    source_lang=source_language_of_run(args.language, args.subs_language),
                                     stream=getattr(args, 'stream', False),
                                     debug=getattr(args, 'debug', False),
                                     extra_context=build_translation_context(args),
@@ -4145,6 +4148,7 @@ def main():
                             tone=args.translate_tone,
                             api_key=getattr(args, 'translate_api_key', None),
                             model=getattr(args, 'translate_model', None),
+                            source_lang=source_language_of_run(args.language, args.subs_language),
                             stream=getattr(args, 'stream', False),
                             debug=getattr(args, 'debug', False),
                             extra_context=extra_context,
