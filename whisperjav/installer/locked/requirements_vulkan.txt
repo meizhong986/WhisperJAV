@@ -103,7 +103,7 @@ cycler==0.12.1
     # via matplotlib
 cython==3.3.0
     # via dynet38
-datasets==4.8.4
+datasets==5.0.1
     # via whisperjav
 decorator==5.3.1
     # via librosa
