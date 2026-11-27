@@ -207,7 +207,7 @@ set "BASE=%~1"
 set "LABEL=%~2"
 
 set "FINAL_SRT="
-for %%s in ("%OUTPUT_DIR%\%BASE%.*.whisperjav.srt") do set "FINAL_SRT=%%~fs"
+for %%s in ("%OUTPUT_DIR%\%BASE%.whisperjav.*.srt") do set "FINAL_SRT=%%~fs"
 
 if defined FINAL_SRT (
     copy "%FINAL_SRT%" "%OUTPUT_DIR%\%LABEL%_%BASE%.srt" >nul
@@ -222,5 +222,5 @@ REM ---------------------------------------------------------------------------
 REM Delete any existing whisperjav output SRTs for this basename in OUTPUT_DIR
 REM ---------------------------------------------------------------------------
 :CLEAN_BASE_OUTPUTS
-del /q "%OUTPUT_DIR%\%~1.*.whisperjav.srt" 2>nul
+del /q "%OUTPUT_DIR%\%~1.whisperjav.*.srt" 2>nul
 exit /b 0

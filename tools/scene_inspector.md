@@ -29,7 +29,7 @@ the semantic threshold flag).
 ```bash
 python tools/scene_inspector.py MOVIE.mp4
 python tools/scene_inspector.py MOVIE.mp4 --backend semantic --scene-threshold 10
-python tools/scene_inspector.py MOVIE.mp4 --backend auditok,semantic --speech-ratio --srt MOVIE.ja.whisperjav.srt
+python tools/scene_inspector.py MOVIE.mp4 --backend auditok,semantic --speech-ratio --srt MOVIE.whisperjav.ja.srt
 python tools/scene_inspector.py MOVIE.mp4 --sensitivity aggressive --no-screenshots
 python tools/scene_inspector.py --list-params auditok
 python tools/scene_inspector.py MOVIE.mp4 --pipeline moss-crispasr --no-screenshots --markers

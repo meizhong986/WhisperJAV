@@ -90,7 +90,7 @@ python tools/crispasr_viability.py selfcheck --out ROOT [--clip S01E04.Scene.1] 
 
 - **fetch:** downloads into the Hugging Face cache at the pinned commit; checks the size and SHA-256 against Hugging Face's
   listing; writes `ROOT/_fetch/<name>.json`.
-- **run:** writes `ROOT/<run>/`: `<clip>.ja.whisperjav.srt`, `raw_subs/` (the per-group record, the raw copy, the
+- **run:** writes `ROOT/<run>/`: `<clip>.whisperjav.ja.srt`, `raw_subs/` (the per-group record, the raw copy, the
   artifacts), `_scores/<clip>/` (subeval), `events.jsonl`, `run.log`, `result.json`, `result.md`. The run's folder is the
   candidate's name, `_vadtrack` added for `--track vad`; `--run-name` gives another (the baseline's repeat:
   `--run-name baseline-repeat`). Recorded: pooled CER with wrong / missing / extra, missed lines, suspected hallucination

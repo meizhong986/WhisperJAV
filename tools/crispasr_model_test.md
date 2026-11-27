@@ -169,7 +169,7 @@ All three are scored with subeval against the reference. The pooled CER is all e
 
 **The self-check (`--compare-pipeline DIR`).** It compares each group's text, and every segment, word and token
 start and end, with what the pipeline received (its `--debug` record). It compares the tool's subtitles with the
-pipeline's final SRT (`--pipeline-srt`, default `{stem}.ja.pass1.srt`): the counts, then each subtitle's text and
+pipeline's final SRT (`--pipeline-srt`, default `{stem}.pass1.ja.srt`): the counts, then each subtitle's text and
 times in order ("SRT identical" only when all agree). When the tool reproduces the shipped pipeline on the same audio, its figures for a new model
 can be trusted. Small differences can come from the audio: the pipeline cuts each group from its scene's WAV, the
 tool from the whole clip, at times rounded to 1 ms.

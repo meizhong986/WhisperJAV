@@ -78,9 +78,9 @@ ensemble_failure_rate_results/
     │   ├── command.txt    # exact whisperjav invocation
     │   ├── log.txt        # full whisperjav stdout/stderr (with --debug)
     │   ├── temp/          # whisperjav --keep-temp output (scene WAVs, intermediate SRTs)
-    │   ├── *.pass1.srt    # pass 1 output
-    │   ├── *.pass2.srt    # pass 2 output (the one we're measuring)
-    │   └── *.merged.whisperjav.srt
+    │   ├── *.pass1.*.srt    # pass 1 output
+    │   ├── *.pass2.*.srt    # pass 2 output (the one we're measuring)
+    │   └── *.merged.whisperjav.*.srt
     └── ...
 ```
 

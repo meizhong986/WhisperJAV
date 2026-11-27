@@ -374,7 +374,7 @@ def generate_forensic_csv(pass_number: int, output_path: Path, base_dir: Path):
     pass_dir = BASE_DIR / "TEMP" / f"pass{pass_number}_worker"
 
     # Final SRT
-    final_srt_path = BASE_DIR / f"{BASENAME}.ja.pass{pass_number}.srt"
+    final_srt_path = BASE_DIR / f"{BASENAME}.pass{pass_number}.ja.srt"
     final_subs = parse_srt_file(final_srt_path)
     print(f"  Pass {pass_number} final SRT: {len(final_subs)} subtitles")
 

@@ -1510,8 +1510,8 @@ def build_parser():
     m.add_argument("--groups-pipeline", default="parakeet-crispasr", help="Whose record (default parakeet-crispasr).")
     m.add_argument("--compare-pipeline", help="A WhisperJAV output folder to compare with (the self-check): its "
                                               "per-group record and its final SRT.")
-    m.add_argument("--pipeline-srt", default="{stem}.ja.pass1.srt",
-                   help="Glob of that run's final SRT, {stem} for the clip (default {stem}.ja.pass1.srt).")
+    m.add_argument("--pipeline-srt", default="{stem}.pass1.ja.srt",
+                   help="Glob of that run's final SRT, {stem} for the clip (default {stem}.pass1.ja.srt).")
     m.add_argument("--vad", help="Without --groups-from: WhisperJAV's speech segmenter, for example ten.")
     m.add_argument("--vad-like", default="parakeet-crispasr", help="Whose segmenter settings (default parakeet-crispasr).")
     m.add_argument("--piece-seconds", type=float, default=30.0, help="Without groups or VAD: pieces of at most N s.")
