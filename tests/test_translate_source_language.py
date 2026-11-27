@@ -100,3 +100,23 @@ def test_adapt_preserves_embedded_japanese_script():
 def test_adapt_empty_or_missing_is_safe():
     assert adapt_instructions_to_source_language("", "korean") == ""
     assert adapt_instructions_to_source_language(_TEMPLATE, "") == _TEMPLATE
+
+
+def test_translate_step_reads_the_run_language():
+    from whisperjav.translate.service import source_language_of_run
+
+    assert source_language_of_run("korean", "native") == "korean"
+    # Direct-to-English subtitles are already English, whatever the audio was.
+    assert source_language_of_run("korean", "direct-to-english") == "english"
+
+
+def test_translate_step_rewords_its_instructions(monkeypatch, tmp_path):
+    """The --translate step writes its own instruction file, so it must reword it too."""
+    from whisperjav.translate import service
+
+    monkeypatch.setattr(service, "get_instruction_content", lambda tone, refresh: _TEMPLATE)
+    monkeypatch.setattr(service.tempfile, "gettempdir", lambda: str(tmp_path))
+    korean = open(service._resolve_instruction_file("standard", source_lang="korean"), encoding="utf-8").read()
+    japanese = open(service._resolve_instruction_file("standard"), encoding="utf-8").read()
+    assert "Korean Adult Videos" in korean and "Japanese" not in korean
+    assert japanese == _TEMPLATE

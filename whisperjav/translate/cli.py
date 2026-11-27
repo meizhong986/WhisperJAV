@@ -62,11 +62,10 @@ from typing import Optional
 from .providers import (PROVIDER_CONFIGS, REMOVED_LOCAL_PROVIDER, SUPPORTED_SOURCES,
                         SUPPORTED_TARGETS, removed_local_provider_error)
 from .core import translate_subtitle, _normalize_api_base, _api_base_to_custom_server, cap_batch_size_for_context, compute_max_output_tokens
-from .instructions import get_instruction_content, get_cache_dir, adapt_instructions_to_source_language
+from .instructions import get_cache_dir
 from .settings import load_settings, create_default_settings, show_settings, get_settings_path, resolve_config
 from .configure import configure_command
-
-import tempfile
+from .service import _resolve_instruction_file
 
 
 # Naming lives in output_naming.py so cli.py and service.py cannot drift apart again,
@@ -187,28 +186,11 @@ def resolve_instruction_file_or_content(args, merged: dict) -> Optional[str]:
     source_lang = merged.get('source', 'japanese')
     tone = merged.get('tone', 'standard')
 
-    # Get instruction content
-    instruction_content = get_instruction_content(tone=tone, refresh=False)
-
-    if instruction_content:
-        # The default template is written for Japanese. Reword it for the selected source language.
-        instruction_content = adapt_instructions_to_source_language(instruction_content, source_lang)
-
-        # Save to a temp file named per source language, so languages don't overwrite each other.
-        safe_lang = (source_lang or 'japanese').strip().lower() or 'japanese'
-        temp_dir = Path(tempfile.gettempdir()) / 'whisperjav_translate'
-        temp_dir.mkdir(exist_ok=True)
-        temp_file = temp_dir / f'instructions_{tone}_{safe_lang}.txt'
-
-        if safe_lang != 'japanese':
-            print(f"  Adapted instructions for source language: {source_lang.capitalize()}",
-                  file=sys.stderr)
-
-        # Another run of the same tone may be reading this file right now.
-        from .core import write_shared_text
-        return write_shared_text(temp_file, instruction_content)
-
-    return None
+    # service.py writes the file, so the --translate step of a transcription gets the same text.
+    instruction_file = _resolve_instruction_file(tone, source_lang=source_lang)
+    if instruction_file and source_lang and source_lang.strip().lower() != 'japanese':
+        print(f"  Adapted instructions for source language: {source_lang.capitalize()}", file=sys.stderr)
+    return instruction_file
 
 
 def main():

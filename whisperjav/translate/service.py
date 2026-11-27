@@ -32,7 +32,7 @@ from typing import Callable, Optional
 from .providers import PROVIDER_CONFIGS, SUPPORTED_TARGETS
 from .output_naming import strip_language_suffix
 from .settings import load_settings, DEFAULT_SETTINGS
-from .instructions import get_instruction_content
+from .instructions import adapt_instructions_to_source_language, get_instruction_content
 from .core import translate_subtitle, _normalize_api_base, _api_base_to_custom_server, cap_batch_size_for_context, compute_max_output_tokens
 
 logger = logging.getLogger(__name__)
@@ -97,13 +97,28 @@ def _resolve_model(provider_config: dict, model: Optional[str] = None, settings:
     return provider_config['model']
 
 
-def _resolve_instruction_file(tone: str = "standard", refresh: bool = False) -> Optional[str]:
+def source_language_of_run(language: str, subs_language: str) -> str:
+    """Name the language of the subtitles a transcription run wrote, for its `--translate` step.
+
+    Args:
+        language: The run's `--language`, the language of the audio.
+        subs_language: The run's `--subs-language`.
+
+    Returns:
+        `english` for a Direct-to-English run, whose subtitles are already English. Otherwise `language`.
+    """
+    return "english" if subs_language == "direct-to-english" else language
+
+
+def _resolve_instruction_file(tone: str = "standard", refresh: bool = False,
+                              source_lang: str = "japanese") -> Optional[str]:
     """
     Resolve instruction file path by fetching content and caching to temp file.
 
     Args:
         tone: Translation tone ('standard' or 'pornify')
         refresh: Force refresh of cached content
+        source_lang: Source language. The default text is written for Japanese and is reworded for any other.
 
     Returns:
         Path to instruction file, or None if unavailable
@@ -113,6 +128,8 @@ def _resolve_instruction_file(tone: str = "standard", refresh: bool = False) -> 
     if not instruction_content:
         logger.debug(f"No instruction content available for tone: {tone}")
         return None
+
+    instruction_content = adapt_instructions_to_source_language(instruction_content, source_lang)
 
     # Save to temp file
     temp_dir = Path(tempfile.gettempdir()) / 'whisperjav_translate'
@@ -327,7 +344,7 @@ def translate_with_config(
             raise FileNotFoundError(f"Instruction file not found: {instruction_file}")
         resolved_instruction_file = instruction_file
     else:
-        resolved_instruction_file = _resolve_instruction_file(tone)
+        resolved_instruction_file = _resolve_instruction_file(tone, source_lang=source_lang)
 
     # Resolve processing options
     resolved_scene_threshold = scene_threshold if scene_threshold is not None else settings.get('scene_threshold', 60.0)
