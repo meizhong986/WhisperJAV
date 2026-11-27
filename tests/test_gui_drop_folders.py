@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from whisperjav.webview_gui.api import describe_dropped_paths
+from whisperjav.webview_gui.api import describe_dropped_paths, srt_files_in
 
 APP_JS = Path(__file__).resolve().parents[1] / "whisperjav" / "webview_gui" / "assets" / "app.js"
 
@@ -27,9 +27,14 @@ def drop(tmp_path):
     return {"folder": str(folder), "empty": str(empty), "video": str(video), "text": str(text)}
 
 
+def test_srt_files_in_lists_only_the_folder_itself(drop):
+    folder = Path(drop["folder"])
+    assert srt_files_in(folder) == [str(folder / "a.srt"), str(folder / "b.srt")]
+
+
 def test_folder_with_a_dot_is_a_folder(drop):
     entries = describe_dropped_paths([drop["folder"], drop["video"]])
-    assert entries[0] == {"path": drop["folder"], "is_dir": True}
+    assert entries[0] == {"path": drop["folder"], "is_dir": True, "srt_files": srt_files_in(drop["folder"])}
     assert entries[1] == {"path": drop["video"], "is_dir": False, "is_media": True}
 
 
@@ -73,8 +78,14 @@ def test_media_tab_adds_the_folder_and_the_video(drop):
 
 
 @needs_node
-def test_srt_tab_adds_srt_files_only(drop):
-    srt = str(Path(drop["folder"]) / "a.srt")
-    out = _run_drop("tab4", describe_dropped_paths([srt, drop["folder"], drop["video"]]))
-    assert out["added"] == [srt]
-    assert "warning" in out["logs"]  # the folder and the video are refused
+def test_srt_tab_adds_the_srt_files_of_a_folder(drop):
+    out = _run_drop("tab4", describe_dropped_paths([drop["folder"], drop["video"]]))
+    assert out["added"] == srt_files_in(drop["folder"])
+    assert "warning" in out["logs"]  # the video is refused
+
+
+@needs_node
+def test_srt_tab_warns_about_a_folder_without_srt_files(drop):
+    out = _run_drop("tab4", describe_dropped_paths([drop["empty"]]))
+    assert out["added"] == []
+    assert out["logs"] == ["warning"]

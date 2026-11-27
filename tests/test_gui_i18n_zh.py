@@ -141,7 +141,7 @@ NOT_UI = {
     "&amp;": "HTML entity", "&lt;": "HTML entity", "&gt;": "HTML entity",
     "Ready.": "console line (ConsoleManager.clear)",
     "SRT file(s)": "console line (Added n SRT file(s))",
-    ".srt subtitle files": "console line (Ignored n incompatible item(s))",
+    ".srt subtitle files (or folders)": "console line (Ignored n incompatible item(s))",
     "video/audio files (or folders)": "console line (Ignored n incompatible item(s))",
     "Files: {}.": "console line (ErrorHandler.showSuccess body)",
     "The run finished.": "console line (ErrorHandler.showSuccess body)",

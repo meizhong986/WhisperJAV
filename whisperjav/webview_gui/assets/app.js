@@ -713,8 +713,9 @@ const FileListManager = {
     /**
      * Add the items of a drop, filtered the way the Add File(s) and Add Folder buttons filter.
      * Called by the Python drop handler in main.py, which tells folders from files and media from the rest.
-     * The AI SRT Translate tab (tab4) takes .srt files, and the other tabs take media files and folders.
-     * @param {Array<{path: string, is_dir: boolean, is_media?: boolean}>} entries - The dropped items.
+     * The AI SRT Translate tab (tab4) takes .srt files, and a folder adds the .srt files directly inside it.
+     * The other tabs take media files and folders.
+     * @param {Array<{path: string, is_dir: boolean, srt_files?: string[], is_media?: boolean}>} entries - The dropped items.
      * @returns {void}
      */
     addDroppedFiles(entries) {
@@ -727,17 +728,23 @@ const FileListManager = {
         let addedCount = 0;
         let duplicates = 0;
         let rejected = 0;
-
-        entries.forEach(({ path, is_dir: isDir, is_media: isMedia }) => {
-            if (!(isSrtMode ? path.toLowerCase().endsWith('.srt') : (isDir || isMedia))) {
-                rejected++;
-                return;
-            }
+        const add = (path) => {
             if (!AppState.selectedFiles.includes(path)) {
                 AppState.selectedFiles.push(path);
                 addedCount++;
             } else {
                 duplicates++;
+            }
+        };
+
+        entries.forEach(({ path, is_dir: isDir, srt_files: srtFiles = [], is_media: isMedia }) => {
+            if (isDir && isSrtMode) {
+                if (srtFiles.length > 0) srtFiles.forEach(add);
+                else ConsoleManager.log(`⚠ No .srt files found in ${path}`, 'warning');
+            } else if (isSrtMode ? path.toLowerCase().endsWith('.srt') : (isDir || isMedia)) {
+                add(path);
+            } else {
+                rejected++;
             }
         });
 
@@ -752,7 +759,7 @@ const FileListManager = {
 
         if (rejected > 0) {
             const accepts = isSrtMode
-                ? '.srt subtitle files'
+                ? '.srt subtitle files (or folders)'
                 : 'video/audio files (or folders)';
             ConsoleManager.log(
                 `⚠ Ignored ${rejected} incompatible item(s) — the ${isSrtMode ? 'AI SRT Translate' : 'current'} tab accepts ${accepts}.`,

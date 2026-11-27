@@ -88,24 +88,37 @@ def gui_log_file(output_dir: Any, inputs: List[Any]) -> Optional[Path]:
     return manifest.parent / "raw_subs" / GUI_LOG_NAME
 
 
+def srt_files_in(folder: Any) -> List[str]:
+    """List the `.srt` files directly inside a folder.
+
+    Args:
+        folder: The folder to look in.
+
+    Returns:
+        The full paths, sorted. Subfolders are not searched.
+    """
+    return sorted(str(f) for f in Path(folder).glob("*.srt"))
+
+
 def describe_dropped_paths(paths: List[str]) -> List[Dict[str, Any]]:
     """Tell the folders of a drop from its files, for `FileListManager.addDroppedFiles`.
 
     The page only sees names, and a folder name can hold a dot (`SONE-853.1080p`).
+    A folder also lists its `.srt` files, which the AI SRT Translate tab adds.
     A file says whether it is media, using the list the Add File(s) dialog offers.
 
     Args:
         paths: The full paths that were dropped.
 
     Returns:
-        One dict per path with `path` and `is_dir`. A file also has `is_media`.
+        One dict per path with `path` and `is_dir`. A folder also has `srt_files`, and a file has `is_media`.
     """
     from whisperjav.modules.media_discovery import SUPPORTED_EXTENSIONS
 
     entries = []
     for path in paths:
         if os.path.isdir(path):
-            entries.append({"path": path, "is_dir": True})
+            entries.append({"path": path, "is_dir": True, "srt_files": srt_files_in(path)})
         else:
             is_media = Path(path).suffix.lower() in SUPPORTED_EXTENSIONS
             entries.append({"path": path, "is_dir": False, "is_media": is_media})
@@ -4809,8 +4822,7 @@ class WhisperJAVAPI:
         result = window.create_file_dialog(FileDialog.FOLDER)
 
         if result and len(result) > 0:
-            folder = Path(result[0])
-            srt_files = sorted(str(f) for f in folder.glob("*.srt"))
+            srt_files = srt_files_in(result[0])
             if srt_files:
                 return {"success": True, "paths": srt_files, "folder": result[0]}
             return {"success": False, "message": "No .srt files found in selected folder"}
