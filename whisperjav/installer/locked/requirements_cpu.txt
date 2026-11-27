@@ -647,7 +647,7 @@ typing-inspection==0.4.4
     # via pydantic
 tzdata==2026.3 ; sys_platform == 'emscripten' or sys_platform == 'win32'
     # via pandas
-urllib3==2.7.0
+urllib3==2.8.0
     # via
     #   modelscope
     #   modelscope-hub
