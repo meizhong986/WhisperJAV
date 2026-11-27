@@ -503,7 +503,7 @@ scipy==1.18.1
     #   scikit-learn
     #   soynlp
     #   whisperjav
-setuptools==81.0.0
+setuptools==84.1.0
     # via
     #   modelscope
     #   pysubtrans
